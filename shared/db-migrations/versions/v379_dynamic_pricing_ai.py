@@ -5,8 +5,8 @@
 
 所有表启用 RLS + FORCE ROW LEVEL SECURITY。
 
-Revision ID: v378_dynamic_pricing_ai
-Revises: v377_daily_scorecard
+Revision ID: v379_dynamic_pricing_ai
+Revises: v378_daily_scorecard
 Create Date: 2026-04-27
 """
 
@@ -14,8 +14,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v378_dynamic_pricing_ai"
-down_revision: Union[str, None] = "v377_daily_scorecard"
+revision: str = "v379_dynamic_pricing_ai"
+down_revision: Union[str, None] = "v378_daily_scorecard"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

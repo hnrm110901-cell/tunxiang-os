@@ -18,8 +18,8 @@
 
 RLS: 4条 PERMISSIVE + NULLIF + FORCE
 
-Revision ID: v380_delivery_disputes
-Revises: v379_invoice_ocr
+Revision ID: v381_delivery_disputes
+Revises: v380_invoice_ocr
 Create Date: 2026-04-27
 """
 
@@ -27,8 +27,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v380_delivery_disputes"
-down_revision: Union[str, None] = "v379_invoice_ocr"
+revision: str = "v381_delivery_disputes"
+down_revision: Union[str, None] = "v380_invoice_ocr"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

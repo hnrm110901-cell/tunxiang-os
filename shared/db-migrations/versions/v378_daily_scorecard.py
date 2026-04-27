@@ -7,8 +7,8 @@
 所有表启用 RLS + FORCE ROW LEVEL SECURITY。
 GENERATED ALWAYS AS 列由 PostgreSQL 自动计算。
 
-Revision ID: v377_daily_scorecard
-Revises: v376_customer_journey
+Revision ID: v378_daily_scorecard
+Revises: v377_customer_journey
 Create Date: 2026-04-27
 """
 
@@ -16,8 +16,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v377_daily_scorecard"
-down_revision: Union[str, None] = "v376_customer_journey"
+revision: str = "v378_daily_scorecard"
+down_revision: Union[str, None] = "v377_customer_journey"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

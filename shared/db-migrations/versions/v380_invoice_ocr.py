@@ -10,8 +10,8 @@
 
 RLS: 4条 PERMISSIVE + NULLIF + FORCE
 
-Revision ID: v379_invoice_ocr
-Revises: v378_dynamic_pricing_ai
+Revision ID: v380_invoice_ocr
+Revises: v379_dynamic_pricing_ai
 Create Date: 2026-04-27
 """
 
@@ -19,8 +19,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v379_invoice_ocr"
-down_revision: Union[str, None] = "v378_dynamic_pricing_ai"
+revision: str = "v380_invoice_ocr"
+down_revision: Union[str, None] = "v379_dynamic_pricing_ai"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

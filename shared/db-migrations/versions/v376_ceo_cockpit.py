@@ -10,8 +10,8 @@
 
 RLS：复用 v371 已有策略，本迁移只做 ALTER TABLE。
 
-Revision ID: v375_ceo_cockpit
-Revises: v374_yield_alerts
+Revision ID: v376_ceo_cockpit
+Revises: v375_yield_alerts
 Create Date: 2026-04-27
 """
 
@@ -19,8 +19,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v375_ceo_cockpit"
-down_revision: Union[str, None] = "v374_yield_alerts"
+revision: str = "v376_ceo_cockpit"
+down_revision: Union[str, None] = "v375_yield_alerts"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

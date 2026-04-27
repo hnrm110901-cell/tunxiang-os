@@ -8,16 +8,16 @@
 
 RLS：使用 v064+ 标准（NULLIF + FORCE ROW LEVEL SECURITY）
 
-Revision ID: v371_ceo_cockpit
-Revises: v370_stocktake_loss
+Revision ID: v372_ceo_cockpit
+Revises: v371_hotfix_rls_partitions_seq
 Create Date: 2026-04-27
 """
 from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v371_ceo_cockpit"
-down_revision: Union[str, None] = "v370_stocktake_loss"
+revision: str = "v372_ceo_cockpit"
+down_revision: Union[str, None] = "v371_hotfix_rls_partitions_seq"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

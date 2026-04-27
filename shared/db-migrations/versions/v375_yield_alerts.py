@@ -8,8 +8,8 @@
 
 RLS：使用 v064+ 标准（NULLIF + FORCE ROW LEVEL SECURITY）
 
-Revision ID: v374_yield_alerts
-Revises: v373_procurement_feedback
+Revision ID: v375_yield_alerts
+Revises: v374_procurement_feedback
 Create Date: 2026-04-27
 """
 
@@ -17,8 +17,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v374_yield_alerts"
-down_revision: Union[str, None] = "v373_procurement_feedback"
+revision: str = "v375_yield_alerts"
+down_revision: Union[str, None] = "v374_procurement_feedback"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

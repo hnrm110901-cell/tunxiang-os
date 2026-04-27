@@ -6,16 +6,16 @@
 
 RLS：使用 v064+ 标准（NULLIF + FORCE ROW LEVEL SECURITY）
 
-Revision ID: v372_dish_profit_enhanced
-Revises: v371_ceo_cockpit
+Revision ID: v373_dish_profit_enhanced
+Revises: v372_ceo_cockpit
 Create Date: 2026-04-27
 """
 from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v372_dish_profit_enhanced"
-down_revision: Union[str, None] = "v371_ceo_cockpit"
+revision: str = "v373_dish_profit_enhanced"
+down_revision: Union[str, None] = "v372_ceo_cockpit"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
