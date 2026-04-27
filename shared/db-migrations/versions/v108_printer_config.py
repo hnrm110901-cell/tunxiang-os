@@ -109,7 +109,9 @@ CREATE TABLE IF NOT EXISTS printer_routes (
     # 索引
     op.execute("CREATE INDEX IF NOT EXISTS idx_printer_routes_tenant_store ON printer_routes(tenant_id, store_id);")
     op.execute("CREATE INDEX IF NOT EXISTS idx_printer_routes_store_category ON printer_routes(store_id, category_id);")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_printer_routes_is_default ON printer_routes(store_id, is_default) WHERE is_default = TRUE;")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_printer_routes_is_default ON printer_routes(store_id, is_default) WHERE is_default = TRUE;"
+    )
 
     # updated_at 触发器
     op.execute("""

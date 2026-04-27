@@ -21,6 +21,7 @@ Base URL: https://api.acewill.net
 
 注意：MD5 是 API 方要求，非我方选择。
 """
+
 import asyncio
 import hashlib
 import json as _json
@@ -125,17 +126,11 @@ class AoqiweiCrmAdapter:
     """
 
     def __init__(self, config: Dict[str, Any]) -> None:
-        self.base_url = config.get(
-            "base_url", os.getenv("AOQIWEI_CRM_BASE_URL", "https://api.acewill.net")
-        )
+        self.base_url = config.get("base_url", os.getenv("AOQIWEI_CRM_BASE_URL", "https://api.acewill.net"))
         self.appid = config.get("appid", os.getenv("AOQIWEI_CRM_APPID", ""))
         self.appkey = config.get("appkey", os.getenv("AOQIWEI_CRM_APPKEY", ""))
-        self.timeout = config.get(
-            "timeout", int(os.getenv("AOQIWEI_CRM_TIMEOUT", "30"))
-        )
-        self.retry_times = config.get(
-            "retry_times", int(os.getenv("AOQIWEI_CRM_RETRY_TIMES", "3"))
-        )
+        self.timeout = config.get("timeout", int(os.getenv("AOQIWEI_CRM_TIMEOUT", "30")))
+        self.retry_times = config.get("retry_times", int(os.getenv("AOQIWEI_CRM_RETRY_TIMES", "3")))
 
         if not self.appid or not self.appkey:
             logger.warning("奥琦玮CRM appid/appkey 未配置，将使用降级模式")
@@ -204,9 +199,7 @@ class AoqiweiCrmAdapter:
                 errcode = result.get("errcode", -1)
                 if errcode != 0:
                     errmsg = result.get("errmsg", "未知错误")
-                    raise Exception(
-                        f"微生活CRM业务错误 [errcode={errcode}]: {errmsg}"
-                    )
+                    raise Exception(f"微生活CRM业务错误 [errcode={errcode}]: {errmsg}")
 
                 return result.get("res", result)
 

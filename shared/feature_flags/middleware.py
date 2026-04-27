@@ -17,6 +17,7 @@
         if is_enabled(GrowthFlags.JOURNEY_V2, ctx):
             ...
 """
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -51,20 +52,13 @@ class FeatureFlagMiddleware(BaseHTTPMiddleware):
         # 从 auth 中间件已设置的 request.state 中提取维度
         # 同时支持从 Header 直接读取（方便边缘节点/调试场景）
         context = FlagContext(
-            tenant_id=getattr(request.state, "tenant_id", None)
-            or request.headers.get("X-Tenant-ID"),
-            brand_id=getattr(request.state, "brand_id", None)
-            or request.headers.get("X-Brand-ID"),
-            region_id=getattr(request.state, "region_id", None)
-            or request.headers.get("X-Region-ID"),
-            store_id=getattr(request.state, "store_id", None)
-            or request.headers.get("X-Store-ID"),
-            role_code=getattr(request.state, "role_code", None)
-            or request.headers.get("X-Role-Code"),
-            app_version=getattr(request.state, "app_version", None)
-            or request.headers.get("X-App-Version"),
-            edge_node_group=getattr(request.state, "edge_node_group", None)
-            or request.headers.get("X-Edge-Node-Group"),
+            tenant_id=getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID"),
+            brand_id=getattr(request.state, "brand_id", None) or request.headers.get("X-Brand-ID"),
+            region_id=getattr(request.state, "region_id", None) or request.headers.get("X-Region-ID"),
+            store_id=getattr(request.state, "store_id", None) or request.headers.get("X-Store-ID"),
+            role_code=getattr(request.state, "role_code", None) or request.headers.get("X-Role-Code"),
+            app_version=getattr(request.state, "app_version", None) or request.headers.get("X-App-Version"),
+            edge_node_group=getattr(request.state, "edge_node_group", None) or request.headers.get("X-Edge-Node-Group"),
         )
 
         request.state.flag_context = context

@@ -2,11 +2,12 @@
 品智收银系统签名认证工具
 支持 MD5 签名和 HMAC-SHA256 签名
 """
+
 import hashlib
 import hmac
 import time
 from collections import OrderedDict
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 def generate_sign(token: str, params: Dict[str, Any]) -> str:
@@ -33,11 +34,7 @@ def generate_sign(token: str, params: Dict[str, Any]) -> str:
         'a1b2c3d4e5f6...'
     """
     # 1. 过滤掉sign、pageIndex、pageSize参数
-    filtered_params = {
-        k: v
-        for k, v in params.items()
-        if k not in ["sign", "pageIndex", "pageSize"] and v is not None
-    }
+    filtered_params = {k: v for k, v in params.items() if k not in ["sign", "pageIndex", "pageSize"] and v is not None}
 
     # 2. 按key排序
     ordered_params = OrderedDict(sorted(filtered_params.items()))
@@ -86,11 +83,7 @@ def pinzhi_sign(params: dict, secret: str) -> str:
         签名字符串（32位小写十六进制）
     """
     # 过滤并排序参数
-    filtered = {
-        k: v
-        for k, v in params.items()
-        if k not in ("sign", "pageIndex", "pageSize") and v is not None
-    }
+    filtered = {k: v for k, v in params.items() if k not in ("sign", "pageIndex", "pageSize") and v is not None}
     ordered = OrderedDict(sorted(filtered.items()))
     param_str = "&".join(f"{k}={v}" for k, v in ordered.items())
 

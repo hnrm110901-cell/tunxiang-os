@@ -17,14 +17,13 @@ Create Date: 2026-03-31
   此迁移与 v056/v057/v058 并行，均以 v047 为基础。
   合并后请确认 alembic heads 状态正常。
 """
-from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v060"
-down_revision: Union[str, None] = "v047"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v060"
+down_revision = "v047"
+branch_labels = None
+depends_on = None
 
 # 标准 NULLIF NULL guard 条件
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
@@ -42,25 +41,16 @@ def _apply_safe_rls(table: str) -> None:
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_select ON {table} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_insert ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_delete ON {table} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -87,10 +77,7 @@ def upgrade() -> None:
             created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_franchisees_tenant_status "
-        "ON franchisees (tenant_id, status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_franchisees_tenant_status ON franchisees (tenant_id, status)")
     _apply_safe_rls("franchisees")
 
     # ─────────────────────────────────────────────────────────────────
@@ -114,10 +101,7 @@ def upgrade() -> None:
         "CREATE INDEX IF NOT EXISTS idx_franchisee_stores_tenant_franchisee "
         "ON franchisee_stores (tenant_id, franchisee_id)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_franchisee_stores_store "
-        "ON franchisee_stores (tenant_id, store_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_franchisee_stores_store ON franchisee_stores (tenant_id, store_id)")
     _apply_safe_rls("franchisee_stores")
 
     # ─────────────────────────────────────────────────────────────────

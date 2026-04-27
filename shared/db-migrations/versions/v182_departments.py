@@ -39,22 +39,10 @@ def upgrade() -> None:
             updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_departments_tenant_parent "
-        "ON departments (tenant_id, parent_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_departments_tenant_store "
-        "ON departments (tenant_id, store_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_departments_tenant_type "
-        "ON departments (tenant_id, dept_type)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_departments_path "
-        "ON departments (path)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_departments_tenant_parent ON departments (tenant_id, parent_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_departments_tenant_store ON departments (tenant_id, store_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_departments_tenant_type ON departments (tenant_id, dept_type)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_departments_path ON departments (path)")
     op.execute("ALTER TABLE departments ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE departments FORCE ROW LEVEL SECURITY")
     op.execute("DROP POLICY IF EXISTS departments_tenant_isolation ON departments")

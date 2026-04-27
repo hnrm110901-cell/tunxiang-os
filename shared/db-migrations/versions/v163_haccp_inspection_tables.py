@@ -10,16 +10,15 @@ Revision ID: v163
 Revises: v162
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision: str = "v163"
-down_revision: Union[str, None] = "v162"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v163"
+down_revision = "v162"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
@@ -28,22 +27,13 @@ def _apply_rls(table_name: str) -> None:
     """标准三段式 RLS：ENABLE → FORCE → 四条策略"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -105,12 +95,10 @@ def upgrade() -> None:
         )
 
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_haccp_check_plans_tenant_store "
-        "ON haccp_check_plans (tenant_id, store_id)"
+        "CREATE INDEX IF NOT EXISTS ix_haccp_check_plans_tenant_store ON haccp_check_plans (tenant_id, store_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_haccp_check_plans_tenant_active "
-        "ON haccp_check_plans (tenant_id, is_active)"
+        "CREATE INDEX IF NOT EXISTS ix_haccp_check_plans_tenant_active ON haccp_check_plans (tenant_id, is_active)"
     )
     _apply_rls("haccp_check_plans")
 
@@ -164,17 +152,13 @@ def upgrade() -> None:
         )
 
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_haccp_check_records_tenant_store "
-        "ON haccp_check_records (tenant_id, store_id)"
+        "CREATE INDEX IF NOT EXISTS ix_haccp_check_records_tenant_store ON haccp_check_records (tenant_id, store_id)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_haccp_check_records_tenant_date "
         "ON haccp_check_records (tenant_id, check_date DESC)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_haccp_check_records_plan "
-        "ON haccp_check_records (plan_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_haccp_check_records_plan ON haccp_check_records (plan_id)")
     _apply_rls("haccp_check_records")
 
 

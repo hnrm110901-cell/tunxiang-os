@@ -11,9 +11,10 @@ Revision ID: v136
 Revises: v135
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v136"
 down_revision = "v135"
@@ -43,22 +44,16 @@ def upgrade() -> None:
     if "sys_dictionaries" not in _existing:
         op.create_table(
             "sys_dictionaries",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("dict_code", sa.String(50), nullable=False),
             sa.Column("dict_name", sa.String(100), nullable=False),
             sa.Column("description", sa.Text),
-            sa.Column("is_system", sa.Boolean, server_default=sa.text("false"),
-                      nullable=False),
-            sa.Column("sort_order", sa.Integer, server_default=sa.text("0"),
-                      nullable=False),
-            sa.Column("is_active", sa.Boolean, server_default=sa.text("true"),
-                      nullable=False),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("is_system", sa.Boolean, server_default=sa.text("false"), nullable=False),
+            sa.Column("sort_order", sa.Integer, server_default=sa.text("0"), nullable=False),
+            sa.Column("is_active", sa.Boolean, server_default=sa.text("true"), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         )
     op.execute("""
         DO $$ BEGIN
@@ -81,8 +76,7 @@ def upgrade() -> None:
     if "sys_dictionary_items" not in _existing:
         op.create_table(
             "sys_dictionary_items",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("dict_id", UUID(as_uuid=True), nullable=False),
             sa.Column("item_code", sa.String(50), nullable=False),
@@ -90,16 +84,11 @@ def upgrade() -> None:
             sa.Column("item_value", sa.String(200)),
             sa.Column("color", sa.String(20)),
             sa.Column("icon", sa.String(50)),
-            sa.Column("sort_order", sa.Integer, server_default=sa.text("0"),
-                      nullable=False),
-            sa.Column("is_active", sa.Boolean, server_default=sa.text("true"),
-                      nullable=False),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.ForeignKeyConstraint(["dict_id"], ["sys_dictionaries.id"],
-                                    ondelete="CASCADE"),
+            sa.Column("sort_order", sa.Integer, server_default=sa.text("0"), nullable=False),
+            sa.Column("is_active", sa.Boolean, server_default=sa.text("true"), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.ForeignKeyConstraint(["dict_id"], ["sys_dictionaries.id"], ondelete="CASCADE"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -129,21 +118,19 @@ def upgrade() -> None:
     # ── B. audit_logs 操作审计日志 ──────────────────────────────
     if "audit_logs" not in _existing:
         op.create_table(
-        "audit_logs",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("user_id", UUID(as_uuid=True)),
-        sa.Column("user_name", sa.String(100)),
-        sa.Column("action", sa.String(50), nullable=False),
-        sa.Column("resource_type", sa.String(50)),
-        sa.Column("resource_id", sa.String(100)),
-        sa.Column("changes", JSONB),
-        sa.Column("ip_address", sa.String(45)),
-        sa.Column("user_agent", sa.Text),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()"), nullable=False),
-    )
+            "audit_logs",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("user_id", UUID(as_uuid=True)),
+            sa.Column("user_name", sa.String(100)),
+            sa.Column("action", sa.String(50), nullable=False),
+            sa.Column("resource_type", sa.String(50)),
+            sa.Column("resource_id", sa.String(100)),
+            sa.Column("changes", JSONB),
+            sa.Column("ip_address", sa.String(45)),
+            sa.Column("user_agent", sa.Text),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -189,23 +176,18 @@ def upgrade() -> None:
     if "feature_flags" not in _existing:
         op.create_table(
             "feature_flags",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("flag_code", sa.String(50), nullable=False),
             sa.Column("flag_name", sa.String(100), nullable=False),
             sa.Column("description", sa.Text),
-            sa.Column("is_enabled", sa.Boolean, server_default=sa.text("false"),
-                      nullable=False),
-            sa.Column("scope", sa.String(20), server_default="all",
-                      nullable=False),
+            sa.Column("is_enabled", sa.Boolean, server_default=sa.text("false"), nullable=False),
+            sa.Column("scope", sa.String(20), server_default="all", nullable=False),
             sa.Column("scope_config", JSONB),
             sa.Column("tag", sa.String(20)),
             sa.Column("updated_by", sa.String(100)),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         )
     op.execute("""
         DO $$ BEGIN
@@ -228,24 +210,18 @@ def upgrade() -> None:
     if "gray_release_rules" not in _existing:
         op.create_table(
             "gray_release_rules",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("flag_id", UUID(as_uuid=True), nullable=False),
             sa.Column("strategy", sa.String(20), nullable=False),
             sa.Column("strategy_config", JSONB),
-            sa.Column("progress_pct", sa.Integer, server_default=sa.text("0"),
-                      nullable=False),
-            sa.Column("status", sa.String(20), server_default="draft",
-                      nullable=False),
+            sa.Column("progress_pct", sa.Integer, server_default=sa.text("0"), nullable=False),
+            sa.Column("status", sa.String(20), server_default="draft", nullable=False),
             sa.Column("start_at", sa.DateTime(timezone=True)),
             sa.Column("end_at", sa.DateTime(timezone=True)),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.ForeignKeyConstraint(["flag_id"], ["feature_flags.id"],
-                                    ondelete="CASCADE"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.ForeignKeyConstraint(["flag_id"], ["feature_flags.id"], ondelete="CASCADE"),
         )
     op.execute("""
         DO $$ BEGIN

@@ -25,14 +25,13 @@ Revision ID: v017
 Revises: v016
 Create Date: 2026-03-30
 """
-from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v017"
-down_revision: Union[str, None] = "v016"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v017"
+down_revision = "v016"
+branch_labels = None
+depends_on = None
 
 # KDS 相关表
 KDS_TABLES = ["production_depts", "dish_dept_mappings"]
@@ -59,22 +58,13 @@ def _drop_all_known_policies(table: str) -> None:
 
 def _apply_safe_rls(table: str) -> None:
     """应用 v006+ 安全 RLS：4 个策略 + NULL 防护 + FORCE。"""
-    op.execute(
-        f"CREATE POLICY {table}_rls_select ON {table} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table}_rls_insert ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table}_rls_delete ON {table} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 

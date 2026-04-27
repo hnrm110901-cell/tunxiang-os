@@ -4,6 +4,7 @@
 - 使用 Claude API 从文本中识别实体和关系
 - 降级模式：基于规则的关键词抽取
 """
+
 from __future__ import annotations
 
 import os
@@ -23,17 +24,32 @@ _TIMEOUT = 15.0
 
 # 餐饮领域实体类型
 ENTITY_TYPES = [
-    "Dish", "Ingredient", "Supplier", "Regulation",
-    "Procedure", "Equipment", "Allergen", "Certification",
-    "Season", "DishPairing",
+    "Dish",
+    "Ingredient",
+    "Supplier",
+    "Regulation",
+    "Procedure",
+    "Equipment",
+    "Allergen",
+    "Certification",
+    "Season",
+    "DishPairing",
 ]
 
 # 关系类型
 RELATIONSHIP_TYPES = [
-    "USES_INGREDIENT", "SUPPLIED_BY", "ALLERGEN_WARNING",
-    "SEASONAL_AVAILABLE", "SUBSTITUTABLE_BY", "REQUIRES_CERTIFICATION",
-    "INSPECTION_COVERS", "PAIRS_WITH", "UPSELL_WITH",
-    "REGULATED_BY", "PROCEDURE_FOR", "BELONGS_TO",
+    "USES_INGREDIENT",
+    "SUPPLIED_BY",
+    "ALLERGEN_WARNING",
+    "SEASONAL_AVAILABLE",
+    "SUBSTITUTABLE_BY",
+    "REQUIRES_CERTIFICATION",
+    "INSPECTION_COVERS",
+    "PAIRS_WITH",
+    "UPSELL_WITH",
+    "REGULATED_BY",
+    "PROCEDURE_FOR",
+    "BELONGS_TO",
 ]
 
 
@@ -108,8 +124,8 @@ async def _extract_with_llm(chunk_text: str, chunk_id: str) -> ExtractionResult 
     try:
         prompt = f"""从以下餐饮行业文本中提取实体和关系。
 
-实体类型：{', '.join(ENTITY_TYPES)}
-关系类型：{', '.join(RELATIONSHIP_TYPES)}
+实体类型：{", ".join(ENTITY_TYPES)}
+关系类型：{", ".join(RELATIONSHIP_TYPES)}
 
 文本：
 {chunk_text[:2000]}
@@ -145,8 +161,9 @@ async def _extract_with_llm(chunk_text: str, chunk_id: str) -> ExtractionResult 
 
             # 解析 JSON
             import json
+
             # 提取 JSON 块
-            json_match = re.search(r'\{[\s\S]*\}', text)
+            json_match = re.search(r"\{[\s\S]*\}", text)
             if not json_match:
                 return None
 
@@ -174,8 +191,9 @@ async def _extract_with_llm(chunk_text: str, chunk_id: str) -> ExtractionResult 
                 if r.get("from") and r.get("to") and r.get("rel_type") in RELATIONSHIP_TYPES
             ]
 
-            logger.info("graph_extract_llm_ok", chunk_id=chunk_id,
-                       entities=len(entities), relationships=len(relationships))
+            logger.info(
+                "graph_extract_llm_ok", chunk_id=chunk_id, entities=len(entities), relationships=len(relationships)
+            )
             return ExtractionResult(entities=entities, relationships=relationships, chunk_id=chunk_id)
 
     except Exception as exc:

@@ -7,6 +7,7 @@
 请求参数: appkey, front(unix时间戳), sign, 业务参数
 签名算法: 所有参数按key升序拼接 key1=value1&key2=value2 + appsecret，MD5
 """
+
 import asyncio
 import hashlib
 import json
@@ -76,8 +77,9 @@ class AoqiweiAdapter:
           orderNo, shopCode, orderDate, orderStatus, totalAmount,
           discountAmount, items (list of goodCode, goodName, qty, price)
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -85,7 +87,11 @@ class AoqiweiAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+            DishCategory,
+            OrderItemSchema,
+            OrderSchema,
+            OrderStatus,
+            OrderType,
         )
 
         _STATUS_MAP = {
@@ -101,16 +107,18 @@ class AoqiweiAdapter:
         for idx, item in enumerate(raw.get("items", []), start=1):
             unit_price = Decimal(str(item.get("price", 0))) / 100
             qty = int(item.get("qty", item.get("quantity", 1)))
-            items.append(OrderItemSchema(
-                item_id=str(item.get("orderItemNo", f"{raw.get('orderNo', '')}_{idx}")),
-                dish_id=str(item.get("goodCode", item.get("goodId", ""))),
-                dish_name=str(item.get("goodName", "")),
-                dish_category=DishCategory.MAIN_COURSE,
-                quantity=qty,
-                unit_price=unit_price,
-                subtotal=unit_price * qty,
-                special_requirements=item.get("remark"),
-            ))
+            items.append(
+                OrderItemSchema(
+                    item_id=str(item.get("orderItemNo", f"{raw.get('orderNo', '')}_{idx}")),
+                    dish_id=str(item.get("goodCode", item.get("goodId", ""))),
+                    dish_name=str(item.get("goodName", "")),
+                    dish_category=DishCategory.MAIN_COURSE,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    subtotal=unit_price * qty,
+                    special_requirements=item.get("remark"),
+                )
+            )
 
         total = Decimal(str(raw.get("totalAmount", raw.get("realAmount", 0)))) / 100
         discount = Decimal(str(raw.get("discountAmount", raw.get("specialOfferPrice", 0)))) / 100
@@ -143,8 +151,9 @@ class AoqiweiAdapter:
 
     def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str):
         """将奥琦玮原始操作数据映射为标准 StaffAction"""
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -327,9 +336,7 @@ class AoqiweiAdapter:
 
         logger.info("查询供应商", params=params)
         try:
-            return await self._request(
-                "/rechain/purchase/api/supplier/getSupplierList/", params
-            )
+            return await self._request("/rechain/purchase/api/supplier/getSupplierList/", params)
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询供应商失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
@@ -340,9 +347,7 @@ class AoqiweiAdapter:
         """查询门店列表"""
         logger.info("查询门店")
         try:
-            result = await self._request(
-                "/rechain/api/pos/v1/basic/shop/getList"
-            )
+            result = await self._request("/rechain/api/pos/v1/basic/shop/getList")
             return result if isinstance(result, list) else result.get("list", [])
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询门店失败", error=str(e), exc_info=True)
@@ -377,9 +382,7 @@ class AoqiweiAdapter:
 
         logger.info("查询库存", params=params)
         try:
-            result = await self._request(
-                "/rechain/stock/api/remain/getListV1", params
-            )
+            result = await self._request("/rechain/stock/api/remain/getListV1", params)
             return result if isinstance(result, list) else result.get("list", [])
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询库存失败，返回空列表", error=str(e), exc_info=True)
@@ -434,9 +437,7 @@ class AoqiweiAdapter:
 
         logger.info("查询配送出库单", params=params)
         try:
-            result = await self._request(
-                "/rechain/delivery/api/dispatchout/getOrderList", params
-            )
+            result = await self._request("/rechain/delivery/api/dispatchout/getOrderList", params)
             return result if isinstance(result, list) else result.get("list", [])
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询配送出库单失败", error=str(e), exc_info=True)
@@ -482,9 +483,7 @@ class AoqiweiAdapter:
 
         logger.info("查询采购入库单", params=params)
         try:
-            return await self._request(
-                "/rechain/purchase/api/depotin/getOrderList", params
-            )
+            return await self._request("/rechain/purchase/api/depotin/getOrderList", params)
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询采购入库单失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
@@ -564,9 +563,7 @@ class AoqiweiAdapter:
 
         logger.info("查询进销存报表", params=params)
         try:
-            return await self._request(
-                "/rechain/stock/api/invocingCost/getList", params
-            )
+            return await self._request("/rechain/stock/api/invocingCost/getList", params)
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询进销存报表失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0}
@@ -586,9 +583,7 @@ class AoqiweiAdapter:
 
         logger.info("货品差异分析", params=params)
         try:
-            return await self._request(
-                "/rechain/bi/api/goodDiffAnalyse/getList", params
-            )
+            return await self._request("/rechain/bi/api/goodDiffAnalyse/getList", params)
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("货品差异分析失败", error=str(e), exc_info=True)
             return {"list": []}

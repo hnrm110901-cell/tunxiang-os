@@ -21,16 +21,15 @@ Revision ID: v008
 Revises: v007
 Create Date: 2026-03-28
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
-revision: str = "v008"
-down_revision: Union[str, None] = "v007"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v008"
+down_revision = "v007"
+branch_labels = None
+depends_on = None
 
 NEW_TABLES = [
     "reservations",
@@ -52,22 +51,13 @@ def _enable_rls(table_name: str) -> None:
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
 
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def _disable_rls(table_name: str) -> None:
@@ -99,11 +89,11 @@ def upgrade() -> None:
         "reservations",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("reservation_id", sa.String(20), unique=True, nullable=False, index=True,
-                  comment="业务ID如RSV-XXXXXXXXXXXX"),
+        sa.Column(
+            "reservation_id", sa.String(20), unique=True, nullable=False, index=True, comment="业务ID如RSV-XXXXXXXXXXXX"
+        ),
         sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("confirmation_code", sa.String(10), nullable=False,
-                  comment="6位确认码"),
+        sa.Column("confirmation_code", sa.String(10), nullable=False, comment="6位确认码"),
         sa.Column("customer_name", sa.String(100), nullable=False),
         sa.Column("phone", sa.String(20), nullable=False, index=True),
         sa.Column("type", sa.String(20), nullable=False, server_default="regular"),
@@ -153,8 +143,7 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("phone", sa.String(20), nullable=False, index=True),
-        sa.Column("reservation_id", sa.String(20), nullable=False,
-                  comment="关联预订业务ID"),
+        sa.Column("reservation_id", sa.String(20), nullable=False, comment="关联预订业务ID"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
@@ -168,8 +157,7 @@ def upgrade() -> None:
         "queue_entries",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column("queue_id", sa.String(20), unique=True, nullable=False, index=True,
-                  comment="业务ID如Q-XXXXXXXXXXXX"),
+        sa.Column("queue_id", sa.String(20), unique=True, nullable=False, index=True, comment="业务ID如Q-XXXXXXXXXXXX"),
         sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True),
         sa.Column("queue_number", sa.String(10), nullable=False, comment="排队号如A001"),
         sa.Column("prefix", sa.String(1), nullable=False, comment="桌型前缀A/B/C"),
@@ -181,8 +169,7 @@ def upgrade() -> None:
         sa.Column("vip_priority", sa.Boolean, nullable=False, server_default="false"),
         sa.Column("reservation_id", sa.String(20), comment="关联预订业务ID"),
         sa.Column("status", sa.String(20), nullable=False, server_default="waiting", index=True),
-        sa.Column("priority_ts", sa.String(50), nullable=False,
-                  comment="优先级时间戳(VIP前移)"),
+        sa.Column("priority_ts", sa.String(50), nullable=False, comment="优先级时间戳(VIP前移)"),
         # 时间线
         sa.Column("taken_at", sa.String(50), nullable=False),
         sa.Column("called_at", sa.String(50)),
@@ -206,8 +193,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_queue_store_date", "queue_entries", ["store_id", "date"])
     op.create_index("idx_queue_store_status", "queue_entries", ["store_id", "status"])
-    op.create_index("idx_queue_store_date_prefix", "queue_entries",
-                    ["store_id", "date", "prefix"])
+    op.create_index("idx_queue_store_date_prefix", "queue_entries", ["store_id", "date", "prefix"])
 
     # =========================================================================
     # queue_counters — 排队号当日计数器
@@ -225,8 +211,7 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
     )
     # 修复: 唯一约束必须包含 tenant_id，否则不同租户的计数器会冲突
-    op.create_index("uq_queue_counter", "queue_counters",
-                    ["tenant_id", "store_id", "date", "prefix"], unique=True)
+    op.create_index("uq_queue_counter", "queue_counters", ["tenant_id", "store_id", "date", "prefix"], unique=True)
 
     # =========================================================================
     # Enable RLS on all new tables

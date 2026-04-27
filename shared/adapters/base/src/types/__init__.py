@@ -5,32 +5,32 @@
 不跟随任何一家三方系统的字段定义。
 """
 
+from .bill import UnifiedBill
+from .customer import UnifiedCustomer
+from .dish import UnifiedDish, UnifiedDishMethod, UnifiedSetMeal
 from .enums import (
-    ReservationStatus,
-    OrderStatus,
-    OrderType,
-    ReservationType,
-    TableType,
-    TableStatus,
-    MealPeriod,
-    PaymentMethod,
     ChannelSource,
-    Gender,
     CustomerLevel,
     DishCategory,
+    Gender,
+    MealPeriod,
+    OrderStatus,
+    OrderType,
+    PaymentMethod,
+    ReservationStatus,
+    ReservationType,
+    TableStatus,
+    TableType,
 )
-from .reservation import (
-    UnifiedReservation,
-    ReservationStats,
-    CreateReservationRequest,
-)
-from .customer import UnifiedCustomer
-from .table import UnifiedTable
-from .order import UnifiedOrder, UnifiedOrderItem
-from .bill import UnifiedBill
-from .dish import UnifiedDish, UnifiedDishMethod, UnifiedSetMeal
 from .inventory import UnifiedIngredient, UnifiedInventoryRecord
-from .supplier import UnifiedSupplier, UnifiedPurchaseOrder
+from .order import UnifiedOrder, UnifiedOrderItem
+from .reservation import (
+    CreateReservationRequest,
+    ReservationStats,
+    UnifiedReservation,
+)
+from .supplier import UnifiedPurchaseOrder, UnifiedSupplier
+from .table import UnifiedTable
 
 __all__ = [
     # Enums

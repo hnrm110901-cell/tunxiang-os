@@ -1,8 +1,9 @@
 """屯象OS Skill Router — 事件→Skill 确定性路由引擎"""
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .registry import SkillRegistry
 from .schemas import EventTrigger, SkillManifest
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SkillMatch:
     """路由命中结果"""
+
     skill: SkillManifest
     trigger: EventTrigger
     priority: int
@@ -160,8 +162,9 @@ class SkillRouter:
             return actual is False or actual == "false"
 
         # 字符串值（带引号）
-        if (raw_expected.startswith("'") and raw_expected.endswith("'")) or \
-           (raw_expected.startswith('"') and raw_expected.endswith('"')):
+        if (raw_expected.startswith("'") and raw_expected.endswith("'")) or (
+            raw_expected.startswith('"') and raw_expected.endswith('"')
+        ):
             expected_str = raw_expected[1:-1]
             return str(actual) == expected_str
 
@@ -180,7 +183,7 @@ class SkillRouter:
         try:
             in_idx = condition.index(" in ")
             field_path = condition[:in_idx].strip()
-            list_str = condition[in_idx + 4:].strip()
+            list_str = condition[in_idx + 4 :].strip()
 
             actual = self._get_payload_value(field_path, payload)
 

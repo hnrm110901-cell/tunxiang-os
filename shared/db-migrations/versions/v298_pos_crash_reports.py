@@ -14,11 +14,12 @@ Revision ID: v260
 Revises: v259
 Create Date: 2026-04-18
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision = "v260"
+revision = "v298"
 down_revision = "v259"
 branch_labels = None
 depends_on = None
@@ -32,21 +33,14 @@ def upgrade() -> None:
     if "pos_crash_reports" not in existing:
         op.create_table(
             "pos_crash_reports",
-            sa.Column("report_id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("report_id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-            sa.Column("store_id", UUID(as_uuid=True), nullable=True,
-                      comment="关联 stores.id，可空（登录前崩溃）"),
-            sa.Column("device_id", sa.Text, nullable=False,
-                      comment="POS 设备指纹/序列号，限流维度"),
-            sa.Column("route", sa.Text, nullable=True,
-                      comment="崩溃时前端路由（如 /cashier/checkout）"),
-            sa.Column("error_stack", sa.Text, nullable=True,
-                      comment="错误堆栈（前端 window.onerror 捕获）"),
-            sa.Column("user_action", sa.Text, nullable=True,
-                      comment="崩溃前最后一个用户动作摘要"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column("store_id", UUID(as_uuid=True), nullable=True, comment="关联 stores.id，可空（登录前崩溃）"),
+            sa.Column("device_id", sa.Text, nullable=False, comment="POS 设备指纹/序列号，限流维度"),
+            sa.Column("route", sa.Text, nullable=True, comment="崩溃时前端路由（如 /cashier/checkout）"),
+            sa.Column("error_stack", sa.Text, nullable=True, comment="错误堆栈（前端 window.onerror 捕获）"),
+            sa.Column("user_action", sa.Text, nullable=True, comment="崩溃前最后一个用户动作摘要"),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
         )
         op.create_index(
             "ix_pos_crash_reports_tenant_created",

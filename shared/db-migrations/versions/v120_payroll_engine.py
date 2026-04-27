@@ -9,9 +9,10 @@ Revision ID: v120
 Revises: v119
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v120"
 down_revision = "v119"
@@ -28,42 +29,40 @@ def upgrade() -> None:
     if "payroll_configs" not in _existing:
         op.create_table(
             "payroll_configs",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-            sa.Column("store_id", UUID(as_uuid=True), nullable=True,
-                      comment="NULL 表示品牌级默认配置"),
-            sa.Column("employee_role", sa.String(30), nullable=False,
-                      comment="cashier/chef/waiter/manager"),
+            sa.Column("store_id", UUID(as_uuid=True), nullable=True, comment="NULL 表示品牌级默认配置"),
+            sa.Column("employee_role", sa.String(30), nullable=False, comment="cashier/chef/waiter/manager"),
             # 底薪 / 时薪（二选一）
-            sa.Column("base_salary_fen", sa.Integer, nullable=True,
-                      comment="月薪（分），与 hourly_rate_fen 二选一"),
-            sa.Column("hourly_rate_fen", sa.Integer, nullable=True,
-                      comment="时薪（分），与 base_salary_fen 二选一"),
-            sa.Column("salary_type", sa.String(20), nullable=False,
-                      server_default="'monthly'",
-                      comment="monthly/hourly/piecework"),
+            sa.Column("base_salary_fen", sa.Integer, nullable=True, comment="月薪（分），与 hourly_rate_fen 二选一"),
+            sa.Column("hourly_rate_fen", sa.Integer, nullable=True, comment="时薪（分），与 base_salary_fen 二选一"),
+            sa.Column(
+                "salary_type",
+                sa.String(20),
+                nullable=False,
+                server_default="'monthly'",
+                comment="monthly/hourly/piecework",
+            ),
             # 计件工资
-            sa.Column("piecework_unit", sa.String(30), nullable=True,
-                      comment="per_order/per_dish/per_table"),
-            sa.Column("piecework_rate_fen", sa.Integer, nullable=True,
-                      comment="每计件单位工资（分）"),
+            sa.Column("piecework_unit", sa.String(30), nullable=True, comment="per_order/per_dish/per_table"),
+            sa.Column("piecework_rate_fen", sa.Integer, nullable=True, comment="每计件单位工资（分）"),
             # 提成配置
-            sa.Column("commission_type", sa.String(20), nullable=False,
-                      server_default="'none'",
-                      comment="none/fixed/percentage"),
-            sa.Column("commission_rate", sa.Numeric(6, 4), nullable=True,
-                      comment="提成比例，如 0.0500 = 5%"),
-            sa.Column("commission_base", sa.String(20), nullable=True,
-                      comment="revenue/profit/tips"),
+            sa.Column(
+                "commission_type",
+                sa.String(20),
+                nullable=False,
+                server_default="'none'",
+                comment="none/fixed/percentage",
+            ),
+            sa.Column("commission_rate", sa.Numeric(6, 4), nullable=True, comment="提成比例，如 0.0500 = 5%"),
+            sa.Column("commission_base", sa.String(20), nullable=True, comment="revenue/profit/tips"),
             # 绩效奖金上限
-            sa.Column("kpi_bonus_max_fen", sa.Integer, nullable=False,
-                      server_default="0",
-                      comment="月最高绩效奖金（分）"),
+            sa.Column(
+                "kpi_bonus_max_fen", sa.Integer, nullable=False, server_default="0", comment="月最高绩效奖金（分）"
+            ),
             # 有效期
             sa.Column("effective_from", sa.Date, nullable=False),
-            sa.Column("effective_to", sa.Date, nullable=True,
-                      comment="NULL 表示永久有效"),
+            sa.Column("effective_to", sa.Date, nullable=True, comment="NULL 表示永久有效"),
             sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
@@ -97,8 +96,7 @@ def upgrade() -> None:
     if "payroll_records" not in _existing:
         op.create_table(
             "payroll_records",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("employee_id", UUID(as_uuid=True), nullable=False),
@@ -110,25 +108,29 @@ def upgrade() -> None:
             sa.Column("commission_fen", sa.Integer, nullable=False, server_default="0"),
             sa.Column("piecework_pay_fen", sa.Integer, nullable=False, server_default="0"),
             sa.Column("kpi_bonus_fen", sa.Integer, nullable=False, server_default="0"),
-            sa.Column("deduction_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="考勤扣款合计（分，正数）"),
+            sa.Column(
+                "deduction_fen", sa.Integer, nullable=False, server_default="0", comment="考勤扣款合计（分，正数）"
+            ),
             # 计算汇总（分）
-            sa.Column("gross_pay_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="应发=base+overtime+commission+piecework+kpi-deduction"),
+            sa.Column(
+                "gross_pay_fen",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
+                comment="应发=base+overtime+commission+piecework+kpi-deduction",
+            ),
             sa.Column("tax_fen", sa.Integer, nullable=False, server_default="0"),
-            sa.Column("net_pay_fen", sa.Integer, nullable=False, server_default="0",
-                      comment="实发=gross-tax"),
+            sa.Column("net_pay_fen", sa.Integer, nullable=False, server_default="0", comment="实发=gross-tax"),
             # 状态机
-            sa.Column("status", sa.String(20), nullable=False, server_default="'draft'",
-                      comment="draft/approved/paid/voided"),
+            sa.Column(
+                "status", sa.String(20), nullable=False, server_default="'draft'", comment="draft/approved/paid/voided"
+            ),
             sa.Column("approved_by", sa.String(100), nullable=True),
             sa.Column("approved_at", sa.TIMESTAMP(timezone=True), nullable=True),
-            sa.Column("payment_method", sa.String(20), nullable=True,
-                      comment="bank/cash/alipay/wechat"),
+            sa.Column("payment_method", sa.String(20), nullable=True, comment="bank/cash/alipay/wechat"),
             sa.Column("notes", sa.Text, nullable=True),
             # 扩展明细（计算快照）
-            sa.Column("calc_snapshot", JSONB, nullable=True,
-                      comment="计算过程快照，含出勤/加班/绩效原始数据"),
+            sa.Column("calc_snapshot", JSONB, nullable=True, comment="计算过程快照，含出勤/加班/绩效原始数据"),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
@@ -198,21 +200,19 @@ def upgrade() -> None:
     if "payroll_line_items" not in _existing:
         op.create_table(
             "payroll_line_items",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-            sa.Column("record_id", UUID(as_uuid=True), nullable=False,
-                      comment="FK → payroll_records.id"),
-            sa.Column("item_type", sa.String(30), nullable=False,
-                      comment="base/overtime/commission/piecework/kpi/deduction/tax"),
-            sa.Column("item_name", sa.String(100), nullable=False,
-                      comment="员工可见的显示名称"),
-            sa.Column("amount_fen", sa.Integer, nullable=False,
-                      comment="金额（分），正数=收入，负数=扣除"),
-            sa.Column("quantity", sa.Numeric(10, 2), nullable=True,
-                      comment="件数/小时数 等数量"),
-            sa.Column("unit_price_fen", sa.Integer, nullable=True,
-                      comment="单价（分/件 或 分/小时）"),
+            sa.Column("record_id", UUID(as_uuid=True), nullable=False, comment="FK → payroll_records.id"),
+            sa.Column(
+                "item_type",
+                sa.String(30),
+                nullable=False,
+                comment="base/overtime/commission/piecework/kpi/deduction/tax",
+            ),
+            sa.Column("item_name", sa.String(100), nullable=False, comment="员工可见的显示名称"),
+            sa.Column("amount_fen", sa.Integer, nullable=False, comment="金额（分），正数=收入，负数=扣除"),
+            sa.Column("quantity", sa.Numeric(10, 2), nullable=True, comment="件数/小时数 等数量"),
+            sa.Column("unit_price_fen", sa.Integer, nullable=True, comment="单价（分/件 或 分/小时）"),
             sa.Column("notes", sa.Text, nullable=True),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
         )

@@ -4,27 +4,28 @@
 
 v2: 注入 MeituanClient 替换 mock，真实 API 调用。
 """
-from decimal import Decimal
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-import structlog
-import httpx
-import hashlib
-import json
 
-from .client import MeituanClient, MeituanAPIError
+import hashlib
+from datetime import datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import httpx
+import structlog
+
+from .client import MeituanAPIError, MeituanClient
 
 logger = structlog.get_logger()
 
 # 美团外卖订单状态码 → 内部状态
 MEITUAN_STATUS_MAP: Dict[int, str] = {
-    1: "pending",       # 待接单
-    2: "confirmed",     # 已接单
-    3: "preparing",     # 备餐中
-    4: "delivering",    # 配送中
-    5: "completed",     # 已完成
-    6: "cancelled",     # 已取消
-    8: "refunded",      # 已退款
+    1: "pending",  # 待接单
+    2: "confirmed",  # 已接单
+    3: "preparing",  # 备餐中
+    4: "delivering",  # 配送中
+    5: "completed",  # 已完成
+    6: "cancelled",  # 已取消
+    8: "refunded",  # 已退款
 }
 
 # 美团 dish_id → 屯象 dish_id 映射缓存（运行时从数据库/配置加载）
@@ -326,14 +327,16 @@ class MeituanSaasAdapter:
         for food in food_list:
             mt_food_code = str(food.get("app_food_code", ""))
             internal_id = get_internal_dish_id(mt_food_code)
-            items.append({
-                "name": food.get("food_name", ""),
-                "quantity": int(food.get("quantity", 1)),
-                "price_fen": int(food.get("price", 0)),
-                "sku_id": mt_food_code,
-                "notes": food.get("food_property", ""),
-                "internal_dish_id": internal_id,
-            })
+            items.append(
+                {
+                    "name": food.get("food_name", ""),
+                    "quantity": int(food.get("quantity", 1)),
+                    "price_fen": int(food.get("price", 0)),
+                    "sku_id": mt_food_code,
+                    "notes": food.get("food_property", ""),
+                    "internal_dish_id": internal_id,
+                }
+            )
 
         status_code = int(raw.get("status", 1))
 
@@ -553,8 +556,9 @@ class MeituanSaasAdapter:
           food_list (food_id, food_name, count, price),
           app_poi_code, operator_id
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -562,7 +566,11 @@ class MeituanSaasAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+            DishCategory,
+            OrderItemSchema,
+            OrderSchema,
+            OrderStatus,
+            OrderType,
         )
 
         # 状态映射（美团：1=待接单, 2=已接单, 3=配送中, 4=已完成, 5=已取消, 8=退款）
@@ -581,16 +589,18 @@ class MeituanSaasAdapter:
         for idx, item in enumerate(raw.get("food_list", raw.get("detail_items", [])), start=1):
             unit_price = Decimal(str(item.get("price", 0))) / 100  # 分 → 元
             qty = int(item.get("count", item.get("quantity", 1)))
-            items.append(OrderItemSchema(
-                item_id=str(item.get("cart_id", f"{raw.get('order_id', '')}_{idx}")),
-                dish_id=str(item.get("food_id", item.get("app_food_code", ""))),
-                dish_name=str(item.get("food_name", "")),
-                dish_category=DishCategory.MAIN_COURSE,
-                quantity=qty,
-                unit_price=unit_price,
-                subtotal=unit_price * qty,
-                special_requirements=item.get("remark"),
-            ))
+            items.append(
+                OrderItemSchema(
+                    item_id=str(item.get("cart_id", f"{raw.get('order_id', '')}_{idx}")),
+                    dish_id=str(item.get("food_id", item.get("app_food_code", ""))),
+                    dish_name=str(item.get("food_name", "")),
+                    dish_category=DishCategory.MAIN_COURSE,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    subtotal=unit_price * qty,
+                    special_requirements=item.get("remark"),
+                )
+            )
 
         total = Decimal(str(raw.get("total_price", raw.get("order_total_price", 0)))) / 100
         discount = Decimal(str(raw.get("discount_price", raw.get("poi_discount", 0)))) / 100
@@ -632,8 +642,9 @@ class MeituanSaasAdapter:
         原始字段参考（后台操作日志）：
           action_type, operator_id, amount, reason, approved_by, action_time
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")

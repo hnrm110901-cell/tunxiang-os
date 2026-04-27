@@ -1,8 +1,9 @@
 """城市监管基础 — civic_city_profiles + store_civic_registries
 Revision: v225
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v225"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- civic_city_profiles 城市监管档案 ---
 
-    if 'civic_city_profiles' not in existing:
+    if "civic_city_profiles" not in existing:
         op.create_table(
             "civic_city_profiles",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -54,7 +53,7 @@ def upgrade() -> None:
 
         # --- store_civic_registries 门店监管注册 ---
 
-    if 'store_civic_registries' not in existing:
+    if "store_civic_registries" not in existing:
         op.create_table(
             "store_civic_registries",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -73,7 +72,6 @@ def upgrade() -> None:
         op.create_index("ix_scr_tenant_store", "store_civic_registries", ["tenant_id", "store_id"])
         op.create_index("ix_scr_city", "store_civic_registries", ["tenant_id", "city_code"])
         _add_rls("store_civic_registries", "scr")
-
 
 
 def downgrade() -> None:

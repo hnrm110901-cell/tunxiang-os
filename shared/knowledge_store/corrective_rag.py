@@ -6,6 +6,7 @@
 3. 如果 < 阈值(0.6)：改写查询 → 重新检索（最多重试2次）
 4. 返回最佳结果
 """
+
 from __future__ import annotations
 
 import re

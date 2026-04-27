@@ -7,14 +7,13 @@ Revision ID: v078
 Revises: v077
 Create Date: 2026-03-31
 """
-from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision: str = "v082"
-down_revision: Union[str, None] = "v081"
+revision = "v082"
+down_revision = "v081"
 branch_labels = None
 depends_on = None
 

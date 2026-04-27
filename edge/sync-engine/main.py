@@ -9,6 +9,7 @@
   python main.py                        # 直接运行
   launchctl load com.tunxiang.sync-engine.plist  # macOS 开机自启
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -32,9 +33,7 @@ def _setup_logging(log_level: str) -> None:
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, log_level.upper(), logging.INFO)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, log_level.upper(), logging.INFO)),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
         cache_logger_on_first_use=True,

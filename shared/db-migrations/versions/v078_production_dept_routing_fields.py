@@ -19,16 +19,15 @@ Revision ID: v076
 Revises: v075
 Create Date: 2026-03-31
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
-revision: str = "v078"
-down_revision: Union[str, None] = "v077"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v078"
+down_revision = "v077"
+branch_labels = None
+depends_on = None
 
 # 安全 RLS 条件（与 v006/v014/v016/v017 保持一致）
 _SAFE_CONDITION = (
@@ -169,15 +168,19 @@ def upgrade() -> None:
     )
 
     # 复合索引：KDS轮询"某档口待出品任务"的核心查询路径
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_kds_tasks_dept_status_created "
-        "ON kds_tasks (dept_id, status, created_at) WHERE is_deleted = false"
-    ))
+    op.execute(
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS ix_kds_tasks_dept_status_created "
+            "ON kds_tasks (dept_id, status, created_at) WHERE is_deleted = false"
+        )
+    )
     # 按订单聚合任务进度查询
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_kds_tasks_order_id "
-        "ON kds_tasks (order_id) WHERE order_id IS NOT NULL AND is_deleted = false"
-    ))
+    op.execute(
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS ix_kds_tasks_order_id "
+            "ON kds_tasks (order_id) WHERE order_id IS NOT NULL AND is_deleted = false"
+        )
+    )
 
 
 def downgrade() -> None:

@@ -17,9 +17,10 @@ Revision ID: v128
 Revises: v127
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v128"
 down_revision = "v127"
@@ -39,8 +40,7 @@ def upgrade() -> None:
     if "coupons" not in _existing:
         op.create_table(
             "coupons",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.String(100), nullable=False),
             sa.Column("coupon_type", sa.String(30), nullable=False),
@@ -58,16 +58,13 @@ def upgrade() -> None:
             # coupon_routes.py SELECT: start_date, end_date
             sa.Column("start_date", sa.Date, nullable=True),
             sa.Column("end_date", sa.Date, nullable=True),
-            sa.Column("applicable_scope", sa.String(20), nullable=False,
-                      server_default="'all'"),
+            sa.Column("applicable_scope", sa.String(20), nullable=False, server_default="'all'"),
             sa.Column("applicable_ids", JSONB, nullable=True),
             # coupon_routes.py WHERE: is_active = true
             sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
             sa.Column("description", sa.Text, nullable=True),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
@@ -93,22 +90,18 @@ def upgrade() -> None:
     if "customer_coupons" not in _existing:
         op.create_table(
             "customer_coupons",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("coupon_id", UUID(as_uuid=True), nullable=False),
             sa.Column("customer_id", UUID(as_uuid=True), nullable=False),
             # coupon_routes.py: status='unused'/'used'/'expired'
             sa.Column("status", sa.String(20), nullable=False, server_default="'unused'"),
-            sa.Column("claimed_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("claimed_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("used_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("order_id", UUID(as_uuid=True), nullable=True),
             sa.Column("expire_at", sa.TIMESTAMP(timezone=True), nullable=True),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
@@ -150,34 +143,31 @@ def upgrade() -> None:
     #   total_cost_fen, conversion_count, created_at, updated_at
     if "campaigns" not in _existing:
         op.create_table(
-        "campaigns",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("name", sa.String(100), nullable=False),
-        sa.Column("campaign_type", sa.String(30), nullable=False),
-        sa.Column("status", sa.String(20), nullable=False, server_default="'draft'"),
-        sa.Column("description", sa.Text, nullable=True),
-        # growth_campaign_routes.py: start_time / end_time（注意非 start_at）
-        sa.Column("start_time", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("end_time", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("budget_fen", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("spent_fen", sa.Integer, nullable=False, server_default="0"),
-        # growth_campaign_routes.py: target_segments (JSONB 数组)
-        sa.Column("target_segments", JSONB, nullable=True),
-        # growth_campaign_routes.py stats: participant_count / reward_count / total_cost_fen
-        sa.Column("participant_count", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("reward_count", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("total_cost_fen", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("conversion_count", sa.Integer, nullable=False, server_default="0"),
-        # growth_campaign_routes.py: config JSONB（存 rules 等扩展字段）
-        sa.Column("config", JSONB, nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                  server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                  server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-    )
+            "campaigns",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("name", sa.String(100), nullable=False),
+            sa.Column("campaign_type", sa.String(30), nullable=False),
+            sa.Column("status", sa.String(20), nullable=False, server_default="'draft'"),
+            sa.Column("description", sa.Text, nullable=True),
+            # growth_campaign_routes.py: start_time / end_time（注意非 start_at）
+            sa.Column("start_time", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("end_time", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("budget_fen", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("spent_fen", sa.Integer, nullable=False, server_default="0"),
+            # growth_campaign_routes.py: target_segments (JSONB 数组)
+            sa.Column("target_segments", JSONB, nullable=True),
+            # growth_campaign_routes.py stats: participant_count / reward_count / total_cost_fen
+            sa.Column("participant_count", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("reward_count", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("total_cost_fen", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("conversion_count", sa.Integer, nullable=False, server_default="0"),
+            # growth_campaign_routes.py: config JSONB（存 rules 等扩展字段）
+            sa.Column("config", JSONB, nullable=True),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -210,8 +200,7 @@ def upgrade() -> None:
     if "notification_tasks" not in _existing:
         op.create_table(
             "notification_tasks",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("campaign_id", UUID(as_uuid=True), nullable=True),
             # notification_routes.py: channel in {sms, wechat_template, miniapp_push}
@@ -229,10 +218,8 @@ def upgrade() -> None:
             sa.Column("scheduled_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("started_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column("completed_at", sa.TIMESTAMP(timezone=True), nullable=True),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
@@ -270,13 +257,11 @@ def upgrade() -> None:
     if "anomaly_dismissals" not in _existing:
         op.create_table(
             "anomaly_dismissals",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("anomaly_id", sa.String(100), nullable=False),
             sa.Column("dismissed_by", sa.String(100), nullable=True),
-            sa.Column("dismissed_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("dismissed_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
         )
     op.execute("""
         DO $$ BEGIN
@@ -297,27 +282,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # 逆序删除，先删依赖表
-    op.execute(
-        "DROP POLICY IF EXISTS anomaly_dismissals_tenant_isolation ON anomaly_dismissals;"
-    )
+    op.execute("DROP POLICY IF EXISTS anomaly_dismissals_tenant_isolation ON anomaly_dismissals;")
     op.drop_table("anomaly_dismissals")
 
-    op.execute(
-        "DROP POLICY IF EXISTS notification_tasks_tenant_isolation ON notification_tasks;"
-    )
+    op.execute("DROP POLICY IF EXISTS notification_tasks_tenant_isolation ON notification_tasks;")
     op.drop_table("notification_tasks")
 
-    op.execute(
-        "DROP POLICY IF EXISTS campaigns_tenant_isolation ON campaigns;"
-    )
+    op.execute("DROP POLICY IF EXISTS campaigns_tenant_isolation ON campaigns;")
     op.drop_table("campaigns")
 
-    op.execute(
-        "DROP POLICY IF EXISTS customer_coupons_tenant_isolation ON customer_coupons;"
-    )
+    op.execute("DROP POLICY IF EXISTS customer_coupons_tenant_isolation ON customer_coupons;")
     op.drop_table("customer_coupons")
 
-    op.execute(
-        "DROP POLICY IF EXISTS coupons_tenant_isolation ON coupons;"
-    )
+    op.execute("DROP POLICY IF EXISTS coupons_tenant_isolation ON coupons;")
     op.drop_table("coupons")

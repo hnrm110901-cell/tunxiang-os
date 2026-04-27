@@ -7,14 +7,13 @@
   3. 业务错误与网络错误的区分处理
   4. 各会员接口入参校验与降级返回
 """
+
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-
 from src.adapter import WeishenghuoAdapter
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -141,9 +140,7 @@ class TestGetMemberInfo:
 
         assert result["member_id"] == "M001"
         assert result["points"] == 1500
-        mock_req.assert_called_once_with(
-            "GET", "/member/info", {"mobile": "13800138000"}
-        )
+        mock_req.assert_called_once_with("GET", "/member/info", {"mobile": "13800138000"})
 
     @pytest.mark.asyncio
     async def test_get_member_info_by_member_id(self, adapter):
@@ -191,9 +188,7 @@ class TestListMembers:
 
         assert len(result["list"]) == 2
         assert result["total"] == 150
-        mock_req.assert_called_once_with(
-            "GET", "/member/list", {"page": 2, "page_size": 50}
-        )
+        mock_req.assert_called_once_with("GET", "/member/list", {"page": 2, "page_size": 50})
 
     @pytest.mark.asyncio
     async def test_list_members_incremental_sync(self, adapter):
@@ -308,9 +303,7 @@ class TestRequestRetry:
         adapter._access_token = "valid_token"
         adapter._token_expires_at = time.time() + 3600
 
-        adapter._client.get = AsyncMock(
-            side_effect=httpx.ConnectError("连接失败")
-        )
+        adapter._client.get = AsyncMock(side_effect=httpx.ConnectError("连接失败"))
 
         with pytest.raises(Exception, match="已重试 2 次"):
             await adapter._request("GET", "/test", {})
@@ -321,9 +314,7 @@ class TestRequestRetry:
         adapter._access_token = "valid_token"
         adapter._token_expires_at = time.time() + 3600
 
-        adapter._client.get = AsyncMock(
-            return_value=_mock_business_error_response(40001, "参数错误")
-        )
+        adapter._client.get = AsyncMock(return_value=_mock_business_error_response(40001, "参数错误"))
 
         with pytest.raises(Exception, match="微生活业务错误.*参数错误"):
             await adapter._request("GET", "/test", {})
@@ -386,9 +377,7 @@ class TestPointsAndStoredValue:
             result = await adapter.get_member_points("M001")
 
         assert result["balance"] == 2500
-        mock_req.assert_called_once_with(
-            "GET", "/member/points", {"member_id": "M001"}
-        )
+        mock_req.assert_called_once_with("GET", "/member/points", {"member_id": "M001"})
 
     @pytest.mark.asyncio
     async def test_get_member_stored_value(self, adapter):
@@ -398,9 +387,7 @@ class TestPointsAndStoredValue:
             result = await adapter.get_member_stored_value("M001")
 
         assert result["balance"] == 100000
-        mock_req.assert_called_once_with(
-            "GET", "/member/stored-value", {"member_id": "M001"}
-        )
+        mock_req.assert_called_once_with("GET", "/member/stored-value", {"member_id": "M001"})
 
     @pytest.mark.asyncio
     async def test_get_member_points_returns_default_on_error(self, adapter):

@@ -3,11 +3,12 @@
 菜品名翻译优先使用 dishes 表 metadata 中的翻译，
 找不到时回退到 i18n 语言包中的 DISH_NAMES 映射。
 """
+
 from typing import Any, Optional
 
 import structlog
 
-from . import get_lang_module, get_text, get_supported_languages, DEFAULT_LANG
+from . import get_lang_module
 
 logger = structlog.get_logger()
 
@@ -71,9 +72,7 @@ def translate_menu(
 
         translated.append(item)
 
-    logger.info("menu_translated",
-                 tenant_id=tenant_id, target_lang=target_lang,
-                 dish_count=len(translated))
+    logger.info("menu_translated", tenant_id=tenant_id, target_lang=target_lang, dish_count=len(translated))
 
     return translated
 
@@ -102,10 +101,24 @@ def translate_receipt(
     translated["labels"] = {
         key: receipt_texts.get(key, key)
         for key in [
-            "header", "store_name", "order_no", "table_no", "cashier",
-            "time", "item", "qty", "price", "subtotal", "total",
-            "discount", "payable", "paid", "change", "payment_method",
-            "footer", "vat_note",
+            "header",
+            "store_name",
+            "order_no",
+            "table_no",
+            "cashier",
+            "time",
+            "item",
+            "qty",
+            "price",
+            "subtotal",
+            "total",
+            "discount",
+            "payable",
+            "paid",
+            "change",
+            "payment_method",
+            "footer",
+            "vat_note",
         ]
     }
 

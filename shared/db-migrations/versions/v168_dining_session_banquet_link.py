@@ -14,24 +14,23 @@ Revision ID: v168
 Revises: v167
 Create Date: 2026-04-06
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v168"
-down_revision: Union[str, None] = "v167"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v168"
+down_revision = "v167"
+branch_labels = None
+depends_on = None
 
 
 def _col_exists(table: str, column: str) -> bool:
     bind = op.get_bind()
-    result = bind.execute(sa.text(
-        "SELECT COUNT(*) FROM information_schema.columns "
-        "WHERE table_name = :t AND column_name = :c"
-    ), {"t": table, "c": column})
+    result = bind.execute(
+        sa.text("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = :t AND column_name = :c"),
+        {"t": table, "c": column},
+    )
     return result.scalar() > 0
 
 
@@ -41,7 +40,9 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "banquet_session_id", UUID(as_uuid=True), nullable=True,
+                "banquet_session_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="关联宴席场次ID（v168）— 宴席多桌聚合调度和统一结账",
             ),
         )
@@ -56,7 +57,9 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "min_spend_override", sa.Boolean, nullable=False,
+                "min_spend_override",
+                sa.Boolean,
+                nullable=False,
                 server_default="false",
                 comment="低消豁免标志（v168）— 管理员审批后设为true，跳过买单低消校验",
             ),
@@ -65,7 +68,9 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "min_spend_override_by", UUID(as_uuid=True), nullable=True,
+                "min_spend_override_by",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="低消豁免审批人ID（v168）",
             ),
         )
@@ -73,7 +78,9 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "min_spend_override_at", sa.TIMESTAMP(timezone=True), nullable=True,
+                "min_spend_override_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=True,
                 comment="低消豁免审批时间（v168）",
             ),
         )
@@ -81,12 +88,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for col in ("min_spend_override_at", "min_spend_override_by", "min_spend_override"):
-        op.execute(sa.text(
-            f"ALTER TABLE dining_sessions DROP COLUMN IF EXISTS {col};"
-        ))
-    op.execute(
-        "DROP INDEX IF EXISTS ix_dining_sessions_banquet_session_id;"
-    )
-    op.execute(sa.text(
-        "ALTER TABLE dining_sessions DROP COLUMN IF EXISTS banquet_session_id;"
-    ))
+        op.execute(sa.text(f"ALTER TABLE dining_sessions DROP COLUMN IF EXISTS {col};"))
+    op.execute("DROP INDEX IF EXISTS ix_dining_sessions_banquet_session_id;")
+    op.execute(sa.text("ALTER TABLE dining_sessions DROP COLUMN IF EXISTS banquet_session_id;"))

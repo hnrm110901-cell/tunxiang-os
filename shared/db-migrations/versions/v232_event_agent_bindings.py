@@ -7,8 +7,9 @@ Revision ID: v232
 Revises: v231
 Create Date: 2026-04-12
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v232"
@@ -57,7 +58,6 @@ _INITIAL_BINDINGS: list[tuple[str, str, str, int, str]] = [
     # ── 班次交接 ──
     ("shift_handover", "finance_audit", "generate_shift_summary", 60, "班次交接→生成财务摘要"),
     ("shift_handover", "store_inspect", "trigger_shift_checklist", 50, "班次交接→触发质检清单"),
-
     # ── 交易域事件驱动 ──
     ("trade.order.paid", "member_insight", "update_customer_rfm", 70, "订单支付→更新会员RFM分层"),
     ("trade.order.paid", "private_ops", "check_journey_trigger", 60, "订单支付→检查私域旅程触发"),
@@ -67,7 +67,6 @@ _INITIAL_BINDINGS: list[tuple[str, str, str, int, str]] = [
     ("trade.discount.blocked", "finance_audit", "flag_discount_anomaly", 50, "折扣拦截→财务稽核标记"),
     ("trade.daily_settlement.completed", "finance_audit", "generate_shift_summary", 60, "日结完成→生成财务摘要"),
     ("trade.daily_settlement.completed", "store_inspect", "trigger_shift_checklist", 50, "日结完成→触发质检清单"),
-
     # ── 供应链域事件驱动 ──
     ("supply.stock.low", "inventory_alert", "assess_shortage_severity", 60, "库存低→评估短缺严重程度"),
     ("supply.stock.low", "smart_menu", "suggest_alternatives", 50, "库存低→推荐替代菜品"),
@@ -76,35 +75,28 @@ _INITIAL_BINDINGS: list[tuple[str, str, str, int, str]] = [
     ("supply.ingredient.expiring", "inventory_alert", "plan_usage", 60, "食材临期→制定用料计划"),
     ("supply.ingredient.expiring", "smart_menu", "push_expiry_specials", 50, "食材临期→推荐特价菜"),
     ("supply.receiving.variance", "finance_audit", "flag_receiving_variance", 50, "收货差异→财务稽核标记"),
-
     # ── 组织人事域事件驱动 ──
     ("org.attendance.late", "store_inspect", "log_attendance_issue", 50, "迟到→记录考勤问题"),
     ("org.attendance.exception", "store_inspect", "create_followup_task", 50, "考勤异常→创建跟进任务"),
     ("org.approval.completed", "finance_audit", "process_approval_result", 50, "审批完成→财务联动"),
-
     # ── 财务域事件驱动 ──
     ("finance.cost_rate.exceeded", "finance_audit", "root_cause_analysis", 60, "成本率超标→原因分析"),
     ("finance.cost_rate.exceeded", "smart_menu", "flag_high_cost_dishes", 50, "成本率超标→标记高成本菜品"),
     ("finance.daily_pl.generated", "finance_audit", "check_pl_anomaly", 50, "日P&L生成→异常检测"),
-
     # ── 千人千面Agent事件驱动 ──
     ("member.profile_updated", "personalization", "generate_batch_reasons", 50, "用户画像更新→重新生成推荐理由"),
-
     # ── 排位Agent事件驱动 ──
     ("trade.table.freed", "queue_seating", "auto_call_next", 50, "桌台空出→自动叫号"),
     ("trade.queue.ticket_created", "queue_seating", "predict_wait_time", 50, "新排队→预测等位时间"),
     ("trade.reservation.no_show", "queue_seating", "handle_no_show_release", 50, "爽约→释放桌位"),
-
     # ── 后厨超时Agent事件驱动 ──
     ("kds.item.overtime_warning", "kitchen_overtime", "analyze_overtime_cause", 60, "出餐超时→原因分析"),
     ("kds.item.overtime_warning", "kitchen_overtime", "auto_rush_notify", 50, "出餐超时→自动催菜"),
     ("kds.scan.scheduled", "kitchen_overtime", "scan_overtime_items", 50, "定时扫描→检查超时项"),
-
     # ── 收银异常Agent事件驱动 ──
     ("trade.order.reverse_settled", "billing_anomaly", "detect_reverse_settle_anomaly", 50, "反结账→异常检测"),
     ("trade.payment.confirmed", "billing_anomaly", "detect_payment_anomaly", 50, "支付确认→异常检测"),
     ("trade.shift.closed", "billing_anomaly", "analyze_shift_variance", 50, "班结→现金差异分析"),
-
     # ── 闭店Agent事件驱动 ──
     ("ops.closing_time.approaching", "closing_ops", "pre_closing_check", 60, "闭店临近→预检"),
     ("ops.closing_time.approaching", "closing_ops", "remind_unsettled_orders", 50, "闭店临近→未结单提醒"),
@@ -118,10 +110,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── 1. 创建 event_agent_bindings 表 ──
 
-    if 'event_agent_bindings' not in existing:
+    if "event_agent_bindings" not in existing:
         op.create_table(
             "event_agent_bindings",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),

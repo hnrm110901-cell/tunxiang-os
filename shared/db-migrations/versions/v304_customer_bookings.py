@@ -9,8 +9,8 @@ Revision: v169
 
 from alembic import op
 
-revision = "v169"
-down_revision = "v168"
+revision = "v304"
+down_revision = "v303"
 branch_labels = None
 depends_on = None
 
@@ -38,8 +38,12 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_customer_bookings_tenant_date ON customer_bookings (tenant_id, booking_date DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_customer_bookings_store_date ON customer_bookings (tenant_id, store_id, booking_date)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_customer_bookings_tenant_date ON customer_bookings (tenant_id, booking_date DESC)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_customer_bookings_store_date ON customer_bookings (tenant_id, store_id, booking_date)"
+    )
     op.execute("ALTER TABLE customer_bookings ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY customer_bookings_tenant_isolation ON customer_bookings
@@ -71,7 +75,9 @@ def upgrade() -> None:
         )
     """)
     op.execute("CREATE INDEX IF NOT EXISTS idx_queue_tickets_tenant_date ON queue_tickets (tenant_id, created_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_queue_tickets_store_status ON queue_tickets (tenant_id, store_id, status)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_queue_tickets_store_status ON queue_tickets (tenant_id, store_id, status)"
+    )
     op.execute("ALTER TABLE queue_tickets ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY queue_tickets_tenant_isolation ON queue_tickets

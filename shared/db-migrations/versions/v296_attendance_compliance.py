@@ -6,10 +6,11 @@ Revision ID: v255
 Revises: v254
 Create Date: 2026-04-13
 """
+
 from alembic import op
 
-revision = "v255"
-down_revision = "v254"
+revision = "v296"
+down_revision = "v295"
 branch_labels = None
 depends_on = None
 

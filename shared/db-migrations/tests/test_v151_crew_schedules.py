@@ -10,15 +10,13 @@
   - 不连接任何真实数据库
   - 不调用 op.execute()，仅验证 Python 模块结构
 """
+
 from __future__ import annotations
-
-import importlib
-import sys
-
 
 # ─────────────────────────────────────────────────────────────────
 # 辅助：动态 import 版本模块
 # ─────────────────────────────────────────────────────────────────
+
 
 def _import_version(version_label: str):
     """根据版本标签（如 'v151'）动态导入对应的迁移模块。
@@ -26,12 +24,10 @@ def _import_version(version_label: str):
     搜索策略：先尝试 shared.db_migrations.versions.{file}，
     若失败则从文件系统扫描，找到包含该 version_label 的 .py 文件后 import。
     """
-    import os
     import importlib.util
+    import os
 
-    versions_dir = os.path.join(
-        os.path.dirname(__file__), "..", "versions"
-    )
+    versions_dir = os.path.join(os.path.dirname(__file__), "..", "versions")
     versions_dir = os.path.normpath(versions_dir)
 
     for fname in os.listdir(versions_dir):
@@ -55,27 +51,21 @@ def test_v151_revision_chain():
     """v151 的 down_revision 应为 v150。"""
     m = _import_version("v151")
     assert m.revision == "v151", f"v151.revision 应为 'v151'，实际: {m.revision}"
-    assert m.down_revision == "v150", (
-        f"v151.down_revision 应为 'v150'，实际: {m.down_revision}"
-    )
+    assert m.down_revision == "v150", f"v151.down_revision 应为 'v150'，实际: {m.down_revision}"
 
 
 def test_v152_revision_chain():
     """v152 的 down_revision 应为 v151。"""
     m = _import_version("v152")
     assert m.revision == "v152", f"v152.revision 应为 'v152'，实际: {m.revision}"
-    assert m.down_revision == "v151", (
-        f"v152.down_revision 应为 'v151'，实际: {m.down_revision}"
-    )
+    assert m.down_revision == "v151", f"v152.down_revision 应为 'v151'，实际: {m.down_revision}"
 
 
 def test_v153_revision_chain():
     """v153 的 down_revision 应为 v152。"""
     m = _import_version("v153")
     assert m.revision == "v153", f"v153.revision 应为 'v153'，实际: {m.revision}"
-    assert m.down_revision == "v152", (
-        f"v153.down_revision 应为 'v152'，实际: {m.down_revision}"
-    )
+    assert m.down_revision == "v152", f"v153.down_revision 应为 'v152'，实际: {m.down_revision}"
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -95,7 +85,7 @@ _EXPECTED_CHAIN = [
     ("v146", "v145"),
     ("v147", "v146"),
     ("v148", "v147"),
-    ("v150", "v148"),   # v149 已删除，v150 跳接 v148
+    ("v150", "v148"),  # v149 已删除，v150 跳接 v148
     ("v151", "v150"),
     ("v152", "v151"),
     ("v153", "v152"),
@@ -124,17 +114,12 @@ def test_migration_chain_no_gaps():
         # 检查 revision 字段
         actual_rev = getattr(m, "revision", None)
         if actual_rev != revision:
-            errors.append(
-                f"{revision}: revision 字段不匹配，期望 '{revision}' 实际 '{actual_rev}'"
-            )
+            errors.append(f"{revision}: revision 字段不匹配，期望 '{revision}' 实际 '{actual_rev}'")
 
         # 检查 down_revision 字段（可能是 str 或 Union[str, None]）
         actual_down = getattr(m, "down_revision", "MISSING")
         if actual_down != expected_down:
-            errors.append(
-                f"{revision}: down_revision 不匹配，"
-                f"期望 '{expected_down}' 实际 '{actual_down}'"
-            )
+            errors.append(f"{revision}: down_revision 不匹配，期望 '{expected_down}' 实际 '{actual_down}'")
 
     assert not errors, "迁移链验证失败：\n" + "\n".join(errors)
 
@@ -142,16 +127,10 @@ def test_migration_chain_no_gaps():
 def test_no_v149_file():
     """确认 v149 迁移文件确实不存在（已知删除，不应误建）。"""
     import os
-    versions_dir = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "versions")
-    )
-    v149_files = [
-        f for f in os.listdir(versions_dir)
-        if f.startswith("v149") and f.endswith(".py")
-    ]
-    assert len(v149_files) == 0, (
-        f"v149 迁移文件不应存在，但发现: {v149_files}"
-    )
+
+    versions_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "versions"))
+    v149_files = [f for f in os.listdir(versions_dir) if f.startswith("v149") and f.endswith(".py")]
+    assert len(v149_files) == 0, f"v149 迁移文件不应存在，但发现: {v149_files}"
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -188,6 +167,4 @@ def test_v153_has_upgrade_and_downgrade():
 def test_v150_jumps_over_v149():
     """v149 被删除，v150.down_revision 应直接指向 v148（不是 v149）。"""
     m = _import_version("v150")
-    assert m.down_revision == "v148", (
-        f"v150.down_revision 应为 'v148'（v149 已删除），实际: {m.down_revision}"
-    )
+    assert m.down_revision == "v148", f"v150.down_revision 应为 'v148'（v149 已删除），实际: {m.down_revision}"

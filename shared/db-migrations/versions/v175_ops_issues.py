@@ -41,10 +41,18 @@ def upgrade() -> None:
             is_deleted       BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_store ON ops_issues (tenant_id, store_id, issue_date DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_status ON ops_issues (tenant_id, status) WHERE is_deleted = FALSE")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_severity ON ops_issues (tenant_id, severity) WHERE is_deleted = FALSE")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_type ON ops_issues (tenant_id, issue_type) WHERE is_deleted = FALSE")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_store ON ops_issues (tenant_id, store_id, issue_date DESC)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_status ON ops_issues (tenant_id, status) WHERE is_deleted = FALSE"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_severity ON ops_issues (tenant_id, severity) WHERE is_deleted = FALSE"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ops_issues_tenant_type ON ops_issues (tenant_id, issue_type) WHERE is_deleted = FALSE"
+    )
     op.execute("ALTER TABLE ops_issues ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY ops_issues_rls ON ops_issues

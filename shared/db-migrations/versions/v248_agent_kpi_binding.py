@@ -7,8 +7,8 @@ Revises: v247
 Create Date: 2026-04-13
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v248"
 down_revision = "v247"
@@ -26,7 +26,10 @@ def upgrade() -> None:
         op.create_table(
             "agent_kpi_configs",
             sa.Column(
-                "id", sa.UUID(), nullable=False, primary_key=True,
+                "id",
+                sa.UUID(),
+                nullable=False,
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", sa.UUID(), nullable=False, comment="租户ID（RLS）"),
@@ -38,8 +41,11 @@ def upgrade() -> None:
             sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true", comment="是否启用"),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("NOW()"), nullable=False),
             sa.Column(
-                "updated_at", sa.TIMESTAMP(timezone=True),
-                server_default=sa.text("NOW()"), onupdate=sa.text("NOW()"), nullable=False,
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                server_default=sa.text("NOW()"),
+                onupdate=sa.text("NOW()"),
+                nullable=False,
             ),
             comment="Agent KPI指标配置表（模块4.4）",
         )
@@ -53,17 +59,22 @@ def upgrade() -> None:
         )
 
         conn.execute(sa.text("ALTER TABLE agent_kpi_configs ENABLE ROW LEVEL SECURITY"))
-        conn.execute(sa.text("""
+        conn.execute(
+            sa.text("""
             CREATE POLICY agent_kpi_configs_tenant_isolation ON agent_kpi_configs
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
-        """))
+        """)
+        )
 
     # ── 2. agent_kpi_snapshots ──────────────────────────────────────────────
     if "agent_kpi_snapshots" not in existing_tables:
         op.create_table(
             "agent_kpi_snapshots",
             sa.Column(
-                "id", sa.UUID(), nullable=False, primary_key=True,
+                "id",
+                sa.UUID(),
+                nullable=False,
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", sa.UUID(), nullable=False, comment="租户ID（RLS）"),
@@ -89,10 +100,12 @@ def upgrade() -> None:
         )
 
         conn.execute(sa.text("ALTER TABLE agent_kpi_snapshots ENABLE ROW LEVEL SECURITY"))
-        conn.execute(sa.text("""
+        conn.execute(
+            sa.text("""
             CREATE POLICY agent_kpi_snapshots_tenant_isolation ON agent_kpi_snapshots
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)
-        """))
+        """)
+        )
 
 
 def downgrade() -> None:

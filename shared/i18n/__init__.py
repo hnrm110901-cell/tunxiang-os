@@ -4,9 +4,10 @@
 默认语言: zh_CN（简体中文）
 支持: zh_CN, en_US, ja_JP, ko_KR
 """
+
 from typing import Any
 
-from . import zh_CN, en_US, ja_JP, ko_KR
+from . import en_US, ja_JP, ko_KR, zh_CN
 
 # 语言注册表
 _LANGUAGES: dict[str, Any] = {
@@ -26,10 +27,7 @@ def get_lang_module(lang: str = DEFAULT_LANG) -> Any:
 
 def get_supported_languages() -> list[dict[str, str]]:
     """获取支持的语言列表"""
-    return [
-        {"code": mod.LANG_CODE, "name": mod.LANG_NAME}
-        for mod in _LANGUAGES.values()
-    ]
+    return [{"code": mod.LANG_CODE, "name": mod.LANG_NAME} for mod in _LANGUAGES.values()]
 
 
 def get_text(key: str, section: str = "UI", lang: str = DEFAULT_LANG) -> str:

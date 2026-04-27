@@ -11,6 +11,7 @@
     DataMasker.mask_bank_account("6225880112346789")   # "****6789"
     DataMasker.mask_dict({"phone": "13812348888", "name": "张三"})
 """
+
 from __future__ import annotations
 
 import copy
@@ -146,9 +147,7 @@ class DataMasker:
         返回:
             脱敏后的新字典（深拷贝，不修改原始 data）
         """
-        effective_fields: set[str] = (
-            fields if fields is not None else set(_DEFAULT_SENSITIVE.keys())
-        )
+        effective_fields: set[str] = fields if fields is not None else set(_DEFAULT_SENSITIVE.keys())
         result = copy.deepcopy(data)
         _mask_recursive(result, effective_fields)
         return result

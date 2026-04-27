@@ -2,9 +2,8 @@
 品智菜品同步模块
 拉取品智菜品数据并映射为屯象 Ontology Dish 格式
 """
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 import structlog
 
@@ -63,20 +62,24 @@ class PinzhiDishSync:
         # 规格/SKU
         specs = []
         for spec in pinzhi_dish.get("specList", pinzhi_dish.get("skuList", [])):
-            specs.append({
-                "spec_id": str(spec.get("specId", spec.get("skuId", ""))),
-                "spec_name": str(spec.get("specName", spec.get("skuName", ""))),
-                "price_fen": int(spec.get("specPrice", spec.get("skuPrice", 0))),
-            })
+            specs.append(
+                {
+                    "spec_id": str(spec.get("specId", spec.get("skuId", ""))),
+                    "spec_name": str(spec.get("specName", spec.get("skuName", ""))),
+                    "price_fen": int(spec.get("specPrice", spec.get("skuPrice", 0))),
+                }
+            )
 
         # 做法/口味
         practices = []
         for p in pinzhi_dish.get("practiceList", []):
-            practices.append({
-                "practice_id": str(p.get("practiceId", "")),
-                "practice_name": str(p.get("practiceName", "")),
-                "extra_price_fen": int(p.get("extraPrice", 0)),
-            })
+            practices.append(
+                {
+                    "practice_id": str(p.get("practiceId", "")),
+                    "practice_name": str(p.get("practiceName", "")),
+                    "extra_price_fen": int(p.get("extraPrice", 0)),
+                }
+            )
 
         return {
             "dish_id": str(pinzhi_dish.get("dishId", "")),

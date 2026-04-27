@@ -23,10 +23,7 @@ down_revision = "v100b"
 branch_labels = None
 depends_on = None
 
-_VALID_CATEGORIES = (
-    "revenue", "ingredient_cost", "labor_cost",
-    "fixed_cost", "marketing_cost", "total"
-)
+_VALID_CATEGORIES = ("revenue", "ingredient_cost", "labor_cost", "fixed_cost", "marketing_cost", "total")
 _VALID_PERIOD_TYPES = ("monthly", "quarterly", "yearly")
 
 

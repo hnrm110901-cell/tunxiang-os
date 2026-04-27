@@ -6,6 +6,7 @@
 - KnowledgeRetrievalService: 租户隔离的知识检索
 - COLLECTIONS: 预定义业务collection配置
 """
+
 from shared.vector_store.client import QdrantClient
 from shared.vector_store.embeddings import EmbeddingService
 from shared.vector_store.indexes import COLLECTIONS

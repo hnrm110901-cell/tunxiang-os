@@ -2,17 +2,16 @@
 
 供 Gateway /api/v1/hub/* 读写；应用层使用 get_db_no_rls()。
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision: str = "v132"
-down_revision: Union[str, None] = "v131"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v132"
+down_revision = "v131"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

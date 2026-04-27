@@ -3,6 +3,7 @@
 从环境变量加载各 Provider 的 API 密钥和端点配置。
 遵循屯象OS安全规范：禁止硬编码密钥。
 """
+
 from __future__ import annotations
 
 import os
@@ -15,11 +16,12 @@ from .types import ProviderName
 @dataclass(frozen=True)
 class ProviderConfig:
     """单个 Provider 的配置。"""
+
     provider: ProviderName
     api_key: Optional[str]
     base_url: Optional[str] = None
     enabled: bool = True
-    priority: int = 0           # 数字越小优先级越高
+    priority: int = 0  # 数字越小优先级越高
     timeout_s: int = 30
     max_retries: int = 3
 
@@ -37,12 +39,12 @@ def load_provider_configs() -> dict[ProviderName, ProviderConfig]:
 
     provider_env_map = {
         ProviderName.ANTHROPIC: "ANTHROPIC",
-        ProviderName.DEEPSEEK:  "DEEPSEEK",
-        ProviderName.QWEN:      "DASHSCOPE",      # 阿里云百炼 SDK 用 DASHSCOPE_API_KEY
-        ProviderName.GLM:       "ZHIPUAI",         # 智谱 SDK 用 ZHIPUAI_API_KEY
-        ProviderName.ERNIE:     "QIANFAN",         # 百度千帆 SDK 用 QIANFAN_API_KEY
-        ProviderName.KIMI:      "MOONSHOT",        # 月之暗面 SDK 用 MOONSHOT_API_KEY
-        ProviderName.COREML:    "COREML",
+        ProviderName.DEEPSEEK: "DEEPSEEK",
+        ProviderName.QWEN: "DASHSCOPE",  # 阿里云百炼 SDK 用 DASHSCOPE_API_KEY
+        ProviderName.GLM: "ZHIPUAI",  # 智谱 SDK 用 ZHIPUAI_API_KEY
+        ProviderName.ERNIE: "QIANFAN",  # 百度千帆 SDK 用 QIANFAN_API_KEY
+        ProviderName.KIMI: "MOONSHOT",  # 月之暗面 SDK 用 MOONSHOT_API_KEY
+        ProviderName.COREML: "COREML",
     }
 
     for provider, env_prefix in provider_env_map.items():

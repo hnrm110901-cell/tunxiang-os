@@ -14,6 +14,7 @@
 
 未配置时进入 Mock 模式。所有金额单位：分（整数）。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -289,7 +290,13 @@ class XiaohongshuMarketingAdapter:
                 },
                 token,
             )
-            return {"store_id": store_id, "start_date": start_date, "end_date": end_date, "platform": "xiaohongshu", **result}
+            return {
+                "store_id": store_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "platform": "xiaohongshu",
+                **result,
+            }
         except (ValueError, ConnectionError, TimeoutError, OSError) as exc:
             logger.error("xiaohongshu_ad_data_failed", store_id=store_id, error=str(exc))
             return {"store_id": store_id, "error": str(exc)}
@@ -369,16 +376,20 @@ class XiaohongshuMarketingAdapter:
             return self._access_token
 
         import aiohttp
+
         payload = {
             "app_key": self._app_key,
             "app_secret": self._app_secret,
             "grant_type": "client_credentials",
         }
-        async with aiohttp.ClientSession() as session, session.post(
-            _XHS_TOKEN_URL,
-            json=payload,
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                _XHS_TOKEN_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
             result = await resp.json()
             data = result.get("data", {})
             if not data.get("access_token"):
@@ -399,12 +410,7 @@ class XiaohongshuMarketingAdapter:
         nonce = uuid.uuid4().hex[:16]
 
         # 小红书 API 签名：按参数名字典序拼接 + HMAC-SHA256
-        sign_str = (
-            self._app_secret
-            + "".join(f"{k}{v}" for k, v in sorted(params.items()))
-            + timestamp
-            + nonce
-        )
+        sign_str = self._app_secret + "".join(f"{k}{v}" for k, v in sorted(params.items())) + timestamp + nonce
         signature = hmac.new(
             self._app_secret.encode("utf-8"),
             sign_str.encode("utf-8"),
@@ -422,6 +428,7 @@ class XiaohongshuMarketingAdapter:
         url = f"{_XHS_BASE_URL}{path}"
 
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             if method == "GET":
                 req = session.get(url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=15))

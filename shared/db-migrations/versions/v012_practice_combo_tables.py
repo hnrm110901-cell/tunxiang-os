@@ -12,16 +12,15 @@ Revision ID: v012
 Revises: v011
 Create Date: 2026-03-28
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
-revision: str = "v012"
-down_revision: Union[str, None] = "v011"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v012"
+down_revision = "v011"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -38,12 +37,15 @@ def upgrade() -> None:
         # 业务字段
         sa.Column("dish_id", UUID(as_uuid=True), sa.ForeignKey("dishes.id"), nullable=False, index=True),
         sa.Column("practice_name", sa.String(100), nullable=False, comment="做法名称"),
-        sa.Column("practice_group", sa.String(50), nullable=False, server_default="default",
-                  comment="分组：辣度/温度/加料/烹饪方式"),
-        sa.Column("additional_price_fen", sa.Integer, server_default="0",
-                  comment="加价金额(分)"),
-        sa.Column("is_default", sa.Boolean, server_default="false",
-                  comment="是否该分组默认选项"),
+        sa.Column(
+            "practice_group",
+            sa.String(50),
+            nullable=False,
+            server_default="default",
+            comment="分组：辣度/温度/加料/烹饪方式",
+        ),
+        sa.Column("additional_price_fen", sa.Integer, server_default="0", comment="加价金额(分)"),
+        sa.Column("is_default", sa.Boolean, server_default="false", comment="是否该分组默认选项"),
         sa.Column("sort_order", sa.Integer, server_default="0", comment="排序"),
         comment="菜品口味做法",
     )
@@ -59,13 +61,23 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
         # 业务字段
-        sa.Column("store_id", UUID(as_uuid=True), sa.ForeignKey("stores.id"),
-                  index=True, comment="所属门店，NULL=集团通用套餐"),
+        sa.Column(
+            "store_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("stores.id"),
+            index=True,
+            comment="所属门店，NULL=集团通用套餐",
+        ),
         sa.Column("combo_name", sa.String(100), nullable=False, comment="套餐名称"),
         sa.Column("combo_price_fen", sa.Integer, nullable=False, comment="套餐售价(分)"),
         sa.Column("original_price_fen", sa.Integer, nullable=False, comment="原价合计(分)"),
-        sa.Column("items_json", JSON, nullable=False, server_default=sa.text("'[]'::jsonb"),
-                  comment='[{"dish_id":"..","dish_name":"..","qty":1,"price_fen":1800}]'),
+        sa.Column(
+            "items_json",
+            JSON,
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
+            comment='[{"dish_id":"..","dish_name":"..","qty":1,"price_fen":1800}]',
+        ),
         sa.Column("description", sa.Text, comment="套餐描述"),
         sa.Column("image_url", sa.String(500), comment="套餐图片"),
         sa.Column("is_active", sa.Boolean, server_default="true", comment="是否上架"),

@@ -5,6 +5,7 @@ Shared path setup for all base-adapter tests.
 Adds both the package's own src/ and the gateway's src/ to sys.path
 so tests can do `from registry import ...` without manual path surgery.
 """
+
 import os
 import sys
 

@@ -8,12 +8,12 @@
 官方文档: https://api.kuaidi100.com/document/
 认证方式: customer + key + sign(MD5)
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
-import time
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -60,11 +60,14 @@ class Kuaidi100Client:
             detect = await self.auto_detect(tracking_no)
             carrier_code = detect.get("carrier_code", "auto")
 
-        param = json.dumps({
-            "com": carrier_code,
-            "num": tracking_no,
-            "resultv2": "4",
-        }, separators=(",", ":"))
+        param = json.dumps(
+            {
+                "com": carrier_code,
+                "num": tracking_no,
+                "resultv2": "4",
+            },
+            separators=(",", ":"),
+        )
 
         sign = self._sign(param)
 
@@ -125,12 +128,15 @@ class Kuaidi100Client:
 
         快递100 会在物流状态变更时 POST 回调到 callback_url。
         """
-        param = json.dumps({
-            "company": carrier_code,
-            "number": tracking_no,
-            "callbackurl": callback_url,
-            "resultv2": "4",
-        }, separators=(",", ":"))
+        param = json.dumps(
+            {
+                "company": carrier_code,
+                "number": tracking_no,
+                "callbackurl": callback_url,
+                "resultv2": "4",
+            },
+            separators=(",", ":"),
+        )
 
         sign = self._sign(param)
 

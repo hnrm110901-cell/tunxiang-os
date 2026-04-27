@@ -3,12 +3,12 @@
 提供硬件设备查询、门店配置管理、设备状态监控等 REST API。
 所有接口需要 X-Tenant-ID header 进行租户隔离。
 """
+
 from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-
-import structlog
 
 from ..device_registry import (
     DEVICE_CATEGORIES,
@@ -27,8 +27,10 @@ router = APIRouter(prefix="/api/v1/hardware", tags=["hardware"])
 
 # ─── 请求/响应模型 ───
 
+
 class DeviceConfigItem(BaseModel):
     """单个设备配置。"""
+
     device_key: str = Field(..., description="设备注册表标识")
     connection_params: dict = Field(default_factory=dict, description="连接参数")
     role: str = Field(default="", description="设备角色: cashier/kitchen/label")
@@ -38,11 +40,13 @@ class DeviceConfigItem(BaseModel):
 
 class StoreConfigRequest(BaseModel):
     """门店硬件配置请求。"""
+
     devices: list[DeviceConfigItem]
 
 
 class AddDeviceRequest(BaseModel):
     """添加单个设备请求。"""
+
     device_key: str
     connection_params: dict = Field(default_factory=dict)
     role: str = ""
@@ -52,6 +56,7 @@ class AddDeviceRequest(BaseModel):
 
 class CreateTemplateRequest(BaseModel):
     """创建硬件模板请求。"""
+
     template_name: str
     devices: list[DeviceConfigItem]
     description: str = ""
@@ -59,12 +64,14 @@ class CreateTemplateRequest(BaseModel):
 
 class ApplyTemplateRequest(BaseModel):
     """应用模板请求。"""
+
     template_id: str
     connection_overrides: dict = Field(default_factory=dict)
 
 
 class APIResponse(BaseModel):
     """统一 API 响应格式。"""
+
     ok: bool = True
     data: dict | list | None = None
     error: dict | None = None
@@ -72,12 +79,14 @@ class APIResponse(BaseModel):
 
 # ─── 依赖注入 ───
 
+
 def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
     """从 header 获取租户 ID。"""
     return x_tenant_id
 
 
 # ─── 设备查询接口 ───
+
 
 @router.get("/categories", response_model=APIResponse)
 async def list_categories() -> APIResponse:
@@ -122,12 +131,14 @@ async def list_devices_by_category(category: str) -> APIResponse:
         )
 
     devices = get_devices_by_category(category)
-    return APIResponse(data={
-        "category": category,
-        "category_name": DEVICE_CATEGORIES[category],
-        "devices": devices,
-        "total": len(devices),
-    })
+    return APIResponse(
+        data={
+            "category": category,
+            "category_name": DEVICE_CATEGORIES[category],
+            "devices": devices,
+            "total": len(devices),
+        }
+    )
 
 
 @router.get("/devices/detail/{device_key}", response_model=APIResponse)
@@ -154,18 +165,18 @@ async def get_recommended(store_size: str) -> APIResponse:
     # 展开设备详情
     detailed_config = {}
     for cat, keys in config.items():
-        detailed_config[cat] = [
-            {"device_key": k, **DEVICE_REGISTRY.get(k, {})}
-            for k in keys
-        ]
+        detailed_config[cat] = [{"device_key": k, **DEVICE_REGISTRY.get(k, {})} for k in keys]
 
-    return APIResponse(data={
-        "store_size": store_size,
-        "config": detailed_config,
-    })
+    return APIResponse(
+        data={
+            "store_size": store_size,
+            "config": detailed_config,
+        }
+    )
 
 
 # ─── 门店硬件配置接口 ───
+
 
 @router.post("/store/{store_id}/config", response_model=APIResponse)
 async def configure_store(
@@ -247,6 +258,7 @@ async def remove_store_device(
 
 # ─── 设备状态与测试 ───
 
+
 @router.get("/store/{store_id}/status", response_model=APIResponse)
 async def get_store_status(
     store_id: str,
@@ -256,12 +268,14 @@ async def get_store_status(
     config = get_store_hardware_config()
     statuses = await config.get_device_status(store_id, tenant_id)
     online_count = sum(1 for s in statuses if s.get("last_status") == "online")
-    return APIResponse(data={
-        "store_id": store_id,
-        "devices": statuses,
-        "total": len(statuses),
-        "online": online_count,
-    })
+    return APIResponse(
+        data={
+            "store_id": store_id,
+            "devices": statuses,
+            "total": len(statuses),
+            "online": online_count,
+        }
+    )
 
 
 @router.post("/store/{store_id}/test", response_model=APIResponse)
@@ -284,12 +298,14 @@ async def test_store_devices(
         online=online_count,
         tenant_id=tenant_id,
     )
-    return APIResponse(data={
-        "store_id": store_id,
-        "results": results,
-        "total": len(results),
-        "online": online_count,
-    })
+    return APIResponse(
+        data={
+            "store_id": store_id,
+            "results": results,
+            "total": len(results),
+            "online": online_count,
+        }
+    )
 
 
 @router.post("/store/{store_id}/test/{instance_id}", response_model=APIResponse)
@@ -310,6 +326,7 @@ async def test_single_device(
 
 
 # ─── 硬件模板接口 ───
+
 
 @router.post("/templates", response_model=APIResponse)
 async def create_template(

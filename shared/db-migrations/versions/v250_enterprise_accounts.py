@@ -8,8 +8,8 @@
 多进程部署时 authorize_sign 存在竞态风险（check_credit→扣额度无锁）。
 此迁移将数据持久化到DB，并通过原子SQL消除竞态。
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v250"
 down_revision = "v249"

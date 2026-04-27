@@ -2,9 +2,8 @@
 品智库存同步模块
 拉取品智库存/食材数据并映射为屯象 Ontology Ingredient 格式
 """
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 import structlog
 
@@ -39,9 +38,7 @@ class PinzhiInventorySync:
         params = {"ognid": store_id}
         params = self.adapter._add_sign(params)
         try:
-            response = await self.adapter._request(
-                "GET", "/pinzhi/queryInventory.do", params=params
-            )
+            response = await self.adapter._request("GET", "/pinzhi/queryInventory.do", params=params)
             items = response.get("data", [])
         except (ConnectionError, TimeoutError, Exception) as exc:
             logger.warning(
@@ -83,19 +80,13 @@ class PinzhiInventorySync:
             屯象标准食材字典
         """
         # 价格（分）
-        unit_price_fen = int(
-            pinzhi_item.get("unitPrice", pinzhi_item.get("costPrice", 0))
-        )
+        unit_price_fen = int(pinzhi_item.get("unitPrice", pinzhi_item.get("costPrice", 0)))
 
         # 库存数量
-        stock_qty = float(
-            pinzhi_item.get("stockQty", pinzhi_item.get("quantity", 0))
-        )
+        stock_qty = float(pinzhi_item.get("stockQty", pinzhi_item.get("quantity", 0)))
 
         # 预警阈值
-        alert_qty = float(
-            pinzhi_item.get("alertQty", pinzhi_item.get("minStock", 0))
-        )
+        alert_qty = float(pinzhi_item.get("alertQty", pinzhi_item.get("minStock", 0)))
 
         # 状态
         status_val = pinzhi_item.get("status", 1)
@@ -103,23 +94,13 @@ class PinzhiInventorySync:
 
         return {
             "ingredient_id": str(
-                pinzhi_item.get("ingredientId",
-                                pinzhi_item.get("practiceId",
-                                                pinzhi_item.get("id", "")))
+                pinzhi_item.get("ingredientId", pinzhi_item.get("practiceId", pinzhi_item.get("id", "")))
             ),
             "ingredient_name": str(
-                pinzhi_item.get("ingredientName",
-                                pinzhi_item.get("practiceName",
-                                                pinzhi_item.get("name", "")))
+                pinzhi_item.get("ingredientName", pinzhi_item.get("practiceName", pinzhi_item.get("name", "")))
             ),
-            "ingredient_code": str(
-                pinzhi_item.get("ingredientCode",
-                                pinzhi_item.get("code", ""))
-            ),
-            "category": str(
-                pinzhi_item.get("category",
-                                pinzhi_item.get("typeName", ""))
-            ),
+            "ingredient_code": str(pinzhi_item.get("ingredientCode", pinzhi_item.get("code", ""))),
+            "category": str(pinzhi_item.get("category", pinzhi_item.get("typeName", ""))),
             "unit": str(pinzhi_item.get("unit", "g")),
             "unit_price_fen": unit_price_fen,
             "stock_qty": stock_qty,
@@ -128,9 +109,7 @@ class PinzhiInventorySync:
             "supplier_id": str(pinzhi_item.get("supplierId", "")),
             "supplier_name": str(pinzhi_item.get("supplierName", "")),
             "shelf_life_days": int(pinzhi_item.get("shelfLifeDays", 0)),
-            "storage_condition": str(
-                pinzhi_item.get("storageCondition", "normal")
-            ),
+            "storage_condition": str(pinzhi_item.get("storageCondition", "normal")),
             "last_purchase_date": pinzhi_item.get("lastPurchaseDate"),
             "expiry_date": pinzhi_item.get("expiryDate"),
             "batch_no": pinzhi_item.get("batchNo"),

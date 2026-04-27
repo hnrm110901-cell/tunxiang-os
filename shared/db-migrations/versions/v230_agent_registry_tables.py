@@ -1,8 +1,9 @@
 """Agent Registry 数据模型 — agent_templates / agent_versions / agent_deployments
 Revision: v230
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v230"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- agent_templates Agent模板表 ---
 
-    if 'agent_templates' not in existing:
+    if "agent_templates" not in existing:
         op.create_table(
             "agent_templates",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -63,7 +62,7 @@ def upgrade() -> None:
 
         # --- agent_versions Agent版本表 ---
 
-    if 'agent_versions' not in existing:
+    if "agent_versions" not in existing:
         op.create_table(
             "agent_versions",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -83,8 +82,11 @@ def upgrade() -> None:
         op.create_index("ix_av_tenant", "agent_versions", ["tenant_id"])
         op.create_index("ix_av_template", "agent_versions", ["template_id"])
         op.create_foreign_key(
-            "fk_av_template", "agent_versions", "agent_templates",
-            ["template_id"], ["id"],
+            "fk_av_template",
+            "agent_versions",
+            "agent_templates",
+            ["template_id"],
+            ["id"],
         )
         op.execute("""
             ALTER TABLE agent_versions
@@ -94,7 +96,7 @@ def upgrade() -> None:
 
         # --- agent_deployments Agent部署表 ---
 
-    if 'agent_deployments' not in existing:
+    if "agent_deployments" not in existing:
         op.create_table(
             "agent_deployments",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -117,15 +119,20 @@ def upgrade() -> None:
         op.create_index("ix_ad_template", "agent_deployments", ["template_id"])
         op.create_index("ix_agent_deployment_scope", "agent_deployments", ["scope_type", "scope_id"])
         op.create_foreign_key(
-            "fk_ad_template", "agent_deployments", "agent_templates",
-            ["template_id"], ["id"],
+            "fk_ad_template",
+            "agent_deployments",
+            "agent_templates",
+            ["template_id"],
+            ["id"],
         )
         op.create_foreign_key(
-            "fk_ad_version", "agent_deployments", "agent_versions",
-            ["version_id"], ["id"],
+            "fk_ad_version",
+            "agent_deployments",
+            "agent_versions",
+            ["version_id"],
+            ["id"],
         )
         _add_rls("agent_deployments", "ad")
-
 
 
 def downgrade() -> None:

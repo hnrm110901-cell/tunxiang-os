@@ -9,6 +9,7 @@ Feature Flag Client 单元测试
 - FlagContext 维度组合
 - 高风险 Flag 默认关闭
 """
+
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -32,10 +33,10 @@ from shared.feature_flags.flag_names import (
     TradeFlags,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def reset_global_client():
@@ -157,12 +158,8 @@ def flags_dir(tmp_path: Path) -> Path:
         ]
     }
 
-    (growth_dir / "growth_hub_flags.yaml").write_text(
-        yaml.dump(growth_flags, allow_unicode=True), encoding="utf-8"
-    )
-    (agents_dir / "agent_flags.yaml").write_text(
-        yaml.dump(agent_flags, allow_unicode=True), encoding="utf-8"
-    )
+    (growth_dir / "growth_hub_flags.yaml").write_text(yaml.dump(growth_flags, allow_unicode=True), encoding="utf-8")
+    (agents_dir / "agent_flags.yaml").write_text(yaml.dump(agent_flags, allow_unicode=True), encoding="utf-8")
 
     return tmp_path
 
@@ -186,8 +183,8 @@ def pilot_client(flags_dir: Path) -> FeatureFlagClient:
 # 测试组 1：Flag 默认值（dev vs prod 环境差异）
 # ---------------------------------------------------------------------------
 
-class TestFlagDefaultValues:
 
+class TestFlagDefaultValues:
     def test_journey_v2_enabled_in_dev(self, dev_client: FeatureFlagClient):
         """dev 环境下 Journey V2 应默认开启。"""
         assert dev_client.is_enabled(GrowthFlags.JOURNEY_V2) is True
@@ -218,9 +215,7 @@ class TestFlagDefaultValues:
         assert prod_client.is_enabled(AgentFlags.L3_AUTONOMY) is False
         assert pilot_client.is_enabled(AgentFlags.L3_AUTONOMY) is False
 
-    def test_touch_frequency_control_enabled_in_pilot(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_touch_frequency_control_enabled_in_pilot(self, pilot_client: FeatureFlagClient):
         """触达频控在 pilot 环境默认开启。"""
         assert pilot_client.is_enabled(GrowthFlags.TOUCH_FREQUENCY_CONTROL) is True
 
@@ -229,11 +224,9 @@ class TestFlagDefaultValues:
 # 测试组 2：环境变量覆盖（最高优先级）
 # ---------------------------------------------------------------------------
 
-class TestEnvVarOverride:
 
-    def test_env_var_true_overrides_yaml_false(
-        self, prod_client: FeatureFlagClient
-    ):
+class TestEnvVarOverride:
+    def test_env_var_true_overrides_yaml_false(self, prod_client: FeatureFlagClient):
         """环境变量 true 应覆盖 YAML 中的 false。"""
         with patch.dict(
             os.environ,
@@ -241,9 +234,7 @@ class TestEnvVarOverride:
         ):
             assert prod_client.is_enabled(GrowthFlags.JOURNEY_V2) is True
 
-    def test_env_var_false_overrides_yaml_true(
-        self, dev_client: FeatureFlagClient
-    ):
+    def test_env_var_false_overrides_yaml_true(self, dev_client: FeatureFlagClient):
         """环境变量 false 应覆盖 YAML 中的 true。"""
         with patch.dict(
             os.environ,
@@ -283,9 +274,7 @@ class TestEnvVarOverride:
         ):
             assert prod_client.is_enabled(GrowthFlags.JOURNEY_V2) is True
 
-    def test_env_var_dot_replaced_with_underscore(
-        self, prod_client: FeatureFlagClient
-    ):
+    def test_env_var_dot_replaced_with_underscore(self, prod_client: FeatureFlagClient):
         """Flag 名称中的点号应替换为下划线构成环境变量名。"""
         # growth.touch.frequency_control.enable → FEATURE_GROWTH_TOUCH_FREQUENCY_CONTROL_ENABLE
         with patch.dict(
@@ -299,68 +288,50 @@ class TestEnvVarOverride:
 # 测试组 3：targeting_rules 评估
 # ---------------------------------------------------------------------------
 
-class TestTargetingRules:
 
-    def test_brand_id_targeting_enables_flag_for_pilot_brand(
-        self, pilot_client: FeatureFlagClient
-    ):
+class TestTargetingRules:
+    def test_brand_id_targeting_enables_flag_for_pilot_brand(self, pilot_client: FeatureFlagClient):
         """pilot_brand_001 应通过 targeting_rules 在 pilot 环境开启 Journey V2。"""
         ctx = FlagContext(brand_id="pilot_brand_001")
         assert pilot_client.is_enabled(GrowthFlags.JOURNEY_V2, ctx) is True
 
-    def test_brand_id_targeting_keeps_flag_off_for_other_brand(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_brand_id_targeting_keeps_flag_off_for_other_brand(self, pilot_client: FeatureFlagClient):
         """非 pilot 品牌不应通过 targeting_rules 开启 Journey V2。"""
         ctx = FlagContext(brand_id="some_other_brand")
         assert pilot_client.is_enabled(GrowthFlags.JOURNEY_V2, ctx) is False
 
-    def test_store_id_targeting_enables_flag_in_prod(
-        self, prod_client: FeatureFlagClient
-    ):
+    def test_store_id_targeting_enables_flag_in_prod(self, prod_client: FeatureFlagClient):
         """vip_store_001 应通过 targeting_rules 在 prod 环境开启 Journey V2。"""
         ctx = FlagContext(store_id="vip_store_001")
         assert prod_client.is_enabled(GrowthFlags.JOURNEY_V2, ctx) is True
 
-    def test_store_id_targeting_keeps_flag_off_for_non_vip(
-        self, prod_client: FeatureFlagClient
-    ):
+    def test_store_id_targeting_keeps_flag_off_for_non_vip(self, prod_client: FeatureFlagClient):
         """普通门店不应通过 targeting_rules 在 prod 开启 Journey V2。"""
         ctx = FlagContext(store_id="normal_store_999")
         assert prod_client.is_enabled(GrowthFlags.JOURNEY_V2, ctx) is False
 
-    def test_role_code_l3_enables_auto_publish_in_pilot(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_role_code_l3_enables_auto_publish_in_pilot(self, pilot_client: FeatureFlagClient):
         """L3 角色应在 pilot 环境通过 targeting_rules 开启 auto_publish。"""
         ctx = FlagContext(role_code="L3")
         assert pilot_client.is_enabled(GrowthFlags.AGENT_AUTO_PUBLISH, ctx) is True
 
-    def test_role_code_l1_keeps_auto_publish_off_in_pilot(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_role_code_l1_keeps_auto_publish_off_in_pilot(self, pilot_client: FeatureFlagClient):
         """L1 角色不应在 pilot 开启 auto_publish（高风险 Flag 仅 L3）。"""
         ctx = FlagContext(role_code="L1")
         assert pilot_client.is_enabled(GrowthFlags.AGENT_AUTO_PUBLISH, ctx) is False
 
-    def test_empty_values_list_does_not_enable_flag(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_empty_values_list_does_not_enable_flag(self, pilot_client: FeatureFlagClient):
         """targeting_rules 中 values 为空列表时，不应定向开启任何 context。"""
         # L3 自治 Flag 的 store_id values 为空列表，不应开启
         ctx = FlagContext(store_id="any_store_id")
         assert pilot_client.is_enabled(AgentFlags.L3_AUTONOMY, ctx) is False
 
-    def test_targeting_rules_without_context_returns_base_value(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_targeting_rules_without_context_returns_base_value(self, pilot_client: FeatureFlagClient):
         """没有 context 时，仅返回 YAML 环境基准值（pilot 为 False）。"""
         # pilot 环境 Journey V2 基准值为 False，无 context 时直接返回 False
         assert pilot_client.is_enabled(GrowthFlags.JOURNEY_V2) is False
 
-    def test_prod_role_code_enables_discount_alert(
-        self, prod_client: FeatureFlagClient
-    ):
+    def test_prod_role_code_enables_discount_alert(self, prod_client: FeatureFlagClient):
         """prod 环境 L1/L2/L3 应通过 targeting_rules 开启折扣预警。"""
         for role in ["L1", "L2", "L3"]:
             ctx = FlagContext(role_code=role)
@@ -371,15 +342,13 @@ class TestTargetingRules:
 # 测试组 4：未定义 Flag
 # ---------------------------------------------------------------------------
 
-class TestUndefinedFlag:
 
+class TestUndefinedFlag:
     def test_undefined_flag_returns_false(self, dev_client: FeatureFlagClient):
         """未定义的 Flag 应返回 False（fail-safe 原则）。"""
         assert dev_client.is_enabled("some.nonexistent.flag") is False
 
-    def test_undefined_flag_with_context_returns_false(
-        self, dev_client: FeatureFlagClient
-    ):
+    def test_undefined_flag_with_context_returns_false(self, dev_client: FeatureFlagClient):
         """未定义的 Flag 即使带 context 也应返回 False。"""
         ctx = FlagContext(brand_id="pilot_brand_001", role_code="L3")
         assert dev_client.is_enabled("some.nonexistent.flag", ctx) is False
@@ -389,8 +358,8 @@ class TestUndefinedFlag:
 # 测试组 5：FlagContext 维度组合
 # ---------------------------------------------------------------------------
 
-class TestFlagContextCombinations:
 
+class TestFlagContextCombinations:
     def test_context_with_all_dimensions(self, prod_client: FeatureFlagClient):
         """完整的多维度 context 不应影响基准关闭的 Flag。"""
         ctx = FlagContext(
@@ -423,17 +392,13 @@ class TestFlagContextCombinations:
         assert ctx.get_dimension_value("edge_node_group") == "group_a"
         assert ctx.get_dimension_value("nonexistent_dim") is None
 
-    def test_empty_context_falls_back_to_base_value(
-        self, dev_client: FeatureFlagClient
-    ):
+    def test_empty_context_falls_back_to_base_value(self, dev_client: FeatureFlagClient):
         """空 context（所有维度为 None）应退化为 YAML 环境基准值。"""
         empty_ctx = FlagContext()
         # dev 环境 Journey V2 基准值为 True
         assert dev_client.is_enabled(GrowthFlags.JOURNEY_V2, empty_ctx) is True
 
-    def test_partial_context_matches_only_matching_dimension(
-        self, pilot_client: FeatureFlagClient
-    ):
+    def test_partial_context_matches_only_matching_dimension(self, pilot_client: FeatureFlagClient):
         """部分维度的 context 仅匹配包含该维度的 targeting_rules。"""
         # 只提供 brand_id，不提供 store_id
         ctx = FlagContext(brand_id="pilot_brand_001")
@@ -445,8 +410,8 @@ class TestFlagContextCombinations:
 # 测试组 6：全局单例 + 便捷函数
 # ---------------------------------------------------------------------------
 
-class TestGlobalSingleton:
 
+class TestGlobalSingleton:
     def test_get_flag_client_returns_same_instance(self, flags_dir: Path):
         """全局单例应返回同一实例。"""
         with patch.dict(
@@ -483,13 +448,17 @@ class TestGlobalSingleton:
 # 测试组 7：Flag 名称常量完整性
 # ---------------------------------------------------------------------------
 
-class TestFlagNameConstants:
 
+class TestFlagNameConstants:
     def test_growth_flags_all_defined(self):
         """GrowthFlags 所有常量都应有值。"""
         for attr in [
-            "JOURNEY_V2", "RECALL_V2", "AGENT_AUTO_PUBLISH",
-            "TOUCH_FREQUENCY_CONTROL", "CUSTOMER_360", "SERVICE_REPAIR",
+            "JOURNEY_V2",
+            "RECALL_V2",
+            "AGENT_AUTO_PUBLISH",
+            "TOUCH_FREQUENCY_CONTROL",
+            "CUSTOMER_360",
+            "SERVICE_REPAIR",
         ]:
             val = getattr(GrowthFlags, attr)
             assert isinstance(val, str) and len(val) > 0
@@ -497,9 +466,16 @@ class TestFlagNameConstants:
     def test_agent_flags_all_defined(self):
         """AgentFlags 所有常量都应有值。"""
         for attr in [
-            "HR_SHIFT_SUGGEST", "HR_SHIFT_AUTO_EXECUTE", "GROWTH_DORMANT_RECALL",
-            "GROWTH_MEMBER_INSIGHT", "OPS_DAILY_REVIEW", "TRADE_DISCOUNT_ALERT",
-            "FINANCE_PNL_SUMMARY", "ORG_ATTRITION_RISK", "WECOM_NOTIFY", "L3_AUTONOMY",
+            "HR_SHIFT_SUGGEST",
+            "HR_SHIFT_AUTO_EXECUTE",
+            "GROWTH_DORMANT_RECALL",
+            "GROWTH_MEMBER_INSIGHT",
+            "OPS_DAILY_REVIEW",
+            "TRADE_DISCOUNT_ALERT",
+            "FINANCE_PNL_SUMMARY",
+            "ORG_ATTRITION_RISK",
+            "WECOM_NOTIFY",
+            "L3_AUTONOMY",
         ]:
             val = getattr(AgentFlags, attr)
             assert isinstance(val, str) and len(val) > 0

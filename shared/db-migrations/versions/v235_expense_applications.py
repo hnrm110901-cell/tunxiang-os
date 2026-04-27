@@ -20,8 +20,8 @@ Revises: v234
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v235"
 down_revision = "v234c"
@@ -35,7 +35,7 @@ _RLS_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUI
 def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
-    if 'expense_applications' in existing:
+    if "expense_applications" in existing:
         return
 
     # ──────────────────────────────────────────────────────────────────

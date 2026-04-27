@@ -9,6 +9,7 @@
 
 当 SMS_ACCESS_KEY_ID 未配置时自动进入 Mock 模式，仅打印日志不发真实短信。
 """
+
 from __future__ import annotations
 
 import base64
@@ -18,7 +19,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote
 
 import structlog
@@ -234,9 +235,7 @@ class SMSService:
     #  内部：阿里云 SMS API
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    async def _call_aliyun_sms(
-        self, phone: str, template_key: str, params: dict[str, str]
-    ) -> dict[str, Any]:
+    async def _call_aliyun_sms(self, phone: str, template_key: str, params: dict[str, str]) -> dict[str, Any]:
         """调用阿里云 dysmsapi SendSms 接口"""
         import aiohttp
 
@@ -264,28 +263,22 @@ class SMSService:
         signature = self._calc_aliyun_signature(query_params)
         query_params["Signature"] = signature
 
-        async with aiohttp.ClientSession() as session, session.get(
-            api_url, params=query_params, timeout=aiohttp.ClientTimeout(total=10)
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(api_url, params=query_params, timeout=aiohttp.ClientTimeout(total=10)) as resp,
+        ):
             result = await resp.json()
             if result.get("Code") != "OK":
-                raise ValueError(
-                    f"Aliyun SMS error: {result.get('Code')} - {result.get('Message')}"
-                )
+                raise ValueError(f"Aliyun SMS error: {result.get('Code')} - {result.get('Message')}")
             return result
 
     def _calc_aliyun_signature(self, params: dict[str, str]) -> str:
         """计算阿里云 API 签名（HMAC-SHA1）"""
         sorted_params = sorted(params.items())
-        canonicalized = "&".join(
-            f"{quote(k, safe='')}" + "=" + f"{quote(str(v), safe='')}"
-            for k, v in sorted_params
-        )
+        canonicalized = "&".join(f"{quote(k, safe='')}" + "=" + f"{quote(str(v), safe='')}" for k, v in sorted_params)
         string_to_sign = f"GET&{quote('/', safe='')}&{quote(canonicalized, safe='')}"
         signing_key = (self._access_key_secret + "&").encode("utf-8")
-        signature = hmac.new(
-            signing_key, string_to_sign.encode("utf-8"), hashlib.sha1
-        ).digest()
+        signature = hmac.new(signing_key, string_to_sign.encode("utf-8"), hashlib.sha1).digest()
         return base64.b64encode(signature).decode("utf-8")
 
     async def _query_aliyun_status(self, biz_id: str) -> dict[str, Any]:
@@ -297,9 +290,7 @@ class SMSService:
     #  内部：腾讯云 SMS API
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    async def _call_tencent_sms(
-        self, phone: str, template_key: str, params: dict[str, str]
-    ) -> dict[str, Any]:
+    async def _call_tencent_sms(self, phone: str, template_key: str, params: dict[str, str]) -> dict[str, Any]:
         """调用腾讯云 SMS SendSms 接口
 
         使用 TC3-HMAC-SHA256 签名。
@@ -324,63 +315,49 @@ class SMSService:
         timestamp = str(int(datetime.now(timezone.utc).timestamp()))
         headers = self._build_tencent_headers(payload, timestamp)
 
-        async with aiohttp.ClientSession() as session, session.post(
-            api_url,
-            json=payload,
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                api_url,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
             result = await resp.json()
             response = result.get("Response", {})
             if response.get("Error"):
                 raise ValueError(
-                    f"Tencent SMS error: {response['Error'].get('Code')} - "
-                    f"{response['Error'].get('Message')}"
+                    f"Tencent SMS error: {response['Error'].get('Code')} - {response['Error'].get('Message')}"
                 )
             return response
 
-    def _build_tencent_headers(
-        self, payload: dict[str, Any], timestamp: str
-    ) -> dict[str, str]:
+    def _build_tencent_headers(self, payload: dict[str, Any], timestamp: str) -> dict[str, str]:
         """构建腾讯云 TC3-HMAC-SHA256 签名 headers"""
         service = "sms"
         host = "sms.tencentcloudapi.com"
-        date = datetime.fromtimestamp(
-            int(timestamp), tz=timezone.utc
-        ).strftime("%Y-%m-%d")
+        date = datetime.fromtimestamp(int(timestamp), tz=timezone.utc).strftime("%Y-%m-%d")
 
         # Step 1: 拼接规范请求串
         payload_str = json.dumps(payload, separators=(",", ":"))
         hashed_payload = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
         canonical_request = (
-            f"POST\n/\n\n"
-            f"content-type:application/json\n"
-            f"host:{host}\n\n"
-            f"content-type;host\n"
-            f"{hashed_payload}"
+            f"POST\n/\n\ncontent-type:application/json\nhost:{host}\n\ncontent-type;host\n{hashed_payload}"
         )
 
         # Step 2: 拼接待签名字符串
         credential_scope = f"{date}/{service}/tc3_request"
-        hashed_canonical = hashlib.sha256(
-            canonical_request.encode("utf-8")
-        ).hexdigest()
-        string_to_sign = (
-            f"TC3-HMAC-SHA256\n{timestamp}\n{credential_scope}\n{hashed_canonical}"
-        )
+        hashed_canonical = hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
+        string_to_sign = f"TC3-HMAC-SHA256\n{timestamp}\n{credential_scope}\n{hashed_canonical}"
 
         # Step 3: 计算签名
         def _hmac_sha256(key: bytes, msg: str) -> bytes:
             return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
 
-        secret_date = _hmac_sha256(
-            f"TC3{self._access_key_secret}".encode("utf-8"), date
-        )
+        secret_date = _hmac_sha256(f"TC3{self._access_key_secret}".encode("utf-8"), date)
         secret_service = _hmac_sha256(secret_date, service)
         secret_signing = _hmac_sha256(secret_service, "tc3_request")
-        signature = hmac.new(
-            secret_signing, string_to_sign.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(secret_signing, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
 
         # Step 4: 拼接 Authorization
         authorization = (

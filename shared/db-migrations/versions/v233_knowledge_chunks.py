@@ -9,8 +9,8 @@ Revises: v232
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v233b"
 down_revision = "v233"
@@ -23,14 +23,12 @@ _SAFE_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uu
 def upgrade() -> None:
     # Ensure vector extension is active (may have been skipped in v231b)
     conn = op.get_bind()
-    row = conn.execute(sa.text(
-        "SELECT count(*) FROM pg_available_extensions WHERE name = 'vector'"
-    )).scalar()
+    row = conn.execute(sa.text("SELECT count(*) FROM pg_available_extensions WHERE name = 'vector'")).scalar()
     if row:
         conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS vector"))
 
     existing = sa.inspect(conn).get_table_names()
-    if 'knowledge_chunks' in existing:
+    if "knowledge_chunks" in existing:
         return
 
     op.execute("""

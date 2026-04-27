@@ -8,12 +8,13 @@
 Revision ID: v256
 Revises: v255
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "v256"
+revision = "v297"
 down_revision = "v255"
 branch_labels = None
 depends_on = None

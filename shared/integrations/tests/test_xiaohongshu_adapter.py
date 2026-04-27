@@ -2,6 +2,7 @@
 
 覆盖 Mock 模式下的核心功能，确保适配器在无凭据时优雅降级。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -13,6 +14,7 @@ class TestXiaohongshuMarketingAdapter:
     @pytest.fixture
     def adapter(self):
         from shared.integrations.xiaohongshu_marketing import XiaohongshuMarketingAdapter
+
         return XiaohongshuMarketingAdapter()
 
     def test_mock_mode(self, adapter) -> None:

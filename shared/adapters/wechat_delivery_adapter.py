@@ -13,11 +13,12 @@
 当前阶段：Mock 模式，不调用真实配送 API。
 接入真实配送商 API 时切换内部方法即可。
 """
+
 from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 
@@ -30,13 +31,13 @@ logger = structlog.get_logger()
 
 # ── 微信自有外卖订单状态 → 屯象统一状态 ──────────────────
 WECHAT_STATUS_MAP: Dict[str, str] = {
-    "pending": "pending",          # 待接单
-    "confirmed": "confirmed",      # 已接单
-    "preparing": "preparing",      # 备餐中
-    "dispatching": "delivering",   # 配送中
-    "delivered": "completed",      # 已送达
-    "cancelled": "cancelled",      # 已取消
-    "refunded": "refunded",        # 已退款
+    "pending": "pending",  # 待接单
+    "confirmed": "confirmed",  # 已接单
+    "preparing": "preparing",  # 备餐中
+    "dispatching": "delivering",  # 配送中
+    "delivered": "completed",  # 已送达
+    "cancelled": "cancelled",  # 已取消
+    "refunded": "refunded",  # 已退款
 }
 
 # 可用配送商
@@ -79,9 +80,7 @@ class WeChatDeliveryAdapter(DeliveryPlatformAdapter):
 
     # ── DeliveryPlatformAdapter 接口实现 ──────────────────
 
-    async def pull_orders(
-        self, store_id: str, since: datetime
-    ) -> list[dict]:
+    async def pull_orders(self, store_id: str, since: datetime) -> list[dict]:
         """拉取自有外卖新订单
 
         微信自有外卖的订单直接通过小程序下单进入 tx-trade，
@@ -106,9 +105,7 @@ class WeChatDeliveryAdapter(DeliveryPlatformAdapter):
         logger.info("wechat_mark_ready", order_id=order_id)
         return True
 
-    async def sync_menu(
-        self, store_id: str, dishes: list[dict]
-    ) -> dict:
+    async def sync_menu(self, store_id: str, dishes: list[dict]) -> dict:
         """同步菜单（自有外卖不需要同步到第三方平台，直接管理可售菜品）"""
         logger.info("wechat_sync_menu", store_id=store_id, dish_count=len(dishes))
         return {
@@ -119,9 +116,7 @@ class WeChatDeliveryAdapter(DeliveryPlatformAdapter):
             "note": "self_managed",
         }
 
-    async def update_stock(
-        self, store_id: str, dish_id: str, available: bool
-    ) -> bool:
+    async def update_stock(self, store_id: str, dish_id: str, available: bool) -> bool:
         """更新菜品上下架状态"""
         logger.info("wechat_update_stock", store_id=store_id, dish_id=dish_id, available=available)
         return True
@@ -168,8 +163,7 @@ class WeChatDeliveryAdapter(DeliveryPlatformAdapter):
             raise DeliveryPlatformError(
                 platform=self.PLATFORM_NAME,
                 code=400,
-                message=f"Unsupported delivery provider: {provider}, "
-                        f"available: {', '.join(self.delivery_providers)}",
+                message=f"Unsupported delivery provider: {provider}, available: {', '.join(self.delivery_providers)}",
             )
 
         delivery_info: dict[str, Any] = {
@@ -186,9 +180,7 @@ class WeChatDeliveryAdapter(DeliveryPlatformAdapter):
         else:
             delivery_info["delivery_type"] = "third_party"
             delivery_info["estimated_minutes"] = 30
-            delivery_info["delivery_fee_fen"] = (
-                delivery_data.get("fee_fen", 500) if delivery_data else 500
-            )
+            delivery_info["delivery_fee_fen"] = delivery_data.get("fee_fen", 500) if delivery_data else 500
 
         logger.info("wechat_delivery_dispatched", order_id=order_id, provider=provider)
         return delivery_info

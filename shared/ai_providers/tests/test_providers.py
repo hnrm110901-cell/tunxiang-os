@@ -7,13 +7,11 @@
 运行方式：
     pytest shared/ai_providers/tests/test_providers.py -v
 """
+
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import os
-import re
-from typing import Any, AsyncGenerator, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,17 +25,14 @@ from shared.ai_providers.security import (
     MaskContext,
 )
 from shared.ai_providers.types import (
-    LLMResponse,
-    ModelInfo,
     ModelTier,
-    ProviderHealth,
     ProviderName,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. 模型注册表
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestModelRegistry:
     """test_model_registry -- 验证 19 个模型全部注册且定价非零。"""
@@ -45,8 +40,7 @@ class TestModelRegistry:
     def test_model_registry_has_expected_models(self) -> None:
         """注册表应包含 17 个模型（3 Anthropic + 2 DeepSeek + 4 Qwen + 2 GLM + 2 ERNIE + 2 Kimi + 2 CoreML）。"""
         assert len(MODEL_REGISTRY) == 17, (
-            f"预期 17 个模型，实际 {len(MODEL_REGISTRY)}。"
-            f" 已注册: {sorted(MODEL_REGISTRY.keys())}"
+            f"预期 17 个模型，实际 {len(MODEL_REGISTRY)}。 已注册: {sorted(MODEL_REGISTRY.keys())}"
         )
 
     def test_all_models_have_pricing(self) -> None:
@@ -56,12 +50,8 @@ class TestModelRegistry:
             if model_id in free_models:
                 # 免费模型允许定价为零
                 continue
-            assert info.pricing.input_rmb_per_million > 0, (
-                f"模型 {model_id} 的输入定价为零"
-            )
-            assert info.pricing.output_rmb_per_million > 0, (
-                f"模型 {model_id} 的输出定价为零"
-            )
+            assert info.pricing.input_rmb_per_million > 0, f"模型 {model_id} 的输入定价为零"
+            assert info.pricing.output_rmb_per_million > 0, f"模型 {model_id} 的输出定价为零"
 
     def test_all_models_have_required_fields(self) -> None:
         """每个注册模型都应包含必要字段。"""
@@ -95,6 +85,7 @@ class TestModelRegistry:
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Provider 配置加载
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestProviderConfigLoading:
     """test_provider_config_loading -- 验证环境变量加载逻辑。"""
@@ -153,9 +144,7 @@ class TestProviderConfigLoading:
                 # 但 load_provider_configs 用 "true" if api_key else "false"
                 # 空字符串是 falsy，所以应该被禁用
                 if not cfg.api_key:
-                    assert cfg.enabled is False, (
-                        f"{provider.value} 无 API Key 时应被禁用"
-                    )
+                    assert cfg.enabled is False, f"{provider.value} 无 API Key 时应被禁用"
 
     def test_custom_base_url(self) -> None:
         """自定义 BASE_URL 应正确加载。"""
@@ -172,6 +161,7 @@ class TestProviderConfigLoading:
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. 数据安全脱敏
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestDataSecurityMasking:
     """test_data_security_masking -- 验证手机号、身份证、银行卡脱敏。"""
@@ -236,6 +226,7 @@ class TestDataSecurityMasking:
 # 4. 数据安全还原
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestDataSecurityUnmask:
     """test_data_security_unmask -- 验证响应还原。"""
 
@@ -293,6 +284,7 @@ class TestDataSecurityUnmask:
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Provider 权限校验
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestProviderClearance:
     """test_provider_clearance -- 验证 Anthropic 无法处理 SENSITIVE 数据。"""
@@ -364,6 +356,7 @@ class TestProviderClearance:
 # 6. 任务路由策略
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestTaskRoutingStrategy:
     """test_task_routing_strategy -- 验证任务路由链的正确性。"""
 
@@ -403,21 +396,18 @@ class TestTaskRoutingStrategy:
         min_price = min(m.pricing.input_rmb_per_million for m in models)
         max_price = max(m.pricing.input_rmb_per_million for m in models)
         # 应有明显的价格梯度
-        assert max_price > min_price * 2, (
-            f"STANDARD tier 价格梯度不足: min={min_price}, max={max_price}"
-        )
+        assert max_price > min_price * 2, f"STANDARD tier 价格梯度不足: min={min_price}, max={max_price}"
 
     def test_data_clearance_matrix_completeness(self) -> None:
         """权限矩阵应覆盖所有 Provider。"""
         for provider in ProviderName:
-            assert provider.value in PROVIDER_DATA_CLEARANCE, (
-                f"{provider.value} 未在 PROVIDER_DATA_CLEARANCE 中定义"
-            )
+            assert provider.value in PROVIDER_DATA_CLEARANCE, f"{provider.value} 未在 PROVIDER_DATA_CLEARANCE 中定义"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. MigrationRouter 兼容性
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestMigrationRouterCompat:
     """test_migration_router_compat -- 验证 MigrationRouter 返回 str 类型。"""
@@ -451,15 +441,23 @@ class TestMigrationRouterCompat:
     async def test_complete_signature_matches_old_router(self) -> None:
         """MigrationRouter.complete 签名应包含所有旧参数。"""
         import inspect
+
         from shared.ai_providers.migration import MigrationRouter
 
         sig = inspect.signature(MigrationRouter.complete)
         param_names = list(sig.parameters.keys())
 
         expected_params = [
-            "self", "tenant_id", "task_type", "messages",
-            "system", "urgency", "max_tokens", "timeout_s",
-            "request_id", "db",
+            "self",
+            "tenant_id",
+            "task_type",
+            "messages",
+            "system",
+            "urgency",
+            "max_tokens",
+            "timeout_s",
+            "request_id",
+            "db",
         ]
         for p in expected_params:
             assert p in param_names, f"缺少参数: {p}"
@@ -468,14 +466,20 @@ class TestMigrationRouterCompat:
     async def test_stream_complete_signature_matches_old_router(self) -> None:
         """MigrationRouter.stream_complete 签名应包含所有旧参数。"""
         import inspect
+
         from shared.ai_providers.migration import MigrationRouter
 
         sig = inspect.signature(MigrationRouter.stream_complete)
         param_names = list(sig.parameters.keys())
 
         expected_params = [
-            "self", "tenant_id", "task_type", "messages",
-            "system", "urgency", "max_tokens",
+            "self",
+            "tenant_id",
+            "task_type",
+            "messages",
+            "system",
+            "urgency",
+            "max_tokens",
         ]
         for p in expected_params:
             assert p in param_names, f"缺少参数: {p}"
@@ -542,6 +546,7 @@ class TestMigrationRouterCompat:
 # 8. A/B 测试确定性分配
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestABTestDeterministicAssignment:
     """test_ab_test_deterministic_assignment -- 验证同租户分配到同变体。
 
@@ -565,46 +570,35 @@ class TestABTestDeterministicAssignment:
         tenant_id = "tenant-abc-123"
         experiment_id = "exp-provider-routing-v1"
 
-        results = [
-            self._assign_variant(tenant_id, experiment_id)
-            for _ in range(100)
-        ]
+        results = [self._assign_variant(tenant_id, experiment_id) for _ in range(100)]
         # 所有结果应相同
         assert len(set(results)) == 1
 
     def test_different_tenants_vary(self) -> None:
         """不同租户应分散到不同变体（统计上）。"""
         experiment_id = "exp-provider-routing-v1"
-        variants = [
-            self._assign_variant(f"tenant-{i}", experiment_id)
-            for i in range(1000)
-        ]
+        variants = [self._assign_variant(f"tenant-{i}", experiment_id) for i in range(1000)]
         # 至少应有两个不同的变体
         assert len(set(variants)) >= 2
 
     def test_different_experiments_independent(self) -> None:
         """同一租户在不同实验中的分配应独立。"""
         tenant_id = "tenant-fixed-001"
-        variants = [
-            self._assign_variant(tenant_id, f"exp-{i}")
-            for i in range(100)
-        ]
+        variants = [self._assign_variant(tenant_id, f"exp-{i}") for i in range(100)]
         # 不同实验应有分散的结果
         assert len(set(variants)) >= 2
 
     def test_three_way_split(self) -> None:
         """三变体实验应支持 0/1/2 三个桶。"""
         experiment_id = "exp-three-way-v1"
-        variants = {
-            self._assign_variant(f"tenant-{i}", experiment_id, num_variants=3)
-            for i in range(1000)
-        }
+        variants = {self._assign_variant(f"tenant-{i}", experiment_id, num_variants=3) for i in range(1000)}
         assert variants == {0, 1, 2}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. 领域增强术语检测
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestDomainEnhancerTerms:
     """test_domain_enhancer_terms -- 验证餐饮领域术语检测。
@@ -684,6 +678,7 @@ class TestDomainEnhancerTerms:
 # 10. 熔断后自动切换 Provider
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestCircuitBreakerFailover:
     """test_circuit_breaker_failover -- 验证熔断后自动切换 Provider。
 
@@ -726,8 +721,7 @@ class TestCircuitBreakerFailover:
         circuit_open = {ProviderName.ANTHROPIC}
 
         available = [
-            p for p in sorted(providers, key=lambda x: x.priority)
-            if p.provider not in circuit_open and p.enabled
+            p for p in sorted(providers, key=lambda x: x.priority) if p.provider not in circuit_open and p.enabled
         ]
 
         assert len(available) >= 1
@@ -779,8 +773,7 @@ class TestCircuitBreakerFailover:
         circuit_open = {ProviderName.ANTHROPIC}
 
         available = [
-            p for p in sorted(providers, key=lambda x: x.priority)
-            if p.provider not in circuit_open and p.enabled
+            p for p in sorted(providers, key=lambda x: x.priority) if p.provider not in circuit_open and p.enabled
         ]
 
         assert len(available) >= 1

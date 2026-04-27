@@ -1,4 +1,5 @@
 """屯象OS Ontology Registry — 实体所有权注册表"""
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,7 @@ class OntologyRegistry:
 
     def __init__(self, registry: SkillRegistry) -> None:
         self.registry = registry
-        self._entity_owner: dict[str, str] = {}   # {entity_name: skill_name}
+        self._entity_owner: dict[str, str] = {}  # {entity_name: skill_name}
         self._event_emitter: dict[str, str] = {}  # {event_type: skill_name}
         self._conflicts: list[str] = []
         self._warnings: list[str] = []
@@ -126,8 +127,7 @@ class OntologyRegistry:
                 existing_owner = self._entity_owner.get(entity.name)
                 if existing_owner is not None and existing_owner != skill_name:
                     conflict_msg = (
-                        f"[CONFLICT] 实体 '{entity.name}' 被多个 Skill 声明拥有: "
-                        f"'{existing_owner}' vs '{skill_name}'"
+                        f"[CONFLICT] 实体 '{entity.name}' 被多个 Skill 声明拥有: '{existing_owner}' vs '{skill_name}'"
                     )
                     self._conflicts.append(conflict_msg)
                     logger.error(conflict_msg)
@@ -139,8 +139,7 @@ class OntologyRegistry:
                 existing_emitter = self._event_emitter.get(event.type)
                 if existing_emitter is not None and existing_emitter != skill_name:
                     warn_msg = (
-                        f"[WARNING] 事件 '{event.type}' 被多个 Skill 发射: "
-                        f"'{existing_emitter}' vs '{skill_name}'"
+                        f"[WARNING] 事件 '{event.type}' 被多个 Skill 发射: '{existing_emitter}' vs '{skill_name}'"
                     )
                     self._warnings.append(warn_msg)
                     logger.warning(warn_msg)

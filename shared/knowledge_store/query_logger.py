@@ -6,9 +6,10 @@
 - Corrective RAG 触发率
 - 平均相关度分数
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -39,11 +40,10 @@ class KnowledgeQueryLogger:
         try:
             from sqlalchemy import text as sql_text
 
-            await db.execute(sql_text(
-                "SELECT set_config('app.tenant_id', :tid, true)"
-            ), {"tid": tenant_id})
+            await db.execute(sql_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            await db.execute(sql_text("""
+            await db.execute(
+                sql_text("""
                 INSERT INTO knowledge_query_logs (
                     tenant_id, query, collection, query_complexity,
                     retrieved_count, reranked_count, relevance_max,
@@ -53,18 +53,20 @@ class KnowledgeQueryLogger:
                     :retrieved_count, :reranked_count, :relevance_max,
                     :latency_ms, :rewrite_count, :answer_source
                 )
-            """), {
-                "tenant_id": tenant_id,
-                "query": query[:2000],  # 截断过长查询
-                "collection": collection,
-                "complexity": complexity,
-                "retrieved_count": retrieved_count,
-                "reranked_count": reranked_count,
-                "relevance_max": relevance_max,
-                "latency_ms": latency_ms,
-                "rewrite_count": rewrite_count,
-                "answer_source": answer_source,
-            })
+            """),
+                {
+                    "tenant_id": tenant_id,
+                    "query": query[:2000],  # 截断过长查询
+                    "collection": collection,
+                    "complexity": complexity,
+                    "retrieved_count": retrieved_count,
+                    "reranked_count": reranked_count,
+                    "relevance_max": relevance_max,
+                    "latency_ms": latency_ms,
+                    "rewrite_count": rewrite_count,
+                    "answer_source": answer_source,
+                },
+            )
 
             await db.commit()
 
@@ -82,11 +84,10 @@ class KnowledgeQueryLogger:
         try:
             from sqlalchemy import text as sql_text
 
-            await db.execute(sql_text(
-                "SELECT set_config('app.tenant_id', :tid, true)"
-            ), {"tid": tenant_id})
+            await db.execute(sql_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            result = await db.execute(sql_text("""
+            result = await db.execute(
+                sql_text("""
                 SELECT
                     COUNT(*) AS total_queries,
                     AVG(latency_ms) AS avg_latency_ms,
@@ -98,7 +99,9 @@ class KnowledgeQueryLogger:
                 FROM knowledge_query_logs
                 WHERE tenant_id = :tenant_id::uuid
                 AND created_at >= NOW() - MAKE_INTERVAL(days => :days)
-            """), {"tenant_id": tenant_id, "days": days})
+            """),
+                {"tenant_id": tenant_id, "days": days},
+            )
 
             row = result.fetchone()
             if not row:

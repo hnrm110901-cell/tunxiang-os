@@ -6,8 +6,9 @@
 
 饿了么开放平台文档: https://open.shop.ele.me
 """
-from decimal import Decimal
+
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -288,8 +289,9 @@ class ElemeAdapter:
           food_list (food_id, food_name, quantity, price),
           shop_id, user_id
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -297,7 +299,11 @@ class ElemeAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+            DishCategory,
+            OrderItemSchema,
+            OrderSchema,
+            OrderStatus,
+            OrderType,
         )
 
         # 饿了么订单状态映射
@@ -311,9 +317,7 @@ class ElemeAdapter:
             5: OrderStatus.CANCELLED,
             9: OrderStatus.CANCELLED,
         }
-        order_status = _STATUS_MAP.get(
-            int(raw.get("status", 1)), OrderStatus.PENDING
-        )
+        order_status = _STATUS_MAP.get(int(raw.get("status", 1)), OrderStatus.PENDING)
 
         # 订单项映射
         items = []
@@ -321,16 +325,18 @@ class ElemeAdapter:
         for idx, item in enumerate(food_list, start=1):
             unit_price = Decimal(str(item.get("price", 0))) / 100  # 分 -> 元
             qty = int(item.get("quantity", item.get("count", 1)))
-            items.append(OrderItemSchema(
-                item_id=str(item.get("item_id", f"{raw.get('order_id', '')}_{idx}")),
-                dish_id=str(item.get("food_id", item.get("sku_id", ""))),
-                dish_name=str(item.get("food_name", item.get("name", ""))),
-                dish_category=DishCategory.MAIN_COURSE,
-                quantity=qty,
-                unit_price=unit_price,
-                subtotal=unit_price * qty,
-                special_requirements=item.get("remark"),
-            ))
+            items.append(
+                OrderItemSchema(
+                    item_id=str(item.get("item_id", f"{raw.get('order_id', '')}_{idx}")),
+                    dish_id=str(item.get("food_id", item.get("sku_id", ""))),
+                    dish_name=str(item.get("food_name", item.get("name", ""))),
+                    dish_category=DishCategory.MAIN_COURSE,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    subtotal=unit_price * qty,
+                    special_requirements=item.get("remark"),
+                )
+            )
 
         total = Decimal(str(raw.get("total_price", raw.get("order_amount", 0)))) / 100
         discount = Decimal(str(raw.get("discount_price", raw.get("shop_discount", 0)))) / 100
@@ -341,9 +347,7 @@ class ElemeAdapter:
             if isinstance(create_time_raw, (int, float)) and create_time_raw > 1e9:
                 created_at = datetime.fromtimestamp(create_time_raw)
             else:
-                created_at = datetime.fromisoformat(
-                    str(create_time_raw).replace("T", " ")
-                )
+                created_at = datetime.fromisoformat(str(create_time_raw).replace("T", " "))
         except (ValueError, TypeError, OSError):
             created_at = datetime.utcnow()
 

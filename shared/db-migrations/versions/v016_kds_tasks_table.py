@@ -7,16 +7,15 @@ Revision ID: v016
 Revises: v015
 Create Date: 2026-03-30
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "v016"
-down_revision: Union[str, None] = "v015"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v016"
+down_revision = "v015"
+branch_labels = None
+depends_on = None
 
 TABLE = "kds_tasks"
 
@@ -32,8 +31,7 @@ def upgrade() -> None:
     # ── 创建 kds_tasks 表 ──
     op.create_table(
         TABLE,
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("order_item_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("dept_id", postgresql.UUID(as_uuid=True), nullable=True),
@@ -53,10 +51,8 @@ def upgrade() -> None:
         # 操作员
         sa.Column("operator_id", postgresql.UUID(as_uuid=True), nullable=True),
         # 基类字段
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
     )
 
@@ -83,22 +79,13 @@ def upgrade() -> None:
     )
 
     # ── RLS策略（与v006/v014安全模式一致）──
-    op.execute(
-        f"CREATE POLICY {TABLE}_rls_select ON {TABLE} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {TABLE}_rls_insert ON {TABLE} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {TABLE}_rls_select ON {TABLE} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {TABLE}_rls_insert ON {TABLE} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {TABLE}_rls_update ON {TABLE} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {TABLE}_rls_delete ON {TABLE} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {TABLE}_rls_delete ON {TABLE} FOR DELETE USING ({_SAFE_CONDITION})")
     op.execute(f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {TABLE} FORCE ROW LEVEL SECURITY")
 

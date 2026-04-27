@@ -8,6 +8,7 @@
 
 当 ESIGN_APP_ID 未配置时自动进入 Mock 模式，仅打印日志不调用第三方接口。
 """
+
 from __future__ import annotations
 
 import os

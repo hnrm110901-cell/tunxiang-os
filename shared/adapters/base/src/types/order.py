@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 订单统一模型
 """
 
-from typing import TypedDict, Optional, List, Dict, Any
+from typing import Any, Dict, List, TypedDict
 
 
 class UnifiedOrderItem(TypedDict, total=False):
     """统一订单明细"""
+
     dish_id: str
     dish_name: str
     category: str
@@ -21,6 +22,7 @@ class UnifiedOrderItem(TypedDict, total=False):
 
 class UnifiedOrder(TypedDict, total=False):
     """统一订单格式"""
+
     id: str
     external_id: str
     source: str

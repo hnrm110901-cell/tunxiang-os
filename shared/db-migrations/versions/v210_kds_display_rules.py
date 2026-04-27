@@ -5,8 +5,9 @@
 
 Revision: v210
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v210"
@@ -19,19 +20,23 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-    if 'kds_display_rules' not in existing:
+    if "kds_display_rules" not in existing:
         op.create_table(
             "kds_display_rules",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column(
+                "id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")
+            ),
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", postgresql.UUID(as_uuid=True), nullable=False),
-            sa.Column("rules", postgresql.JSONB, nullable=False, server_default="{}",
-                      comment="KDS 显示规则: timeout/colors/channel_colors 等"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()"), nullable=False),
+            sa.Column(
+                "rules",
+                postgresql.JSONB,
+                nullable=False,
+                server_default="{}",
+                comment="KDS 显示规则: timeout/colors/channel_colors 等",
+            ),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("is_deleted", sa.BOOLEAN, server_default="false", nullable=False),
         )
         op.create_index("ix_kds_dr_tenant", "kds_display_rules", ["tenant_id"])

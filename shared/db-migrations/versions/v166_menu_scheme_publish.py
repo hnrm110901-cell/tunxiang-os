@@ -11,16 +11,15 @@ Revision ID: v166
 Revises: v165
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v166"
-down_revision: Union[str, None] = "v165"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v166"
+down_revision = "v165"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
@@ -29,22 +28,13 @@ def _apply_rls(table_name: str) -> None:
     """标准三段式 RLS：ENABLE → FORCE → 四条策略"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -102,18 +92,9 @@ def upgrade() -> None:
             ),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_menu_schemes_tenant "
-        "ON menu_schemes (tenant_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_menu_schemes_tenant_brand "
-        "ON menu_schemes (tenant_id, brand_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_menu_schemes_tenant_status "
-        "ON menu_schemes (tenant_id, status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_menu_schemes_tenant ON menu_schemes (tenant_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_menu_schemes_tenant_brand ON menu_schemes (tenant_id, brand_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_menu_schemes_tenant_status ON menu_schemes (tenant_id, status)")
     _apply_rls("menu_schemes")
 
     # ── menu_scheme_items 方案内菜品配置 ──────────────────────────────────
@@ -161,13 +142,9 @@ def upgrade() -> None:
         )
 
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_menu_scheme_items_tenant_scheme "
-        "ON menu_scheme_items (tenant_id, scheme_id)"
+        "CREATE INDEX IF NOT EXISTS ix_menu_scheme_items_tenant_scheme ON menu_scheme_items (tenant_id, scheme_id)"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_menu_scheme_items_tenant_dish "
-        "ON menu_scheme_items (tenant_id, dish_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_menu_scheme_items_tenant_dish ON menu_scheme_items (tenant_id, dish_id)")
     _apply_rls("menu_scheme_items")
 
     # ── store_menu_overrides 门店菜谱微调 ─────────────────────────────────
@@ -216,16 +193,14 @@ def upgrade() -> None:
         )
 
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_store_menu_overrides_tenant_store "
-        "ON store_menu_overrides (tenant_id, store_id)"
+        "CREATE INDEX IF NOT EXISTS ix_store_menu_overrides_tenant_store ON store_menu_overrides (tenant_id, store_id)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_store_menu_overrides_tenant_scheme "
         "ON store_menu_overrides (tenant_id, scheme_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_store_menu_overrides_store_scheme "
-        "ON store_menu_overrides (store_id, scheme_id)"
+        "CREATE INDEX IF NOT EXISTS ix_store_menu_overrides_store_scheme ON store_menu_overrides (store_id, scheme_id)"
     )
     _apply_rls("store_menu_overrides")
 

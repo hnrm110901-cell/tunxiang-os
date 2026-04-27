@@ -9,9 +9,10 @@ Revision ID: v133
 Revises: v132
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v133"
 down_revision = "v132"
@@ -28,8 +29,7 @@ def upgrade() -> None:
     if "customer_addresses" not in _existing:
         op.create_table(
             "customer_addresses",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("customer_id", UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.String(50), nullable=False),
@@ -73,25 +73,24 @@ def upgrade() -> None:
     # ── notifications 通知消息 ────────────────────────────────────
     if "notifications" not in _existing:
         op.create_table(
-        "notifications",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("target_type", sa.String(20), nullable=False),
-        sa.Column("target_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("channel", sa.String(20), nullable=False),
-        sa.Column("title", sa.String(100), nullable=False),
-        sa.Column("content", sa.Text, nullable=False, server_default=""),
-        sa.Column("category", sa.String(30), nullable=False, server_default="system"),
-        sa.Column("priority", sa.String(10), nullable=False, server_default="normal"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
-        sa.Column("sent_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("read_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("metadata", JSONB, nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-    )
+            "notifications",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("target_type", sa.String(20), nullable=False),
+            sa.Column("target_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("channel", sa.String(20), nullable=False),
+            sa.Column("title", sa.String(100), nullable=False),
+            sa.Column("content", sa.Text, nullable=False, server_default=""),
+            sa.Column("category", sa.String(30), nullable=False, server_default="system"),
+            sa.Column("priority", sa.String(10), nullable=False, server_default="normal"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
+            sa.Column("sent_at", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("read_at", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("metadata", JSONB, nullable=True),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -144,8 +143,7 @@ def upgrade() -> None:
     if "notification_templates" not in _existing:
         op.create_table(
             "notification_templates",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.String(100), nullable=False),
             sa.Column("code", sa.String(50), nullable=False),

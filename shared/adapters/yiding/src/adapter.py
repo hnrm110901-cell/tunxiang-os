@@ -5,18 +5,19 @@
 实现预订数据读取、会员查询、订单列表等功能
 """
 
-import structlog
 from typing import Any, Dict, List, Optional
 
-from .client import YiDingClient, YiDingAPIError
-from .mapper import YiDingMapper
+import structlog
+
 from .cache import YiDingCache
+from .client import YiDingAPIError, YiDingClient
+from .mapper import YiDingMapper
 from .types import (
-    YiDingConfig,
-    UnifiedReservation,
-    UnifiedCustomer,
-    ReservationStats,
     CreateReservationDTO,
+    ReservationStats,
+    UnifiedCustomer,
+    UnifiedReservation,
+    YiDingConfig,
 )
 
 logger = structlog.get_logger()
@@ -39,9 +40,7 @@ class YiDingAdapter:
         self.config = config
         self.client = YiDingClient(config)
         self.mapper = YiDingMapper()
-        self.cache = YiDingCache(
-            ttl=config.get("cache_ttl", 300)
-        )
+        self.cache = YiDingCache(ttl=config.get("cache_ttl", 300))
         self.hotel_id = config.get("hotel_id")
         self.logger = logger.bind(adapter="yiding")
 
@@ -81,15 +80,9 @@ class YiDingAdapter:
         data_list = response.get("data", [])
         request_id = response.get("requestId")
 
-        reservations = self.mapper.to_unified_reservations(
-            data_list, store_id=self.hotel_id
-        )
+        reservations = self.mapper.to_unified_reservations(data_list, store_id=self.hotel_id)
 
-        self.logger.info(
-            "pending_orders_fetched",
-            count=len(reservations),
-            request_id=request_id
-        )
+        self.logger.info("pending_orders_fetched", count=len(reservations), request_id=request_id)
 
         return reservations
 
@@ -142,7 +135,7 @@ class YiDingAdapter:
                 "table_code": table_code,
                 "meal_type_code": meal_type_code,
                 "resv_date": resv_date,
-            }
+            },
         )
         data = response.get("data", {})
         return int(data.get("status", 0)) == 1
@@ -264,9 +257,7 @@ class YiDingAdapter:
         response = await self.client.get("resv/orders/list", params=params)
         data_list = response.get("data", [])
 
-        reservations = self.mapper.to_unified_reservations(
-            data_list, store_id=self.hotel_id
-        )
+        reservations = self.mapper.to_unified_reservations(data_list, store_id=self.hotel_id)
 
         self.logger.info(
             "order_list_fetched",
@@ -300,13 +291,11 @@ class YiDingAdapter:
             params={
                 "start_date": start_date,
                 "end_date": end_date,
-            }
+            },
         )
         data_list = response.get("data", [])
 
-        reservations = self.mapper.to_unified_reservations(
-            data_list, store_id=self.hotel_id
-        )
+        reservations = self.mapper.to_unified_reservations(data_list, store_id=self.hotel_id)
 
         self.logger.info(
             "order_list_v2_fetched",
@@ -358,10 +347,7 @@ class YiDingAdapter:
             tables: [{"area_code": "1", "table_code": "3", "table_name": "101",
                       "max_people_num": "10", "status": "1", "sort_id": 1}]
         """
-        return await self.client.post(
-            "sync/tables",
-            json={"areas": areas, "tables": tables}
-        )
+        return await self.client.post("sync/tables", json={"areas": areas, "tables": tables})
 
     async def sync_dishes(
         self,

@@ -2,10 +2,10 @@
 品智订单同步模块
 拉取品智订单数据并映射为屯象 Ontology Order 格式
 """
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 import structlog
 
@@ -68,6 +68,7 @@ class PinzhiOrderSync:
                 break
             # 安全递增日期
             from datetime import timedelta
+
             current = datetime.strptime(biz_date, "%Y-%m-%d") + timedelta(days=1)
 
         logger.info(
@@ -105,23 +106,27 @@ class PinzhiOrderSync:
         for idx, dish in enumerate(pinzhi_order.get("dishList", []), start=1):
             unit_price_fen = int(dish.get("dishPrice", dish.get("price", 0)))
             qty = int(dish.get("dishNum", dish.get("quantity", 1)))
-            items.append({
-                "item_id": str(dish.get("dishId", f"{pinzhi_order.get('billId', '')}_{idx}")),
-                "dish_id": str(dish.get("dishId", "")),
-                "dish_name": str(dish.get("dishName", "")),
-                "quantity": qty,
-                "unit_price_fen": unit_price_fen,
-                "subtotal_fen": unit_price_fen * qty,
-            })
+            items.append(
+                {
+                    "item_id": str(dish.get("dishId", f"{pinzhi_order.get('billId', '')}_{idx}")),
+                    "dish_id": str(dish.get("dishId", "")),
+                    "dish_name": str(dish.get("dishName", "")),
+                    "quantity": qty,
+                    "unit_price_fen": unit_price_fen,
+                    "subtotal_fen": unit_price_fen * qty,
+                }
+            )
 
         # 支付信息
         payments = []
         for pay in pinzhi_order.get("paymentList", []):
-            payments.append({
-                "pay_type": str(pay.get("payType", "")),
-                "pay_name": str(pay.get("payName", "")),
-                "amount_fen": int(pay.get("payMoney", 0)),
-            })
+            payments.append(
+                {
+                    "pay_type": str(pay.get("payType", "")),
+                    "pay_name": str(pay.get("payName", "")),
+                    "amount_fen": int(pay.get("payMoney", 0)),
+                }
+            )
 
         return {
             "order_id": str(pinzhi_order.get("billId", "")),

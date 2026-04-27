@@ -1,4 +1,5 @@
 """tenant_registry — 商户码与 DEMO 租户 UUID 对齐"""
+
 from uuid import UUID
 
 import pytest

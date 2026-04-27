@@ -7,6 +7,7 @@ Revision ID: v276_store_baselines
 Revises: v275_coaching_logs
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v276_store_baselines"
@@ -54,9 +55,7 @@ def upgrade() -> None:
 
     # RLS
     op.execute("ALTER TABLE store_baselines ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        "DROP POLICY IF EXISTS store_baselines_tenant ON store_baselines"
-    )
+    op.execute("DROP POLICY IF EXISTS store_baselines_tenant ON store_baselines")
     op.execute("""
         CREATE POLICY store_baselines_tenant ON store_baselines
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
@@ -84,12 +83,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS store_baselines_tenant ON store_baselines"
-    )
-    op.execute(
-        "ALTER TABLE IF EXISTS store_baselines DISABLE ROW LEVEL SECURITY"
-    )
+    op.execute("DROP POLICY IF EXISTS store_baselines_tenant ON store_baselines")
+    op.execute("ALTER TABLE IF EXISTS store_baselines DISABLE ROW LEVEL SECURITY")
     op.execute("DROP INDEX IF EXISTS uq_store_baselines_natural_key")
     op.execute("DROP INDEX IF EXISTS idx_store_baselines_store_metric")
     op.execute("DROP TABLE IF EXISTS store_baselines")

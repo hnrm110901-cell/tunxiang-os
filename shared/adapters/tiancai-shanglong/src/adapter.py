@@ -18,6 +18,7 @@ Base URL:   https://cysms.wuuxiang.com
   TIANCAI_CENTER_ID  集团 centerId
   TIANCAI_SHOP_ID    门店 shopId
 """
+
 import asyncio
 import os
 import time
@@ -50,17 +51,13 @@ class TiancaiShanglongAdapter:
     """
 
     def __init__(self, config: Dict[str, Any]) -> None:
-        self.base_url = config.get(
-            "base_url", os.getenv("TIANCAI_BASE_URL", "https://cysms.wuuxiang.com")
-        ).rstrip("/")
+        self.base_url = config.get("base_url", os.getenv("TIANCAI_BASE_URL", "https://cysms.wuuxiang.com")).rstrip("/")
         self.appid = config.get("appid", os.getenv("TIANCAI_APPID", ""))
         self.accessid = config.get("accessid", os.getenv("TIANCAI_ACCESSID", ""))
         self.center_id = config.get("center_id", os.getenv("TIANCAI_CENTER_ID", ""))
         self.shop_id = config.get("shop_id", os.getenv("TIANCAI_SHOP_ID", ""))
         self.timeout = config.get("timeout", int(os.getenv("TIANCAI_TIMEOUT", "30")))
-        self.retry_times = config.get(
-            "retry_times", int(os.getenv("TIANCAI_RETRY_TIMES", "3"))
-        )
+        self.retry_times = config.get("retry_times", int(os.getenv("TIANCAI_RETRY_TIMES", "3")))
 
         if not self.appid or not self.accessid:
             logger.warning("天财商龙 appid/accessid 未配置，将使用降级模式")
@@ -315,8 +312,9 @@ class TiancaiShanglongAdapter:
           waiter_code    → waiter_id
           item[]         → items（品项明细）
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -324,7 +322,11 @@ class TiancaiShanglongAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory,
+            DishCategory,
+            OrderItemSchema,
+            OrderSchema,
+            OrderStatus,
+            OrderType,
         )
 
         # state: 0=未结 1=已结 其他=特殊（押金/存酒等）
@@ -364,22 +366,24 @@ class TiancaiShanglongAdapter:
             # combo_id — 天财 pkg_id / combo_id
             combo_id = item.get("pkg_id") or item.get("combo_id")
 
-            items.append(OrderItemSchema(
-                item_id=str(item.get("item_id", f"{raw.get('bs_id', '')}_{idx}")),
-                dish_id=str(item.get("item_code", item.get("item_id", ""))),
-                dish_name=str(item.get("item_name", item.get("temp_item_name", ""))),
-                dish_category=DishCategory.MAIN_COURSE,
-                quantity=int(qty),
-                unit_price=unit_price,
-                subtotal=subtotal,
-                special_requirements=None,
-                original_price_fen=original_price_fen,
-                single_discount_fen=single_discount_fen,
-                practice_names=practice_names,
-                is_gift=is_gift,
-                gift_reason=gift_reason,
-                combo_id=str(combo_id) if combo_id else None,
-            ))
+            items.append(
+                OrderItemSchema(
+                    item_id=str(item.get("item_id", f"{raw.get('bs_id', '')}_{idx}")),
+                    dish_id=str(item.get("item_code", item.get("item_id", ""))),
+                    dish_name=str(item.get("item_name", item.get("temp_item_name", ""))),
+                    dish_category=DishCategory.MAIN_COURSE,
+                    quantity=int(qty),
+                    unit_price=unit_price,
+                    subtotal=subtotal,
+                    special_requirements=None,
+                    original_price_fen=original_price_fen,
+                    single_discount_fen=single_discount_fen,
+                    practice_names=practice_names,
+                    is_gift=is_gift,
+                    gift_reason=gift_reason,
+                    combo_id=str(combo_id) if combo_id else None,
+                )
+            )
 
         total = Decimal(str(raw.get("last_total", 0))) / 100
         discount = Decimal(str(raw.get("disc_total", 0))) / 100
@@ -436,8 +440,9 @@ class TiancaiShanglongAdapter:
         将天财商龙操作记录映射为标准 StaffAction（付款修正、折扣操作等）。
         对应接口：付款修正记录 [page_id=27276]
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")

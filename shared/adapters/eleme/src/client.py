@@ -4,6 +4,7 @@
 
 饿了么开放平台文档: https://open.shop.ele.me
 """
+
 import hashlib
 import hmac
 import os
@@ -88,11 +89,15 @@ class ElemeClient:
             sign_str += f"{k}{v}"
         sign_str += self.app_secret
 
-        signature = hmac.new(
-            self.app_secret.encode("utf-8"),
-            sign_str.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest().upper()
+        signature = (
+            hmac.new(
+                self.app_secret.encode("utf-8"),
+                sign_str.encode("utf-8"),
+                hashlib.sha256,
+            )
+            .hexdigest()
+            .upper()
+        )
         return signature
 
     # ── OAuth2 Token ──────────────────────────────────────
@@ -175,11 +180,15 @@ class ElemeClient:
 
                 if method.upper() == "GET":
                     resp = await self._http.get(
-                        endpoint, params=auth_params, headers=headers,
+                        endpoint,
+                        params=auth_params,
+                        headers=headers,
                     )
                 elif method.upper() == "POST":
                     resp = await self._http.post(
-                        endpoint, json=auth_params, headers=headers,
+                        endpoint,
+                        json=auth_params,
+                        headers=headers,
                     )
                 else:
                     raise ValueError(f"不支持的 HTTP 方法: {method}")
@@ -200,9 +209,7 @@ class ElemeClient:
                     self._access_token = None
                     self._token_expires_at = 0
                 if attempt == self.retry_times - 1:
-                    raise ConnectionError(
-                        f"饿了么 HTTP 请求失败: {e.response.status_code}"
-                    ) from e
+                    raise ConnectionError(f"饿了么 HTTP 请求失败: {e.response.status_code}") from e
 
             except (httpx.ConnectError, httpx.TimeoutException) as e:
                 logger.error(
@@ -232,11 +239,15 @@ class ElemeClient:
     ) -> Dict[str, Any]:
         """取消订单"""
         logger.info("eleme_cancel_order", order_id=order_id, reason=reason)
-        result = await self.request("POST", "/order/cancel", data={
-            "order_id": order_id,
-            "reason_code": reason_code,
-            "reason": reason,
-        })
+        result = await self.request(
+            "POST",
+            "/order/cancel",
+            data={
+                "order_id": order_id,
+                "reason_code": reason_code,
+                "reason": reason,
+            },
+        )
         return result.get("data", {})
 
     async def query_order(self, order_id: str) -> Dict[str, Any]:
@@ -258,10 +269,14 @@ class ElemeClient:
     ) -> Dict[str, Any]:
         """更新菜品信息"""
         logger.info("eleme_update_food", food_id=food_id)
-        result = await self.request("POST", "/food/update", data={
-            "food_id": food_id,
-            **food_data,
-        })
+        result = await self.request(
+            "POST",
+            "/food/update",
+            data={
+                "food_id": food_id,
+                **food_data,
+            },
+        )
         return result.get("data", {})
 
     async def query_settlement(
@@ -280,10 +295,14 @@ class ElemeClient:
             对账数据（金额单位：分）
         """
         logger.info("eleme_query_settlement", start_date=start_date, end_date=end_date)
-        result = await self.request("GET", "/settlement/query", data={
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        result = await self.request(
+            "GET",
+            "/settlement/query",
+            data={
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         return result.get("data", {})
 
     # ── 资源释放 ──────────────────────────────────────────

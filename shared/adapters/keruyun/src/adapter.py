@@ -2,12 +2,14 @@
 客如云餐饮管理系统API适配器
 提供订单管理、菜品管理、会员管理、报表等功能
 """
-from decimal import Decimal
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-import structlog
-import httpx
+
 import hashlib
+from datetime import datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import httpx
+import structlog
 
 logger = structlog.get_logger()
 
@@ -98,8 +100,7 @@ class KeruyunAdapter:
                 return result
 
             except httpx.HTTPStatusError as e:
-                logger.error("HTTP请求失败", endpoint=endpoint,
-                             status_code=e.response.status_code, attempt=attempt + 1)
+                logger.error("HTTP请求失败", endpoint=endpoint, status_code=e.response.status_code, attempt=attempt + 1)
                 if attempt == self.retry_times - 1:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
 
@@ -228,8 +229,9 @@ class KeruyunAdapter:
           create_time (ISO datetime), member_id, waiter_id, note,
           items (list): item_id, sku_id, sku_name, qty, unit_price
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -237,7 +239,11 @@ class KeruyunAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+            DishCategory,
+            OrderItemSchema,
+            OrderSchema,
+            OrderStatus,
+            OrderType,
         )
 
         # 状态映射（客如云：1=待确认, 2=服务中, 3=已结账, 4=已取消）
@@ -254,16 +260,18 @@ class KeruyunAdapter:
         for idx, item in enumerate(raw.get("items", []), start=1):
             unit_price = Decimal(str(item.get("unit_price", 0))) / 100  # 分 → 元
             qty = int(item.get("qty", item.get("quantity", 1)))
-            items.append(OrderItemSchema(
-                item_id=str(item.get("item_id", f"{raw.get('order_id', '')}_{idx}")),
-                dish_id=str(item.get("sku_id", "")),
-                dish_name=str(item.get("sku_name", "")),
-                dish_category=DishCategory.MAIN_COURSE,
-                quantity=qty,
-                unit_price=unit_price,
-                subtotal=unit_price * qty,
-                special_requirements=item.get("note"),
-            ))
+            items.append(
+                OrderItemSchema(
+                    item_id=str(item.get("item_id", f"{raw.get('order_id', '')}_{idx}")),
+                    dish_id=str(item.get("sku_id", "")),
+                    dish_name=str(item.get("sku_name", "")),
+                    dish_category=DishCategory.MAIN_COURSE,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    subtotal=unit_price * qty,
+                    special_requirements=item.get("note"),
+                )
+            )
 
         total = Decimal(str(raw.get("total_amount", 0))) / 100
         discount = Decimal(str(raw.get("discount_amount", 0))) / 100
@@ -304,8 +312,9 @@ class KeruyunAdapter:
         原始字段参考（POS 操作日志）：
           action_type, staff_id, amount, reason, approved_by, operate_time
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")

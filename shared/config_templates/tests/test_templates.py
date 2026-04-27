@@ -8,6 +8,7 @@ shared/config_templates 单元测试
   4. registry.get_template() / list_templates() 注册表查询
   5. 金额单位校验（全部为分，无浮点）
 """
+
 from __future__ import annotations
 
 import pytest
@@ -18,7 +19,6 @@ from shared.config_templates import (
     get_template,
     list_templates,
 )
-
 
 # ── fixture ───────────────────────────────────────────────────────────
 
@@ -43,9 +43,7 @@ def test_all_templates_have_printers(any_template):
     """每种模板至少配置一台收银打印机"""
     pkg = any_template.build_default()
     receipt_printers = [p for p in pkg.printers if p.printer_type == "receipt"]
-    assert len(receipt_printers) >= 1, (
-        f"{any_template.display_name} 模板缺少收银打印机"
-    )
+    assert len(receipt_printers) >= 1, f"{any_template.display_name} 模板缺少收银打印机"
 
 
 def test_all_templates_have_shifts(any_template):
@@ -90,9 +88,7 @@ def test_member_tiers_amounts_are_integers(any_template):
     """会员升级门槛必须是整数（分）"""
     pkg = any_template.build_default()
     for tier in pkg.member_tiers:
-        assert isinstance(tier.min_spend_fen, int), (
-            f"{any_template.display_name} 会员等级 {tier.tier_code} 金额非整数"
-        )
+        assert isinstance(tier.min_spend_fen, int), f"{any_template.display_name} 会员等级 {tier.tier_code} 金额非整数"
 
 
 # ── apply() 覆写测试 ──────────────────────────────────────────────────
@@ -113,11 +109,13 @@ def test_apply_overwrites_table_count():
 
 def test_apply_overwrites_discount_threshold():
     tpl = get_template(RestaurantType.CASUAL_DINING)
-    pkg = tpl.apply({
-        "employee_max_discount": 0.92,
-        "manager_max_discount": 0.85,
-        "min_gross_margin": 0.25,
-    })
+    pkg = tpl.apply(
+        {
+            "employee_max_discount": 0.92,
+            "manager_max_discount": 0.85,
+            "min_gross_margin": 0.25,
+        }
+    )
     assert pkg.agent_policies.discount_guard.employee_max_discount == 0.92
     assert pkg.agent_policies.discount_guard.manager_max_discount == 0.85
     assert pkg.agent_policies.discount_guard.min_gross_margin == 0.25

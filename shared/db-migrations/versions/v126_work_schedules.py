@@ -7,8 +7,9 @@ Revision ID: v126
 Revises: v125
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v126"
@@ -26,21 +27,21 @@ def upgrade() -> None:
     if "work_schedules" not in _existing:
         op.create_table(
             "work_schedules",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("employee_id", UUID(as_uuid=True), nullable=False),
             sa.Column("schedule_date", sa.Date, nullable=False),
-            sa.Column("shift_start", sa.Time, nullable=False,
-                      comment="班次开始时间，如 09:00"),
-            sa.Column("shift_end", sa.Time, nullable=False,
-                      comment="班次结束时间，如 18:00"),
-            sa.Column("role", sa.String(30), nullable=False,
-                      comment="cashier/chef/waiter/manager"),
-            sa.Column("status", sa.String(20), nullable=False,
-                      server_default="'planned'",
-                      comment="planned/confirmed/cancelled"),
+            sa.Column("shift_start", sa.Time, nullable=False, comment="班次开始时间，如 09:00"),
+            sa.Column("shift_end", sa.Time, nullable=False, comment="班次结束时间，如 18:00"),
+            sa.Column("role", sa.String(30), nullable=False, comment="cashier/chef/waiter/manager"),
+            sa.Column(
+                "status",
+                sa.String(20),
+                nullable=False,
+                server_default="'planned'",
+                comment="planned/confirmed/cancelled",
+            ),
             sa.Column("notes", sa.Text, nullable=True),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),

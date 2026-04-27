@@ -4,9 +4,10 @@ Revision ID: v112
 Revises: v111
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v112"
 down_revision = "v111"
@@ -16,47 +17,54 @@ depends_on = None
 
 def upgrade() -> None:
     # ── 1. dishes 表新增活鲜专属字段 ──────────────────────────────
-    op.add_column("dishes", sa.Column(
-        "pricing_method", sa.String(20), nullable=False,
-        server_default="fixed",
-        comment="计价方式：fixed=固定价 / weight=称重计价 / count=条头计价"
-    ))
-    op.add_column("dishes", sa.Column(
-        "weight_unit", sa.String(10), nullable=True,
-        comment="称重单位：jin=斤 / liang=两 / kg=千克 / g=克"
-    ))
-    op.add_column("dishes", sa.Column(
-        "price_per_unit_fen", sa.Integer, nullable=True,
-        comment="单位价格（分）—— 称重时=每斤价，计头时=每条/头价"
-    ))
-    op.add_column("dishes", sa.Column(
-        "min_order_qty", sa.Numeric(6, 2), nullable=True,
-        server_default="1.0",
-        comment="最小点单量，如0.5斤起"
-    ))
-    op.add_column("dishes", sa.Column(
-        "display_unit", sa.String(10), nullable=True,
-        comment="展示单位，如：斤/条/头/位/份"
-    ))
-    op.add_column("dishes", sa.Column(
-        "tank_zone_id", UUID(as_uuid=True), nullable=True,
-        comment="所属鱼缸区域ID"
-    ))
-    op.add_column("dishes", sa.Column(
-        "alive_rate_pct", sa.Integer, nullable=True,
-        server_default="100",
-        comment="历史成活率%（用于采购成本核算）"
-    ))
-    op.add_column("dishes", sa.Column(
-        "live_stock_count", sa.Integer, nullable=True,
-        server_default="0",
-        comment="当前活鲜库存数量（条/头）"
-    ))
-    op.add_column("dishes", sa.Column(
-        "live_stock_weight_g", sa.Integer, nullable=True,
-        server_default="0",
-        comment="当前活鲜库存重量（克）"
-    ))
+    op.add_column(
+        "dishes",
+        sa.Column(
+            "pricing_method",
+            sa.String(20),
+            nullable=False,
+            server_default="fixed",
+            comment="计价方式：fixed=固定价 / weight=称重计价 / count=条头计价",
+        ),
+    )
+    op.add_column(
+        "dishes",
+        sa.Column("weight_unit", sa.String(10), nullable=True, comment="称重单位：jin=斤 / liang=两 / kg=千克 / g=克"),
+    )
+    op.add_column(
+        "dishes",
+        sa.Column(
+            "price_per_unit_fen", sa.Integer, nullable=True, comment="单位价格（分）—— 称重时=每斤价，计头时=每条/头价"
+        ),
+    )
+    op.add_column(
+        "dishes",
+        sa.Column(
+            "min_order_qty", sa.Numeric(6, 2), nullable=True, server_default="1.0", comment="最小点单量，如0.5斤起"
+        ),
+    )
+    op.add_column(
+        "dishes", sa.Column("display_unit", sa.String(10), nullable=True, comment="展示单位，如：斤/条/头/位/份")
+    )
+    op.add_column("dishes", sa.Column("tank_zone_id", UUID(as_uuid=True), nullable=True, comment="所属鱼缸区域ID"))
+    op.add_column(
+        "dishes",
+        sa.Column(
+            "alive_rate_pct", sa.Integer, nullable=True, server_default="100", comment="历史成活率%（用于采购成本核算）"
+        ),
+    )
+    op.add_column(
+        "dishes",
+        sa.Column(
+            "live_stock_count", sa.Integer, nullable=True, server_default="0", comment="当前活鲜库存数量（条/头）"
+        ),
+    )
+    op.add_column(
+        "dishes",
+        sa.Column(
+            "live_stock_weight_g", sa.Integer, nullable=True, server_default="0", comment="当前活鲜库存重量（克）"
+        ),
+    )
 
     # ── 2. fish_tank_zones 鱼缸区域表 ────────────────────────────
     op.create_table(
@@ -96,8 +104,13 @@ def upgrade() -> None:
         sa.Column("weighed_by", UUID(as_uuid=True), nullable=True, comment="称重员工ID"),
         sa.Column("confirmed_by", UUID(as_uuid=True), nullable=True, comment="顾客/服务员确认人ID"),
         sa.Column("confirmed_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending=待确认 / confirmed=已确认 / cancelled=已取消"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending=待确认 / confirmed=已确认 / cancelled=已取消",
+        ),
         sa.Column("print_ticket_id", sa.String(50), nullable=True, comment="打印流水号"),
         sa.Column("notes", sa.Text, nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
@@ -142,8 +155,14 @@ def downgrade() -> None:
     op.drop_table("fish_tank_zones")
     # 删除 dishes 扩展字段
     for col in [
-        "pricing_method", "weight_unit", "price_per_unit_fen",
-        "min_order_qty", "display_unit", "tank_zone_id",
-        "alive_rate_pct", "live_stock_count", "live_stock_weight_g"
+        "pricing_method",
+        "weight_unit",
+        "price_per_unit_fen",
+        "min_order_qty",
+        "display_unit",
+        "tank_zone_id",
+        "alive_rate_pct",
+        "live_stock_count",
+        "live_stock_weight_g",
     ]:
         op.drop_column("dishes", col)

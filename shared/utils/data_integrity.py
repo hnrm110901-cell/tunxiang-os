@@ -3,6 +3,7 @@ HMAC-SHA256数据完整性校验
 用于防止数据库记录被篡改（订单金额/财务记录）
 密钥：TX_INTEGRITY_SECRET 环境变量
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -44,9 +45,7 @@ class DataIntegrity:
             ensure_ascii=False,
             sort_keys=True,
         )
-        return hmac.new(
-            self._secret, payload.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        return hmac.new(self._secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def verify(self, data: dict, fields: list[str], signature: str) -> bool:
         """验证签名，使用时间恒定比较防时序攻击。
@@ -103,9 +102,7 @@ def sign_order(order_data: dict) -> str:
 
 def verify_order(order_data: dict, signature: str) -> bool:
     """验证订单完整性签名。"""
-    return _get_integrity().verify(
-        order_data, DataIntegrity.ORDER_INTEGRITY_FIELDS, signature
-    )
+    return _get_integrity().verify(order_data, DataIntegrity.ORDER_INTEGRITY_FIELDS, signature)
 
 
 def sign_finance(finance_data: dict) -> str:
@@ -115,6 +112,4 @@ def sign_finance(finance_data: dict) -> str:
 
 def verify_finance(finance_data: dict, signature: str) -> bool:
     """验证财务记录完整性签名。"""
-    return _get_integrity().verify(
-        finance_data, DataIntegrity.FINANCE_INTEGRITY_FIELDS, signature
-    )
+    return _get_integrity().verify(finance_data, DataIntegrity.FINANCE_INTEGRITY_FIELDS, signature)

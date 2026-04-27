@@ -14,6 +14,7 @@
 
 依赖：FastAPI + httpx.AsyncClient + unittest.mock（全Mock，无真实DB连接）
 """
+
 import os
 import sys
 import uuid
@@ -29,16 +30,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = str(uuid.uuid4())
-COMBO_ID  = str(uuid.uuid4())
-GROUP_ID_MAIN   = str(uuid.uuid4())
+COMBO_ID = str(uuid.uuid4())
+GROUP_ID_MAIN = str(uuid.uuid4())
 GROUP_ID_STAPLE = str(uuid.uuid4())
-GROUP_ID_DRINK  = str(uuid.uuid4())
-ITEM_ID_FISH    = str(uuid.uuid4())
-ITEM_ID_PORK    = str(uuid.uuid4())
-ITEM_ID_SHRIMP  = str(uuid.uuid4())
-ITEM_ID_RICE    = str(uuid.uuid4())
-ITEM_ID_COKE    = str(uuid.uuid4())
-ITEM_ID_SPRITE  = str(uuid.uuid4())
+GROUP_ID_DRINK = str(uuid.uuid4())
+ITEM_ID_FISH = str(uuid.uuid4())
+ITEM_ID_PORK = str(uuid.uuid4())
+ITEM_ID_SHRIMP = str(uuid.uuid4())
+ITEM_ID_RICE = str(uuid.uuid4())
+ITEM_ID_COKE = str(uuid.uuid4())
+ITEM_ID_SPRITE = str(uuid.uuid4())
 
 HEADERS = {
     "X-Tenant-ID": TENANT_ID,
@@ -47,6 +48,7 @@ HEADERS = {
 
 
 # ─── Fixture ──────────────────────────────────────────────────────────────────
+
 
 def _build_app_with_mock(mock_db: AsyncMock) -> FastAPI:
     """构建带 Mock DB 的测试应用"""
@@ -91,6 +93,7 @@ def _make_valid_item_row(item_id: str, group_id: str) -> MagicMock:
 
 # ─── validate-selection 端点测试 ──────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_validate_selection_valid():
     """POST /combos/{id}/validate-selection：N=1 M=3，选了2个 → valid=True
@@ -129,9 +132,7 @@ async def test_validate_selection_valid():
         ]
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -176,9 +177,7 @@ async def test_validate_selection_too_few():
         ]
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -226,9 +225,7 @@ async def test_validate_selection_too_many():
         ]
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -267,9 +264,7 @@ async def test_required_group_missing():
         "selections": []  # 没有提交任何分组选择
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -310,9 +305,7 @@ async def test_optional_group_empty():
         "selections": []  # 不选饮料
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -337,6 +330,7 @@ async def test_extra_price_calculation():
 
     # 验证 AddGroupItemReq 的 extra_price_fen 字段 Pydantic 校验
     from api.combo_routes import AddGroupItemReq
+
     req = AddGroupItemReq(
         dish_id=str(uuid.uuid4()),
         dish_name="白灼虾",
@@ -391,9 +385,7 @@ async def test_invalid_dish_in_group():
         ]
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -441,9 +433,7 @@ async def test_group_disabled_is_not_returned_in_validation():
         ]
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -473,13 +463,9 @@ async def test_validate_selection_no_groups_returns_404():
 
     app = _build_app_with_mock(mock_db)
 
-    payload = {
-        "selections": []
-    }
+    payload = {"selections": []}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -496,9 +482,7 @@ async def test_validate_selection_missing_tenant_id():
     mock_db = AsyncMock()
     app = _build_app_with_mock(mock_db)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json={"selections": []},
@@ -520,7 +504,7 @@ async def test_validate_multiple_groups_partial_valid():
     """
     mock_db = AsyncMock()
 
-    group_main  = _make_group_row(GROUP_ID_MAIN,   "主菜", 1, 1, True)
+    group_main = _make_group_row(GROUP_ID_MAIN, "主菜", 1, 1, True)
     group_staple = _make_group_row(GROUP_ID_STAPLE, "主食", 1, 1, True)
     groups_result = MagicMock()
     groups_result.fetchall.return_value = [group_main, group_staple]
@@ -545,9 +529,7 @@ async def test_validate_multiple_groups_partial_valid():
         ]
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/menu/combos/{COMBO_ID}/validate-selection",
             json=payload,
@@ -564,6 +546,7 @@ async def test_validate_multiple_groups_partial_valid():
 
 # ─── Pydantic 模型校验测试 ─────────────────────────────────────────────────────
 
+
 class TestComboGroupRequestValidation:
     """测试 CreateGroupReq / AddGroupItemReq Pydantic 模型约束"""
 
@@ -574,6 +557,7 @@ class TestComboGroupRequestValidation:
         所以 Pydantic 不报错，422 由 HTTPException 422 抛出。
         """
         from api.combo_routes import CreateGroupReq
+
         # Pydantic 层不校验 max >= min，此对象可以创建
         req = CreateGroupReq(group_name="测试分组", min_select=3, max_select=1)
         assert req.min_select == 3
@@ -583,6 +567,7 @@ class TestComboGroupRequestValidation:
         """AddGroupItemReq：extra_price_fen 不能为负数（ge=0）"""
         from api.combo_routes import AddGroupItemReq
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             AddGroupItemReq(
                 dish_id=str(uuid.uuid4()),
@@ -595,6 +580,7 @@ class TestComboGroupRequestValidation:
         """AddGroupItemReq：quantity 必须 >= 1"""
         from api.combo_routes import AddGroupItemReq
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             AddGroupItemReq(
                 dish_id=str(uuid.uuid4()),
@@ -607,6 +593,7 @@ class TestComboGroupRequestValidation:
         """SelectionGroupReq：item_ids 为必填字段"""
         from api.combo_routes import SelectionGroupReq
         from pydantic import ValidationError
+
         # 缺少 item_ids → ValidationError
         with pytest.raises((ValidationError, TypeError)):
             SelectionGroupReq(group_id=str(uuid.uuid4()))
@@ -614,5 +601,6 @@ class TestComboGroupRequestValidation:
     def test_validate_selection_req_allows_empty_selections(self):
         """ValidateSelectionReq：selections 可以为空列表"""
         from api.combo_routes import ValidateSelectionReq
+
         req = ValidateSelectionReq(selections=[])
         assert req.selections == []

@@ -56,8 +56,7 @@ def upgrade() -> None:
         "ON inspection_reports (tenant_id, inspection_date DESC)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_inspection_reports_inspector "
-        "ON inspection_reports (tenant_id, inspector_id)"
+        "CREATE INDEX IF NOT EXISTS idx_inspection_reports_inspector ON inspection_reports (tenant_id, inspector_id)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_inspection_reports_status "

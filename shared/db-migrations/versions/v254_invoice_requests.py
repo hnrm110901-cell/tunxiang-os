@@ -6,6 +6,7 @@
 Revision ID: v254
 Revises: v253
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

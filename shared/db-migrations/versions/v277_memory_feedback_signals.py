@@ -10,6 +10,7 @@ Revision ID: v277_memory_feedback_signals
 Revises: v276_store_baselines
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v277_memory_feedback_signals"
@@ -54,9 +55,7 @@ def upgrade() -> None:
 
     # RLS
     op.execute("ALTER TABLE memory_feedback_signals ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        "DROP POLICY IF EXISTS memory_feedback_signals_tenant ON memory_feedback_signals"
-    )
+    op.execute("DROP POLICY IF EXISTS memory_feedback_signals_tenant ON memory_feedback_signals")
     op.execute("""
         CREATE POLICY memory_feedback_signals_tenant ON memory_feedback_signals
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
@@ -78,12 +77,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS memory_feedback_signals_tenant ON memory_feedback_signals"
-    )
-    op.execute(
-        "ALTER TABLE IF EXISTS memory_feedback_signals DISABLE ROW LEVEL SECURITY"
-    )
+    op.execute("DROP POLICY IF EXISTS memory_feedback_signals_tenant ON memory_feedback_signals")
+    op.execute("ALTER TABLE IF EXISTS memory_feedback_signals DISABLE ROW LEVEL SECURITY")
     op.execute("DROP INDEX IF EXISTS idx_feedback_signals_source")
     op.execute("DROP INDEX IF EXISTS idx_feedback_signals_type")
     op.execute("DROP INDEX IF EXISTS idx_feedback_signals_store_user_time")

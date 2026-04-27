@@ -1,7 +1,7 @@
 """知识库 Phase 2 数据模型 — Agentic RAG"""
+
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class Citation(BaseModel):
     """引用定位"""
+
     chunk_id: str
     doc_id: str
     text_span: str
@@ -18,6 +19,7 @@ class Citation(BaseModel):
 
 class QueryResult(BaseModel):
     """Agentic RAG 查询结果"""
+
     query: str
     complexity: str = "simple"  # simple/medium/complex
     results: list[dict[str, Any]] = Field(default_factory=list)
@@ -31,6 +33,7 @@ class QueryResult(BaseModel):
 
 class AnswerWithCitations(BaseModel):
     """带引用的回答"""
+
     answer: str
     citations: list[Citation] = Field(default_factory=list)
     model_used: str = ""
@@ -39,6 +42,7 @@ class AnswerWithCitations(BaseModel):
 
 class QueryLogEntry(BaseModel):
     """检索质量日志"""
+
     tenant_id: str
     query: str
     collection: str | None = None

@@ -9,6 +9,7 @@
 - 更新了 sys.path 设置以适配新项目目录结构
 - 适配器类名和方法签名保持一致，无需修改
 """
+
 import os
 import sys
 
@@ -18,18 +19,18 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
-import httpx
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+import pytest
 from src.adapter import AoqiweiAdapter
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def adapter():
@@ -62,6 +63,7 @@ def _mock_response(json_data, status_code=200):
 # ---------------------------------------------------------------------------
 # 正常数据拉取路径
 # ---------------------------------------------------------------------------
+
 
 class TestAoqiweiFetchData:
     """正常数据拉取路径测试"""
@@ -161,6 +163,7 @@ class TestAoqiweiFetchData:
 # 认证失败处理
 # ---------------------------------------------------------------------------
 
+
 class TestAuthenticationFailure:
     """认证失败处理测试"""
 
@@ -193,9 +196,7 @@ class TestAuthenticationFailure:
     @pytest.mark.asyncio
     async def test_http_401_raises_error(self, adapter):
         """HTTP 401认证失败时，query_goods 内部捕获并降级返回空结果"""
-        adapter._client.get = AsyncMock(
-            return_value=_mock_response({"error": "Unauthorized"}, status_code=401)
-        )
+        adapter._client.get = AsyncMock(return_value=_mock_response({"error": "Unauthorized"}, status_code=401))
 
         # query_goods 内部 try/except 捕获 HTTPStatusError，降级返回安全默认值
         result = await adapter.query_goods()
@@ -213,6 +214,7 @@ class TestAuthenticationFailure:
 # ---------------------------------------------------------------------------
 # 数据格式转换验证
 # ---------------------------------------------------------------------------
+
 
 class TestDataFormatConversion:
     """数据格式转换验证"""
@@ -259,8 +261,11 @@ class TestDataFormatConversion:
         from schemas.restaurant_standard_schema import OrderStatus
 
         base_raw = {
-            "orderId": "A1", "orderNo": "N1",
-            "totalAmount": 1000, "discountAmount": 0, "items": [],
+            "orderId": "A1",
+            "orderNo": "N1",
+            "totalAmount": 1000,
+            "discountAmount": 0,
+            "items": [],
         }
 
         for status_str, expected in [
@@ -314,6 +319,7 @@ class TestDataFormatConversion:
 # 签名和参数构建测试
 # ---------------------------------------------------------------------------
 
+
 class TestSignAndParams:
     """签名和参数构建测试"""
 
@@ -322,11 +328,13 @@ class TestSignAndParams:
         params1 = {"a": "1"}
         sign1 = adapter._sign(params1)
 
-        adapter2 = AoqiweiAdapter({
-            "base_url": "https://openapi.acescm.cn",
-            "app_key": "test_key",
-            "app_secret": "different_secret",
-        })
+        adapter2 = AoqiweiAdapter(
+            {
+                "base_url": "https://openapi.acescm.cn",
+                "app_key": "test_key",
+                "app_secret": "different_secret",
+            }
+        )
         sign2 = adapter2._sign(params1)
 
         assert sign1 != sign2
@@ -348,6 +356,7 @@ class TestSignAndParams:
 # ---------------------------------------------------------------------------
 # 参数校验
 # ---------------------------------------------------------------------------
+
 
 class TestParameterValidation:
     """参数校验测试"""
@@ -388,15 +397,14 @@ class TestParameterValidation:
 # 网络错误和重试
 # ---------------------------------------------------------------------------
 
+
 class TestNetworkErrors:
     """网络错误测试"""
 
     @pytest.mark.asyncio
     async def test_connection_timeout_raises(self, adapter):
         """连接超时后，query_shops 内部捕获并降级返回空列表"""
-        adapter._client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("连接超时")
-        )
+        adapter._client.get = AsyncMock(side_effect=httpx.ConnectTimeout("连接超时"))
 
         # query_shops 内部 try/except 捕获重试耗尽后的异常，降级返回空列表
         result = await adapter.query_shops()
@@ -425,9 +433,7 @@ class TestNetworkErrors:
     @pytest.mark.asyncio
     async def test_query_stock_fallback_on_error(self, adapter):
         """库存查询失败时返回空列表"""
-        adapter._client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("timeout")
-        )
+        adapter._client.get = AsyncMock(side_effect=httpx.ConnectTimeout("timeout"))
 
         result = await adapter.query_stock(depot_code="D001")
         assert result == []
@@ -437,21 +443,26 @@ class TestNetworkErrors:
 # P1-1: 多门店Token隔离测试
 # ---------------------------------------------------------------------------
 
+
 class TestMultiStoreTokenIsolation:
     """验证不同门店/客户适配器的凭证隔离"""
 
     def test_different_app_keys_produce_different_signs(self):
         """不同app_key/app_secret的适配器生成不同签名"""
-        adapter_a = AoqiweiAdapter({
-            "base_url": "https://openapi.acescm.cn",
-            "app_key": "key_xuji",
-            "app_secret": "secret_xuji",
-        })
-        adapter_b = AoqiweiAdapter({
-            "base_url": "https://openapi.acescm.cn",
-            "app_key": "key_changzai",
-            "app_secret": "secret_changzai",
-        })
+        adapter_a = AoqiweiAdapter(
+            {
+                "base_url": "https://openapi.acescm.cn",
+                "app_key": "key_xuji",
+                "app_secret": "secret_xuji",
+            }
+        )
+        adapter_b = AoqiweiAdapter(
+            {
+                "base_url": "https://openapi.acescm.cn",
+                "app_key": "key_changzai",
+                "app_secret": "secret_changzai",
+            }
+        )
 
         params = {"shopCode": "SH001"}
         sign_a = adapter_a._sign(params)
@@ -461,16 +472,20 @@ class TestMultiStoreTokenIsolation:
 
     def test_adapters_have_isolated_credentials(self):
         """两个适配器实例的凭证完全隔离"""
-        adapter_a = AoqiweiAdapter({
-            "base_url": "https://a.acescm.cn",
-            "app_key": "key_a",
-            "app_secret": "secret_a",
-        })
-        adapter_b = AoqiweiAdapter({
-            "base_url": "https://b.acescm.cn",
-            "app_key": "key_b",
-            "app_secret": "secret_b",
-        })
+        adapter_a = AoqiweiAdapter(
+            {
+                "base_url": "https://a.acescm.cn",
+                "app_key": "key_a",
+                "app_secret": "secret_a",
+            }
+        )
+        adapter_b = AoqiweiAdapter(
+            {
+                "base_url": "https://b.acescm.cn",
+                "app_key": "key_b",
+                "app_secret": "secret_b",
+            }
+        )
 
         assert adapter_a.app_key != adapter_b.app_key
         assert adapter_a.app_secret != adapter_b.app_secret
@@ -481,16 +496,24 @@ class TestMultiStoreTokenIsolation:
         """两个门店同时拉取数据，结果互不干扰"""
         import asyncio
 
-        adapter_a = AoqiweiAdapter({
-            "base_url": "https://openapi.acescm.cn",
-            "app_key": "key_a", "app_secret": "sec_a",
-            "timeout": 5, "retry_times": 1,
-        })
-        adapter_b = AoqiweiAdapter({
-            "base_url": "https://openapi.acescm.cn",
-            "app_key": "key_b", "app_secret": "sec_b",
-            "timeout": 5, "retry_times": 1,
-        })
+        adapter_a = AoqiweiAdapter(
+            {
+                "base_url": "https://openapi.acescm.cn",
+                "app_key": "key_a",
+                "app_secret": "sec_a",
+                "timeout": 5,
+                "retry_times": 1,
+            }
+        )
+        adapter_b = AoqiweiAdapter(
+            {
+                "base_url": "https://openapi.acescm.cn",
+                "app_key": "key_b",
+                "app_secret": "sec_b",
+                "timeout": 5,
+                "retry_times": 1,
+            }
+        )
 
         response_a = {"success": True, "code": 0, "data": [{"shopCode": "SH_A", "shopName": "徐记总店"}]}
         response_b = {"success": True, "code": 0, "data": [{"shopCode": "SH_B", "shopName": "尝在一起"}]}
@@ -509,9 +532,12 @@ class TestMultiStoreTokenIsolation:
     def test_to_order_store_brand_injection_isolation(self, adapter):
         """to_order 不同 store_id/brand_id 参数不会互相污染"""
         raw = {
-            "orderId": "ISO_AQ001", "orderNo": "ISO-001",
-            "totalAmount": 5000, "discountAmount": 0,
-            "orderStatus": "2", "items": [],
+            "orderId": "ISO_AQ001",
+            "orderNo": "ISO-001",
+            "totalAmount": 5000,
+            "discountAmount": 0,
+            "orderStatus": "2",
+            "items": [],
         }
 
         order_a = adapter.to_order(raw, store_id="XUJI_01", brand_id="XUJI")
@@ -527,6 +553,7 @@ class TestMultiStoreTokenIsolation:
 # P1-1: 分页处理测试
 # ---------------------------------------------------------------------------
 
+
 class TestPaginationHandling:
     """分页查询处理测试"""
 
@@ -534,7 +561,8 @@ class TestPaginationHandling:
     async def test_query_goods_pagination_params(self, adapter):
         """验证分页参数正确传递到请求"""
         mock_response_data = {
-            "success": True, "code": 0,
+            "success": True,
+            "code": 0,
             "data": {"list": [{"goodCode": "G001"}], "total": 1},
         }
         adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
@@ -551,7 +579,8 @@ class TestPaginationHandling:
     async def test_query_purchase_orders_pagination(self, adapter):
         """采购入库单分页查询"""
         page1_data = {
-            "success": True, "code": 0,
+            "success": True,
+            "code": 0,
             "data": {
                 "list": [{"orderNo": f"PO{i:03d}"} for i in range(1, 51)],
                 "total": 80,
@@ -573,7 +602,8 @@ class TestPaginationHandling:
     async def test_empty_list_returns_empty_not_error(self, adapter):
         """返回空数据时正常返回空列表/字典，不报错"""
         mock_response_data = {
-            "success": True, "code": 0,
+            "success": True,
+            "code": 0,
             "data": {"list": [], "total": 0},
         }
         adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
@@ -588,6 +618,7 @@ class TestPaginationHandling:
 # P1-1: POST接口测试（配送/采购/POS上传）
 # ---------------------------------------------------------------------------
 
+
 class TestPostEndpoints:
     """POST类型接口测试"""
 
@@ -595,15 +626,18 @@ class TestPostEndpoints:
     async def test_create_delivery_apply_success(self, adapter):
         """配送申请单创建成功"""
         mock_response_data = {
-            "success": True, "code": 0,
+            "success": True,
+            "code": 0,
             "data": {"applyNo": "AP20240101001", "status": "submitted"},
         }
         adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
 
-        result = await adapter.create_delivery_apply({
-            "shopCode": "SH001",
-            "items": [{"goodCode": "G001", "qty": 100}],
-        })
+        result = await adapter.create_delivery_apply(
+            {
+                "shopCode": "SH001",
+                "items": [{"goodCode": "G001", "qty": 100}],
+            }
+        )
 
         assert result["applyNo"] == "AP20240101001"
 
@@ -613,11 +647,13 @@ class TestPostEndpoints:
         mock_response_data = {"success": True, "code": 0, "data": {"received": True}}
         adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
 
-        result = await adapter.pos_upload_order({
-            "orderNo": "POS20240101001",
-            "shopCode": "SH001",
-            "totalAmount": 15000,
-        })
+        result = await adapter.pos_upload_order(
+            {
+                "orderNo": "POS20240101001",
+                "shopCode": "SH001",
+                "totalAmount": 15000,
+            }
+        )
 
         assert result["received"] is True
 
@@ -634,9 +670,7 @@ class TestPostEndpoints:
     @pytest.mark.asyncio
     async def test_pos_upload_order_failure_degrades(self, adapter):
         """POS订单上传失败时降级返回失败状态"""
-        adapter._client.post = AsyncMock(
-            side_effect=httpx.ConnectTimeout("timeout")
-        )
+        adapter._client.post = AsyncMock(side_effect=httpx.ConnectTimeout("timeout"))
 
         result = await adapter.pos_upload_order({"orderNo": "FAIL001"})
         assert result["success"] is False
@@ -648,9 +682,12 @@ class TestPostEndpoints:
         mock_response_data = {"success": True, "code": 0, "data": {"confirmed": True}}
         adapter._client.post = AsyncMock(return_value=_mock_response(mock_response_data))
 
-        result = await adapter.confirm_delivery_in({
-            "orderNo": "DO001", "shopCode": "SH001",
-        })
+        result = await adapter.confirm_delivery_in(
+            {
+                "orderNo": "DO001",
+                "shopCode": "SH001",
+            }
+        )
 
         assert result["confirmed"] is True
 
@@ -659,6 +696,7 @@ class TestPostEndpoints:
 # P1-1: 报表接口测试
 # ---------------------------------------------------------------------------
 
+
 class TestReportEndpoints:
     """报表接口测试"""
 
@@ -666,7 +704,8 @@ class TestReportEndpoints:
     async def test_query_inventory_report_success(self, adapter):
         """进销存报表查询成功"""
         mock_response_data = {
-            "success": True, "code": 0,
+            "success": True,
+            "code": 0,
             "data": {
                 "list": [
                     {"goodCode": "G001", "beginQty": 100, "inQty": 50, "outQty": 30, "endQty": 120},
@@ -687,9 +726,7 @@ class TestReportEndpoints:
     @pytest.mark.asyncio
     async def test_query_inventory_report_fallback_on_error(self, adapter):
         """进销存报表查询失败时降级返回空"""
-        adapter._client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("timeout")
-        )
+        adapter._client.get = AsyncMock(side_effect=httpx.ConnectTimeout("timeout"))
 
         result = await adapter.query_inventory_report(
             start_date="2024-01-01",
@@ -702,7 +739,8 @@ class TestReportEndpoints:
     async def test_good_diff_analysis_success(self, adapter):
         """货品差异分析查询成功"""
         mock_response_data = {
-            "success": True, "code": 0,
+            "success": True,
+            "code": 0,
             "data": {"list": [{"goodCode": "G001", "diffQty": -5}]},
         }
         adapter._client.get = AsyncMock(return_value=_mock_response(mock_response_data))
@@ -718,6 +756,7 @@ class TestReportEndpoints:
 # ---------------------------------------------------------------------------
 # P1-1: to_order 边界场景补充
 # ---------------------------------------------------------------------------
+
 
 class TestToOrderEdgeCases:
     """to_order 边界场景补充测试"""
@@ -737,7 +776,8 @@ class TestToOrderEdgeCases:
     def test_order_subtotal_calculation(self, adapter):
         """subtotal = total + discount"""
         raw = {
-            "orderId": "SUB001", "orderNo": "SUB-001",
+            "orderId": "SUB001",
+            "orderNo": "SUB-001",
             "orderStatus": "2",
             "totalAmount": 18000,
             "discountAmount": 2000,
@@ -751,10 +791,14 @@ class TestToOrderEdgeCases:
     def test_order_unknown_status_defaults_pending(self, adapter):
         """未知状态码默认映射为 PENDING"""
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw = {
-            "orderId": "UNK001", "orderNo": "UNK-001",
+            "orderId": "UNK001",
+            "orderNo": "UNK-001",
             "orderStatus": "99",
-            "totalAmount": 5000, "discountAmount": 0, "items": [],
+            "totalAmount": 5000,
+            "discountAmount": 0,
+            "items": [],
         }
         order = adapter.to_order(raw, "S1", "B1")
         assert order.order_status == OrderStatus.PENDING
@@ -762,9 +806,11 @@ class TestToOrderEdgeCases:
     def test_item_quantity_fallback(self, adapter):
         """订单项缺少 qty 时使用 quantity 字段"""
         raw = {
-            "orderId": "QTY001", "orderNo": "QTY-001",
+            "orderId": "QTY001",
+            "orderNo": "QTY-001",
             "orderStatus": "2",
-            "totalAmount": 5000, "discountAmount": 0,
+            "totalAmount": 5000,
+            "discountAmount": 0,
             "items": [
                 {"goodCode": "G001", "goodName": "菜A", "quantity": 3, "price": 5000},
             ],
@@ -775,9 +821,11 @@ class TestToOrderEdgeCases:
     def test_item_special_requirements(self, adapter):
         """订单项备注映射到 special_requirements"""
         raw = {
-            "orderId": "RMK001", "orderNo": "RMK-001",
+            "orderId": "RMK001",
+            "orderNo": "RMK-001",
             "orderStatus": "2",
-            "totalAmount": 5000, "discountAmount": 0,
+            "totalAmount": 5000,
+            "discountAmount": 0,
             "items": [
                 {"goodCode": "G001", "goodName": "菜A", "qty": 1, "price": 5000, "remark": "不要葱"},
             ],
@@ -789,6 +837,7 @@ class TestToOrderEdgeCases:
 # ---------------------------------------------------------------------------
 # P1-1: 异步资源管理测试
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncResourceManagement:
     """异步资源管理测试"""

@@ -2,39 +2,38 @@
 
 覆盖：设备注册表查询、协议创建、门店配置管理、模板管理、API 路由。
 """
+
 import pytest
 import pytest_asyncio
 
 from shared.hardware.device_registry import (
     DEVICE_CATEGORIES,
     DEVICE_REGISTRY,
+    get_all_brands,
     get_device,
     get_devices_by_category,
     get_recommended_config,
     search_devices,
-    get_all_brands,
 )
 from shared.hardware.protocol_support import (
+    CashDrawerProtocol,
     ConnectionState,
     ESCPOSProtocol,
-    SerialScaleProtocol,
     HIDScannerProtocol,
-    CashDrawerProtocol,
-    SUNMIBridge,
-    LabelPrinterProtocol,
     HTTPDeviceProtocol,
+    LabelPrinterProtocol,
+    SerialScaleProtocol,
+    SUNMIBridge,
     create_protocol_handler,
 )
 from shared.hardware.store_hardware_config import (
     StoreHardwareConfig,
-    DeviceInstance,
-    HardwareTemplate,
 )
-
 
 # ════════════════════════════════════════════
 # 1. 设备注册表测试
 # ════════════════════════════════════════════
+
 
 class TestDeviceRegistry:
     """设备注册表查询测试。"""
@@ -124,6 +123,7 @@ class TestDeviceRegistry:
 # 2. 协议支持层测试
 # ════════════════════════════════════════════
 
+
 class TestProtocolSupport:
     """协议支持层测试。"""
 
@@ -202,6 +202,7 @@ class TestProtocolSupport:
 # ════════════════════════════════════════════
 # 3. 门店硬件配置管理测试
 # ════════════════════════════════════════════
+
 
 class TestStoreHardwareConfig:
     """门店硬件配置管理测试。"""
@@ -341,11 +342,13 @@ class TestStoreHardwareConfig:
     async def test_list_templates(self, config: StoreHardwareConfig) -> None:
         """列出模板。"""
         await config.create_store_template(
-            template_name="模板A", devices=[{"device_key": "beiyang_98np", "connection_params": {}}],
+            template_name="模板A",
+            devices=[{"device_key": "beiyang_98np", "connection_params": {}}],
             tenant_id="tenant-1",
         )
         await config.create_store_template(
-            template_name="模板B", devices=[{"device_key": "sunmi_t2", "connection_params": {}}],
+            template_name="模板B",
+            devices=[{"device_key": "sunmi_t2", "connection_params": {}}],
             tenant_id="tenant-1",
         )
         templates = await config.list_templates("tenant-1")
@@ -371,6 +374,7 @@ class TestStoreHardwareConfig:
 # ════════════════════════════════════════════
 # 4. 异步协议操作测试
 # ════════════════════════════════════════════
+
 
 class TestAsyncProtocolOps:
     """异步协议操作测试。"""

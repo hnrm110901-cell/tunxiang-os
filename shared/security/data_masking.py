@@ -3,24 +3,41 @@
 
 用途：日志输出、API 响应、数据导出时自动脱敏敏感字段
 """
+
 from __future__ import annotations
 
 import hashlib
 import re
 from typing import Any
 
-
 # PII 字段名列表（忽略大小写，支持下划线/驼峰）
-_PII_FIELD_NAMES = frozenset([
-    "phone", "mobile", "telephone", "cellphone",
-    "email", "email_address",
-    "id_card", "id_number", "national_id",
-    "bank_card", "card_number", "account_number",
-    "address", "home_address",
-    "name", "full_name", "real_name",
-    "password", "passwd", "secret", "token",
-    "openid", "union_id",
-])
+_PII_FIELD_NAMES = frozenset(
+    [
+        "phone",
+        "mobile",
+        "telephone",
+        "cellphone",
+        "email",
+        "email_address",
+        "id_card",
+        "id_number",
+        "national_id",
+        "bank_card",
+        "card_number",
+        "account_number",
+        "address",
+        "home_address",
+        "name",
+        "full_name",
+        "real_name",
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "openid",
+        "union_id",
+    ]
+)
 
 
 def mask_phone(phone: str) -> str:
@@ -103,10 +120,7 @@ def mask_dict(data: dict[str, Any], deep: bool = True) -> dict[str, Any]:
         if isinstance(value, dict) and deep:
             result[key] = mask_dict(value, deep=True)
         elif isinstance(value, list) and deep:
-            result[key] = [
-                mask_dict(item, deep=True) if isinstance(item, dict) else item
-                for item in value
-            ]
+            result[key] = [mask_dict(item, deep=True) if isinstance(item, dict) else item for item in value]
         else:
             result[key] = mask_value(key, value)
     return result

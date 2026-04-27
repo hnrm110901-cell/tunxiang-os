@@ -23,8 +23,6 @@ Create Date: 2026-03-31
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v089"
 down_revision = "v088"
@@ -75,8 +73,12 @@ def upgrade() -> None:
     """)
 
     op.execute("CREATE INDEX IF NOT EXISTS idx_journey_definitions_tenant ON journey_definitions(tenant_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_journey_definitions_active ON journey_definitions(tenant_id, is_active) WHERE is_active = TRUE")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_journey_definitions_event ON journey_definitions(tenant_id, trigger_event) WHERE is_active = TRUE")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journey_definitions_active ON journey_definitions(tenant_id, is_active) WHERE is_active = TRUE"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journey_definitions_event ON journey_definitions(tenant_id, trigger_event) WHERE is_active = TRUE"
+    )
 
     # RLS
     op.execute("ALTER TABLE journey_definitions ENABLE ROW LEVEL SECURITY")
@@ -120,9 +122,15 @@ def upgrade() -> None:
     """)
 
     op.execute("CREATE INDEX IF NOT EXISTS idx_journey_enrollments_tenant ON journey_enrollments(tenant_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_journey_enrollments_customer ON journey_enrollments(tenant_id, customer_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_journey_enrollments_poll ON journey_enrollments(status, next_step_at) WHERE status = 'active'")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_journey_enrollments_def ON journey_enrollments(tenant_id, journey_definition_id)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journey_enrollments_customer ON journey_enrollments(tenant_id, customer_id)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journey_enrollments_poll ON journey_enrollments(status, next_step_at) WHERE status = 'active'"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_journey_enrollments_def ON journey_enrollments(tenant_id, journey_definition_id)"
+    )
     # 防重入：同一客户在同一旅程中只能有一个 active 实例
     op.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS uq_enrollment_active
@@ -182,7 +190,9 @@ def upgrade() -> None:
 
     op.execute("CREATE INDEX IF NOT EXISTS idx_step_executions_tenant ON journey_step_executions(tenant_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_step_executions_enrollment ON journey_step_executions(enrollment_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_step_executions_poll ON journey_step_executions(status, scheduled_at) WHERE status = 'pending'")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_step_executions_poll ON journey_step_executions(status, scheduled_at) WHERE status = 'pending'"
+    )
 
     # RLS
     op.execute("ALTER TABLE journey_step_executions ENABLE ROW LEVEL SECURITY")

@@ -11,9 +11,10 @@ Revision ID: v144
 Revises: v143
 Create Date: 2026-04-04
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v144"
 down_revision = "v143"
@@ -30,8 +31,7 @@ def upgrade() -> None:
     if "offers" not in _existing:
         op.create_table(
             "offers",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("name", sa.String(100), nullable=False),
             sa.Column("offer_type", sa.String(40), nullable=False),
@@ -48,10 +48,8 @@ def upgrade() -> None:
             sa.Column("issued_count", sa.Integer, nullable=False, server_default="0"),
             sa.Column("redeemed_count", sa.Integer, nullable=False, server_default="0"),
             sa.Column("total_discount_fen", sa.Integer, nullable=False, server_default="0"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
@@ -83,18 +81,15 @@ def upgrade() -> None:
     if "offer_redemptions" not in _existing:
         op.create_table(
             "offer_redemptions",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("offer_id", UUID(as_uuid=True), nullable=False),
             sa.Column("customer_id", UUID(as_uuid=True), nullable=False),
             sa.Column("order_id", UUID(as_uuid=True), nullable=True),
             sa.Column("order_total_fen", sa.Integer, nullable=False, server_default="0"),
             sa.Column("discount_fen", sa.Integer, nullable=False, server_default="0"),
-            sa.Column("redeemed_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("redeemed_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
@@ -126,17 +121,14 @@ def upgrade() -> None:
     if "channel_configs" not in _existing:
         op.create_table(
             "channel_configs",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("channel", sa.String(30), nullable=False),
             sa.Column("max_daily_per_user", sa.Integer, nullable=False, server_default="3"),
             sa.Column("settings", JSONB, nullable=True),
             sa.Column("is_enabled", sa.Boolean, nullable=False, server_default="true"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
             sa.UniqueConstraint("tenant_id", "channel", name="uq_channel_configs_tenant_channel"),
         )
@@ -161,8 +153,7 @@ def upgrade() -> None:
     if "message_send_logs" not in _existing:
         op.create_table(
             "message_send_logs",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("channel", sa.String(30), nullable=False),
             sa.Column("customer_id", UUID(as_uuid=True), nullable=True),
@@ -172,10 +163,8 @@ def upgrade() -> None:
             sa.Column("campaign_id", UUID(as_uuid=True), nullable=True),
             sa.Column("status", sa.String(20), nullable=False, server_default=sa.text("'sent'")),
             sa.Column("error_reason", sa.Text, nullable=True),
-            sa.Column("sent_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("sent_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
@@ -215,8 +204,7 @@ def upgrade() -> None:
     if "content_templates" not in _existing:
         op.create_table(
             "content_templates",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("template_key", sa.String(80), nullable=True),
             sa.Column("name", sa.String(100), nullable=False),
@@ -226,13 +214,12 @@ def upgrade() -> None:
             sa.Column("is_builtin", sa.Boolean, nullable=False, server_default="false"),
             sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
             sa.Column("usage_count", sa.Integer, nullable=False, server_default="0"),
-            sa.Column("created_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.TIMESTAMP(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
             sa.UniqueConstraint(
-                "tenant_id", "template_key",
+                "tenant_id",
+                "template_key",
                 name="uq_content_templates_tenant_key",
             ),
         )
@@ -263,27 +250,17 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS content_templates_tenant_isolation ON content_templates;"
-    )
+    op.execute("DROP POLICY IF EXISTS content_templates_tenant_isolation ON content_templates;")
     op.drop_table("content_templates")
 
-    op.execute(
-        "DROP POLICY IF EXISTS message_send_logs_tenant_isolation ON message_send_logs;"
-    )
+    op.execute("DROP POLICY IF EXISTS message_send_logs_tenant_isolation ON message_send_logs;")
     op.drop_table("message_send_logs")
 
-    op.execute(
-        "DROP POLICY IF EXISTS channel_configs_tenant_isolation ON channel_configs;"
-    )
+    op.execute("DROP POLICY IF EXISTS channel_configs_tenant_isolation ON channel_configs;")
     op.drop_table("channel_configs")
 
-    op.execute(
-        "DROP POLICY IF EXISTS offer_redemptions_tenant_isolation ON offer_redemptions;"
-    )
+    op.execute("DROP POLICY IF EXISTS offer_redemptions_tenant_isolation ON offer_redemptions;")
     op.drop_table("offer_redemptions")
 
-    op.execute(
-        "DROP POLICY IF EXISTS offers_tenant_isolation ON offers;"
-    )
+    op.execute("DROP POLICY IF EXISTS offers_tenant_isolation ON offers;")
     op.drop_table("offers")

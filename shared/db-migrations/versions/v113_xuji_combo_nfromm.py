@@ -4,8 +4,9 @@ Revision ID: v113
 Revises: v112
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v113"
@@ -53,10 +54,14 @@ def upgrade() -> None:
         sa.Column("dish_id", UUID(as_uuid=True), nullable=False),
         sa.Column("dish_name", sa.String(100), nullable=False, comment="冗余，防止菜品更名后历史套餐显示异常"),
         sa.Column("quantity", sa.Integer, nullable=False, server_default="1", comment="该菜品在此分组内的份数"),
-        sa.Column("extra_price_fen", sa.Integer, nullable=False, server_default="0",
-                  comment="额外加价（高档替换菜）"),
-        sa.Column("is_default", sa.Boolean, nullable=False, server_default="false",
-                  comment="固定套餐兼容：is_default=True表示默认包含"),
+        sa.Column("extra_price_fen", sa.Integer, nullable=False, server_default="0", comment="额外加价（高档替换菜）"),
+        sa.Column(
+            "is_default",
+            sa.Boolean,
+            nullable=False,
+            server_default="false",
+            comment="固定套餐兼容：is_default=True表示默认包含",
+        ),
         sa.Column("sort_order", sa.Integer, nullable=False, server_default="0"),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
@@ -107,6 +112,13 @@ def downgrade() -> None:
     op.drop_table("order_item_combo_selections")
     op.drop_table("combo_group_items")
     op.drop_table("combo_groups")
-    for col in ["combo_type", "description", "min_person", "is_active",
-                "available_from", "available_until", "image_url"]:
+    for col in [
+        "combo_type",
+        "description",
+        "min_person",
+        "is_active",
+        "available_from",
+        "available_until",
+        "image_url",
+    ]:
         op.drop_column("dish_combos", col)

@@ -7,8 +7,8 @@ Revises: v237
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v238b"
 down_revision = "v238"
@@ -22,7 +22,7 @@ _RLS_COND = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUI
 def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
-    if 'invoices' in existing:
+    if "invoices" in existing:
         return
 
     # ──────────────────────────────────────────────────────────────────

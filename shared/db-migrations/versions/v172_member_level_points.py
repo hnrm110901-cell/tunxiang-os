@@ -38,7 +38,9 @@ def upgrade() -> None:
             UNIQUE (tenant_id, level_code)
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_member_level_configs_tenant ON member_level_configs (tenant_id, sort_order)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_member_level_configs_tenant ON member_level_configs (tenant_id, sort_order)"
+    )
     op.execute("ALTER TABLE member_level_configs ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY member_level_configs_rls ON member_level_configs
@@ -61,7 +63,9 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_member_level_history_member ON member_level_history (tenant_id, member_id, created_at DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_member_level_history_member ON member_level_history (tenant_id, member_id, created_at DESC)"
+    )
     op.execute("ALTER TABLE member_level_history ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY member_level_history_rls ON member_level_history

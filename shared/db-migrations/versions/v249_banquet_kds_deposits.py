@@ -8,8 +8,8 @@ Fix: schema aligned with banquet_kds_routes.py and banquet_deposit_routes.py
   - banquet_kds_dishes:  total_qty/served_qty/serve_status/sequence_no/is_deleted/notes
   - banquet_session_deposits: balance_fen/collected_at/applied_at + status default 'active'
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v249"
 down_revision = "v248"

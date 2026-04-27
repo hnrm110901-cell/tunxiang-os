@@ -46,8 +46,7 @@ def upgrade() -> None:
         "ON staff_performance_records (tenant_id, employee_id, stat_date DESC)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_spr_tenant_role "
-        "ON staff_performance_records (tenant_id, role, stat_date DESC)"
+        "CREATE INDEX IF NOT EXISTS idx_spr_tenant_role ON staff_performance_records (tenant_id, role, stat_date DESC)"
     )
     op.execute("ALTER TABLE staff_performance_records ENABLE ROW LEVEL SECURITY")
     op.execute("""

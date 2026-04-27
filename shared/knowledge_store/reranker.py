@@ -3,6 +3,7 @@
 对粗召回结果（top-20）重排序，返回 top-5 高质量结果。
 API 不可用时降级为分数阈值过滤。
 """
+
 from __future__ import annotations
 
 import os

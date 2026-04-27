@@ -1,8 +1,9 @@
 """上报引擎 — civic_submissions + civic_compliance_scores
 Revision: v229
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v229"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- civic_submissions 统一上报日志 ---
 
-    if 'civic_submissions' not in existing:
+    if "civic_submissions" not in existing:
         op.create_table(
             "civic_submissions",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -71,7 +70,7 @@ def upgrade() -> None:
 
         # --- civic_compliance_scores 门店合规评分 ---
 
-    if 'civic_compliance_scores' not in existing:
+    if "civic_compliance_scores" not in existing:
         op.create_table(
             "civic_compliance_scores",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -98,7 +97,6 @@ def upgrade() -> None:
             unique=True,
         )
         _add_rls("civic_compliance_scores", "ccs")
-
 
 
 def downgrade() -> None:

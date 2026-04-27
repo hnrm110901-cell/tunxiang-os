@@ -10,6 +10,7 @@
   TAX_BUREAU_CERT_PATH       -- 数字证书路径
   TAX_BUREAU_ENV             -- sandbox / production (默认 sandbox)
 """
+
 from __future__ import annotations
 
 import os

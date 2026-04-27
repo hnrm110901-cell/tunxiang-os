@@ -2,11 +2,12 @@
 屯象OS 行业公共字典 — 客户/会员统一模型
 """
 
-from typing import TypedDict, Optional, List
+from typing import List, TypedDict
 
 
 class UnifiedCustomer(TypedDict, total=False):
     """统一客户/会员格式"""
+
     # ── 标识 ──
     id: str
     consumer_id: str

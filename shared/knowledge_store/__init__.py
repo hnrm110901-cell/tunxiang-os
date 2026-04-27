@@ -26,9 +26,9 @@ from .corrective_rag import CorrectiveRAG
 from .document_processor import DocumentProcessor
 from .graph_event_handler import GraphEventHandler
 from .graph_extractor import (
-    ExtractionResult,
     ExtractedEntity,
     ExtractedRelationship,
+    ExtractionResult,
     GraphExtractor,
 )
 from .graph_retriever import GraphRetriever

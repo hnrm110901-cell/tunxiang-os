@@ -14,9 +14,10 @@
 11. delete_by_document 执行含正确 WHERE 子句的 DELETE
 12. 租户隔离：所有查询包含 tenant_id 过滤
 """
+
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -28,8 +29,8 @@ sys.path.insert(0, _ROOT_DIR)
 
 from shared.knowledge_store.pg_vector_store import PgVectorStore
 
-
 # ── 工具：生成假向量 ────────────────────────────────────────────
+
 
 def _fake_embedding(val: float = 0.1, size: int = 1536) -> list[float]:
     return [val] * size
@@ -44,6 +45,7 @@ def _mock_db_session() -> AsyncMock:
 
 
 # ── health_check 测试 ────────────────────────────────────────────
+
 
 class TestHealthCheck:
     """健康检查测试"""
@@ -81,6 +83,7 @@ class TestHealthCheck:
 
 
 # ── upsert_chunks 测试 ──────────────────────────────────────────
+
 
 class TestUpsertChunks:
     """知识块写入测试"""
@@ -172,10 +175,7 @@ class TestUpsertChunks:
         db = _mock_db_session()
         db.execute.side_effect = ConnectionRefusedError("db down")
 
-        chunks = [
-            {"text": f"chunk{i}", "embedding": [0.1], "metadata": {}, "doc_id": f"d{i}"}
-            for i in range(3)
-        ]
+        chunks = [{"text": f"chunk{i}", "embedding": [0.1], "metadata": {}, "doc_id": f"d{i}"} for i in range(3)]
 
         result = await PgVectorStore.upsert_chunks(chunks, "tenant_001", db)
         assert result["failed"] == 3
@@ -192,6 +192,7 @@ class TestUpsertChunks:
 
 
 # ── vector_search 测试 ──────────────────────────────────────────
+
 
 class TestVectorSearch:
     """向量相似度检索测试"""
@@ -223,10 +224,14 @@ class TestVectorSearch:
         # set_config 调用
         db.execute.side_effect = [
             MagicMock(),  # set_config
-            MagicMock(fetchall=MagicMock(return_value=[
-                ("chunk-id-1", "doc:001", "红烧肉做法", 0.95, {"cat": "热菜"}, 0, "doc-uuid-1"),
-                ("chunk-id-2", "doc:002", "清蒸鱼做法", 0.87, {"cat": "海鲜"}, 1, "doc-uuid-1"),
-            ])),
+            MagicMock(
+                fetchall=MagicMock(
+                    return_value=[
+                        ("chunk-id-1", "doc:001", "红烧肉做法", 0.95, {"cat": "热菜"}, 0, "doc-uuid-1"),
+                        ("chunk-id-2", "doc:002", "清蒸鱼做法", 0.87, {"cat": "海鲜"}, 1, "doc-uuid-1"),
+                    ]
+                )
+            ),
         ]
 
         results = await PgVectorStore.vector_search(
@@ -302,6 +307,7 @@ class TestVectorSearch:
 
 # ── keyword_search 测试 ─────────────────────────────────────────
 
+
 class TestKeywordSearch:
     """关键词全文检索测试"""
 
@@ -325,9 +331,13 @@ class TestKeywordSearch:
         db = _mock_db_session()
         db.execute.side_effect = [
             MagicMock(),  # set_config
-            MagicMock(fetchall=MagicMock(return_value=[
-                ("chunk-kw-1", "doc:010", "红烧肉的制作步骤", 0.65, {"cat": "热菜"}, 0, "doc-uuid-2"),
-            ])),
+            MagicMock(
+                fetchall=MagicMock(
+                    return_value=[
+                        ("chunk-kw-1", "doc:010", "红烧肉的制作步骤", 0.65, {"cat": "热菜"}, 0, "doc-uuid-2"),
+                    ]
+                )
+            ),
         ]
 
         results = await PgVectorStore.keyword_search(
@@ -366,6 +376,7 @@ class TestKeywordSearch:
 
 
 # ── delete_by_document 测试 ─────────────────────────────────────
+
 
 class TestDeleteByDocument:
     """文档删除测试"""
@@ -427,6 +438,7 @@ class TestDeleteByDocument:
 
 
 # ── 租户隔离综合验证 ────────────────────────────────────────────
+
 
 class TestTenantIsolation:
     """租户隔离：所有操作包含 tenant_id"""

@@ -14,6 +14,7 @@
     - 查询时不支持 LIKE / = 等操作（密文不可比较），需要模糊搜索请配合
       明文辅助列（如 phone_last4）
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -38,9 +39,7 @@ class EncryptedString(sa.types.TypeDecorator):
     def __init__(self, length: int = 512, **kwargs: object) -> None:
         super().__init__(length=length, **kwargs)
 
-    def process_bind_param(
-        self, value: Optional[str], dialect: Dialect
-    ) -> Optional[str]:
+    def process_bind_param(self, value: Optional[str], dialect: Dialect) -> Optional[str]:
         """写入 DB 前加密。"""
         if value is None:
             return None
@@ -50,9 +49,7 @@ class EncryptedString(sa.types.TypeDecorator):
             return value
         return encryptor.encrypt(value)
 
-    def process_result_value(
-        self, value: Optional[str], dialect: Dialect
-    ) -> Optional[str]:
+    def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[str]:
         """从 DB 读取后解密。"""
         if value is None:
             return None

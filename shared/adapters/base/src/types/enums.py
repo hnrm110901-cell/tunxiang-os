@@ -16,6 +16,7 @@ class ReservationStatus(str, Enum):
                   ↓           ↓        ↓
               CANCELLED    NO_SHOW  TABLE_CHANGE
     """
+
     PENDING = "pending"
     CONFIRMED = "confirmed"
     ARRIVED = "arrived"
@@ -28,6 +29,7 @@ class ReservationStatus(str, Enum):
 
 class OrderStatus(str, Enum):
     """订单状态"""
+
     PENDING = "pending"
     CONFIRMED = "confirmed"
     PREPARING = "preparing"
@@ -40,6 +42,7 @@ class OrderStatus(str, Enum):
 
 class OrderType(str, Enum):
     """订单类型"""
+
     DINE_IN = "dine_in"
     TAKEOUT = "takeout"
     DELIVERY = "delivery"
@@ -48,6 +51,7 @@ class OrderType(str, Enum):
 
 class ReservationType(str, Enum):
     """预订类型"""
+
     REGULAR = "regular"
     BANQUET = "banquet"
     WEDDING = "wedding"
@@ -62,6 +66,7 @@ class ReservationType(str, Enum):
 
 class TableType(str, Enum):
     """桌位类型"""
+
     STANDARD_ROOM = "standard_room"
     DELUXE_ROOM = "deluxe_room"
     CONNECTED_ROOM = "connected_room"
@@ -74,6 +79,7 @@ class TableType(str, Enum):
 
 class TableStatus(str, Enum):
     """桌位状态"""
+
     AVAILABLE = "available"
     RESERVED = "reserved"
     OCCUPIED = "occupied"
@@ -84,6 +90,7 @@ class TableStatus(str, Enum):
 
 class MealPeriod(str, Enum):
     """餐别"""
+
     BREAKFAST = "breakfast"
     LUNCH = "lunch"
     DINNER = "dinner"
@@ -93,6 +100,7 @@ class MealPeriod(str, Enum):
 
 class PaymentMethod(str, Enum):
     """支付方式"""
+
     CASH = "cash"
     CARD = "card"
     WECHAT = "wechat"
@@ -107,6 +115,7 @@ class PaymentMethod(str, Enum):
 
 class ChannelSource(str, Enum):
     """获客渠道"""
+
     PHONE = "phone"
     WALK_IN = "walk_in"
     MEITUAN = "meituan"
@@ -126,6 +135,7 @@ class ChannelSource(str, Enum):
 
 class Gender(str, Enum):
     """性别"""
+
     MALE = "male"
     FEMALE = "female"
     UNKNOWN = "unknown"
@@ -133,6 +143,7 @@ class Gender(str, Enum):
 
 class CustomerLevel(str, Enum):
     """客户生命周期分层"""
+
     NEW = "new"
     ACTIVE = "active"
     LOYAL = "loyal"
@@ -144,6 +155,7 @@ class CustomerLevel(str, Enum):
 
 class DishCategory(str, Enum):
     """菜品大类"""
+
     HOT_DISH = "hot_dish"
     COLD_DISH = "cold_dish"
     SOUP = "soup"

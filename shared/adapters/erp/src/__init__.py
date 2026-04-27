@@ -10,9 +10,10 @@
     adapter = get_erp_adapter(erp_type="kingdee")
     result = await adapter.push_voucher(voucher)
 """
+
 from .base import (
-    ERPAdapter,
     ERPAccount,
+    ERPAdapter,
     ERPPushResult,
     ERPType,
     ERPVoucher,
@@ -20,9 +21,9 @@ from .base import (
     PushStatus,
     VoucherType,
 )
+from .factory import get_erp_adapter
 from .kingdee_adapter import KingdeeAdapter
 from .yonyou_adapter import YonyouAdapter
-from .factory import get_erp_adapter
 
 __all__ = [
     # 基类 & 数据模型

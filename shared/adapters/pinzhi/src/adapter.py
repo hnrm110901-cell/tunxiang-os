@@ -2,13 +2,16 @@
 品智收银系统API适配器
 提供门店管理、菜品管理、订单查询、营业数据等功能
 """
-import os
-from decimal import Decimal
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-import structlog
+
 import asyncio
+import os
+from datetime import datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
 import httpx
+import structlog
+
 from .signature import generate_sign
 
 logger = structlog.get_logger()
@@ -94,7 +97,7 @@ class PinzhiAdapter:
                 )
                 if attempt == self.retry_times - 1:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
-                await asyncio.sleep(0.5 * (2 ** attempt))
+                await asyncio.sleep(0.5 * (2**attempt))
 
             except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError, ValueError) as e:
                 logger.error(
@@ -105,7 +108,7 @@ class PinzhiAdapter:
                 )
                 if attempt == self.retry_times - 1:
                     raise
-                await asyncio.sleep(0.5 * (2 ** attempt))
+                await asyncio.sleep(0.5 * (2**attempt))
 
         raise RuntimeError("请求失败，已达到最大重试次数")
 
@@ -332,9 +335,7 @@ class PinzhiAdapter:
         response = await self._request("POST", "/pinzhi/orderNew.do", data=params)
         return response.get("res", [])
 
-    async def query_order_summary(
-        self, ognid: str, business_date: str
-    ) -> Dict[str, Any]:
+    async def query_order_summary(self, ognid: str, business_date: str) -> Dict[str, Any]:
         """
         按门店查询收入数据
 
@@ -356,9 +357,7 @@ class PinzhiAdapter:
             logger.warning("查询收入数据失败", error=str(e), exc_info=True)
             return {}
 
-    async def query_store_summary_list(
-        self, business_date: str
-    ) -> List[Dict[str, Any]]:
+    async def query_store_summary_list(self, business_date: str) -> List[Dict[str, Any]]:
         """
         查询所有门店营业额及菜类销售数据
 
@@ -453,9 +452,7 @@ class PinzhiAdapter:
         logger.info("查询门店每日经营数据", business_date=business_date, ognid=ognid)
 
         try:
-            response = await self._request(
-                "GET", "/pinzhi/queryOgnDailyBizData.do", params=params
-            )
+            response = await self._request("GET", "/pinzhi/queryOgnDailyBizData.do", params=params)
             return response.get("res", response.get("data", {}))
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询门店每日经营数据失败", error=str(e), exc_info=True)
@@ -496,9 +493,7 @@ class PinzhiAdapter:
                 logger.warning("查询支付方式失败", path=path, error=str(e))
         return []
 
-    async def download_bill_data(
-        self, ognid: str, pay_date: str, pay_type: int
-    ) -> str:
+    async def download_bill_data(self, ognid: str, pay_date: str, pay_type: int) -> str:
         """
         下载微信支付宝订单数据
 
@@ -512,9 +507,7 @@ class PinzhiAdapter:
         """
         params = {"ognid": ognid, "payDate": pay_date, "payType": pay_type}
         params = self._add_sign(params)
-        logger.info(
-            "下载对账单", ognid=ognid, pay_date=pay_date, pay_type=pay_type
-        )
+        logger.info("下载对账单", ognid=ognid, pay_date=pay_date, pay_type=pay_type)
 
         try:
             response = await self._request("GET", "/pinzhi/downloadBillData.do", params=params)
@@ -546,9 +539,27 @@ class PinzhiAdapter:
         # 定义所有检测项：name, method, endpoint, params_builder, required(核心=True)
         checks = [
             ("门店信息", "GET", "/pinzhi/organizations.do", lambda: {"ognid": ognid} if ognid else {}, True),
-            ("门店每日经营数据(报表)", "GET", "/pinzhi/queryOgnDailyBizData.do", lambda: {"businessDate": business_date, **({"ognid": ognid} if ognid else {})}, True),
-            ("按门店收入数据", "GET", "/pinzhi/queryOrderSummary.do", lambda: {"ognid": ognid or "", "businessDate": business_date}, True),
-            ("订单列表V2", "POST", "/pinzhi/orderNew.do", lambda: {"ognid": ognid or "", "businessDate": business_date, "pageIndex": 1, "pageSize": 5}, True),
+            (
+                "门店每日经营数据(报表)",
+                "GET",
+                "/pinzhi/queryOgnDailyBizData.do",
+                lambda: {"businessDate": business_date, **({"ognid": ognid} if ognid else {})},
+                True,
+            ),
+            (
+                "按门店收入数据",
+                "GET",
+                "/pinzhi/queryOrderSummary.do",
+                lambda: {"ognid": ognid or "", "businessDate": business_date},
+                True,
+            ),
+            (
+                "订单列表V2",
+                "POST",
+                "/pinzhi/orderNew.do",
+                lambda: {"ognid": ognid or "", "businessDate": business_date, "pageIndex": 1, "pageSize": 5},
+                True,
+            ),
             ("菜品类别", "GET", "/pinzhi/reportcategory.do", lambda: {}, True),
             ("菜品列表", "POST", "/pinzhi/querydishes.do", lambda: {"updatetime": 0}, False),  # 签名机制待品智确认
             ("支付方式", "GET", "/pinzhi/payment.do", lambda: {}, True),
@@ -586,22 +597,26 @@ class PinzhiAdapter:
                         if isinstance(val, dict) and "list" in val:
                             count = f"list共{len(val.get('list', []))}条"
                             break
-                results.append({
-                    "name": name,
-                    "endpoint": endpoint.split("/")[-1],
-                    "ok": True,
-                    "message": count or "成功",
-                    "required": required,
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "endpoint": endpoint.split("/")[-1],
+                        "ok": True,
+                        "message": count or "成功",
+                        "required": required,
+                    }
+                )
             except Exception as e:  # 诊断工具：必须捕获所有异常以报告接口状态
                 logger.debug("run_all_checks接口失败", name=name, error=str(e), exc_info=True)
-                results.append({
-                    "name": name,
-                    "endpoint": endpoint.split("/")[-1],
-                    "ok": False,
-                    "message": str(e)[:80],
-                    "required": required,
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "endpoint": endpoint.split("/")[-1],
+                        "ok": False,
+                        "message": str(e)[:80],
+                        "required": required,
+                    }
+                )
         return results
 
     async def close(self):
@@ -620,8 +635,9 @@ class PinzhiAdapter:
           dishPriceTotal, specialOfferPrice, realPrice, billStatus,
           openOrderUser, cashiers, paymentList
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
@@ -629,7 +645,11 @@ class PinzhiAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+            DishCategory,
+            OrderItemSchema,
+            OrderSchema,
+            OrderStatus,
+            OrderType,
         )
 
         # 品智 billStatus: 1=已结账, 0=未结账, 2=已退单
@@ -695,21 +715,23 @@ class PinzhiAdapter:
             # 套餐 — 品智 comboId / packageId
             combo_id = dish.get("comboId") or dish.get("packageId")
 
-            items.append(OrderItemSchema(
-                item_id=str(dish.get("dishId", f"{raw.get('billId', '')}_{idx}")),
-                dish_id=str(dish.get("dishId", "")),
-                dish_name=str(dish.get("dishName", "")),
-                dish_category=DishCategory.MAIN_COURSE,
-                quantity=qty,
-                unit_price=unit_price,
-                subtotal=unit_price * qty,
-                original_price_fen=original_price_fen,
-                single_discount_fen=single_discount_fen,
-                practice_names=practice_names,
-                is_gift=is_gift,
-                gift_reason=gift_reason,
-                combo_id=str(combo_id) if combo_id else None,
-            ))
+            items.append(
+                OrderItemSchema(
+                    item_id=str(dish.get("dishId", f"{raw.get('billId', '')}_{idx}")),
+                    dish_id=str(dish.get("dishId", "")),
+                    dish_name=str(dish.get("dishName", "")),
+                    dish_category=DishCategory.MAIN_COURSE,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    subtotal=unit_price * qty,
+                    original_price_fen=original_price_fen,
+                    single_discount_fen=single_discount_fen,
+                    practice_names=practice_names,
+                    is_gift=is_gift,
+                    gift_reason=gift_reason,
+                    combo_id=str(combo_id) if combo_id else None,
+                )
+            )
 
         order_source_raw = raw.get("orderSource", 1)
         order_type = OrderType.DINE_IN if order_source_raw == 1 else OrderType.DELIVERY
@@ -761,8 +783,9 @@ class PinzhiAdapter:
         原始字段参考（品智操作日志）：
           actionType, staffId, amount, reason, approvedBy, createdAt
         """
-        import sys
         import os as _os
+        import sys
+
         _src_dir = _os.path.dirname(__file__)
         _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
         _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")

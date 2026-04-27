@@ -6,21 +6,22 @@
   - 字段映射：平台原始字段 → 屯象统一格式的关键字段校验
   - 异常处理：空原因拒单 / 未知平台 / 工厂注册
 """
-import pytest
+
 from datetime import datetime, timedelta
 
-from shared.adapters.delivery_platform_base import (
-    DeliveryPlatformAdapter,
-    DeliveryPlatformError,
-)
-from shared.adapters.meituan_adapter import MeituanDeliveryAdapter, MEITUAN_STATUS_MAP
-from shared.adapters.eleme_adapter import ElemeDeliveryAdapter, ELEME_STATUS_MAP
-from shared.adapters.douyin_adapter import DouyinDeliveryAdapter, DOUYIN_STATUS_MAP
+import pytest
+
 from shared.adapters.delivery_factory import (
     get_delivery_adapter,
     register_delivery_platform,
 )
-
+from shared.adapters.delivery_platform_base import (
+    DeliveryPlatformAdapter,
+    DeliveryPlatformError,
+)
+from shared.adapters.douyin_adapter import DOUYIN_STATUS_MAP, DouyinDeliveryAdapter
+from shared.adapters.eleme_adapter import ELEME_STATUS_MAP, ElemeDeliveryAdapter
+from shared.adapters.meituan_adapter import MEITUAN_STATUS_MAP, MeituanDeliveryAdapter
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  工厂测试
@@ -231,9 +232,7 @@ class TestMeituanDeliveryAdapter:
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
-        async with MeituanDeliveryAdapter(
-            app_key="k", app_secret="s"
-        ) as adapter:
+        async with MeituanDeliveryAdapter(app_key="k", app_secret="s") as adapter:
             assert isinstance(adapter, DeliveryPlatformAdapter)
 
 
@@ -428,9 +427,7 @@ class TestElemeDeliveryAdapter:
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
-        async with ElemeDeliveryAdapter(
-            app_key="k", app_secret="s"
-        ) as adapter:
+        async with ElemeDeliveryAdapter(app_key="k", app_secret="s") as adapter:
             assert isinstance(adapter, DeliveryPlatformAdapter)
 
 
@@ -676,9 +673,7 @@ class TestDouyinDeliveryAdapter:
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
-        async with DouyinDeliveryAdapter(
-            app_key="k", app_secret="s"
-        ) as adapter:
+        async with DouyinDeliveryAdapter(app_key="k", app_secret="s") as adapter:
             assert isinstance(adapter, DeliveryPlatformAdapter)
 
 

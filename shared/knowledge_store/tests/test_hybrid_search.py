@@ -10,9 +10,10 @@
 7. 一路为空时另一路结果仍然出现
 8. vector_weight 和 keyword_weight 影响最终分数
 """
+
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -24,8 +25,8 @@ sys.path.insert(0, _ROOT_DIR)
 
 from shared.knowledge_store.hybrid_search import HybridSearchEngine, _rrf_fuse
 
-
 # ── 工具 ────────────────────────────────────────────────────────
+
 
 def _fake_embedding(val: float = 0.1, size: int = 1536) -> list[float]:
     return [val] * size
@@ -50,6 +51,7 @@ def _mock_db_session() -> AsyncMock:
 
 # ── 空查询 ──────────────────────────────────────────────────────
 
+
 class TestEmptyQuery:
     """空查询应返回空列表"""
 
@@ -69,6 +71,7 @@ class TestEmptyQuery:
 
 
 # ── search 调用双路检索 ─────────────────────────────────────────
+
 
 class TestDualRetrieval:
     """search 应同时调用 vector_search 和 keyword_search"""
@@ -104,8 +107,12 @@ class TestDualRetrieval:
 
             db = _mock_db_session()
             await HybridSearchEngine.search(
-                "红烧肉", "menu_knowledge", "tenant_001", db,
-                top_k=5, retrieval_k=20,
+                "红烧肉",
+                "menu_knowledge",
+                "tenant_001",
+                db,
+                top_k=5,
+                retrieval_k=20,
             )
 
             call_kwargs = mock_store.vector_search.call_args[1]
@@ -115,6 +122,7 @@ class TestDualRetrieval:
 
 
 # ── RRF 融合 ────────────────────────────────────────────────────
+
 
 class TestRRFFusion:
     """RRF 融合测试"""
@@ -194,6 +202,7 @@ class TestRRFFusion:
 
 # ── top_k 限制 ──────────────────────────────────────────────────
 
+
 class TestTopKLimit:
     """top_k 应限制输出数量"""
 
@@ -213,7 +222,11 @@ class TestTopKLimit:
 
             db = _mock_db_session()
             results = await HybridSearchEngine.search(
-                "测试", "menu_knowledge", "tenant_001", db, top_k=3,
+                "测试",
+                "menu_knowledge",
+                "tenant_001",
+                db,
+                top_k=3,
             )
 
             assert len(results) == 3
@@ -233,13 +246,18 @@ class TestTopKLimit:
 
             db = _mock_db_session()
             results = await HybridSearchEngine.search(
-                "测试", "menu_knowledge", "tenant_001", db, top_k=10,
+                "测试",
+                "menu_knowledge",
+                "tenant_001",
+                db,
+                top_k=10,
             )
 
             assert len(results) == 1
 
 
 # ── 权重影响 ────────────────────────────────────────────────────
+
 
 class TestWeightEffect:
     """vector_weight 和 keyword_weight 应影响最终分数"""
@@ -276,6 +294,7 @@ class TestWeightEffect:
 
 # ── 单路为空时的行为 ────────────────────────────────────────────
 
+
 class TestSingleLegEmpty:
     """一路检索为空时另一路结果仍然出现"""
 
@@ -297,7 +316,11 @@ class TestSingleLegEmpty:
 
             db = _mock_db_session()
             results = await HybridSearchEngine.search(
-                "红烧", "menu_knowledge", "tenant_001", db, top_k=5,
+                "红烧",
+                "menu_knowledge",
+                "tenant_001",
+                db,
+                top_k=5,
             )
 
             assert len(results) == 2
@@ -322,7 +345,11 @@ class TestSingleLegEmpty:
 
             db = _mock_db_session()
             results = await HybridSearchEngine.search(
-                "红烧", "menu_knowledge", "tenant_001", db, top_k=5,
+                "红烧",
+                "menu_knowledge",
+                "tenant_001",
+                db,
+                top_k=5,
             )
 
             assert len(results) == 1

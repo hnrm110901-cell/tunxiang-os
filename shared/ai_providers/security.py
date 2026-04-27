@@ -12,13 +12,14 @@
   - 《数据安全法》
   - 屯象OS CLAUDE.md 安全规范
 """
+
 from __future__ import annotations
 
 import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 
@@ -29,12 +30,12 @@ logger = structlog.get_logger()
 
 # Provider 数据权限矩阵
 PROVIDER_DATA_CLEARANCE: dict[str, list[DataSensitivity]] = {
-    "coreml":    [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE, DataSensitivity.RESTRICTED],
-    "deepseek":  [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
-    "qwen":      [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
-    "glm":       [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
-    "ernie":     [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
-    "kimi":      [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
+    "coreml": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE, DataSensitivity.RESTRICTED],
+    "deepseek": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
+    "qwen": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
+    "glm": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
+    "ernie": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
+    "kimi": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL, DataSensitivity.SENSITIVE],
     "anthropic": [DataSensitivity.PUBLIC, DataSensitivity.INTERNAL],  # 境外，仅非敏感
 }
 
@@ -42,15 +43,17 @@ PROVIDER_DATA_CLEARANCE: dict[str, list[DataSensitivity]] = {
 @dataclass
 class MaskToken:
     """脱敏令牌：记录原始值和替换令牌的映射。"""
-    token: str           # 替换后的令牌，如 [TX_PHONE_a1b2_001]
-    original: str        # 原始值
-    category: str        # 脱敏类别：phone/id_card/bank_card/amount/name
+
+    token: str  # 替换后的令牌，如 [TX_PHONE_a1b2_001]
+    original: str  # 原始值
+    category: str  # 脱敏类别：phone/id_card/bank_card/amount/name
     position: tuple[int, int] = (0, 0)  # 在原文中的位置
 
 
 @dataclass
 class MaskContext:
     """脱敏上下文：保存单次请求的所有脱敏映射，用于响应还原。"""
+
     request_id: str
     tokens: list[MaskToken] = field(default_factory=list)
     sensitivity_level: DataSensitivity = DataSensitivity.PUBLIC
@@ -87,6 +90,7 @@ class MaskContext:
 @dataclass
 class AuditEntry:
     """审计日志条目。"""
+
     request_id: str
     tenant_id: str
     provider: str
@@ -116,11 +120,11 @@ class DataSecurityGateway:
 
     MASK_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # (category, token_prefix, regex_pattern)
-        ("phone",     "PHONE",    re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")),
-        ("id_card",   "IDCARD",   re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")),
+        ("phone", "PHONE", re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")),
+        ("id_card", "IDCARD", re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")),
         ("bank_card", "BANKCARD", re.compile(r"(?<!\d)\d{16,19}(?!\d)")),
-        ("email",     "EMAIL",    re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
-        ("address",   "ADDR",     re.compile(r"[\u4e00-\u9fa5]{2,}(省|市|区|县|镇|乡|路|街|号|栋|单元|室|楼)")),
+        ("email", "EMAIL", re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
+        ("address", "ADDR", re.compile(r"[\u4e00-\u9fa5]{2,}(省|市|区|县|镇|乡|路|街|号|栋|单元|室|楼)")),
     ]
 
     # 大额金额模式（¥10,000 以上）
@@ -173,9 +177,13 @@ class DataSecurityGateway:
                     count = counter.get("amount", 0) + 1
                     counter["amount"] = count
                     token_str = f"[TX_AMOUNT_{ctx.short_id}_{count:03d}]"
-                    ctx.add_token(MaskToken(
-                        token=token_str, original=amount_str, category="amount",
-                    ))
+                    ctx.add_token(
+                        MaskToken(
+                            token=token_str,
+                            original=amount_str,
+                            category="amount",
+                        )
+                    )
                     masked = masked.replace(amount_str, token_str, 1)
             except ValueError:
                 pass
@@ -265,16 +273,18 @@ class DataSecurityGateway:
                 sensitivity=ctx.sensitivity_level.value,
                 reason=msg,
             )
-            self._audit_log.append(AuditEntry(
-                request_id=ctx.request_id,
-                tenant_id="",
-                provider=provider_name,
-                sensitivity_level=ctx.sensitivity_level.value,
-                masked_fields_count=len(ctx.tokens),
-                categories=[t.category for t in ctx.tokens],
-                blocked=True,
-                block_reason=msg,
-            ))
+            self._audit_log.append(
+                AuditEntry(
+                    request_id=ctx.request_id,
+                    tenant_id="",
+                    provider=provider_name,
+                    sensitivity_level=ctx.sensitivity_level.value,
+                    masked_fields_count=len(ctx.tokens),
+                    categories=[t.category for t in ctx.tokens],
+                    blocked=True,
+                    block_reason=msg,
+                )
+            )
             raise PermissionError(msg)
 
         return True

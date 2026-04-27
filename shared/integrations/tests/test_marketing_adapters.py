@@ -2,14 +2,15 @@
 
 覆盖 Mock 模式下的核心功能，确保所有适配器在无凭据时优雅降级。
 """
+
 from __future__ import annotations
 
 import pytest
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 微信公众号 + 企微 适配器测试
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestWeChatOAService:
     """WeChatOAService Mock 模式测试"""
@@ -17,6 +18,7 @@ class TestWeChatOAService:
     @pytest.fixture
     def service(self):
         from shared.integrations.wechat_marketing import WeChatOAService
+
         return WeChatOAService()
 
     def test_mock_mode_when_no_credentials(self, service) -> None:
@@ -50,6 +52,7 @@ class TestWeChatOAService:
     async def test_openid_masking(self, service) -> None:
         """openid 脱敏正确"""
         from shared.integrations.wechat_marketing import _mask_openid
+
         masked = _mask_openid("oXyz12345678abcd")
         assert "****" in masked
         assert len(masked) <= 20
@@ -73,6 +76,7 @@ class TestWeComService:
     @pytest.fixture
     def service(self):
         from shared.integrations.wechat_marketing import WeComService
+
         return WeComService()
 
     def test_mock_mode_when_no_credentials(self, service) -> None:
@@ -111,11 +115,12 @@ class TestWeComService:
 # 美团营销适配器测试
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMeituanMarketingAdapter:
 
+class TestMeituanMarketingAdapter:
     @pytest.fixture
     def adapter(self):
         from shared.integrations.meituan_marketing import MeituanMarketingAdapter
+
         return MeituanMarketingAdapter()
 
     def test_mock_mode(self, adapter) -> None:
@@ -171,11 +176,12 @@ class TestMeituanMarketingAdapter:
 # 抖音营销适配器测试
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestDouyinMarketingAdapter:
 
+class TestDouyinMarketingAdapter:
     @pytest.fixture
     def adapter(self):
         from shared.integrations.douyin_marketing import DouyinMarketingAdapter
+
         return DouyinMarketingAdapter()
 
     def test_mock_mode(self, adapter) -> None:

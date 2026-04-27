@@ -4,15 +4,15 @@ AES-256-GCM字段级加密
 格式：enc:v1:<base64(12字节nonce||16字节tag||ciphertext)>
 迁移兼容：非enc:v1:前缀的值原样返回（渐进式迁移）
 """
+
 from __future__ import annotations
 
 import base64
 import os
 from typing import Optional
 
-from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import structlog
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = structlog.get_logger(__name__)
 
@@ -30,9 +30,7 @@ class FieldEncryption:
         else:
             key_bytes = bytes.fromhex(hex_key)
             if len(key_bytes) != KEY_BYTES:
-                raise ValueError(
-                    f"TX_FIELD_ENCRYPTION_KEY必须为64位hex（32字节），实际为{len(key_bytes)}字节"
-                )
+                raise ValueError(f"TX_FIELD_ENCRYPTION_KEY必须为64位hex（32字节），实际为{len(key_bytes)}字节")
             self._key = key_bytes
 
     def encrypt(self, plaintext: str) -> str:
@@ -63,16 +61,14 @@ class FieldEncryption:
         if self._key is None:
             raise RuntimeError("TX_FIELD_ENCRYPTION_KEY未配置，无法解密")
 
-        encoded = value[len(PREFIX):]
+        encoded = value[len(PREFIX) :]
         try:
             raw = base64.b64decode(encoded)
         except Exception as exc:
             raise ValueError(f"加密字段base64格式错误: {exc}") from exc
 
         if len(raw) <= NONCE_BYTES:
-            raise ValueError(
-                f"加密字段数据长度不足，期望>{NONCE_BYTES}字节，实际{len(raw)}字节"
-            )
+            raise ValueError(f"加密字段数据长度不足，期望>{NONCE_BYTES}字节，实际{len(raw)}字节")
 
         nonce, ciphertext_with_tag = raw[:NONCE_BYTES], raw[NONCE_BYTES:]
         aesgcm = AESGCM(self._key)

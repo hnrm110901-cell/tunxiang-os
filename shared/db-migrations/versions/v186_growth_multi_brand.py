@@ -9,6 +9,7 @@
 
 Revision: v186
 """
+
 from alembic import op
 
 revision = "v186"
@@ -36,8 +37,7 @@ def upgrade() -> None:
     # brand_id索引（截断表名避免标识符过长）
     for t in _TABLES_NEED_BRAND:
         op.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{t[:20]}_brand "
-            f"ON {t} (tenant_id, brand_id) WHERE brand_id IS NOT NULL"
+            f"CREATE INDEX IF NOT EXISTS idx_{t[:20]}_brand ON {t} (tenant_id, brand_id) WHERE brand_id IS NOT NULL"
         )
 
     # ── enrollment加store_id ──
@@ -55,13 +55,9 @@ def upgrade() -> None:
     )
 
     # ── journey_templates加brand_scope ──
+    op.execute("ALTER TABLE growth_journey_templates ADD COLUMN IF NOT EXISTS brand_scope TEXT DEFAULT 'all'")
     op.execute(
-        "ALTER TABLE growth_journey_templates "
-        "ADD COLUMN IF NOT EXISTS brand_scope TEXT DEFAULT 'all'"
-    )
-    op.execute(
-        "ALTER TABLE growth_journey_templates "
-        "ADD COLUMN IF NOT EXISTS allowed_brand_ids JSONB DEFAULT '[]'::jsonb"
+        "ALTER TABLE growth_journey_templates ADD COLUMN IF NOT EXISTS allowed_brand_ids JSONB DEFAULT '[]'::jsonb"
     )
 
     # ── 新建品牌级增长配置表 ──
@@ -93,18 +89,12 @@ def upgrade() -> None:
             UNIQUE (tenant_id, brand_id)
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gbc_tenant_brand "
-        "ON growth_brand_configs (tenant_id, brand_id)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_gbc_tenant_brand ON growth_brand_configs (tenant_id, brand_id)")
 
     # RLS
     op.execute("ALTER TABLE growth_brand_configs ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE growth_brand_configs FORCE ROW LEVEL SECURITY")
-    op.execute(
-        "DROP POLICY IF EXISTS growth_brand_configs_tenant_isolation "
-        "ON growth_brand_configs"
-    )
+    op.execute("DROP POLICY IF EXISTS growth_brand_configs_tenant_isolation ON growth_brand_configs")
     op.execute("""
         CREATE POLICY growth_brand_configs_tenant_isolation ON growth_brand_configs
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID)

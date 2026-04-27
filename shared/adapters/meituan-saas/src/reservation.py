@@ -2,7 +2,9 @@
 美团预订适配器方法
 提供预订确认、取消、查询等API调用
 """
-from typing import Dict, Any
+
+from typing import Any, Dict
+
 import structlog
 
 logger = structlog.get_logger()
@@ -43,8 +45,7 @@ class MeituanReservationMixin:
             "status": status,
         }
         result = await self._request("POST", "/api/reservation/update-status", data=params)
-        logger.info("meituan_update_reservation_status",
-                     external_id=external_reservation_id, status=status)
+        logger.info("meituan_update_reservation_status", external_id=external_reservation_id, status=status)
         return result
 
     async def query_reservation(self, external_reservation_id: str) -> Dict[str, Any]:

@@ -13,6 +13,7 @@
 - 断线续传：sync_cursors 表（本地PG）存储每表每方向的最后成功时间戳
 - 每批 BATCH_SIZE 行，超时 SYNC_TIMEOUT_SECONDS 秒，指数退避重试
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -81,9 +82,11 @@ _BACKOFF_INITIAL: int = 30
 
 # ─── 结果数据类 ────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SyncResult:
     """一轮同步结果摘要"""
+
     upstream_rows: int = 0
     downstream_rows: int = 0
     conflicts: int = 0
@@ -102,6 +105,7 @@ class SyncResult:
 
 
 # ─── 核心同步引擎 ──────────────────────────────────────────────────────────
+
 
 class SyncEngine:
     """
@@ -366,9 +370,7 @@ class SyncEngine:
 
         return total
 
-    async def resolve_conflict(
-        self, local_row: dict[str, Any], cloud_row: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def resolve_conflict(self, local_row: dict[str, Any], cloud_row: dict[str, Any]) -> dict[str, Any]:
         """冲突解决：
         - 云端 authoritative=true → 云端优先
         - 否则比较 updated_at → 较新者优先
@@ -376,9 +378,7 @@ class SyncEngine:
         """
         # 规则 1：云端标记为权威 → 直接覆盖
         if cloud_row.get("authoritative") is True:
-            await self._log_conflict(
-                local_row, cloud_row, resolution="cloud_authoritative"
-            )
+            await self._log_conflict(local_row, cloud_row, resolution="cloud_authoritative")
             return cloud_row
 
         # 规则 2：POS 交易保护 — 本地 source=pos 且处于活跃交易状态
@@ -522,9 +522,7 @@ class SyncEngine:
 
     # ─── 内部辅助 ──────────────────────────────────────────────────────────
 
-    async def _fetch_local_row(
-        self, table: str, record_id: Any
-    ) -> dict[str, Any] | None:
+    async def _fetch_local_row(self, table: str, record_id: Any) -> dict[str, Any] | None:
         """按主键查询本地一条记录"""
         assert self._local_pool is not None
 
@@ -591,6 +589,7 @@ class SyncEngine:
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
 
+
 def _normalize_dsn(dsn: str) -> str:
     """将 SQLAlchemy asyncpg DSN 转换为 asyncpg 原生 DSN
 
@@ -647,17 +646,11 @@ async def _batch_upsert(
         raise ValueError(f"Table {table!r}: records must contain 'id' column for upsert")
 
     col_list = ", ".join(f'"{c}"' for c in columns)
-    update_set = ", ".join(
-        f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id"
-    )
+    update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
 
     # asyncpg executemany — 传入参数列表
     placeholders = ", ".join(f"${i + 1}" for i in range(len(columns)))
-    sql = (
-        f'INSERT INTO {_q(table)} ({col_list}) '
-        f'VALUES ({placeholders}) '
-        f'ON CONFLICT (id) DO UPDATE SET {update_set}'
-    )
+    sql = f"INSERT INTO {_q(table)} ({col_list}) VALUES ({placeholders}) ON CONFLICT (id) DO UPDATE SET {update_set}"
 
     rows_as_tuples = [tuple(r.get(c) for c in columns) for r in records]
     await conn.executemany(sql, rows_as_tuples)

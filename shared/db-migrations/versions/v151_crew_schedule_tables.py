@@ -12,6 +12,7 @@ Revision ID: v151
 Revises: v150
 Create Date: 2026-04-04
 """
+
 from alembic import op
 
 revision = "v151"

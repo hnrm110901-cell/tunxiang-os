@@ -10,6 +10,7 @@
   WECOM_CORP_SECRET
   WECOM_AGENT_ID
 """
+
 from __future__ import annotations
 
 import time
@@ -185,9 +186,7 @@ class WeComSDK:
         )
         return data
 
-    async def send_template_card(
-        self, touser: str, card: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def send_template_card(self, touser: str, card: dict[str, Any]) -> dict[str, Any]:
         """发送模板卡片消息（审批/预警通知）。
 
         Args:

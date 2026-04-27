@@ -3,6 +3,7 @@
 根据商户代码和门店ID创建已配置好的 PinzhiAdapter 实例。
 所有 token 通过环境变量加载，不硬编码。
 """
+
 import os
 from typing import Optional
 
@@ -40,17 +41,12 @@ class PinzhiAdapterFactory:
         merchant = MERCHANT_CONFIG.get(merchant_code)
         if not merchant:
             valid_codes = ", ".join(MERCHANT_CONFIG.keys())
-            raise ValueError(
-                f"未知商户代码: {merchant_code}，可选值: {valid_codes}"
-            )
+            raise ValueError(f"未知商户代码: {merchant_code}，可选值: {valid_codes}")
 
         token_env = merchant["api_token_env"]
         token = os.getenv(token_env)
         if not token:
-            raise ValueError(
-                f"商户 {merchant['brand_name']}({merchant_code}) 的 API token "
-                f"环境变量 {token_env} 未设置"
-            )
+            raise ValueError(f"商户 {merchant['brand_name']}({merchant_code}) 的 API token 环境变量 {token_env} 未设置")
 
         config = {
             "base_url": merchant["pinzhi_base_url"],
@@ -94,17 +90,12 @@ class PinzhiAdapterFactory:
         merchant = MERCHANT_CONFIG.get(merchant_code)
         if not merchant:
             valid_codes = ", ".join(MERCHANT_CONFIG.keys())
-            raise ValueError(
-                f"未知商户代码: {merchant_code}，可选值: {valid_codes}"
-            )
+            raise ValueError(f"未知商户代码: {merchant_code}，可选值: {valid_codes}")
 
         store = merchant["stores"].get(store_id)
         if not store:
             valid_stores = ", ".join(merchant["stores"].keys())
-            raise ValueError(
-                f"商户 {merchant['brand_name']} 下不存在门店 {store_id}，"
-                f"可选值: {valid_stores}"
-            )
+            raise ValueError(f"商户 {merchant['brand_name']} 下不存在门店 {store_id}，可选值: {valid_stores}")
 
         # 优先使用门店级 token，回退到商户级 token
         token = os.getenv(store["token_env"])
@@ -170,11 +161,13 @@ class PinzhiAdapterFactory:
         """列出所有商户及其门店概要"""
         result = []
         for code, merchant in MERCHANT_CONFIG.items():
-            result.append({
-                "merchant_code": code,
-                "brand_name": merchant["brand_name"],
-                "base_url": merchant["pinzhi_base_url"],
-                "store_count": len(merchant["stores"]),
-                "store_ids": list(merchant["stores"].keys()),
-            })
+            result.append(
+                {
+                    "merchant_code": code,
+                    "brand_name": merchant["brand_name"],
+                    "base_url": merchant["pinzhi_base_url"],
+                    "store_count": len(merchant["stores"]),
+                    "store_ids": list(merchant["stores"].keys()),
+                }
+            )
         return result

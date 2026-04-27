@@ -9,6 +9,7 @@
 Revision ID: v253
 Revises: v252
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -39,7 +40,7 @@ def upgrade() -> None:
                 "weights",
                 sa.JSON,
                 nullable=False,
-                comment="KPI权重配置 JSONB，如 {\"revenue_growth\": 0.20, ...}",
+                comment='KPI权重配置 JSONB，如 {"revenue_growth": 0.20, ...}',
             ),
             sa.Column("notes", sa.Text, nullable=True, comment="配置说明"),
             sa.Column(

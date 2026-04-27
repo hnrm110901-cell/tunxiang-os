@@ -1,6 +1,7 @@
 """
 美团SAAS适配器单元测试 - 重点覆盖 to_order() 和 to_staff_action()
 """
+
 import os
 import sys
 
@@ -16,9 +17,10 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 # 将 meituan-saas/src 加入 path
 _adapter_src = os.path.abspath(os.path.join(_here, "../src"))
@@ -46,9 +48,9 @@ def raw_order():
         "order_id": "MT_20240301_001",
         "day_seq": "20240301001",
         "status": 4,
-        "total_price": 8800,          # 88.00 元
-        "discount_price": 500,         # 5.00 元
-        "create_time": 1709280000,     # unix timestamp
+        "total_price": 8800,  # 88.00 元
+        "discount_price": 500,  # 5.00 元
+        "create_time": 1709280000,  # unix timestamp
         "caution": "不要辣",
         "user_id": "user_123",
         "food_list": [
@@ -75,7 +77,7 @@ def raw_staff_action():
     return {
         "action_type": "refund_apply",
         "operator_id": "OP_001",
-        "amount": 1000,            # 10.00 元
+        "amount": 1000,  # 10.00 元
         "reason": "顾客投诉",
         "approved_by": "MANAGER_001",
         "action_time": 1709280300,
@@ -109,11 +111,13 @@ class TestToOrder:
 
     def test_maps_status_completed(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         result = adapter.to_order(raw_order, "STORE_MT1", "BRAND_001")
         assert result.order_status == OrderStatus.COMPLETED
 
     def test_maps_status_cancelled(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw_order["status"] = 5
         result = adapter.to_order(raw_order, "STORE_MT1", "BRAND_001")
         assert result.order_status == OrderStatus.CANCELLED
@@ -146,6 +150,7 @@ class TestToOrder:
 
     def test_order_type_is_takeout(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderType
+
         result = adapter.to_order(raw_order, "STORE_MT1", "BRAND_001")
         assert result.order_type == OrderType.TAKEOUT
 

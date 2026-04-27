@@ -4,15 +4,14 @@
 基于真实易订API格式编写
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
+import pytest
 from src.adapter import YiDingAdapter
-from src.client import YiDingAPIError
 from src.mapper import YiDingMapper
 from src.types import (
-    YiDingConfig,
     ReservationStatus,
+    YiDingConfig,
 )
 
 
@@ -86,9 +85,7 @@ class TestYiDingAdapter:
         }
 
         with patch.object(adapter.client, "get", return_value=mock_response):
-            orders = await adapter.get_order_list(
-                start_date="2026-03-17", end_date="2026-03-17"
-            )
+            orders = await adapter.get_order_list(start_date="2026-03-17", end_date="2026-03-17")
 
             assert len(orders) == 1
             o = orders[0]
@@ -235,9 +232,7 @@ class TestYiDingAdapter:
         }
 
         with patch.object(adapter.client, "get", return_value=mock_response):
-            orders = await adapter.get_order_list_v2(
-                start_date="2026-03-15", end_date="2026-03-18"
-            )
+            orders = await adapter.get_order_list_v2(start_date="2026-03-15", end_date="2026-03-18")
 
             assert len(orders) == 1
             o = orders[0]
@@ -295,9 +290,7 @@ class TestYiDingMapper:
             },
         ]
 
-        stats = mapper.compute_reservation_stats(
-            reservations, "S001", "2026-03-01", "2026-03-18"
-        )
+        stats = mapper.compute_reservation_stats(reservations, "S001", "2026-03-01", "2026-03-18")
 
         assert stats["total_reservations"] == 3
         assert stats["average_party_size"] == 6.0

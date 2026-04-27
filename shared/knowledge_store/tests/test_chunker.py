@@ -11,11 +11,9 @@
 8. 超长单段触发 force_split
 9. 重叠片段正确携带到下一块
 """
+
 import os
 import sys
-from unittest.mock import patch
-
-import pytest
 
 # 路径设置：shared/knowledge_store/tests/ → shared/knowledge_store/ → shared/ → tunxiang-os/
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,8 +24,8 @@ sys.path.insert(0, _ROOT_DIR)
 
 from shared.knowledge_store.chunker import ChunkResult, semantic_chunk
 
-
 # ── 空文本和纯空白 ──────────────────────────────────────────────
+
 
 class TestEmptyText:
     """空文本应返回空列表"""
@@ -49,6 +47,7 @@ class TestEmptyText:
 
 
 # ── 短文本（单块） ──────────────────────────────────────────────
+
 
 class TestShortText:
     """短文本（< max_tokens）应返回单块"""
@@ -78,6 +77,7 @@ class TestShortText:
 
 
 # ── 长文本切分为多块 ────────────────────────────────────────────
+
 
 class TestLongTextSplit:
     """长文本应被切分为多块，带正确的重叠"""
@@ -127,6 +127,7 @@ class TestLongTextSplit:
 
 # ── 中文语义边界 ────────────────────────────────────────────────
 
+
 class TestChineseBoundaries:
     """中文文本应在句号/问号/感叹号等边界处切分"""
 
@@ -160,6 +161,7 @@ class TestChineseBoundaries:
 
 # ── token 计数准确性 ────────────────────────────────────────────
 
+
 class TestTokenCountAccuracy:
     """token 计数应准确（或使用 fallback 时接近）"""
 
@@ -187,6 +189,7 @@ class TestTokenCountAccuracy:
 
 # ── start_char / end_char 偏移量 ────────────────────────────────
 
+
 class TestCharOffsets:
     """start_char 和 end_char 应正确追踪字符偏移量"""
 
@@ -204,6 +207,7 @@ class TestCharOffsets:
 
 
 # ── 超长单段 force_split ────────────────────────────────────────
+
 
 class TestForceSplit:
     """超长单段落（无自然分隔符）应触发强制切分"""
@@ -227,6 +231,7 @@ class TestForceSplit:
 
 # ── 重叠段 ──────────────────────────────────────────────────────
 
+
 class TestOverlap:
     """相邻块之间应有重叠片段"""
 
@@ -246,9 +251,7 @@ class TestOverlap:
                     overlap_found = True
                     break
             # 有重叠或者 start_char 有回退
-            has_char_overlap = (
-                len(result) >= 2 and result[1].start_char < result[0].end_char
-            )
+            has_char_overlap = len(result) >= 2 and result[1].start_char < result[0].end_char
             assert overlap_found or has_char_overlap, "相邻块之间应有重叠"
 
     def test_zero_overlap_produces_no_overlap(self):

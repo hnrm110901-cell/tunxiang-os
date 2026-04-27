@@ -9,6 +9,7 @@ Revision ID: v274_sop_quick_actions
 Revises: v273_sop_im_interactions
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v274_sop_quick_actions"
@@ -53,9 +54,7 @@ def upgrade() -> None:
 
     # RLS
     op.execute("ALTER TABLE sop_quick_actions ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        "DROP POLICY IF EXISTS sop_quick_actions_tenant ON sop_quick_actions"
-    )
+    op.execute("DROP POLICY IF EXISTS sop_quick_actions_tenant ON sop_quick_actions")
     op.execute("""
         CREATE POLICY sop_quick_actions_tenant ON sop_quick_actions
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
@@ -100,12 +99,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS sop_quick_actions_tenant ON sop_quick_actions"
-    )
-    op.execute(
-        "ALTER TABLE IF EXISTS sop_quick_actions DISABLE ROW LEVEL SECURITY"
-    )
+    op.execute("DROP POLICY IF EXISTS sop_quick_actions_tenant ON sop_quick_actions")
+    op.execute("ALTER TABLE IF EXISTS sop_quick_actions DISABLE ROW LEVEL SECURITY")
     op.execute("DROP INDEX IF EXISTS uq_sop_quick_actions_tenant_code")
     op.execute("DROP INDEX IF EXISTS idx_sop_quick_actions_tenant_code")
     op.execute("DROP TABLE IF EXISTS sop_quick_actions")

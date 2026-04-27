@@ -6,6 +6,7 @@
 环境变量：
   ANTHROPIC_API_KEY   — Claude API 密钥
 """
+
 from __future__ import annotations
 
 import time
@@ -13,8 +14,8 @@ from typing import Any, AsyncGenerator, Optional
 
 import structlog
 
+from ..registry import get_model_info, get_models_by_provider
 from ..types import LLMResponse, ModelInfo, ModelPricing, ProviderHealth, ProviderName
-from ..registry import get_models_by_provider, get_model_info
 from .base import BaseProviderAdapter
 
 logger = structlog.get_logger()
@@ -42,6 +43,7 @@ class AnthropicAdapter(BaseProviderAdapter):
         max_retries: int = 3,
     ):
         import os
+
         resolved_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         super().__init__(resolved_key, base_url, timeout_s, max_retries)
         self._client: Any = None
@@ -95,7 +97,8 @@ class AnthropicAdapter(BaseProviderAdapter):
         async def _do_call():
             return await client.messages.create(**kwargs)
 
-        from anthropic import APIConnectionError, APITimeoutError, APIStatusError
+        from anthropic import APIConnectionError, APIStatusError, APITimeoutError
+
         response = await self._retry_with_backoff(
             _do_call,
             retryable_exceptions=(APIConnectionError, APITimeoutError, APIStatusError),

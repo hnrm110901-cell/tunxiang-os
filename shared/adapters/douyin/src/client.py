@@ -4,6 +4,7 @@
 
 抖音开放平台文档: https://open.douyin.com/
 """
+
 import hashlib
 import hmac
 import os
@@ -105,9 +106,7 @@ class DouyinClient:
             result = response.json()
         except httpx.HTTPStatusError as e:
             logger.error("douyin_token_http_error", status_code=e.response.status_code)
-            raise ConnectionError(
-                f"抖音 token 请求失败: {e.response.status_code}"
-            ) from e
+            raise ConnectionError(f"抖音 token 请求失败: {e.response.status_code}") from e
 
         data = result.get("data", {})
         if data.get("error_code", 0) != 0:
@@ -164,11 +163,16 @@ class DouyinClient:
 
                 if method.upper() == "GET":
                     resp = await self._http.get(
-                        endpoint, params=params, headers=headers,
+                        endpoint,
+                        params=params,
+                        headers=headers,
                     )
                 elif method.upper() == "POST":
                     resp = await self._http.post(
-                        endpoint, json=data, params=params, headers=headers,
+                        endpoint,
+                        json=data,
+                        params=params,
+                        headers=headers,
                     )
                 else:
                     raise ValueError(f"不支持的 HTTP 方法: {method}")
@@ -186,9 +190,7 @@ class DouyinClient:
                     attempt=attempt + 1,
                 )
                 if attempt == self.retry_times - 1:
-                    raise ConnectionError(
-                        f"抖音 HTTP 请求失败: {e.response.status_code}"
-                    ) from e
+                    raise ConnectionError(f"抖音 HTTP 请求失败: {e.response.status_code}") from e
 
             except (httpx.ConnectError, httpx.TimeoutException) as e:
                 logger.error(

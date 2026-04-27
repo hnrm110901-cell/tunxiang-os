@@ -11,6 +11,7 @@
 运行：
   pytest edge/sync-engine/tests/test_sync_engine.py -v
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,6 +34,7 @@ from sync_engine import SyncEngine, _max_updated_at  # noqa: E402
 from sync_tracker import SyncTracker  # noqa: E402
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _ts(offset_seconds: int = 0) -> str:
     """生成相对当前时刻 offset_seconds 秒的 ISO 8601 时间戳"""
@@ -69,6 +71,7 @@ async def tracker(tmp_db):
 
 # ─── 辅助 Fake Engine ─────────────────────────────────────────────────────
 
+
 def _make_engine(tracker: SyncTracker, cloud_records_by_table=None, batch_size=500):
     """创建 SyncEngine，注入 mock 的 HTTP 拉取和本地 PG 操作"""
     engine = SyncEngine(
@@ -86,7 +89,7 @@ def _make_engine(tracker: SyncTracker, cloud_records_by_table=None, batch_size=5
         if since and since != "1970-01-01T00:00:00+00:00":
             records = [r for r in records if str(r.get("updated_at", "")) > since]
         start = (page - 1) * size
-        return records[start: start + size]
+        return records[start : start + size]
 
     async def fake_upsert(table, records, resolve_conflicts=True):
         _upserted.setdefault(table, [])
@@ -111,11 +114,12 @@ def _make_engine(tracker: SyncTracker, cloud_records_by_table=None, batch_size=5
 # 1. 增量同步：只同步 updated_at > last_sync_time 的记录
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_incremental_sync_only_new_records(tracker):
     """增量同步只拉取 updated_at > watermark 的记录"""
     old_ts = _ts(-3600)  # 1 小时前
-    new_ts = _ts(-60)    # 1 分钟前
+    new_ts = _ts(-60)  # 1 分钟前
 
     old_record = _make_record("order-old", updated_at=old_ts)
     new_record = _make_record("order-new", updated_at=new_ts)
@@ -158,6 +162,7 @@ async def test_incremental_sync_only_new_records(tracker):
 # 2. 全量同步：首次连接或强制重置时
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_full_sync_resets_watermarks_and_pulls_all(tracker):
     """全量同步重置水位，拉取所有记录"""
@@ -165,9 +170,7 @@ async def test_full_sync_resets_watermarks_and_pulls_all(tracker):
     await tracker.set_watermark("orders", _ts(-3600))
 
     records = [_make_record(f"order-{i}") for i in range(10)]
-    engine, upserted = _make_engine(
-        tracker, cloud_records_by_table={"orders": records}
-    )
+    engine, upserted = _make_engine(tracker, cloud_records_by_table={"orders": records})
 
     # 模拟其他表返回空
     original_fetch = engine._fetch_from_cloud
@@ -198,6 +201,7 @@ async def test_full_sync_first_run_has_epoch_watermark(tracker):
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. 冲突解决：云端优先，保留本地终态
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestConflictResolver:
     def test_remote_wins_by_default(self):
@@ -264,13 +268,12 @@ class TestConflictResolver:
 # 4. 幂等性：重复同步不产生重复数据
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_idempotent_incremental_sync(tracker):
     """重复运行增量同步，不产生重复记录"""
     records = [_make_record(f"order-{i}", updated_at=_ts(-i * 10)) for i in range(5)]
-    engine, upserted = _make_engine(
-        tracker, cloud_records_by_table={"orders": records}
-    )
+    engine, upserted = _make_engine(tracker, cloud_records_by_table={"orders": records})
     engine._bulk_upsert_to_cloud = AsyncMock(return_value=True)
 
     # 第一次同步
@@ -303,6 +306,7 @@ async def test_idempotent_change_log(tracker):
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. 断网恢复：本地操作缓冲 → 恢复连接后增量推送
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_offline_buffer_and_recovery(tracker):
@@ -385,14 +389,12 @@ async def test_no_cloud_url_skips_push(tracker):
 # 6. 大批量：10000 条记录分批同步（每批 500 条）
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_large_batch_split_into_pages(tracker):
     """10000 条记录被分批（每批 500）拉取"""
     total_records = 10_000
-    records = [
-        _make_record(f"order-{i}", updated_at=_ts(-i))
-        for i in range(total_records)
-    ]
+    records = [_make_record(f"order-{i}", updated_at=_ts(-i)) for i in range(total_records)]
 
     fetch_calls: list[dict] = []
 
@@ -407,7 +409,7 @@ async def test_large_batch_split_into_pages(tracker):
     async def fake_fetch(table, tenant_id, since, page=1, size=500):
         fetch_calls.append({"table": table, "page": page, "size": size})
         start = (page - 1) * size
-        chunk = records[start: start + size]
+        chunk = records[start : start + size]
         return chunk
 
     upserted_ids: list[str] = []
@@ -436,9 +438,7 @@ async def test_large_batch_split_into_pages(tracker):
 async def test_large_batch_push(tracker):
     """1000 条本地变更分 2 批推送到云端"""
     for i in range(1000):
-        await tracker.log_change(
-            "orders", f"order-{i}", "INSERT", _make_record(f"order-{i}")
-        )
+        await tracker.log_change("orders", f"order-{i}", "INSERT", _make_record(f"order-{i}"))
 
     engine = SyncEngine(
         tracker=tracker,
@@ -465,6 +465,7 @@ async def test_large_batch_push(tracker):
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. SyncTracker 单元测试
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_tracker_watermark_default(tracker):
@@ -509,6 +510,7 @@ async def test_tracker_change_log_lifecycle(tracker):
 # ═══════════════════════════════════════════════════════════════════════════
 # 8. 工具函数
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def test_max_updated_at_basic():
     records = [

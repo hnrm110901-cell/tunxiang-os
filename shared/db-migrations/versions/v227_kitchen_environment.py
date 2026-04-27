@@ -1,8 +1,9 @@
 """明厨亮灶 + 环保 — kitchen_devices + kitchen_ai_alerts + env_emission_records + env_waste_disposal
 Revision: v227
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v227"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- kitchen_devices 明厨亮灶设备 ---
 
-    if 'kitchen_devices' not in existing:
+    if "kitchen_devices" not in existing:
         op.create_table(
             "kitchen_devices",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -61,7 +60,7 @@ def upgrade() -> None:
 
         # --- kitchen_ai_alerts AI告警记录 ---
 
-    if 'kitchen_ai_alerts' not in existing:
+    if "kitchen_ai_alerts" not in existing:
         op.create_table(
             "kitchen_ai_alerts",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -94,7 +93,7 @@ def upgrade() -> None:
 
         # --- env_emission_records 油烟排放记录 ---
 
-    if 'env_emission_records' not in existing:
+    if "env_emission_records" not in existing:
         op.create_table(
             "env_emission_records",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -119,7 +118,7 @@ def upgrade() -> None:
 
         # --- env_waste_disposal 餐厨垃圾台账 ---
 
-    if 'env_waste_disposal' not in existing:
+    if "env_waste_disposal" not in existing:
         op.create_table(
             "env_waste_disposal",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -142,7 +141,6 @@ def upgrade() -> None:
         op.create_index("ix_ewd_tenant_store", "env_waste_disposal", ["tenant_id", "store_id"])
         op.create_index("ix_ewd_date", "env_waste_disposal", ["tenant_id", "store_id", "collected_at"])
         _add_rls("env_waste_disposal", "ewd")
-
 
 
 def downgrade() -> None:

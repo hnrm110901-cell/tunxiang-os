@@ -4,22 +4,71 @@ Revision ID: v006
 Revises: v005
 Create Date: 2026-03-28
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
-revision: str = "v006"
-down_revision: Union[str, None] = "v005"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v006"
+down_revision = "v005"
+branch_labels = None
+depends_on = None
 
-V001_TABLES = ["customers", "stores", "dish_categories", "dishes", "dish_ingredients", "orders", "order_items", "ingredient_masters", "ingredients", "ingredient_transactions", "employees"]
-V002_TABLES = ["tables", "payments", "refunds", "settlements", "shift_handovers", "receipt_templates", "receipt_logs", "production_depts", "dish_dept_mappings", "daily_ops_flows", "daily_ops_nodes", "agent_decision_logs"]
-V003_TABLES = ["payment_records", "reconciliation_batches", "reconciliation_diffs", "tri_reconciliation_records", "store_daily_settlements", "payment_fees"]
-V004_TABLES = ["reservations", "queues", "banquet_halls", "banquet_leads", "banquet_orders", "banquet_contracts", "menu_packages", "banquet_checklists"]
-V005_TABLES = ["attendance_rules", "clock_records", "daily_attendance", "payroll_batches", "payroll_items", "leave_requests", "leave_balances", "settlement_records"]
+V001_TABLES = [
+    "customers",
+    "stores",
+    "dish_categories",
+    "dishes",
+    "dish_ingredients",
+    "orders",
+    "order_items",
+    "ingredient_masters",
+    "ingredients",
+    "ingredient_transactions",
+    "employees",
+]
+V002_TABLES = [
+    "tables",
+    "payments",
+    "refunds",
+    "settlements",
+    "shift_handovers",
+    "receipt_templates",
+    "receipt_logs",
+    "production_depts",
+    "dish_dept_mappings",
+    "daily_ops_flows",
+    "daily_ops_nodes",
+    "agent_decision_logs",
+]
+V003_TABLES = [
+    "payment_records",
+    "reconciliation_batches",
+    "reconciliation_diffs",
+    "tri_reconciliation_records",
+    "store_daily_settlements",
+    "payment_fees",
+]
+V004_TABLES = [
+    "reservations",
+    "queues",
+    "banquet_halls",
+    "banquet_leads",
+    "banquet_orders",
+    "banquet_contracts",
+    "menu_packages",
+    "banquet_checklists",
+]
+V005_TABLES = [
+    "attendance_rules",
+    "clock_records",
+    "daily_attendance",
+    "payroll_batches",
+    "payroll_items",
+    "leave_requests",
+    "leave_balances",
+    "settlement_records",
+]
 ALL_RLS_TABLES = V001_TABLES + V002_TABLES + V003_TABLES + V004_TABLES + V005_TABLES
 
 
@@ -27,14 +76,20 @@ def _upgrade_rls(table_name: str) -> None:
     op.execute(f"DROP POLICY IF EXISTS tenant_isolation_{table_name} ON {table_name}")
     op.execute(f"DROP POLICY IF EXISTS tenant_insert_{table_name} ON {table_name}")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(f"CREATE POLICY tenant_isolation ON {table_name} USING (tenant_id::text = current_setting('app.tenant_id', true)) WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true))")
+    op.execute(
+        f"CREATE POLICY tenant_isolation ON {table_name} USING (tenant_id::text = current_setting('app.tenant_id', true)) WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true))"
+    )
 
 
 def _downgrade_rls(table_name: str) -> None:
     op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table_name}")
     op.execute(f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY")
-    op.execute(f"CREATE POLICY tenant_isolation_{table_name} ON {table_name} USING (tenant_id = current_setting('app.tenant_id')::UUID)")
-    op.execute(f"CREATE POLICY tenant_insert_{table_name} ON {table_name} FOR INSERT WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID)")
+    op.execute(
+        f"CREATE POLICY tenant_isolation_{table_name} ON {table_name} USING (tenant_id = current_setting('app.tenant_id')::UUID)"
+    )
+    op.execute(
+        f"CREATE POLICY tenant_insert_{table_name} ON {table_name} FOR INSERT WITH CHECK (tenant_id = current_setting('app.tenant_id')::UUID)"
+    )
 
 
 def upgrade() -> None:
@@ -50,7 +105,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
-    op.execute("INSERT INTO tenants (id, code, name, brand_name) VALUES ('10000000-0000-0000-0000-000000000001', 't-czq', '尝在一起', '尝在一起'), ('10000000-0000-0000-0000-000000000002', 't-zqx', '最黔线', '最黔线'), ('10000000-0000-0000-0000-000000000003', 't-sgc', '尚宫厨', '尚宫厨')")
+    op.execute(
+        "INSERT INTO tenants (id, code, name, brand_name) VALUES ('10000000-0000-0000-0000-000000000001', 't-czq', '尝在一起', '尝在一起'), ('10000000-0000-0000-0000-000000000002', 't-zqx', '最黔线', '最黔线'), ('10000000-0000-0000-0000-000000000003', 't-sgc', '尚宫厨', '尚宫厨')"
+    )
     for table in ALL_RLS_TABLES:
         _upgrade_rls(table)
 

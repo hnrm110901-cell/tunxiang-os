@@ -71,8 +71,7 @@ def upgrade() -> None:
         "ON payslip_records (tenant_id, employee_id, pay_period DESC)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_payslip_records_tenant_period "
-        "ON payslip_records (tenant_id, pay_period DESC)"
+        "CREATE INDEX IF NOT EXISTS idx_payslip_records_tenant_period ON payslip_records (tenant_id, pay_period DESC)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_payslip_records_status "

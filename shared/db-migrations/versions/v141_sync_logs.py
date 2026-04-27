@@ -33,9 +33,7 @@ depends_on = None
 
 _TABLE = "sync_logs"
 _POLICY = "sync_logs_tenant_isolation"
-_SAFE_CONDITION = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-)
+_SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def upgrade() -> None:

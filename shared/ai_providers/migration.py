@@ -12,11 +12,11 @@
     MULTI_PROVIDER_ENABLED  — "true" 启用多 Provider 路由，默认 "false"
     ANTHROPIC_API_KEY       — Claude API 密钥（降级模式必须）
 """
+
 from __future__ import annotations
 
 import asyncio
 import os
-import time
 import uuid
 from typing import Any, AsyncGenerator, Optional
 
@@ -30,6 +30,7 @@ _MultiProviderRouter = None
 
 try:
     from shared.ai_providers.router import MultiProviderRouter as _MultiProviderRouter  # type: ignore[assignment]
+
     _NEW_ROUTER_AVAILABLE = True
 except ImportError:
     logger.info("migration_router_new_arch_unavailable", reason="shared.ai_providers.router not found")
@@ -37,10 +38,7 @@ except ImportError:
 
 def _is_multi_provider_enabled() -> bool:
     """检查是否启用多 Provider 路由。"""
-    return (
-        _NEW_ROUTER_AVAILABLE
-        and os.environ.get("MULTI_PROVIDER_ENABLED", "false").lower() == "true"
-    )
+    return _NEW_ROUTER_AVAILABLE and os.environ.get("MULTI_PROVIDER_ENABLED", "false").lower() == "true"
 
 
 class MigrationRouter:
@@ -92,15 +90,15 @@ class MigrationRouter:
         # 复刻旧 ModelRouter 的模型选择策略
         self._task_model_map: dict[str, str] = {
             "quick_classification": "claude-haiku-4-5-20251001",
-            "standard_analysis":    "claude-sonnet-4-6",
-            "complex_reasoning":    "claude-opus-4-6",
-            "agent_decision":       "claude-sonnet-4-6",
-            "supplier_scoring":     "claude-sonnet-4-6",
-            "demand_forecast":      "claude-sonnet-4-6",
-            "cost_analysis":        "claude-sonnet-4-6",
-            "patrol_report":        "claude-haiku-4-5-20251001",
-            "dashboard_brief":      "claude-sonnet-4-6",
-            "default":              "claude-sonnet-4-6",
+            "standard_analysis": "claude-sonnet-4-6",
+            "complex_reasoning": "claude-opus-4-6",
+            "agent_decision": "claude-sonnet-4-6",
+            "supplier_scoring": "claude-sonnet-4-6",
+            "demand_forecast": "claude-sonnet-4-6",
+            "cost_analysis": "claude-sonnet-4-6",
+            "patrol_report": "claude-haiku-4-5-20251001",
+            "dashboard_brief": "claude-sonnet-4-6",
+            "default": "claude-sonnet-4-6",
         }
         self._downgrade_model = "claude-haiku-4-5-20251001"
         self._upgrade_model = "claude-opus-4-6"

@@ -16,16 +16,15 @@
 未配置时进入 Mock 模式，返回模拟数据。
 所有金额使用分（整数），不使用浮点。
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -38,6 +37,7 @@ _ELEME_BASE_URL = "https://open-api.shop.ele.me/api/v1"
 # ─────────────────────────────────────────────────────────────────────────────
 # 美团商家营销适配器
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class MeituanMarketingAdapter:
     """美团/饿了么商家营销适配器
@@ -162,7 +162,9 @@ class MeituanMarketingAdapter:
             }
 
         try:
-            result = await self._call_api("GET", "/promotion/list", {"ePoiId": store_id, "page": page, "pageSize": page_size})
+            result = await self._call_api(
+                "GET", "/promotion/list", {"ePoiId": store_id, "page": page, "pageSize": page_size}
+            )
             return {
                 "store_id": store_id,
                 "total": result.get("total", 0),
@@ -335,6 +337,7 @@ class MeituanMarketingAdapter:
         url = f"{_MEITUAN_BASE_URL}{path}"
 
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             if method == "GET":
                 req = session.get(url, params=request_params, timeout=aiohttp.ClientTimeout(total=15))

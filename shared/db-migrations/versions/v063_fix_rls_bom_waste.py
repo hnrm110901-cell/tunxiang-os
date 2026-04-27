@@ -26,14 +26,13 @@ Create Date: 2026-03-31
   变量名问题（v056 已修复三段条件统一为 NULLIF，但若原策略变量名完全不同
   则 DROP IF EXISTS 幂等操作已确保本次重建生效）。
 """
-from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v063"
-down_revision: Union[str, None] = "v056"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v063"
+down_revision = "v056"
+branch_labels = None
+depends_on = None
 
 # 标准 NULLIF NULL guard 条件（v056+ 唯一正确模式）
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
@@ -71,22 +70,13 @@ def _drop_all_known_policies(table: str) -> None:
 
 def _apply_safe_rls(table: str) -> None:
     """创建标准安全 RLS：四操作 PERMISSIVE + NULLIF NULL guard + FORCE ROW LEVEL SECURITY。"""
-    op.execute(
-        f"CREATE POLICY {table}_rls_select ON {table} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table}_rls_insert ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table}_rls_delete ON {table} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
@@ -122,21 +112,12 @@ def downgrade() -> None:
         op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
 
         # 恢复 v056 前的旧三段条件四操作策略（安全但非 NULLIF 标准）
-        op.execute(
-            f"CREATE POLICY {table}_rls_select ON {table} "
-            f"FOR SELECT USING ({_OLD_CONDITION})"
-        )
-        op.execute(
-            f"CREATE POLICY {table}_rls_insert ON {table} "
-            f"FOR INSERT WITH CHECK ({_OLD_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_OLD_CONDITION})")
+        op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_OLD_CONDITION})")
         op.execute(
             f"CREATE POLICY {table}_rls_update ON {table} "
             f"FOR UPDATE USING ({_OLD_CONDITION}) WITH CHECK ({_OLD_CONDITION})"
         )
-        op.execute(
-            f"CREATE POLICY {table}_rls_delete ON {table} "
-            f"FOR DELETE USING ({_OLD_CONDITION})"
-        )
+        op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_OLD_CONDITION})")
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
         op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")

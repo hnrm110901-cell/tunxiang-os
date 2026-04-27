@@ -19,8 +19,9 @@ Revision ID: v030
 Revises: v029
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "v030"
 down_revision = "v029"

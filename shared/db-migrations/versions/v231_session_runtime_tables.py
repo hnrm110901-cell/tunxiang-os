@@ -1,8 +1,9 @@
 """Session Runtime 数据模型 — session_runs / session_events / session_checkpoints
 Revision: v231
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v231c"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- session_runs 任务运行实例 ---
 
-    if 'session_runs' not in existing:
+    if "session_runs" not in existing:
         op.create_table(
             "session_runs",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -68,7 +67,7 @@ def upgrade() -> None:
 
         # --- session_events 事件记录 ---
 
-    if 'session_events' not in existing:
+    if "session_events" not in existing:
         op.create_table(
             "session_events",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -96,7 +95,7 @@ def upgrade() -> None:
 
         # --- session_checkpoints 断点记录 ---
 
-    if 'session_checkpoints' not in existing:
+    if "session_checkpoints" not in existing:
         op.create_table(
             "session_checkpoints",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -120,7 +119,6 @@ def upgrade() -> None:
         op.create_index("ix_sc_session", "session_checkpoints", ["session_id"])
         op.create_index("ix_sc_tenant", "session_checkpoints", ["tenant_id"])
         _add_rls("session_checkpoints", "sc")
-
 
 
 def downgrade() -> None:

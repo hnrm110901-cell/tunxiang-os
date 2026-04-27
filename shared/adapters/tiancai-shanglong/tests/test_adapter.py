@@ -8,6 +8,7 @@
   4. get_serial_data 入参校验
   5. 初始化参数（新 OAuth2 凭据字段）
 """
+
 import os
 import sys
 
@@ -21,9 +22,10 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 _adapter_src = os.path.abspath(os.path.join(_here, "../src"))
 if _adapter_src not in sys.path:
@@ -31,8 +33,8 @@ if _adapter_src not in sys.path:
 
 from adapter import TiancaiShanglongAdapter
 
-
 # ── Fixtures ───────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def adapter():
@@ -60,10 +62,10 @@ def raw_order():
         "bs_id": "TC_20240301_001",
         "bs_code": "TC20240301001",
         "point_code": "A03",
-        "state": 1,                    # 1=已结账
-        "last_total": 13600,           # 实收 136.00 元（分）
-        "disc_total": 1000,            # 折扣 10.00 元（分）
-        "orig_total": 14600,           # 折前 146.00 元（分）
+        "state": 1,  # 1=已结账
+        "last_total": 13600,  # 实收 136.00 元（分）
+        "disc_total": 1000,  # 折扣 10.00 元（分）
+        "orig_total": 14600,  # 折前 146.00 元（分）
         "settle_time": "2024-03-01 12:30:00",
         "open_time": "2024-03-01 11:00:00",
         "member_card_no": "MBR_001",
@@ -98,7 +100,7 @@ def raw_staff_action():
     return {
         "action_type": "discount_apply",
         "operator_id": "STAFF_001",
-        "amount": 2000,            # 20.00 元（分）
+        "amount": 2000,  # 20.00 元（分）
         "reason": "VIP 优惠",
         "approved_by": "MGR_001",
         "action_time": "2024-03-01 13:00:00",
@@ -106,6 +108,7 @@ def raw_staff_action():
 
 
 # ── 初始化测试 ─────────────────────────────────────────────────────────────────
+
 
 class TestTiancaiShanglongAdapterInit:
     def test_init_success(self, adapter):
@@ -134,6 +137,7 @@ class TestTiancaiShanglongAdapterInit:
 
 # ── to_order：字段映射 ─────────────────────────────────────────────────────────
 
+
 class TestToOrder:
     def test_maps_order_id(self, adapter, raw_order):
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
@@ -150,11 +154,13 @@ class TestToOrder:
 
     def test_maps_status_completed_when_state_1(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
         assert result.order_status == OrderStatus.COMPLETED
 
     def test_maps_status_pending_when_state_0(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw_order["state"] = 0
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
         assert result.order_status == OrderStatus.PENDING
@@ -162,6 +168,7 @@ class TestToOrder:
     def test_maps_status_special_state_as_completed(self, adapter, raw_order):
         """state 非 0/1 的特殊账单（押金/存酒等）按 COMPLETED 处理"""
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw_order["state"] = 5
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
         assert result.order_status == OrderStatus.COMPLETED
@@ -190,16 +197,16 @@ class TestToOrder:
     def test_maps_item_fields(self, adapter, raw_order):
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
         item0 = result.items[0]
-        assert item0.dish_id == "DISH_001"       # from item_code
-        assert item0.dish_name == "红烧肉"        # from item_name
-        assert item0.quantity == 1                # from last_qty
+        assert item0.dish_id == "DISH_001"  # from item_code
+        assert item0.dish_name == "红烧肉"  # from item_name
+        assert item0.quantity == 1  # from last_qty
         assert item0.unit_price == Decimal("88.00")  # last_price=8800 分
 
     def test_maps_item_second(self, adapter, raw_order):
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
         item1 = result.items[1]
         assert item1.quantity == 2
-        assert item1.unit_price == Decimal("4.00")   # last_price=400 分
+        assert item1.unit_price == Decimal("4.00")  # last_price=400 分
 
     def test_datetime_from_settle_time(self, adapter, raw_order):
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
@@ -221,6 +228,7 @@ class TestToOrder:
 
     def test_order_type_is_dine_in(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderType
+
         result = adapter.to_order(raw_order, "STORE_TC1", "BRAND_001")
         assert result.order_type == OrderType.DINE_IN
 
@@ -235,6 +243,7 @@ class TestToOrder:
 
 
 # ── to_staff_action ────────────────────────────────────────────────────────────
+
 
 class TestToStaffAction:
     def test_maps_action_type(self, adapter, raw_staff_action):
@@ -271,6 +280,7 @@ class TestToStaffAction:
 
 # ── get_serial_data 入参校验 ───────────────────────────────────────────────────
 
+
 class TestGetSerialDataValidation:
     @pytest.mark.asyncio
     async def test_raises_if_no_date_params(self, adapter):
@@ -290,10 +300,12 @@ class TestGetSerialDataValidation:
     @pytest.mark.asyncio
     async def test_accepts_begin_end_date(self, adapter):
         from unittest.mock import AsyncMock, patch
+
         with patch.object(adapter, "_request", new_callable=AsyncMock) as mock_req:
             mock_req.return_value = {"billList": [], "pageInfo": {"total": 0}}
             result = await adapter.get_serial_data(
-                page_no=1, page_size=10,
+                page_no=1,
+                page_size=10,
                 begin_date="2024-01-01 00:00:00",
                 end_date="2024-01-01 23:59:59",
             )
@@ -302,6 +314,7 @@ class TestGetSerialDataValidation:
     @pytest.mark.asyncio
     async def test_body_contains_center_and_shop_id(self, adapter):
         from unittest.mock import AsyncMock, patch
+
         with patch.object(adapter, "_request", new_callable=AsyncMock) as mock_req:
             mock_req.return_value = {"billList": [], "pageInfo": {"total": 0}}
             await adapter.get_serial_data(page_no=1, page_size=10, settle_date="2024-01-01")
@@ -315,6 +328,7 @@ class TestGetSerialDataValidation:
 
 # ── fetch_orders_by_date（mock _request） ────────────────────────────────────
 
+
 class TestFetchOrdersByDate:
     """_request 已提取 data 层，mock 返回值应为 billList/pageInfo 结构"""
 
@@ -324,9 +338,15 @@ class TestFetchOrdersByDate:
 
         mock_data = {
             "billList": [
-                {"bs_id": "O001", "bs_code": "N001", "state": 1,
-                 "last_total": 5000, "settle_time": "2026-03-04 12:00:00",
-                 "point_code": "A01", "item": []},
+                {
+                    "bs_id": "O001",
+                    "bs_code": "N001",
+                    "state": 1,
+                    "last_total": 5000,
+                    "settle_time": "2026-03-04 12:00:00",
+                    "point_code": "A01",
+                    "item": [],
+                },
             ],
             "pageInfo": {"total": 1},
         }
@@ -343,8 +363,7 @@ class TestFetchOrdersByDate:
 
         mock_data = {
             "billList": [
-                {"bs_id": f"O{i:03d}", "state": 1, "last_total": 1000,
-                 "settle_time": "2026-03-04 10:00:00", "item": []}
+                {"bs_id": f"O{i:03d}", "state": 1, "last_total": 1000, "settle_time": "2026-03-04 10:00:00", "item": []}
                 for i in range(100)
             ],
             "pageInfo": {"total": 250},
@@ -369,6 +388,7 @@ class TestFetchOrdersByDate:
 
 # ── pull_daily_orders（自动分页） ─────────────────────────────────────────────
 
+
 class TestPullDailyOrders:
     @pytest.mark.asyncio
     async def test_returns_order_schemas(self, adapter):
@@ -376,23 +396,31 @@ class TestPullDailyOrders:
 
         page1_items = [
             {
-                "bs_id": "O001", "bs_code": "N001", "state": 1,
-                "last_total": 5000, "disc_total": 0, "orig_total": 5000,
+                "bs_id": "O001",
+                "bs_code": "N001",
+                "state": 1,
+                "last_total": 5000,
+                "disc_total": 0,
+                "orig_total": 5000,
                 "settle_time": "2026-03-04 12:00:00",
                 "point_code": "B02",
                 "item": [
-                    {"item_id": "I1", "item_code": "D1", "item_name": "红烧肉",
-                     "last_qty": 1, "last_price": 5000, "last_total": 5000}
+                    {
+                        "item_id": "I1",
+                        "item_code": "D1",
+                        "item_name": "红烧肉",
+                        "last_qty": 1,
+                        "last_price": 5000,
+                        "last_total": 5000,
+                    }
                 ],
             }
         ]
 
         async def mock_fetch(date_str, page=1, page_size=100):
             if page == 1:
-                return {"items": page1_items, "page": 1, "page_size": 100,
-                        "total": 1, "has_more": False}
-            return {"items": [], "page": page, "page_size": 100,
-                    "total": 1, "has_more": False}
+                return {"items": page1_items, "page": 1, "page_size": 100, "total": 1, "has_more": False}
+            return {"items": [], "page": page, "page_size": 100, "total": 1, "has_more": False}
 
         with patch.object(adapter, "fetch_orders_by_date", side_effect=mock_fetch):
             orders = await adapter.pull_daily_orders("2026-03-04", "BRAND_001")
@@ -410,8 +438,7 @@ class TestPullDailyOrders:
         async def mock_fetch(date_str, page=1, page_size=100):
             nonlocal call_count
             call_count += 1
-            return {"items": [], "page": page, "page_size": 100,
-                    "total": 0, "has_more": False}
+            return {"items": [], "page": page, "page_size": 100, "total": 0, "has_more": False}
 
         with patch.object(adapter, "fetch_orders_by_date", side_effect=mock_fetch):
             orders = await adapter.pull_daily_orders("2026-03-04", "BRAND_001")
@@ -426,16 +453,13 @@ class TestPullDailyOrders:
 
         page_items = [
             # 第一条：缺少 item_name（仍能处理）
-            {"bs_id": "O001", "state": 1, "last_total": 1000,
-             "settle_time": "2026-03-04 10:00:00", "item": []},
+            {"bs_id": "O001", "state": 1, "last_total": 1000, "settle_time": "2026-03-04 10:00:00", "item": []},
             # 第二条：bs_id 为 None，to_order 也应能容错
-            {"bs_id": None, "state": 1, "last_total": 500,
-             "settle_time": "2026-03-04 11:00:00", "item": []},
+            {"bs_id": None, "state": 1, "last_total": 500, "settle_time": "2026-03-04 11:00:00", "item": []},
         ]
 
         async def mock_fetch(date_str, page=1, page_size=100):
-            return {"items": page_items, "page": 1, "page_size": 100,
-                    "total": 2, "has_more": False}
+            return {"items": page_items, "page": 1, "page_size": 100, "total": 2, "has_more": False}
 
         with patch.object(adapter, "fetch_orders_by_date", side_effect=mock_fetch):
             orders = await adapter.pull_daily_orders("2026-03-04", "BRAND_001")

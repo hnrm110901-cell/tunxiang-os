@@ -13,15 +13,12 @@ from datetime import date, timedelta
 from typing import Optional
 from urllib.parse import urlparse
 
-
 # ---------------------------------------------------------------------------
 # 内部常量
 # ---------------------------------------------------------------------------
 
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-_EMAIL_RE = re.compile(
-    r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
-)
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 _PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 _SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9\u4e00-\u9fff._\-]")
 # 基本格式标签白名单（sanitize_html 保留这些）
@@ -106,9 +103,7 @@ def sanitize_filename(value: str) -> str:
     return name
 
 
-def validate_url(
-    value: str, allowed_hosts: Optional[list[str]] = None
-) -> str:
+def validate_url(value: str, allowed_hosts: Optional[list[str]] = None) -> str:
     """验证 URL：防止 SSRF（只允许白名单域名）。
 
     Raises:
@@ -124,9 +119,7 @@ def validate_url(
     _reject_internal_host(hostname)
     if allowed_hosts is not None:
         if hostname not in [h.lower() for h in allowed_hosts]:
-            raise ValueError(
-                f"host {hostname!r} not in allowed list"
-            )
+            raise ValueError(f"host {hostname!r} not in allowed list")
     return value
 
 
@@ -187,7 +180,7 @@ def validate_date_range(start: str, end: str) -> tuple[str, str]:
         start_date = date.fromisoformat(start)
         end_date = date.fromisoformat(end)
     except (ValueError, TypeError) as exc:
-        raise ValueError(f"invalid date format, expected YYYY-MM-DD") from exc
+        raise ValueError("invalid date format, expected YYYY-MM-DD") from exc
     if start_date > end_date:
         raise ValueError("start date must be <= end date")
     if (end_date - start_date) > timedelta(days=365):

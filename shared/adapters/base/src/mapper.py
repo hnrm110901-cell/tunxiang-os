@@ -2,9 +2,10 @@
 数据模型映射器
 用于在不同系统间转换数据格式
 """
-from typing import Dict, Any, Optional
+
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Dict
 
 
 class DataMapper:
@@ -118,12 +119,8 @@ class DataMapper:
                 "order_no": source_data.get("orderNo"),
                 "store_id": source_data.get("storeId"),
                 "member_id": source_data.get("cardNo"),
-                "total_amount": DataMapper.fen_to_yuan(
-                    source_data.get("totalAmount", 0)
-                ),
-                "discount_amount": DataMapper.fen_to_yuan(
-                    source_data.get("discountAmount", 0)
-                ),
+                "total_amount": DataMapper.fen_to_yuan(source_data.get("totalAmount", 0)),
+                "discount_amount": DataMapper.fen_to_yuan(source_data.get("discountAmount", 0)),
                 "real_amount": DataMapper.fen_to_yuan(source_data.get("realAmount", 0)),
                 "status": source_data.get("status"),
                 "create_time": source_data.get("orderTime"),
@@ -136,12 +133,9 @@ class DataMapper:
                 "order_no": source_data.get("billNo"),
                 "store_id": source_data.get("ognid"),
                 "member_id": source_data.get("vipCard"),
-                "total_amount": DataMapper.fen_to_yuan(
-                    source_data.get("billPriceTotal", 0)
-                ),
+                "total_amount": DataMapper.fen_to_yuan(source_data.get("billPriceTotal", 0)),
                 "discount_amount": DataMapper.fen_to_yuan(
-                    source_data.get("specialOfferPrice", 0)
-                    + source_data.get("singleDiscountPrice", 0)
+                    source_data.get("specialOfferPrice", 0) + source_data.get("singleDiscountPrice", 0)
                 ),
                 "real_amount": DataMapper.fen_to_yuan(source_data.get("realPrice", 0)),
                 "status": source_data.get("billStatus"),

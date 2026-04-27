@@ -5,6 +5,7 @@
 - tiktoken 精确 token 计数（cl100k_base，与 Claude 一致）
 - 可配置块大小和重叠
 """
+
 from __future__ import annotations
 
 import re
@@ -23,6 +24,7 @@ def _get_encoder():
     if _encoder is None:
         try:
             import tiktoken
+
             _encoder = tiktoken.get_encoding("cl100k_base")
         except ImportError:
             logger.warning("tiktoken_not_installed_fallback_to_char_count")
@@ -32,6 +34,7 @@ def _get_encoder():
 
 class _FallbackEncoder:
     """tiktoken 不可用时的降级编码器（按字符估算 token）"""
+
     def encode(self, text: str) -> list[int]:
         # 粗略估算：中文 1 字 ≈ 1.5 token，英文 4 字符 ≈ 1 token
         return list(range(len(text) // 2))
@@ -40,6 +43,7 @@ class _FallbackEncoder:
 @dataclass
 class ChunkResult:
     """分块结果"""
+
     text: str
     chunk_index: int
     token_count: int
@@ -85,26 +89,30 @@ def semantic_chunk(
             # 先保存当前积累的块
             if current_segments:
                 chunk_text = "".join(current_segments)
-                chunks.append(ChunkResult(
-                    text=chunk_text,
-                    chunk_index=len(chunks),
-                    token_count=current_tokens,
-                    start_char=chunk_start_char,
-                    end_char=chunk_start_char + len(chunk_text),
-                ))
+                chunks.append(
+                    ChunkResult(
+                        text=chunk_text,
+                        chunk_index=len(chunks),
+                        token_count=current_tokens,
+                        start_char=chunk_start_char,
+                        end_char=chunk_start_char + len(chunk_text),
+                    )
+                )
                 current_segments = []
                 current_tokens = 0
 
             # 对超长片段强制切分
             sub_chunks = _force_split(segment, max_tokens, overlap_tokens, encoder)
             for sc in sub_chunks:
-                chunks.append(ChunkResult(
-                    text=sc,
-                    chunk_index=len(chunks),
-                    token_count=len(encoder.encode(sc)),
-                    start_char=char_offset,
-                    end_char=char_offset + len(sc),
-                ))
+                chunks.append(
+                    ChunkResult(
+                        text=sc,
+                        chunk_index=len(chunks),
+                        token_count=len(encoder.encode(sc)),
+                        start_char=char_offset,
+                        end_char=char_offset + len(sc),
+                    )
+                )
             char_offset += len(segment)
             chunk_start_char = char_offset
             continue
@@ -113,17 +121,21 @@ def semantic_chunk(
         if current_tokens + seg_tokens > max_tokens and current_segments:
             # 保存当前块
             chunk_text = "".join(current_segments)
-            chunks.append(ChunkResult(
-                text=chunk_text,
-                chunk_index=len(chunks),
-                token_count=current_tokens,
-                start_char=chunk_start_char,
-                end_char=chunk_start_char + len(chunk_text),
-            ))
+            chunks.append(
+                ChunkResult(
+                    text=chunk_text,
+                    chunk_index=len(chunks),
+                    token_count=current_tokens,
+                    start_char=chunk_start_char,
+                    end_char=chunk_start_char + len(chunk_text),
+                )
+            )
 
             # 计算重叠：从已有片段尾部取 overlap_tokens
             overlap_segments, overlap_token_count = _compute_overlap(
-                current_segments, overlap_tokens, encoder,
+                current_segments,
+                overlap_tokens,
+                encoder,
             )
             current_segments = overlap_segments
             current_tokens = overlap_token_count
@@ -137,13 +149,15 @@ def semantic_chunk(
     if current_segments:
         chunk_text = "".join(current_segments)
         if chunk_text.strip():
-            chunks.append(ChunkResult(
-                text=chunk_text,
-                chunk_index=len(chunks),
-                token_count=current_tokens,
-                start_char=chunk_start_char,
-                end_char=chunk_start_char + len(chunk_text),
-            ))
+            chunks.append(
+                ChunkResult(
+                    text=chunk_text,
+                    chunk_index=len(chunks),
+                    token_count=current_tokens,
+                    start_char=chunk_start_char,
+                    end_char=chunk_start_char + len(chunk_text),
+                )
+            )
 
     return chunks
 

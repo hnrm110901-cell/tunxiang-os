@@ -5,8 +5,9 @@ Tables:
   - daily_briefs     门店日报持久化（store_id/date/content_json/sent_at）
   - sentiment_cache  评价情感分析缓存（store_id/platform/date/scores）
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v223"
@@ -19,10 +20,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── daily_briefs 表 ──
 
-    if 'daily_briefs' not in existing:
+    if "daily_briefs" not in existing:
         op.create_table(
             "daily_briefs",
             sa.Column(
@@ -82,7 +82,7 @@ def upgrade() -> None:
 
         # ── sentiment_cache 表 ──
 
-    if 'sentiment_cache' not in existing:
+    if "sentiment_cache" not in existing:
         op.create_table(
             "sentiment_cache",
             sa.Column(

@@ -23,22 +23,19 @@ Revision ID: v064
 Revises: v063
 Create Date: 2026-03-31
 """
-from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "v064"
-down_revision: Union[str, None] = "v063"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v064"
+down_revision = "v063"
+branch_labels = None
+depends_on = None
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  安全 RLS 条件 — NULLIF NULL-guard 防止空字符串绕过（v056+ 标准）
 #  禁止使用 app.current_store_id 或 app.current_tenant（错误变量名）
 # ─────────────────────────────────────────────────────────────────────────────
-_SAFE_CONDITION = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
-)
+_SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
 _WMS_TABLES = [
     "stocktakes",
@@ -55,25 +52,16 @@ def _apply_safe_rls(table: str) -> None:
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_select ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_select ON {table} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_select ON {table} FOR SELECT USING ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_insert ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_insert ON {table} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_insert ON {table} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_update ON {table}")
     op.execute(
         f"CREATE POLICY {table}_rls_update ON {table} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
     op.execute(f"DROP POLICY IF EXISTS {table}_rls_delete ON {table}")
-    op.execute(
-        f"CREATE POLICY {table}_rls_delete ON {table} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table}_rls_delete ON {table} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -103,14 +91,8 @@ def upgrade() -> None:
             is_deleted    BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_stocktakes_tenant_store "
-        "ON stocktakes (tenant_id, store_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_stocktakes_tenant_status "
-        "ON stocktakes (tenant_id, status)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stocktakes_tenant_store ON stocktakes (tenant_id, store_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stocktakes_tenant_status ON stocktakes (tenant_id, status)")
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_stocktakes_tenant_store_created "
         "ON stocktakes (tenant_id, store_id, created_at DESC)"
@@ -143,12 +125,10 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_stocktake_items_tenant_stocktake "
-        "ON stocktake_items (tenant_id, stocktake_id)"
+        "CREATE INDEX IF NOT EXISTS idx_stocktake_items_tenant_stocktake ON stocktake_items (tenant_id, stocktake_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_stocktake_items_tenant_ingredient "
-        "ON stocktake_items (tenant_id, ingredient_id)"
+        "CREATE INDEX IF NOT EXISTS idx_stocktake_items_tenant_ingredient ON stocktake_items (tenant_id, ingredient_id)"
     )
     _apply_safe_rls("stocktake_items")
 
@@ -189,12 +169,10 @@ def upgrade() -> None:
         "ON warehouse_transfers (tenant_id, from_store_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_warehouse_transfers_tenant_to "
-        "ON warehouse_transfers (tenant_id, to_store_id)"
+        "CREATE INDEX IF NOT EXISTS idx_warehouse_transfers_tenant_to ON warehouse_transfers (tenant_id, to_store_id)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_warehouse_transfers_tenant_status "
-        "ON warehouse_transfers (tenant_id, status)"
+        "CREATE INDEX IF NOT EXISTS idx_warehouse_transfers_tenant_status ON warehouse_transfers (tenant_id, status)"
     )
     _apply_safe_rls("warehouse_transfers")
 
@@ -221,8 +199,7 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_wt_items_tenant_transfer "
-        "ON warehouse_transfer_items (tenant_id, transfer_id)"
+        "CREATE INDEX IF NOT EXISTS idx_wt_items_tenant_transfer ON warehouse_transfer_items (tenant_id, transfer_id)"
     )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_wt_items_tenant_ingredient "
@@ -264,12 +241,10 @@ def upgrade() -> None:
         )
     """)
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_supplier_profiles_tenant_status "
-        "ON supplier_profiles (tenant_id, status)"
+        "CREATE INDEX IF NOT EXISTS idx_supplier_profiles_tenant_status ON supplier_profiles (tenant_id, status)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_supplier_profiles_tenant_source "
-        "ON supplier_profiles (tenant_id, source)"
+        "CREATE INDEX IF NOT EXISTS idx_supplier_profiles_tenant_source ON supplier_profiles (tenant_id, source)"
     )
     # 同一租户内，第三方系统来源 + 外部 ID 唯一
     op.execute(

@@ -9,16 +9,17 @@
 奥琦玮金额单位为分（fen），映射时转换为元（float）。
 奥琦玮采购单状态：0=待确认, 1=已确认, 2=已入库
 """
+
 from __future__ import annotations
 
+import os as _os
+
+# 引用 base 类型（根据项目实际路径）
+import sys
 import uuid
 from typing import Any, Dict, List
 
 import structlog
-
-# 引用 base 类型（根据项目实际路径）
-import sys
-import os as _os
 
 _src_dir = _os.path.dirname(__file__)
 _adapters_root = _os.path.abspath(_os.path.join(_src_dir, "../../.."))
@@ -26,15 +27,15 @@ _base_types_path = _os.path.join(_adapters_root, "base", "src", "types")
 if _base_types_path not in sys.path:
     sys.path.insert(0, _base_types_path)
 
-from supplier import UnifiedSupplier, UnifiedPurchaseOrder  # noqa: E402
+from supplier import UnifiedPurchaseOrder, UnifiedSupplier  # noqa: E402
 
 logger = structlog.get_logger(__name__)
 
 # 奥琦玮采购入库单状态 → 屯象标准状态
 _PURCHASE_STATUS_MAP: Dict[int, str] = {
-    0: "ordered",    # 待确认
-    1: "received",   # 已确认（到货）
-    2: "stocked",    # 已入库
+    0: "ordered",  # 待确认
+    1: "received",  # 已确认（到货）
+    2: "stocked",  # 已入库
 }
 
 
@@ -189,15 +190,17 @@ def aoqiwei_purchase_order_to_unified(
         except (ValueError, TypeError):
             unit_price_yuan = 0.0
 
-        items.append({
-            "item_no": idx,
-            "good_code": good_code,
-            "good_name": good_name,
-            "quantity": qty,
-            "unit": unit,
-            "unit_price": unit_price_yuan,
-            "subtotal": round(qty * unit_price_yuan, 4),
-        })
+        items.append(
+            {
+                "item_no": idx,
+                "good_code": good_code,
+                "good_name": good_name,
+                "quantity": qty,
+                "unit": unit,
+                "unit_price": unit_price_yuan,
+                "subtotal": round(qty * unit_price_yuan, 4),
+            }
+        )
 
     result: UnifiedPurchaseOrder = {
         "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"aoqiwei:{tenant_id}:{order_no}")),
@@ -211,7 +214,7 @@ def aoqiwei_purchase_order_to_unified(
         "items": items,
         "remark": raw.get("remark") or "",
         # 扩展字段
-        "tenant_id": tenant_id,          # type: ignore[typeddict-unknown-key]
+        "tenant_id": tenant_id,  # type: ignore[typeddict-unknown-key]
         "depot_code": raw.get("depotCode") or "",  # type: ignore[typeddict-unknown-key]
     }
 
@@ -269,16 +272,18 @@ def aoqiwei_dispatch_to_receiving(
             qty = 0.0
         unit: str = str(good.get("unit") or "")
 
-        items.append({
-            # receiving_service 约定字段
-            "ingredient_id": good_code,
-            "name": good_name,
-            "ordered_qty": qty,
-            "received_qty": qty,   # 配送出库即视为实收（门店可在UI修改）
-            "quality": "pass",
-            "unit": unit,
-            "notes": "",
-        })
+        items.append(
+            {
+                # receiving_service 约定字段
+                "ingredient_id": good_code,
+                "name": good_name,
+                "ordered_qty": qty,
+                "received_qty": qty,  # 配送出库即视为实收（门店可在UI修改）
+                "quality": "pass",
+                "unit": unit,
+                "notes": "",
+            }
+        )
 
     result = {
         "external_dispatch_no": dispatch_no,

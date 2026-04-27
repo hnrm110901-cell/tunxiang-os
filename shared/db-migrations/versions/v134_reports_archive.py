@@ -9,9 +9,10 @@ Revision ID: v134
 Revises: v133
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v134"
 down_revision = "v133"
@@ -28,32 +29,22 @@ def upgrade() -> None:
     if "daily_business_reports" not in _existing:
         op.create_table(
             "daily_business_reports",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("report_date", sa.Date, nullable=False),
-            sa.Column("order_count", sa.Integer, nullable=False,
-                      server_default="0"),
-            sa.Column("revenue_fen", sa.BigInteger, nullable=False,
-                      server_default="0"),
-            sa.Column("cost_fen", sa.BigInteger, nullable=False,
-                      server_default="0"),
-            sa.Column("gross_profit_fen", sa.BigInteger, nullable=False,
-                      server_default="0"),
+            sa.Column("order_count", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("revenue_fen", sa.BigInteger, nullable=False, server_default="0"),
+            sa.Column("cost_fen", sa.BigInteger, nullable=False, server_default="0"),
+            sa.Column("gross_profit_fen", sa.BigInteger, nullable=False, server_default="0"),
             sa.Column("gross_margin", sa.Numeric(5, 4)),
-            sa.Column("avg_ticket_fen", sa.Integer, nullable=False,
-                      server_default="0"),
-            sa.Column("table_turnover", sa.Numeric(5, 2), nullable=False,
-                      server_default="0"),
-            sa.Column("new_members", sa.Integer, nullable=False,
-                      server_default="0"),
+            sa.Column("avg_ticket_fen", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("table_turnover", sa.Numeric(5, 2), nullable=False, server_default="0"),
+            sa.Column("new_members", sa.Integer, nullable=False, server_default="0"),
             sa.Column("payment_breakdown", JSONB),
             sa.Column("channel_breakdown", JSONB),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         )
     # 唯一约束：同一租户+门店+日期只能有一条
     op.execute("""
@@ -81,9 +72,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE daily_business_reports ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE daily_business_reports ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY daily_business_reports_tenant_isolation
         ON daily_business_reports
@@ -96,19 +85,15 @@ def upgrade() -> None:
     if "archived_orders" not in _existing:
         op.create_table(
             "archived_orders",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("original_order_id", UUID(as_uuid=True), nullable=False),
             sa.Column("order_data", JSONB, nullable=False),
             sa.Column("order_date", sa.Date, nullable=False),
-            sa.Column("total_fen", sa.BigInteger, nullable=False,
-                      server_default="0"),
-            sa.Column("archived_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("archive_reason", sa.String(20), nullable=False,
-                      server_default="auto"),
+            sa.Column("total_fen", sa.BigInteger, nullable=False, server_default="0"),
+            sa.Column("archived_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("archive_reason", sa.String(20), nullable=False, server_default="auto"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -135,9 +120,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE archived_orders ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE archived_orders ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY archived_orders_tenant_isolation
         ON archived_orders
@@ -150,20 +133,14 @@ def upgrade() -> None:
     if "search_hot_keywords" not in _existing:
         op.create_table(
             "search_hot_keywords",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("keyword", sa.String(50), nullable=False),
-            sa.Column("search_count", sa.Integer, nullable=False,
-                      server_default="0"),
-            sa.Column("is_promoted", sa.Boolean, nullable=False,
-                      server_default="false"),
-            sa.Column("display_order", sa.Integer, nullable=False,
-                      server_default="0"),
-            sa.Column("is_active", sa.Boolean, nullable=False,
-                      server_default="true"),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
+            sa.Column("search_count", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("is_promoted", sa.Boolean, nullable=False, server_default="false"),
+            sa.Column("display_order", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         )
     # 同一租户下关键词唯一
     op.execute("""
@@ -183,9 +160,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE search_hot_keywords ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE search_hot_keywords ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY search_hot_keywords_tenant_isolation
         ON search_hot_keywords

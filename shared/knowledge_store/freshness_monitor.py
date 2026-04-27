@@ -5,6 +5,7 @@
 - 触发 agent.knowledge.stale_alert 事件
 - 通知管理员审核更新
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,11 +33,10 @@ class FreshnessMonitor:
         try:
             from sqlalchemy import text as sql_text
 
-            await db.execute(sql_text(
-                "SELECT set_config('app.tenant_id', :tid, true)"
-            ), {"tid": tenant_id})
+            await db.execute(sql_text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
-            result = await db.execute(sql_text("""
+            result = await db.execute(
+                sql_text("""
                 SELECT
                     id::text,
                     title,
@@ -49,7 +49,9 @@ class FreshnessMonitor:
                 AND is_deleted = false
                 AND COALESCE(published_at, created_at) < NOW() - MAKE_INTERVAL(days => :days)
                 ORDER BY stale_days DESC
-            """), {"tid": tenant_id, "days": threshold_days})
+            """),
+                {"tid": tenant_id, "days": threshold_days},
+            )
 
             rows = result.fetchall()
             stale_docs = [
@@ -94,17 +96,19 @@ class FreshnessMonitor:
             from shared.events.src.emitter import emit_event
             from shared.events.src.event_types import KnowledgeEventType
 
-            asyncio.create_task(emit_event(
-                event_type=KnowledgeEventType.STALE_ALERT,
-                tenant_id=tenant_id,
-                stream_id=f"knowledge:stale:{tenant_id}",
-                payload={
-                    "stale_count": len(stale_docs),
-                    "documents": stale_docs[:10],  # 最多包含10条
-                    "threshold_days": _STALE_THRESHOLD_DAYS,
-                },
-                source_service="knowledge-monitor",
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=KnowledgeEventType.STALE_ALERT,
+                    tenant_id=tenant_id,
+                    stream_id=f"knowledge:stale:{tenant_id}",
+                    payload={
+                        "stale_count": len(stale_docs),
+                        "documents": stale_docs[:10],  # 最多包含10条
+                        "threshold_days": _STALE_THRESHOLD_DAYS,
+                    },
+                    source_service="knowledge-monitor",
+                )
+            )
 
             logger.info(
                 "knowledge_stale_alert_sent",

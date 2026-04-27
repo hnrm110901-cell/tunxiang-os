@@ -10,9 +10,10 @@ Revision ID: v130
 Revises: v129
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v130"
 down_revision = "v129"
@@ -29,8 +30,7 @@ def upgrade() -> None:
     if "order_reviews" not in _existing:
         op.create_table(
             "order_reviews",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("order_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=True),
@@ -108,8 +108,7 @@ def upgrade() -> None:
     if "review_media" not in _existing:
         op.create_table(
             "review_media",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("review_id", UUID(as_uuid=True), nullable=False),
             sa.Column("media_type", sa.String(20), nullable=False),
@@ -145,8 +144,7 @@ def upgrade() -> None:
     if "member_tier_configs" not in _existing:
         op.create_table(
             "member_tier_configs",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("level", sa.SmallInteger, nullable=False),
             sa.Column("name", sa.String(50), nullable=False),
@@ -183,8 +181,7 @@ def upgrade() -> None:
     if "tier_upgrade_logs" not in _existing:
         op.create_table(
             "tier_upgrade_logs",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("customer_id", UUID(as_uuid=True), nullable=False),
             sa.Column("from_tier_id", UUID(as_uuid=True), nullable=True),

@@ -10,16 +10,15 @@ Revision ID: v158
 Revises: v157
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision: str = "v158"
-down_revision: Union[str, None] = "v157"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v158"
+down_revision = "v157"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
@@ -28,22 +27,13 @@ def _apply_rls(table_name: str) -> None:
     """标准三段式 RLS：ENABLE → FORCE → 四条策略"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -92,13 +82,9 @@ def upgrade() -> None:
             ),
         )
 
+    op.execute("CREATE INDEX IF NOT EXISTS ix_pfc_tenant_store ON peak_forecast_configs (tenant_id, store_id)")
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_pfc_tenant_store "
-        "ON peak_forecast_configs (tenant_id, store_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_pfc_tenant_store_date "
-        "ON peak_forecast_configs (tenant_id, store_id, date)"
+        "CREATE INDEX IF NOT EXISTS ix_pfc_tenant_store_date ON peak_forecast_configs (tenant_id, store_id, date)"
     )
     _apply_rls("peak_forecast_configs")
 
@@ -144,14 +130,8 @@ def upgrade() -> None:
             sa.CheckConstraint("hour BETWEEN 0 AND 23", name="ck_par_hour_range"),
         )
 
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_par_tenant_store "
-        "ON peak_actual_records (tenant_id, store_id)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_par_tenant_store_date "
-        "ON peak_actual_records (tenant_id, store_id, date)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_par_tenant_store ON peak_actual_records (tenant_id, store_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_par_tenant_store_date ON peak_actual_records (tenant_id, store_id, date)")
     op.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS uix_par_store_date_hour "
         "ON peak_actual_records (tenant_id, store_id, date, hour)"

@@ -2,6 +2,7 @@
 品智员工同步模块
 拉取品智员工数据并以 UPSERT 模式写入屯象 employees 表
 """
+
 from __future__ import annotations
 
 import uuid
@@ -57,10 +58,12 @@ class PinzhiEmployeeSync:
 
         # 员工ID生成：基于品智员工ID + 租户ID 确保跨商户唯一
         pinzhi_emp_id = str(pinzhi_emp.get("userId", pinzhi_emp.get("employeeId", "")))
-        deterministic_id = str(uuid.uuid5(
-            uuid.NAMESPACE_DNS,
-            f"pinzhi:emp:{tenant_id}:{pinzhi_emp_id}",
-        ))
+        deterministic_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"pinzhi:emp:{tenant_id}:{pinzhi_emp_id}",
+            )
+        )
 
         # 角色映射
         role_code = str(pinzhi_emp.get("roleCode", pinzhi_emp.get("role", "staff")) or "staff")

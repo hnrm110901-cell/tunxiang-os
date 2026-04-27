@@ -10,9 +10,8 @@ Revision ID: v140
 Revises: v139
 Create Date: 2026-04-04
 """
+
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v140"
 down_revision = "v139"
@@ -112,7 +111,6 @@ def upgrade() -> None:
                 tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
             )
     """)
-
 
     # ── role_configs: 新增 permissions_json 列（web-admin 权限 key 数组） ────
     op.execute("""

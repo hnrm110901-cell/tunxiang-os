@@ -8,6 +8,7 @@
 5. API 异常时：降级为分数排序
 6. 分数阈值过滤在降级模式下生效
 """
+
 import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -22,8 +23,8 @@ sys.path.insert(0, _ROOT_DIR)
 
 from shared.knowledge_store.reranker import RerankerService, _fallback_rerank
 
-
 # ── 工具 ────────────────────────────────────────────────────────
+
 
 def _make_doc(doc_id: str, text: str, score: float) -> dict:
     """生成模拟文档"""
@@ -39,6 +40,7 @@ def _make_doc(doc_id: str, text: str, score: float) -> dict:
 
 # ── 空文档 ──────────────────────────────────────────────────────
 
+
 class TestEmptyDocuments:
     """空文档列表应返回空列表"""
 
@@ -50,6 +52,7 @@ class TestEmptyDocuments:
 
 
 # ── 文档数少于 top_k ────────────────────────────────────────────
+
 
 class TestFewerThanTopK:
     """文档数 <= top_k 时原样返回"""
@@ -82,6 +85,7 @@ class TestFewerThanTopK:
 
 
 # ── API 精排成功 ────────────────────────────────────────────────
+
 
 class TestAPIRerank:
     """有 VOYAGE_API_KEY 时通过 API 精排"""
@@ -138,9 +142,7 @@ class TestAPIRerank:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"index": 0, "relevance_score": 0.9}]
-        }
+        mock_response.json.return_value = {"data": [{"index": 0, "relevance_score": 0.9}]}
 
         with (
             patch("shared.knowledge_store.reranker._VOYAGE_API_KEY", "test-key"),
@@ -163,6 +165,7 @@ class TestAPIRerank:
 
 
 # ── 无 API Key 降级 ─────────────────────────────────────────────
+
 
 class TestNoAPIKeyFallback:
     """无 VOYAGE_API_KEY 时降级为分数排序"""
@@ -205,6 +208,7 @@ class TestNoAPIKeyFallback:
 
 
 # ── API 异常降级 ────────────────────────────────────────────────
+
 
 class TestAPIErrorFallback:
     """API 异常时降级为分数排序"""
@@ -287,6 +291,7 @@ class TestAPIErrorFallback:
 
 
 # ── 分数阈值过滤（降级模式） ────────────────────────────────────
+
 
 class TestFallbackScoreThreshold:
     """降级模式下分数阈值过滤"""

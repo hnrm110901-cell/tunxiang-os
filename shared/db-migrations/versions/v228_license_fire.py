@@ -1,8 +1,9 @@
 """证照 + 消防 — store_licenses + employee_health_certs + fire_equipment + fire_inspection_logs
 Revision: v228
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v228"
@@ -28,11 +29,9 @@ def upgrade() -> None:
             END$$;
         """)
 
-
-
     # --- store_licenses 门店证照库 ---
 
-    if 'store_licenses' not in existing:
+    if "store_licenses" not in existing:
         op.create_table(
             "store_licenses",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -60,7 +59,7 @@ def upgrade() -> None:
 
         # --- employee_health_certs 员工健康证 ---
 
-    if 'employee_health_certs' not in existing:
+    if "employee_health_certs" not in existing:
         op.create_table(
             "employee_health_certs",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -87,7 +86,7 @@ def upgrade() -> None:
 
         # --- fire_equipment 消防设备台账 ---
 
-    if 'fire_equipment' not in existing:
+    if "fire_equipment" not in existing:
         op.create_table(
             "fire_equipment",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -114,7 +113,7 @@ def upgrade() -> None:
 
         # --- fire_inspection_logs 消防巡检记录 ---
 
-    if 'fire_inspection_logs' not in existing:
+    if "fire_inspection_logs" not in existing:
         op.create_table(
             "fire_inspection_logs",
             sa.Column("id", postgresql.UUID(), server_default=sa.text("gen_random_uuid()"), primary_key=True),
@@ -133,7 +132,6 @@ def upgrade() -> None:
         )
         op.create_index("ix_fil_tenant_store", "fire_inspection_logs", ["tenant_id", "store_id"])
         _add_rls("fire_inspection_logs", "fil")
-
 
 
 def downgrade() -> None:

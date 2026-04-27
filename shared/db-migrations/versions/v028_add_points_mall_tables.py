@@ -37,9 +37,10 @@ Revision ID: v028
 Revises: v027
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v028"
 down_revision = "v027"
@@ -63,50 +64,53 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(),
-                  onupdate=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
-
         # 基本信息
         sa.Column("name", sa.String(100), nullable=False, comment="商品名称"),
         sa.Column("description", sa.Text(), nullable=True, comment="商品描述"),
         sa.Column("image_url", sa.String(500), nullable=True, comment="商品图片URL"),
-
         # 商品类型
-        sa.Column("product_type", sa.String(20), nullable=False,
-                  comment="physical=实物 | coupon=优惠券 | dish=菜品兑换 | stored_value=储值金"),
-
+        sa.Column(
+            "product_type",
+            sa.String(20),
+            nullable=False,
+            comment="physical=实物 | coupon=优惠券 | dish=菜品兑换 | stored_value=储值金",
+        ),
         # 积分定价
         sa.Column("points_required", sa.Integer(), nullable=False, comment="所需积分（正整数）"),
-
         # 库存：-1 = 不限
-        sa.Column("stock", sa.Integer(), nullable=False, server_default="-1",
-                  comment="-1=不限库存；>=0=有限库存"),
-        sa.Column("stock_sold", sa.Integer(), nullable=False, server_default="0",
-                  comment="累计已兑换数量"),
-
+        sa.Column("stock", sa.Integer(), nullable=False, server_default="-1", comment="-1=不限库存；>=0=有限库存"),
+        sa.Column("stock_sold", sa.Integer(), nullable=False, server_default="0", comment="累计已兑换数量"),
         # 商品内容（JSONB）
-        sa.Column("product_content", JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb"),
-                  comment="商品内容详情，结构因 product_type 不同"),
-
+        sa.Column(
+            "product_content",
+            JSONB(),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+            comment="商品内容详情，结构因 product_type 不同",
+        ),
         # 兑换限制
-        sa.Column("limit_per_customer", sa.Integer(), nullable=False, server_default="0",
-                  comment="每人最多兑换次数（0=不限）"),
-        sa.Column("limit_per_period", sa.Integer(), nullable=False, server_default="0",
-                  comment="每周期最多兑换次数（0=不限）"),
-        sa.Column("limit_period_days", sa.Integer(), nullable=False, server_default="30",
-                  comment="限购统计周期（天数）"),
-
+        sa.Column(
+            "limit_per_customer", sa.Integer(), nullable=False, server_default="0", comment="每人最多兑换次数（0=不限）"
+        ),
+        sa.Column(
+            "limit_per_period", sa.Integer(), nullable=False, server_default="0", comment="每周期最多兑换次数（0=不限）"
+        ),
+        sa.Column(
+            "limit_period_days", sa.Integer(), nullable=False, server_default="30", comment="限购统计周期（天数）"
+        ),
         # 展示与状态
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true",
-                  comment="是否上架"),
-        sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0",
-                  comment="排序权重，ASC 越小越靠前"),
-        sa.Column("valid_from", sa.DateTime(timezone=True), nullable=True,
-                  comment="上架生效时间（NULL=立即生效）"),
-        sa.Column("valid_until", sa.DateTime(timezone=True), nullable=True,
-                  comment="下架时间（NULL=永久有效）"),
-
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true", comment="是否上架"),
+        sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0", comment="排序权重，ASC 越小越靠前"),
+        sa.Column("valid_from", sa.DateTime(timezone=True), nullable=True, comment="上架生效时间（NULL=立即生效）"),
+        sa.Column("valid_until", sa.DateTime(timezone=True), nullable=True, comment="下架时间（NULL=永久有效）"),
         comment="积分商城商品主档",
     )
 
@@ -134,49 +138,48 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(),
-                  onupdate=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default="false"),
-
         # 订单标识
-        sa.Column("order_no", sa.String(40), nullable=False, unique=True,
-                  comment="订单号 PM-{YYYYMMDD}-{6位大写随机}"),
-
+        sa.Column("order_no", sa.String(40), nullable=False, unique=True, comment="订单号 PM-{YYYYMMDD}-{6位大写随机}"),
         # 关联
-        sa.Column("customer_id", UUID(as_uuid=True), nullable=False,
-                  comment="兑换顾客 ID"),
-        sa.Column("product_id", UUID(as_uuid=True),
-                  sa.ForeignKey("points_mall_products.id", ondelete="RESTRICT"),
-                  nullable=False, comment="兑换商品 ID"),
-        sa.Column("store_id", UUID(as_uuid=True), nullable=True,
-                  comment="兑换门店（实物需填）"),
-
+        sa.Column("customer_id", UUID(as_uuid=True), nullable=False, comment="兑换顾客 ID"),
+        sa.Column(
+            "product_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("points_mall_products.id", ondelete="RESTRICT"),
+            nullable=False,
+            comment="兑换商品 ID",
+        ),
+        sa.Column("store_id", UUID(as_uuid=True), nullable=True, comment="兑换门店（实物需填）"),
         # 兑换信息
         sa.Column("points_deducted", sa.Integer(), nullable=False, comment="扣除积分"),
-        sa.Column("quantity", sa.Integer(), nullable=False, server_default="1",
-                  comment="兑换数量"),
-
+        sa.Column("quantity", sa.Integer(), nullable=False, server_default="1", comment="兑换数量"),
         # 状态
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending | fulfilled | cancelled | expired"),
-
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending | fulfilled | cancelled | expired",
+        ),
         # 配送信息（实物商品）
         sa.Column("delivery_address", sa.String(500), nullable=True, comment="配送地址"),
         sa.Column("delivery_name", sa.String(50), nullable=True, comment="收件人姓名"),
         sa.Column("delivery_phone", sa.String(20), nullable=True, comment="收件人电话"),
         sa.Column("tracking_no", sa.String(100), nullable=True, comment="快递单号"),
-
         # 关联业务
-        sa.Column("coupon_id", UUID(as_uuid=True), nullable=True,
-                  comment="兑换所发放的优惠券 ID"),
-
+        sa.Column("coupon_id", UUID(as_uuid=True), nullable=True, comment="兑换所发放的优惠券 ID"),
         # 操作时间戳
-        sa.Column("fulfilled_at", sa.DateTime(timezone=True), nullable=True,
-                  comment="核销/发放完成时间"),
-        sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True,
-                  comment="取消时间"),
+        sa.Column("fulfilled_at", sa.DateTime(timezone=True), nullable=True, comment="核销/发放完成时间"),
+        sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True, comment="取消时间"),
         sa.Column("cancel_reason", sa.String(200), nullable=True, comment="取消原因"),
-
         comment="积分商城兑换订单",
     )
 

@@ -7,16 +7,15 @@ Revision ID: v013
 Revises: v012
 Create Date: 2026-03-28
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
-revision: str = "v013"
-down_revision: Union[str, None] = "v012"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v013"
+down_revision = "v012"
+branch_labels = None
+depends_on = None
 
 NEW_TABLES = ["banquet_proposals", "banquet_quotations", "banquet_feedbacks", "banquet_cases"]
 

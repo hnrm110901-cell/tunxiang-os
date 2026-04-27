@@ -41,7 +41,9 @@ def upgrade() -> None:
             is_deleted      BOOLEAN     NOT NULL DEFAULT FALSE
         )
     """)
-    op.execute("CREATE INDEX IF NOT EXISTS idx_shift_records_tenant_store ON shift_records (tenant_id, store_id, shift_date DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shift_records_tenant_store ON shift_records (tenant_id, store_id, shift_date DESC)"
+    )
     op.execute("CREATE INDEX IF NOT EXISTS idx_shift_records_tenant_date ON shift_records (tenant_id, shift_date DESC)")
     op.execute("ALTER TABLE shift_records ENABLE ROW LEVEL SECURITY")
     op.execute("""

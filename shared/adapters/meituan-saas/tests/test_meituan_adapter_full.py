@@ -9,6 +9,7 @@
 - 更新了 sys.path 设置以适配新项目目录结构
 - 适配器类名和方法签名保持一致，无需修改
 """
+
 import os
 import sys
 
@@ -26,18 +27,17 @@ _adapter_src = os.path.abspath(os.path.join(_here, "../src"))
 if _adapter_src not in sys.path:
     sys.path.insert(0, _adapter_src)
 
-import pytest
-import httpx
-from decimal import Decimal
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+import pytest
 from adapter import MeituanSaasAdapter
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def adapter():
@@ -72,6 +72,7 @@ def _mock_response(json_data, status_code=200):
 # Webhook 签名验证
 # ---------------------------------------------------------------------------
 
+
 class TestWebhookSignatureVerification:
     """Webhook接收签名验证测试"""
 
@@ -95,12 +96,14 @@ class TestWebhookSignatureVerification:
         params = {"order_id": "MT001"}
         sign1 = adapter._generate_sign(params)
 
-        adapter2 = MeituanSaasAdapter({
-            "base_url": "https://waimaiopen.meituan.com",
-            "app_key": "test_app_key",
-            "app_secret": "different_secret",
-            "poi_id": "12345678",
-        })
+        adapter2 = MeituanSaasAdapter(
+            {
+                "base_url": "https://waimaiopen.meituan.com",
+                "app_key": "test_app_key",
+                "app_secret": "different_secret",
+                "poi_id": "12345678",
+            }
+        )
         sign2 = adapter2._generate_sign(params)
         assert sign1 != sign2
 
@@ -118,6 +121,7 @@ class TestWebhookSignatureVerification:
 # 等位/预订数据处理（reservation.py）
 # ---------------------------------------------------------------------------
 
+
 class TestReservationMixin:
     """等位/预订数据处理测试（MeituanReservationMixin）"""
 
@@ -129,12 +133,14 @@ class TestReservationMixin:
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
 
-        mixed = TestableAdapter({
-            "base_url": "https://waimaiopen.meituan.com",
-            "app_key": "test_key",
-            "app_secret": "test_secret",
-            "poi_id": "P001",
-        })
+        mixed = TestableAdapter(
+            {
+                "base_url": "https://waimaiopen.meituan.com",
+                "app_key": "test_key",
+                "app_secret": "test_secret",
+                "poi_id": "P001",
+            }
+        )
 
         mock_data = {
             "code": "ok",
@@ -163,12 +169,14 @@ class TestReservationMixin:
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
 
-        mixed = TestableAdapter({
-            "base_url": "https://waimaiopen.meituan.com",
-            "app_key": "test_key",
-            "app_secret": "test_secret",
-            "poi_id": "P001",
-        })
+        mixed = TestableAdapter(
+            {
+                "base_url": "https://waimaiopen.meituan.com",
+                "app_key": "test_key",
+                "app_secret": "test_secret",
+                "poi_id": "P001",
+            }
+        )
 
         mock_data = {"code": "ok", "data": {"reservation_id": "RSV001", "status": "confirmed"}}
         mixed.client.post = AsyncMock(return_value=_mock_response(mock_data))
@@ -185,12 +193,14 @@ class TestReservationMixin:
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
 
-        mixed = TestableAdapter({
-            "base_url": "https://waimaiopen.meituan.com",
-            "app_key": "test_key",
-            "app_secret": "test_secret",
-            "poi_id": "P001",
-        })
+        mixed = TestableAdapter(
+            {
+                "base_url": "https://waimaiopen.meituan.com",
+                "app_key": "test_key",
+                "app_secret": "test_secret",
+                "poi_id": "P001",
+            }
+        )
 
         mock_data = {"code": "ok", "data": {"reservation_id": "RSV001", "status": "cancelled"}}
         mixed.client.post = AsyncMock(return_value=_mock_response(mock_data))
@@ -210,6 +220,7 @@ class TestReservationMixin:
 # ---------------------------------------------------------------------------
 # 订单管理（核心路径）
 # ---------------------------------------------------------------------------
+
 
 class TestOrderManagement:
     """订单管理接口测试"""
@@ -272,6 +283,7 @@ class TestOrderManagement:
 # 商品管理
 # ---------------------------------------------------------------------------
 
+
 class TestFoodManagement:
     """商品管理接口测试"""
 
@@ -318,6 +330,7 @@ class TestFoodManagement:
 # 错误处理
 # ---------------------------------------------------------------------------
 
+
 class TestMeituanErrorHandling:
     """错误处理测试"""
 
@@ -342,9 +355,7 @@ class TestMeituanErrorHandling:
     @pytest.mark.asyncio
     async def test_network_timeout(self, adapter):
         """网络超时"""
-        adapter.client.get = AsyncMock(
-            side_effect=httpx.ConnectTimeout("连接超时")
-        )
+        adapter.client.get = AsyncMock(side_effect=httpx.ConnectTimeout("连接超时"))
 
         with pytest.raises(Exception):
             await adapter.query_order(order_id="MT001")
@@ -376,46 +387,56 @@ class TestMeituanErrorHandling:
 # 初始化校验
 # ---------------------------------------------------------------------------
 
+
 class TestMeituanAdapterInit:
     """适配器初始化测试"""
 
     def test_init_missing_app_key(self):
         """缺少app_key时抛出ValueError"""
         with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
-            MeituanSaasAdapter({
-                "base_url": "https://waimaiopen.meituan.com",
-                "app_secret": "secret",
-            })
+            MeituanSaasAdapter(
+                {
+                    "base_url": "https://waimaiopen.meituan.com",
+                    "app_secret": "secret",
+                }
+            )
 
     def test_init_missing_app_secret(self):
         """缺少app_secret时抛出ValueError"""
         with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
-            MeituanSaasAdapter({
-                "base_url": "https://waimaiopen.meituan.com",
-                "app_key": "key",
-            })
+            MeituanSaasAdapter(
+                {
+                    "base_url": "https://waimaiopen.meituan.com",
+                    "app_key": "key",
+                }
+            )
 
     def test_init_default_base_url(self):
         """未指定base_url时使用默认美团地址"""
-        adapter = MeituanSaasAdapter({
-            "app_key": "k",
-            "app_secret": "s",
-        })
+        adapter = MeituanSaasAdapter(
+            {
+                "app_key": "k",
+                "app_secret": "s",
+            }
+        )
         assert adapter.base_url == "https://waimaiopen.meituan.com"
 
     def test_init_custom_poi_id(self):
         """自定义门店ID"""
-        adapter = MeituanSaasAdapter({
-            "app_key": "k",
-            "app_secret": "s",
-            "poi_id": "CUSTOM_POI",
-        })
+        adapter = MeituanSaasAdapter(
+            {
+                "app_key": "k",
+                "app_secret": "s",
+                "poi_id": "CUSTOM_POI",
+            }
+        )
         assert adapter.poi_id == "CUSTOM_POI"
 
 
 # ---------------------------------------------------------------------------
 # to_order 补充测试
 # ---------------------------------------------------------------------------
+
 
 class TestToOrderEdgeCases:
     """to_order 边界场景"""
@@ -452,6 +473,7 @@ class TestToOrderEdgeCases:
     def test_order_status_refund_maps_cancelled(self, adapter):
         """美团status=8（退款）映射为CANCELLED"""
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw = {
             "order_id": "MT_REFUND",
             "day_seq": "003",
@@ -467,6 +489,7 @@ class TestToOrderEdgeCases:
 # ---------------------------------------------------------------------------
 # 异步资源管理
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncResourceManagement:
     """异步资源管理测试"""

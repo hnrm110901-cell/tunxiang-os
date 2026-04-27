@@ -25,11 +25,9 @@ DEVICE_CATEGORIES = {
 # ─── 硬件设备注册表 ───
 
 DEVICE_REGISTRY: dict[str, dict] = {
-
     # ════════════════════════════════════════════
     # 热敏打印机（小票 / 厨打）
     # ════════════════════════════════════════════
-
     # --- 北洋(SNBC) ---
     "beiyang_98np": {
         "brand": "北洋(SNBC)",
@@ -79,7 +77,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "connection_config": {"port": 9100, "type": "tcp"},
         "notes": "高端收银机型，打印速度250mm/s",
     },
-
     # --- 佳博(Gainscha/Gprinter) ---
     "gainscha_c80180ii": {
         "brand": "佳博(Gprinter)",
@@ -145,7 +142,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "connection_config": {"port": 9100, "type": "tcp"},
         "notes": "佳博旗舰收银打印机",
     },
-
     # --- 爱普生(Epson) ---
     "epson_t88vi": {
         "brand": "爱普生(Epson)",
@@ -195,7 +191,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "connection_config": {"port": 9100, "type": "tcp"},
         "notes": "针式厨打经典款，声音大提醒效果好，耐油污，适合重油厨房",
     },
-
     # --- 芯烨(XPrinter) ---
     "xprinter_n160ii": {
         "brand": "芯烨(XPrinter)",
@@ -229,7 +224,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "connection_config": {"port": 9100, "type": "tcp"},
         "notes": "支持WiFi连接，中端机型",
     },
-
     # --- 容大(Rongda/RONGTA) ---
     "rongta_rp80": {
         "brand": "容大(RONGTA)",
@@ -247,7 +241,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "connection_config": {"port": 9100, "type": "tcp"},
         "notes": "国产高性价比，外卖平台常见配套机型",
     },
-
     # --- 商米内置打印机 ---
     "sunmi_builtin_printer": {
         "brand": "商米(SUNMI)",
@@ -265,11 +258,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "connection_config": {"type": "sunmi_bridge"},
         "notes": "商米T2/T2s/V2等机型内置打印机，通过JS Bridge调用",
     },
-
     # ════════════════════════════════════════════
     # POS收银机
     # ════════════════════════════════════════════
-
     # --- 商米(SUNMI) ---
     "sunmi_t2": {
         "brand": "商米(SUNMI)",
@@ -338,7 +329,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "轻量门店收银",
         "notes": "经济型单屏POS，适合小型门店",
     },
-
     # --- 客如云(Keruyun) ---
     "keruyun_smart_pos": {
         "brand": "客如云(Keruyun)",
@@ -374,7 +364,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "小型门店/奶茶店",
         "notes": "紧凑型收银机，适合台面空间有限的门店",
     },
-
     # --- 美团收银 ---
     "meituan_d1": {
         "brand": "美团",
@@ -393,7 +382,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "美团生态门店收银",
         "notes": "美团自有品牌收银机，深度整合美团外卖/团购",
     },
-
     # --- 中科英泰(INTECH) ---
     "intech_p10": {
         "brand": "中科英泰(INTECH)",
@@ -411,11 +399,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "Windows收银(传统软件兼容)",
         "notes": "Windows POS机，兼容传统餐饮软件（思迅/科脉等）",
     },
-
     # ════════════════════════════════════════════
     # KDS 厨显屏
     # ════════════════════════════════════════════
-
     # --- 商米(SUNMI) ---
     "sunmi_d2s_kds": {
         "brand": "商米(SUNMI)",
@@ -449,7 +435,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "大型后厨KDS",
         "notes": "商米专业KDS大屏，21.5寸大屏清晰显示",
     },
-
     # --- 客如云(Keruyun) ---
     "keruyun_kds": {
         "brand": "客如云(Keruyun)",
@@ -467,7 +452,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "后厨出餐显示",
         "notes": "客如云自有KDS硬件，与客如云POS深度联动",
     },
-
     # --- 通用安卓平板方案 ---
     "generic_android_kds": {
         "brand": "通用安卓平板",
@@ -485,11 +469,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "后厨出餐显示(通用方案)",
         "notes": "华为/联想等品牌商用平板，安装Chrome运行Web KDS",
     },
-
     # ════════════════════════════════════════════
     # 电子秤
     # ════════════════════════════════════════════
-
     # --- 顶尖(Digi) ---
     "digi_sm5300": {
         "brand": "顶尖(DIGI)",
@@ -525,7 +507,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "自助称重/标签打印",
         "notes": "触摸屏操作，可直接打印标签",
     },
-
     # --- 大华(Dahua) ---
     "dahua_tm30": {
         "brand": "大华(Dahua)",
@@ -561,7 +542,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "小份称重",
         "notes": "紧凑型，适合吧台称重",
     },
-
     # --- 凯士(CAS) ---
     "cas_sw_ii": {
         "brand": "凯士(CAS)",
@@ -580,7 +560,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "称重菜收银",
         "notes": "韩国品牌，全球出货量领先，耐用稳定",
     },
-
     # --- 梅特勒-托利多(Mettler Toledo) ---
     "mettler_bba231": {
         "brand": "梅特勒-托利多(Mettler Toledo)",
@@ -599,11 +578,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "高精度称重",
         "notes": "瑞士品牌，高端连锁和中央厨房使用",
     },
-
     # ════════════════════════════════════════════
     # 扫码设备（扫码枪 / 扫码盒）
     # ════════════════════════════════════════════
-
     # --- 新大陆(Newland) ---
     "newland_fr80": {
         "brand": "新大陆(Newland)",
@@ -644,7 +621,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "高频收银扫码",
         "notes": "高速扫码盒，大窗口，适合高峰期",
     },
-
     # --- 霍尼韦尔(Honeywell) ---
     "honeywell_yj_hf600": {
         "brand": "霍尼韦尔(Honeywell)",
@@ -672,7 +648,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "手持扫码",
         "notes": "工业级扫码枪，耐摔耐用",
     },
-
     # --- 斑马(Zebra) ---
     "zebra_ds9308": {
         "brand": "斑马(Zebra)",
@@ -687,7 +662,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "收银台扫码",
         "notes": "原Motorola Symbol产品线，餐饮连锁装机量大",
     },
-
     # --- 商米内置扫码 ---
     "sunmi_builtin_scanner": {
         "brand": "商米(SUNMI)",
@@ -702,11 +676,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "商米POS内置扫码",
         "notes": "商米V2 Pro等手持设备内置扫码头",
     },
-
     # ════════════════════════════════════════════
     # 钱箱
     # ════════════════════════════════════════════
-
     "cash_drawer_405": {
         "brand": "通用",
         "model": "405型三档钱箱",
@@ -746,11 +718,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "商米POS配套钱箱",
         "notes": "商米POS专用钱箱，USB直连，通过SDK控制",
     },
-
     # ════════════════════════════════════════════
     # 排队叫号机
     # ════════════════════════════════════════════
-
     "meiou_qms": {
         "brand": "美欧(MEIOU)",
         "model": "QMS-200",
@@ -790,11 +760,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "门店排队取号",
         "notes": "基于商米D系列平板+排队APP实现",
     },
-
     # ════════════════════════════════════════════
     # 自助点餐机 / 自助结账机
     # ════════════════════════════════════════════
-
     "sunmi_kiosk_k2": {
         "brand": "商米(SUNMI)",
         "model": "K2 自助点餐机",
@@ -840,11 +808,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "快餐连锁自助点餐",
         "notes": "美团自有品牌自助机，与美团生态深度整合",
     },
-
     # ════════════════════════════════════════════
     # 标签打印机
     # ════════════════════════════════════════════
-
     # --- 斑马(Zebra) ---
     "zebra_gk888t": {
         "brand": "斑马(Zebra)",
@@ -872,7 +838,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "中央厨房大批量标签",
         "notes": "工业级标签打印机，适合中央厨房高产量标签打印",
     },
-
     # --- 得力(Deli) ---
     "deli_dl_888b": {
         "brand": "得力(Deli)",
@@ -887,7 +852,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "菜品标签/价签",
         "notes": "国产高性价比标签打印机，门店菜品标签常用",
     },
-
     # --- 精臣(Niimbot) ---
     "niimbot_d11": {
         "brand": "精臣(Niimbot)",
@@ -902,7 +866,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "便携标签/食材标签",
         "notes": "便携式蓝牙标签机，适合厨房食材日期标签",
     },
-
     # --- 佳博(Gprinter) ---
     "gainscha_gp1324d": {
         "brand": "佳博(Gprinter)",
@@ -917,11 +880,9 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "菜品标签/外卖标签",
         "notes": "热敏标签打印机，免碳带，适合门店标签打印",
     },
-
     # ════════════════════════════════════════════
     # 网络设备
     # ════════════════════════════════════════════
-
     # --- 路由器 ---
     "huawei_ar161": {
         "brand": "华为(Huawei)",
@@ -947,7 +908,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "门店主路由(多WAN)",
         "notes": "多WAN口路由器，支持双线接入，连锁餐饮常用",
     },
-
     # --- 交换机 ---
     "h3c_s1208": {
         "brand": "新华三(H3C)",
@@ -973,7 +933,6 @@ DEVICE_REGISTRY: dict[str, dict] = {
         "recommended_scene": "大型门店汇聚交换机",
         "notes": "24口千兆交换机，大型门店多设备接入",
     },
-
     # --- 无线AP ---
     "huawei_ap4050dn": {
         "brand": "华为(Huawei)",
@@ -1016,6 +975,7 @@ DEVICE_REGISTRY: dict[str, dict] = {
 
 # ─── 便捷查询函数 ───
 
+
 def get_devices_by_category(category: str) -> dict[str, dict]:
     """按品类筛选设备。
 
@@ -1025,10 +985,7 @@ def get_devices_by_category(category: str) -> dict[str, dict]:
     Returns:
         该品类下的所有设备字典
     """
-    return {
-        key: dev for key, dev in DEVICE_REGISTRY.items()
-        if dev.get("category") == category
-    }
+    return {key: dev for key, dev in DEVICE_REGISTRY.items() if dev.get("category") == category}
 
 
 def get_device(device_key: str) -> dict:
@@ -1045,10 +1002,7 @@ def get_device(device_key: str) -> dict:
     """
     device = DEVICE_REGISTRY.get(device_key)
     if device is None:
-        raise ValueError(
-            f"设备不存在: {device_key}，"
-            f"可用设备: {', '.join(DEVICE_REGISTRY.keys())}"
-        )
+        raise ValueError(f"设备不存在: {device_key}，可用设备: {', '.join(DEVICE_REGISTRY.keys())}")
     return device
 
 

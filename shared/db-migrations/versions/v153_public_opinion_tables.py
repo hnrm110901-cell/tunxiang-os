@@ -11,16 +11,15 @@ Revision ID: v153
 Revises: v152
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, NUMERIC, UUID
 
-revision: str = "v153"
-down_revision: Union[str, None] = "v152"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v153"
+down_revision = "v152"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -33,7 +32,9 @@ def upgrade() -> None:
         op.create_table(
             "public_opinion_mentions",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -51,16 +52,23 @@ def upgrade() -> None:
             sa.Column("author_name", sa.String(100), nullable=True),
             sa.Column("published_at", sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column(
-                "captured_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "captured_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
             sa.Column(
-                "is_resolved", sa.Boolean, nullable=False, server_default="false",
+                "is_resolved",
+                sa.Boolean,
+                nullable=False,
+                server_default="false",
             ),
             sa.Column("resolution_note", sa.Text, nullable=True),
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
         )
     op.execute("""
@@ -116,7 +124,9 @@ def upgrade() -> None:
         op.create_table(
             "mv_public_opinion",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -126,16 +136,28 @@ def upgrade() -> None:
             # 平台：dianping/meituan/weibo/wechat
             sa.Column("platform", sa.String(50), nullable=False),
             sa.Column(
-                "total_mentions", sa.Integer, nullable=False, server_default="0",
+                "total_mentions",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
             ),
             sa.Column(
-                "positive_count", sa.Integer, nullable=False, server_default="0",
+                "positive_count",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
             ),
             sa.Column(
-                "neutral_count", sa.Integer, nullable=False, server_default="0",
+                "neutral_count",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
             ),
             sa.Column(
-                "negative_count", sa.Integer, nullable=False, server_default="0",
+                "negative_count",
+                sa.Integer,
+                nullable=False,
+                server_default="0",
             ),
             # 平均评分 0.00 ~ 5.00
             sa.Column("avg_rating", NUMERIC(3, 2), nullable=True),
@@ -143,12 +165,16 @@ def upgrade() -> None:
             sa.Column("avg_sentiment_score", NUMERIC(3, 2), nullable=True),
             # 高频投诉关键词列表：[{"keyword": "xxx", "count": N}, ...]
             sa.Column(
-                "top_complaint_keywords", JSONB, nullable=False,
+                "top_complaint_keywords",
+                JSONB,
+                nullable=False,
                 server_default=sa.text("'[]'::jsonb"),
             ),
             sa.Column(
-                "updated_at", sa.TIMESTAMP(timezone=True),
-                nullable=False, server_default=sa.text("now()"),
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=False,
+                server_default=sa.text("now()"),
             ),
         )
     op.execute("""
@@ -193,12 +219,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS mv_public_opinion_tenant_isolation ON mv_public_opinion;"
-    )
+    op.execute("DROP POLICY IF EXISTS mv_public_opinion_tenant_isolation ON mv_public_opinion;")
     op.drop_table("mv_public_opinion")
-    op.execute(
-        "DROP POLICY IF EXISTS public_opinion_mentions_tenant_isolation "
-        "ON public_opinion_mentions;"
-    )
+    op.execute("DROP POLICY IF EXISTS public_opinion_mentions_tenant_isolation ON public_opinion_mentions;")
     op.drop_table("public_opinion_mentions")

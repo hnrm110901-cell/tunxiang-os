@@ -8,6 +8,7 @@ Revision ID: v271_sop_tasks
 Revises: v270_sop_templates
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v271_sop_tasks"

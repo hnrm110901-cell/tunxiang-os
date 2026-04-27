@@ -14,16 +14,15 @@ Revision ID: v004
 Revises: v003
 Create Date: 2026-03-27
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON, ARRAY
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
-revision: str = "v004"
-down_revision: Union[str, None] = "v003"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v004"
+down_revision = "v003"
+branch_labels = None
+depends_on = None
 
 NEW_TABLES = [
     "reservations",
@@ -81,8 +80,13 @@ def upgrade() -> None:
         sa.Column("deposit_required", sa.Boolean, server_default="false"),
         sa.Column("deposit_amount_fen", sa.BigInteger, server_default="0"),
         sa.Column("deposit_paid", sa.Boolean, server_default="false"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/confirmed/arrived/queuing/seated/completed/cancelled/no_show"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/confirmed/arrived/queuing/seated/completed/cancelled/no_show",
+        ),
         sa.Column("queue_id", UUID(as_uuid=True), nullable=True),
         sa.Column("order_id", UUID(as_uuid=True), nullable=True),
         sa.Column("confirmed_by", sa.String(64), nullable=True),
@@ -116,12 +120,22 @@ def upgrade() -> None:
         sa.Column("customer_name", sa.String(128), nullable=False),
         sa.Column("phone", sa.String(20), nullable=False),
         sa.Column("party_size", sa.Integer, nullable=False),
-        sa.Column("source", sa.String(32), nullable=False, server_default="walk_in",
-                  comment="walk_in/meituan/reservation/wechat"),
+        sa.Column(
+            "source",
+            sa.String(32),
+            nullable=False,
+            server_default="walk_in",
+            comment="walk_in/meituan/reservation/wechat",
+        ),
         sa.Column("vip_priority", sa.Boolean, server_default="false"),
         sa.Column("reservation_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("status", sa.String(20), nullable=False, server_default="waiting",
-                  comment="waiting/called/arrived/seated/skipped/cancelled"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="waiting",
+            comment="waiting/called/arrived/seated/skipped/cancelled",
+        ),
         sa.Column("priority_ts", sa.DateTime(timezone=True), nullable=False, comment="排序用优先级时间戳"),
         sa.Column("table_no", sa.String(32), nullable=True),
         sa.Column("skip_reason", sa.String(64), nullable=True),
@@ -151,7 +165,9 @@ def upgrade() -> None:
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
         sa.Column("store_id", sa.String(64), nullable=False),
         sa.Column("hall_name", sa.String(64), nullable=False),
-        sa.Column("hall_type", sa.String(32), nullable=False, comment="small_hall/medium_hall/large_hall/vip_room/outdoor"),
+        sa.Column(
+            "hall_type", sa.String(32), nullable=False, comment="small_hall/medium_hall/large_hall/vip_room/outdoor"
+        ),
         sa.Column("capacity_min", sa.Integer, nullable=False),
         sa.Column("capacity_max", sa.Integer, nullable=False),
         sa.Column("table_capacity", sa.Integer, nullable=False, comment="最大桌数"),
@@ -184,9 +200,14 @@ def upgrade() -> None:
         sa.Column("event_date", sa.Date, nullable=False),
         sa.Column("special_requirements", sa.Text, nullable=True),
         sa.Column("referral_source", sa.String(32), server_default="walk_in"),
-        sa.Column("stage", sa.String(32), nullable=False, server_default="lead",
-                  comment="lead/consultation/proposal/quotation/contract/deposit_paid/menu_confirmed/"
-                          "preparation/rehearsal/execution/settlement/feedback/archived/cancelled"),
+        sa.Column(
+            "stage",
+            sa.String(32),
+            nullable=False,
+            server_default="lead",
+            comment="lead/consultation/proposal/quotation/contract/deposit_paid/menu_confirmed/"
+            "preparation/rehearsal/execution/settlement/feedback/archived/cancelled",
+        ),
         sa.Column("assigned_sales", sa.String(64), nullable=True),
         sa.Column("proposal_id", UUID(as_uuid=True), nullable=True),
         sa.Column("quotation_id", UUID(as_uuid=True), nullable=True),
@@ -258,8 +279,7 @@ def upgrade() -> None:
         sa.Column("menu_confirmed", sa.Boolean, server_default="false"),
         sa.Column("hall_locked", sa.Boolean, server_default="false"),
         sa.Column("settlement", JSON, nullable=True, comment="结算明细"),
-        sa.Column("status", sa.String(20), nullable=False, server_default="active",
-                  comment="active/settled/cancelled"),
+        sa.Column("status", sa.String(20), nullable=False, server_default="active", comment="active/settled/cancelled"),
         sa.Column("stage", sa.String(32), nullable=False, server_default="contract"),
         sa.Column("execution_started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("feedback_id", UUID(as_uuid=True), nullable=True),
@@ -311,8 +331,13 @@ def upgrade() -> None:
         sa.Column("due_date", sa.Date, nullable=False),
         sa.Column("task", sa.Text, nullable=False),
         sa.Column("responsible", sa.String(64), nullable=False),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending",
-                  comment="pending/in_progress/completed/skipped"),
+        sa.Column(
+            "status",
+            sa.String(20),
+            nullable=False,
+            server_default="pending",
+            comment="pending/in_progress/completed/skipped",
+        ),
         sa.Column("required", sa.Boolean, nullable=False, server_default="true"),
         sa.Column("notes", sa.Text, nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),

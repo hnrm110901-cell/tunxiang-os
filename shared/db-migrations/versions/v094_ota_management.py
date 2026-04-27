@@ -16,7 +16,6 @@ Create Date: 2026-04-01
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "v094"
 down_revision = "v093"
@@ -93,14 +92,8 @@ def upgrade() -> None:
             checked_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ota_check_logs_device "
-        "ON ota_check_logs(device_id, checked_at DESC)"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ota_check_logs_tenant "
-        "ON ota_check_logs(tenant_id, checked_at DESC)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_ota_check_logs_device ON ota_check_logs(device_id, checked_at DESC)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_ota_check_logs_tenant ON ota_check_logs(tenant_id, checked_at DESC)")
     op.execute("ALTER TABLE ota_check_logs ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE ota_check_logs FORCE ROW LEVEL SECURITY")
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):

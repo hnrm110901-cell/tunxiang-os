@@ -3,6 +3,7 @@
 封装发票申请、查询、红冲等核心操作。
 所有密钥从环境变量读取，禁止硬编码。
 """
+
 import os
 from dataclasses import dataclass, field
 from typing import Any

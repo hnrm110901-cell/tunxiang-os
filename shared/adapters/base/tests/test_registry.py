@@ -8,26 +8,29 @@ POS 适配器注册表（registry.py）单元测试
 - 模块路径无效 → ImportError（含清晰错误信息）
 - list_registered_pos_types / list_implemented_pos_types 辅助函数
 """
+
 import sys
 import types
+
 import pytest
 
 # sys.path is set up in conftest.py
 from registry import (
-    get_transformer,
-    list_registered_pos_types,
-    list_implemented_pos_types,
-    AdapterNotImplementedError,
     POS_REGISTRY,
+    AdapterNotImplementedError,
+    get_transformer,
+    list_implemented_pos_types,
+    list_registered_pos_types,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _FakeAdapter:
     """最简适配器 stub，满足 get_transformer 实例化要求"""
+
     def __init__(self, config: dict):
         self.config = config
 
@@ -43,6 +46,7 @@ def _inject_fake_adapter(monkeypatch, pos_type: str, module_path: str, class_nam
 # ---------------------------------------------------------------------------
 # 1. 未知 pos_type → ValueError
 # ---------------------------------------------------------------------------
+
 
 class TestUnknownPosType:
     def test_raises_value_error(self):
@@ -60,6 +64,7 @@ class TestUnknownPosType:
 # ---------------------------------------------------------------------------
 # 2. 注册表中值为 None → AdapterNotImplementedError
 # ---------------------------------------------------------------------------
+
 
 class TestNotImplementedAdapter:
     def test_raises_adapter_not_implemented(self, monkeypatch):
@@ -83,6 +88,7 @@ class TestNotImplementedAdapter:
 # 3. 有效的 pos_type（使用注入的 fake adapter）→ 实例化成功
 # ---------------------------------------------------------------------------
 
+
 class TestSuccessfulInstantiation:
     def test_returns_adapter_instance(self, monkeypatch):
         _inject_fake_adapter(monkeypatch, "fake_pos", "fake_module", "FakeAdapter")
@@ -101,16 +107,14 @@ class TestSuccessfulInstantiation:
 
     def test_extra_config_passed_through(self, monkeypatch):
         _inject_fake_adapter(monkeypatch, "fake_pos4", "fake_module4", "FakeAdapter4")
-        adapter = get_transformer(
-            "fake_pos4", store_id="S", brand_id="B", config={"token": "abc"}
-        )
+        adapter = get_transformer("fake_pos4", store_id="S", brand_id="B", config={"token": "abc"})
         assert adapter.config["token"] == "abc"
 
     def test_module_hyphen_replaced_with_underscore(self, monkeypatch):
         """注册路径中的 '-' 应被替换为 '_' 以满足 Python 模块命名规范"""
         fake_module_name = "packages.api_adapters.hyphen_test.src.adapter"
         fake_module = types.ModuleType(fake_module_name)
-        setattr(fake_module, "HyphenAdapter", _FakeAdapter)
+        fake_module.HyphenAdapter = _FakeAdapter
         monkeypatch.setitem(sys.modules, fake_module_name, fake_module)
         # 注册路径含 '-'
         monkeypatch.setitem(
@@ -125,6 +129,7 @@ class TestSuccessfulInstantiation:
 # ---------------------------------------------------------------------------
 # 4. 无效模块路径 → ImportError
 # ---------------------------------------------------------------------------
+
 
 class TestInvalidModulePath:
     def test_raises_import_error(self, monkeypatch):
@@ -150,6 +155,7 @@ class TestInvalidModulePath:
 # ---------------------------------------------------------------------------
 # 5. 辅助函数
 # ---------------------------------------------------------------------------
+
 
 class TestHelpers:
     def test_list_registered_includes_all_keys(self):

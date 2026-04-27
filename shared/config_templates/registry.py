@@ -1,6 +1,7 @@
 """
 业态模板注册表 — 通过 RestaurantType 枚举获取对应模板实例。
 """
+
 from .base import BaseTemplate, RestaurantType
 from .templates import (
     BanquetTemplate,

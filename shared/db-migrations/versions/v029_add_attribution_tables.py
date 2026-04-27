@@ -27,8 +27,9 @@ Revision ID: v029
 Revises: v026
 Create Date: 2026-03-30
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v029"
@@ -53,7 +54,6 @@ def upgrade() -> None:
     # ----------------------------------------------------------------
     op.create_table(
         "marketing_touches",
-
         # 基础字段（TenantBase）
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -75,7 +75,6 @@ def upgrade() -> None:
             nullable=False,
             server_default="false",
         ),
-
         # 客户关联
         sa.Column(
             "customer_id",
@@ -83,7 +82,6 @@ def upgrade() -> None:
             nullable=False,
             comment="客户 UUID",
         ),
-
         # 来源信息
         sa.Column(
             "touch_type",
@@ -110,7 +108,6 @@ def upgrade() -> None:
             nullable=False,
             comment="触达渠道：wecom | sms | miniapp | pos_receipt",
         ),
-
         # 内容信息
         sa.Column(
             "message_title",
@@ -124,7 +121,6 @@ def upgrade() -> None:
             nullable=True,
             comment="附带的优惠券/活动ID",
         ),
-
         # 转化追踪
         sa.Column(
             "is_converted",
@@ -151,7 +147,6 @@ def upgrade() -> None:
             nullable=True,
             comment="转化（下单）时间",
         ),
-
         # 触达时间
         sa.Column(
             "touched_at",
@@ -159,7 +154,6 @@ def upgrade() -> None:
             nullable=False,
             comment="触达发生时间",
         ),
-
         comment="营销触达记录表 — 每次推送/触达记一条，支持归因回写",
     )
 
@@ -200,7 +194,6 @@ def upgrade() -> None:
     # ----------------------------------------------------------------
     op.create_table(
         "attribution_summaries",
-
         # 基础字段（TenantBase）
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -222,7 +215,6 @@ def upgrade() -> None:
             nullable=False,
             server_default="false",
         ),
-
         # 来源维度
         sa.Column(
             "source_type",
@@ -243,7 +235,6 @@ def upgrade() -> None:
             server_default="",
             comment="来源名称（冗余）",
         ),
-
         # 日期维度
         sa.Column(
             "stat_date",
@@ -251,7 +242,6 @@ def upgrade() -> None:
             nullable=False,
             comment="统计日期（UTC）",
         ),
-
         # 触达指标
         sa.Column(
             "total_touches",
@@ -267,7 +257,6 @@ def upgrade() -> None:
             server_default="0",
             comment="触达去重客户数",
         ),
-
         # 转化指标
         sa.Column(
             "converted_customers",
@@ -283,7 +272,6 @@ def upgrade() -> None:
             server_default="0.0",
             comment="转化率 = converted_customers / unique_customers",
         ),
-
         # 收益与成本
         sa.Column(
             "attributed_revenue_fen",
@@ -306,7 +294,6 @@ def upgrade() -> None:
             server_default="0.0",
             comment="ROI = (revenue - cost) / cost",
         ),
-
         # 归因模型
         sa.Column(
             "model",
@@ -315,7 +302,6 @@ def upgrade() -> None:
             server_default="last_touch",
             comment="last_touch | first_touch | linear",
         ),
-
         comment="归因汇总表 — 按活动维度每日 ROI 指标快照",
     )
 

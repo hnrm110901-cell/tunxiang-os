@@ -31,14 +31,11 @@
   delivery_trips          — 配送趟次
   delivery_items          — 配送清单行项
 """
-from typing import Union
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
-revision: str = "v031"
-down_revision: Union[str, None] = "v030"
+revision = "v031"
+down_revision = "v030"
 branch_labels = None
 depends_on = None
 
@@ -426,14 +423,26 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     tables = [
-        "delivery_items", "delivery_trips", "production_tasks", "production_plans",
-        "royalty_bills", "franchisee_stores", "franchisees",
-        "approval_records", "approval_instances", "approval_flow_definitions",
+        "delivery_items",
+        "delivery_trips",
+        "production_tasks",
+        "production_plans",
+        "royalty_bills",
+        "franchisee_stores",
+        "franchisees",
+        "approval_records",
+        "approval_instances",
+        "approval_flow_definitions",
         "payroll_records",
-        "menu_dispatch_records", "menu_versions",
-        "lifecycle_configs", "lifecycle_events",
-        "stored_value_transactions", "stored_value_accounts",
-        "invoices", "financial_vouchers", "cost_snapshots",
+        "menu_dispatch_records",
+        "menu_versions",
+        "lifecycle_configs",
+        "lifecycle_events",
+        "stored_value_transactions",
+        "stored_value_accounts",
+        "invoices",
+        "financial_vouchers",
+        "cost_snapshots",
     ]
     for t in tables:
         op.execute(f"DROP TABLE IF EXISTS {t} CASCADE;")

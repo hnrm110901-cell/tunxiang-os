@@ -1,6 +1,7 @@
 """
 品智适配器单元测试
 """
+
 import os
 import sys
 
@@ -10,9 +11,9 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
 from decimal import Decimal
-from datetime import datetime
+
+import pytest
 from src.adapter import PinzhiAdapter
 from src.signature import generate_sign, verify_sign
 
@@ -208,9 +209,7 @@ class TestPinzhiAdapter:
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="requires live PinZhi server at 192.168.1.100:8080")
     async def test_query_orders(self, adapter):
-        result = await adapter.query_orders(
-            ognid="12345", begin_date="2024-01-01", end_date="2024-01-31"
-        )
+        result = await adapter.query_orders(ognid="12345", begin_date="2024-01-01", end_date="2024-01-31")
 
         assert isinstance(result, list)
         if len(result) > 0:
@@ -230,9 +229,7 @@ class TestPinzhiAdapter:
     @pytest.mark.skip(reason="requires live PinZhi server at 192.168.1.100:8080")
     async def test_query_order_summary(self, adapter):
         """测试查询收入数据"""
-        result = await adapter.query_order_summary(
-            ognid="12345", business_date="2024-01-01"
-        )
+        result = await adapter.query_order_summary(ognid="12345", business_date="2024-01-01")
 
         assert isinstance(result, dict)
         assert "ognId" in result
@@ -355,13 +352,14 @@ if __name__ == "__main__":
 # ARCH-001: to_order() / to_staff_action() 标准数据总线接口测试
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def raw_pinzhi_order():
     """品智原始订单数据（queryOrderListV2.do 返回格式）"""
     return {
         "billId": "uuid-pz-001",
         "billNo": "B202401010001",
-        "orderSource": 1,        # 1=堂食
+        "orderSource": 1,  # 1=堂食
         "tableNo": "0001",
         "openOrderUser": "服务员001",
         "cashiers": "收银员001",
@@ -369,11 +367,11 @@ def raw_pinzhi_order():
         "payTime": "2024-01-01 13:00:00",
         "payDate": "2024-01-01",
         "vipCard": "M20240001",
-        "dishPriceTotal": 20000,     # 分
-        "teaPrice": 400,             # 分
-        "specialOfferPrice": 2000,   # 分
-        "realPrice": 18400,          # 分
-        "billStatus": 1,             # 已结账
+        "dishPriceTotal": 20000,  # 分
+        "teaPrice": 400,  # 分
+        "specialOfferPrice": 2000,  # 分
+        "realPrice": 18400,  # 分
+        "billStatus": 1,  # 已结账
         "dishList": [
             {"dishId": "D001", "dishName": "红烧肉", "dishNum": 1, "dishPrice": 8800},
             {"dishId": "D002", "dishName": "蒸鸡蛋", "dishNum": 2, "dishPrice": 2400},
@@ -436,6 +434,7 @@ class TestPinzhiToOrderMapsCorrectly:
 
     def test_status_completed(self, adapter, raw_pinzhi_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
         assert order.order_status == OrderStatus.COMPLETED
 
@@ -457,4 +456,3 @@ class TestPinzhiToStaffActionMapsCorrectly:
         action = adapter.to_staff_action(raw_pinzhi_staff_action, store_id="STORE_P1", brand_id="BRAND_P")
         assert action.brand_id == "BRAND_P"
         assert action.store_id == "STORE_P1"
-

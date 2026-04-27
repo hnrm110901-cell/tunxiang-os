@@ -5,6 +5,7 @@
     - EncryptedString: 模拟 SQLAlchemy 存取流程
     - masking: 各种格式的脱敏函数
 """
+
 from __future__ import annotations
 
 import base64
@@ -14,6 +15,7 @@ from unittest.mock import patch
 import pytest
 from cryptography.exceptions import InvalidTag
 
+from shared.security.src.encrypted_type import EncryptedString
 from shared.security.src.field_encryption import (
     PREFIX,
     FieldEncryptor,
@@ -21,7 +23,6 @@ from shared.security.src.field_encryption import (
     is_encrypted,
     reset_encryptor,
 )
-from shared.security.src.encrypted_type import EncryptedString
 from shared.security.src.masking import (
     mask_bank_card,
     mask_email,
@@ -106,7 +107,7 @@ class TestFieldEncryptorTamperDetection:
         """修改密文后解密失败 (InvalidTag)。"""
         encrypted = self.enc.encrypt("sensitive data")
         # 提取 base64 部分，修改一个字节
-        payload = encrypted[len(PREFIX):]
+        payload = encrypted[len(PREFIX) :]
         raw = bytearray(base64.b64decode(payload))
         # 翻转密文区域的一个比特（跳过 IV 前12字节）
         raw[15] ^= 0xFF

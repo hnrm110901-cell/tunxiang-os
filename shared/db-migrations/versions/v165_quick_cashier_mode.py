@@ -11,16 +11,15 @@ Revision ID: v165
 Revises: v164
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v165"
-down_revision: Union[str, None] = "v164"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v165"
+down_revision = "v164"
+branch_labels = None
+depends_on = None
 
 _SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 # call_number_sequences 不含 tenant_id，用 store_id 隔离（无 RLS，通过应用层控制）
@@ -30,22 +29,13 @@ def _apply_rls(table_name: str) -> None:
     """标准三段式 RLS：ENABLE → FORCE → 四条策略"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_select ON {table_name} "
-        f"FOR SELECT USING ({_SAFE_CONDITION})"
-    )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_insert ON {table_name} "
-        f"FOR INSERT WITH CHECK ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_select ON {table_name} FOR SELECT USING ({_SAFE_CONDITION})")
+    op.execute(f"CREATE POLICY {table_name}_rls_insert ON {table_name} FOR INSERT WITH CHECK ({_SAFE_CONDITION})")
     op.execute(
         f"CREATE POLICY {table_name}_rls_update ON {table_name} "
         f"FOR UPDATE USING ({_SAFE_CONDITION}) WITH CHECK ({_SAFE_CONDITION})"
     )
-    op.execute(
-        f"CREATE POLICY {table_name}_rls_delete ON {table_name} "
-        f"FOR DELETE USING ({_SAFE_CONDITION})"
-    )
+    op.execute(f"CREATE POLICY {table_name}_rls_delete ON {table_name} FOR DELETE USING ({_SAFE_CONDITION})")
 
 
 def upgrade() -> None:
@@ -202,22 +192,14 @@ def upgrade() -> None:
             ),
         )
 
+    op.execute("CREATE INDEX IF NOT EXISTS ix_quick_orders_tenant_store ON quick_orders (tenant_id, store_id)")
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_quick_orders_tenant_store "
-        "ON quick_orders (tenant_id, store_id)"
+        "CREATE INDEX IF NOT EXISTS ix_quick_orders_tenant_store_status ON quick_orders (tenant_id, store_id, status)"
     )
     op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_quick_orders_tenant_store_status "
-        "ON quick_orders (tenant_id, store_id, status)"
+        "CREATE INDEX IF NOT EXISTS ix_quick_orders_order_id ON quick_orders (order_id) WHERE order_id IS NOT NULL"
     )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_quick_orders_order_id "
-        "ON quick_orders (order_id) WHERE order_id IS NOT NULL"
-    )
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_quick_orders_created_at "
-        "ON quick_orders (store_id, created_at DESC)"
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_quick_orders_created_at ON quick_orders (store_id, created_at DESC)")
     _apply_rls("quick_orders")
 
     # ── call_number_sequences 取餐号流水 ──────────────────────────────────

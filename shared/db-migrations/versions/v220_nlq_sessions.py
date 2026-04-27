@@ -5,8 +5,9 @@ Tables:
   - nlq_sessions   NLQ会话主表（会话ID/租户/用户/创建时间）
   - nlq_messages   NLQ消息明细（会话ID/角色/内容/意图/SQL/结果/操作）
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "v220"
@@ -19,10 +20,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ── NLQ 会话主表 ──
 
-    if 'nlq_sessions' not in existing:
+    if "nlq_sessions" not in existing:
         op.create_table(
             "nlq_sessions",
             sa.Column("id", sa.VARCHAR(64), primary_key=True, comment="会话ID (UUID字符串)"),
@@ -52,9 +52,7 @@ def upgrade() -> None:
         )
 
         # ── RLS: nlq_sessions ──
-        op.execute(
-            "ALTER TABLE nlq_sessions ENABLE ROW LEVEL SECURITY;"
-        )
+        op.execute("ALTER TABLE nlq_sessions ENABLE ROW LEVEL SECURITY;")
         op.execute(
             "CREATE POLICY nlq_sessions_tenant_isolation ON nlq_sessions"
             " USING (tenant_id = current_setting('app.tenant_id')::UUID);"
@@ -62,7 +60,7 @@ def upgrade() -> None:
 
         # ── NLQ 消息明细表 ──
 
-    if 'nlq_messages' not in existing:
+    if "nlq_messages" not in existing:
         op.create_table(
             "nlq_messages",
             sa.Column(
@@ -99,7 +97,9 @@ def upgrade() -> None:
                 server_default="[]",
                 comment="建议操作列表",
             ),
-            sa.Column("source", sa.VARCHAR(50), server_default="", comment="数据来源: sql_template/agent_call/mv/claude"),
+            sa.Column(
+                "source", sa.VARCHAR(50), server_default="", comment="数据来源: sql_template/agent_call/mv/claude"
+            ),
             sa.Column("chart_type", sa.VARCHAR(30), server_default="", comment="建议图表类型"),
             sa.Column(
                 "latency_ms",
@@ -132,9 +132,7 @@ def upgrade() -> None:
         )
 
         # ── RLS: nlq_messages ──
-        op.execute(
-            "ALTER TABLE nlq_messages ENABLE ROW LEVEL SECURITY;"
-        )
+        op.execute("ALTER TABLE nlq_messages ENABLE ROW LEVEL SECURITY;")
         op.execute(
             "CREATE POLICY nlq_messages_tenant_isolation ON nlq_messages"
             " USING (tenant_id = current_setting('app.tenant_id')::UUID);"

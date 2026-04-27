@@ -10,9 +10,10 @@ Revision ID: v135
 Revises: v134
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v135"
 down_revision = "v134"
@@ -29,30 +30,23 @@ def upgrade() -> None:
     if "franchise_contracts" not in _existing:
         op.create_table(
             "franchise_contracts",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("contract_no", sa.String(50), nullable=False, unique=True),
             sa.Column("franchisee_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True)),
-            sa.Column("contract_type", sa.String(20), nullable=False,
-                      server_default="franchise"),
-            sa.Column("amount_fen", sa.BigInteger, nullable=False,
-                      server_default="0"),
+            sa.Column("contract_type", sa.String(20), nullable=False, server_default="franchise"),
+            sa.Column("amount_fen", sa.BigInteger, nullable=False, server_default="0"),
             sa.Column("start_date", sa.Date),
             sa.Column("end_date", sa.Date),
             sa.Column("terms", JSONB),
-            sa.Column("status", sa.String(20), nullable=False,
-                      server_default="draft"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="draft"),
             sa.Column("signed_at", sa.DateTime(timezone=True)),
             sa.Column("terminated_at", sa.DateTime(timezone=True)),
             sa.Column("notes", sa.Text),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("is_deleted", sa.Boolean, nullable=False,
-                      server_default="false"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -95,9 +89,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE franchise_contracts ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE franchise_contracts ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY franchise_contracts_tenant_isolation
         ON franchise_contracts
@@ -109,30 +101,23 @@ def upgrade() -> None:
     # ── training_courses 培训课程 ────────────────────────────────
     if "training_courses" not in _existing:
         op.create_table(
-        "training_courses",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                  server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("name", sa.String(100), nullable=False),
-        sa.Column("category", sa.String(30), nullable=False),
-        sa.Column("description", sa.Text),
-        sa.Column("instructor", sa.String(50)),
-        sa.Column("duration_minutes", sa.Integer),
-        sa.Column("target_roles", JSONB),
-        sa.Column("chapters", JSONB),
-        sa.Column("is_required", sa.Boolean, nullable=False,
-                  server_default="false"),
-        sa.Column("pass_score", sa.Integer, nullable=False,
-                  server_default="60"),
-        sa.Column("status", sa.String(20), nullable=False,
-                  server_default="draft"),
-        sa.Column("created_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True),
-                  server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False,
-                  server_default="false"),
-    )
+            "training_courses",
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("name", sa.String(100), nullable=False),
+            sa.Column("category", sa.String(30), nullable=False),
+            sa.Column("description", sa.Text),
+            sa.Column("instructor", sa.String(50)),
+            sa.Column("duration_minutes", sa.Integer),
+            sa.Column("target_roles", JSONB),
+            sa.Column("chapters", JSONB),
+            sa.Column("is_required", sa.Boolean, nullable=False, server_default="false"),
+            sa.Column("pass_score", sa.Integer, nullable=False, server_default="60"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="draft"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 
@@ -158,9 +143,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE training_courses ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE training_courses ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY training_courses_tenant_isolation
         ON training_courses
@@ -173,26 +156,19 @@ def upgrade() -> None:
     if "training_records" not in _existing:
         op.create_table(
             "training_records",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("employee_id", UUID(as_uuid=True), nullable=False),
             sa.Column("course_id", UUID(as_uuid=True), nullable=False),
-            sa.Column("progress_pct", sa.Integer, nullable=False,
-                      server_default="0"),
-            sa.Column("current_chapter", sa.Integer, nullable=False,
-                      server_default="0"),
-            sa.Column("status", sa.String(20), nullable=False,
-                      server_default="not_started"),
+            sa.Column("progress_pct", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("current_chapter", sa.Integer, nullable=False, server_default="0"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="not_started"),
             sa.Column("started_at", sa.DateTime(timezone=True)),
             sa.Column("completed_at", sa.DateTime(timezone=True)),
             sa.Column("exam_score", sa.Integer),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.ForeignKeyConstraint(["course_id"], ["training_courses.id"],
-                                    name="fk_training_records_course"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.ForeignKeyConstraint(["course_id"], ["training_courses.id"], name="fk_training_records_course"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -227,9 +203,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE training_records ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE training_records ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY training_records_tenant_isolation
         ON training_records
@@ -242,8 +216,7 @@ def upgrade() -> None:
     if "employee_certificates" not in _existing:
         op.create_table(
             "employee_certificates",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("employee_id", UUID(as_uuid=True), nullable=False),
             sa.Column("cert_name", sa.String(100), nullable=False),
@@ -252,15 +225,11 @@ def upgrade() -> None:
             sa.Column("expiry_date", sa.Date),
             sa.Column("issuer", sa.String(100)),
             sa.Column("cert_number", sa.String(50)),
-            sa.Column("status", sa.String(20), nullable=False,
-                      server_default="valid"),
+            sa.Column("status", sa.String(20), nullable=False, server_default="valid"),
             sa.Column("attachment_url", sa.Text),
-            sa.Column("created_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.DateTime(timezone=True),
-                      server_default=sa.text("now()")),
-            sa.Column("is_deleted", sa.Boolean, nullable=False,
-                      server_default="false"),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
         )
     op.execute("""
         DO $$ BEGIN
@@ -295,9 +264,7 @@ def upgrade() -> None:
         END $$;
     """)
     # RLS
-    op.execute(
-        "ALTER TABLE employee_certificates ENABLE ROW LEVEL SECURITY"
-    )
+    op.execute("ALTER TABLE employee_certificates ENABLE ROW LEVEL SECURITY")
     op.execute("""
         CREATE POLICY employee_certificates_tenant_isolation
         ON employee_certificates

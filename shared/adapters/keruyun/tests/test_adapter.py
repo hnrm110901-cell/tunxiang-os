@@ -1,6 +1,7 @@
 """
 客如云适配器单元测试 - 重点覆盖 to_order() 和 to_staff_action()
 """
+
 import os
 import sys
 
@@ -14,9 +15,10 @@ _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
 if _gateway_src not in sys.path:
     sys.path.insert(0, _gateway_src)
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 _adapter_src = os.path.abspath(os.path.join(_here, "../src"))
 if _adapter_src not in sys.path:
@@ -45,9 +47,9 @@ def raw_order():
         "store_id": "KR_STORE_001",
         "table_id": "T05",
         "table_name": "5号桌",
-        "status": 3,                    # 已结账
-        "total_amount": 24600,          # 246.00 元
-        "discount_amount": 2400,        # 24.00 元
+        "status": 3,  # 已结账
+        "total_amount": 24600,  # 246.00 元
+        "discount_amount": 2400,  # 24.00 元
         "create_time": "2024-03-01 18:00:00",
         "member_id": "MBR_KR_001",
         "waiter_id": "WAITER_KR_002",
@@ -76,7 +78,7 @@ def raw_staff_action():
     return {
         "action_type": "void_item",
         "staff_id": "STAFF_KR_001",
-        "amount": 3000,             # 30.00 元
+        "amount": 3000,  # 30.00 元
         "reason": "顾客不满意",
         "approved_by": "MGR_KR_001",
         "operate_time": "2024-03-01 18:30:00",
@@ -110,23 +112,27 @@ class TestToOrder:
 
     def test_maps_status_completed(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         result = adapter.to_order(raw_order, "STORE_KR1", "BRAND_001")
         assert result.order_status == OrderStatus.COMPLETED
 
     def test_maps_status_pending(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw_order["status"] = 1
         result = adapter.to_order(raw_order, "STORE_KR1", "BRAND_001")
         assert result.order_status == OrderStatus.PENDING
 
     def test_maps_status_confirmed(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw_order["status"] = 2
         result = adapter.to_order(raw_order, "STORE_KR1", "BRAND_001")
         assert result.order_status == OrderStatus.CONFIRMED
 
     def test_maps_status_cancelled(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderStatus
+
         raw_order["status"] = 4
         result = adapter.to_order(raw_order, "STORE_KR1", "BRAND_001")
         assert result.order_status == OrderStatus.CANCELLED
@@ -174,6 +180,7 @@ class TestToOrder:
 
     def test_order_type_is_dine_in(self, adapter, raw_order):
         from schemas.restaurant_standard_schema import OrderType
+
         result = adapter.to_order(raw_order, "STORE_KR1", "BRAND_001")
         assert result.order_type == OrderType.DINE_IN
 

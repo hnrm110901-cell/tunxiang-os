@@ -16,29 +16,30 @@
   PINZHI_TOKEN          API Token
   PINZHI_PAGE_SIZE      分页大小（默认 20）
 """
+
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import structlog
 
 from .base.src.event_bus import AdapterEventMixin
 from .pinzhi.src.adapter import PinzhiAdapter
-from .pinzhi.src.order_sync import PinzhiOrderSync
 from .pinzhi.src.dish_sync import PinzhiDishSync
-from .pinzhi.src.member_sync import PinzhiMemberSync
 from .pinzhi.src.inventory_sync import PinzhiInventorySync
+from .pinzhi.src.member_sync import PinzhiMemberSync
+from .pinzhi.src.order_sync import PinzhiOrderSync
 
 logger = structlog.get_logger()
 
 # -- 品智订单状态 -> 屯象统一状态 ------------------------------------
 PINZHI_ORDER_STATUS_MAP: Dict[int, str] = {
-    0: "pending",       # 未结账
-    1: "completed",     # 已结账
-    2: "cancelled",     # 已退单
+    0: "pending",  # 未结账
+    1: "completed",  # 已结账
+    2: "cancelled",  # 已退单
 }
 
 # -- 品智回写状态映射 ------------------------------------------------
@@ -357,7 +358,9 @@ class PinzhiPOSAdapter(AdapterEventMixin):
             }
             params = self._inner._add_sign(params)
             await self._inner._request(
-                "POST", "/pinzhi/updateOrderStatus.do", data=params,
+                "POST",
+                "/pinzhi/updateOrderStatus.do",
+                data=params,
             )
             logger.info(
                 "pinzhi_order_status_pushed",
@@ -495,6 +498,9 @@ class PinzhiPOSAdapter(AdapterEventMixin):
         return self
 
     async def __aexit__(
-        self, exc_type: type, exc_val: BaseException, exc_tb: Any,
+        self,
+        exc_type: type,
+        exc_val: BaseException,
+        exc_tb: Any,
     ) -> None:
         await self.close()

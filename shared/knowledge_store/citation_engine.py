@@ -5,6 +5,7 @@
 - Claude 回答时自动标注引用来源
 - 返回答案 + 引用列表（定位到具体知识块 + 文本片段）
 """
+
 from __future__ import annotations
 
 import os
@@ -82,22 +83,26 @@ async def _call_claude_with_citations(
 
     for i, chunk in enumerate(source_chunks):
         # Document source block
-        content_blocks.append({
-            "type": "document",
-            "source": {
-                "type": "text",
-                "media_type": "text/plain",
-                "data": chunk.get("text", ""),
-            },
-            "title": f"知识块 {i + 1} (ID: {chunk.get('chunk_id', chunk.get('doc_id', ''))})",
-            "citations": {"enabled": True},
-        })
+        content_blocks.append(
+            {
+                "type": "document",
+                "source": {
+                    "type": "text",
+                    "media_type": "text/plain",
+                    "data": chunk.get("text", ""),
+                },
+                "title": f"知识块 {i + 1} (ID: {chunk.get('chunk_id', chunk.get('doc_id', ''))})",
+                "citations": {"enabled": True},
+            }
+        )
 
     # 添加用户问题
-    content_blocks.append({
-        "type": "text",
-        "text": query,
-    })
+    content_blocks.append(
+        {
+            "type": "text",
+            "text": query,
+        }
+    )
 
     # 构建请求
     messages = [{"role": "user", "content": content_blocks}]
@@ -148,13 +153,15 @@ async def _call_claude_with_citations(
                     doc_index = cite.get("document_index", 0)
                     if 0 <= doc_index < len(source_chunks):
                         chunk = source_chunks[doc_index]
-                        citations.append(Citation(
-                            chunk_id=chunk.get("chunk_id", ""),
-                            doc_id=chunk.get("doc_id", ""),
-                            text_span=cite.get("cited_text", ""),
-                            start_offset=cite.get("start_char_offset", 0),
-                            end_offset=cite.get("end_char_offset", 0),
-                        ))
+                        citations.append(
+                            Citation(
+                                chunk_id=chunk.get("chunk_id", ""),
+                                doc_id=chunk.get("doc_id", ""),
+                                text_span=cite.get("cited_text", ""),
+                                start_offset=cite.get("start_char_offset", 0),
+                                end_offset=cite.get("end_char_offset", 0),
+                            )
+                        )
 
     # Token 使用统计
     usage = data.get("usage", {})
@@ -190,11 +197,13 @@ def _fallback_answer(
     for i, chunk in enumerate(source_chunks[:3]):  # 最多取前3个
         text = chunk.get("text", "")
         texts.append(f"[{i + 1}] {text[:200]}")
-        citations.append(Citation(
-            chunk_id=chunk.get("chunk_id", ""),
-            doc_id=chunk.get("doc_id", ""),
-            text_span=text[:100],
-        ))
+        citations.append(
+            Citation(
+                chunk_id=chunk.get("chunk_id", ""),
+                doc_id=chunk.get("doc_id", ""),
+                text_span=text[:100],
+            )
+        )
 
     answer = f"以下是与「{query}」相关的知识内容：\n\n" + "\n\n".join(texts)
 

@@ -12,16 +12,15 @@ Revision ID: v152
 Revises: v151
 Create Date: 2026-04-04
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v152"
-down_revision: Union[str, None] = "v151"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v152"
+down_revision = "v151"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -34,7 +33,9 @@ def upgrade() -> None:
         op.create_table(
             "invite_codes",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -77,7 +78,9 @@ def upgrade() -> None:
         op.create_table(
             "invite_records",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -86,7 +89,10 @@ def upgrade() -> None:
             sa.Column("invitee_member_id", UUID(as_uuid=True), nullable=False),
             sa.Column("invite_code", sa.String(20), nullable=False),
             sa.Column(
-                "status", sa.String(20), nullable=False, server_default="pending",
+                "status",
+                sa.String(20),
+                nullable=False,
+                server_default="pending",
             ),
             sa.Column("inviter_points", sa.Integer, nullable=False, server_default="0"),
             sa.Column("invitee_points", sa.Integer, nullable=False, server_default="0"),
@@ -143,7 +149,9 @@ def upgrade() -> None:
         op.create_table(
             "invoice_titles",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
                 server_default=sa.text("gen_random_uuid()"),
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
@@ -181,28 +189,33 @@ def upgrade() -> None:
     # ── 4. invoices 发票申请记录 ──────────────────────────────────
     if "invoices" not in _existing:
         op.create_table(
-        "invoices",
-        sa.Column(
-            "id", UUID(as_uuid=True), primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
-        sa.Column("customer_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("order_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("order_no", sa.String(50), nullable=False, server_default=""),
-        sa.Column("amount_fen", sa.BigInteger, nullable=False, server_default="0"),
-        sa.Column("invoice_title_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("title_snapshot", sa.String(100), nullable=False, server_default=""),
-        sa.Column("type_snapshot", sa.String(20), nullable=False, server_default="personal"),
-        sa.Column(
-            "status", sa.String(20), nullable=False, server_default="pending",
-        ),
-        sa.Column("invoice_no", sa.String(50), nullable=True),
-        sa.Column("issued_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
-        sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
-    )
+            "invoices",
+            sa.Column(
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
+                server_default=sa.text("gen_random_uuid()"),
+            ),
+            sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
+            sa.Column("customer_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("order_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("order_no", sa.String(50), nullable=False, server_default=""),
+            sa.Column("amount_fen", sa.BigInteger, nullable=False, server_default="0"),
+            sa.Column("invoice_title_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("title_snapshot", sa.String(100), nullable=False, server_default=""),
+            sa.Column("type_snapshot", sa.String(20), nullable=False, server_default="personal"),
+            sa.Column(
+                "status",
+                sa.String(20),
+                nullable=False,
+                server_default="pending",
+            ),
+            sa.Column("invoice_no", sa.String(50), nullable=True),
+            sa.Column("issued_at", sa.TIMESTAMP(timezone=True), nullable=True),
+            sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+            sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
+        )
     op.execute("""
         DO $$ BEGIN
             IF (SELECT COUNT(*) FROM information_schema.columns 

@@ -12,6 +12,7 @@ Base URL: https://open.i200.cn
     WSH_TIMEOUT       — 超时秒数，默认 30
     WSH_RETRY_TIMES   — 重试次数，默认 3
 """
+
 import asyncio
 import os
 import time
@@ -36,19 +37,11 @@ class WeishenghuoAdapter:
     """
 
     def __init__(self, config: Dict[str, Any]) -> None:
-        self.base_url = config.get(
-            "base_url", os.getenv("WSH_BASE_URL", "https://open.i200.cn")
-        )
+        self.base_url = config.get("base_url", os.getenv("WSH_BASE_URL", "https://open.i200.cn"))
         self.appid = config.get("appid", os.getenv("WSH_APPID", ""))
-        self.app_secret = config.get(
-            "app_secret", os.getenv("WSH_APP_SECRET", "")
-        )
-        self.timeout = config.get(
-            "timeout", int(os.getenv("WSH_TIMEOUT", "30"))
-        )
-        self.retry_times = config.get(
-            "retry_times", int(os.getenv("WSH_RETRY_TIMES", "3"))
-        )
+        self.app_secret = config.get("app_secret", os.getenv("WSH_APP_SECRET", ""))
+        self.timeout = config.get("timeout", int(os.getenv("WSH_TIMEOUT", "30")))
+        self.retry_times = config.get("retry_times", int(os.getenv("WSH_RETRY_TIMES", "3")))
 
         if not self.appid or not self.app_secret:
             logger.warning("微生活 appid/app_secret 未配置，将使用降级模式")
@@ -124,13 +117,9 @@ class WeishenghuoAdapter:
                 headers = {"Authorization": f"Bearer {token}"}
 
                 if method.upper() == "GET":
-                    response = await self._client.get(
-                        endpoint, params=params, headers=headers
-                    )
+                    response = await self._client.get(endpoint, params=params, headers=headers)
                 else:
-                    response = await self._client.post(
-                        endpoint, json=params or {}, headers=headers
-                    )
+                    response = await self._client.post(endpoint, json=params or {}, headers=headers)
 
                 response.raise_for_status()
                 result = response.json()
@@ -138,9 +127,7 @@ class WeishenghuoAdapter:
                 errcode = result.get("errcode", -1)
                 if errcode != 0:
                     errmsg = result.get("errmsg", "未知错误")
-                    raise Exception(
-                        f"微生活业务错误 [errcode={errcode}]: {errmsg}"
-                    )
+                    raise Exception(f"微生活业务错误 [errcode={errcode}]: {errmsg}")
 
                 return result.get("data", result)
 
@@ -154,9 +141,7 @@ class WeishenghuoAdapter:
                     error=str(e),
                 )
 
-        raise RuntimeError(
-            f"微生活请求失败，已重试 {self.retry_times} 次: {last_exc}"
-        )
+        raise RuntimeError(f"微生活请求失败，已重试 {self.retry_times} 次: {last_exc}")
 
     async def aclose(self) -> None:
         """关闭 httpx 客户端连接"""
@@ -291,9 +276,7 @@ class WeishenghuoAdapter:
         """
         logger.info("查询微生活会员积分", member_id=member_id)
         try:
-            return await self._request(
-                "GET", "/member/points", {"member_id": member_id}
-            )
+            return await self._request("GET", "/member/points", {"member_id": member_id})
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询微生活会员积分失败", error=str(e), exc_info=True)
             return {"balance": 0, "history": []}
@@ -311,9 +294,7 @@ class WeishenghuoAdapter:
         """
         logger.info("查询微生活会员储值余额", member_id=member_id)
         try:
-            return await self._request(
-                "GET", "/member/stored-value", {"member_id": member_id}
-            )
+            return await self._request("GET", "/member/stored-value", {"member_id": member_id})
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询微生活会员储值余额失败", error=str(e), exc_info=True)
             return {"balance": 0}

@@ -51,9 +51,13 @@ def upgrade() -> None:
         op.execute(f"DROP POLICY IF EXISTS channel_menu_items_{action.lower()}_tenant ON channel_menu_items")
         _cond = "current_setting('app.tenant_id', TRUE) IS NOT NULL AND current_setting('app.tenant_id', TRUE) <> '' AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID"
         if action == "INSERT":
-            op.execute(f"CREATE POLICY channel_menu_items_{action.lower()}_tenant ON channel_menu_items AS RESTRICTIVE FOR {action} WITH CHECK ({_cond})")
+            op.execute(
+                f"CREATE POLICY channel_menu_items_{action.lower()}_tenant ON channel_menu_items AS RESTRICTIVE FOR {action} WITH CHECK ({_cond})"
+            )
         else:
-            op.execute(f"CREATE POLICY channel_menu_items_{action.lower()}_tenant ON channel_menu_items AS RESTRICTIVE FOR {action} USING ({_cond})")
+            op.execute(
+                f"CREATE POLICY channel_menu_items_{action.lower()}_tenant ON channel_menu_items AS RESTRICTIVE FOR {action} USING ({_cond})"
+            )
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_channel_menu_items_store_channel
             ON channel_menu_items (tenant_id, store_id, channel);
@@ -87,9 +91,13 @@ def upgrade() -> None:
         op.execute(f"DROP POLICY IF EXISTS channel_pricing_rules_{action.lower()}_tenant ON channel_pricing_rules")
         _cond = "current_setting('app.tenant_id', TRUE) IS NOT NULL AND current_setting('app.tenant_id', TRUE) <> '' AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID"
         if action == "INSERT":
-            op.execute(f"CREATE POLICY channel_pricing_rules_{action.lower()}_tenant ON channel_pricing_rules AS RESTRICTIVE FOR {action} WITH CHECK ({_cond})")
+            op.execute(
+                f"CREATE POLICY channel_pricing_rules_{action.lower()}_tenant ON channel_pricing_rules AS RESTRICTIVE FOR {action} WITH CHECK ({_cond})"
+            )
         else:
-            op.execute(f"CREATE POLICY channel_pricing_rules_{action.lower()}_tenant ON channel_pricing_rules AS RESTRICTIVE FOR {action} USING ({_cond})")
+            op.execute(
+                f"CREATE POLICY channel_pricing_rules_{action.lower()}_tenant ON channel_pricing_rules AS RESTRICTIVE FOR {action} USING ({_cond})"
+            )
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_channel_pricing_rules_store_channel
             ON channel_pricing_rules (tenant_id, store_id, channel)

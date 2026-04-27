@@ -3,17 +3,16 @@
 供 tx-agent Skill Agent（折扣守护、出餐调度、库存预警等）写入经营告警。
 tx-analytics 服务读取此表，驱动实时告警 API。
 """
-from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v146"
-down_revision: Union[str, None] = "v145"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v146"
+down_revision = "v145"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -115,7 +114,8 @@ def upgrade() -> None:
     op.execute(text("ALTER TABLE analytics_alerts ENABLE ROW LEVEL SECURITY"))
     op.execute(text("ALTER TABLE analytics_alerts FORCE ROW LEVEL SECURITY"))
 
-    op.execute(text("""
+    op.execute(
+        text("""
         CREATE POLICY analytics_alerts_tenant_isolation
         ON analytics_alerts
         USING (
@@ -124,14 +124,17 @@ def upgrade() -> None:
         WITH CHECK (
             tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
         )
-    """))
+    """)
+    )
 
     # updated_at 自动更新触发器
-    op.execute(text("""
+    op.execute(
+        text("""
         CREATE TRIGGER trg_analytics_alerts_updated_at
         BEFORE UPDATE ON analytics_alerts
         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

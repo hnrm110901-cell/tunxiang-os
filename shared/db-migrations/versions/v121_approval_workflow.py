@@ -10,9 +10,10 @@ Revision ID: v121
 Revises: v120
 Create Date: 2026-04-02
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "v121"
 down_revision = "v120"
@@ -29,16 +30,19 @@ def upgrade() -> None:
     if "approval_templates" not in _existing:
         op.create_table(
             "approval_templates",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("template_name", sa.String(100), nullable=False),
             sa.Column(
-                "business_type", sa.String(30), nullable=False,
+                "business_type",
+                sa.String(30),
+                nullable=False,
                 comment="discount/refund/void_order/large_purchase/staff_leave/payroll",
             ),
             sa.Column(
-                "steps", JSONB, nullable=False,
+                "steps",
+                JSONB,
+                nullable=False,
                 server_default=sa.text("'[]'"),
                 comment=(
                     "审批步骤数组，每步含: "
@@ -79,19 +83,24 @@ def upgrade() -> None:
     if "approval_instances" not in _existing:
         op.create_table(
             "approval_instances",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column(
-                "template_id", UUID(as_uuid=True), nullable=True,
+                "template_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="FK → approval_templates.id（模板删除后保留历史）",
             ),
             sa.Column(
-                "business_type", sa.String(30), nullable=False,
+                "business_type",
+                sa.String(30),
+                nullable=False,
                 comment="discount/refund/void_order/large_purchase/staff_leave/payroll",
             ),
             sa.Column(
-                "business_id", sa.String(100), nullable=False,
+                "business_id",
+                sa.String(100),
+                nullable=False,
                 comment="关联业务单号（订单ID/薪资单ID等）",
             ),
             sa.Column("title", sa.String(200), nullable=False),
@@ -102,11 +111,16 @@ def upgrade() -> None:
             sa.Column("current_step", sa.Integer, nullable=False, server_default="1"),
             sa.Column("total_steps", sa.Integer, nullable=False, server_default="1"),
             sa.Column(
-                "status", sa.String(20), nullable=False, server_default="'pending'",
+                "status",
+                sa.String(20),
+                nullable=False,
+                server_default="'pending'",
                 comment="pending/approved/rejected/cancelled/expired",
             ),
             sa.Column(
-                "deadline_at", sa.TIMESTAMP(timezone=True), nullable=True,
+                "deadline_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=True,
                 comment="超时自动拒绝时间",
             ),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
@@ -180,11 +194,12 @@ def upgrade() -> None:
     if "approval_step_records" not in _existing:
         op.create_table(
             "approval_step_records",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column(
-                "instance_id", UUID(as_uuid=True), nullable=False,
+                "instance_id",
+                UUID(as_uuid=True),
+                nullable=False,
                 comment="FK → approval_instances.id",
             ),
             sa.Column("step_no", sa.Integer, nullable=False),
@@ -192,16 +207,19 @@ def upgrade() -> None:
             sa.Column("approver_name", sa.String(100), nullable=False),
             sa.Column("approver_role", sa.String(50), nullable=False),
             sa.Column(
-                "action", sa.String(20), nullable=False,
+                "action",
+                sa.String(20),
+                nullable=False,
                 comment="approve/reject/delegate",
             ),
             sa.Column("comment", sa.Text, nullable=True),
             sa.Column(
-                "delegated_to", sa.String(100), nullable=True,
+                "delegated_to",
+                sa.String(100),
+                nullable=True,
                 comment="转交目标人员ID（action=delegate时有值）",
             ),
-            sa.Column("acted_at", sa.TIMESTAMP(timezone=True), nullable=False,
-                      server_default=sa.text("now()")),
+            sa.Column("acted_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()")),
         )
     op.execute("""
         DO $$ BEGIN
@@ -237,23 +255,25 @@ def upgrade() -> None:
     if "approval_notifications" not in _existing:
         op.create_table(
             "approval_notifications",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column(
-                "instance_id", UUID(as_uuid=True), nullable=False,
+                "instance_id",
+                UUID(as_uuid=True),
+                nullable=False,
                 comment="FK → approval_instances.id",
             ),
             sa.Column("recipient_id", sa.String(100), nullable=False),
             sa.Column("recipient_name", sa.String(100), nullable=False),
             sa.Column(
-                "notification_type", sa.String(20), nullable=False,
+                "notification_type",
+                sa.String(20),
+                nullable=False,
                 comment="pending/approved/rejected/reminder",
             ),
             sa.Column("message", sa.Text, nullable=False),
             sa.Column("is_read", sa.Boolean, nullable=False, server_default="false"),
-            sa.Column("sent_at", sa.TIMESTAMP(timezone=True), nullable=False,
-                      server_default=sa.text("now()")),
+            sa.Column("sent_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()")),
             sa.Column("read_at", sa.TIMESTAMP(timezone=True), nullable=True),
         )
     op.execute("""

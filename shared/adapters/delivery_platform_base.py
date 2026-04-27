@@ -5,9 +5,10 @@
 所有外卖平台适配器必须实现本基类的全部方法，
 确保业务层可以通过工厂模式无差别调用不同平台。
 """
+
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
@@ -26,11 +27,13 @@ class DeliveryPlatformError(Exception):
 
 class DeliveryPlatformTimeoutError(DeliveryPlatformError):
     """网络超时错误"""
+
     pass
 
 
 class DeliveryPlatformSignError(DeliveryPlatformError):
     """签名校验失败"""
+
     pass
 
 
@@ -54,9 +57,7 @@ class DeliveryPlatformAdapter(ABC):
     """
 
     @abstractmethod
-    async def pull_orders(
-        self, store_id: str, since: datetime
-    ) -> list[dict]:
+    async def pull_orders(self, store_id: str, since: datetime) -> list[dict]:
         """拉取指定时间之后的新订单
 
         Args:
@@ -106,9 +107,7 @@ class DeliveryPlatformAdapter(ABC):
         ...
 
     @abstractmethod
-    async def sync_menu(
-        self, store_id: str, dishes: list[dict]
-    ) -> dict:
+    async def sync_menu(self, store_id: str, dishes: list[dict]) -> dict:
         """同步菜品到外卖平台
 
         Args:
@@ -121,9 +120,7 @@ class DeliveryPlatformAdapter(ABC):
         ...
 
     @abstractmethod
-    async def update_stock(
-        self, store_id: str, dish_id: str, available: bool
-    ) -> bool:
+    async def update_stock(self, store_id: str, dish_id: str, available: bool) -> bool:
         """更新单个菜品的上下架状态
 
         Args:

@@ -7,6 +7,7 @@ Revision ID: v275_coaching_logs
 Revises: v274_sop_quick_actions
 Create Date: 2026-04-23
 """
+
 from alembic import op
 
 revision = "v275_coaching_logs"
@@ -50,9 +51,7 @@ def upgrade() -> None:
 
     # RLS
     op.execute("ALTER TABLE sop_coaching_logs ENABLE ROW LEVEL SECURITY")
-    op.execute(
-        "DROP POLICY IF EXISTS sop_coaching_logs_tenant ON sop_coaching_logs"
-    )
+    op.execute("DROP POLICY IF EXISTS sop_coaching_logs_tenant ON sop_coaching_logs")
     op.execute("""
         CREATE POLICY sop_coaching_logs_tenant ON sop_coaching_logs
             USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
@@ -78,12 +77,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS sop_coaching_logs_tenant ON sop_coaching_logs"
-    )
-    op.execute(
-        "ALTER TABLE IF EXISTS sop_coaching_logs DISABLE ROW LEVEL SECURITY"
-    )
+    op.execute("DROP POLICY IF EXISTS sop_coaching_logs_tenant ON sop_coaching_logs")
+    op.execute("ALTER TABLE IF EXISTS sop_coaching_logs DISABLE ROW LEVEL SECURITY")
     op.execute("DROP INDEX IF EXISTS idx_coaching_logs_type")
     op.execute("DROP INDEX IF EXISTS idx_coaching_logs_store_date")
     op.execute("DROP TABLE IF EXISTS sop_coaching_logs")

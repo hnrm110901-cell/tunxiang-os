@@ -22,15 +22,15 @@
     )
     print(resp.text, resp.cost_rmb)
 """
+
 from __future__ import annotations
 
 import asyncio
 import time
 import uuid
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator
 
 import structlog
 
@@ -127,7 +127,10 @@ TASK_ROUTING: dict[str, list[RouteTarget]] = {
 
 # urgency 覆盖规则
 _FAST_MODELS: set[str] = {
-    "qwen-turbo", "glm-4-flash", "ernie-speed-128k", "deepseek-chat",
+    "qwen-turbo",
+    "glm-4-flash",
+    "ernie-speed-128k",
+    "deepseek-chat",
     "claude-haiku-4-5-20251001",
 }
 _QUALITY_MODELS: set[str] = {"deepseek-reasoner", "claude-opus-4-6"}
@@ -189,8 +192,10 @@ class TaskRoutingStrategy:
 # 2. 多 Provider 熔断器
 # ---------------------------------------------------------------------------
 
+
 class CircuitState(str, Enum):
     """熔断器状态。"""
+
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
@@ -303,6 +308,7 @@ class CircuitBreakerRegistry:
 # 3. 成本计算工具
 # ---------------------------------------------------------------------------
 
+
 def _calculate_cost_rmb(model_id: str, input_tokens: int, output_tokens: int) -> float:
     """计算单次调用成本（人民币元）。
 
@@ -330,6 +336,7 @@ def _calculate_cost_rmb(model_id: str, input_tokens: int, output_tokens: int) ->
 # ---------------------------------------------------------------------------
 # 4. MultiProviderRouter
 # ---------------------------------------------------------------------------
+
 
 class AllProvidersExhaustedError(Exception):
     """故障转移链中所有 Provider 均不可用。"""
@@ -564,8 +571,7 @@ class MultiProviderRouter:
             )
 
         raise AllProvidersExhaustedError(
-            f"故障转移链全部耗尽: task_type={task_type}, request_id={req_id}. "
-            f"最后错误: {last_exc}"
+            f"故障转移链全部耗尽: task_type={task_type}, request_id={req_id}. 最后错误: {last_exc}"
         )
 
     # ── 流式完成 ────────────────────────────────────────────────────────────
@@ -730,7 +736,9 @@ class MultiProviderRouter:
         raise RuntimeError("Retry loop exited without exception or result")
 
     async def _safe_health_check(
-        self, name: str, adapter: ProviderAdapter,
+        self,
+        name: str,
+        adapter: ProviderAdapter,
     ) -> ProviderHealth:
         """安全封装单个 Provider 的健康检查。"""
         try:
@@ -778,22 +786,25 @@ class MultiProviderRouter:
             ON CONFLICT (request_id) DO NOTHING
         """)
         try:
-            await db.execute(sql, {
-                "id":            str(uuid.uuid4()),
-                "tenant_id":     tenant_id,
-                "task_type":     task_type,
-                "model":         model,
-                "provider":      provider,
-                "input_tokens":  input_tokens,
-                "output_tokens": output_tokens,
-                "cost_usd":      cost_usd,
-                "cost_rmb":      cost_rmb,
-                "duration_ms":   duration_ms,
-                "success":       success,
-                "error_type":    error_type,
-                "request_id":    request_id,
-                "created_at":    datetime.now(timezone.utc),
-            })
+            await db.execute(
+                sql,
+                {
+                    "id": str(uuid.uuid4()),
+                    "tenant_id": tenant_id,
+                    "task_type": task_type,
+                    "model": model,
+                    "provider": provider,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cost_usd": cost_usd,
+                    "cost_rmb": cost_rmb,
+                    "duration_ms": duration_ms,
+                    "success": success,
+                    "error_type": error_type,
+                    "request_id": request_id,
+                    "created_at": datetime.now(timezone.utc),
+                },
+            )
             await db.commit()
         except Exception as exc:  # noqa: BLE001 -- 成本记录失败不阻塞主业务
             logger.warning(
@@ -808,6 +819,7 @@ class MultiProviderRouter:
 # ---------------------------------------------------------------------------
 # 5. ModelRouterCompat -- 向后兼容旧 ModelRouter.complete() 签名
 # ---------------------------------------------------------------------------
+
 
 class ModelRouterCompat:
     """向后兼容层。

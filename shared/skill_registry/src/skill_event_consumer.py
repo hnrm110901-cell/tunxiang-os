@@ -10,7 +10,8 @@ SkillRouter EventBus Consumer
 import asyncio
 import json
 import logging
-from typing import Optional, Callable, Awaitable
+from typing import Awaitable, Callable
+
 import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ CONSUMER_NAME = "skill-router-worker-1"
 
 SkillHandler = Callable[[str, dict, dict], Awaitable[None]]
 # skill_name, event_type, payload
+
 
 class SkillEventConsumer:
     """
@@ -78,7 +80,7 @@ class SkillEventConsumer:
                 results = await r.xreadgroup(
                     groupname=CONSUMER_GROUP,
                     consumername=CONSUMER_NAME,
-                    streams={s: ">" for s in SKILL_STREAMS},
+                    streams=dict.fromkeys(SKILL_STREAMS, ">"),
                     count=10,
                     block=1000,  # 1秒超时
                 )

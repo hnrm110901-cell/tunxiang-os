@@ -4,22 +4,29 @@ Revision ID: v001
 Revises: None
 Create Date: 2026-03-22
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSON
+from alembic import op
+from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
 
-revision: str = "v001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v001"
+down_revision = None
+branch_labels = None
+depends_on = None
 
 # RLS 辅助函数
 RLS_TABLES = [
-    "customers", "stores", "dish_categories", "dishes", "dish_ingredients",
-    "orders", "order_items", "ingredient_masters", "ingredients",
-    "ingredient_transactions", "employees",
+    "customers",
+    "stores",
+    "dish_categories",
+    "dishes",
+    "dish_ingredients",
+    "orders",
+    "order_items",
+    "ingredient_masters",
+    "ingredients",
+    "ingredient_transactions",
+    "employees",
 ]
 
 

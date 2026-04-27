@@ -10,6 +10,7 @@
   DINGTALK_APP_SECRET
   DINGTALK_AGENT_ID
 """
+
 from __future__ import annotations
 
 import time
@@ -181,9 +182,7 @@ class DingTalkSDK:
     #  工作通知
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    async def send_work_notification(
-        self, userid_list: str, msg: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def send_work_notification(self, userid_list: str, msg: dict[str, Any]) -> dict[str, Any]:
         """发送工作通知。
 
         Args:
@@ -205,9 +204,7 @@ class DingTalkSDK:
             json=payload,
         )
         data = resp.json()
-        self._check_old_response(
-            data, "/topapi/message/corpconversation/asyncsend_v2"
-        )
+        self._check_old_response(data, "/topapi/message/corpconversation/asyncsend_v2")
         logger.info(
             "dingtalk_work_notification_sent",
             userid_list=userid_list[:50],

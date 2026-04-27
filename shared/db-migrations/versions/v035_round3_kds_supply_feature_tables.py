@@ -49,9 +49,13 @@ def upgrade() -> None:
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         op.execute(f"DROP POLICY IF EXISTS dispatch_codes_{action.lower()}_tenant ON dispatch_codes")
         if action == "INSERT":
-            op.execute(f"CREATE POLICY dispatch_codes_{action.lower()}_tenant ON dispatch_codes AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_dc})")
+            op.execute(
+                f"CREATE POLICY dispatch_codes_{action.lower()}_tenant ON dispatch_codes AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_dc})"
+            )
         else:
-            op.execute(f"CREATE POLICY dispatch_codes_{action.lower()}_tenant ON dispatch_codes AS RESTRICTIVE FOR {action} USING ({_cond_dc})")
+            op.execute(
+                f"CREATE POLICY dispatch_codes_{action.lower()}_tenant ON dispatch_codes AS RESTRICTIVE FOR {action} USING ({_cond_dc})"
+            )
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_dispatch_codes_tenant_order
             ON dispatch_codes (tenant_id, order_id);
@@ -81,9 +85,13 @@ def upgrade() -> None:
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         op.execute(f"DROP POLICY IF EXISTS store_push_configs_{action.lower()}_tenant ON store_push_configs")
         if action == "INSERT":
-            op.execute(f"CREATE POLICY store_push_configs_{action.lower()}_tenant ON store_push_configs AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_spc})")
+            op.execute(
+                f"CREATE POLICY store_push_configs_{action.lower()}_tenant ON store_push_configs AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_spc})"
+            )
         else:
-            op.execute(f"CREATE POLICY store_push_configs_{action.lower()}_tenant ON store_push_configs AS RESTRICTIVE FOR {action} USING ({_cond_spc})")
+            op.execute(
+                f"CREATE POLICY store_push_configs_{action.lower()}_tenant ON store_push_configs AS RESTRICTIVE FOR {action} USING ({_cond_spc})"
+            )
 
     # ─────────────────────────────────────────────────────────────────
     # P1-B: kds_tasks ALTER — 等叫状态机扩展
@@ -126,9 +134,13 @@ def upgrade() -> None:
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         op.execute(f"DROP POLICY IF EXISTS booking_prep_tasks_{action.lower()}_tenant ON booking_prep_tasks")
         if action == "INSERT":
-            op.execute(f"CREATE POLICY booking_prep_tasks_{action.lower()}_tenant ON booking_prep_tasks AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_bpt})")
+            op.execute(
+                f"CREATE POLICY booking_prep_tasks_{action.lower()}_tenant ON booking_prep_tasks AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_bpt})"
+            )
         else:
-            op.execute(f"CREATE POLICY booking_prep_tasks_{action.lower()}_tenant ON booking_prep_tasks AS RESTRICTIVE FOR {action} USING ({_cond_bpt})")
+            op.execute(
+                f"CREATE POLICY booking_prep_tasks_{action.lower()}_tenant ON booking_prep_tasks AS RESTRICTIVE FOR {action} USING ({_cond_bpt})"
+            )
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_booking_prep_tasks_tenant_booking
             ON booking_prep_tasks (tenant_id, booking_id);
@@ -161,9 +173,13 @@ def upgrade() -> None:
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         op.execute(f"DROP POLICY IF EXISTS inventory_thresholds_{action.lower()}_tenant ON inventory_thresholds")
         if action == "INSERT":
-            op.execute(f"CREATE POLICY inventory_thresholds_{action.lower()}_tenant ON inventory_thresholds AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_it})")
+            op.execute(
+                f"CREATE POLICY inventory_thresholds_{action.lower()}_tenant ON inventory_thresholds AS RESTRICTIVE FOR {action} WITH CHECK ({_cond_it})"
+            )
         else:
-            op.execute(f"CREATE POLICY inventory_thresholds_{action.lower()}_tenant ON inventory_thresholds AS RESTRICTIVE FOR {action} USING ({_cond_it})")
+            op.execute(
+                f"CREATE POLICY inventory_thresholds_{action.lower()}_tenant ON inventory_thresholds AS RESTRICTIVE FOR {action} USING ({_cond_it})"
+            )
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_inventory_thresholds_tenant_store
             ON inventory_thresholds (tenant_id, store_id);

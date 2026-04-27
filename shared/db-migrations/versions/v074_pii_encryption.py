@@ -26,13 +26,14 @@ Revision ID: v074
 Revises: v073
 Create Date: 2026-03-31
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
-revision: str = "v074"
-down_revision: str = "v073"
+revision = "v074"
+down_revision = "v073"
 branch_labels = None
 depends_on = None
 

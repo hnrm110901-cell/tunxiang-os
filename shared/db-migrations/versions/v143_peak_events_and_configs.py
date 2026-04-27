@@ -11,18 +11,16 @@ Revises: v142
 Create Date: 2026-04-04
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v143"
 down_revision = "v142"
 branch_labels = None
 depends_on = None
 
-_SAFE_RLS = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-)
+_SAFE_RLS = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def upgrade() -> None:
@@ -34,8 +32,7 @@ def upgrade() -> None:
     if "peak_events" not in _existing:
         op.create_table(
             "peak_events",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("event_type", sa.String(50), nullable=False),
@@ -81,8 +78,7 @@ def upgrade() -> None:
     if "store_peak_configs" not in _existing:
         op.create_table(
             "store_peak_configs",
-            sa.Column("id", UUID(as_uuid=True), primary_key=True,
-                      server_default=sa.text("gen_random_uuid()")),
+            sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("peak_name", sa.String(50), nullable=True),

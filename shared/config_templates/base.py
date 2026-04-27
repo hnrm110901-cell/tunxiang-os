@@ -6,26 +6,25 @@ shared/config_templates/base.py — 业态模板基础数据结构
 - 金额统一用分（整数），不使用浮点
 - 模板只提供默认值，DeliveryAgent 覆写关键字段后才生成最终包
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field
-
 
 # ── 业态枚举 ──────────────────────────────────────────────────────────
 
 
 class RestaurantType(str, Enum):
-    CASUAL_DINING = "casual_dining"   # 正餐（湘菜/粤菜/川菜等）
-    HOT_POT = "hot_pot"               # 火锅
-    FAST_FOOD = "fast_food"           # 快餐/档口
-    BANQUET = "banquet"               # 宴席（徐记海鲜类大店）
-    CAFE_TEA = "cafe_tea"             # 茶饮/咖啡
+    CASUAL_DINING = "casual_dining"  # 正餐（湘菜/粤菜/川菜等）
+    HOT_POT = "hot_pot"  # 火锅
+    FAST_FOOD = "fast_food"  # 快餐/档口
+    BANQUET = "banquet"  # 宴席（徐记海鲜类大店）
+    CAFE_TEA = "cafe_tea"  # 茶饮/咖啡
 
 
 # ── 子配置结构 ────────────────────────────────────────────────────────
@@ -33,78 +32,80 @@ class RestaurantType(str, Enum):
 
 class PrinterConfig(BaseModel):
     name: str
-    printer_type: str                 # receipt | kitchen | label
-    protocol: str = "escpos"         # escpos | zpl | pdf
-    connection: str = "network"      # network | usb | bluetooth
-    ip: str = ""                     # 网口打印机 IP（运行时填入）
+    printer_type: str  # receipt | kitchen | label
+    protocol: str = "escpos"  # escpos | zpl | pdf
+    connection: str = "network"  # network | usb | bluetooth
+    ip: str = ""  # 网口打印机 IP（运行时填入）
     is_default: bool = False
     auto_cut: bool = True
     copies: int = 1
 
 
 class KDSZoneConfig(BaseModel):
-    zone_code: str                    # 如 "wok", "seafood", "cold"
-    zone_name: str                    # 如 "炒锅档", "海鲜档", "凉菜档"
+    zone_code: str  # 如 "wok", "seafood", "cold"
+    zone_name: str  # 如 "炒锅档", "海鲜档", "凉菜档"
     display_order: int = 0
-    alert_minutes: int = 8           # 超时预警分钟数
+    alert_minutes: int = 8  # 超时预警分钟数
     color_normal: str = "#FFFFFF"
-    color_warning: str = "#FFC107"   # 橙色：即将超时
-    color_overdue: str = "#F44336"   # 红色：已超时
+    color_warning: str = "#FFC107"  # 橙色：即将超时
+    color_overdue: str = "#F44336"  # 红色：已超时
 
 
 class ShiftConfig(BaseModel):
-    shift_name: str                  # 如 "午市", "晚市"
-    start_time: str                  # "HH:MM"
-    end_time: str                    # "HH:MM"
-    is_overnight: bool = False       # 跨午夜
-    settlement_cutoff: str = "02:00" # 日结截止时间
+    shift_name: str  # 如 "午市", "晚市"
+    start_time: str  # "HH:MM"
+    end_time: str  # "HH:MM"
+    is_overnight: bool = False  # 跨午夜
+    settlement_cutoff: str = "02:00"  # 日结截止时间
 
 
 class BillingRuleSet(BaseModel):
-    min_spend_fen: int = 0           # 最低消费（分），0=不限
-    service_fee_rate: float = 0.0    # 服务费率（0.1 = 10%）
-    service_fee_fixed_fen: int = 0   # 固定服务费（分），与 rate 二选一
-    packing_fee_fen: int = 0         # 打包费（外卖用）
+    min_spend_fen: int = 0  # 最低消费（分），0=不限
+    service_fee_rate: float = 0.0  # 服务费率（0.1 = 10%）
+    service_fee_fixed_fen: int = 0  # 固定服务费（分），与 rate 二选一
+    packing_fee_fen: int = 0  # 打包费（外卖用）
     min_spend_applies_to: str = "table"  # table | person
 
 
 class DiscountPolicy(BaseModel):
     """折扣守护 Agent 初始策略（L3）"""
-    employee_max_discount: float = 0.88      # 员工最大折扣（0.88 = 88折）
-    manager_max_discount: float = 0.80       # 店长最大折扣
-    owner_max_discount: float = 0.0          # 老板无限制（0.0 = 不限）
-    min_gross_margin: float = 0.30           # 毛利保护线（30%）
-    alert_on_gift: bool = True               # 赠菜需预警
-    require_reason_below: float = 0.85       # 低于85折需填理由
-    block_below_cost: bool = True            # 低于成本价自动阻断
+
+    employee_max_discount: float = 0.88  # 员工最大折扣（0.88 = 88折）
+    manager_max_discount: float = 0.80  # 店长最大折扣
+    owner_max_discount: float = 0.0  # 老板无限制（0.0 = 不限）
+    min_gross_margin: float = 0.30  # 毛利保护线（30%）
+    alert_on_gift: bool = True  # 赠菜需预警
+    require_reason_below: float = 0.85  # 低于85折需填理由
+    block_below_cost: bool = True  # 低于成本价自动阻断
 
 
 class MemberTierConfig(BaseModel):
     tier_code: str
     tier_name: str
-    min_spend_fen: int = 0           # 升级所需累计消费（分）
-    point_multiplier: float = 1.0    # 积分倍率
-    discount_rate: float = 1.0       # 会员折扣（1.0 = 无折扣）
-    birthday_benefit: str = ""       # 生日权益描述
+    min_spend_fen: int = 0  # 升级所需累计消费（分）
+    point_multiplier: float = 1.0  # 积分倍率
+    discount_rate: float = 1.0  # 会员折扣（1.0 = 无折扣）
+    birthday_benefit: str = ""  # 生日权益描述
 
 
 class AgentPolicySet(BaseModel):
     """9大 Agent 的初始策略参数"""
+
     # 折扣守护
     discount_guard: DiscountPolicy = Field(default_factory=DiscountPolicy)
     # 库存预警（初始阈值，Agent 开业后自动标定）
-    inventory_alert_days: int = 3            # 库存不足 N 天用量时预警
-    inventory_waste_alert_rate: float = 0.05 # 损耗超过 5% 时预警
+    inventory_alert_days: int = 3  # 库存不足 N 天用量时预警
+    inventory_waste_alert_rate: float = 0.05  # 损耗超过 5% 时预警
     # 出餐调度
-    kds_target_minutes: int = 15             # 出餐目标时间（分钟）
-    kds_warn_minutes: int = 20               # 超出时预警
+    kds_target_minutes: int = 15  # 出餐目标时间（分钟）
+    kds_warn_minutes: int = 20  # 超出时预警
     # 智能排菜（宴席）
-    banquet_pre_sort_hours: int = 2          # 宴席前 N 小时自动排菜
+    banquet_pre_sort_hours: int = 2  # 宴席前 N 小时自动排菜
     # 财务稽核
     finance_audit_enabled: bool = True
     # 其余 Agent 默认激活
     member_insight_enabled: bool = True
-    tour_inspection_enabled: bool = False    # P2，默认不激活
+    tour_inspection_enabled: bool = False  # P2，默认不激活
 
 
 # ── 配置包 ─────────────────────────────────────────────────────────────
@@ -119,17 +120,18 @@ class TenantConfigPackage(BaseModel):
       2. DeliveryAgent 将 20 问答案 apply() 覆写关键字段
       3. POST /api/v1/onboarding/import 原子性写入数据库
     """
+
     # 元信息
     schema_version: str = "1.0"
     restaurant_type: RestaurantType
     generated_at: datetime = Field(default_factory=datetime.utcnow)
-    delivery_session_id: str = ""    # DeliveryAgent 会话 ID，留痕
+    delivery_session_id: str = ""  # DeliveryAgent 会话 ID，留痕
 
     # 门店基础
     store_name: str = ""
     store_address: str = ""
     table_count: int = 0
-    vip_room_count: int = 0          # 包厢数
+    vip_room_count: int = 0  # 包厢数
 
     # 硬件配置
     printers: list[PrinterConfig] = Field(default_factory=list)
@@ -140,8 +142,8 @@ class TenantConfigPackage(BaseModel):
     billing_rules: BillingRuleSet = Field(default_factory=BillingRuleSet)
 
     # 会员体系
-    point_rate: float = 1.0          # 消费1元=N积分
-    point_redeem_rate: float = 100.0 # N积分=1元
+    point_rate: float = 1.0  # 消费1元=N积分
+    point_redeem_rate: float = 100.0  # N积分=1元
     member_tiers: list[MemberTierConfig] = Field(default_factory=list)
 
     # 渠道激活
@@ -155,9 +157,7 @@ class TenantConfigPackage(BaseModel):
     agent_policies: AgentPolicySet = Field(default_factory=AgentPolicySet)
 
     # 支付方式
-    payment_methods: list[str] = Field(
-        default_factory=lambda: ["wechat", "alipay", "cash"]
-    )
+    payment_methods: list[str] = Field(default_factory=lambda: ["wechat", "alipay", "cash"])
 
     # 配置健康度（由 config_health 服务写入）
     config_score: float = 0.0
@@ -179,18 +179,15 @@ class BaseTemplate(ABC):
 
     @property
     @abstractmethod
-    def restaurant_type(self) -> RestaurantType:
-        ...
+    def restaurant_type(self) -> RestaurantType: ...
 
     @property
     @abstractmethod
-    def display_name(self) -> str:
-        ...
+    def display_name(self) -> str: ...
 
     @property
     @abstractmethod
-    def description(self) -> str:
-        ...
+    def description(self) -> str: ...
 
     @abstractmethod
     def build_default(self) -> TenantConfigPackage:
@@ -219,7 +216,7 @@ class BaseTemplate(ABC):
             pkg.vip_room_count = int(v)
 
         # KDS 分区（覆写）
-        if zones := answers.get("kds_zones"):   # list[dict]
+        if zones := answers.get("kds_zones"):  # list[dict]
             pkg.kds_zones = [KDSZoneConfig(**z) for z in zones]
 
         # 打印机（覆写）

@@ -13,8 +13,8 @@ Revises: v242
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "v243"
@@ -30,85 +30,118 @@ def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
 
-
     # ------------------------------------------------------------------
     # 表1：daily_cost_reports（每日成本归集日报）
     # ------------------------------------------------------------------
 
-    if 'daily_cost_reports' not in existing:
+    if "daily_cost_reports" not in existing:
         op.create_table(
             "daily_cost_reports",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
-                server_default=sa.text("gen_random_uuid()"), nullable=False,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
+                server_default=sa.text("gen_random_uuid()"),
+                nullable=False,
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("report_date", sa.Date(), nullable=False, comment="日报日期"),
-
             # 营收数据（来自POS）
             sa.Column(
-                "total_revenue_fen", sa.BigInteger(), nullable=True, server_default="0",
+                "total_revenue_fen",
+                sa.BigInteger(),
+                nullable=True,
+                server_default="0",
                 comment="当日营收（分）",
             ),
             sa.Column(
-                "table_count", sa.Integer(), nullable=True, server_default="0",
+                "table_count",
+                sa.Integer(),
+                nullable=True,
+                server_default="0",
                 comment="桌次",
             ),
             sa.Column(
-                "customer_count", sa.Integer(), nullable=True, server_default="0",
+                "customer_count",
+                sa.Integer(),
+                nullable=True,
+                server_default="0",
                 comment="客数",
             ),
-
             # 成本数据（来自费控）
             sa.Column(
-                "food_cost_fen", sa.BigInteger(), nullable=True, server_default="0",
+                "food_cost_fen",
+                sa.BigInteger(),
+                nullable=True,
+                server_default="0",
                 comment="食材成本（分）",
             ),
             sa.Column(
-                "labor_cost_fen", sa.BigInteger(), nullable=True, server_default="0",
+                "labor_cost_fen",
+                sa.BigInteger(),
+                nullable=True,
+                server_default="0",
                 comment="人力成本（分）",
             ),
             sa.Column(
-                "other_cost_fen", sa.BigInteger(), nullable=True, server_default="0",
+                "other_cost_fen",
+                sa.BigInteger(),
+                nullable=True,
+                server_default="0",
                 comment="其他费用（分）",
             ),
             sa.Column(
-                "total_cost_fen", sa.BigInteger(), nullable=True, server_default="0",
+                "total_cost_fen",
+                sa.BigInteger(),
+                nullable=True,
+                server_default="0",
                 comment="总成本（分）",
             ),
-
             # 计算指标
             sa.Column(
-                "food_cost_rate", sa.Numeric(7, 4), nullable=True,
+                "food_cost_rate",
+                sa.Numeric(7, 4),
+                nullable=True,
                 comment="食材成本率 = food_cost_fen / total_revenue_fen",
             ),
             sa.Column(
-                "labor_cost_rate", sa.Numeric(7, 4), nullable=True,
+                "labor_cost_rate",
+                sa.Numeric(7, 4),
+                nullable=True,
                 comment="人力成本率 = labor_cost_fen / total_revenue_fen",
             ),
             sa.Column(
-                "gross_margin_rate", sa.Numeric(7, 4), nullable=True,
+                "gross_margin_rate",
+                sa.Numeric(7, 4),
+                nullable=True,
                 comment="毛利率 = (total_revenue_fen - total_cost_fen) / total_revenue_fen",
             ),
-
             # 元数据
             sa.Column(
-                "pos_data_source", sa.String(50), nullable=True,
+                "pos_data_source",
+                sa.String(50),
+                nullable=True,
                 comment="POS数据来源：pinzhi/aoqiwei/meituan",
             ),
             sa.Column(
-                "data_status", sa.String(32), nullable=False, server_default="pending",
+                "data_status",
+                sa.String(32),
+                nullable=False,
+                server_default="pending",
                 comment="数据状态：pending/complete/manual_adjusted",
             ),
             sa.Column("notes", sa.Text(), nullable=True, comment="备注"),
-
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True), nullable=True,
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=True,
                 server_default=sa.text("now()"),
             ),
             sa.Column(
-                "updated_at", sa.TIMESTAMP(timezone=True), nullable=True,
+                "updated_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=True,
                 server_default=sa.text("now()"),
             ),
         )
@@ -152,16 +185,21 @@ def upgrade() -> None:
         # 表2：cost_attribution_items（成本归集明细）
         # ------------------------------------------------------------------
 
-    if 'cost_attribution_items' not in existing:
+    if "cost_attribution_items" not in existing:
         op.create_table(
             "cost_attribution_items",
             sa.Column(
-                "id", UUID(as_uuid=True), primary_key=True,
-                server_default=sa.text("gen_random_uuid()"), nullable=False,
+                "id",
+                UUID(as_uuid=True),
+                primary_key=True,
+                server_default=sa.text("gen_random_uuid()"),
+                nullable=False,
             ),
             sa.Column("tenant_id", UUID(as_uuid=True), nullable=False),
             sa.Column(
-                "report_id", UUID(as_uuid=True), nullable=True,
+                "report_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="关联日报ID",
             ),
             sa.ForeignKeyConstraint(
@@ -171,22 +209,30 @@ def upgrade() -> None:
                 ondelete="SET NULL",
             ),
             sa.Column(
-                "expense_application_id", UUID(as_uuid=True), nullable=True,
+                "expense_application_id",
+                UUID(as_uuid=True),
+                nullable=True,
                 comment="费控申请ID",
             ),
             sa.Column("store_id", UUID(as_uuid=True), nullable=False),
             sa.Column("attribution_date", sa.Date(), nullable=False, comment="归集日期"),
             sa.Column(
-                "cost_type", sa.String(32), nullable=True,
+                "cost_type",
+                sa.String(32),
+                nullable=True,
                 comment="成本类型：food/labor/rent/utility/other",
             ),
             sa.Column(
-                "amount_fen", sa.BigInteger(), nullable=False,
+                "amount_fen",
+                sa.BigInteger(),
+                nullable=False,
                 comment="金额（分）",
             ),
             sa.Column("description", sa.Text(), nullable=True, comment="描述"),
             sa.Column(
-                "created_at", sa.TIMESTAMP(timezone=True), nullable=True,
+                "created_at",
+                sa.TIMESTAMP(timezone=True),
+                nullable=True,
                 server_default=sa.text("now()"),
             ),
         )
@@ -229,13 +275,9 @@ def downgrade() -> None:
     # 按依赖反向删除
 
     # cost_attribution_items（先删，因为外键引用 daily_cost_reports）
-    op.execute(
-        "DROP POLICY IF EXISTS cost_attribution_items_tenant_isolation ON cost_attribution_items"
-    )
+    op.execute("DROP POLICY IF EXISTS cost_attribution_items_tenant_isolation ON cost_attribution_items")
     op.drop_table("cost_attribution_items")
 
     # daily_cost_reports
-    op.execute(
-        "DROP POLICY IF EXISTS daily_cost_reports_tenant_isolation ON daily_cost_reports"
-    )
+    op.execute("DROP POLICY IF EXISTS daily_cost_reports_tenant_isolation ON daily_cost_reports")
     op.drop_table("daily_cost_reports")

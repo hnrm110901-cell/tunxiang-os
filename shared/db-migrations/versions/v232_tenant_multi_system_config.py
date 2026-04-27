@@ -14,9 +14,8 @@ Revises: v231
 Create Date: 2026-04-12
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
+from alembic import op
 
 revision = "v232c"
 down_revision = "v232b"
@@ -58,7 +57,7 @@ _CONFIG_SKELETON = """{
 def upgrade() -> None:
     conn = op.get_bind()
     existing = sa.inspect(conn).get_table_names()
-    if 'tenants' not in existing:
+    if "tenants" not in existing:
         return  # tenants table not yet created; skip
 
     # ── 1. 新增列（幂等，IF NOT EXISTS） ────────────────────────────

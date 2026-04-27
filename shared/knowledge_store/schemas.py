@@ -1,14 +1,16 @@
 """知识库 Pydantic V2 数据模型"""
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class KnowledgeSearchRequest(BaseModel):
     """知识检索请求"""
+
     query: str
     collection: str
     tenant_id: str
@@ -19,6 +21,7 @@ class KnowledgeSearchRequest(BaseModel):
 
 class KnowledgeSearchResult(BaseModel):
     """单条检索结果"""
+
     doc_id: str
     chunk_id: str | None = None
     text: str
@@ -28,6 +31,7 @@ class KnowledgeSearchResult(BaseModel):
 
 class IndexTextRequest(BaseModel):
     """文本索引请求（向后兼容）"""
+
     collection: str
     doc_id: str
     text: str
@@ -37,6 +41,7 @@ class IndexTextRequest(BaseModel):
 
 class DocumentUploadRequest(BaseModel):
     """文档上传请求"""
+
     title: str
     collection: str = "ops_procedures"
     source_type: str = "manual"
@@ -45,6 +50,7 @@ class DocumentUploadRequest(BaseModel):
 
 class ChunkPreview(BaseModel):
     """分块预览"""
+
     chunk_index: int
     text: str
     token_count: int
@@ -54,6 +60,7 @@ class ChunkPreview(BaseModel):
 
 class DocumentResponse(BaseModel):
     """文档响应"""
+
     id: str
     tenant_id: str
     title: str
@@ -74,6 +81,7 @@ class DocumentResponse(BaseModel):
 
 class ChunkResponse(BaseModel):
     """知识块响应"""
+
     id: str
     document_id: str
     collection: str

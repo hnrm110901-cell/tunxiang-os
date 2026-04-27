@@ -14,16 +14,15 @@ Revision ID: v016
 Revises: v015
 Create Date: 2026-03-30
 """
-from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision: str = "v018"
-down_revision: Union[str, None] = "v017"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "v018"
+down_revision = "v017"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -34,18 +33,14 @@ def upgrade() -> None:
         "table_production_plans",
         # ── 基类字段（对齐 TenantBase）──
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="租户ID（RLS隔离）"),
+        sa.Column("tenant_id", UUID(as_uuid=True), nullable=False, index=True, comment="租户ID（RLS隔离）"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("is_deleted", sa.Boolean, server_default="false"),
         # ── 业务字段 ──
-        sa.Column("order_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="订单ID"),
-        sa.Column("table_no", sa.String(20), nullable=False,
-                  comment="桌号如A01"),
-        sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True,
-                  comment="门店ID"),
+        sa.Column("order_id", UUID(as_uuid=True), nullable=False, index=True, comment="订单ID"),
+        sa.Column("table_no", sa.String(20), nullable=False, comment="桌号如A01"),
+        sa.Column("store_id", UUID(as_uuid=True), nullable=False, index=True, comment="门店ID"),
         sa.Column(
             "target_completion",
             sa.DateTime(timezone=True),
@@ -65,14 +60,14 @@ def upgrade() -> None:
             JSONB,
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
-            comment='JSON: {dept_id: ready_bool} 各档口就绪状态',
+            comment="JSON: {dept_id: ready_bool} 各档口就绪状态",
         ),
         sa.Column(
             "dept_delays",
             JSONB,
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
-            comment='JSON: {dept_id: delay_seconds} 各档口延迟开始时间(秒)',
+            comment="JSON: {dept_id: delay_seconds} 各档口延迟开始时间(秒)",
         ),
         comment="同桌同出协调计划（TableFire）",
     )
@@ -138,9 +133,7 @@ def downgrade() -> None:
     table_name = "table_production_plans"
 
     for action in ("delete", "update", "insert", "select"):
-        op.execute(
-            f"DROP POLICY IF EXISTS {table_name}_tenant_{action} ON {table_name}"
-        )
+        op.execute(f"DROP POLICY IF EXISTS {table_name}_tenant_{action} ON {table_name}")
 
     op.execute(f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY")
     op.drop_index("ix_table_production_plans_store_status", table_name=table_name)
