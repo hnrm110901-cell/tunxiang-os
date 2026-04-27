@@ -80,15 +80,73 @@ class CampaignEngine:
         config: dict,
         tenant_id: str,
         db: Any = None,
+        operator_id: str = "",
+        operator_name: str = "",
     ) -> dict:
-        """创建营销活动"""
+        """创建营销活动 — 创建后自动检查是否需要审批
+
+        如果匹配到审批流模板，status 设为 pending_approval 并创建审批单。
+        如果无需审批，status 保持 draft。
+        """
         if campaign_type not in self.CAMPAIGN_TYPES:
             return {"error": f"不支持的活动类型: {campaign_type}"}
         if db is None:
             return {"error": "db 参数不能为空（v097 已切换到 DB 模式）"}
 
         repo = CampaignRepository(db, tenant_id)
-        return await repo.create_campaign(campaign_type, config)
+        result = await repo.create_campaign(campaign_type, config)
+        if "error" in result:
+            return result
+
+        campaign_id = result.get("campaign_id", "")
+
+        # 自动检查审批流触发条件
+        if operator_id and campaign_id:
+            approval_svc = _get_approval_service()
+            try:
+                trigger_result = await approval_svc.check_trigger(
+                    tenant_id=uuid.UUID(tenant_id),
+                    object_type="campaign",
+                    object_data={
+                        "max_discount_fen": config.get("max_discount_fen", 0),
+                        "target_count": config.get("target_count", 0),
+                        **{k: v for k, v in config.items() if k not in ("max_discount_fen", "target_count")},
+                    },
+                    db=db,
+                )
+                if trigger_result.get("needs_approval") and trigger_result.get("workflow_id"):
+                    # 将活动状态改为 pending_approval
+                    await repo.transition_status(campaign_id, "pending_approval")
+                    # 创建审批单
+                    request = await approval_svc.create_request(
+                        workflow_id=trigger_result["workflow_id"],
+                        object_type="campaign",
+                        object_id=campaign_id,
+                        object_summary={
+                            "name": config.get("name", ""),
+                            "type": campaign_type,
+                        },
+                        requester_id=uuid.UUID(operator_id),
+                        requester_name=operator_name or "未知",
+                        tenant_id=uuid.UUID(tenant_id),
+                        db=db,
+                    )
+                    result["status"] = "pending_approval"
+                    result["approval_request_id"] = str(request.id)
+                    log.info(
+                        "campaign.create_pending_approval",
+                        campaign_id=campaign_id,
+                        request_id=str(request.id),
+                        tenant_id=tenant_id,
+                    )
+            except (ValueError, TypeError) as exc:
+                log.warning(
+                    "campaign.create_approval_check_failed",
+                    campaign_id=campaign_id,
+                    error=str(exc),
+                )
+
+        return result
 
     async def start_campaign(self, campaign_id: str, tenant_id: str, db: Any = None) -> dict:
         """启动活动 (draft -> active)"""

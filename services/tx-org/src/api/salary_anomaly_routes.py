@@ -9,6 +9,7 @@
   GET  /api/v1/org/salary/anomaly/summary
     按 status + 城市 + 法律风险聚合 + Prompt Cache 命中率
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,6 +40,7 @@ router = APIRouter(
 
 
 # ── 请求模型 ─────────────────────────────────────────────────────
+
 
 class EmployeeSignalInput(BaseModel):
     employee_id: str
@@ -78,6 +80,7 @@ class ReviewRequest(BaseModel):
 
 # ── 端点 ────────────────────────────────────────────────────────
 
+
 @router.post("/analyze", response_model=dict)
 async def analyze_salary_anomaly(
     req: AnalyzeRequest,
@@ -88,7 +91,10 @@ async def analyze_salary_anomaly(
     tenant_uuid = _parse_uuid(x_tenant_id, "X-Tenant-ID")
 
     if req.analysis_scope not in (
-        "monthly_batch", "single_employee", "anomaly_triggered", "manual",
+        "monthly_batch",
+        "single_employee",
+        "anomaly_triggered",
+        "manual",
     ):
         raise HTTPException(status_code=400, detail=f"未知 analysis_scope: {req.analysis_scope}")
 
@@ -166,12 +172,8 @@ async def analyze_salary_anomaly(
             ],
             "summary": {
                 "anomaly_count": len(result.ranked_anomalies),
-                "critical_count": sum(
-                    1 for a in result.ranked_anomalies if a.severity == "critical"
-                ),
-                "legal_risk_count": sum(
-                    1 for a in result.ranked_anomalies if a.legal_risk
-                ),
+                "critical_count": sum(1 for a in result.ranked_anomalies if a.severity == "critical"),
+                "legal_risk_count": sum(1 for a in result.ranked_anomalies if a.legal_risk),
             },
             "prompt_cache_stats": {
                 "cache_read_tokens": result.cache_read_tokens,
@@ -210,7 +212,8 @@ async def review_analysis(
         )
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             UPDATE salary_anomaly_analyses
             SET status = :new_status,
                 reviewed_by = CAST(:op AS uuid),
@@ -221,12 +224,14 @@ async def review_analysis(
               AND status IN ('analyzed', 'escalated')
               AND is_deleted = false
             RETURNING id, status
-        """), {
-            "id": analysis_id,
-            "tenant_id": x_tenant_id,
-            "op": x_operator_id,
-            "new_status": new_status,
-        })
+        """),
+            {
+                "id": analysis_id,
+                "tenant_id": x_tenant_id,
+                "op": x_operator_id,
+                "new_status": new_status,
+            },
+        )
         row = result.mappings().first()
         await db.commit()
     except SQLAlchemyError as exc:
@@ -255,7 +260,8 @@ async def salary_anomaly_summary(
         raise HTTPException(status_code=400, detail="months_back ∈ [1, 12]")
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 status,
                 city,
@@ -272,7 +278,9 @@ async def salary_anomaly_summary(
               AND created_at >= CURRENT_DATE - (:months_back || ' months')::interval
             GROUP BY status, city
             ORDER BY status, city NULLS LAST
-        """), {"tenant_id": x_tenant_id, "months_back": str(months_back)})
+        """),
+            {"tenant_id": x_tenant_id, "months_back": str(months_back)},
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("salary_anomaly_summary_failed")
@@ -310,10 +318,9 @@ async def salary_anomaly_summary(
 
 # ── 辅助 ─────────────────────────────────────────────────────────
 
+
 def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

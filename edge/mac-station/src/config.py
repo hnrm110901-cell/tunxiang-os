@@ -3,6 +3,7 @@
 环境变量优先，未设置则使用默认值。
 离线模式通过定期探测云端 /health 自动切换。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +18,7 @@ logger = structlog.get_logger(__name__)
 
 # ── 离线检测常量 ──
 _CLOUD_PROBE_INTERVAL_S = 30  # 每30秒探测一次云端
-_CLOUD_PROBE_TIMEOUT_S = 5    # 探测超时5秒视为离线
+_CLOUD_PROBE_TIMEOUT_S = 5  # 探测超时5秒视为离线
 
 
 @dataclass(frozen=False)

@@ -6,6 +6,7 @@
   GET  /api/v1/intel/competitor-monitor/alerts          — 获取活跃威胁预警
   POST /api/v1/intel/competitor-monitor/platform-snapshot — 从平台适配器拉取竞对快照
 """
+
 from __future__ import annotations
 
 import os
@@ -34,6 +35,7 @@ AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
 
 class ScanBody(BaseModel):
     """竞品扫描请求体"""
+
     model_config = ConfigDict(extra="ignore")
 
     store_id: str
@@ -43,6 +45,7 @@ class ScanBody(BaseModel):
 
 class PlatformSnapshotBody(BaseModel):
     """平台快照请求体"""
+
     model_config = ConfigDict(extra="ignore")
 
     store_id: str
@@ -260,24 +263,24 @@ async def get_active_alerts(
 
             # 构建事件描述：汇总促销标题
             if promotions:
-                promo_titles = "、".join(
-                    p.get("title", "未知活动") for p in promotions[:3]
-                )
+                promo_titles = "、".join(p.get("title", "未知活动") for p in promotions[:3])
                 event = f"当前活跃促销：{promo_titles}"
             else:
                 event = "暂无活跃促销，关注评分变化"
 
-            alerts.append({
-                "alert_id": d["snapshot_id"],
-                "competitor_id": d["competitor_id"],
-                "competitor": d["competitor_name"],
-                "threat_level": level,
-                "active_promotions": promotions,
-                "event": event,
-                "avg_rating": float(d["avg_rating"]) if d.get("avg_rating") is not None else None,
-                "source": d.get("source"),
-                "created_at": d["snapshot_date"].isoformat() if d.get("snapshot_date") else None,
-            })
+            alerts.append(
+                {
+                    "alert_id": d["snapshot_id"],
+                    "competitor_id": d["competitor_id"],
+                    "competitor": d["competitor_name"],
+                    "threat_level": level,
+                    "active_promotions": promotions,
+                    "event": event,
+                    "avg_rating": float(d["avg_rating"]) if d.get("avg_rating") is not None else None,
+                    "source": d.get("source"),
+                    "created_at": d["snapshot_date"].isoformat() if d.get("snapshot_date") else None,
+                }
+            )
 
         # 按威胁级别排序
         alerts.sort(key=lambda a: _level_rank.get(a["threat_level"], 99))
@@ -332,11 +335,10 @@ async def get_platform_snapshot(
         if platform == "meituan":
             try:
                 from shared.integrations.meituan_marketing import MeituanMarketingAdapter
+
                 adapter = MeituanMarketingAdapter()
                 promotions = await adapter.get_promotion_list(tenant_id, body.store_id)
-                attribution = await adapter.get_order_attribution(
-                    tenant_id, body.store_id, week_ago, today
-                )
+                attribution = await adapter.get_order_attribution(tenant_id, body.store_id, week_ago, today)
                 snapshots["meituan"] = {
                     "promotions": promotions,
                     "order_attribution": attribution,
@@ -351,10 +353,9 @@ async def get_platform_snapshot(
         elif platform == "douyin":
             try:
                 from shared.integrations.douyin_marketing import DouyinMarketingAdapter
+
                 adapter = DouyinMarketingAdapter()
-                content_perf = await adapter.get_content_performance(
-                    tenant_id, body.store_id, days=7
-                )
+                content_perf = await adapter.get_content_performance(tenant_id, body.store_id, days=7)
                 ad_roi = await adapter.get_ad_roi_data(tenant_id, body.store_id)
                 snapshots["douyin"] = {
                     "content_performance": content_perf,
@@ -370,13 +371,10 @@ async def get_platform_snapshot(
         elif platform == "xiaohongshu":
             try:
                 from shared.integrations.xiaohongshu_marketing import XiaohongshuMarketingAdapter
+
                 adapter = XiaohongshuMarketingAdapter()
-                mentions = await adapter.get_store_mentions(
-                    tenant_id, body.store_id, days=7
-                )
-                ad_data = await adapter.get_ad_data(
-                    tenant_id, body.store_id, week_ago, today
-                )
+                mentions = await adapter.get_store_mentions(tenant_id, body.store_id, days=7)
+                ad_data = await adapter.get_ad_data(tenant_id, body.store_id, week_ago, today)
                 snapshots["xiaohongshu"] = {
                     "store_mentions": mentions,
                     "ad_data": ad_data,

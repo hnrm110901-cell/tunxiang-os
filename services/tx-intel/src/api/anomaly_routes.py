@@ -13,6 +13,7 @@
 
 如果无法查询真实数据，返回带 _is_mock: true 的演示数据。
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/api/v1/intel", tags=["anomalies"])
 
 # ─── 依赖项 ───────────────────────────────────────────────────────────────────
 
+
 async def get_db() -> AsyncSession:  # type: ignore[return]
     raise NotImplementedError("请在应用启动时注入 DB session factory")
 
@@ -44,11 +46,11 @@ async def get_tenant_id(x_tenant_id: Annotated[str, Header()]) -> uuid.UUID:
 # ─── 异常检测阈值 ─────────────────────────────────────────────────────────────
 
 THRESHOLDS = {
-    "revenue_drop_pct": 0.20,      # 同比下滑20%触发
-    "cost_ratio_max": 0.60,        # 成本占比60%触发
-    "refund_rate_max": 0.05,       # 退单率5%触发
-    "kitchen_time_max_min": 30,    # 平均出餐时间30分钟触发
-    "expiry_count_max": 10,        # 临期食材10种触发
+    "revenue_drop_pct": 0.20,  # 同比下滑20%触发
+    "cost_ratio_max": 0.60,  # 成本占比60%触发
+    "refund_rate_max": 0.05,  # 退单率5%触发
+    "kitchen_time_max_min": 30,  # 平均出餐时间30分钟触发
+    "expiry_count_max": 10,  # 临期食材10种触发
 }
 
 ANOMALY_DESCRIPTIONS = {
@@ -80,9 +82,8 @@ async def _set_rls(db: AsyncSession, tenant_id: uuid.UUID) -> None:
 
 # ─── 检测函数 ─────────────────────────────────────────────────────────────────
 
-async def _detect_revenue_drop(
-    db: AsyncSession, tenant_id: uuid.UUID, days: int
-) -> list[dict[str, Any]]:
+
+async def _detect_revenue_drop(db: AsyncSession, tenant_id: uuid.UUID, days: int) -> list[dict[str, Any]]:
     """检测每日营收同比下滑超20%的天"""
     now = datetime.now(timezone.utc)
     anomalies = []
@@ -120,26 +121,26 @@ async def _detect_revenue_drop(
 
         if yoy_rev > 0 and this_rev < yoy_rev * (1 - THRESHOLDS["revenue_drop_pct"]):
             drop_pct = (yoy_rev - this_rev) / yoy_rev
-            anomalies.append({
-                "id": str(uuid.uuid4()),
-                "type": "revenue_drop",
-                "severity": ANOMALY_SEVERITY["revenue_drop"],
-                "description": f"{day_start.strftime('%m月%d日')}日营收同比下滑{drop_pct:.0%}",
-                "detail": {
-                    "date": day_start.strftime("%Y-%m-%d"),
-                    "this_revenue": this_rev,
-                    "yoy_revenue": yoy_rev,
-                    "drop_pct": round(drop_pct, 4),
-                },
-                "occurred_at": day_start.isoformat(),
-                "dismissed": False,
-            })
+            anomalies.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "revenue_drop",
+                    "severity": ANOMALY_SEVERITY["revenue_drop"],
+                    "description": f"{day_start.strftime('%m月%d日')}日营收同比下滑{drop_pct:.0%}",
+                    "detail": {
+                        "date": day_start.strftime("%Y-%m-%d"),
+                        "this_revenue": this_rev,
+                        "yoy_revenue": yoy_rev,
+                        "drop_pct": round(drop_pct, 4),
+                    },
+                    "occurred_at": day_start.isoformat(),
+                    "dismissed": False,
+                }
+            )
     return anomalies
 
 
-async def _detect_cost_spike(
-    db: AsyncSession, tenant_id: uuid.UUID, days: int
-) -> list[dict[str, Any]]:
+async def _detect_cost_spike(db: AsyncSession, tenant_id: uuid.UUID, days: int) -> list[dict[str, Any]]:
     """检测某日食材成本占比超60%"""
     now = datetime.now(timezone.utc)
     anomalies = []
@@ -170,26 +171,26 @@ async def _detect_cost_spike(
 
         if revenue > 0 and cost / revenue > THRESHOLDS["cost_ratio_max"]:
             ratio = cost / revenue
-            anomalies.append({
-                "id": str(uuid.uuid4()),
-                "type": "cost_spike",
-                "severity": ANOMALY_SEVERITY["cost_spike"],
-                "description": f"{day_start.strftime('%m月%d日')}食材成本占比达{ratio:.0%}，超过60%阈值",
-                "detail": {
-                    "date": day_start.strftime("%Y-%m-%d"),
-                    "cost_ratio": round(ratio, 4),
-                    "revenue": revenue,
-                    "ingredient_cost": cost,
-                },
-                "occurred_at": day_start.isoformat(),
-                "dismissed": False,
-            })
+            anomalies.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "cost_spike",
+                    "severity": ANOMALY_SEVERITY["cost_spike"],
+                    "description": f"{day_start.strftime('%m月%d日')}食材成本占比达{ratio:.0%}，超过60%阈值",
+                    "detail": {
+                        "date": day_start.strftime("%Y-%m-%d"),
+                        "cost_ratio": round(ratio, 4),
+                        "revenue": revenue,
+                        "ingredient_cost": cost,
+                    },
+                    "occurred_at": day_start.isoformat(),
+                    "dismissed": False,
+                }
+            )
     return anomalies
 
 
-async def _detect_high_refund(
-    db: AsyncSession, tenant_id: uuid.UUID, days: int
-) -> list[dict[str, Any]]:
+async def _detect_high_refund(db: AsyncSession, tenant_id: uuid.UUID, days: int) -> list[dict[str, Any]]:
     """检测退单率超5%"""
     now = datetime.now(timezone.utc)
     period_start = (now - timedelta(days=days)).isoformat()
@@ -213,25 +214,25 @@ async def _detect_high_refund(
     refund_rate = refunded / total
     if refund_rate <= THRESHOLDS["refund_rate_max"]:
         return []
-    return [{
-        "id": str(uuid.uuid4()),
-        "type": "high_refund",
-        "severity": ANOMALY_SEVERITY["high_refund"],
-        "description": f"近{days}天退单率{refund_rate:.1%}，超过5%警戒线",
-        "detail": {
-            "period_days": days,
-            "refund_rate": round(refund_rate, 4),
-            "refunded_count": refunded,
-            "total_count": total,
-        },
-        "occurred_at": now.isoformat(),
-        "dismissed": False,
-    }]
+    return [
+        {
+            "id": str(uuid.uuid4()),
+            "type": "high_refund",
+            "severity": ANOMALY_SEVERITY["high_refund"],
+            "description": f"近{days}天退单率{refund_rate:.1%}，超过5%警戒线",
+            "detail": {
+                "period_days": days,
+                "refund_rate": round(refund_rate, 4),
+                "refunded_count": refunded,
+                "total_count": total,
+            },
+            "occurred_at": now.isoformat(),
+            "dismissed": False,
+        }
+    ]
 
 
-async def _detect_slow_kitchen(
-    db: AsyncSession, tenant_id: uuid.UUID, days: int
-) -> list[dict[str, Any]]:
+async def _detect_slow_kitchen(db: AsyncSession, tenant_id: uuid.UUID, days: int) -> list[dict[str, Any]]:
     """检测平均出餐时间超30分钟"""
     now = datetime.now(timezone.utc)
     period_start = (now - timedelta(days=days)).isoformat()
@@ -248,24 +249,24 @@ async def _detect_slow_kitchen(
     avg_min = float(r.scalar() or 0)
     if avg_min <= THRESHOLDS["kitchen_time_max_min"]:
         return []
-    return [{
-        "id": str(uuid.uuid4()),
-        "type": "slow_kitchen",
-        "severity": ANOMALY_SEVERITY["slow_kitchen"],
-        "description": f"近{days}天平均出餐时间{avg_min:.1f}分钟，超过30分钟标准",
-        "detail": {
-            "period_days": days,
-            "avg_kitchen_minutes": round(avg_min, 1),
-            "threshold_minutes": THRESHOLDS["kitchen_time_max_min"],
-        },
-        "occurred_at": now.isoformat(),
-        "dismissed": False,
-    }]
+    return [
+        {
+            "id": str(uuid.uuid4()),
+            "type": "slow_kitchen",
+            "severity": ANOMALY_SEVERITY["slow_kitchen"],
+            "description": f"近{days}天平均出餐时间{avg_min:.1f}分钟，超过30分钟标准",
+            "detail": {
+                "period_days": days,
+                "avg_kitchen_minutes": round(avg_min, 1),
+                "threshold_minutes": THRESHOLDS["kitchen_time_max_min"],
+            },
+            "occurred_at": now.isoformat(),
+            "dismissed": False,
+        }
+    ]
 
 
-async def _detect_expiry_risk(
-    db: AsyncSession, tenant_id: uuid.UUID
-) -> list[dict[str, Any]]:
+async def _detect_expiry_risk(db: AsyncSession, tenant_id: uuid.UUID) -> list[dict[str, Any]]:
     """检测7天内过期食材超10种"""
     now = datetime.now(timezone.utc)
     threshold_date = (now + timedelta(days=7)).isoformat()
@@ -283,22 +284,25 @@ async def _detect_expiry_risk(
     count = int(r.scalar() or 0)
     if count <= THRESHOLDS["expiry_count_max"]:
         return []
-    return [{
-        "id": str(uuid.uuid4()),
-        "type": "expiry_risk",
-        "severity": ANOMALY_SEVERITY["expiry_risk"],
-        "description": f"7天内临期食材达{count}种，需尽快处理",
-        "detail": {
-            "expiry_count": count,
-            "threshold": THRESHOLDS["expiry_count_max"],
-            "check_before": threshold_date,
-        },
-        "occurred_at": now.isoformat(),
-        "dismissed": False,
-    }]
+    return [
+        {
+            "id": str(uuid.uuid4()),
+            "type": "expiry_risk",
+            "severity": ANOMALY_SEVERITY["expiry_risk"],
+            "description": f"7天内临期食材达{count}种，需尽快处理",
+            "detail": {
+                "expiry_count": count,
+                "threshold": THRESHOLDS["expiry_count_max"],
+                "check_before": threshold_date,
+            },
+            "occurred_at": now.isoformat(),
+            "dismissed": False,
+        }
+    ]
 
 
 # ─── 合规告警异常查询 ──────────────────────────────────────────────────────────
+
 
 async def _fetch_compliance_anomalies(
     db: AsyncSession,
@@ -337,20 +341,22 @@ async def _fetch_compliance_anomalies(
     rows = r.fetchall()
     anomalies: list[dict[str, Any]] = []
     for row in rows:
-        anomalies.append({
-            "id": str(row[0]),
-            "type": "compliance_alert",
-            "severity": row[2] or "info",
-            "description": row[4] or row[5] or "合规告警",
-            "detail": {
-                "store_id": str(row[1]) if row[1] else None,
-                "status": row[3],
-                "title": row[4],
-                "description": row[5],
-            },
-            "occurred_at": row[6].isoformat() if row[6] else now.isoformat(),
-            "dismissed": row[3] in ("resolved", "dismissed"),
-        })
+        anomalies.append(
+            {
+                "id": str(row[0]),
+                "type": "compliance_alert",
+                "severity": row[2] or "info",
+                "description": row[4] or row[5] or "合规告警",
+                "detail": {
+                    "store_id": str(row[1]) if row[1] else None,
+                    "status": row[3],
+                    "title": row[4],
+                    "description": row[5],
+                },
+                "occurred_at": row[6].isoformat() if row[6] else now.isoformat(),
+                "dismissed": row[3] in ("resolved", "dismissed"),
+            }
+        )
     return anomalies
 
 
@@ -403,21 +409,23 @@ async def _fetch_revenue_anomalies(
         s_id, curr_rev, prev_rev = str(row[0]), int(row[1]), int(row[2])
         if prev_rev > 0 and curr_rev < prev_rev * (1 - THRESHOLDS["revenue_drop_pct"]):
             drop_pct = (prev_rev - curr_rev) / prev_rev
-            anomalies.append({
-                "id": str(uuid.uuid4()),
-                "type": "revenue_drop",
-                "severity": ANOMALY_SEVERITY["revenue_drop"],
-                "description": f"门店 {s_id} 近{days}天营收环比下滑{drop_pct:.0%}",
-                "detail": {
-                    "store_id": s_id,
-                    "period_days": days,
-                    "current_revenue_fen": curr_rev,
-                    "previous_revenue_fen": prev_rev,
-                    "drop_pct": round(drop_pct, 4),
-                },
-                "occurred_at": now.isoformat(),
-                "dismissed": False,
-            })
+            anomalies.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "revenue_drop",
+                    "severity": ANOMALY_SEVERITY["revenue_drop"],
+                    "description": f"门店 {s_id} 近{days}天营收环比下滑{drop_pct:.0%}",
+                    "detail": {
+                        "store_id": s_id,
+                        "period_days": days,
+                        "current_revenue_fen": curr_rev,
+                        "previous_revenue_fen": prev_rev,
+                        "drop_pct": round(drop_pct, 4),
+                    },
+                    "occurred_at": now.isoformat(),
+                    "dismissed": False,
+                }
+            )
     return anomalies
 
 
@@ -437,6 +445,7 @@ async def _fetch_anomalies_from_db(
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/anomalies")
 async def list_anomalies(
@@ -462,9 +471,7 @@ async def list_anomalies(
             pass  # 部分检测表不存在时跳过，继续后续查询
 
         # 从 compliance_alerts + orders 补充通用异常数据
-        anomalies.extend(
-            await _fetch_anomalies_from_db(db, tenant_id, store_id, days)
-        )
+        anomalies.extend(await _fetch_anomalies_from_db(db, tenant_id, store_id, days))
 
         # 按严重程度 + 时间排序（critical 优先）
         severity_order = {"critical": 0, "warning": 1, "info": 2}

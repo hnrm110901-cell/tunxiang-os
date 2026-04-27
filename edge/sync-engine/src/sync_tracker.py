@@ -5,6 +5,7 @@
   2. 读写 sync_watermarks（每张表的最后同步时间）
   3. 写入 / 查询 / 标记 local_change_log（本地操作缓冲）
 """
+
 from __future__ import annotations
 
 import json
@@ -194,8 +195,6 @@ class SyncTracker:
     async def get_pending_count(self) -> int:
         """未同步变更数量（用于状态展示）"""
         async with aiosqlite.connect(self._db_path) as db:
-            cursor = await db.execute(
-                "SELECT COUNT(*) FROM local_change_log WHERE synced = 0"
-            )
+            cursor = await db.execute("SELECT COUNT(*) FROM local_change_log WHERE synced = 0")
             row = await cursor.fetchone()
         return row[0] if row else 0

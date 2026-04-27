@@ -31,10 +31,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import src.api.billing_rules_routes as billing_module
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
-
-import src.api.billing_rules_routes as billing_module
 from src.api.billing_rules_routes import router as billing_rules_router
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────

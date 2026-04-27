@@ -10,6 +10,7 @@ sync-engine 恢复网络后自动回灌到云端。
 - idempotency_key 防重，云端已有同一 key 则标记 conflict，不覆盖
 - 金额全部使用分（整数）
 """
+
 from __future__ import annotations
 
 import os
@@ -35,6 +36,7 @@ _HEALTH_TIMEOUT = 3.0
 
 
 # ─── 模型定义 ─────────────────────────────────────────────────────────────────
+
 
 class OfflineOrderItem(BaseModel):
     dish_id: str = Field(..., description="菜品 ID")
@@ -73,6 +75,7 @@ class VoidOrderRequest(BaseModel):
 
 # ─── 内部工具 ─────────────────────────────────────────────────────────────────
 
+
 async def _check_cloud_reachable() -> bool:
     """检查云端 API 是否可达（GET /health，超时 3s）"""
     try:
@@ -100,6 +103,7 @@ async def _get_pending_count(db: AsyncSession, store_id: str) -> int:
 
 
 # ─── 路由实现 ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/health", summary="检查网络状态与本地 DB 状态")
 async def offline_health(

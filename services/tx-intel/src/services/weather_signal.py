@@ -1,7 +1,9 @@
 """天气信号服务 — 天气变化对餐饮客流的影响评估"""
-import structlog
-from typing import Optional
+
 from datetime import date, timedelta
+from typing import Optional
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -35,6 +37,7 @@ class WeatherSignalService:
         # P0简化：返回模拟天气信号
         # 后续接入: 和风天气API / 心知天气API
         import random
+
         weather_types = list(self.WEATHER_IMPACT.keys())
         weather = random.choice(weather_types)
         impact = self.WEATHER_IMPACT[weather]
@@ -54,40 +57,48 @@ class WeatherSignalService:
         recs: list[dict] = []
 
         if impact.get("traffic_impact", 0) < -0.2:
-            recs.append({
-                "type": "boost_delivery",
-                "description": (
-                    f"天气({weather})导致到店客流预计下降"
-                    f"{abs(impact['traffic_impact']) * 100:.0f}%，"
-                    "建议加大外卖/储值触达"
-                ),
-                "suggested_journey": "stored_value_renewal_v1",
-                "suggested_channel": "miniapp",
-            })
+            recs.append(
+                {
+                    "type": "boost_delivery",
+                    "description": (
+                        f"天气({weather})导致到店客流预计下降"
+                        f"{abs(impact['traffic_impact']) * 100:.0f}%，"
+                        "建议加大外卖/储值触达"
+                    ),
+                    "suggested_journey": "stored_value_renewal_v1",
+                    "suggested_channel": "miniapp",
+                }
+            )
 
         if impact.get("indoor_preference", 0) > 0.5:
-            recs.append({
-                "type": "promote_indoor",
-                "description": "室内消费偏好增强，建议推荐包厢/空调舒适环境",
-                "suggested_journey": "banquet_repurchase_v1",
-                "suggested_channel": "wecom",
-            })
+            recs.append(
+                {
+                    "type": "promote_indoor",
+                    "description": "室内消费偏好增强，建议推荐包厢/空调舒适环境",
+                    "suggested_journey": "banquet_repurchase_v1",
+                    "suggested_channel": "wecom",
+                }
+            )
 
         if impact.get("delivery_boost", 0) > 0.3:
-            recs.append({
-                "type": "delivery_recall",
-                "description": "外卖需求上升，建议触达渠道客回流",
-                "suggested_journey": "channel_reflow_v1",
-                "suggested_channel": "sms",
-            })
+            recs.append(
+                {
+                    "type": "delivery_recall",
+                    "description": "外卖需求上升，建议触达渠道客回流",
+                    "suggested_journey": "channel_reflow_v1",
+                    "suggested_channel": "sms",
+                }
+            )
 
         if impact.get("outdoor_preference", 0) > 0.2:
-            recs.append({
-                "type": "outdoor_dining",
-                "description": "好天气适合户外用餐，建议推荐露台/花园席位",
-                "suggested_journey": None,
-                "suggested_channel": "wecom",
-            })
+            recs.append(
+                {
+                    "type": "outdoor_dining",
+                    "description": "好天气适合户外用餐，建议推荐露台/花园席位",
+                    "suggested_journey": None,
+                    "suggested_channel": "wecom",
+                }
+            )
 
         return recs
 

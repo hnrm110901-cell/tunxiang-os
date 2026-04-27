@@ -7,6 +7,7 @@
 - 记忆写入(category=cost_focus, importance=0.8)
 - 下次推送自动将成本分析提前
 """
+
 from __future__ import annotations
 
 from collections import Counter, defaultdict
@@ -23,7 +24,7 @@ from ..models.feedback_signal import MemoryFeedbackSignal
 logger = structlog.get_logger(__name__)
 
 # ── 偏好推断阈值 ──
-_WEAK_PREFERENCE_DAYS = 3    # 连续3天 -> 弱偏好(confidence=0.7)
+_WEAK_PREFERENCE_DAYS = 3  # 连续3天 -> 弱偏好(confidence=0.7)
 _STRONG_PREFERENCE_DAYS = 5  # 连续5天 -> 强偏好(confidence=0.9)
 
 # ── 信号分类映射 ──
@@ -206,11 +207,13 @@ class FeedbackEvolutionService:
         for action, count in action_counter.most_common(10):
             dwells = action_dwell.get(action, [])
             avg_dwell = round(sum(dwells) / len(dwells), 1) if dwells else 0.0
-            top_actions.append({
-                "action": action,
-                "count": count,
-                "avg_dwell_sec": avg_dwell,
-            })
+            top_actions.append(
+                {
+                    "action": action,
+                    "count": count,
+                    "avg_dwell_sec": avg_dwell,
+                }
+            )
 
         # 2. 最常关注的指标
         metric_counter: Counter = Counter()
@@ -354,13 +357,9 @@ class FeedbackEvolutionService:
                     # 强化/弱化已有记忆
                     old_importance = existing_memory.importance
                     if pref["preference_type"] == "positive":
-                        existing_memory.importance = min(
-                            1.0, old_importance + 0.1 * pref["confidence"]
-                        )
+                        existing_memory.importance = min(1.0, old_importance + 0.1 * pref["confidence"])
                     elif pref["preference_type"] == "negative":
-                        existing_memory.importance = max(
-                            0.0, old_importance - 0.1 * pref["confidence"]
-                        )
+                        existing_memory.importance = max(0.0, old_importance - 0.1 * pref["confidence"])
                     # 重置 confidence（被重新验证）
                     existing_memory.confidence = min(1.0, existing_memory.confidence + 0.05)
                     memories_updated += 1
@@ -516,7 +515,8 @@ class FeedbackEvolutionService:
                 if cat:
                     dismiss_categories[cat] += 1
         avoid_topics = [
-            cat for cat, count in dismiss_categories.items()
+            cat
+            for cat, count in dismiss_categories.items()
             if count >= 3  # 3次以上dismiss才回避
         ]
 
@@ -574,11 +574,7 @@ class FeedbackEvolutionService:
             conditions.append(MemoryFeedbackSignal.signal_type == signal_type)
 
         # 计数
-        count_stmt = (
-            select(func.count())
-            .select_from(MemoryFeedbackSignal)
-            .where(*conditions)
-        )
+        count_stmt = select(func.count()).select_from(MemoryFeedbackSignal).where(*conditions)
         count_result = await self.db.execute(count_stmt)
         total = count_result.scalar() or 0
 
@@ -642,12 +638,9 @@ class FeedbackEvolutionService:
         total_signals = total_result.scalar() or 0
 
         # 活跃用户数（近30天有信号的用户）
-        users_stmt = (
-            select(func.count(MemoryFeedbackSignal.user_id.distinct()))
-            .where(
-                MemoryFeedbackSignal.tenant_id == tid,
-                MemoryFeedbackSignal.created_at >= cutoff,
-            )
+        users_stmt = select(func.count(MemoryFeedbackSignal.user_id.distinct())).where(
+            MemoryFeedbackSignal.tenant_id == tid,
+            MemoryFeedbackSignal.created_at >= cutoff,
         )
         users_result = await self.db.execute(users_stmt)
         active_users = users_result.scalar() or 0
@@ -692,10 +685,7 @@ class FeedbackEvolutionService:
             .group_by(MemoryFeedbackSignal.signal_type)
         )
         breakdown_result = await self.db.execute(breakdown_stmt)
-        signal_breakdown = {
-            row.signal_type: row.count
-            for row in breakdown_result
-        }
+        signal_breakdown = {row.signal_type: row.count for row in breakdown_result}
 
         return {
             "total_signals": total_signals,
@@ -798,11 +788,10 @@ class FeedbackEvolutionService:
                     confidence = 0.5
                 # 正面反馈加成
                 helpful_count = sum(
-                    1 for s in signals
+                    1
+                    for s in signals
                     if s.get("signal_data", {}).get("feedback") == "helpful"
-                    and _ACTION_TO_CATEGORY.get(
-                        s.get("signal_data", {}).get("action", "")
-                    ) == category
+                    and _ACTION_TO_CATEGORY.get(s.get("signal_data", {}).get("action", "")) == category
                 )
                 if helpful_count > 0:
                     confidence = min(1.0, confidence + 0.05 * helpful_count)
@@ -812,12 +801,14 @@ class FeedbackEvolutionService:
             else:
                 continue  # 信号不明确，跳过
 
-            preferences.append({
-                "category": category,
-                "preference_type": preference_type,
-                "confidence": round(confidence, 2),
-                "evidence_count": total,
-            })
+            preferences.append(
+                {
+                    "category": category,
+                    "preference_type": preference_type,
+                    "confidence": round(confidence, 2),
+                    "evidence_count": total,
+                }
+            )
 
         # 按置信度排序
         preferences.sort(key=lambda p: p["confidence"], reverse=True)

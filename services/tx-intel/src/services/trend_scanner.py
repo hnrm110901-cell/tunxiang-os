@@ -6,6 +6,7 @@
   - 计算 0-100 趋势评分
   - 写入 market_trend_signals 表
 """
+
 import uuid
 from datetime import date, timedelta
 from typing import Any
@@ -17,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = structlog.get_logger()
 
 # 趋势方向判断阈值
-_RISING_THRESHOLD = 60.0    # score >= 60 且方向为 rising → rising
+_RISING_THRESHOLD = 60.0  # score >= 60 且方向为 rising → rising
 _DECLINING_THRESHOLD = 30.0  # score < 30 → declining
 
 
@@ -44,12 +45,14 @@ class TrendScannerService:
             cuisine_type=cuisine_type,
         )
         import time
+
         t0 = time.monotonic()
 
         try:
             import os
 
             from adapters.douyin_adapter import DouyinAdapter
+
             adapter = DouyinAdapter(
                 client_key=os.environ.get("DOUYIN_CLIENT_KEY", ""),
                 client_secret=os.environ.get("DOUYIN_CLIENT_SECRET", ""),
@@ -140,6 +143,7 @@ class TrendScannerService:
             region=region,
         )
         import time
+
         t0 = time.monotonic()
 
         # 占位符：从 review_intel 表中提取食材关键词频次作为趋势信号
@@ -303,13 +307,12 @@ def _count_ingredient_keywords(texts: list[str], category: str) -> dict[str, int
                 counts[kw] = counts.get(kw, 0) + 1
 
     # 只保留有实际提及的关键词，按频次排序取 top 10
-    sorted_counts = dict(
-        sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    )
+    sorted_counts = dict(sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10])
     return sorted_counts
 
 
 def _to_json(data: dict[str, Any]) -> str:
     """序列化为 JSON 字符串"""
     import json
+
     return json.dumps(data, ensure_ascii=False, default=str)

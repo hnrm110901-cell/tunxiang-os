@@ -11,6 +11,7 @@
   - AsyncMock.side_effect 顺序匹配路由内 execute 调用顺序
   - 覆盖 happy path + 空数据 + DB异常回落 + 参数校验
 """
+
 import sys
 import types
 import uuid
@@ -18,7 +19,7 @@ import uuid
 # ─── 注入假模块 ───────────────────────────────────────────────────────────────
 
 _fake_structlog = types.ModuleType("structlog")
-_fake_structlog.get_logger = lambda: types.SimpleNamespace(
+_fake_structlog.get_logger = lambda *a, **kw: types.SimpleNamespace(
     warning=lambda *a, **kw: None,
     info=lambda *a, **kw: None,
 )
@@ -56,9 +57,10 @@ _hs_spec = importlib.util.spec_from_file_location("health_score_routes", _base /
 _hs_mod = importlib.util.module_from_spec(_hs_spec)
 _hs_spec.loader.exec_module(_hs_mod)
 
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock
 
 TENANT_ID = str(uuid.uuid4())
 HEADERS = {"X-Tenant-ID": TENANT_ID}
@@ -88,6 +90,7 @@ def _make_hs_app(mock_db: AsyncMock) -> TestClient:
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _scalar_mock(value):
     m = MagicMock()
     m.scalar.return_value = value
@@ -110,6 +113,7 @@ def _fetchall_mock(rows):
 # GET /api/v1/intel/dish-matrix
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestDishMatrix:
     """菜品四象限分析接口"""
 
@@ -117,13 +121,13 @@ class TestDishMatrix:
         """伪造 fetchall 返回的菜品数据行（dish_name, dish_id, sales_count, gross_margin_pct）"""
         return [
             ("招牌红烧肉", uuid.uuid4(), 320, 0.68),
-            ("辣椒炒肉",   uuid.uuid4(), 280, 0.72),
-            ("白米饭",     uuid.uuid4(), 450, 0.35),
+            ("辣椒炒肉", uuid.uuid4(), 280, 0.72),
+            ("白米饭", uuid.uuid4(), 450, 0.35),
             ("老坛酸菜鱼", uuid.uuid4(), 380, 0.42),
-            ("松茸炖土鸡", uuid.uuid4(),  45, 0.71),
-            ("和牛刺身",   uuid.uuid4(),  28, 0.65),
-            ("茄子炒肉",   uuid.uuid4(),  62, 0.28),
-            ("素炒时蔬",   uuid.uuid4(),  55, 0.22),
+            ("松茸炖土鸡", uuid.uuid4(), 45, 0.71),
+            ("和牛刺身", uuid.uuid4(), 28, 0.65),
+            ("茄子炒肉", uuid.uuid4(), 62, 0.28),
+            ("素炒时蔬", uuid.uuid4(), 55, 0.22),
         ]
 
     def test_dish_matrix_happy_path_with_data(self):
@@ -220,13 +224,14 @@ class TestDishMatrix:
         # 直接测试纯函数 _classify_quadrant
         assert _dm_mod._classify_quadrant(200, 0.7, 100, 0.5) == "star"
         assert _dm_mod._classify_quadrant(200, 0.3, 100, 0.5) == "cash_cow"
-        assert _dm_mod._classify_quadrant(50,  0.7, 100, 0.5) == "question_mark"
-        assert _dm_mod._classify_quadrant(50,  0.3, 100, 0.5) == "dog"
+        assert _dm_mod._classify_quadrant(50, 0.7, 100, 0.5) == "question_mark"
+        assert _dm_mod._classify_quadrant(50, 0.3, 100, 0.5) == "dog"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GET /api/v1/intel/dish-matrix/recommendations
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestDishRecommendations:
     """菜品运营建议接口"""
@@ -234,9 +239,9 @@ class TestDishRecommendations:
     def _dish_rows_with_dogs(self):
         return [
             ("招牌红烧肉", uuid.uuid4(), 320, 0.68),
-            ("白米饭",     uuid.uuid4(), 450, 0.35),
-            ("茄子炒肉",   uuid.uuid4(),  62, 0.28),
-            ("素炒时蔬",   uuid.uuid4(),  55, 0.22),
+            ("白米饭", uuid.uuid4(), 450, 0.35),
+            ("茄子炒肉", uuid.uuid4(), 62, 0.28),
+            ("素炒时蔬", uuid.uuid4(), 55, 0.22),
         ]
 
     def test_recommendations_happy_path(self):
@@ -311,6 +316,7 @@ class TestDishRecommendations:
 # ═══════════════════════════════════════════════════════════════════════════════
 # GET /api/v1/intel/health-score
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestHealthScore:
     """经营健康度综合评分接口"""
@@ -470,6 +476,7 @@ class TestHealthScore:
 # GET /api/v1/intel/health-score/breakdown
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestHealthScoreBreakdown:
     """分项评分明细接口"""
 
@@ -482,13 +489,13 @@ class TestHealthScoreBreakdown:
         r2 = MagicMock()
         r2.fetchone.return_value = (280000, 28)
         effects.append(r2)
-        effects.append(_scalar_mock(300000))   # revenue
-        effects.append(_scalar_mock(130000))   # cost (ratio≈43% → score=100)
+        effects.append(_scalar_mock(300000))  # revenue
+        effects.append(_scalar_mock(130000))  # cost (ratio≈43% → score=100)
         r3 = MagicMock()
-        r3.fetchone.return_value = (150, 1)    # refund_rate≈0.66%
+        r3.fetchone.return_value = (150, 1)  # refund_rate≈0.66%
         effects.append(r3)
-        effects.append(_scalar_mock(12))       # avg_min=12 → score=100
-        effects.append(_scalar_mock(3))        # expiry_count=3 → score=92
+        effects.append(_scalar_mock(12))  # avg_min=12 → score=100
+        effects.append(_scalar_mock(3))  # expiry_count=3 → score=92
         return effects
 
     def test_breakdown_happy_path(self):

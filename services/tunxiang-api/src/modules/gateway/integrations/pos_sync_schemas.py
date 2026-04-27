@@ -1,4 +1,5 @@
 """POS同步请求/响应模型"""
+
 from __future__ import annotations
 
 from datetime import date
@@ -19,18 +20,14 @@ class BackfillRequest(BaseModel):
     )
     start_date: date = Field(..., description="开始日期")
     end_date: date = Field(..., description="结束日期")
-    store_ids: list[str] | None = Field(
-        None, description="指定门店ID列表，为空则同步所有活跃门店"
-    )
+    store_ids: list[str] | None = Field(None, description="指定门店ID列表，为空则同步所有活跃门店")
     max_days: int = Field(31, ge=1, le=90, description="最大允许天数")
 
 
 class SyncTodayRequest(BaseModel):
     """同步今日数据请求（可选指定门店）"""
 
-    store_ids: list[str] | None = Field(
-        None, description="指定门店ID列表，为空则同步所有活跃门店"
-    )
+    store_ids: list[str] | None = Field(None, description="指定门店ID列表，为空则同步所有活跃门店")
 
 
 # ── 响应模型 ──────────────────────────────────────────────────────────────────

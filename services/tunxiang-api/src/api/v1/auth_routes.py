@@ -2,6 +2,7 @@
 
 MVP直接内嵌简化auth，不依赖gateway的import路径。
 """
+
 import uuid
 
 from fastapi import APIRouter, Request

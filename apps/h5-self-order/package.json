@@ -12,8 +12,8 @@
   "dependencies": {
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^6.20.0",
-    "zustand": "^4.4.0",
+    "react-router-dom": "^7.14.1",
+    "zustand": "^5.0.12",
     "dayjs": "^1.11.0",
     "@tunxiang/design-system": "workspace:*"
   },
@@ -23,6 +23,6 @@
     "@vitejs/plugin-react": "^4.2.0",
     "typescript": "^5.3.0",
     "vite": "^5.0.0",
-    "eslint": "^8.56.0"
+    "eslint": "^10.2.1"
   }
 }

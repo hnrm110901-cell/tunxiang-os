@@ -13,6 +13,7 @@ from .production_dept import DishDeptMapping, ProductionDept
 from .queue import QueueCounter, QueueEntry
 from .receipt import ReceiptLog, ReceiptTemplate
 from .reservation import NoShowRecord, Reservation
+from .reservation_config import ReservationConfig, ReservationTimeSlot
 from .retail_mall import RetailOrder, RetailOrderItem, RetailProduct
 from .settlement import Settlement, ShiftHandover
 from .tables import Table

@@ -5,6 +5,7 @@
 
 所有金额单位：分（fen）。
 """
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -18,9 +19,15 @@ logger = structlog.get_logger()
 # ─── 常量 ───
 
 MONITOR_DIMENSIONS = [
-    "new_product", "menu_change", "price_change",
-    "campaign", "store_open", "store_close",
-    "rating_change", "hot_selling_item", "negative_review_spike",
+    "new_product",
+    "menu_change",
+    "price_change",
+    "campaign",
+    "store_open",
+    "store_close",
+    "rating_change",
+    "hot_selling_item",
+    "negative_review_spike",
     "delivery_performance",
 ]
 
@@ -37,6 +44,7 @@ MONITOR_LEVELS = ["basic", "standard", "intensive"]
 @dataclass
 class Competitor:
     """竞对信息"""
+
     competitor_id: str
     name: str
     category: str
@@ -54,6 +62,7 @@ class Competitor:
 @dataclass
 class CompetitorAction:
     """竞对动态"""
+
     action_id: str
     competitor_id: str
     action_type: str
@@ -280,8 +289,7 @@ class CompetitorMonitorService:
             )
             self._actions.append(action)
 
-        logger.info("seed_data_loaded", competitors=len(self._competitors),
-                     actions=len(self._actions))
+        logger.info("seed_data_loaded", competitors=len(self._competitors), actions=len(self._actions))
 
     # ─── 竞对管理 ───
 
@@ -323,9 +331,7 @@ class CompetitorMonitorService:
         logger.info("competitor_registered", name=name, competitor_id=cid)
         return {"competitor_id": cid, "name": name, "status": "registered"}
 
-    def list_competitors(
-        self, category: Optional[str] = None, city: Optional[str] = None
-    ) -> list[dict]:
+    def list_competitors(self, category: Optional[str] = None, city: Optional[str] = None) -> list[dict]:
         """列出竞对品牌，可按品类/城市过滤"""
         results = []
         for c in self._competitors.values():
@@ -333,17 +339,19 @@ class CompetitorMonitorService:
                 continue
             if city and city not in c.cities:
                 continue
-            results.append({
-                "competitor_id": c.competitor_id,
-                "name": c.name,
-                "category": c.category,
-                "price_tier": c.price_tier,
-                "cities": c.cities,
-                "stores_count": c.stores_count,
-                "monitor_level": c.monitor_level,
-                "avg_rating": c.avg_rating,
-                "tags": c.tags,
-            })
+            results.append(
+                {
+                    "competitor_id": c.competitor_id,
+                    "name": c.name,
+                    "category": c.category,
+                    "price_tier": c.price_tier,
+                    "cities": c.cities,
+                    "stores_count": c.stores_count,
+                    "monitor_level": c.monitor_level,
+                    "avg_rating": c.avg_rating,
+                    "tags": c.tags,
+                }
+            )
         return results
 
     def get_competitor_detail(self, competitor_id: str) -> dict:
@@ -351,10 +359,7 @@ class CompetitorMonitorService:
         c = self._competitors.get(competitor_id)
         if not c:
             raise KeyError(f"Competitor not found: {competitor_id}")
-        recent_actions = [
-            a for a in self._actions
-            if a.competitor_id == competitor_id
-        ][-10:]
+        recent_actions = [a for a in self._actions if a.competitor_id == competitor_id][-10:]
         return {
             "competitor_id": c.competitor_id,
             "name": c.name,
@@ -370,8 +375,13 @@ class CompetitorMonitorService:
             "notes": c.notes,
             "recent_actions_count": len(recent_actions),
             "recent_actions": [
-                {"action_id": a.action_id, "title": a.title, "action_type": a.action_type,
-                 "impact_level": a.impact_level, "recorded_at": a.recorded_at}
+                {
+                    "action_id": a.action_id,
+                    "title": a.title,
+                    "action_type": a.action_type,
+                    "impact_level": a.impact_level,
+                    "recorded_at": a.recorded_at,
+                }
                 for a in recent_actions
             ],
         }
@@ -408,8 +418,12 @@ class CompetitorMonitorService:
             recorded_at=datetime.now(timezone.utc).isoformat(),
         )
         self._actions.append(action)
-        logger.info("competitor_action_recorded", action_id=action.action_id,
-                     competitor=self._competitors[competitor_id].name, action_type=action_type)
+        logger.info(
+            "competitor_action_recorded",
+            action_id=action.action_id,
+            competitor=self._competitors[competitor_id].name,
+            action_type=action_type,
+        )
         return {
             "action_id": action.action_id,
             "competitor_name": self._competitors[competitor_id].name,
@@ -435,18 +449,20 @@ class CompetitorMonitorService:
             if action_type and a.action_type != action_type:
                 continue
             comp = self._competitors.get(a.competitor_id)
-            results.append({
-                "action_id": a.action_id,
-                "competitor_id": a.competitor_id,
-                "competitor_name": comp.name if comp else "未知",
-                "action_type": a.action_type,
-                "title": a.title,
-                "detail": a.detail,
-                "impact_level": a.impact_level,
-                "source": a.source,
-                "city": a.city,
-                "recorded_at": a.recorded_at,
-            })
+            results.append(
+                {
+                    "action_id": a.action_id,
+                    "competitor_id": a.competitor_id,
+                    "competitor_name": comp.name if comp else "未知",
+                    "action_type": a.action_type,
+                    "title": a.title,
+                    "detail": a.detail,
+                    "impact_level": a.impact_level,
+                    "source": a.source,
+                    "city": a.city,
+                    "recorded_at": a.recorded_at,
+                }
+            )
         results.sort(key=lambda x: x["recorded_at"], reverse=True)
         return results
 
@@ -506,13 +522,15 @@ class CompetitorMonitorService:
                 continue
             if a.recorded_at and datetime.fromisoformat(a.recorded_at) < cutoff:
                 continue
-            timeline.append({
-                "action_id": a.action_id,
-                "action_type": a.action_type,
-                "title": a.title,
-                "impact_level": a.impact_level,
-                "recorded_at": a.recorded_at,
-            })
+            timeline.append(
+                {
+                    "action_id": a.action_id,
+                    "action_type": a.action_type,
+                    "title": a.title,
+                    "impact_level": a.impact_level,
+                    "recorded_at": a.recorded_at,
+                }
+            )
         timeline.sort(key=lambda x: x["recorded_at"])
         return timeline
 
@@ -526,10 +544,9 @@ class CompetitorMonitorService:
 
         for cid, comp in self._competitors.items():
             recent = [
-                a for a in self._actions
-                if a.competitor_id == cid
-                and a.recorded_at
-                and datetime.fromisoformat(a.recorded_at) >= recent_cutoff
+                a
+                for a in self._actions
+                if a.competitor_id == cid and a.recorded_at and datetime.fromisoformat(a.recorded_at) >= recent_cutoff
             ]
             if not recent:
                 continue
@@ -540,55 +557,63 @@ class CompetitorMonitorService:
                 for oa in open_actions:
                     overlap_cities = set(comp.cities) & set(_OUR_BRAND_METRICS["cities"])
                     if overlap_cities:
-                        threats.append({
-                            "threat_type": "同品类扩张",
-                            "competitor_name": comp.name,
-                            "severity": "high",
-                            "description": f"{comp.name}在重叠城市{', '.join(overlap_cities)}开新店",
-                            "source_action_id": oa.action_id,
-                            "recommended_response": "关注新店选址位置，评估对周边门店客流影响",
-                            "detected_at": now.isoformat(),
-                        })
+                        threats.append(
+                            {
+                                "threat_type": "同品类扩张",
+                                "competitor_name": comp.name,
+                                "severity": "high",
+                                "description": f"{comp.name}在重叠城市{', '.join(overlap_cities)}开新店",
+                                "source_action_id": oa.action_id,
+                                "recommended_response": "关注新店选址位置，评估对周边门店客流影响",
+                                "detected_at": now.isoformat(),
+                            }
+                        )
 
             # 威胁2：竞对降价
             price_actions = [a for a in recent if a.action_type == "price_change"]
             for pa in price_actions:
-                threats.append({
-                    "threat_type": "价格竞争",
-                    "competitor_name": comp.name,
-                    "severity": "medium",
-                    "description": pa.title,
-                    "source_action_id": pa.action_id,
-                    "recommended_response": "分析降价对客流影响，评估是否需要调整套餐策略",
-                    "detected_at": now.isoformat(),
-                })
+                threats.append(
+                    {
+                        "threat_type": "价格竞争",
+                        "competitor_name": comp.name,
+                        "severity": "medium",
+                        "description": pa.title,
+                        "source_action_id": pa.action_id,
+                        "recommended_response": "分析降价对客流影响，评估是否需要调整套餐策略",
+                        "detected_at": now.isoformat(),
+                    }
+                )
 
             # 威胁3：竞对爆品冲击
             hot_items = [a for a in recent if a.action_type == "hot_selling_item"]
             for hi in hot_items:
                 if comp.category == _OUR_BRAND_METRICS["category"]:
-                    threats.append({
-                        "threat_type": "爆品冲击",
-                        "competitor_name": comp.name,
-                        "severity": "high",
-                        "description": hi.title,
-                        "source_action_id": hi.action_id,
-                        "recommended_response": "研究爆品卖点，评估是否需要开发类似产品或差异化应对",
-                        "detected_at": now.isoformat(),
-                    })
+                    threats.append(
+                        {
+                            "threat_type": "爆品冲击",
+                            "competitor_name": comp.name,
+                            "severity": "high",
+                            "description": hi.title,
+                            "source_action_id": hi.action_id,
+                            "recommended_response": "研究爆品卖点，评估是否需要开发类似产品或差异化应对",
+                            "detected_at": now.isoformat(),
+                        }
+                    )
 
             # 威胁4：高频动作 = 竞对在发力
             high_impact = [a for a in recent if a.impact_level in ("high", "critical")]
             if len(high_impact) >= 3:
-                threats.append({
-                    "threat_type": "竞对加速",
-                    "competitor_name": comp.name,
-                    "severity": "critical",
-                    "description": f"{comp.name}近14天有{len(high_impact)}个高影响力动作，可能在发起战略攻势",
-                    "source_action_id": high_impact[0].action_id,
-                    "recommended_response": "召开竞对分析专题会，制定应对方案",
-                    "detected_at": now.isoformat(),
-                })
+                threats.append(
+                    {
+                        "threat_type": "竞对加速",
+                        "competitor_name": comp.name,
+                        "severity": "critical",
+                        "description": f"{comp.name}近14天有{len(high_impact)}个高影响力动作，可能在发起战略攻势",
+                        "source_action_id": high_impact[0].action_id,
+                        "recommended_response": "召开竞对分析专题会，制定应对方案",
+                        "detected_at": now.isoformat(),
+                    }
+                )
 
         threats.sort(key=lambda t: {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(t["severity"], 9))
         return threats
@@ -606,10 +631,16 @@ class CompetitorMonitorService:
             summary_text = f"{c.name}近30天无显著动态。"
         else:
             action_types_cn = {
-                "new_product": "新品上线", "menu_change": "菜单调整", "price_change": "价格变动",
-                "campaign": "营销活动", "store_open": "新开门店", "store_close": "关闭门店",
-                "rating_change": "评分变化", "hot_selling_item": "爆款单品",
-                "negative_review_spike": "差评突增", "delivery_performance": "外卖变化",
+                "new_product": "新品上线",
+                "menu_change": "菜单调整",
+                "price_change": "价格变动",
+                "campaign": "营销活动",
+                "store_open": "新开门店",
+                "store_close": "关闭门店",
+                "rating_change": "评分变化",
+                "hot_selling_item": "爆款单品",
+                "negative_review_spike": "差评突增",
+                "delivery_performance": "外卖变化",
             }
             action_counts: dict[str, int] = {}
             titles: list[str] = []
@@ -622,10 +653,7 @@ class CompetitorMonitorService:
             highlights = "；".join(titles[:3])
             high_impact_count = sum(1 for a in recent_actions if a["impact_level"] in ("high", "critical"))
 
-            summary_text = (
-                f"{c.name}近30天共{len(recent_actions)}条动态（{count_str}）。"
-                f"重点事件：{highlights}。"
-            )
+            summary_text = f"{c.name}近30天共{len(recent_actions)}条动态（{count_str}）。重点事件：{highlights}。"
             if high_impact_count > 0:
                 summary_text += f"其中{high_impact_count}条为高影响力事件，需重点关注。"
 

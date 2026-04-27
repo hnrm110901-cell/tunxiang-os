@@ -25,6 +25,7 @@ TODO: 真正集成 Core ML Vision 后，替换推理逻辑为以下步骤：
   from .vision_stub import router as vision_stub_router
   app.include_router(vision_stub_router)
 """
+
 from __future__ import annotations
 
 import structlog
@@ -38,7 +39,7 @@ router = APIRouter(prefix="/vision", tags=["vision-stub"])
 # ─── Mock 识别结果（Core ML 集成后替换） ───
 _MOCK_MATCHES = [
     {"dish_id": "mock_1", "dish_name": "宫保鸡丁", "price": 48.0, "confidence": 92, "thumbnail_url": ""},
-    {"dish_id": "mock_2", "dish_name": "红烧肉",   "price": 68.0, "confidence": 75, "thumbnail_url": ""},
+    {"dish_id": "mock_2", "dish_name": "红烧肉", "price": 68.0, "confidence": 75, "thumbnail_url": ""},
     {"dish_id": "mock_3", "dish_name": "鱼香茄子", "price": 38.0, "confidence": 68, "thumbnail_url": ""},
 ]
 

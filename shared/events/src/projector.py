@@ -310,7 +310,7 @@ class ProjectorBase(ABC):
                   {time_clause}
                 ORDER BY occurred_at ASC, event_id ASC
                 LIMIT ${len(params)}
-                """,
+                """,  # noqa: S608 — type_filter/time_clause 由本模块构造，非用户输入
                 *params,
             )
 

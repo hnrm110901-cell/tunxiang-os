@@ -20,7 +20,7 @@ import { fetchTicketQueue, startTicket, completeTicket } from '../api/kdsOpsApi'
 import { warmUpAudio, playNewOrder, playTimeout } from '../utils/audio';
 import { OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
-import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch/components/TXKDSTicket';
+import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch';
 import { useKDSRules } from '../hooks/useKDSRules';
 import { useOrdersCache } from '../hooks/useOrdersCache';
 import { useConnection } from '../contexts/ConnectionContext';

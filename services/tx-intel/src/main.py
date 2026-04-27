@@ -2,6 +2,7 @@
 
 提供竞对监测、消费洞察、口碑分析、新品雷达、价格洞察、情报报告、试点建议等 API。
 """
+
 import asyncio
 import os
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from services.calendar_signal import CalendarSignalService
 from services.competitor_monitor import CompetitorMonitorService
 from services.consumer_insight import ConsumerInsightService
 from services.intel_report_engine import IntelReportEngine
@@ -19,7 +21,6 @@ from services.pilot_suggestion import PilotSuggestionService
 from services.pricing_insight import PricingInsightService
 from services.review_topic_engine import ReviewTopicEngine
 from services.weather_signal import WeatherSignalService
-from services.calendar_signal import CalendarSignalService
 
 AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
 
@@ -27,6 +28,7 @@ AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
 async def _daily_intel_report_task() -> None:
     """每日0点自动生成竞对情报周报（后台任务）"""
     import structlog as _structlog
+
     _logger = _structlog.get_logger("daily_intel_task")
 
     while True:
@@ -90,10 +92,12 @@ app = FastAPI(
 )
 
 from prometheus_fastapi_instrumentator import Instrumentator
+
 Instrumentator().instrument(app).expose(app)
 
 # /api/v1/intel/competitor-monitor/* — 竞品监控（v207）
 from .api.competitor_monitoring_routes import router as competitor_monitoring_router
+
 app.include_router(competitor_monitoring_router)
 
 # ─── 服务实例 ───
@@ -110,6 +114,7 @@ calendar_svc = CalendarSignalService()
 
 
 # ─── 通用响应 ───
+
 
 def ok(data: dict | list) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -151,10 +156,15 @@ class RecordActionReq(BaseModel):
 def register_competitor(req: RegisterCompetitorReq) -> dict:
     try:
         result = competitor_svc.register_competitor(
-            name=req.name, category=req.category, price_tier=req.price_tier,
-            cities=req.cities, stores_count=req.stores_count,
-            monitor_level=req.monitor_level, tags=req.tags,
-            avg_rating=req.avg_rating, avg_spend_fen=req.avg_spend_fen,
+            name=req.name,
+            category=req.category,
+            price_tier=req.price_tier,
+            cities=req.cities,
+            stores_count=req.stores_count,
+            monitor_level=req.monitor_level,
+            tags=req.tags,
+            avg_rating=req.avg_rating,
+            avg_spend_fen=req.avg_spend_fen,
             notes=req.notes,
         )
         return ok(result)
@@ -182,9 +192,13 @@ def get_competitor_detail(competitor_id: str) -> dict:
 def record_action(req: RecordActionReq) -> dict:
     try:
         result = competitor_svc.record_competitor_action(
-            competitor_id=req.competitor_id, action_type=req.action_type,
-            title=req.title, detail=req.detail,
-            impact_level=req.impact_level, source=req.source, city=req.city,
+            competitor_id=req.competitor_id,
+            action_type=req.action_type,
+            title=req.title,
+            detail=req.detail,
+            impact_level=req.impact_level,
+            source=req.source,
+            city=req.city,
         )
         return ok(result)
     except (KeyError, ValueError) as e:
@@ -197,8 +211,7 @@ def get_recent_actions(
     competitor_id: Optional[str] = None,
     action_type: Optional[str] = None,
 ) -> dict:
-    return ok(competitor_svc.get_recent_actions(days=days, competitor_id=competitor_id,
-                                                 action_type=action_type))
+    return ok(competitor_svc.get_recent_actions(days=days, competitor_id=competitor_id, action_type=action_type))
 
 
 @app.get("/api/v1/intel/competitors/{competitor_id}/compare")
@@ -251,8 +264,10 @@ class ExtractTopicsReq(BaseModel):
 def ingest_signal(req: IngestSignalReq) -> dict:
     try:
         result = consumer_svc.ingest_signal(
-            source_type=req.source_type, content=req.content,
-            city=req.city, store_id=req.store_id,
+            source_type=req.source_type,
+            content=req.content,
+            city=req.city,
+            store_id=req.store_id,
         )
         return ok(result)
     except ValueError as e:
@@ -372,9 +387,13 @@ class CreatePilotPlanReq(BaseModel):
 @app.post("/api/v1/intel/opportunities")
 def register_opportunity(req: RegisterOpportunityReq) -> dict:
     result = product_radar.register_opportunity(
-        name=req.name, category=req.category, source=req.source,
-        description=req.description, market_heat_score=req.market_heat_score,
-        brand_fit_score=req.brand_fit_score, audience_fit_score=req.audience_fit_score,
+        name=req.name,
+        category=req.category,
+        source=req.source,
+        description=req.description,
+        market_heat_score=req.market_heat_score,
+        brand_fit_score=req.brand_fit_score,
+        audience_fit_score=req.audience_fit_score,
         cost_feasibility_score=req.cost_feasibility_score,
     )
     return ok(result)
@@ -417,8 +436,10 @@ def recommend_pilot_stores(opportunity_id: str) -> dict:
 def create_pilot_plan(req: CreatePilotPlanReq) -> dict:
     try:
         result = product_radar.create_pilot_plan(
-            opportunity_id=req.opportunity_id, stores=req.stores,
-            period_days=req.period_days, metrics=req.metrics,
+            opportunity_id=req.opportunity_id,
+            stores=req.stores,
+            period_days=req.period_days,
+            metrics=req.metrics,
         )
         return ok(result)
     except KeyError as e:
@@ -505,7 +526,9 @@ class ScheduleReportReq(BaseModel):
 def generate_report(req: GenerateReportReq) -> dict:
     try:
         result = report_engine.generate_report(
-            report_type=req.report_type, date_range=req.date_range, city=req.city,
+            report_type=req.report_type,
+            date_range=req.date_range,
+            city=req.city,
         )
         return ok(result)
     except ValueError as e:
@@ -529,7 +552,8 @@ def get_report_detail(report_id: str) -> dict:
 def schedule_report(req: ScheduleReportReq) -> dict:
     try:
         result = report_engine.schedule_auto_report(
-            report_type=req.report_type, frequency=req.frequency,
+            report_type=req.report_type,
+            frequency=req.frequency,
             recipients=req.recipients,
         )
         return ok(result)
@@ -577,10 +601,14 @@ class CompletePilotReq(BaseModel):
 def create_suggestion(req: CreateSuggestionReq) -> dict:
     try:
         result = pilot_svc.create_suggestion(
-            source_type=req.source_type, source_id=req.source_id,
-            suggestion_type=req.suggestion_type, title=req.title,
-            description=req.description, recommended_stores=req.recommended_stores,
-            period_days=req.period_days, success_metrics=req.success_metrics,
+            source_type=req.source_type,
+            source_id=req.source_id,
+            suggestion_type=req.suggestion_type,
+            title=req.title,
+            description=req.description,
+            recommended_stores=req.recommended_stores,
+            period_days=req.period_days,
+            success_metrics=req.success_metrics,
         )
         return ok(result)
     except ValueError as e:
@@ -620,7 +648,8 @@ def track_pilot_progress(pilot_id: str) -> dict:
 def complete_pilot_review(req: CompletePilotReq) -> dict:
     try:
         result = pilot_svc.complete_pilot_review(
-            pilot_id=req.pilot_id, results=req.results,
+            pilot_id=req.pilot_id,
+            results=req.results,
             conclusion=req.conclusion,
         )
         return ok(result)
@@ -649,6 +678,7 @@ def get_pilot_portfolio() -> dict:
 @app.get("/api/v1/intel/weather/signal")
 async def get_weather_signal(city: str, target_date: Optional[str] = None) -> dict:
     from datetime import date as _date
+
     td = _date.fromisoformat(target_date) if target_date else None
     result = await weather_svc.get_weather_signal(city, td)
     return ok(result)
@@ -686,25 +716,29 @@ def get_event_by_date(target_date: str) -> dict:
 # ─── 评价情感分析路由 ───
 
 from .api.sentiment_routes import router as sentiment_router
+
 app.include_router(sentiment_router)
 
 # ─── 健康检查 ───
 
+
 @app.get("/health")
 def health_check() -> dict:
-    return ok({
-        "service": "tx-intel",
-        "version": "1.1.0",
-        "engines": [
-            "competitor_monitor",
-            "consumer_insight",
-            "review_topic_engine",
-            "new_product_radar",
-            "pricing_insight",
-            "intel_report_engine",
-            "pilot_suggestion",
-            "weather_signal",
-            "calendar_signal",
-            "sentiment_analysis",
-        ],
-    })
+    return ok(
+        {
+            "service": "tx-intel",
+            "version": "1.1.0",
+            "engines": [
+                "competitor_monitor",
+                "consumer_insight",
+                "review_topic_engine",
+                "new_product_radar",
+                "pricing_insight",
+                "intel_report_engine",
+                "pilot_suggestion",
+                "weather_signal",
+                "calendar_signal",
+                "sentiment_analysis",
+            ],
+        }
+    )

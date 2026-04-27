@@ -16,11 +16,9 @@
   8. mock发票数据
 """
 import argparse
-import json
 import sys
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import UUID
 
 # ---------------------------------------------------------------------------
 # 依赖：requests（标准库优先，回退 httpx）

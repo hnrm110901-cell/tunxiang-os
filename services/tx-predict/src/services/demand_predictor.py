@@ -9,6 +9,7 @@
 
 输出单位：预测份数（整数）
 """
+
 from __future__ import annotations
 
 import math
@@ -24,9 +25,9 @@ from .weather_service import WeatherService
 log = structlog.get_logger(__name__)
 
 # 默认参数
-LOOKBACK_DAYS = 14          # 回溯14天销售数据
-WEIGHTED_DAYS = 7           # 加权移动平均窗口
-FORECAST_DAYS = 3           # 预测未来3天
+LOOKBACK_DAYS = 14  # 回溯14天销售数据
+WEIGHTED_DAYS = 7  # 加权移动平均窗口
+FORECAST_DAYS = 3  # 预测未来3天
 
 # 加权移动平均权重（近日权重高）
 # day-1 权重7, day-2 权重6, ..., day-7 权重1
@@ -164,23 +165,27 @@ class DemandPredictor:
                 data_days = len(daily_sales)
                 confidence = min(0.90, 0.40 + data_days * 0.04)
 
-                daily_forecasts.append({
-                    "date": target_date.isoformat(),
-                    "predicted_qty": predicted,
-                    "confidence": round(confidence, 2),
-                })
+                daily_forecasts.append(
+                    {
+                        "date": target_date.isoformat(),
+                        "predicted_qty": predicted,
+                        "confidence": round(confidence, 2),
+                    }
+                )
                 dish_total += predicted
 
             avg_daily = dish_total / forecast_days if forecast_days > 0 else 0
 
-            dishes_result.append({
-                "dish_id": dish_id,
-                "dish_name": dish_name,
-                "category": category,
-                "daily_forecasts": daily_forecasts,
-                "avg_daily": round(avg_daily, 1),
-                "total_forecast": dish_total,
-            })
+            dishes_result.append(
+                {
+                    "dish_id": dish_id,
+                    "dish_name": dish_name,
+                    "category": category,
+                    "daily_forecasts": daily_forecasts,
+                    "avg_daily": round(avg_daily, 1),
+                    "total_forecast": dish_total,
+                }
+            )
 
             total_qty += dish_total
             if len(daily_sales) >= 7:
@@ -226,7 +231,11 @@ class DemandPredictor:
             }
         """
         forecast = await self.forecast_demand(
-            store_id, tenant_id, db, forecast_days=1, city=city,
+            store_id,
+            tenant_id,
+            db,
+            forecast_days=1,
+            city=city,
         )
 
         tomorrow = (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat()
@@ -246,14 +255,16 @@ class DemandPredictor:
             # 优先级：高销量 = high
             priority = "high" if predicted_qty >= 20 else ("medium" if predicted_qty >= 5 else "low")
 
-            prep_items.append({
-                "dish_id": dish["dish_id"],
-                "dish_name": dish["dish_name"],
-                "category": dish.get("category", ""),
-                "predicted_qty": predicted_qty,
-                "prep_qty": prep_qty,
-                "priority": priority,
-            })
+            prep_items.append(
+                {
+                    "dish_id": dish["dish_id"],
+                    "dish_name": dish["dish_name"],
+                    "category": dish.get("category", ""),
+                    "predicted_qty": predicted_qty,
+                    "prep_qty": prep_qty,
+                    "priority": priority,
+                }
+            )
 
         # 高优先级排前面
         priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -360,12 +371,14 @@ class DemandPredictor:
                 pred = predicted_by_dish.get(dish_id, 0)
                 if act > 0:
                     dish_mape = abs(pred - act) / act * 100
-                    dish_accuracy.append({
-                        "dish_id": dish_id,
-                        "actual": act,
-                        "predicted": pred,
-                        "mape": round(dish_mape, 1),
-                    })
+                    dish_accuracy.append(
+                        {
+                            "dish_id": dish_id,
+                            "actual": act,
+                            "predicted": pred,
+                            "mape": round(dish_mape, 1),
+                        }
+                    )
             dish_accuracy.sort(key=lambda x: x["mape"], reverse=True)
 
             return {

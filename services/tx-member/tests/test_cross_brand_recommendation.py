@@ -16,8 +16,7 @@ import os
 import sys
 import types
 import uuid
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -43,7 +42,7 @@ if "api" not in sys.modules:
     sys.modules["api"] = _api_pkg
 
 # 把 api 的父包指向一个虚拟包（包含 db）
-_parent_pkg_name = "api".rsplit(".", 1)[0] if "." in "api" else ""
+_parent_pkg_name = ["api"][0] if "." in "api" else ""
 if not _parent_pkg_name:
     # api 是顶层包，需要给 api 模块的 parent 包注入 db
     # 这里使用 mock 对 ..db 做 patch
@@ -95,7 +94,6 @@ def _make_row(**kwargs):
 # ──────────────────────────────────────────────────────────────────
 
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 
 def _create_test_app():
@@ -115,7 +113,7 @@ def _create_test_app():
 def test_cross_brand_merge_same_brand_validation():
     """CrossBrandMergeReq 验证：源品牌与目标品牌相同应在端点层拒绝"""
     # 直接测试验证逻辑
-    from pydantic import BaseModel, Field, field_validator
+    from pydantic import BaseModel
 
     class CrossBrandMergeReq(BaseModel):
         phone: str
@@ -138,7 +136,7 @@ def test_cross_brand_merge_same_brand_validation():
 
 def test_points_transfer_validation():
     """PointsTransferReq 验证：points 必须 > 0，品牌不能相同"""
-    from pydantic import BaseModel, Field, field_validator, ValidationError
+    from pydantic import BaseModel, Field, ValidationError, field_validator
 
     class PointsTransferReq(BaseModel):
         golden_id: str
@@ -189,8 +187,9 @@ def test_points_transfer_validation():
 
 def test_order_time_recommend_req_validation():
     """OrderTimeRecommendReq 验证：limit 范围 1-20"""
-    from pydantic import BaseModel, Field, ValidationError
     from typing import Optional
+
+    from pydantic import BaseModel, Field, ValidationError
 
     class OrderTimeRecommendReq(BaseModel):
         customer_id: str
@@ -257,8 +256,6 @@ def test_phone_hash_consistency():
 
 def test_meal_period_detection():
     """不同时间应返回正确的餐段"""
-    from datetime import datetime
-    from unittest.mock import patch
 
     def _current_meal_period_for(hour: int) -> str:
         if 6 <= hour < 10:

@@ -48,7 +48,7 @@ _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 # ─── structlog mock ──────────────────────────────────────────────────────────
 _structlog = types.ModuleType("structlog")
-_structlog.get_logger = lambda: types.SimpleNamespace(  # type: ignore[attr-defined]
+_structlog.get_logger = lambda *a, **kw: types.SimpleNamespace(  # type: ignore[attr-defined]
     info=lambda *a, **k: None,
     warning=lambda *a, **k: None,
     error=lambda *a, **k: None,
