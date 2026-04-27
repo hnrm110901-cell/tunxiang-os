@@ -139,6 +139,11 @@ from .api.mrp_routes import router as mrp_router
 
 app.include_router(mrp_router, prefix="/api/v1/supply/mrp")  # MRP预估：需求计算/生产建议/采购建议/领料（v282表）
 
+# ── 盘亏处理审批闭环（v370 新增 — TASK-5）──
+from .api.stocktake_loss_routes import router as stocktake_loss_router
+
+app.include_router(stocktake_loss_router)
+
 
 @app.get("/health")
 async def health():
