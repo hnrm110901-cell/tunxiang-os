@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
 
 from ..config import get_settings
 from ..db import check_db_connectivity
@@ -26,11 +26,13 @@ async def health() -> dict[str, object]:
 
 
 @router.get("/readiness")
-async def readiness() -> dict[str, object]:
-    """readiness 探针：DB 可连通才视为就绪。"""
+async def readiness(response: Response) -> dict[str, object]:
+    """readiness 探针：DB 可连通才视为就绪；不就绪时返回 503 让 K8s 摘流量。"""
 
     settings = get_settings()
     db_ok = await check_db_connectivity()
+    if not db_ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {
         "ok": db_ok,
         "data": {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Table,
@@ -28,10 +28,19 @@ export default function AppsPage() {
   const [resourceType, setResourceType] = useState<ResourceType | undefined>(undefined)
   const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+
+  // 筛选条件变化时重置到第 1 页，避免停留在变成空的旧页
+  useEffect(() => {
+    setPage(1)
+  }, [resourceType, q])
 
   const { data, isLoading, refetch, isFetching } = useApplications({
     resource_type: resourceType,
     q: q || undefined,
+    page,
+    size: pageSize,
   })
 
   const columns = [
@@ -138,7 +147,13 @@ export default function AppsPage() {
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}
-        pagination={{ total: data?.total ?? 0, pageSize: 20, showSizeChanger: false }}
+        pagination={{
+          current: page,
+          total: data?.total ?? 0,
+          pageSize,
+          showSizeChanger: false,
+          onChange: (p) => setPage(p),
+        }}
       />
 
       <Modal

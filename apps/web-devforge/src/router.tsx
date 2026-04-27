@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import { AppLayout } from './layout/AppLayout'
@@ -21,7 +21,7 @@ const IntegrationPage = lazy(() => import('./pages/integration'))
 const SecurityPage    = lazy(() => import('./pages/security'))
 const SystemPage      = lazy(() => import('./pages/system'))
 
-const withSuspense = (node: React.ReactNode) => (
+const withSuspense = (node: ReactNode) => (
   <Suspense
     fallback={
       <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>

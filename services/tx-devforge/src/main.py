@@ -9,6 +9,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,27 +29,47 @@ settings = get_settings()
 configure_logging(settings.log_level)
 logger = structlog.get_logger(__name__)
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """FastAPI lifespan：启动/关闭钩子。替换已废弃的 @app.on_event。"""
+
+    logger.info(
+        "tx_devforge_started",
+        service=settings.service_name,
+        version=settings.service_version,
+        port=settings.port,
+    )
+    yield
+    logger.info("tx_devforge_stopped")
+
+
 app = FastAPI(
     title="TunxiangOS tx-devforge",
     version=settings.service_version,
     description="屯象 OS 内部研发运维平台后端（DevForge）",
+    lifespan=_lifespan,
 )
 
 # Prometheus
 Instrumentator().instrument(app).expose(app)
 
-# CORS
+# 中间件注册顺序：starlette 中后注册的先执行（包装在最外层）。
+# 我们希望 CORS 处理 OPTIONS preflight 在 TenantMiddleware 之前完成，
+# 所以 TenantMiddleware 先 add（内层），CORSMiddleware 后 add（外层）。
+app.add_middleware(TenantMiddleware)
+
+# CORS — 当 allow_credentials=True 时不能用 ["*"]（CORS 规范禁止），
+# 必须显式列出 origin。env 未配置时禁用 credentials 以兼容开发期通配。
 _origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()]
+_allow_credentials = bool(_origins)  # 仅当配置了具体 origin 才开 credentials
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins or ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,
+    allow_credentials=_allow_credentials,
 )
-
-# 租户中间件（先于业务依赖执行）
-app.add_middleware(TenantMiddleware)
 
 # 路由注册
 app.include_router(health_router)
@@ -102,11 +125,3 @@ async def _value_error_handler(request: Request, exc: ValueError) -> JSONRespons
     )
 
 
-@app.on_event("startup")
-async def _on_startup() -> None:
-    logger.info(
-        "tx_devforge_started",
-        service=settings.service_name,
-        version=settings.service_version,
-        port=settings.port,
-    )

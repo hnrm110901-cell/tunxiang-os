@@ -49,6 +49,11 @@ class TenantMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        # CORS 预检（OPTIONS）必须由 CORSMiddleware 直接回复，
+        # 不能被本中间件 401 拦截，否则浏览器永远拿不到 Access-Control-Allow-* header。
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if _is_public(request.url.path):
             return await call_next(request)
 

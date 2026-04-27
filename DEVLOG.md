@@ -1,3 +1,32 @@
+## 2026-04-27 DevForge — PR #120 CodeRabbit + Codex 评审修复（7 fix + 3 defer + 1 false-positive）
+
+### CodeRabbit + Codex 12 条评审修复
+PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 全部分类处理：
+
+**已修复（7 条，本轮 commit）：**
+- 🔴 `services/tx-devforge/src/api/health_routes.py` — `/readiness` DB 不可达时返回 **503** 而非 200，修 K8s probe 误判 (Codex P1)
+- 🔴 `apps/web-devforge/src/api/client.ts` — 默认 tenant_id 改为 all-zero UUID，避免 `'demo-tenant'` 字面量被后端 401；env 改从 zustand store 读取，避免 localStorage JSON 信封被当作 raw 字符串 (CodeRabbit Critical + Codex P1)
+- 🔴 `apps/web-devforge/src/router.tsx` — 引入 `type ReactNode`，修 strict 模式 TS 编译 (CodeRabbit Critical)
+- 🔴 `services/tx-devforge/src/main.py` — CORSMiddleware 改后注册（外层），TenantMiddleware 加 OPTIONS 预检放行；`allow_credentials` 仅在显式配置 origin 时启用；`@app.on_event` 迁移到 `lifespan` (CodeRabbit Critical)
+- 🟠 `services/tx-devforge/src/db.py` — `check_db_connectivity` 加 `SQLAlchemyError` 捕获，避免 OperationalError 导致 /readiness 500 (CodeRabbit Major)
+- 🟠 `services/tx-devforge/src/middlewares/tenant.py` — 新增 OPTIONS 短路，让 CORS 预检不被 401 拦
+- 🟠 `apps/web-devforge/src/pages/apps/index.tsx` — 真实 `page` 状态接入 `useApplications`，AntD `Table.pagination.onChange` 联动；筛选变化时 useEffect 重置到第 1 页 (CodeRabbit Major)
+
+**延期到 Day-2（3 条，已加 TODO）：**
+- 🟠 `Dockerfile` USER 非 root：仓内 17 个服务有 15 个跑 root，统一治理（与 tx-pay/tx-civic/tx-expense 一并）
+- 🟠 `app_routes.py` CQRS 事件发射（CREATED/UPDATED/DELETED）：需先在 `shared/events/src/event_types.py` 注册 `DevForgeApplicationEventType`，与 v147 事件总线规范对齐
+- 🟠 `logging.py` structlog stdlib bridge：把 uvicorn/sqlalchemy 日志也桥接成 JSON，提升可观测一致性
+
+**False positive 1 条（PR 评论中说明）：**
+- 🟠 `package.json` Tailwind 缺失：本骨架明确选 AntD v5 主题作为唯一样式系统（CLAUDE.md 第十条 + 与 web-forge-admin 保持一致），不引入第二套 CSS 框架。**这是设计决策，不是疏漏。**
+
+### 验证
+- `python3 -m py_compile` 5 文件全过
+- `cd apps/web-devforge && npx tsc --noEmit` 零错误
+- `npx vite build` 通过（chunk size 警告：AntD 800k → 后续 manualChunks 优化）
+
+---
+
 ## 2026-04-27 DevForge 研运平台 — Day-1 骨架并行启动
 
 ### 今日完成

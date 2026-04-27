@@ -8,6 +8,7 @@ from typing import AsyncGenerator, AsyncIterator
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -100,12 +101,19 @@ async def session_scope(tenant_id: str) -> AsyncIterator[AsyncSession]:
 
 
 async def check_db_connectivity() -> bool:
-    """readiness 探针：连一次 DB 跑 SELECT 1。"""
+    """readiness 探针：连一次 DB 跑 SELECT 1。
+
+    捕获三类异常：
+    - OSError / RuntimeError：网络层 / asyncio 层失败
+    - SQLAlchemyError 子类（OperationalError/InterfaceError/DBAPIError）：
+      DB 不可达 / 鉴权失败 / pool 取连接超时等
+    任一返回 False，让 /readiness 返回 503 而非 500。
+    """
 
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return True
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, SQLAlchemyError) as exc:
         logger.warning("devforge_db_unreachable", error=str(exc))
         return False
