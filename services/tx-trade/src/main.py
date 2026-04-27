@@ -586,6 +586,13 @@ from .api.delivery_dispute_routes import router as delivery_dispute_router
 
 app.include_router(delivery_dispute_router)
 
+# ── Sprint R2 Track A：预订礼宾员邀请函 / 核餐外呼记录（v281）──
+from .api.reservation_invitation_routes import (
+    router as reservation_invitation_router,
+)
+
+app.include_router(reservation_invitation_router)
+
 
 @app.get("/health")
 async def health():

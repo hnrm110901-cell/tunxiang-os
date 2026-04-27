@@ -1,303 +1,348 @@
-"""宴会线索管理 API — 线索CRUD / 分配 / 跟进 / 转让 / 漏斗"""
+"""宴会商机漏斗路由（Track D / Sprint R1）
 
-from typing import AsyncGenerator, Optional
+端点：
+    POST /api/v1/banquet-leads
+        创建商机 → stage=all + CREATED 事件
+    POST /api/v1/banquet-leads/{lead_id}/transition
+        阶段变更 → STAGE_CHANGED 事件
+    POST /api/v1/banquet-leads/{lead_id}/convert
+        转预订 → CONVERTED 事件 + 关联 reservation_id
+    GET  /api/v1/banquet-leads
+        分页查询：?sales_employee_id=&stage=&source_channel=&page=&size=
+    GET  /api/v1/banquet-leads/funnel
+        漏斗统计：?group_by=sales_employee_id|source_channel
+                  &period_start=ISO&period_end=ISO
+    GET  /api/v1/banquet-leads/attribution
+        渠道归因：?period_start=ISO&period_end=ISO
+
+统一响应：{"ok": bool, "data": {...}, "error": {...}}
+统一鉴权：X-Tenant-ID（缺失返回 400）
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date as _date
+from datetime import datetime
+from typing import Any, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.database import get_db_with_tenant
+from shared.ontology.src.extensions.banquet_leads import (
+    BanquetType,
+    LeadStage,
+    SourceChannel,
+)
 
-from ..services.banquet_crm_service import BanquetCRMService
+from ..repositories.banquet_lead_repo import (
+    BanquetLeadRepositoryBase,
+    InMemoryBanquetLeadRepository,
+)
+from ..services.banquet_lead_service import (
+    BanquetLeadError,
+    BanquetLeadNotFoundError,
+    BanquetLeadService,
+    InvalidationReasonMissingError,
+    InvalidStageTransitionError,
+    ReservationIdMissingError,
+)
 
-logger = structlog.get_logger()
-router = APIRouter(prefix="/api/v1/banquet/leads", tags=["banquet-crm"])
-
-
-# ─── 依赖注入 ───
-
-
-def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
-    if not tid:
-        raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
-    return tid
-
-
-async def _get_db_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    tenant_id = _get_tenant_id(request)
-    async for session in get_db_with_tenant(tenant_id):
-        yield session
+logger = structlog.get_logger(__name__)
+router = APIRouter(prefix="/api/v1/banquet-leads", tags=["banquet-lead"])
 
 
-def _ok(data: object) -> dict:
+# ──────────────────────────────────────────────────────────────────────────
+# 工具
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _ok(data: Any) -> dict[str, Any]:
     return {"ok": True, "data": data, "error": None}
 
 
-def _err(msg: str, code: int = 400) -> None:
-    raise HTTPException(
-        status_code=code,
-        detail={"ok": False, "data": None, "error": {"message": msg}},
+def _err(msg: str, code: str = "BAD_REQUEST") -> dict[str, Any]:
+    return {"ok": False, "data": None, "error": {"code": code, "message": msg}}
+
+
+def _require_tenant(request: Request) -> uuid.UUID:
+    raw = getattr(request.state, "tenant_id", None) or request.headers.get(
+        "X-Tenant-ID", ""
     )
+    if not raw:
+        raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
+    try:
+        return uuid.UUID(str(raw))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid X-Tenant-ID: {exc}"
+        ) from exc
 
 
-# ─── Request / Response Models ───
+def _optional_store_id(request: Request) -> Optional[uuid.UUID]:
+    raw = request.headers.get("X-Store-ID", "")
+    if not raw:
+        return None
+    try:
+        return uuid.UUID(raw)
+    except ValueError:
+        return None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 服务依赖注入
+# ──────────────────────────────────────────────────────────────────────────
+
+# 进程内默认 repo（生产环境在 main lifespan 中可替换为 SQL 版本）
+_default_repo: BanquetLeadRepositoryBase = InMemoryBanquetLeadRepository()
+
+
+def get_repo() -> BanquetLeadRepositoryBase:
+    """Repository provider. 路由测试可通过 app.dependency_overrides 替换。"""
+    return _default_repo
+
+
+def get_service(
+    repo: BanquetLeadRepositoryBase = Depends(get_repo),
+) -> BanquetLeadService:
+    return BanquetLeadService(repo=repo)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 请求/响应模型
+# ──────────────────────────────────────────────────────────────────────────
 
 
 class CreateLeadReq(BaseModel):
-    store_id: str
-    customer_name: str = Field(min_length=1)
-    phone: str = Field(min_length=1)
-    event_type: str
-    company: Optional[str] = None
-    event_date: Optional[str] = None  # YYYY-MM-DD
-    guest_count_est: Optional[int] = Field(None, ge=1)
-    table_count_est: Optional[int] = Field(None, ge=1)
-    budget_per_table_fen: int = 0
-    source_channel: str = "walk_in"
-    notes: Optional[str] = None
+    customer_id: uuid.UUID = Field(..., description="客户ID（Golden Customer）")
+    banquet_type: BanquetType = Field(..., description="宴会类型")
+    source_channel: SourceChannel = Field(
+        default=SourceChannel.BOOKING_DESK, description="渠道来源"
+    )
+    sales_employee_id: Optional[uuid.UUID] = Field(
+        default=None, description="跟进销售员工ID"
+    )
+    estimated_amount_fen: int = Field(default=0, ge=0, description="预估金额（分）")
+    estimated_tables: int = Field(default=0, ge=0, description="预估桌数")
+    scheduled_date: Optional[_date] = Field(default=None, description="预计宴会日期")
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class UpdateLeadReq(BaseModel):
-    customer_name: Optional[str] = None
-    phone: Optional[str] = None
-    event_type: Optional[str] = None
-    company: Optional[str] = None
-    event_date: Optional[str] = None
-    guest_count_est: Optional[int] = Field(None, ge=1)
-    table_count_est: Optional[int] = Field(None, ge=1)
-    budget_per_table_fen: Optional[int] = None
-    source_channel: Optional[str] = None
-    notes: Optional[str] = None
+class TransitionReq(BaseModel):
+    next_stage: LeadStage = Field(..., description="目标阶段")
+    operator_id: Optional[uuid.UUID] = Field(
+        default=None, description="操作人员工ID（审计）"
+    )
+    invalidation_reason: Optional[str] = Field(
+        default=None, max_length=200, description="失效原因（next_stage=invalid 时必填）"
+    )
 
 
-class AssignSalesReq(BaseModel):
-    sales_id: str
+class ConvertReq(BaseModel):
+    reservation_id: uuid.UUID = Field(..., description="关联 reservation_id")
+    operator_id: Optional[uuid.UUID] = Field(default=None)
 
 
-class AddFollowUpReq(BaseModel):
-    sales_id: str
-    follow_type: str
-    content: str = Field(min_length=1)
-    next_action: Optional[str] = None
-    next_follow_at: Optional[str] = None
+# ──────────────────────────────────────────────────────────────────────────
+# 端点
+# ──────────────────────────────────────────────────────────────────────────
 
 
-class TransferLeadReq(BaseModel):
-    from_employee_id: str
-    to_employee_id: str
-    reason: Optional[str] = None
-
-
-class UpdateStatusReq(BaseModel):
-    status: str
-    reason: Optional[str] = None
-
-
-# ─── Endpoints ───
-
-
-@router.post("/")
+@router.post("")
 async def create_lead(
-    body: CreateLeadReq,
+    payload: CreateLeadReq,
     request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """创建宴会线索"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
+    service: BanquetLeadService = Depends(get_service),
+) -> dict[str, Any]:
+    tenant_id = _require_tenant(request)
+    store_id = _optional_store_id(request)
     try:
-        result = await svc.create_lead(body.model_dump())
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
+        lead = await service.create_lead(
+            customer_id=payload.customer_id,
+            banquet_type=payload.banquet_type,
+            source_channel=payload.source_channel,
+            sales_employee_id=payload.sales_employee_id,
+            estimated_amount_fen=payload.estimated_amount_fen,
+            estimated_tables=payload.estimated_tables,
+            scheduled_date=payload.scheduled_date,
+            tenant_id=tenant_id,
+            store_id=store_id,
+            metadata=payload.metadata,
+        )
+    except ValueError as exc:
+        return _err(str(exc), code="VALIDATION_ERROR")
+    return _ok(lead.model_dump(mode="json"))
 
 
-@router.get("/")
+@router.post("/{lead_id}/transition")
+async def transition(
+    lead_id: uuid.UUID,
+    payload: TransitionReq,
+    request: Request,
+    service: BanquetLeadService = Depends(get_service),
+) -> dict[str, Any]:
+    tenant_id = _require_tenant(request)
+    try:
+        lead = await service.transition_stage(
+            lead_id=lead_id,
+            next_stage=payload.next_stage,
+            operator_id=payload.operator_id,
+            tenant_id=tenant_id,
+            invalidation_reason=payload.invalidation_reason,
+        )
+    except BanquetLeadNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (InvalidStageTransitionError, InvalidationReasonMissingError) as exc:
+        return _err(str(exc), code=exc.code)
+    except BanquetLeadError as exc:
+        return _err(str(exc), code=exc.code)
+    return _ok(lead.model_dump(mode="json"))
+
+
+@router.post("/{lead_id}/convert")
+async def convert(
+    lead_id: uuid.UUID,
+    payload: ConvertReq,
+    request: Request,
+    service: BanquetLeadService = Depends(get_service),
+) -> dict[str, Any]:
+    tenant_id = _require_tenant(request)
+    try:
+        lead = await service.convert_to_reservation(
+            lead_id=lead_id,
+            reservation_id=payload.reservation_id,
+            operator_id=payload.operator_id,
+            tenant_id=tenant_id,
+        )
+    except BanquetLeadNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (
+        InvalidStageTransitionError,
+        ReservationIdMissingError,
+        InvalidationReasonMissingError,
+    ) as exc:
+        return _err(str(exc), code=exc.code)
+    except BanquetLeadError as exc:
+        return _err(str(exc), code=exc.code)
+    return _ok(lead.model_dump(mode="json"))
+
+
+@router.get("")
 async def list_leads(
     request: Request,
-    store_id: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    event_type: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    assigned_sales_id: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """列表查询线索（支持多维过滤）"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.list_leads(
-            store_id=store_id,
-            status=status,
-            event_type=event_type,
-            date_from=date_from,
-            date_to=date_to,
-            assigned_sales_id=assigned_sales_id,
-            page=page,
-            size=size,
+    sales_employee_id: Optional[uuid.UUID] = Query(default=None),
+    stage: Optional[LeadStage] = Query(default=None),
+    source_channel: Optional[SourceChannel] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
+    repo: BanquetLeadRepositoryBase = Depends(get_repo),
+) -> dict[str, Any]:
+    tenant_id = _require_tenant(request)
+    offset = (page - 1) * size
+
+    # 三条件优先级：sales_employee_id > source_channel > stage
+    if sales_employee_id is not None:
+        items, total = await repo.list_by_sales_employee(
+            tenant_id=tenant_id,
+            sales_employee_id=sales_employee_id,
+            stage=stage,
+            offset=offset,
+            limit=size,
         )
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.get("/funnel/{store_id}")
-async def get_conversion_funnel(
-    store_id: str,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """获取线索转化漏斗"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.get_conversion_funnel(store_id=store_id)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.get("/due/{store_id}")
-async def get_leads_due_followup(
-    store_id: str,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """获取待跟进线索列表"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.get_leads_due_followup(store_id=store_id)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.get("/{lead_id}")
-async def get_lead(
-    lead_id: str,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """获取线索详情"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.get_lead(lead_id=lead_id)
-        if not result:
-            _err("Lead not found", code=404)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.patch("/{lead_id}")
-async def update_lead(
-    lead_id: str,
-    body: UpdateLeadReq,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """更新线索信息"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        updates = body.model_dump(exclude_unset=True)
-        result = await svc.update_lead(lead_id=lead_id, updates=updates)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.post("/{lead_id}/assign")
-async def assign_sales(
-    lead_id: str,
-    body: AssignSalesReq,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """分配销售"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.assign_sales(lead_id=lead_id, sales_id=body.sales_id)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.post("/{lead_id}/follow-up")
-async def add_follow_up(
-    lead_id: str,
-    body: AddFollowUpReq,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """新增跟进记录"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.add_follow_up(lead_id=lead_id, data=body.model_dump())
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.get("/{lead_id}/follow-ups")
-async def list_follow_ups(
-    lead_id: str,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """获取线索跟进记录列表"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.list_follow_ups(lead_id=lead_id)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
-
-
-@router.post("/{lead_id}/transfer")
-async def transfer_lead(
-    lead_id: str,
-    body: TransferLeadReq,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """转让线索"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
-    try:
-        result = await svc.transfer_lead(
-            lead_id=lead_id,
-            from_employee_id=body.from_employee_id,
-            to_employee_id=body.to_employee_id,
-            reason=body.reason,
+    elif source_channel is not None:
+        items, total = await repo.list_by_source_channel(
+            tenant_id=tenant_id,
+            source_channel=source_channel,
+            offset=offset,
+            limit=size,
         )
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
+    elif stage is not None:
+        items, total = await repo.list_by_stage(
+            tenant_id=tenant_id,
+            stage=stage,
+            offset=offset,
+            limit=size,
+        )
+    else:
+        return _err(
+            "Must provide one of: sales_employee_id / stage / source_channel",
+            code="VALIDATION_ERROR",
+        )
+
+    return _ok(
+        {
+            "items": [i.model_dump(mode="json") for i in items],
+            "total": total,
+            "page": page,
+            "size": size,
+        }
+    )
 
 
-@router.patch("/{lead_id}/status")
-async def update_lead_status(
-    lead_id: str,
-    body: UpdateStatusReq,
-    request: Request,
-    db: AsyncSession = Depends(_get_db_session),
-):
-    """更新线索状态"""
-    tenant_id = _get_tenant_id(request)
-    svc = BanquetCRMService(tenant_id=tenant_id, db=db)
+def _parse_iso(v: str, field: str) -> datetime:
     try:
-        result = await svc.update_status(lead_id=lead_id, status=body.status, reason=body.reason)
-        return _ok(result)
-    except ValueError as e:
-        _err(str(e))
+        dt = datetime.fromisoformat(v)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid {field}: {exc}"
+        ) from exc
+    return dt
+
+
+@router.get("/funnel")
+async def funnel(
+    request: Request,
+    group_by: Literal["sales_employee_id", "source_channel"] = Query(...),
+    period_start: str = Query(..., description="ISO 8601"),
+    period_end: str = Query(..., description="ISO 8601"),
+    service: BanquetLeadService = Depends(get_service),
+) -> dict[str, Any]:
+    tenant_id = _require_tenant(request)
+    start_dt = _parse_iso(period_start, "period_start")
+    end_dt = _parse_iso(period_end, "period_end")
+    if start_dt > end_dt:
+        return _err("period_start must be <= period_end", code="VALIDATION_ERROR")
+    result = await service.compute_conversion_rate(
+        tenant_id=tenant_id,
+        period_start=start_dt,
+        period_end=end_dt,
+        group_by=group_by,
+    )
+    return _ok(
+        {
+            "group_by": group_by,
+            "period_start": start_dt.isoformat(),
+            "period_end": end_dt.isoformat(),
+            "groups": result,
+        }
+    )
+
+
+@router.get("/attribution")
+async def attribution(
+    request: Request,
+    period_start: str = Query(..., description="ISO 8601"),
+    period_end: str = Query(..., description="ISO 8601"),
+    service: BanquetLeadService = Depends(get_service),
+) -> dict[str, Any]:
+    tenant_id = _require_tenant(request)
+    start_dt = _parse_iso(period_start, "period_start")
+    end_dt = _parse_iso(period_end, "period_end")
+    if start_dt > end_dt:
+        return _err("period_start must be <= period_end", code="VALIDATION_ERROR")
+    rows = await service.source_attribution(
+        tenant_id=tenant_id,
+        period_start=start_dt,
+        period_end=end_dt,
+    )
+    return _ok(
+        {
+            "period_start": start_dt.isoformat(),
+            "period_end": end_dt.isoformat(),
+            "channels": rows,
+        }
+    )
+
+
+__all__ = ["router"]

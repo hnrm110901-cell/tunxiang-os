@@ -308,6 +308,16 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "devforge_application": "tx_devforge_application_events",
     # 实验框架域（Sprint G）
     "experiment": "tx_experiment_events",
+    # 预订业务 Sprint R1 新增域
+    "customer": "tx_customer_lifecycle_events",
+    "task": "tx_task_events",
+    "sales_target": "tx_sales_target_events",
+    "banquet": "tx_banquet_lead_events",
+    # 预订业务 Sprint R2 新增域（与 R1 复用 reservation/banquet stream）
+    #   R2ReservationEventType 共用 tx_reservation_events（reservation 域已存在于本表）
+    #   BanquetContractEventType 共用 tx_banquet_lead_events（banquet 域已存在）
+    #   SalesCoachEventType 独立一条 stream
+    "sales_coach": "tx_sales_coach_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -357,6 +367,13 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "devforge_application": "devforge_application",
     # 实验框架域（Sprint G）
     "experiment": "experiment",
+    # 预订业务 Sprint R1 新增域
+    "customer": "customer_lifecycle",
+    "task": "task",
+    "sales_target": "sales_target",
+    "banquet": "banquet_lead",
+    # 预订业务 Sprint R2 — SalesCoach 独立 stream_type（Reservation / Banquet 复用 R1/核心 stream_type）
+    "sales_coach": "sales_coach",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -557,6 +574,124 @@ class ExperimentEventType(str, Enum):
     CIRCUIT_BREAKER_RESET = "experiment.circuit_breaker_reset"
 
 
+# ──────────────────────────────────────────────────────────────────────
+# 预订业务 Sprint R1 新增域（reservation-roadmap-2026-q2.md §6）
+# ──────────────────────────────────────────────────────────────────────
+
+
+class CustomerLifecycleEventType(str, Enum):
+    """客户生命周期状态机事件 — 四象限跃迁（R1 新增）
+
+    对应 customer_lifecycle_state 表状态流转：
+        无订单(no_order) → 活跃(active) → 沉睡(dormant) → 流失(churned)
+        逆向：沉睡/流失 → 活跃（唤醒/召回）
+
+    每次状态迁移写入本事件，由 CustomerLifecycleProjector 消费生成
+    mv_customer_lifecycle 物化视图，支撑销售教练 Agent 的 4 象限分析。
+    """
+
+    STATE_CHANGED = "customer.state_changed"  # 四象限跃迁：无订单/活跃/沉睡/流失
+
+
+class TaskEventType(str, Enum):
+    """任务引擎事件 — 10 类销售/服务任务统一事件流（R1 新增）
+
+    对应 tasks 表，10 类任务：
+      lead_follow_up / banquet_stage / dining_followup / birthday /
+      anniversary / dormant_recall / new_customer / confirm_arrival /
+      adhoc / banquet_followup
+
+    销售教练 Agent 按本事件流追踪每日派单/完成率/逾期升级。
+    """
+
+    DISPATCHED = "task.dispatched"  # 任务派发（assignee_employee_id 已分配）
+    COMPLETED = "task.completed"  # 任务完成（completed_at 已写入）
+    ESCALATED = "task.escalated"  # 任务升级（to store_manager / area_manager）
+
+
+class SalesTargetEventType(str, Enum):
+    """销售目标事件 — 年/月/周/日目标与进度追踪（R1 新增）
+
+    对应 sales_targets 表（目标设定）和 sales_progress 表（进度快照）。
+    销售教练 Agent 按本事件流触发 decompose_target / diagnose_gap。
+    """
+
+    SET = "sales_target.set"  # 目标设定（新增/修改）
+    PROGRESS_UPDATED = "sales_target.progress_updated"  # 进度快照更新
+
+
+class BanquetLeadEventType(str, Enum):
+    """宴会商机漏斗事件 — 全部商机 → 商机 → 订单 → 失效（R1 新增）
+
+    对应 banquet_leads 表，四阶段漏斗：all/opportunity/order/invalid
+    banquet_growth Agent 的 lead_funnel_analytics action 消费本事件流。
+    """
+
+    CREATED = "banquet.lead_created"  # 商机创建
+    STAGE_CHANGED = "banquet.lead_stage_changed"  # 阶段变更
+    CONVERTED = "banquet.lead_converted"  # 商机转正式订单
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 预订业务 Sprint R2 新增域（reservation-roadmap-2026-q2.md §5）
+# ──────────────────────────────────────────────────────────────────────
+
+
+class R2ReservationEventType(str, Enum):
+    """预订礼宾员 Agent 事件 — AI 预订电话 + 邀请函 + 核餐回拨（R2 新增）
+
+    对应 reservation_invitations 表 + 现有 reservations 表。
+    reservation_concierge Agent 负责 identify_caller / suggest_slot /
+    detect_collision / send_invitation / confirm_arrival 5 个 action。
+
+    注意：本枚举与 R1 中的 ReservationEventType 互不覆盖 —
+      - ReservationEventType 覆盖订单域（CREATED/CONFIRMED/BANQUET_*）
+      - R2ReservationEventType 覆盖礼宾动作（INVITATION/CONFIRM_CALL/NO_SHOW）
+    两者共享同一 Redis Stream (tx_reservation_events)，stream_type = reservation。
+    """
+
+    CREATED = "reservation.created"  # 预订创建（与 ReservationEventType 同义，R2 复用语义）
+    CANCELLED = "reservation.cancelled"  # 取消（含 AI 外呼后客户主动取消）
+    NO_SHOW = "reservation.no_show"  # T-2h 核餐后客户未到店
+    CONFIRMED = "reservation.confirmed"  # 客户确认到店
+    CONFIRM_CALL_SENT = "reservation.confirm_call_sent"  # AI 外呼已发出（含短信）
+    INVITATION_SENT = "reservation.invitation_sent"  # H5 邀请函/券码已发出
+
+
+class SalesCoachEventType(str, Enum):
+    """销售经理教练 Agent 事件 — 目标分解 + 每日派单 + 偏差诊断（R2 新增）
+
+    对应 sales_coach Agent 的 6 个 action：
+      decompose_target / dispatch_daily_tasks / diagnose_gap /
+      coach_action / audit_coverage / score_profile_completeness
+
+    消费：SalesTargetEventType + TaskEventType + CustomerLifecycleEventType
+    产出：本域事件（决策留痕 + 告警）
+    """
+
+    DAILY_TASKS_DISPATCHED = "sales_coach.daily_tasks_dispatched"  # 每日派单批次完成
+    COACHING_ADVICE = "sales_coach.coaching_advice"  # 个性化教练建议产出
+    GAP_ALERT = "sales_coach.gap_alert"  # 偏差告警（目标达成率 < 阈值）
+
+
+class BanquetContractEventType(str, Enum):
+    """宴会合同管家 Agent 事件 — 合同 + EO + 审批 + 档期（R2 新增）
+
+    对应 banquet_contracts / banquet_eo_tickets / banquet_approval_logs 三表。
+    banquet_contract_agent 的 5 个 action：
+      generate_contract / split_eo / route_approval / lock_schedule /
+      progress_reminder
+
+    stream_id = contract_id，stream_type = banquet_contract
+    """
+
+    CONTRACT_GENERATED = "banquet.contract_generated"  # 合同 PDF 生成
+    CONTRACT_SIGNED = "banquet.contract_signed"  # 电子签完成
+    EO_DISPATCHED = "banquet.eo_dispatched"  # EO 工单分发到部门
+    APPROVAL_ROUTED = "banquet.approval_routed"  # 路由到审批人
+    SCHEDULE_LOCKED = "banquet.schedule_locked"  # 档期锁定（首交订金）
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -620,4 +755,73 @@ ALL_EVENT_ENUMS = (
     DevForgeApplicationEventType,
     # 实验框架域（Sprint G）
     ExperimentEventType,
+    # 预订业务 Sprint R1 新增域（reservation-roadmap-2026-q2.md §6）
+    CustomerLifecycleEventType,
+    TaskEventType,
+    SalesTargetEventType,
+    BanquetLeadEventType,
+    # 预订业务 Sprint R2 新增域（reservation-roadmap-2026-q2.md §5）
+    R2ReservationEventType,
+    SalesCoachEventType,
+    BanquetContractEventType,
 )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 公共导出
+# ──────────────────────────────────────────────────────────────────────
+
+__all__ = [
+    # 核心业务域
+    "OrderEventType",
+    "DiscountEventType",
+    "PaymentEventType",
+    "MemberEventType",
+    "InventoryEventType",
+    "ChannelEventType",
+    "ReservationEventType",
+    "SettlementEventType",
+    # 新增模块
+    "SafetyEventType",
+    "EnergyEventType",
+    "ReviewEventType",
+    "OpinionEventType",
+    "RecipeEventType",
+    # 系统域
+    "TableEventType",
+    "KdsEventType",
+    "AgentEventType",
+    # 财务应收管理域
+    "DepositEventType",
+    "WineStorageEventType",
+    "CreditEventType",
+    # 食安巡检 / 营销活动 / 知识库
+    "SafetyInspectionEventType",
+    "CampaignEventType",
+    "KnowledgeEventType",
+    # 增长中枢 / 菜谱方案 / 适配器
+    "GrowthEventType",
+    "DeliveryProofEventType",
+    "DeliveryTempEventType",
+    "MenuEventType",
+    "LocationEventType",
+    "AdapterEventType",
+    "PriceEventType",
+    "DevForgeApplicationEventType",
+    "ExperimentEventType",
+    # 预订业务 Sprint R1 新增
+    "CustomerLifecycleEventType",
+    "TaskEventType",
+    "SalesTargetEventType",
+    "BanquetLeadEventType",
+    # 预订业务 Sprint R2 新增
+    "R2ReservationEventType",
+    "SalesCoachEventType",
+    "BanquetContractEventType",
+    # 全局查找表与工具
+    "DOMAIN_STREAM_MAP",
+    "DOMAIN_STREAM_TYPE_MAP",
+    "ALL_EVENT_ENUMS",
+    "resolve_stream_key",
+    "resolve_stream_type",
+]

@@ -7,6 +7,9 @@ from .attendance_recovery import AttendanceRecoveryAgent
 
 # Sprint D1 / PR 批次 6 + Overflow：内容洞察 + 遗漏 Skill（冲 100% 覆盖）
 from .audit_trail import AuditTrailAgent
+
+# Sprint R2 Track C：宴会合同管家（P1 · 云端 · margin+safety）
+from .banquet_contract_agent import BanquetContractAgent
 from .banquet_growth import BanquetGrowthAgent
 
 # 专项运营Agent (Phase 6)
@@ -59,6 +62,9 @@ from .points_advisor import PointsAdvisorAgent
 from .private_ops import PrivateOpsAgent
 from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
+
+# Sprint R2 Track A：AI 预订礼宾员（P0 云端+边缘）
+from .reservation_concierge import ReservationConciergeAgent
 from .review_insight import ReviewInsightAgent
 from .review_summary import ReviewSummaryAgent
 
@@ -68,6 +74,9 @@ from .salary_advisor import SalaryAdvisorAgent
 
 # Sprint D4b：薪资异常 Skill（Sonnet 4.7 + Prompt Cache）
 from .salary_anomaly import SalaryAnomalyAgent
+
+# Sprint R2 Track B：销售经理教练（P1 / 云端 / 豁免）
+from .sales_coach import SalesCoachAgent
 from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
 from .smart_customer_service import SmartCustomerServiceAgent
@@ -171,6 +180,12 @@ ALL_SKILL_AGENTS = [
     SalaryAnomalyAgent,
     # Sprint D4c：预算预测（Sonnet 4.7 + Prompt Cache）
     BudgetForecastAgent,
+    # Sprint R2 Track A：AI 预订礼宾员（P0 Agent，margin + experience）
+    ReservationConciergeAgent,
+    # Sprint R2 Track B：销售经理教练（豁免类 P1 Agent）
+    SalesCoachAgent,
+    # Sprint R2 Track C：宴会合同管家（P1 Agent，margin + safety）
+    BanquetContractAgent,
 ]
 
 
