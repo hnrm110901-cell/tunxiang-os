@@ -54,6 +54,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 
+# 前向引用: AccountingPeriodService (W1.4b 接入). 本 service 允许不注入,
+# 构造时传 period_service=None 即跳过账期校验 (向前兼容 / 历史回填路径).
+try:
+    from services.accounting_period_service import (  # type: ignore
+        AccountingPeriodService,
+    )
+except ImportError:  # pragma: no cover — 仅为 IDE 类型提示兜底
+    AccountingPeriodService = None  # type: ignore
+
+
 log = structlog.get_logger(__name__)
 
 
@@ -115,8 +125,21 @@ class VoucherCreateInput:
 class FinancialVoucherService:
     """financial_vouchers + lines 持久化唯一入口.
 
-    无状态 — 所有 session / tenant_id 通过方法参数传入. 方便测试 / DI.
+    构造参数:
+        period_service: AccountingPeriodService | None
+            - None (默认): 跳过账期校验 (向前兼容 W1.4 前的调用方).
+            - 非 None: create() 写前校验 voucher_date 所属 period 必须 open.
+              period 不存在时走 auto_ensure (首次写该月自动建 open).
+              period 已 closed/locked 时 raise ValueError (引导红冲).
+
+    事务边界: service 只 flush 不 commit. 调用方持事务边界.
     """
+
+    def __init__(
+        self,
+        period_service: "AccountingPeriodService | None" = None,
+    ) -> None:
+        self._period_service = period_service
 
     # ── 创建 ──────────────────────────────────────────────────────────
 
@@ -165,7 +188,34 @@ class FinancialVoucherService:
         if total_debit_fen == 0:
             raise ValueError("凭证借贷总额均为 0, 无会计意义")
 
-        # 2. 幂等预查 ─────────────────────────────────────────────────
+        # 2. 账期校验 (W1.4b, period_service 注入时启用) ──────────────
+        # 为什么先于幂等预查: 账期 closed 时, 即便幂等命中也应拒绝 —
+        # 防止历史事件重放误写已关月份. 若幂等命中的凭证已存在, 它必定
+        # 是在账期 open 时写入的 (因为当时能写), 所以也允许返回该凭证.
+        # 严格来说"幂等返回已存在凭证"不算新写入, 不破坏账期语义.
+        # 但保守起见: 账期 closed 一律拒, 让 caller 先 reopen 或走红冲.
+        if self._period_service is not None:
+            writable = await self._period_service.is_date_writable(
+                tenant_id=payload.tenant_id,
+                biz_date=payload.voucher_date,
+                session=session,
+                auto_ensure=True,  # period 不存在则懒建 open
+            )
+            if not writable:
+                # 找具体状态以便错误信息指向正确路径
+                period = await self._period_service.find_period_for_date(
+                    tenant_id=payload.tenant_id,
+                    biz_date=payload.voucher_date,
+                    session=session,
+                )
+                status = period.status if period else "unknown"
+                raise ValueError(
+                    f"账期 {payload.voucher_date.year}-{payload.voucher_date.month:02d} "
+                    f"状态={status}, 凭证写入被拒 "
+                    f"(请走红冲 red_flush 或先重开账期)"
+                )
+
+        # 3. 幂等预查 ─────────────────────────────────────────────────
         if payload.event_id is not None:
             existing = await self._find_by_event(
                 session=session,
@@ -182,7 +232,7 @@ class FinancialVoucherService:
                 )
                 return existing
 
-        # 3. 构造 ORM (双写 entries + lines, 单事务) ──────────────────
+        # 4. 构造 ORM (双写 entries + lines, 单事务) ──────────────────
         voucher = self._build_orm_voucher(payload, total_debit_fen)
         session.add(voucher)
 
