@@ -195,9 +195,15 @@ def upgrade() -> None:
         "DROP POLICY IF EXISTS financial_voucher_lines_tenant "
         "ON financial_voucher_lines;"
     )
+    # [BLOCKER-B2 独立验证响应 — DBA P0-4 / 安全 P0-1]:
+    # 原策略只有 USING 无 WITH CHECK. PG 对 FOR ALL POLICY 会复用 USING 为
+    # WITH CHECK 兜底, 但显式声明更稳: (1) 未来如果有 FOR SELECT / FOR UPDATE
+    # 等细分策略添加, 不会默认缺 WITH CHECK; (2) 防御性编程, 明确 INSERT/UPDATE
+    # 的 tenant 约束.
     op.execute("""
         CREATE POLICY financial_voucher_lines_tenant ON financial_voucher_lines
-            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
     """)
 
     # ── step 3/4: 表注释 ───────────────────────────────────────────────

@@ -601,6 +601,18 @@ class VoucherGenerator:
                     "pushed_at": result.pushed_at.isoformat(),
                 },
             )
-            await db.commit()
+            # [BLOCKER-B1 独立验证响应 — DBA P1-6 / 安全 P0-2]
+            # 原代码: await db.commit() — 破坏调用方事务边界
+            # 后果: persist_and_push 的 persist → push → 改 status 三步编排中,
+            #   本行会把 persist 阶段的 financial_vouchers + lines 提前 commit.
+            #   若 push 后 "改 status=exported" flush 失败, DB status=draft +
+            #   ERP 已收到, 永久分裂.
+            #   同时: 若 caller 用 `async with db.begin()` 包裹, 嵌套 commit
+            #   会抛 InvalidRequestError.
+            # 修复: 改为 flush, 事务边界交还调用方. 推送日志入 erp_push_log
+            #   仍在同一 txn 内, 原子性保持.
+            # Wave 2 长期: 推送日志应走独立 session 或 outbox pattern
+            #   (避免业务事务与 audit log 耦合).
+            await db.flush()
         except Exception as exc:  # noqa: BLE001 — 兜底：日志记录失败不阻断主业务
             log.error("voucher.record_push_result.failed", error=str(exc), exc_info=True)

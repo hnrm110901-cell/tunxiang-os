@@ -128,23 +128,37 @@ def _daily_settlement_payload(
     )
 
 
+def _tenant_assertion_mock() -> MagicMock:
+    """[BLOCKER-B5] Helper: 构造 'tenant 断言豁免' 的 mock (scalar 返 None).
+
+    service.create() 第一次 execute 调用是 tenant 断言 (SELECT current_setting).
+    测试里豁免这条 (返 None), 让后续 _find_by_event 的 execute mock 走原逻辑.
+    """
+    m = MagicMock()
+    m.scalar = MagicMock(return_value=None)
+    return m
+
+
 class TestCreateIdempotency:
     """场景: Celery 任务重试 / order.paid 事件重发 → 不生成重复凭证."""
 
     @pytest.mark.asyncio
     async def test_create_without_event_id_skips_idempotency_check(self):
-        """event_id=None: 不查预存在, 直接 INSERT (靠 voucher_no UNIQUE 兜底)."""
+        """event_id=None: 不查预存在, 直接 INSERT (靠 voucher_no UNIQUE 兜底).
+
+        B5 后 execute 仍会调用 1 次 (tenant 断言), 但不走 _find_by_event.
+        """
         svc = FinancialVoucherService()
         session = AsyncMock()
-        session.execute = AsyncMock()
+        # tenant 断言豁免 (返 None)
+        session.execute = AsyncMock(return_value=_tenant_assertion_mock())
         session.flush = AsyncMock()
 
         payload = _daily_settlement_payload(event_id=None)
         result = await svc.create(payload, session=session)
 
-        # 没走 _find_by_event (SELECT)
-        session.execute.assert_not_called()
-        # add + flush 调用
+        # B5 后只有 tenant 断言那 1 次 execute, 不走 _find_by_event
+        assert session.execute.await_count == 1
         session.add.assert_called_once()
         session.flush.assert_awaited_once()
         assert isinstance(result, FinancialVoucher)
@@ -166,17 +180,17 @@ class TestCreateIdempotency:
         session = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none = MagicMock(return_value=existing)
-        session.execute = AsyncMock(return_value=mock_result)
+        # side_effect: [tenant 断言豁免, _find_by_event 命中]
+        session.execute = AsyncMock(side_effect=[_tenant_assertion_mock(), mock_result])
 
         event_id = uuid.uuid4()
         payload = _daily_settlement_payload(event_id=event_id)
 
         result = await svc.create(payload, session=session)
 
-        # 走了 _find_by_event (SELECT), 拿到 existing
-        session.execute.assert_awaited_once()
-        # 没 add 新凭证 (直接复用)
-        session.add.assert_not_called()
+        # 2 次: tenant 断言 + _find_by_event
+        assert session.execute.await_count == 2
+        session.add.assert_not_called()  # 命中复用, 不 add
         session.flush.assert_not_called()
         assert result is existing
 
@@ -188,14 +202,16 @@ class TestCreateIdempotency:
         session = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none = MagicMock(return_value=None)  # 未命中
-        session.execute = AsyncMock(return_value=mock_result)
+        # side_effect: [tenant 断言豁免, _find_by_event miss]
+        session.execute = AsyncMock(side_effect=[_tenant_assertion_mock(), mock_result])
         session.flush = AsyncMock()
 
         payload = _daily_settlement_payload(event_id=uuid.uuid4())
 
         result = await svc.create(payload, session=session)
 
-        session.execute.assert_awaited_once()  # 幂等预查
+        # 2 次 execute (tenant + find)
+        assert session.execute.await_count == 2
         session.add.assert_called_once()
         session.flush.assert_awaited_once()
         assert isinstance(result, FinancialVoucher)
@@ -216,15 +232,18 @@ class TestCreateIdempotency:
             voided=False,
         )
 
-        # 第一次 execute (预查) 返回 None, flush 触发 IntegrityError,
-        # 第二次 execute (refetch) 返回 winner
+        # side_effect: [tenant 断言豁免, _find_by_event miss, refetch hit]
         mock_result_miss = MagicMock()
         mock_result_miss.scalar_one_or_none = MagicMock(return_value=None)
         mock_result_hit = MagicMock()
         mock_result_hit.scalar_one_or_none = MagicMock(return_value=winner)
 
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[mock_result_miss, mock_result_hit])
+        session.execute = AsyncMock(side_effect=[
+            _tenant_assertion_mock(),  # B5 断言
+            mock_result_miss,           # 幂等 pre-check miss
+            mock_result_hit,            # refetch hit
+        ])
 
         # IntegrityError 的 orig 字符串必须含 uq_fv_tenant_event (service 识别线索)
         fake_orig = Exception(
@@ -238,8 +257,8 @@ class TestCreateIdempotency:
         payload = _daily_settlement_payload(event_id=uuid.uuid4())
         result = await svc.create(payload, session=session)
 
-        # 预查 miss → add → flush 报错 → rollback → refetch hit
-        assert session.execute.await_count == 2
+        # 3 次 execute: tenant 断言 + miss + refetch
+        assert session.execute.await_count == 3
         session.rollback.assert_awaited_once()
         assert result is winner
 
@@ -353,6 +372,185 @@ class TestDoubleWrite:
 
 
 # ─── 借贷平衡前置校验 ──────────────────────────────────────────────
+
+
+class TestTenantContextAssertion:
+    """[BLOCKER-B5]: payload.tenant_id 必须等于 session 的 app.tenant_id."""
+
+    def _payload(self, tenant_id: uuid.UUID) -> VoucherCreateInput:
+        return VoucherCreateInput(
+            tenant_id=tenant_id,
+            voucher_no=f"V_TENANT_{uuid.uuid4().hex[:6]}",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            lines=[
+                VoucherLineInput(account_code="1001", debit_fen=10000,
+                                 account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000,
+                                 account_name="收入"),
+            ],
+        )
+
+    @pytest.mark.asyncio
+    async def test_matching_tenant_passes(self):
+        """payload.tenant_id == session app.tenant_id → 正常."""
+        from services.financial_voucher_service import (  # type: ignore
+            TenantContextMismatchError,
+        )
+
+        svc = FinancialVoucherService()
+        tenant = uuid.uuid4()
+
+        session = AsyncMock()
+        # session.execute(SELECT current_setting) 返回匹配的 UUID 字符串
+        mock_setting = MagicMock()
+        mock_setting.scalar = MagicMock(return_value=str(tenant))
+        session.execute = AsyncMock(return_value=mock_setting)
+        session.flush = AsyncMock()
+
+        result = await svc.create(self._payload(tenant), session=session)
+        assert isinstance(result, FinancialVoucher)
+
+    @pytest.mark.asyncio
+    async def test_mismatch_raises_tenant_context_error(self):
+        """payload.tenant_id != session → TenantContextMismatchError."""
+        from services.financial_voucher_service import (  # type: ignore
+            TenantContextMismatchError,
+        )
+
+        svc = FinancialVoucherService()
+        payload_tenant = uuid.uuid4()
+        session_tenant = uuid.uuid4()  # 不同
+
+        session = AsyncMock()
+        mock_setting = MagicMock()
+        mock_setting.scalar = MagicMock(return_value=str(session_tenant))
+        session.execute = AsyncMock(return_value=mock_setting)
+
+        with pytest.raises(TenantContextMismatchError) as exc_info:
+            await svc.create(self._payload(payload_tenant), session=session)
+
+        err = exc_info.value
+        assert err.payload_tenant == payload_tenant
+        assert err.session_tenant == str(session_tenant)
+        # 独立异常类型便于审计/告警区分
+        assert isinstance(err, ValueError)  # 仍是 ValueError 子类 (向后兼容)
+
+        # 不调 add/flush (前置 fail-fast)
+        session.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_session_unset_app_tenant_id_exempted(self):
+        """session 未 SET app.tenant_id (scalar() 返 None 或 '') → 豁免.
+
+        豁免路径: 测试 / 管理员脚本 / 特权用户. RLS 兜底拒写入.
+        """
+        svc = FinancialVoucherService()
+
+        session = AsyncMock()
+        mock_setting = MagicMock()
+        mock_setting.scalar = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=mock_setting)
+        session.flush = AsyncMock()
+
+        # 即使 payload tenant 随意, 豁免路径不抛
+        result = await svc.create(self._payload(uuid.uuid4()), session=session)
+        assert isinstance(result, FinancialVoucher)
+
+    @pytest.mark.asyncio
+    async def test_session_unparseable_uuid_exempted_with_warning(self):
+        """session 值无法转 UUID (生产配置错 / 测试 AsyncMock) → 豁免 + warning.
+
+        生产场景: app.tenant_id 被误设为非 UUID 字符串.
+        Service 不替运维 gate (RLS 会拦写入).
+        """
+        svc = FinancialVoucherService()
+
+        session = AsyncMock()
+        mock_setting = MagicMock()
+        mock_setting.scalar = MagicMock(return_value="not-a-uuid-at-all")
+        session.execute = AsyncMock(return_value=mock_setting)
+        session.flush = AsyncMock()
+
+        # 豁免, 不抛
+        result = await svc.create(self._payload(uuid.uuid4()), session=session)
+        assert isinstance(result, FinancialVoucher)
+
+
+class TestEventIdRequiresEventType:
+    """[BLOCKER-B3]: event_id 非空时 event_type 必填 (幂等键完整性)."""
+
+    @pytest.mark.asyncio
+    async def test_event_id_without_event_type_rejected(self):
+        """event_id 非空但 event_type=None → ValueError, 不调 DB."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        payload = VoucherCreateInput(
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_NO_ETYPE",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            event_type=None,           # 未填
+            event_id=uuid.uuid4(),     # 但 event_id 非空
+            lines=[
+                VoucherLineInput(account_code="1001", account_name="现金",
+                                 debit_fen=10000),
+                VoucherLineInput(account_code="6001", account_name="收入",
+                                 credit_fen=10000),
+            ],
+        )
+        with pytest.raises(ValueError, match="event_id 非空时 event_type 必填"):
+            await svc.create(payload, session=session)
+
+        session.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_event_id_with_empty_event_type_rejected(self):
+        """event_type='' 或纯空白同样拒 (strip 后空)."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+
+        payload = VoucherCreateInput(
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_BLANK_ETYPE",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            event_type="   ",          # 纯空白
+            event_id=uuid.uuid4(),
+            lines=[
+                VoucherLineInput(account_code="1001", debit_fen=10000,
+                                 account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000,
+                                 account_name="收入"),
+            ],
+        )
+        with pytest.raises(ValueError, match="event_id 非空时 event_type 必填"):
+            await svc.create(payload, session=session)
+
+    @pytest.mark.asyncio
+    async def test_event_id_none_with_event_type_ok(self):
+        """event_id=None 时 event_type 任何值都可 (手工凭证场景)."""
+        svc = FinancialVoucherService()
+        session = AsyncMock()
+        session.flush = AsyncMock()
+
+        payload = VoucherCreateInput(
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_MANUAL_OK",
+            voucher_date=date(2026, 4, 19),
+            voucher_type="sales",
+            event_type=None,
+            event_id=None,
+            lines=[
+                VoucherLineInput(account_code="1001", debit_fen=10000,
+                                 account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000,
+                                 account_name="收入"),
+            ],
+        )
+        result = await svc.create(payload, session=session)
+        assert isinstance(result, FinancialVoucher)
 
 
 class TestBalanceValidation:

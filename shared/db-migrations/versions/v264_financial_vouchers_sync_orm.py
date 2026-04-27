@@ -135,18 +135,51 @@ def upgrade() -> None:
             ALTER COLUMN period_end   DROP NOT NULL;
     """)
 
-    # ── step 3/5: 回填 voucher_date = period_start(语义等价, 幂等) ──────
-    # 大表(>100 万行)建议 SKIP 本步骤, 改用外部 scripts/backfill_voucher_date.sh
+    # ── step 3/5: 回填 voucher_date = period_start (语义等价, 幂等) ──────
+    # [W1.0 BLOCKER-B4 修复]
+    # 原方案: 迁移内 UPDATE 全表. TB 级老表会导致 alembic 主事务长持有,
+    #   WAL 膨胀 + 主从 lag 小时级 + 后续 CREATE INDEX CONCURRENTLY 被阻.
+    # 修复: 预检待回填行数. 超过 BACKFILL_INLINE_THRESHOLD (默认 5 万) 直接
+    #   RAISE EXCEPTION, 强制 DBA 走外部脚本 scripts/backfill_voucher_date.sh.
+    #   小表 (<5 万行) 仍然在迁移内 UPDATE, 部署更平滑.
+    #
+    # 阈值 5 万行的依据:
+    #   - PG16 WAL segment 16MB, 全表 UPDATE 5 万行 ~ 100 MB WAL
+    #   - 对 15 分钟主从 lag 阈值友好 (一般 100 MB WAL replay < 1 min)
+    #   - 大于阈值的部署路径 (外部脚本分批 10k 行/批, 每批独立事务) 成本低
     op.execute("DO $$ BEGIN RAISE NOTICE 'v264 step 3/5: backfill voucher_date'; END $$;")
     op.execute("""
-        WITH backfilled AS (
-            UPDATE financial_vouchers
-               SET voucher_date = period_start
+        DO $$
+        DECLARE
+            null_rows BIGINT;
+            threshold BIGINT := 50000;  -- BACKFILL_INLINE_THRESHOLD
+        BEGIN
+            SELECT COUNT(*) INTO null_rows
+              FROM financial_vouchers
              WHERE voucher_date IS NULL
-               AND period_start IS NOT NULL
-            RETURNING 1
-        )
-        SELECT COUNT(*) FROM backfilled;
+               AND period_start IS NOT NULL;
+
+            IF null_rows > threshold THEN
+                RAISE EXCEPTION
+                    'v264 backfill aborted: % rows need voucher_date backfill '
+                    '(threshold: %). Too many for inline migration — '
+                    'WAL growth + replication lag risk. '
+                    'Use external script: scripts/backfill_voucher_date.sh '
+                    '(batched with FOR UPDATE SKIP LOCKED). '
+                    'Then stamp this migration: alembic stamp v264.',
+                    null_rows, threshold;
+            END IF;
+
+            IF null_rows > 0 THEN
+                UPDATE financial_vouchers
+                   SET voucher_date = period_start
+                 WHERE voucher_date IS NULL
+                   AND period_start IS NOT NULL;
+                RAISE NOTICE 'v264 step 3/5: backfilled % rows inline', null_rows;
+            ELSE
+                RAISE NOTICE 'v264 step 3/5: no rows need backfill';
+            END IF;
+        END $$;
     """)
 
     # ── step 4/5: DEPRECATED 注释 ──────────────────────────────────────

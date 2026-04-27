@@ -126,12 +126,18 @@ def upgrade() -> None:
 
     # ── step 3/5: UNIQUE partial index (幂等) CONCURRENTLY ────────────
     # 必须 CONCURRENTLY: financial_vouchers 是百万级老表, 非 CONCURRENTLY 会锁表.
+    #
+    # [BLOCKER-B3 独立验证响应 — DBA P0-3 修复]:
+    # 原 partial WHERE 只写 event_id IS NOT NULL. 但 event_type 列 NULLABLE,
+    # PG UNIQUE 对多 NULL 按 "都不相等" 处理. 两条 event_id=<同一UUID> +
+    # event_type=NULL 都会落盘, 幂等失效.
+    # 修复: partial 条件同时要求 event_type IS NOT NULL (service 层也补 ValueError).
     op.execute("DO $$ BEGIN RAISE NOTICE 'v268 step 3/5: UNIQUE partial index CONCURRENTLY'; END $$;")
     with op.get_context().autocommit_block():
         op.execute("""
             CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_fv_tenant_event
                 ON financial_vouchers(tenant_id, event_type, event_id)
-                WHERE event_id IS NOT NULL;
+                WHERE event_id IS NOT NULL AND event_type IS NOT NULL;
         """)
 
     # ── step 4/5: 辅助索引 CONCURRENTLY ────────────────────────────────

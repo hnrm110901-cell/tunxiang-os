@@ -248,6 +248,20 @@ class TestVoucherLinesRLS:
         assert "current_setting('app.tenant_id', true)" in self.migration_src
         assert "NULLIF(" in self.migration_src
 
+    def test_rls_policy_has_with_check(self):
+        """[BLOCKER-B2]: 策略必须同时有 USING 和 WITH CHECK.
+
+        PG 对 FOR ALL POLICY 默认复用 USING 为 WITH CHECK, 但显式更稳:
+        (1) 防未来加细分 POLICY 时缺 WITH CHECK;
+        (2) 明确 INSERT/UPDATE 的 tenant 约束防止横向越权写入.
+        """
+        assert re.search(
+            r"CREATE POLICY.*financial_voucher_lines_tenant.*"
+            r"USING\s*\(.*app\.tenant_id.*\).*"
+            r"WITH\s+CHECK\s*\(.*app\.tenant_id.*\)",
+            self.migration_src, re.S | re.I,
+        ), "POLICY 必须同时声明 USING 和 WITH CHECK"
+
     def test_tenant_id_is_not_nullable(self):
         """tenant_id 必须 NOT NULL — 防 RLS 绕过 (NULL = NULL 永假但 IS NULL 为真)."""
         # 找 tenant_id 列定义

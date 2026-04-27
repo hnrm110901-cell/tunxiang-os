@@ -67,6 +67,25 @@ except ImportError:  # pragma: no cover — 仅为 IDE 类型提示兜底
 log = structlog.get_logger(__name__)
 
 
+# ─── 异常类型 ─────────────────────────────────────────────────────────
+
+
+class TenantContextMismatchError(ValueError):
+    """[BLOCKER-B5]: payload.tenant_id 与 session 里的 app.tenant_id 不一致.
+
+    独立于普通 ValueError 抛出, 审计日志 / 告警系统可以区分
+    "输入错误" vs "潜在安全事件".
+    """
+    def __init__(self, payload_tenant, session_tenant: str | None) -> None:
+        self.payload_tenant = payload_tenant
+        self.session_tenant = session_tenant
+        super().__init__(
+            f"租户上下文不匹配: payload.tenant_id={payload_tenant} "
+            f"vs session app.tenant_id={session_tenant!r} "
+            f"(RLS 会拒写入, 应用层提前中断避免 IntegrityError 污染批次)"
+        )
+
+
 # ─── 输入/输出数据契约 ────────────────────────────────────────────────
 
 
@@ -177,6 +196,29 @@ class FinancialVoucherService:
         # 1. 前置校验 ────────────────────────────────────────────────
         if not payload.lines:
             raise ValueError("凭证必须含至少一条分录")
+
+        # [BLOCKER-B3] event_id 非空时 event_type 必填
+        # 理由: uq_fv_tenant_event partial UNIQUE 的 WHERE 条件要求两者都非空,
+        # 应用层显式校验比 DB 层错误消息更友好 + 防误用.
+        if payload.event_id is not None and (
+            payload.event_type is None or not str(payload.event_type).strip()
+        ):
+            raise ValueError(
+                "event_id 非空时 event_type 必填 "
+                "(幂等键需要 (tenant_id, event_type, event_id) 完整三元组)"
+            )
+
+        # [BLOCKER-B5] 租户上下文断言
+        # payload.tenant_id 来自调用方不可信输入 (如 ERPVoucher webhook).
+        # session 的 app.tenant_id 来自路由中间件 SET LOCAL (可信).
+        # 两者必须一致, 否则:
+        #   - INSERT 会被 RLS WITH CHECK 拒 → IntegrityError (消息不明, 污染批次)
+        #   - 攻击者可能通过"预期行为与错误消息"做存在性探测
+        # 修复: 显式断言, 不一致抛 TenantContextMismatchError (独立异常类型,
+        #   审计/告警系统可区分"配置错误" vs "横向越权尝试").
+        await self._assert_tenant_matches_session(
+            session=session, payload_tenant_id=payload.tenant_id,
+        )
 
         total_debit_fen = sum(l.debit_fen for l in payload.lines)
         total_credit_fen = sum(l.credit_fen for l in payload.lines)
@@ -468,6 +510,52 @@ class FinancialVoucherService:
         )
 
     # ── 私有辅助 ──────────────────────────────────────────────────────
+
+    async def _assert_tenant_matches_session(
+        self,
+        *,
+        session: AsyncSession,
+        payload_tenant_id: uuid.UUID,
+    ) -> None:
+        """[BLOCKER-B5] 校验 payload.tenant_id == session 当前 app.tenant_id.
+
+        不通过则 raise TenantContextMismatchError.
+
+        豁免场景 (session 未 SET app.tenant_id, 设置为空字符串):
+          - 测试 / 管理员脚本 直接用 DB superuser 跑, 没走路由中间件
+          - 历史回填 / backfill 场景 (voucher_backfill_service) 可能 unset
+          - 此时跳过断言 (RLS 自己兜底; service 下游 DB 约束仍生效)
+        """
+        from sqlalchemy import text as _text
+
+        result = await session.execute(
+            _text("SELECT NULLIF(current_setting('app.tenant_id', true), '')")
+        )
+        session_tid_str = result.scalar()
+
+        # 豁免: session 未 SET, 视为特权/管理员路径 (RLS 会拒, 不在这里叠加拒绝)
+        if session_tid_str is None or session_tid_str == "":
+            return
+
+        try:
+            session_tid = uuid.UUID(str(session_tid_str))
+        except (ValueError, TypeError):
+            # session 里的值无法转 UUID. 两种情况:
+            # 1. 生产: app.tenant_id 被误设为非 UUID 字符串 → 配置错误, 告警后豁免
+            #    (RLS 会拦 INSERT; service 不该在这里替运维做"先拒绝")
+            # 2. 测试: AsyncMock.scalar() 返回 MagicMock → 不是真实 SET, 豁免
+            log.warning(
+                "voucher.create.tenant_context_unparseable",
+                raw_value=repr(session_tid_str)[:80],
+                payload_tenant=str(payload_tenant_id),
+            )
+            return
+
+        if session_tid != payload_tenant_id:
+            raise TenantContextMismatchError(
+                payload_tenant=payload_tenant_id,
+                session_tenant=str(session_tid),
+            )
 
     async def _find_by_event(
         self,

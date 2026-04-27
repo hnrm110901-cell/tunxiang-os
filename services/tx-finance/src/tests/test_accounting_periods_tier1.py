@@ -555,6 +555,15 @@ class TestV270MigrationFileStructure:
         assert "CREATE POLICY accounting_periods_tenant" in self.migration_src
         assert "current_setting('app.tenant_id', true)" in self.migration_src
 
+    def test_rls_policy_has_with_check(self):
+        """[BLOCKER-B2]: 策略必须同时有 USING 和 WITH CHECK (防御性显式)."""
+        assert re.search(
+            r"CREATE POLICY.*accounting_periods_tenant.*"
+            r"USING\s*\(.*app\.tenant_id.*\).*"
+            r"WITH\s+CHECK\s*\(.*app\.tenant_id.*\)",
+            self.migration_src, re.S | re.I,
+        ), "POLICY 必须同时声明 USING 和 WITH CHECK"
+
     def test_tenant_id_not_nullable(self):
         tenant_col = re.search(
             r'Column\(\s*"tenant_id"\s*,\s*UUID\(as_uuid=True\)\s*,\s*(.+?)\)',
