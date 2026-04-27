@@ -12,7 +12,7 @@ RLS：四条策略（select/insert/update/delete），使用 NULLIF 安全模式
 所有金额字段统一使用"分"（bigint）。
 
 Revision ID: v366
-Revises: v365
+Revises: v365_forge_ecosystem_metrics
 Create Date: 2026-04-27
 """
 from typing import Sequence, Union
@@ -22,7 +22,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision: str = "v366"
-down_revision: Union[str, None] = "v365"
+down_revision: Union[str, None] = "v365_forge_ecosystem_metrics"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
