@@ -3,13 +3,13 @@
 薪资项目库持久化表 — 支持7大类71项标准薪资项模板。
 租户初始化时从内存模板批量写入，后续支持自定义新增/启用禁用。
 
-Revision ID: v250
+Revision ID: v250b
 Revises: v249
 Create Date: 2026-04-13
 """
 from alembic import op
 
-revision = "v250"
+revision = "v250b"
 down_revision = "v249"
 branch_labels = None
 depends_on = None

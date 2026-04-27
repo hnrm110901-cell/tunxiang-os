@@ -2,13 +2,13 @@
 
 借调单管理 + 成本分摊记录持久化。支持跨门店借调工时拆分与薪资成本分摊。
 
-Revision ID: v251
+Revision ID: v251b
 Revises: v250
 Create Date: 2026-04-13
 """
 from alembic import op
 
-revision = "v251"
+revision = "v251b"
 down_revision = "v250"
 branch_labels = None
 depends_on = None

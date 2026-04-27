@@ -2,13 +2,13 @@
 
 评审周期管理 + 在线打分持久化。支持多维度评分、多评审人、校准流程。
 
-Revision ID: v254
+Revision ID: v254b
 Revises: v253
 Create Date: 2026-04-13
 """
 from alembic import op
 
-revision = "v254"
+revision = "v254b"
 down_revision = "v253"
 branch_labels = None
 depends_on = None

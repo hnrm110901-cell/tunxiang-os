@@ -16,7 +16,7 @@
 
 所有含 tenant_id 的表启用 RLS（app.tenant_id）。
 
-Revision ID: v260
+Revision ID: v260b
 Revises: v259
 Create Date: 2026-04-16
 """
@@ -24,7 +24,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
-revision = "v260"
+revision = "v260b"
 down_revision = "v259"
 branch_labels = None
 depends_on = None

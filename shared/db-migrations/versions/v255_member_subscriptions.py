@@ -2,7 +2,7 @@
 
 月卡/季卡/年卡订阅记录，关联微信支付订单号，追踪订阅生命周期。
 
-Revision ID: v255
+Revision ID: v255b
 Revises: v253
 """
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "v255"
+revision = "v255b"
 down_revision = "v253"
 branch_labels = None
 depends_on = None

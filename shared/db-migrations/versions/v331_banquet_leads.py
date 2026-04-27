@@ -4,13 +4,13 @@
 支持8种宴席类型、6种来源渠道、6种线索状态。
 
 Revision ID: v315_banquet_leads
-Revises: v314_wifi_visit_logs
+Revises: v325_surprise_rules (reanchored from missing v330_reputation_alerts)
 Create Date: 2026-04-25
 """
 from alembic import op
 
 revision = "v331_banquet_leads"
-down_revision = "v330_reputation_alerts"
+down_revision = "v325_surprise_rules"
 branch_labels = None
 depends_on = None
 

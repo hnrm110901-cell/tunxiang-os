@@ -6,7 +6,7 @@
 背景：三商户（czyz/zqx/sgc）经营重点不同，KPI 权重需差异化配置，
 以支撑 merchant_kpi_config_routes.py 端点的 UPSERT 写入与查询。
 
-Revision ID: v253
+Revision ID: v253b
 Revises: v252
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "v253"
+revision = "v253b"
 down_revision = "v252"
 branch_labels = None
 depends_on = None

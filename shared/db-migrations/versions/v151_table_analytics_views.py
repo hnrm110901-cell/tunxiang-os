@@ -21,7 +21,7 @@ Revision: v151
 from alembic import op
 from typing import Sequence, Union
 
-revision: str = "v151"
+revision: str = "v151b"
 down_revision: Union[str, None] = "v150"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

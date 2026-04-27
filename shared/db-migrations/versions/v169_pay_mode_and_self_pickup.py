@@ -14,7 +14,7 @@
   后付区域（postpay）：开台 → 就餐 → 买单 → 结账（传统堂食）
   混合门店：大厅快餐区=prepay，包间区=postpay，互不干扰
 
-Revision ID: v169
+Revision ID: v169b
 Revises: v168
 Create Date: 2026-04-06
 """
@@ -24,7 +24,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "v169"
+revision: str = "v169b"
 down_revision: Union[str, None] = "v168"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

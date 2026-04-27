@@ -3,7 +3,7 @@
 Tables: petty_cash_accounts, petty_cash_transactions, petty_cash_settlements
 Sprint: P0-S3 预建表（服务层在P0-S3实现）
 
-Revision ID: v237
+Revision ID: v237b
 Revises: v236
 Create Date: 2026-04-12
 """
@@ -11,7 +11,7 @@ Create Date: 2026-04-12
 from alembic import op
 import sqlalchemy as sa
 
-revision = "v237"
+revision = "v237b"
 down_revision = "v236"
 branch_labels = None
 depends_on = None

@@ -2,13 +2,13 @@
 
 电子签约模块。合同模板管理 + 签署流程记录（草稿→待签→员工签→企业盖章→已完成/过期/终止）。
 
-Revision ID: v252
+Revision ID: v252b
 Revises: v251
 Create Date: 2026-04-13
 """
 from alembic import op
 
-revision = "v252"
+revision = "v252b"
 down_revision = "v251"
 branch_labels = None
 depends_on = None

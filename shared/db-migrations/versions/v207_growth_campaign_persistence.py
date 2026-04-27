@@ -6,7 +6,7 @@ campaign_report_entries 表，支持多租户隔离和 RLS 策略。
 新增表：
   campaign_report_entries — 活动报名记录（报名人/报名时间/是否中奖）
 
-Revision ID: v207
+Revision ID: v207c
 Revises: v206
 Create Date: 2026-04-11
 """
@@ -14,7 +14,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = 'v207'
+revision = "v207c"
 down_revision = 'v206'
 branch_labels = None
 depends_on = None

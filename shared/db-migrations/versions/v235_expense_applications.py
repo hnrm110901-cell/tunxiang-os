@@ -15,7 +15,7 @@ Sprint: P0-S1, P0-S2
 RLS 采用 NULLIF 安全格式，防止 app.tenant_id 为空时发生跨租户数据泄露。
 所有金额字段单位为分（fen），前端展示时除以 100 转换为元。
 
-Revision ID: v235
+Revision ID: v235c
 Revises: v234
 Create Date: 2026-04-12
 """
@@ -23,7 +23,7 @@ Create Date: 2026-04-12
 from alembic import op
 import sqlalchemy as sa
 
-revision = "v235"
+revision = "v235c"
 down_revision = "v234c"
 branch_labels = None
 depends_on = None

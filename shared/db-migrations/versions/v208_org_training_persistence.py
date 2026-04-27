@@ -8,14 +8,14 @@
   end_date        — 借调结束日期（NOT NULL，业务必填）
   approved_at     — 审批时间（nullable，待审批时为空）
 
-Revision ID: v208
+Revision ID: v208b
 Revises: v207
 Create Date: 2026-04-11
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'v208'
+revision = "v208b"
 down_revision = 'v207'
 branch_labels = None
 depends_on = None
