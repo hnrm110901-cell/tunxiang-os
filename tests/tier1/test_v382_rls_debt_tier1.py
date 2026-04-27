@@ -1,4 +1,4 @@
-"""Tier 1 契约测试 — v291_fill_rls_historical_debt.py
+"""Tier 1 契约测试 — v382_fill_rls_historical_debt.py
 
 补齐 14 张历史遗留业务表的 RLS。本测试静态验证 migration 源码：
   · 14 张表全部列在 TABLES_TO_FIX
@@ -18,7 +18,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = (
     ROOT / "shared" / "db-migrations" / "versions"
-    / "v291_fill_rls_historical_debt.py"
+    / "v382_fill_rls_historical_debt.py"
 )
 
 # 期望补齐的 14 张表（任何顺序无关）
@@ -31,7 +31,7 @@ EXPECTED_TABLES: frozenset[str] = frozenset({
 })
 
 
-class TestV291Migration:
+class TestV382Migration:
 
     @pytest.fixture(scope="class")
     def source(self) -> str:
@@ -39,8 +39,8 @@ class TestV291Migration:
         return MIGRATION.read_text(encoding="utf-8")
 
     def test_revision_metadata(self, source):
-        assert 'revision = "v291_fill_rls_historical_debt"' in source
-        assert 'down_revision = "v290_ab_experiments"' in source
+        assert 'revision = "v382_fill_rls_historical_debt"' in source
+        assert 'down_revision = "v381_delivery_disputes"' in source
 
     def test_tables_to_fix_matches_expected(self, source):
         """TABLES_TO_FIX 元组必须覆盖 14 张预期表（不多不少）"""
@@ -49,7 +49,7 @@ class TestV291Migration:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
         spec = importlib.util.spec_from_file_location(
-            "v291_under_test", MIGRATION
+            "v382_under_test", MIGRATION
         )
         assert spec and spec.loader
         # 不 execute（涉及 alembic.op）；直接解析 tuple 定义
