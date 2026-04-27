@@ -371,18 +371,28 @@ class TestGetCompleteProof:
                 return _result(rows=[])
             if "FROM delivery_attachments" in sql and "DAMAGE" in sql:
                 return _result(rows=[attachment_row])
-            if "information_schema.tables" in sql:
-                # cold_chain_evidence 不存在
-                return _result(rows=[])
             return _result()
 
         db = _make_db(execute)
 
-        proof = await svc.get_complete_proof(
-            delivery_id=DELIVERY_ID,
-            tenant_id=TENANT_A,
-            db=db,
-        )
+        # hotfix v371：温度凭证改为直接调用 TASK-3 service，不再走
+        # information_schema 探测 cold_chain_evidence 路径。
+        # 此处用 patch.object mock 出"无温度数据"场景。
+        from unittest.mock import patch as _patch
+        with _patch.object(
+            svc._temperature_service,
+            "get_temperature_proof",
+            new=AsyncMock(return_value={
+                "summary": {"sample_count": 0},
+                "alerts": [],
+                "timeline_sampled": [],
+            }),
+        ):
+            proof = await svc.get_complete_proof(
+                delivery_id=DELIVERY_ID,
+                tenant_id=TENANT_A,
+                db=db,
+            )
 
         assert proof["summary"]["has_signature"] is True
         assert proof["summary"]["damage_count"] == 1
@@ -392,7 +402,7 @@ class TestGetCompleteProof:
         assert proof["receipt"]["signer_name"] == "王店长"
         assert proof["damages"][0]["damage_type"] == "BROKEN"
         assert proof["damage_attachments"][0]["file_url"].endswith("photo.jpg")
-        # 温度凭证为空（TASK-3 表不存在）
+        # 温度凭证为空（TASK-3 service 返回空数据）
         assert proof["temperature_evidence"] == []
 
 

@@ -54,6 +54,16 @@ from ..models.delivery_proof import (
     SignerRole,
 )
 
+# TASK-3 温度凭证 service：直接复用，不再走 information_schema 探测 + 不存在
+# 的 cold_chain_evidence 表（v369 智能体当时猜的表名，与 v368 实际表 schema
+# delivery_temperature_logs/_alerts 不匹配）。
+try:
+    from ..services import delivery_temperature_service as _temperature_service
+    _TEMP_SERVICE_AVAILABLE = True
+except ImportError:  # pragma: no cover — 防御性导入
+    _temperature_service = None  # type: ignore[assignment]
+    _TEMP_SERVICE_AVAILABLE = False
+
 log = structlog.get_logger(__name__)
 
 
@@ -726,9 +736,11 @@ async def get_complete_proof(
     tenant_id: str,
     db: AsyncSession,
 ) -> dict[str, Any]:
-    """组装完整凭证：签名 + 全部损坏 + 全部附件 + （可选）温度凭证占位。
+    """组装完整凭证：签名 + 全部损坏 + 全部附件 + TASK-3 温度凭证。
 
-    若 TASK-3 cold_chain_evidence 表已存在，会一并查出温度凭证；不存在则返回空数组。
+    温度凭证通过直接调用 delivery_temperature_service.get_temperature_proof
+    获取（TASK-3 / v368 提供）。若该 service 不可用或查询失败，温度部分降级
+    为空数据但不阻断签收凭证返回，便于断网或部分服务故障时仍能出凭证。
     """
     tenant_uuid = _to_uuid(tenant_id)
     delivery_uuid = _to_uuid(delivery_id)
@@ -788,29 +800,42 @@ async def get_complete_proof(
         )
         damage_attach = [_serialize_attachment(r) for r in att_rows.fetchall()]
 
-    # 温度凭证（TASK-3）— 表存在则查，不存在静默跳过
+    # 温度凭证（TASK-3 v368）— 直接调用 delivery_temperature_service.get_temperature_proof
+    # 该 service 返回 summary（min/max/avg/超限秒数）+ alerts + 抽样时序 + GPS 摘要，
+    # 我们在签收凭证里把它打平为：
+    #   temperature_evidence  = 抽样时序（向后兼容：原字段名保留）
+    #   temperature_summary   = TASK-3 摘要（最高/最低/超限次数/告警等）
+    #   temperature_record_count = 总样本数
     temperature_evidence: list[dict[str, Any]] = []
-    try:
-        check = await db.execute(
-            text(
-                "SELECT 1 FROM information_schema.tables "
-                "WHERE table_name = 'cold_chain_evidence' LIMIT 1"
+    temperature_summary: dict[str, Any] = {}
+    temperature_alerts: list[dict[str, Any]] = []
+
+    if _TEMP_SERVICE_AVAILABLE:
+        try:
+            proof = await _temperature_service.get_temperature_proof(
+                tenant_id=tenant_id,
+                delivery_id=delivery_id,
+                db=db,
             )
-        )
-        if check.first() is not None:
-            tev = await db.execute(
-                text("""
-                    SELECT * FROM cold_chain_evidence
-                    WHERE tenant_id = :tid AND delivery_id = :did
-                    ORDER BY recorded_at DESC
-                """),
-                {"tid": tenant_uuid, "did": delivery_uuid},
+            temperature_evidence = proof.get("timeline_sampled", []) or []
+            temperature_summary = proof.get("summary", {}) or {}
+            temperature_alerts = proof.get("alerts", []) or []
+        except (LookupError, ValueError, ProgrammingError, DBAPIError, SQLAlchemyError) as exc:
+            # TASK-3 表/数据缺失或瞬态查询失败时降级（不阻断签收凭证返回）
+            log.warning(
+                "temperature_proof_unavailable",
+                delivery_id=str(delivery_id),
+                error=str(exc),
             )
-            for r in tev.mappings().fetchall():
-                temperature_evidence.append({k: str(v) if v is not None else None for k, v in r.items()})
-    except (ProgrammingError, DBAPIError, SQLAlchemyError) as exc:
-        # TASK-3 表可能未上线：缺表/缺列时静默跳过温度凭证查询。
-        log.debug("temperature_evidence_skipped", error=str(exc))
+
+    # 总样本数：优先取 TASK-3 给的 timeline_full_count（抽样前），否则回退到抽样长度
+    temperature_full_count = (
+        temperature_summary.get("sample_count")
+        if isinstance(temperature_summary, dict)
+        else None
+    )
+    if temperature_full_count is None:
+        temperature_full_count = len(temperature_evidence)
 
     summary = {
         "delivery_id": delivery_id,
@@ -823,7 +848,9 @@ async def get_complete_proof(
             (d["damage_amount_fen"] or 0) for d in damages
         ),
         "attachment_count": len(receipt_attach) + len(damage_attach),
-        "temperature_record_count": len(temperature_evidence),
+        # 向后兼容字段：原值含义为温度记录条数
+        "temperature_record_count": int(temperature_full_count or 0),
+        "temperature_alert_count": len(temperature_alerts),
     }
 
     return {
@@ -832,7 +859,11 @@ async def get_complete_proof(
         "damages": damages,
         "receipt_attachments": receipt_attach,
         "damage_attachments": damage_attach,
+        # 向后兼容：保留 temperature_evidence 字段名（前端已在用）
         "temperature_evidence": temperature_evidence,
+        # 新增：TASK-3 的完整摘要 + 告警
+        "temperature_summary": temperature_summary,
+        "temperature_alerts": temperature_alerts,
     }
 
 
