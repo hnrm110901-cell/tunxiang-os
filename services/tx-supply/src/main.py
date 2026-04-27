@@ -160,6 +160,11 @@ from .api.stocktake_loss_routes import router as stocktake_loss_router
 
 app.include_router(stocktake_loss_router)  # 盘点差异→案件→多级审批→财务核销闭环
 
+# ── 损耗告警 + 采购反馈闭环（G2+G3 / v373+v374）──
+from .api.yield_alert_routes import router as yield_alert_router
+
+app.include_router(yield_alert_router)  # 损耗告警：理论vs实际超标/班次归因/采购反馈闭环（8端点）
+
 
 @app.get("/health")
 async def health():
