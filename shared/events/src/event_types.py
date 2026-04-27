@@ -262,6 +262,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "growth": "tx_growth_events",
     # 知识库域
     "knowledge": "tx_knowledge_events",
+    # 库位域（v367 TASK-2，仓储细化）
+    "location": "tx_location_events",
     # 旧系统适配器域（Sprint F1 / PR F，14 个 POS / 外卖 / 物流 / 财税适配器统一入口）
     "adapter": "tx_adapter_events",
     # 兼容旧域
@@ -300,6 +302,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "growth": "growth",
     # 知识库域
     "knowledge": "knowledge",
+    # 库位域（v367 TASK-2）
+    "location": "location",
     # 旧系统适配器域（Sprint F1 / PR F）
     "adapter": "adapter",
 }
@@ -421,6 +425,18 @@ class AdapterEventType(str, Enum):
     CREDENTIAL_EXPIRED = "adapter.credential_expired"  # Token/AccessKey 到期
 
 
+class LocationEventType(str, Enum):
+    """库位事件 — 仓储库存细化（v367 TASK-2）
+
+    用于追踪库位级别的库存变更与食材绑定操作：
+      INVENTORY_MOVED    — 库位间转移（更新 inventory_by_location）
+      LOCATION_BOUND     — 食材绑定到主库位
+    """
+
+    INVENTORY_MOVED = "location.inventory_moved"
+    LOCATION_BOUND = "location.location_bound"
+
+
 class GrowthEventType(str, Enum):
     """增长中枢事件 — 私域复购链路"""
 
@@ -486,6 +502,8 @@ ALL_EVENT_ENUMS = (
     GrowthEventType,
     # 菜谱方案域（v245 新增，模块3.4）
     MenuEventType,
+    # 库位域（v367 TASK-2，仓储细化）
+    LocationEventType,
     # 旧系统适配器域（Sprint F1 / PR F）
     AdapterEventType,
 )
