@@ -80,7 +80,7 @@ function parseQRCode(qrData: string): {
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useStoreInfo = create<StoreInfoStore>((set) => ({
+export const useStoreInfo = create<StoreInfoStore>()((set) => ({
   // state
   brandId: '',
   brandName: '',

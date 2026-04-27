@@ -88,7 +88,7 @@ const API_BASE = '/api/v1';
 /**
  * 桌台状态管理 Store
  */
-export const useTableStore = create<TableStoreState>((set, get) => ({
+export const useTableStore = create<TableStoreState>()((set, get) => ({
   // ==================== Initial State ====================
   tables: [],
   summary: null,

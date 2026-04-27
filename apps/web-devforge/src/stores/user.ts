@@ -16,7 +16,7 @@ interface UserState {
 }
 
 /** 当前登录用户 — Day-1 用 mock，后续接 SSO/OAuth */
-export const useUserStore = create<UserState>((set) => ({
+export const useUserStore = create<UserState>()((set) => ({
   user: {
     id: 'u-001',
     name: '未了已',

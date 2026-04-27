@@ -35,7 +35,7 @@ export interface HubState {
   setStreamStatus: (s: StreamConnectionStatus) => void;
 }
 
-export const useHubStore = create<HubState>((set) => ({
+export const useHubStore = create<HubState>()((set) => ({
   /* ─── 初始值 ─── */
   workMode: 'today',
   activeWorkspace: null,
