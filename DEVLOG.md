@@ -1,3 +1,44 @@
+## 2026-04-27 DevForge 研运平台 — Day-1 骨架并行启动
+
+### 今日完成
+- [docs] 落档 [docs/devforge-platform-plan.md](docs/devforge-platform-plan.md)：15 模块 × 5 类资源 × 4 阶段(MVP/V1/V2/V3) 全量开发计划
+- [tx-devforge] 后端骨架：19 文件（main.py + 5 routes + Application 模型 + Repository + TenantMiddleware + structlog + Prometheus + 3 个具体异常处理器）
+- [shared/db-migrations] v366_devforge_application：表 + 4 条独立 RLS 策略（SELECT/INSERT/UPDATE/DELETE）+ FORCE ROW LEVEL SECURITY；链入 head=v365_forge_ecosystem_metrics
+- [apps/web-devforge] 前端骨架：41 文件，AntD v5 暗色主题 + 15 模块路由 + AppLayout(240+56px) + EnvSwitcher(prod 二次确认+红框) + ⌘K GlobalSearch + 应用中心(02)真实 API 接入 + 13 占位页
+- [scripts] forge_register_resources.py：扫出 57 条资源（21 backend / 18 frontend / 4 edge / 13 adapter / 1 data_asset），Owner 推断 96.5%，--dry-run/--push/--type 三种模式
+- [services/gateway] 路由注册 devforge → DOMAIN_ROUTES 字典加一行（路径前缀模式，与 13 个下游服务一致）
+- [infra/docker] docker-compose.yml + docker-compose.dev.yml 加入 tx-devforge 服务（端口 8017，hot-reload 卷挂载）
+
+### 关键偏差与修复
+- **端口**：原计划 8015，实际分配 **8017**（8015 被 tx-expense 占、8016 被 tx-pay 占）。已同步：Dockerfile / config.py / main.py / vite proxy / api client / pages/apps / 发现脚本 / compose / 计划文档
+- **迁移 head**：CLAUDE.md 写 229，实测 **v365_forge_ecosystem_metrics**（仓内总迁移文件 409 个，含旧 0001_ 与新 vNNN_ 双格式）。新 v230 已正确链入 v365
+- **微服务数**：CLAUDE.md 写 14 业务+2 支撑，实测 **21**（多出 tx-pay/tx-expense/tx-predict/mcp-server/tunxiang-api 等）
+- **适配器数**：CLAUDE.md 写 10，实测 **13**
+
+### 数据变化
+- 迁移版本：v365 → v366_devforge_application（已添加，待执行；原起草为 v230_*，独立验证发现 v230 已被 agent_registry 与 rls_nullif 双占，避免 alembic 多 head 已重命名）
+- 新增 API 端点：5 个（GET/POST/PATCH/DELETE applications + health）
+- 新增代码：~4500 行（后端 ~1200 + 前端 ~2200 + 脚本 ~830 + 配置 ~270）
+- 新前端应用：1 个（apps/web-devforge，端口 5182）
+- 新后端微服务：1 个（services/tx-devforge，端口 8017）
+
+### 遗留 TODO（Day-2+）
+- 后端 Service 层（当前 API 直调 Repository，待引入；CI/CD 编排逻辑接入时一起加）
+- pytest 测试目录（v230 表 + RLS 跨租户隔离用例必须 Tier 2 起步）
+- helm chart 缺失（tx-pay/tx-civic/tx-expense 同样未补，统一治理）
+- gateway / web-devforge 之间的端到端 token 鉴权（目前仅 X-Tenant-ID 透传）
+- 13 个前端占位页待实装；新建应用 Modal 表单待接 createApplication
+- CODEOWNERS 文件未建（脚本 0 命中），建议 Day-2 由 devforge 后台落地一份
+- forge_register_resources.py --push 待真实跑（需先执行 v366 迁移）
+
+### 明日计划
+- 把 v366 迁移 apply 到 dev 环境，跑 `--push` 把 57 条资源真实入库
+- 后端补 Application 列表的过滤/排序/分页参数 + Repository 单元测试
+- 前端"应用中心"页对接真实数据，添加资源详情 8 Tab 中的"概览"和"依赖拓扑"（拓扑数据先用 metadata_json 占位）
+- 起 06 流水线模块的数据库 schema 设计（v232 迁移草稿）
+
+---
+
 ## 2026-04-25 Sprint P — 私域增长6大模块(对标iCC Grow)
 
 ### 今日完成
