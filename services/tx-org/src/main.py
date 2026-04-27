@@ -89,10 +89,12 @@ from api.store_clone_routes import router as store_clone_router
 from api.store_ops_routes import router as store_ops_router
 from api.store_readiness_routes import router as store_readiness_router
 from api.tax_filing_routes import router as tax_filing_router
+from api.ai_salary_advisor_routes import router as ai_salary_advisor_router
 from api.tenant_systems_routes import router as tenant_systems_router
 from api.transfer_routes import router as transfer_db_router
 from api.transfers import router as transfer_router
 from api.unified_schedule_routes import router as unified_schedule_router
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -240,6 +242,7 @@ app.include_router(e_signature_router)  # 电子签约模块（v252表）合同�
 app.include_router(points_router)  # 员工积分+赛马（v253表）积分流水+兑换+赛季
 app.include_router(tax_filing_router)  # 薪税申报对接（v256表）个税申报生成+提交+查询
 app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v255表）GPS/代打/加班超时
+app.include_router(ai_salary_advisor_router)   # AI 薪资推荐（v257）岗位档位+区域系数+工龄曲线
 app.include_router(daily_scorecard_router)  # 日KPI得分卡（v378表）Sprint G5
 app.include_router(bonus_router)  # 绩效奖金计算（v378表）Sprint G5
 app.include_router(lifecycle_router)  # 门店生命周期（v378表）Sprint G5
