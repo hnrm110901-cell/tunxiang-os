@@ -3,6 +3,7 @@
 礼品卡面值单位：分（fen）。
 卡密码：6位随机数字。
 """
+
 import random
 import string
 import uuid
@@ -19,6 +20,7 @@ logger = structlog.get_logger()
 
 class _CardTypeStore:
     """礼品卡类型存储"""
+
     _types: dict[str, dict] = {}
 
     @classmethod
@@ -40,6 +42,7 @@ class _CardTypeStore:
 
 class _CardStore:
     """礼品卡实例存储"""
+
     _cards: dict[str, dict] = {}
     _card_no_index: dict[str, str] = {}  # card_no -> card_id
 
@@ -75,6 +78,7 @@ class _CardStore:
 
 class _OnlineConfigStore:
     """线上售卖配置存储"""
+
     _configs: dict[str, dict] = {}
 
     @classmethod
@@ -190,11 +194,13 @@ async def batch_create_cards(
             "transactions": [],
         }
         _CardStore.save(card_id, card)
-        cards.append({
-            "card_id": card_id,
-            "card_no": card_no,
-            "password": password,
-        })
+        cards.append(
+            {
+                "card_id": card_id,
+                "card_no": card_no,
+                "password": password,
+            }
+        )
 
     card_type["total_created"] += count
     _CardTypeStore.save(type_id, card_type)
@@ -338,9 +344,7 @@ async def use_card(
     if amount_fen <= 0:
         raise ValueError("使用金额必须大于0")
     if card["balance_fen"] < amount_fen:
-        raise ValueError(
-            f"余额不足: 当前{card['balance_fen']}分, 需扣{amount_fen}分"
-        )
+        raise ValueError(f"余额不足: 当前{card['balance_fen']}分, 需扣{amount_fen}分")
 
     now = datetime.now(timezone.utc).isoformat()
     card["balance_fen"] -= amount_fen
@@ -348,13 +352,15 @@ async def use_card(
     if card["balance_fen"] == 0:
         card["status"] = "exhausted"
 
-    card["transactions"].append({
-        "type": "consume",
-        "amount_fen": -amount_fen,
-        "order_id": order_id,
-        "balance_after_fen": card["balance_fen"],
-        "at": now,
-    })
+    card["transactions"].append(
+        {
+            "type": "consume",
+            "amount_fen": -amount_fen,
+            "order_id": order_id,
+            "balance_after_fen": card["balance_fen"],
+            "at": now,
+        }
+    )
     _CardStore.save(card["card_id"], card)
 
     logger.info(

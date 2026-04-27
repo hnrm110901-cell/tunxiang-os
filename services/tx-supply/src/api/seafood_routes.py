@@ -3,6 +3,7 @@
 
 所有接口需要 X-Tenant-ID header。重量单位：克(g)。金额单位：分(fen)。
 """
+
 from datetime import date
 from typing import Optional
 
@@ -62,12 +63,8 @@ class StockIntakeRequest(BaseModel):
     quantity_kg: float = Field(gt=0, description="入库重量(kg)")
     unit_price_fen: int = Field(ge=0, description="进货单价(分/kg)")
     supplier_name: str = Field(min_length=1, max_length=100, description="供应商名称")
-    origin_certificate_no: str = Field(
-        min_length=1, description="产地证明编号（食安合规必填）"
-    )
-    quarantine_certificate_no: str = Field(
-        min_length=1, description="检疫证编号（食安合规必填）"
-    )
+    origin_certificate_no: str = Field(min_length=1, description="产地证明编号（食安合规必填）")
+    quarantine_certificate_no: str = Field(min_length=1, description="检疫证编号（食安合规必填）")
     operator_id: str = Field(description="操作人员工ID")
     tank_id: Optional[str] = Field(default=None, description="入缸ID（可选）")
     notes: Optional[str] = Field(default=None, max_length=500, description="备注")
@@ -93,24 +90,15 @@ class TankReadingRequest(BaseModel):
     """水质检测数据记录请求。"""
 
     tank_id: str = Field(min_length=1, description="鱼缸/水族箱ID")
-    temperature: Optional[float] = Field(
-        default=None, ge=-5.0, le=50.0, description="水温(℃)"
-    )
-    salinity_ppt: Optional[float] = Field(
-        default=None, ge=0.0, le=50.0, description="盐度(ppt，千分比)"
-    )
-    dissolved_oxygen_mgl: Optional[float] = Field(
-        default=None, ge=0.0, le=30.0, description="溶解氧(mg/L)"
-    )
-    ph: Optional[float] = Field(
-        default=None, ge=0.0, le=14.0, description="pH值"
-    )
+    temperature: Optional[float] = Field(default=None, ge=-5.0, le=50.0, description="水温(℃)")
+    salinity_ppt: Optional[float] = Field(default=None, ge=0.0, le=50.0, description="盐度(ppt，千分比)")
+    dissolved_oxygen_mgl: Optional[float] = Field(default=None, ge=0.0, le=30.0, description="溶解氧(mg/L)")
+    ph: Optional[float] = Field(default=None, ge=0.0, le=14.0, description="pH值")
     operator_id: str
     notes: Optional[str] = Field(default=None, max_length=500)
 
 
 # ─── 依赖注入占位 ─────────────────────────────────────────────────────────────
-
 
 
 # ─── 原有端点（保持不变） ─────────────────────────────────────────────────────
@@ -335,9 +323,7 @@ async def api_record_tank_reading(
 @router.get("/alerts", summary="综合预警")
 async def api_get_alerts(
     store_id: str = Query(..., description="门店ID"),
-    min_stock_kg: float = Query(
-        default=5.0, ge=0, description="库存低预警阈值(kg)，默认5kg"
-    ),
+    min_stock_kg: float = Query(default=5.0, ge=0, description="库存低预警阈值(kg)，默认5kg"),
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
 ):
     """综合预警：死亡率异常（>5%/天）/ 水质异常（水温/pH） / 库存低（< 安全库存）。"""

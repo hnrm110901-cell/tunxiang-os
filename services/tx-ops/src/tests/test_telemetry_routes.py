@@ -12,6 +12,7 @@
   - TestClient + dependency_overrides[get_db] + AsyncMock
   - 每个测试前清空限流缓存，避免用例间串扰
 """
+
 from __future__ import annotations
 
 import sys
@@ -45,8 +46,10 @@ _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 if "structlog" not in sys.modules:
@@ -72,6 +75,7 @@ STORE_ID = str(uuid.uuid4())
 def _override(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 

@@ -15,16 +15,16 @@
   - 路由不依赖 get_db（传 db=None），无需 dependency_overrides
   - shared.* 模块通过 sys.modules 注入存根，避免循环导入
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import types
 import uuid
-from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -40,9 +40,13 @@ def _make_analytics_stubs():
 
     # structlog
     sl = types.ModuleType("structlog")
-    sl.get_logger = MagicMock(return_value=MagicMock(
-        info=MagicMock(), warning=MagicMock(), error=MagicMock(),
-    ))
+    sl.get_logger = MagicMock(
+        return_value=MagicMock(
+            info=MagicMock(),
+            warning=MagicMock(),
+            error=MagicMock(),
+        )
+    )
     sys.modules.setdefault("structlog", sl)
 
     # shared
@@ -90,8 +94,8 @@ sys.modules["reports.p0_reports"] = _p0_mod
 
 # ─── 导入路由模块 ──────────────────────────────────────────────────────────────
 
-from api.reports_router import router  # noqa: E402
 import api.reports_router as _rr_module  # noqa: E402
+from api.reports_router import router  # noqa: E402
 
 # ─── 公共常量 ──────────────────────────────────────────────────────────────────
 
@@ -205,9 +209,7 @@ def test_cashflow_by_store_ok():
 
 def test_billing_audit_runtime_error_503():
     """P0Reports.billing_audit 抛出 RuntimeError（DB 不可用）时路由应返回 503。"""
-    _rr_module._p0.billing_audit = AsyncMock(
-        side_effect=RuntimeError("DB connection timeout")
-    )
+    _rr_module._p0.billing_audit = AsyncMock(side_effect=RuntimeError("DB connection timeout"))
 
     client = _make_app()
     resp = client.get(

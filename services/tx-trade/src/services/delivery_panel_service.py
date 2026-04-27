@@ -14,6 +14,7 @@
   - 所有函数 type hints
   - 金额用 int（分）
 """
+
 from __future__ import annotations
 
 import os
@@ -56,6 +57,7 @@ _MAC_STATION_URL = os.getenv("MAC_STATION_URL", "http://localhost:8000")
 
 # ─── 自定义异常 ────────────────────────────────────────────────────────────────
 
+
 class DeliveryOrderNotFound(ValueError):
     """订单不存在或租户不匹配"""
 
@@ -77,6 +79,7 @@ class DuplicateOrderError(ValueError):
 
 
 # ─── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _make_order_no(platform: str) -> str:
     """生成内部流水号，格式：MT/EL/DY + YYYYMMDDHHMMSS + 6位随机"""
@@ -109,6 +112,7 @@ async def _push_kds_event(store_id: UUID, event: dict) -> None:
     """通过 Mac mini 推送 KDS 事件（失败不阻断主流程）"""
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=3) as client:
             await client.post(
                 f"{_MAC_STATION_URL}/api/v1/kds/push",
@@ -124,6 +128,7 @@ async def _trigger_delivery_print(
     """触发外卖出餐单打印（通过 Mac mini 调度，失败不阻断）"""
     try:
         import httpx
+
         payload = {
             "type": "delivery_receipt",
             "store_id": str(order.store_id),
@@ -152,6 +157,7 @@ async def _trigger_delivery_print(
 
 
 # ─── 核心 Service ──────────────────────────────────────────────────────────────
+
 
 class DeliveryPanelService:
     """外卖聚合接单面板服务层（所有方法通过 Repository 访问 DB）"""
@@ -213,10 +219,7 @@ class DeliveryPanelService:
                 "delivery_panel.duplicate_order_skipped",
                 platform_order_id=parsed.platform_order_id,
             )
-            raise DuplicateOrderError(
-                f"订单已存在: platform={platform}, "
-                f"platform_order_id={parsed.platform_order_id}"
-            )
+            raise DuplicateOrderError(f"订单已存在: platform={platform}, platform_order_id={parsed.platform_order_id}")
 
         # 4. 计算佣金
         commission_fen: int = round(parsed.total_fen * commission_rate)
@@ -243,11 +246,7 @@ class DeliveryPanelService:
             customer_name=parsed.customer_name,
             customer_phone=parsed.customer_phone,
             delivery_address=parsed.delivery_address,
-            expected_time=(
-                parsed.estimated_delivery_at.isoformat()
-                if parsed.estimated_delivery_at
-                else None
-            ),
+            expected_time=(parsed.estimated_delivery_at.isoformat() if parsed.estimated_delivery_at else None),
             estimated_prep_time=None,
             special_request=payload.get("notes") or payload.get("remark"),
             notes=payload.get("notes") or payload.get("remark"),
@@ -321,9 +320,7 @@ class DeliveryPanelService:
             return False
 
         # 检查并发上限
-        active_count = await DeliveryOrderRepository.count_active_orders(
-            db, store_id, tenant_id
-        )
+        active_count = await DeliveryOrderRepository.count_active_orders(db, store_id, tenant_id)
         # active_count 包含刚创建的 pending_accept 订单本身
         if active_count > rule.max_concurrent_orders:
             log.info(
@@ -375,9 +372,7 @@ class DeliveryPanelService:
         if order is None:
             raise DeliveryOrderNotFound(f"订单不存在: {order_id}")
         if order.status != "pending_accept":
-            raise DeliveryOrderStatusError(
-                f"订单状态 '{order.status}' 不允许接单，需为 pending_accept"
-            )
+            raise DeliveryOrderStatusError(f"订单状态 '{order.status}' 不允许接单，需为 pending_accept")
 
         adapter = _get_adapter(order.platform, app_id, app_secret, shop_id)
         await DeliveryPanelService._do_accept_order(
@@ -409,8 +404,7 @@ class DeliveryPanelService:
         ok = await adapter.confirm_order(order.platform_order_id)
         if not ok:
             raise PlatformAdapterError(
-                f"平台接单 API 返回失败: platform={order.platform}, "
-                f"platform_order_id={order.platform_order_id}"
+                f"平台接单 API 返回失败: platform={order.platform}, platform_order_id={order.platform_order_id}"
             )
 
         now = datetime.now(timezone.utc)
@@ -478,17 +472,13 @@ class DeliveryPanelService:
         if order is None:
             raise DeliveryOrderNotFound(f"订单不存在: {order_id}")
         if order.status not in ("pending_accept", "accepted"):
-            raise DeliveryOrderStatusError(
-                f"订单状态 '{order.status}' 不允许拒单"
-            )
+            raise DeliveryOrderStatusError(f"订单状态 '{order.status}' 不允许拒单")
 
         adapter = _get_adapter(order.platform, app_id, app_secret, shop_id)
         reject_reason_full = f"[{reason_code}] {reason}" if reason_code else reason
         ok = await adapter.reject_order(order.platform_order_id, reject_reason_full)
         if not ok:
-            raise PlatformAdapterError(
-                f"平台拒单 API 返回失败: platform={order.platform}"
-            )
+            raise PlatformAdapterError(f"平台拒单 API 返回失败: platform={order.platform}")
 
         now = datetime.now(timezone.utc)
         await DeliveryOrderRepository.update_status(
@@ -532,9 +522,7 @@ class DeliveryPanelService:
         if order is None:
             raise DeliveryOrderNotFound(f"订单不存在: {order_id}")
         if order.status not in ("accepted", "preparing"):
-            raise DeliveryOrderStatusError(
-                f"订单状态 '{order.status}' 不允许标记出餐完成"
-            )
+            raise DeliveryOrderStatusError(f"订单状态 '{order.status}' 不允许标记出餐完成")
 
         now = datetime.now(timezone.utc)
         await DeliveryOrderRepository.update_status(
@@ -572,9 +560,7 @@ class DeliveryPanelService:
         db: AsyncSession,
     ) -> dict:
         """今日外卖汇总：各平台订单数/营收/佣金/实收"""
-        rows = await DeliveryOrderRepository.get_daily_stats_by_platform(
-            db, tenant_id, store_id, target_date
-        )
+        rows = await DeliveryOrderRepository.get_daily_stats_by_platform(db, tenant_id, store_id, target_date)
         total_orders = sum(r["order_count"] for r in rows)
         total_revenue = sum(r["revenue_fen"] for r in rows)
         total_commission = sum(r["commission_fen"] for r in rows)

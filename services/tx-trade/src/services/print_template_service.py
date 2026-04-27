@@ -7,6 +7,7 @@
 输出格式：base64编码的 ESC/POS 字节流，供 TXBridge.print() 直接调用。
 编码：GBK（热敏打印机中文标准）
 """
+
 import base64
 from datetime import datetime
 from typing import Optional
@@ -17,18 +18,18 @@ logger = structlog.get_logger(__name__)
 
 # ─── ESC/POS 指令常量 ──────────────────────────────────────────────────────────
 
-ESC_INIT          = b'\x1b\x40'          # 初始化打印机
-ESC_ALIGN_LEFT    = b'\x1b\x61\x00'      # 左对齐
-ESC_ALIGN_CENTER  = b'\x1b\x61\x01'      # 居中
-ESC_ALIGN_RIGHT   = b'\x1b\x61\x02'      # 右对齐
-ESC_BOLD_ON       = b'\x1b\x45\x01'      # 加粗开
-ESC_BOLD_OFF      = b'\x1b\x45\x00'      # 加粗关
-GS_SIZE_NORMAL    = b'\x1d\x21\x00'      # 正常字号
-GS_SIZE_DBL_W     = b'\x1d\x21\x10'      # 双倍宽
-GS_SIZE_DBL_BOTH  = b'\x1d\x21\x11'      # 双倍宽高
-GS_CUT_PARTIAL    = b'\x1d\x56\x01'      # 半切
-ESC_CHINESE_ON    = b'\x1c\x26'          # 中文模式开
-LF                = b'\x0a'              # 换行
+ESC_INIT = b"\x1b\x40"  # 初始化打印机
+ESC_ALIGN_LEFT = b"\x1b\x61\x00"  # 左对齐
+ESC_ALIGN_CENTER = b"\x1b\x61\x01"  # 居中
+ESC_ALIGN_RIGHT = b"\x1b\x61\x02"  # 右对齐
+ESC_BOLD_ON = b"\x1b\x45\x01"  # 加粗开
+ESC_BOLD_OFF = b"\x1b\x45\x00"  # 加粗关
+GS_SIZE_NORMAL = b"\x1d\x21\x00"  # 正常字号
+GS_SIZE_DBL_W = b"\x1d\x21\x10"  # 双倍宽
+GS_SIZE_DBL_BOTH = b"\x1d\x21\x11"  # 双倍宽高
+GS_CUT_PARTIAL = b"\x1d\x56\x01"  # 半切
+ESC_CHINESE_ON = b"\x1c\x26"  # 中文模式开
+LF = b"\x0a"  # 换行
 
 # 纸宽字符数
 WIDTH_58MM = 32
@@ -36,6 +37,7 @@ WIDTH_80MM = 48
 
 
 # ─── 内部工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _gbk_len(text: str) -> int:
     """文本的 GBK 字节宽度（中文2字节，ASCII 1字节）。"""
@@ -111,6 +113,7 @@ def _get_width(store_config: Optional[dict]) -> int:
 
 # ─── 公共模块：页头 / 页脚 ─────────────────────────────────────────────────────
 
+
 def _header_block(
     title: str,
     store_name: str,
@@ -122,16 +125,23 @@ def _header_block(
         ESC_INIT,
         ESC_CHINESE_ON,
         ESC_ALIGN_CENTER,
-        GS_SIZE_DBL_BOTH, ESC_BOLD_ON,
-        store_name, LF,
-        GS_SIZE_NORMAL, ESC_BOLD_OFF,
-        ESC_BOLD_ON, title, ESC_BOLD_OFF, LF,
+        GS_SIZE_DBL_BOTH,
+        ESC_BOLD_ON,
+        store_name,
+        LF,
+        GS_SIZE_NORMAL,
+        ESC_BOLD_OFF,
+        ESC_BOLD_ON,
+        title,
+        ESC_BOLD_OFF,
+        LF,
     ]
     if subtitle:
         chunks += [subtitle, LF]
     chunks += [
         ESC_ALIGN_LEFT,
-        _line(width), LF,
+        _line(width),
+        LF,
     ]
     return _build(chunks)
 
@@ -140,8 +150,10 @@ def _footer_block(width: int, extra_lines: int = 3) -> bytes:
     """生成通用页脚：感谢语 + 走纸 + 切纸。"""
     chunks: list = [
         ESC_ALIGN_CENTER,
-        _line(width, "="), LF,
-        "*** 屯象OS ***", LF,
+        _line(width, "="),
+        LF,
+        "*** 屯象OS ***",
+        LF,
     ]
     for _ in range(extra_lines):
         chunks.append(LF)
@@ -150,6 +162,7 @@ def _footer_block(width: int, extra_lines: int = 3) -> bytes:
 
 
 # ─── 任务1-A：活鲜称重单 ───────────────────────────────────────────────────────
+
 
 def generate_weigh_ticket(record: dict, store_config: Optional[dict] = None) -> str:
     """生成活鲜称重单 ESC/POS base64。
@@ -169,16 +182,16 @@ def generate_weigh_ticket(record: dict, store_config: Optional[dict] = None) -> 
     """
     width = _get_width(store_config)
 
-    store_name   = record.get("store_name", "屯象餐饮")
-    table_no     = record.get("table_no", "")
-    waiter_name  = record.get("waiter_name", "")
-    dish_name    = record.get("dish_name", "")
-    tank_name    = record.get("tank_name", "")
-    weight_gram  = float(record.get("weight_gram", 0))
+    store_name = record.get("store_name", "屯象餐饮")
+    table_no = record.get("table_no", "")
+    waiter_name = record.get("waiter_name", "")
+    dish_name = record.get("dish_name", "")
+    tank_name = record.get("tank_name", "")
+    weight_gram = float(record.get("weight_gram", 0))
     unit_price_fen = int(record.get("unit_price_fen", 0))
-    price_unit   = record.get("price_unit", "500g")
-    amount_fen   = int(record.get("amount_fen", 0))
-    ticket_no    = record.get("ticket_no", "")
+    price_unit = record.get("price_unit", "500g")
+    amount_fen = int(record.get("amount_fen", 0))
+    ticket_no = record.get("ticket_no", "")
 
     raw_time = record.get("weigh_time")
     if isinstance(raw_time, datetime):
@@ -195,26 +208,42 @@ def generate_weigh_ticket(record: dict, store_config: Optional[dict] = None) -> 
         ESC_CHINESE_ON,
         # ── 页头 ──
         ESC_ALIGN_CENTER,
-        GS_SIZE_DBL_BOTH, ESC_BOLD_ON,
-        store_name, LF,
-        GS_SIZE_NORMAL, ESC_BOLD_OFF,
-        ESC_BOLD_ON, "【活鲜称重单】", ESC_BOLD_OFF, LF,
+        GS_SIZE_DBL_BOTH,
+        ESC_BOLD_ON,
+        store_name,
+        LF,
+        GS_SIZE_NORMAL,
+        ESC_BOLD_OFF,
+        ESC_BOLD_ON,
+        "【活鲜称重单】",
+        ESC_BOLD_OFF,
+        LF,
         ESC_ALIGN_LEFT,
-        _line(width), LF,
+        _line(width),
+        LF,
         # ── 基本信息 ──
-        _two_col("时间:" + weigh_time_str, "桌号:" + table_no, width), LF,
+        _two_col("时间:" + weigh_time_str, "桌号:" + table_no, width),
+        LF,
     ]
     if waiter_name:
         chunks += [f"服务员：{waiter_name}", LF]
     if ticket_no:
         chunks += [f"单据号：{ticket_no}", LF]
     chunks += [
-        _line(width, "-"), LF,
-        # ── 称重明细 ──
-        ESC_BOLD_ON, _pad_right("品种", 12) + "鱼缸", ESC_BOLD_OFF, LF,
-        _two_col(dish_name, tank_name or "-", width), LF,
+        _line(width, "-"),
         LF,
-        ESC_BOLD_ON, "称重量", ESC_BOLD_OFF, LF,
+        # ── 称重明细 ──
+        ESC_BOLD_ON,
+        _pad_right("品种", 12) + "鱼缸",
+        ESC_BOLD_OFF,
+        LF,
+        _two_col(dish_name, tank_name or "-", width),
+        LF,
+        LF,
+        ESC_BOLD_ON,
+        "称重量",
+        ESC_BOLD_OFF,
+        LF,
     ]
 
     # 重量行
@@ -224,26 +253,38 @@ def generate_weigh_ticket(record: dict, store_config: Optional[dict] = None) -> 
         weight_str += f"  ({jin:.2f}斤)"
     chunks += [
         ESC_ALIGN_CENTER,
-        GS_SIZE_DBL_W, ESC_BOLD_ON,
-        weight_str, LF,
-        GS_SIZE_NORMAL, ESC_BOLD_OFF,
+        GS_SIZE_DBL_W,
+        ESC_BOLD_ON,
+        weight_str,
+        LF,
+        GS_SIZE_NORMAL,
+        ESC_BOLD_OFF,
         ESC_ALIGN_LEFT,
         LF,
-        _two_col(f"单价：{unit_label}", f"金额：{_fmt_yuan(amount_fen)}", width), LF,
-        _line(width, "="), LF,
+        _two_col(f"单价：{unit_label}", f"金额：{_fmt_yuan(amount_fen)}", width),
+        LF,
+        _line(width, "="),
+        LF,
         ESC_ALIGN_CENTER,
-        GS_SIZE_DBL_W, ESC_BOLD_ON,
-        f"合计：{_fmt_yuan(amount_fen)}", LF,
-        GS_SIZE_NORMAL, ESC_BOLD_OFF,
+        GS_SIZE_DBL_W,
+        ESC_BOLD_ON,
+        f"合计：{_fmt_yuan(amount_fen)}",
+        LF,
+        GS_SIZE_NORMAL,
+        ESC_BOLD_OFF,
         ESC_ALIGN_LEFT,
-        _line(width, "="), LF,
+        _line(width, "="),
+        LF,
         LF,
         # ── 确认签字栏 ──
-        "顾客确认签字：", LF,
+        "顾客确认签字：",
         LF,
-        _line(width // 2, "_"), LF,
         LF,
-        "（签字即表示对称重结果确认无异议）", LF,
+        _line(width // 2, "_"),
+        LF,
+        LF,
+        "（签字即表示对称重结果确认无异议）",
+        LF,
         LF,
     ]
     chunks.append(_footer_block(width))
@@ -258,13 +299,13 @@ def generate_weigh_ticket(record: dict, store_config: Optional[dict] = None) -> 
 
 # 宴席节中文名映射（兜底展示）
 _SECTION_NAMES = {
-    "cold":     "凉菜",
-    "hot":      "热菜",
-    "seafood":  "海鲜",
-    "soup":     "汤品",
-    "staple":   "主食",
-    "dessert":  "甜点",
-    "fruit":    "水果",
+    "cold": "凉菜",
+    "hot": "热菜",
+    "seafood": "海鲜",
+    "soup": "汤品",
+    "staple": "主食",
+    "dessert": "甜点",
+    "fruit": "水果",
 }
 
 
@@ -297,16 +338,16 @@ def generate_banquet_notice(
     """
     width = _get_width(store_config)
 
-    store_name     = session.get("store_name", "屯象餐饮")
-    contract_no    = session.get("contract_no", "")
-    customer_name  = session.get("customer_name", "")
+    store_name = session.get("store_name", "屯象餐饮")
+    contract_no = session.get("contract_no", "")
+    customer_name = session.get("customer_name", "")
     customer_phone = session.get("customer_phone", "")
-    table_count    = int(session.get("table_count", 0))
-    pax_per_table  = int(session.get("pax_per_table", 0))
-    banquet_type   = session.get("banquet_type", "宴席")
-    menu_name      = session.get("menu_name", "")
-    special_notes  = session.get("special_notes", "")
-    printed_by     = session.get("printed_by", "")
+    table_count = int(session.get("table_count", 0))
+    pax_per_table = int(session.get("pax_per_table", 0))
+    banquet_type = session.get("banquet_type", "宴席")
+    menu_name = session.get("menu_name", "")
+    special_notes = session.get("special_notes", "")
+    printed_by = session.get("printed_by", "")
 
     raw_start = session.get("start_time")
     if isinstance(raw_start, datetime):
@@ -329,23 +370,35 @@ def generate_banquet_notice(
         ESC_INIT,
         ESC_CHINESE_ON,
         ESC_ALIGN_CENTER,
-        GS_SIZE_DBL_BOTH, ESC_BOLD_ON,
-        store_name, LF,
-        GS_SIZE_NORMAL, ESC_BOLD_OFF,
-        ESC_BOLD_ON, f"【{banquet_type}通知单】", ESC_BOLD_OFF, LF,
+        GS_SIZE_DBL_BOTH,
+        ESC_BOLD_ON,
+        store_name,
+        LF,
+        GS_SIZE_NORMAL,
+        ESC_BOLD_OFF,
+        ESC_BOLD_ON,
+        f"【{banquet_type}通知单】",
+        ESC_BOLD_OFF,
+        LF,
         ESC_ALIGN_LEFT,
-        _line(width), LF,
+        _line(width),
+        LF,
     ]
 
     # ── 宴席基本信息 ──
     if contract_no:
         chunks += [f"合同号：{contract_no}", LF]
     chunks += [
-        _two_col(f"客户：{customer_name}", f"电话：{customer_phone or '-'}", width), LF,
-        f"类型：{banquet_type}  菜单：{menu_name}", LF,
-        f"开席：{start_str}", LF,
-        _two_col(f"桌数：{table_count}桌", f"每桌：{pax_per_table}人", width), LF,
-        _line(width, "-"), LF,
+        _two_col(f"客户：{customer_name}", f"电话：{customer_phone or '-'}", width),
+        LF,
+        f"类型：{banquet_type}  菜单：{menu_name}",
+        LF,
+        f"开席：{start_str}",
+        LF,
+        _two_col(f"桌数：{table_count}桌", f"每桌：{pax_per_table}人", width),
+        LF,
+        _line(width, "-"),
+        LF,
     ]
 
     # ── 各节菜品清单 ──
@@ -360,15 +413,16 @@ def generate_banquet_notice(
         chunks += [
             ESC_BOLD_ON,
             f"▌ {order_label}  {sec_name}",
-            ESC_BOLD_OFF, LF,
+            ESC_BOLD_OFF,
+            LF,
         ]
 
         for dish in dishes:
             dish_name = dish.get("dish_name", "")
-            quantity  = dish.get("quantity", "")
-            unit      = dish.get("unit", "份")
-            notes     = dish.get("notes", "")
-            qty_str   = f"{quantity}{unit}" if quantity else ""
+            quantity = dish.get("quantity", "")
+            unit = dish.get("unit", "份")
+            notes = dish.get("notes", "")
+            qty_str = f"{quantity}{unit}" if quantity else ""
             if notes:
                 line = _two_col(f"  · {dish_name}", f"{qty_str} {notes}", width)
             else:
@@ -380,18 +434,28 @@ def generate_banquet_notice(
     # ── 特殊备注 ──
     if special_notes:
         chunks += [
-            _line(width, "-"), LF,
-            ESC_BOLD_ON, "【特殊备注】", ESC_BOLD_OFF, LF,
-            special_notes, LF,
+            _line(width, "-"),
+            LF,
+            ESC_BOLD_ON,
+            "【特殊备注】",
+            ESC_BOLD_OFF,
+            LF,
+            special_notes,
+            LF,
             LF,
         ]
 
     # ── 页脚 ──
     chunks += [
-        _line(width, "="), LF,
-        _two_col(f"打印：{printed_by or '-'}", f"时间：{print_str}", width), LF,
-        "（本通知单由屯象OS自动生成，请妥善保存）", LF,
-        LF, LF, LF,
+        _line(width, "="),
+        LF,
+        _two_col(f"打印：{printed_by or '-'}", f"时间：{print_str}", width),
+        LF,
+        "（本通知单由屯象OS自动生成，请妥善保存）",
+        LF,
+        LF,
+        LF,
+        LF,
         GS_CUT_PARTIAL,
     ]
 
@@ -406,6 +470,7 @@ def generate_banquet_notice(
 
 
 # ─── 任务1-C：企业挂账单 ──────────────────────────────────────────────────────
+
 
 def generate_credit_account_ticket(
     order: dict,
@@ -436,14 +501,14 @@ def generate_credit_account_ticket(
     """
     width = _get_width(store_config)
 
-    store_name       = order.get("store_name", "屯象餐饮")
-    order_no         = order.get("order_no", "")
-    table_no         = order.get("table_no", "")
-    items            = order.get("items", [])
-    total_fen        = int(order.get("total_amount_fen", 0))
-    final_fen        = int(order.get("final_amount_fen", total_fen))
-    discount_fen     = int(order.get("discount_amount_fen", 0))
-    cashier_name     = order.get("cashier_name", "")
+    store_name = order.get("store_name", "屯象餐饮")
+    order_no = order.get("order_no", "")
+    table_no = order.get("table_no", "")
+    items = order.get("items", [])
+    total_fen = int(order.get("total_amount_fen", 0))
+    final_fen = int(order.get("final_amount_fen", total_fen))
+    discount_fen = int(order.get("discount_amount_fen", 0))
+    cashier_name = order.get("cashier_name", "")
 
     raw_time = order.get("order_time")
     if isinstance(raw_time, datetime):
@@ -453,30 +518,41 @@ def generate_credit_account_ticket(
     else:
         time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    company_name     = credit_info.get("company_name", "")
-    company_code     = credit_info.get("company_code", "")
-    contact_name     = credit_info.get("contact_name", "")
-    contact_phone    = credit_info.get("contact_phone", "")
+    company_name = credit_info.get("company_name", "")
+    company_code = credit_info.get("company_code", "")
+    contact_name = credit_info.get("contact_name", "")
+    contact_phone = credit_info.get("contact_phone", "")
     credit_limit_fen = credit_info.get("credit_limit_fen")
-    balance_fen      = credit_info.get("current_balance_fen")
-    notes            = credit_info.get("notes", "")
+    balance_fen = credit_info.get("current_balance_fen")
+    notes = credit_info.get("notes", "")
 
     chunks: list = [
         ESC_INIT,
         ESC_CHINESE_ON,
         # ── 页头 ──
         ESC_ALIGN_CENTER,
-        GS_SIZE_DBL_BOTH, ESC_BOLD_ON,
-        store_name, LF,
-        GS_SIZE_NORMAL, ESC_BOLD_OFF,
-        ESC_BOLD_ON, "【企业挂账单】", ESC_BOLD_OFF, LF,
+        GS_SIZE_DBL_BOTH,
+        ESC_BOLD_ON,
+        store_name,
+        LF,
+        GS_SIZE_NORMAL,
+        ESC_BOLD_OFF,
+        ESC_BOLD_ON,
+        "【企业挂账单】",
+        ESC_BOLD_OFF,
+        LF,
         ESC_ALIGN_LEFT,
-        _line(width), LF,
+        _line(width),
+        LF,
         # ── 订单信息 ──
-        f"单号：{order_no}", LF,
-        _two_col(f"桌号：{table_no}", f"时间：{time_str[:16]}", width), LF,
-        _two_col(f"收银：{cashier_name}", "", width), LF,
-        _line(width, "-"), LF,
+        f"单号：{order_no}",
+        LF,
+        _two_col(f"桌号：{table_no}", f"时间：{time_str[:16]}", width),
+        LF,
+        _two_col(f"收银：{cashier_name}", "", width),
+        LF,
+        _line(width, "-"),
+        LF,
     ]
 
     # ── 消费明细 ──
@@ -485,11 +561,11 @@ def generate_credit_account_ticket(
         header = _pad_right("品名", width - 20) + _pad_right("数量", 6) + _pad_right("单价", 8) + "小计"
         chunks += [ESC_BOLD_ON, header, ESC_BOLD_OFF, LF]
         for item in items:
-            item_name   = item.get("item_name", "")
-            qty         = item.get("quantity", 1)
+            item_name = item.get("item_name", "")
+            qty = item.get("quantity", 1)
             u_price_fen = int(item.get("unit_price_fen", 0))
-            sub_fen     = int(item.get("subtotal_fen", 0))
-            name_w      = width - 20
+            sub_fen = int(item.get("subtotal_fen", 0))
+            name_w = width - 20
             name_truncated = item_name
             if _gbk_len(item_name) > name_w:
                 # 截断
@@ -506,35 +582,45 @@ def generate_credit_account_ticket(
 
     # ── 金额汇总 ──
     chunks += [
-        _two_col("消费合计：", _fmt_yuan(total_fen), width), LF,
+        _two_col("消费合计：", _fmt_yuan(total_fen), width),
+        LF,
     ]
     if discount_fen:
         chunks += [_two_col("优惠减免：", f"-{_fmt_yuan(discount_fen)}", width), LF]
     chunks += [
         ESC_BOLD_ON,
-        _two_col("挂账金额：", _fmt_yuan(final_fen), width), LF,
+        _two_col("挂账金额：", _fmt_yuan(final_fen), width),
+        LF,
         ESC_BOLD_OFF,
-        _line(width, "="), LF,
+        _line(width, "="),
+        LF,
     ]
 
     # ── 挂账单位信息 ──
     chunks += [
-        ESC_BOLD_ON, "【挂账单位信息】", ESC_BOLD_OFF, LF,
-        f"单位名称：{company_name}", LF,
+        ESC_BOLD_ON,
+        "【挂账单位信息】",
+        ESC_BOLD_OFF,
+        LF,
+        f"单位名称：{company_name}",
+        LF,
     ]
     if company_code:
         chunks += [f"单位代码：{company_code}", LF]
     chunks += [
-        _two_col(f"经办人：{contact_name}", f"电话：{contact_phone or '-'}", width), LF,
+        _two_col(f"经办人：{contact_name}", f"电话：{contact_phone or '-'}", width),
+        LF,
     ]
     if credit_limit_fen is not None:
         chunks += [_two_col(f"授信额度：{_fmt_yuan(int(credit_limit_fen))}", "", width), LF]
     if balance_fen is not None:
         new_balance = int(balance_fen) + final_fen
         chunks += [
-            _two_col(f"原挂账余额：{_fmt_yuan(int(balance_fen))}", "", width), LF,
+            _two_col(f"原挂账余额：{_fmt_yuan(int(balance_fen))}", "", width),
+            LF,
             ESC_BOLD_ON,
-            _two_col(f"本次后余额：{_fmt_yuan(new_balance)}", "", width), LF,
+            _two_col(f"本次后余额：{_fmt_yuan(new_balance)}", "", width),
+            LF,
             ESC_BOLD_OFF,
         ]
     if notes:
@@ -542,17 +628,24 @@ def generate_credit_account_ticket(
 
     # ── 签字确认栏 ──
     chunks += [
-        _line(width, "-"), LF,
-        "经办人签字确认：", LF,
+        _line(width, "-"),
         LF,
-        _line(width // 2, "_") + "        " + _line(width // 4, "_"), LF,
-        "（签字）                          （日期）", LF,
+        "经办人签字确认：",
         LF,
-        "单位盖章：", LF,
         LF,
-        _line(width // 2, "_"), LF,
+        _line(width // 2, "_") + "        " + _line(width // 4, "_"),
         LF,
-        "（本单一式两联：门店存根 / 单位留存）", LF,
+        "（签字）                          （日期）",
+        LF,
+        LF,
+        "单位盖章：",
+        LF,
+        LF,
+        _line(width // 2, "_"),
+        LF,
+        LF,
+        "（本单一式两联：门店存根 / 单位留存）",
+        LF,
         LF,
     ]
     chunks.append(_footer_block(width))

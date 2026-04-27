@@ -13,6 +13,7 @@
 
 金额单位：分（fen）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -27,9 +28,9 @@ from .demand_forecast import DemandForecastService
 log = structlog.get_logger(__name__)
 
 # 默认配置常量
-DEFAULT_SAFETY_DAYS = 3          # 安全天数
-DEFAULT_REORDER_CYCLE_DAYS = 2   # 默认采购周期（天）
-DEFAULT_URGENT_THRESHOLD = 3     # 紧急预警阈值（天）
+DEFAULT_SAFETY_DAYS = 3  # 安全天数
+DEFAULT_REORDER_CYCLE_DAYS = 2  # 默认采购周期（天）
+DEFAULT_URGENT_THRESHOLD = 3  # 紧急预警阈值（天）
 
 # 供应商评分权重
 SCORE_WEIGHT_ON_TIME = 0.5
@@ -67,8 +68,8 @@ class ProcurementRecommendation(BaseModel):
     supplier_name: Optional[str] = None
     supplier_score: Optional[float] = None
     is_urgent: bool
-    days_remaining: Optional[float] = None   # 按日均消耗，还能用多少天
-    status: str = "draft"                    # draft | applied
+    days_remaining: Optional[float] = None  # 按日均消耗，还能用多少天
+    status: str = "draft"  # draft | applied
     store_id: str
     tenant_id: str
     created_at: str = Field(default_factory=_now_iso)
@@ -160,9 +161,7 @@ class AutoProcurementService:
             综合评分（0~1）
         """
         return (
-            on_time_rate * SCORE_WEIGHT_ON_TIME
-            + quality_rate * SCORE_WEIGHT_QUALITY
-            + price_score * SCORE_WEIGHT_PRICE
+            on_time_rate * SCORE_WEIGHT_ON_TIME + quality_rate * SCORE_WEIGHT_QUALITY + price_score * SCORE_WEIGHT_PRICE
         )
 
     # ──────────────────────────────────────────────────────
@@ -193,9 +192,7 @@ class AutoProcurementService:
 
         if db is not None:
             # 生产模式：从DB补充历史统计数据
-            enriched = await self._enrich_suppliers_from_db(
-                suppliers, ingredient_id, tenant_id, db
-            )
+            enriched = await self._enrich_suppliers_from_db(suppliers, ingredient_id, tenant_id, db)
         else:
             enriched = suppliers
 
@@ -284,11 +281,14 @@ class AutoProcurementService:
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
             """)
-            result = await db.execute(sql, {
-                "supplier_id": supplier_id,
-                "ingredient_id": ingredient_id,
-                "tenant_id": tenant_id,
-            })
+            result = await db.execute(
+                sql,
+                {
+                    "supplier_id": supplier_id,
+                    "ingredient_id": ingredient_id,
+                    "tenant_id": tenant_id,
+                },
+            )
             row = result.fetchone()
             total = int(row.total or 0) if row else 0
             if total == 0:
@@ -309,7 +309,7 @@ class AutoProcurementService:
             return {
                 "on_time_rate": on_time_rate,
                 "quality_rate": quality_rate,
-                "price_score": 0.5,   # 占位：由外部比价逻辑填入
+                "price_score": 0.5,  # 占位：由外部比价逻辑填入
                 "total_deliveries": total,
             }
         except Exception:  # noqa: BLE001 — 表不存在等情况静默返回默认值
@@ -360,13 +360,10 @@ class AutoProcurementService:
             {"tid": tenant_id},
         )
 
-        ing_q = (
-            select(Ingredient)
-            .where(
-                Ingredient.tenant_id == _uuid(tenant_id),
-                Ingredient.store_id == _uuid(store_id),
-                Ingredient.is_deleted == False,  # noqa: E712
-            )
+        ing_q = select(Ingredient).where(
+            Ingredient.tenant_id == _uuid(tenant_id),
+            Ingredient.store_id == _uuid(store_id),
+            Ingredient.is_deleted == False,  # noqa: E712
         )
         result = await db.execute(ing_q)
         ingredients = result.scalars().all()
@@ -440,7 +437,7 @@ class AutoProcurementService:
             recommendations.append(rec)
 
         # urgent排前面
-        recommendations.sort(key=lambda r: (0 if r.is_urgent else 1))
+        recommendations.sort(key=lambda r: 0 if r.is_urgent else 1)
 
         log.info(
             "auto_procurement.generate_recommendations",
@@ -511,7 +508,7 @@ class AutoProcurementService:
             recommendations.append(rec)
 
         # urgent排前面
-        recommendations.sort(key=lambda r: (0 if r.is_urgent else 1))
+        recommendations.sort(key=lambda r: 0 if r.is_urgent else 1)
 
         log.debug(
             "auto_procurement.generate_recommendations_from_mock",
@@ -571,6 +568,7 @@ class AutoProcurementService:
             # 生产模式：调用现有申购服务
             try:
                 from .requisition import create_requisition
+
                 result = await create_requisition(
                     store_id=store_id,
                     items=items,

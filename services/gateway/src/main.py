@@ -1,4 +1,5 @@
 """TunxiangOS API Gateway — 统一入口，按域路由到各微服务"""
+
 import asyncio
 import os
 
@@ -9,13 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .api.config_health_routes import router as config_health_router
+from .api.demo_healthcheck_routes import router as demo_healthcheck_router  # Week 3 演示巡检
+from .api.flags_routes import router as flags_router  # Follow-up PR B — 灰度配置下发
 from .api.migration_routes import router as migration_router
 from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
 from .auth import router as auth_router
 from .gdpr_routes import router as gdpr_router
+from .group_ops_routes import router as group_ops_router
 from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
+from .material_routes import router as material_router
 from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
 from .middleware.audit_middleware import AuditMiddleware
 from .personalization_middleware import PersonalizationMiddleware
@@ -30,8 +35,6 @@ from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
-from .api.demo_healthcheck_routes import router as demo_healthcheck_router  # Week 3 演示巡检
-from .api.flags_routes import router as flags_router  # Follow-up PR B — 灰度配置下发
 
 logger = structlog.get_logger(__name__)
 
@@ -82,9 +85,7 @@ async def _run_daily_sop() -> None:
 
         async for db in get_async_session():
             # 获取所有有 active 群配置的租户
-            stmt = select(distinct(WecomGroupConfig.tenant_id)).where(
-                WecomGroupConfig.status == "active"
-            )
+            stmt = select(distinct(WecomGroupConfig.tenant_id)).where(WecomGroupConfig.status == "active")
             result = await db.execute(stmt)
             tenant_ids = result.scalars().all()
 
@@ -149,6 +150,7 @@ async def _shutdown() -> None:
     _scheduler.shutdown(wait=False)
     logger.info("gateway_scheduler_stopped")
 
+
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
 
@@ -173,6 +175,11 @@ app.include_router(wecom_internal_router)
 # 企微群运营 SOP API
 app.include_router(wecom_group_router)
 
+# 社群运营工具 API（标签管理 + 群发任务）
+app.include_router(group_ops_router)
+# 企业素材库 API（分组 + 素材 CRUD + 时段匹配）
+app.include_router(material_router)
+
 # GDPR 个人信息保护合规 API
 app.include_router(gdpr_router)
 # 企微群管理与通知推送 API（群创建/列表/发消息/通知/状态）
@@ -189,6 +196,7 @@ app.include_router(flags_router)
 
 # C-04: 演示监控面板
 from .api.demo_monitor_routes import router as demo_monitor_router
+
 app.include_router(demo_monitor_router)  # C-04: 演示监控面板
 
 # 上线交付 API（DeliveryAgent 20问 + 配置包导入）
@@ -212,6 +220,7 @@ async def health():
 @app.get("/api/v1/domains")
 async def list_domains():
     from .proxy import DOMAIN_ROUTES
+
     domains = {k: {"configured": bool(v), "url": v or "not configured"} for k, v in DOMAIN_ROUTES.items()}
     return ok(domains)
 
@@ -219,6 +228,7 @@ async def list_domains():
 @app.get("/api/v1/menu-config")
 async def get_menu_config(role: str = "admin"):
     from .menu_config import generate_menu_for_tenant
+
     all_domains = ["tx-trade", "tx-menu", "tx-member", "tx-supply", "tx-finance", "tx-org", "tx-analytics", "tx-agent"]
     modules = generate_menu_for_tenant(all_domains, role)
     return ok(modules)

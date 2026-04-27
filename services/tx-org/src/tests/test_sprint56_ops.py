@@ -19,7 +19,7 @@ import sys
 # ── Setup path BEFORE any local imports ──
 _here = os.path.dirname(os.path.abspath(__file__))
 for _p in [
-    os.path.join(_here, ".."),                          # tx-org/src
+    os.path.join(_here, ".."),  # tx-org/src
     os.path.join(_here, "..", "..", "..", "tx-supply", "src"),  # tx-supply/src
 ]:
     _abs = os.path.abspath(_p)
@@ -116,14 +116,8 @@ class TestTrafficPrediction:
         wed = date(2026, 3, 25)  # Wednesday
         sat = date(2026, 3, 28)  # Saturday
 
-        weekday_total = sum(
-            h["predicted_customers"]
-            for h in schedule_svc.predict_traffic(STORE_ID, wed)
-        )
-        weekend_total = sum(
-            h["predicted_customers"]
-            for h in schedule_svc.predict_traffic(STORE_ID, sat)
-        )
+        weekday_total = sum(h["predicted_customers"] for h in schedule_svc.predict_traffic(STORE_ID, wed))
+        weekend_total = sum(h["predicted_customers"] for h in schedule_svc.predict_traffic(STORE_ID, sat))
         assert weekend_total > weekday_total
 
     def test_holiday_prediction(self, schedule_svc):
@@ -131,12 +125,10 @@ class TestTrafficPrediction:
         wed = date(2026, 3, 25)
 
         normal_total = sum(
-            h["predicted_customers"]
-            for h in schedule_svc.predict_traffic(STORE_ID, wed, holiday_type="normal")
+            h["predicted_customers"] for h in schedule_svc.predict_traffic(STORE_ID, wed, holiday_type="normal")
         )
         holiday_total = sum(
-            h["predicted_customers"]
-            for h in schedule_svc.predict_traffic(STORE_ID, wed, holiday_type="national_day")
+            h["predicted_customers"] for h in schedule_svc.predict_traffic(STORE_ID, wed, holiday_type="national_day")
         )
         assert holiday_total > normal_total * 1.4  # national_day factor is 1.6
 
@@ -144,14 +136,8 @@ class TestTrafficPrediction:
         """下雨天客流应减少"""
         d = date(2026, 3, 25)
 
-        sunny = sum(
-            h["predicted_customers"]
-            for h in schedule_svc.predict_traffic(STORE_ID, d, weather="sunny")
-        )
-        rainy = sum(
-            h["predicted_customers"]
-            for h in schedule_svc.predict_traffic(STORE_ID, d, weather="rainy")
-        )
+        sunny = sum(h["predicted_customers"] for h in schedule_svc.predict_traffic(STORE_ID, d, weather="sunny"))
+        rainy = sum(h["predicted_customers"] for h in schedule_svc.predict_traffic(STORE_ID, d, weather="rainy"))
         assert rainy < sunny
 
     def test_peak_detection(self, schedule_svc):
@@ -219,17 +205,12 @@ class TestSmartSchedule:
 
     def test_skill_matching(self, schedule_svc):
         """技能匹配"""
-        matches = schedule_svc.match_skills(
-            STORE_ID, "morning", ["chef_hot", "chef_cold"]
-        )
+        matches = schedule_svc.match_skills(STORE_ID, "morning", ["chef_hot", "chef_cold"])
 
         assert len(matches) > 0
         for m in matches:
             assert m["match_score"] > 0
-            assert any(
-                s in m["skills"]
-                for s in ["chef_hot", "chef_cold"]
-            )
+            assert any(s in m["skills"] for s in ["chef_hot", "chef_cold"])
 
         # 王强（主厨）should be top match — all chef skills
         chef_names = [m["name"] for m in matches]
@@ -244,8 +225,7 @@ class TestSmartSchedule:
         for date_str, day_sch in result["schedule"].items():
             evening_emps = day_sch.get("evening", [])
             # Evening shift ends at 22:00, which is the cutoff
-            assert minor_id not in evening_emps, \
-                f"Minor {minor_id} assigned to evening shift on {date_str}"
+            assert minor_id not in evening_emps, f"Minor {minor_id} assigned to evening shift on {date_str}"
 
     def test_staffing_need_calculation(self, schedule_svc):
         """人力需求计算"""
@@ -290,9 +270,7 @@ class TestSmartSchedule:
         evening_emps = result["schedule"][first_date].get("evening", [])
 
         if morning_emps and evening_emps:
-            swap = schedule_svc.swap_shift(
-                sch_id, morning_emps[0], evening_emps[0], first_date
-            )
+            swap = schedule_svc.swap_shift(sch_id, morning_emps[0], evening_emps[0], first_date)
             assert swap["ok"]
 
     def test_schedule_efficiency(self, schedule_svc):
@@ -301,14 +279,9 @@ class TestSmartSchedule:
         schedule_svc.generate_schedule(STORE_ID, start)
 
         end = start + timedelta(days=6)
-        actual_traffic = {
-            (start + timedelta(days=i)).isoformat(): 250 + i * 10
-            for i in range(7)
-        }
+        actual_traffic = {(start + timedelta(days=i)).isoformat(): 250 + i * 10 for i in range(7)}
 
-        efficiency = schedule_svc.get_schedule_efficiency(
-            STORE_ID, (start, end), actual_traffic
-        )
+        efficiency = schedule_svc.get_schedule_efficiency(STORE_ID, (start, end), actual_traffic)
 
         assert "total_scheduled_hours" in efficiency
         assert "prediction_accuracy_pct" in efficiency
@@ -352,10 +325,7 @@ class TestConstraintValidation:
         result = schedule_svc.validate_schedule(fake_schedule)
         assert not result["valid"]
 
-        ot_violations = [
-            v for v in result["violations"]
-            if v["rule"] == "weekly_hours_cap"
-        ]
+        ot_violations = [v for v in result["violations"] if v["rule"] == "weekly_hours_cap"]
         assert len(ot_violations) > 0
         assert ot_violations[0]["employee_id"] == "EMP001"
 
@@ -377,10 +347,7 @@ class TestConstraintValidation:
 
         result = schedule_svc.validate_schedule(fake_schedule)
 
-        consec_violations = [
-            v for v in result["violations"]
-            if v["rule"] == "max_consecutive_days"
-        ]
+        consec_violations = [v for v in result["violations"] if v["rule"] == "max_consecutive_days"]
         assert len(consec_violations) > 0
 
     def test_minor_night_shift_violation(self, schedule_svc):
@@ -396,10 +363,7 @@ class TestConstraintValidation:
 
         result = schedule_svc.validate_schedule(fake_schedule)
 
-        minor_violations = [
-            v for v in result["violations"]
-            if v["rule"] == "minor_night_shift"
-        ]
+        minor_violations = [v for v in result["violations"] if v["rule"] == "minor_night_shift"]
         assert len(minor_violations) > 0
         assert minor_violations[0]["employee_id"] == "EMP009"
 
@@ -432,7 +396,8 @@ class TestAttendance:
     def test_clock_in_on_time(self, attendance_engine):
         """准时打卡"""
         result = attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 0),
             method="face",
         )
@@ -443,7 +408,8 @@ class TestAttendance:
     def test_clock_in_late(self, attendance_engine):
         """迟到打卡（超过宽限期）"""
         result = attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 15),  # 15 min late
         )
         assert result["ok"]
@@ -453,7 +419,8 @@ class TestAttendance:
     def test_clock_in_within_grace(self, attendance_engine):
         """宽限期内打卡不算迟到"""
         result = attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 3),  # 3 min, within grace
         )
         assert result["ok"]
@@ -463,12 +430,14 @@ class TestAttendance:
         """准时下班打卡"""
         # Clock in first
         attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 0),
         )
         # Clock out
         result = attendance_engine.clock_out(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 15, 0),
         )
         assert result["ok"]
@@ -478,11 +447,13 @@ class TestAttendance:
     def test_clock_out_early_leave(self, attendance_engine):
         """早退检测"""
         attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 0),
         )
         result = attendance_engine.clock_out(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 14, 0),  # 1 hour early
         )
         assert result["ok"]
@@ -491,11 +462,13 @@ class TestAttendance:
     def test_clock_out_overtime(self, attendance_engine):
         """加班检测"""
         attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 0),
         )
         result = attendance_engine.clock_out(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 16, 0),  # 1 hour overtime
         )
         assert result["ok"]
@@ -505,11 +478,13 @@ class TestAttendance:
         """日考勤报表"""
         # EMP001 clocks in on time
         attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 0),
         )
         attendance_engine.clock_out(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 15, 0),
         )
 
@@ -532,11 +507,13 @@ class TestAttendance:
         # Simulate a few days of attendance
         for day in [23, 24]:
             attendance_engine.clock_in(
-                "EMP001", STORE_ID,
+                "EMP001",
+                STORE_ID,
                 clock_time=datetime(2026, 3, day, 8, 0),
             )
             attendance_engine.clock_out(
-                "EMP001", STORE_ID,
+                "EMP001",
+                STORE_ID,
                 clock_time=datetime(2026, 3, day, 15, 0),
             )
 
@@ -551,9 +528,7 @@ class TestAttendance:
         attendance_engine.init_leave_balance("EMP007")
 
         # Apply
-        result = attendance_engine.apply_leave(
-            "EMP007", "annual", "2026-04-01", "2026-04-03", "家庭事务"
-        )
+        result = attendance_engine.apply_leave("EMP007", "annual", "2026-04-01", "2026-04-03", "家庭事务")
         assert result["ok"]
         assert result["days_requested"] == 3
         assert result["remaining_after"] == 2  # 5 - 3 = 2
@@ -566,18 +541,14 @@ class TestAttendance:
 
         # Balance should be updated
         balance = attendance_engine.get_leave_balance("EMP007")
-        annual = next(
-            b for b in balance["balances"] if b["leave_type"] == "annual"
-        )
+        annual = next(b for b in balance["balances"] if b["leave_type"] == "annual")
         assert annual["remaining_days"] == 2.0
 
     def test_leave_insufficient_balance(self, attendance_engine):
         """余额不足应拒绝"""
         attendance_engine.init_leave_balance("EMP008")
 
-        result = attendance_engine.apply_leave(
-            "EMP008", "annual", "2026-04-01", "2026-04-15", "长假"
-        )
+        result = attendance_engine.apply_leave("EMP008", "annual", "2026-04-01", "2026-04-15", "长假")
         assert not result["ok"]
         assert "Insufficient" in result["error"]
 
@@ -585,7 +556,8 @@ class TestAttendance:
         """考勤异常检测"""
         # EMP001 clocks in late
         attendance_engine.clock_in(
-            "EMP001", STORE_ID,
+            "EMP001",
+            STORE_ID,
             clock_time=datetime(2026, 3, 23, 8, 20),
         )
 
@@ -601,9 +573,7 @@ class TestAttendance:
 
     def test_record_overtime(self, attendance_engine):
         """记录加班"""
-        result = attendance_engine.record_overtime(
-            "EMP003", "2026-03-28", 4.0, "活鱼到货需处理", "EMP001", "weekend"
-        )
+        result = attendance_engine.record_overtime("EMP003", "2026-03-28", 4.0, "活鱼到货需处理", "EMP001", "weekend")
         assert result["ok"]
         assert result["hours"] == 4.0
         assert result["rate"] == 2.0
@@ -654,14 +624,14 @@ class TestPayroll:
     def test_payroll_with_absence(self, payroll_svc):
         """缺勤影响工资"""
         full = payroll_svc.calculate_employee_payroll(
-            "EMP007", "2026-03",
-            attendance_data={"attendance_days": 22, "absence_days": 0,
-                             "late_count": 0, "early_leave_count": 0},
+            "EMP007",
+            "2026-03",
+            attendance_data={"attendance_days": 22, "absence_days": 0, "late_count": 0, "early_leave_count": 0},
         )
         partial = payroll_svc.calculate_employee_payroll(
-            "EMP007", "2026-03",
-            attendance_data={"attendance_days": 18, "absence_days": 4,
-                             "late_count": 2, "early_leave_count": 1},
+            "EMP007",
+            "2026-03",
+            attendance_data={"attendance_days": 18, "absence_days": 4, "late_count": 2, "early_leave_count": 1},
         )
 
         assert full["ok"] and partial["ok"]
@@ -675,7 +645,8 @@ class TestPayroll:
         """提成计算"""
         # EMP007 (waiter) has 0.3% commission
         result = payroll_svc.calculate_employee_payroll(
-            "EMP007", "2026-03",
+            "EMP007",
+            "2026-03",
             sales_amount_fen=10_000_000,  # 10万销售额
         )
         assert result["ok"]
@@ -684,7 +655,8 @@ class TestPayroll:
     def test_overtime_pay_rates(self, payroll_svc):
         """加班费倍率：工作日1.5x，周末2x，节假日3x"""
         result = payroll_svc.calculate_employee_payroll(
-            "EMP004", "2026-03",
+            "EMP004",
+            "2026-03",
             overtime_data={
                 "weekday_hours": 10,
                 "weekend_hours": 8,
@@ -755,7 +727,9 @@ class TestPayroll:
         payroll_svc.calculate_payroll(STORE_ID, "2026-03")
 
         cost = payroll_svc.get_store_labor_cost(
-            STORE_ID, "2026-03", revenue_fen=200_000_000  # 200万营收
+            STORE_ID,
+            "2026-03",
+            revenue_fen=200_000_000,  # 200万营收
         )
 
         assert cost["total_labor_cost_fen"] > 0
@@ -927,8 +901,13 @@ class TestWasteGuardV2:
     def test_record_waste(self, waste_guard):
         """记录损耗"""
         result = waste_guard.record_waste(
-            STORE_ID, "ING001", 2.5, "expired",
-            "过期3天", "EMP001", record_date="2026-03-01",
+            STORE_ID,
+            "ING001",
+            2.5,
+            "expired",
+            "过期3天",
+            "EMP001",
+            record_date="2026-03-01",
         )
         assert result["ok"]
         assert result["waste_cost_yuan"] == 100.0  # 2.5kg * 40 yuan/kg
@@ -936,8 +915,12 @@ class TestWasteGuardV2:
     def test_invalid_waste_type(self, waste_guard):
         """无效损耗类型"""
         result = waste_guard.record_waste(
-            STORE_ID, "ING001", 1.0, "invalid_type",
-            "test", "EMP001",
+            STORE_ID,
+            "ING001",
+            1.0,
+            "invalid_type",
+            "test",
+            "EMP001",
         )
         assert not result["ok"]
 
@@ -946,7 +929,9 @@ class TestWasteGuardV2:
         self._seed_waste_records(waste_guard)
 
         dashboard = waste_guard.get_waste_dashboard(
-            STORE_ID, "2026-03-01", "2026-03-31",
+            STORE_ID,
+            "2026-03-01",
+            "2026-03-31",
             revenue_fen=200_000_000,
             prev_waste_fen=50_000,
         )
@@ -958,17 +943,16 @@ class TestWasteGuardV2:
 
         # TOP1 by cost should have highest cost
         if len(dashboard["top5_by_cost"]) >= 2:
-            assert (
-                dashboard["top5_by_cost"][0]["waste_cost_fen"]
-                >= dashboard["top5_by_cost"][1]["waste_cost_fen"]
-            )
+            assert dashboard["top5_by_cost"][0]["waste_cost_fen"] >= dashboard["top5_by_cost"][1]["waste_cost_fen"]
 
     def test_waste_dashboard_by_type(self, waste_guard):
         """按类型分类"""
         self._seed_waste_records(waste_guard)
 
         dashboard = waste_guard.get_waste_dashboard(
-            STORE_ID, "2026-03-01", "2026-03-31",
+            STORE_ID,
+            "2026-03-01",
+            "2026-03-31",
         )
 
         by_type = dashboard["by_type"]
@@ -981,7 +965,9 @@ class TestWasteGuardV2:
         self._seed_waste_records(waste_guard)
 
         analysis = waste_guard.analyze_root_cause(
-            STORE_ID, "ING001", days=30,
+            STORE_ID,
+            "ING001",
+            days=30,
         )
 
         assert analysis["total_records"] >= 3  # 3 records for ING001
@@ -995,7 +981,10 @@ class TestWasteGuardV2:
 
         analysis = waste_guard.analyze_root_cause(STORE_ID, "ING001")
         plan = waste_guard.create_improvement_plan(
-            STORE_ID, analysis, target_reduction_pct=30.0, duration_days=30,
+            STORE_ID,
+            analysis,
+            target_reduction_pct=30.0,
+            duration_days=30,
         )
 
         assert plan["ok"]
@@ -1044,7 +1033,8 @@ class TestWasteGuardV2:
         self._seed_waste_records(waste_guard)
 
         impact = waste_guard.get_waste_cost_impact(
-            STORE_ID, "2026-03",
+            STORE_ID,
+            "2026-03",
             revenue_fen=200_000_000,
             cogs_fen=80_000_000,
         )
@@ -1060,7 +1050,9 @@ class TestWasteGuardV2:
         self._seed_waste_records(waste_guard)
 
         dashboard = waste_guard.get_waste_dashboard(
-            STORE_ID, "2026-03-01", "2026-03-31",
+            STORE_ID,
+            "2026-03-01",
+            "2026-03-31",
             revenue_fen=200_000_000,
             prev_waste_fen=50_000,
         )
@@ -1110,11 +1102,13 @@ class TestIntegration:
                     start_t = shift_time["start"]
                     end_t = shift_time["end"]
                     att_engine.clock_in(
-                        "EMP001", STORE_ID,
+                        "EMP001",
+                        STORE_ID,
                         clock_time=datetime.combine(d, start_t),
                     )
                     att_engine.clock_out(
-                        "EMP001", STORE_ID,
+                        "EMP001",
+                        STORE_ID,
                         clock_time=datetime.combine(d, end_t),
                     )
 
@@ -1125,7 +1119,8 @@ class TestIntegration:
         # 6. Calculate payroll using attendance data
         payroll_svc = PayrollService()
         payroll = payroll_svc.calculate_employee_payroll(
-            "EMP001", "2026-03",
+            "EMP001",
+            "2026-03",
             attendance_data={
                 "attendance_days": summary["work_days"],
                 "absence_days": summary["absent_count"],

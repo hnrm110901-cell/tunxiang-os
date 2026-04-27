@@ -8,25 +8,26 @@
 运行：
   pytest shared/events/tests/test_universal_publisher.py -v
 """
+
 from __future__ import annotations
 
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from universal_publisher import UniversalPublisher, STREAM_KEYS
-from trade_events import TradeEventType
 from supply_events import SupplyEventType
-
+from trade_events import TradeEventType
+from universal_publisher import STREAM_KEYS, UniversalPublisher
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def reset_redis_singleton():
@@ -39,6 +40,7 @@ def reset_redis_singleton():
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. _resolve_stream_key()
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestResolveStreamKey:
     """_resolve_stream_key() 域路由"""
@@ -85,6 +87,7 @@ class TestResolveStreamKey:
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. publish() — 正常路径
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestPublishNormalPath:
     """publish() 正常发布路径"""
@@ -220,12 +223,14 @@ class TestPublishNormalPath:
 # 3. publish() — 未知域
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPublishUnknownDomain:
     """未知域事件处理"""
 
     @pytest.mark.asyncio
     async def test_unknown_domain_returns_none(self):
         """无法路由到 Stream 时返回 None，不抛异常"""
+
         class UnknownEventType:
             value = "unknown.some.action"
 
@@ -265,15 +270,14 @@ class TestPublishUnknownDomain:
 # 4. publish() — Redis 故障降级
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPublishRedisFault:
     """Redis 故障降级行为"""
 
     @pytest.mark.asyncio
     async def test_os_error_returns_none_not_raises(self):
         """Redis OSError（连接失败）时返回 None，不抛异常"""
-        with patch.object(
-            UniversalPublisher, "get_redis", side_effect=OSError("connection refused")
-        ):
+        with patch.object(UniversalPublisher, "get_redis", side_effect=OSError("connection refused")):
             result = await UniversalPublisher.publish(
                 event_type=TradeEventType.ORDER_PAID,
                 tenant_id=uuid4(),
@@ -343,6 +347,7 @@ class TestPublishRedisFault:
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. close()
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestClose:
     """close() Redis 连接关闭"""

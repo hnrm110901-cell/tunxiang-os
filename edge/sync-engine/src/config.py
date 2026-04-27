@@ -2,6 +2,7 @@
 
 从环境变量或 .env 文件读取，集中管理所有同步参数。
 """
+
 from __future__ import annotations
 
 import os

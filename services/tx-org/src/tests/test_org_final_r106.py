@@ -4,6 +4,7 @@
   - labor_margin_routes.py   (5 endpoints: realtime/hourly/monthly/comparison/loss-hours)
 测试数量：≥ 8
 """
+
 import sys
 import types
 import unittest.mock as _mock
@@ -13,9 +14,11 @@ _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: _mock.MagicMock()
 sys.modules.setdefault("structlog", _structlog)
 
+
 # ── Mock shared.ontology.src.database ────────────────────────────────
 async def _fake_get_db():
     yield None
+
 
 _shared = types.ModuleType("shared")
 _shared_onto = types.ModuleType("shared.ontology")
@@ -77,12 +80,13 @@ sys.modules.setdefault("src", _src_pkg)
 sys.modules.setdefault("src.services", _src_svc_pkg)
 sys.modules.setdefault("src.services.labor_margin_service", _labor_svc_mod)
 
-import pytest
 import importlib.util
 import pathlib
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
 
 ORG_SRC = pathlib.Path(__file__).parent.parent
 
@@ -101,6 +105,7 @@ def _load_module(rel_path: str, name: str):
 # ════════════════════════════════════════════════════════════════════
 # PART A — org_structure_routes.py  (8 endpoints)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="module")
 def org_struct_client():
@@ -149,9 +154,7 @@ class TestOrgStructureRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = org_struct_client.get(
                 "/api/v1/org-structure/tree",
                 headers={"X-Tenant-ID": TENANT_ID},
@@ -188,9 +191,7 @@ class TestOrgStructureRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = org_struct_client.post(
                 "/api/v1/org-structure/departments",
                 json={"name": "总部运营部", "dept_type": "department"},
@@ -215,9 +216,7 @@ class TestOrgStructureRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = org_struct_client.get(
                 f"/api/v1/org-structure/departments/{DEPT_ID}",
                 headers={"X-Tenant-ID": TENANT_ID},
@@ -241,9 +240,7 @@ class TestOrgStructureRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = org_struct_client.put(
                 f"/api/v1/org-structure/departments/{DEPT_ID}",
                 json={},  # no fields
@@ -265,9 +262,7 @@ class TestOrgStructureRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = org_struct_client.get(
                 "/api/v1/org-structure/statistics",
                 headers={"X-Tenant-ID": TENANT_ID},
@@ -282,6 +277,7 @@ class TestOrgStructureRoutes:
 # ════════════════════════════════════════════════════════════════════
 # PART B — labor_margin_routes.py  (5 endpoints)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="module")
 def labor_margin_client():
@@ -309,9 +305,7 @@ class TestLaborMarginRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = labor_margin_client.get(
                 "/api/v1/labor-margin/realtime",
                 params={"store_id": STORE_ID},
@@ -330,9 +324,7 @@ class TestLaborMarginRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = labor_margin_client.get(
                 "/api/v1/labor-margin/hourly",
                 params={"store_id": STORE_ID},
@@ -350,9 +342,7 @@ class TestLaborMarginRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = labor_margin_client.get(
                 "/api/v1/labor-margin/monthly",
                 params={"store_id": STORE_ID, "month": "2026-04"},
@@ -370,9 +360,7 @@ class TestLaborMarginRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = labor_margin_client.get(
                 "/api/v1/labor-margin/comparison",
                 params={"store_ids": "store-001,store-002", "month": "2026-04"},
@@ -391,9 +379,7 @@ class TestLaborMarginRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = labor_margin_client.get(
                 "/api/v1/labor-margin/comparison",
                 params={"store_ids": "   ", "month": "2026-04"},
@@ -411,9 +397,7 @@ class TestLaborMarginRoutes:
         async def fake_get_db():
             yield mock_db
 
-        with patch.object(
-            sys.modules["shared.ontology.src.database"], "get_db", fake_get_db
-        ):
+        with patch.object(sys.modules["shared.ontology.src.database"], "get_db", fake_get_db):
             r = labor_margin_client.get(
                 "/api/v1/labor-margin/loss-hours",
                 params={"store_id": STORE_ID},

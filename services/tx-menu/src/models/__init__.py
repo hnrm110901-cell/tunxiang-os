@@ -1,13 +1,14 @@
 """tx-menu ORM 模型"""
+
 from .dish_combo import DishCombo
-from .menu_template import (
-    MenuTemplate,
-    StoreMenuPublish,
-    ChannelPrice,
-    SeasonalMenu,
-    RoomMenu,
-)
 from .dish_practice import DishPractice
+from .menu_template import (
+    ChannelPrice,
+    MenuTemplate,
+    RoomMenu,
+    SeasonalMenu,
+    StoreMenuPublish,
+)
 
 __all__ = [
     "DishPractice",

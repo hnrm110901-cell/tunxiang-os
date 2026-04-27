@@ -11,6 +11,7 @@ Covered routes:
 
 Total: 15 test cases
 """
+
 import sys
 import types
 
@@ -18,8 +19,10 @@ import types
 _src_mod = types.ModuleType("src")
 _db_mod = types.ModuleType("src.db")
 
+
 async def _fake_get_db():
     yield None
+
 
 _db_mod.get_db = _fake_get_db
 sys.modules.setdefault("src", _src_mod)
@@ -27,6 +30,7 @@ sys.modules.setdefault("src.db", _db_mod)
 
 # stub structlog
 import logging
+
 _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: logging.getLogger("test")
 sys.modules.setdefault("structlog", _structlog)
@@ -34,6 +38,7 @@ sys.modules.setdefault("structlog", _structlog)
 # ── stub SkillAwareOrchestrator ────────────────────────────────────────────
 _agents_pkg = types.ModuleType("src.agents")
 _orch_mod = types.ModuleType("src.agents.skill_aware_orchestrator")
+
 
 class _FakeTool:
     def __init__(self, name):
@@ -80,6 +85,7 @@ _agents_skills_mod = types.ModuleType("src.agents.skills")
 _model_router_mod = types.ModuleType("src.services.model_router")
 _specials_engine_mod = types.ModuleType("src.services.specials_engine")
 _services_mod = types.ModuleType("src.services")
+
 
 class _FakeMasterAgent:
     def __init__(self, tenant_id="default"):
@@ -148,20 +154,23 @@ sys.modules.setdefault("src.services.model_router", _model_router_mod)
 sys.modules.setdefault("src.services.specials_engine", _specials_engine_mod)
 
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_skill_context_app():
     from api.skill_context_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -169,6 +178,7 @@ def _build_skill_context_app():
 
 def _build_specials_app():
     from api.specials_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -191,6 +201,7 @@ def specials_client():
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/agent/skill-context/tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_tools_default_role(skill_ctx_client):
@@ -229,6 +240,7 @@ async def test_get_tools_offline_mode(skill_ctx_client):
 # GET /api/v1/agent/skill-context/ontology
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_ontology_summary(skill_ctx_client):
     """Ontology summary includes total_skills, total_entities, ontology_issues."""
@@ -255,6 +267,7 @@ async def test_get_ontology_no_issues(skill_ctx_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/agent/skill-context/event/{event_type}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_event_skills_known_event(skill_ctx_client):
@@ -284,6 +297,7 @@ async def test_get_event_skills_unknown_event(skill_ctx_client):
 # GET /api/v1/agent/skill-context/dependencies/{skill_name}
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_check_dependencies_valid_skill(skill_ctx_client):
     """Valid skill with all dependencies met returns ok=True in data."""
@@ -312,6 +326,7 @@ async def test_check_dependencies_unknown_skill(skill_ctx_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/specials/generate
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_generate_specials_happy_path(specials_client):
@@ -349,6 +364,7 @@ async def test_generate_specials_model_router_fallback(specials_client):
 # GET /api/v1/specials/today
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_today_specials_with_report(specials_client):
     """When a report exists, returns full specials data."""
@@ -385,6 +401,7 @@ async def test_get_today_specials_no_report(specials_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/specials/push
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_push_specials_happy_path(specials_client):

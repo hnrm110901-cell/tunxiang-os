@@ -17,6 +17,7 @@ POST   /api/v1/analytics/narrative-templates                 — 创建叙事模
 PUT    /api/v1/analytics/narrative-templates/{template_id}   — 更新叙事模板
 POST   /api/v1/analytics/narrative-templates/{template_id}/preview — 预览叙事效果
 """
+
 from __future__ import annotations
 
 import secrets
@@ -41,6 +42,7 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["custom-reports"])
 
 # ─── DB 依赖 ────────────────────────────────────────────────────────────────
 
+
 async def _get_db(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
 ) -> AsyncGenerator[AsyncSession, None]:
@@ -49,6 +51,7 @@ async def _get_db(
 
 
 # ─── Pydantic 模型 ───────────────────────────────────────────────────────────
+
 
 class ReportConfigCreate(BaseModel):
     name: str
@@ -104,6 +107,7 @@ class NarrativeTemplateUpdate(BaseModel):
 
 # ─── 叙事辅助 ───────────────────────────────────────────────────────────────
 
+
 def _generate_narrative_preview(template: dict[str, Any], mock_data: dict[str, Any]) -> str:
     """根据模板生成示例叙事文本"""
     name = template.get("name", "经营日报")
@@ -132,6 +136,7 @@ def _generate_narrative_preview(template: dict[str, Any], mock_data: dict[str, A
 
 
 # ─── 报表配置 CRUD（纯DB） ──────────────────────────────────────────────────
+
 
 @router.get("/reports")
 async def list_reports(
@@ -325,6 +330,7 @@ async def toggle_favorite(report_id: str) -> dict[str, Any]:
 
 # ─── 报表执行 ────────────────────────────────────────────────────────────────
 
+
 @router.post("/reports/{report_id}/execute")
 async def execute_report(
     report_id: str,
@@ -394,9 +400,7 @@ async def execute_report(
     }
 
 
-def _build_columns(
-    dimensions: Any, metrics: Any
-) -> list[dict[str, str]]:
+def _build_columns(dimensions: Any, metrics: Any) -> list[dict[str, str]]:
     """从报表配置提取列定义"""
     cols: list[dict[str, str]] = []
     if isinstance(dimensions, list):
@@ -421,6 +425,7 @@ async def generate_share_link(report_id: str) -> dict[str, Any]:
 
 # ─── 定时推送（保留占位） ────────────────────────────────────────────────────
 
+
 @router.post("/reports/{report_id}/schedule")
 async def configure_schedule(report_id: str, body: ScheduleConfigUpdate) -> dict[str, Any]:
     """配置定时推送 — 保留占位"""
@@ -441,6 +446,7 @@ async def cancel_schedule(report_id: str) -> dict[str, Any]:
 
 
 # ─── AI叙事模板（DB 实现） ───────────────────────────────────────────────────
+
 
 @router.get("/narrative-templates")
 async def list_narrative_templates(
@@ -524,10 +530,7 @@ async def update_narrative_template(
     """更新叙事模板"""
     try:
         check = await db.execute(
-            text(
-                "SELECT is_system FROM narrative_templates "
-                "WHERE id = :id AND is_deleted = FALSE"
-            ),
+            text("SELECT is_system FROM narrative_templates WHERE id = :id AND is_deleted = FALSE"),
             {"id": template_id},
         )
         row = check.mappings().first()
@@ -620,7 +623,9 @@ async def preview_narrative_template(
 
 # ─── 工具函数 ───────────────────────────────────────────────────────────────
 
+
 def _json_str(obj: Any) -> str:
     """将 Python 对象序列化为 JSON 字符串，供 ::jsonb 类型转换使用"""
     import json
+
     return json.dumps(obj, ensure_ascii=False, default=str)

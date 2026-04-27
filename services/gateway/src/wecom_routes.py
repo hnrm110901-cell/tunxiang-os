@@ -8,6 +8,7 @@ GET  /api/v1/wecom/callback — 企微服务器验证（echostr）
   customer_del    — 客户删除好友
   transfer_fail   — 好友转移失败（仅日志）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -56,6 +57,7 @@ def _parse_xml_event(raw_xml: str) -> dict:
 # ─────────────────────────────────────────────────────────────────
 # 事件处理器（后台任务，不阻塞回调响应）
 # ─────────────────────────────────────────────────────────────────
+
 
 async def _handle_customer_add(event: dict) -> None:
     """处理 customer_add 事件：导购加客户好友
@@ -177,6 +179,7 @@ async def _handle_transfer_fail(event: dict) -> None:
 # ─────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/callback")
 async def wecom_callback_verify(

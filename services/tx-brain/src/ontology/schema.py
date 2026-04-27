@@ -33,31 +33,31 @@ NODE_LABELS = [
 # ─── 24 Relationship Types ───
 
 RELATIONSHIP_TYPES = [
-    "BELONGS_TO",       # Store→Brand, Brand→Region
-    "SERVES",           # Store→Dish
+    "BELONGS_TO",  # Store→Brand, Brand→Region
+    "SERVES",  # Store→Dish
     "USES_INGREDIENT",  # Dish→Ingredient (with BOM quantity)
-    "SUPPLIED_BY",      # Ingredient→Supplier
-    "WORKS_AT",         # Employee→Store (with role, since)
-    "HAS_SKILL",        # Employee→Skill
-    "ORDERED",          # Customer→Order
-    "CONTAINS",         # Order→Dish (with quantity, price)
-    "VISITED",          # Customer→Store (with date, spend)
-    "LOCATED_IN",       # Store→Region
-    "COMPETES_WITH",    # Brand→Brand
-    "SIMILAR_TO",       # Store→Store (similarity score)
-    "CAUSES",           # Event→Event (causal chain)
-    "DECIDED_BY",       # Decision→Agent
-    "RESULTED_IN",      # Decision→Outcome
+    "SUPPLIED_BY",  # Ingredient→Supplier
+    "WORKS_AT",  # Employee→Store (with role, since)
+    "HAS_SKILL",  # Employee→Skill
+    "ORDERED",  # Customer→Order
+    "CONTAINS",  # Order→Dish (with quantity, price)
+    "VISITED",  # Customer→Store (with date, spend)
+    "LOCATED_IN",  # Store→Region
+    "COMPETES_WITH",  # Brand→Brand
+    "SIMILAR_TO",  # Store→Store (similarity score)
+    "CAUSES",  # Event→Event (causal chain)
+    "DECIDED_BY",  # Decision→Agent
+    "RESULTED_IN",  # Decision→Outcome
     # Phase 3 — LightRAG 知识图谱扩展
-    "ALLERGEN_WARNING",       # Dish/Ingredient→Allergen（过敏原预警）
-    "SEASONAL_AVAILABLE",     # Dish/Ingredient→Season（季节供应）
-    "SUBSTITUTABLE_BY",       # Ingredient→Ingredient（可替代关系）
-    "REQUIRES_CERTIFICATION", # Store/Employee→Certification（资质要求）
-    "INSPECTION_COVERS",      # Regulation→Store/Equipment（检查覆盖）
-    "PAIRS_WITH",             # Dish→Dish（搭配推荐）
-    "UPSELL_WITH",            # Dish→Dish（加售推荐）
-    "REGULATED_BY",           # Dish/Ingredient/Store→Regulation（受监管）
-    "PROCEDURE_FOR",          # Procedure→Equipment/Dish（操作规程）
+    "ALLERGEN_WARNING",  # Dish/Ingredient→Allergen（过敏原预警）
+    "SEASONAL_AVAILABLE",  # Dish/Ingredient→Season（季节供应）
+    "SUBSTITUTABLE_BY",  # Ingredient→Ingredient（可替代关系）
+    "REQUIRES_CERTIFICATION",  # Store/Employee→Certification（资质要求）
+    "INSPECTION_COVERS",  # Regulation→Store/Equipment（检查覆盖）
+    "PAIRS_WITH",  # Dish→Dish（搭配推荐）
+    "UPSELL_WITH",  # Dish→Dish（加售推荐）
+    "REGULATED_BY",  # Dish/Ingredient/Store→Regulation（受监管）
+    "PROCEDURE_FOR",  # Procedure→Equipment/Dish（操作规程）
 ]
 
 # ─── Node Required Properties ───

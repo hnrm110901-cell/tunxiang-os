@@ -6,19 +6,16 @@ Y-D7 付费会员卡产品化测试
 2. test_refund_pro_rata       — 退款按比例：购买后用了10天退款，退款≈年卡价×(355/365)
 3. test_check_premium_member  — 检查会员：有效年卡→has_premium=True，days_remaining>0
 """
-import pytest
-from datetime import date, timedelta
-from decimal import Decimal
 
+from datetime import date, timedelta
 
 # 直接导入路由模块中的业务常量和逻辑函数
 from services.tx_member.src.api.premium_membership_card_routes import (
-    PREMIUM_CARD_PRODUCTS,
     _PRODUCTS_BY_TYPE,
-    _generate_card_no,
+    PREMIUM_CARD_PRODUCTS,
     _calc_end_date,
+    _generate_card_no,
 )
-
 
 # ─── 测试 1: 购买年卡 ─────────────────────────────────────────────────────────
 
@@ -61,10 +58,9 @@ class TestPurchaseAnnualCard:
         """卡号格式应为 PMC-YYYYMM-XXXX（大写4位字母数字）。"""
         card_no = _generate_card_no()
         import re
+
         pattern = r"^PMC-\d{6}-[A-Z0-9]{4}$"
-        assert re.match(pattern, card_no), (
-            f"卡号格式不符合 PMC-YYYYMM-XXXX，实际: {card_no}"
-        )
+        assert re.match(pattern, card_no), f"卡号格式不符合 PMC-YYYYMM-XXXX，实际: {card_no}"
 
     def test_card_no_uniqueness(self) -> None:
         """连续生成10个卡号应不重复（概率极高）。"""
@@ -93,9 +89,7 @@ class TestPurchaseAnnualCard:
         """所有预期卡类型均应存在于产品列表。"""
         expected_types = {"monthly", "quarterly", "annual", "lifetime"}
         actual_types = {p["card_type"] for p in PREMIUM_CARD_PRODUCTS}
-        assert expected_types == actual_types, (
-            f"产品列表缺少类型: {expected_types - actual_types}"
-        )
+        assert expected_types == actual_types, f"产品列表缺少类型: {expected_types - actual_types}"
 
 
 # ─── 测试 2: 退款按比例计算 ───────────────────────────────────────────────────
@@ -114,9 +108,7 @@ class TestRefundProRata:
         refund_fen = int(price_fen * remaining_days / total_days)
         expected_approx = int(88800 * 355 / 365)  # ≈ 86368
 
-        assert refund_fen == expected_approx, (
-            f"期望退款 {expected_approx} 分，实际 {refund_fen} 分"
-        )
+        assert refund_fen == expected_approx, f"期望退款 {expected_approx} 分，实际 {refund_fen} 分"
         # 退款不应超过原价
         assert refund_fen <= price_fen
 
@@ -170,12 +162,8 @@ class TestRefundProRata:
 
     def test_lifetime_card_not_refundable(self) -> None:
         """终身卡标记为不可退款。"""
-        lifetime_product = next(
-            p for p in PREMIUM_CARD_PRODUCTS if p["card_type"] == "lifetime"
-        )
-        assert lifetime_product.get("refundable", True) is False, (
-            "终身卡应标记 refundable=False"
-        )
+        lifetime_product = next(p for p in PREMIUM_CARD_PRODUCTS if p["card_type"] == "lifetime")
+        assert lifetime_product.get("refundable", True) is False, "终身卡应标记 refundable=False"
 
     def test_refund_calculation_no_floating_point_error(self) -> None:
         """退款计算应使用整数，不引入浮点误差。"""
@@ -227,7 +215,10 @@ class TestCheckPremiumMember:
         """当会员持有多张有效卡时，终身卡优先级最高。"""
         # 按业务逻辑排序：lifetime > annual > quarterly > monthly
         priority_order = {
-            "lifetime": 1, "annual": 2, "quarterly": 3, "monthly": 4,
+            "lifetime": 1,
+            "annual": 2,
+            "quarterly": 3,
+            "monthly": 4,
         }
         assert priority_order["lifetime"] < priority_order["annual"]
         assert priority_order["annual"] < priority_order["quarterly"]

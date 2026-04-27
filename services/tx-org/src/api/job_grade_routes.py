@@ -36,9 +36,7 @@ router = APIRouter(prefix="/api/v1/job-grades", tags=["job-grades"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -167,19 +165,22 @@ async def create_job_grade(
         RETURNING id::text AS grade_id
     """)
 
-    result = await db.execute(sql, {
-        "id": grade_id,
-        "tenant_id": tenant_id,
-        "name": req.name,
-        "category": req.category,
-        "level": req.level,
-        "min_salary": req.min_salary,
-        "max_salary": req.max_salary,
-        "description": req.description,
-        "requirements": req.requirements,
-        "sort_order": req.sort_order,
-        "now": now,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": grade_id,
+            "tenant_id": tenant_id,
+            "name": req.name,
+            "category": req.category,
+            "level": req.level,
+            "min_salary": req.min_salary,
+            "max_salary": req.max_salary,
+            "description": req.description,
+            "requirements": req.requirements,
+            "sort_order": req.sort_order,
+            "now": now,
+        },
+    )
     await db.commit()
     row = result.fetchone()
 
@@ -230,13 +231,15 @@ async def get_job_grade_statistics(
         items.append(d)
 
     log.info("job_grade_statistics", tenant_id=tenant_id, grades=len(items))
-    return _ok({
-        "grades": items,
-        "summary": {
-            "total_grades": len(items),
-            "total_employees": total_employees,
-        },
-    })
+    return _ok(
+        {
+            "grades": items,
+            "summary": {
+                "total_grades": len(items),
+                "total_employees": total_employees,
+            },
+        }
+    )
 
 
 @router.get("/{grade_id}")
@@ -348,7 +351,9 @@ async def delete_job_grade(
 
     # 检查是否有在职员工使用该职级
     emp_check = await db.execute(
-        text("SELECT COUNT(*) FROM employees WHERE job_grade_id = :grade_id AND is_deleted = FALSE AND status = 'active'"),
+        text(
+            "SELECT COUNT(*) FROM employees WHERE job_grade_id = :grade_id AND is_deleted = FALSE AND status = 'active'"
+        ),
         {"grade_id": grade_id},
     )
     emp_count = emp_check.scalar() or 0

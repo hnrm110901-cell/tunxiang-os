@@ -7,6 +7,7 @@ GET /api/v1/private-domain/journey-funnel     — 旅程转化漏斗
 GET /api/v1/private-domain/roi-trend          — ROI 趋势（近N天）
 GET /api/v1/private-domain/cross-brand        — 跨品牌对比
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query

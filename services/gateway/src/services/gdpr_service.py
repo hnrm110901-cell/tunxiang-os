@@ -8,10 +8,10 @@
 
 注意：跨域数据操作通过 HTTP 调用各域微服务完成。
 """
+
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -186,9 +186,7 @@ class GDPRService:
 
     # ── Access：收集客户在各域的数据 ─────────────────────────────
 
-    async def _process_access_request(
-        self, *, tenant_id: str, customer_id: str
-    ) -> dict[str, Any]:
+    async def _process_access_request(self, *, tenant_id: str, customer_id: str) -> dict[str, Any]:
         """收集客户在 会员/订单/财务 各域的数据"""
         headers = {"X-Tenant-ID": tenant_id}
         collected: dict[str, Any] = {"customer_id": customer_id, "collected_at": _now().isoformat()}
@@ -245,22 +243,16 @@ class GDPRService:
 
     # ── Export：导出为 JSON ───────────────────────────────────────
 
-    async def _process_export_request(
-        self, *, tenant_id: str, customer_id: str
-    ) -> dict[str, Any]:
+    async def _process_export_request(self, *, tenant_id: str, customer_id: str) -> dict[str, Any]:
         """收集并序列化为可下载 JSON（GDPR Article 20 数据可携带权）"""
-        data = await self._process_access_request(
-            tenant_id=tenant_id, customer_id=customer_id
-        )
+        data = await self._process_access_request(tenant_id=tenant_id, customer_id=customer_id)
         data["export_format"] = "json"
         data["gdpr_article"] = "Article 20 - Right to data portability"
         return data
 
     # ── Delete：跨域删除/匿名化 ──────────────────────────────────
 
-    async def _process_delete_request(
-        self, *, tenant_id: str, customer_id: str
-    ) -> None:
+    async def _process_delete_request(self, *, tenant_id: str, customer_id: str) -> None:
         """跨域删除 / 匿名化客户数据（GDPR Article 17 被遗忘权）
 
         策略：
@@ -425,7 +417,8 @@ class GDPRService:
     ) -> tuple[list[AuditLogEntry], int]:
         """获取 GDPR 操作审计日志（分页 + 可选过滤）"""
         filtered = [
-            e for e in _audit_logs
+            e
+            for e in _audit_logs
             if e["tenant_id"] == tenant_id
             and (customer_id is None or e.get("target_customer_id") == customer_id)
             and (action is None or action in e.get("action", ""))

@@ -1,4 +1,5 @@
 """外卖平台适配器基类 — 定义统一接口和数据模型"""
+
 from __future__ import annotations
 
 import hashlib
@@ -13,8 +14,10 @@ from pydantic import BaseModel, Field
 # 统一数据模型
 # ─────────────────────────────────────────────────────────────────
 
+
 class DeliveryOrderItem(BaseModel):
     """外卖订单商品行（统一格式）"""
+
     platform_item_id: str = Field(..., description="平台 SKU ID")
     name: str = Field(..., description="商品名称")
     qty: int = Field(..., ge=1, description="数量")
@@ -25,6 +28,7 @@ class DeliveryOrderItem(BaseModel):
 
 class DeliveryOrder(BaseModel):
     """统一外卖订单格式（所有平台解析后均转换为此格式）"""
+
     platform: str = Field(..., description="平台标识：meituan / eleme / douyin")
     platform_order_id: str = Field(..., description="平台原始订单号")
     status: str = Field(default="pending", description="初始状态")
@@ -41,6 +45,7 @@ class DeliveryOrder(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 抽象基类
 # ─────────────────────────────────────────────────────────────────
+
 
 class BaseDeliveryAdapter(ABC):
     """外卖平台适配器基类 — 所有平台必须实现此接口"""

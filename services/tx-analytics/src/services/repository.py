@@ -2,6 +2,7 @@
 
 封装门店健康度、日报、KPI 预警、决策推荐的聚合查询。
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -43,9 +44,7 @@ class AnalyticsRepository:
 
         # 获取门店目标
         store_result = await self.db.execute(
-            select(Store)
-            .where(Store.id == store_uuid)
-            .where(Store.tenant_id == self._tenant_uuid)
+            select(Store).where(Store.id == store_uuid).where(Store.tenant_id == self._tenant_uuid)
         )
         store = store_result.scalar_one_or_none()
         if not store:
@@ -173,10 +172,7 @@ class AnalyticsRepository:
             .where(Order.order_time < day_end)
             .group_by(Order.sales_channel)
         )
-        channels = {
-            r[0] or "unknown": {"count": r[1], "revenue_fen": r[2]}
-            for r in channel_result.all()
-        }
+        channels = {r[0] or "unknown": {"count": r[1], "revenue_fen": r[2]} for r in channel_result.all()}
 
         # 取消订单数
         cancel_result = await self.db.execute(
@@ -211,9 +207,7 @@ class AnalyticsRepository:
 
         # 获取门店目标
         store_result = await self.db.execute(
-            select(Store)
-            .where(Store.id == store_uuid)
-            .where(Store.tenant_id == self._tenant_uuid)
+            select(Store).where(Store.id == store_uuid).where(Store.tenant_id == self._tenant_uuid)
         )
         store = store_result.scalar_one_or_none()
         if not store:
@@ -239,14 +233,16 @@ class AnalyticsRepository:
             progress = now.day / 30  # 月度进度
             expected = int(target * progress)
             if month_revenue < expected * 0.8:
-                alerts.append({
-                    "type": "revenue_behind",
-                    "severity": "high",
-                    "message": f"月营收进度落后: 已完成 {month_revenue} 分, 期望 {expected} 分",
-                    "current": month_revenue,
-                    "expected": expected,
-                    "target": target,
-                })
+                alerts.append(
+                    {
+                        "type": "revenue_behind",
+                        "severity": "high",
+                        "message": f"月营收进度落后: 已完成 {month_revenue} 分, 期望 {expected} 分",
+                        "current": month_revenue,
+                        "expected": expected,
+                        "target": target,
+                    }
+                )
 
         # 检查库存预警数量
         inv_alert_result = await self.db.execute(
@@ -254,19 +250,25 @@ class AnalyticsRepository:
             .where(Ingredient.tenant_id == self._tenant_uuid)
             .where(Ingredient.store_id == store_uuid)
             .where(Ingredient.is_deleted == False)  # noqa: E712
-            .where(Ingredient.status.in_([
-                InventoryStatus.critical.value,
-                InventoryStatus.out_of_stock.value,
-            ]))
+            .where(
+                Ingredient.status.in_(
+                    [
+                        InventoryStatus.critical.value,
+                        InventoryStatus.out_of_stock.value,
+                    ]
+                )
+            )
         )
         inv_alert_count = inv_alert_result.scalar() or 0
         if inv_alert_count > 0:
-            alerts.append({
-                "type": "inventory_critical",
-                "severity": "high" if inv_alert_count >= 3 else "medium",
-                "message": f"{inv_alert_count} 种食材库存告急",
-                "count": inv_alert_count,
-            })
+            alerts.append(
+                {
+                    "type": "inventory_critical",
+                    "severity": "high" if inv_alert_count >= 3 else "medium",
+                    "message": f"{inv_alert_count} 种食材库存告急",
+                    "count": inv_alert_count,
+                }
+            )
 
         return alerts
 
@@ -300,13 +302,15 @@ class AnalyticsRepository:
         slow_items = slow_result.all()
         if slow_items:
             names = ", ".join(r[0] for r in slow_items)
-            decisions.append({
-                "type": "menu_optimization",
-                "title": "建议优化滞销菜品",
-                "description": f"近 7 天销量最低: {names}，建议调整价格或替换",
-                "impact_fen": 0,
-                "confidence": 0.75,
-            })
+            decisions.append(
+                {
+                    "type": "menu_optimization",
+                    "title": "建议优化滞销菜品",
+                    "description": f"近 7 天销量最低: {names}，建议调整价格或替换",
+                    "impact_fen": 0,
+                    "confidence": 0.75,
+                }
+            )
 
         # 分析2：高折扣订单占比
         discount_result = await self.db.execute(
@@ -324,13 +328,15 @@ class AnalyticsRepository:
         discounted = d_row[1] or 0
         discount_rate = discounted / total_orders
         if discount_rate > 0.3:
-            decisions.append({
-                "type": "discount_control",
-                "title": "折扣比例偏高",
-                "description": f"近7天折扣订单占比 {discount_rate:.0%}，建议加强折扣审批",
-                "impact_fen": 0,
-                "confidence": 0.80,
-            })
+            decisions.append(
+                {
+                    "type": "discount_control",
+                    "title": "折扣比例偏高",
+                    "description": f"近7天折扣订单占比 {discount_rate:.0%}，建议加强折扣审批",
+                    "impact_fen": 0,
+                    "confidence": 0.80,
+                }
+            )
 
         # 分析3：库存风险
         inv_result = await self.db.execute(
@@ -338,20 +344,26 @@ class AnalyticsRepository:
             .where(Ingredient.tenant_id == self._tenant_uuid)
             .where(Ingredient.store_id == store_uuid)
             .where(Ingredient.is_deleted == False)  # noqa: E712
-            .where(Ingredient.status.in_([
-                InventoryStatus.low.value,
-                InventoryStatus.critical.value,
-            ]))
+            .where(
+                Ingredient.status.in_(
+                    [
+                        InventoryStatus.low.value,
+                        InventoryStatus.critical.value,
+                    ]
+                )
+            )
         )
         low_count = inv_result.scalar() or 0
         if low_count > 0:
-            decisions.append({
-                "type": "procurement",
-                "title": "建议补货",
-                "description": f"{low_count} 种食材库存偏低，建议尽快采购补货",
-                "impact_fen": 0,
-                "confidence": 0.90,
-            })
+            decisions.append(
+                {
+                    "type": "procurement",
+                    "title": "建议补货",
+                    "description": f"{low_count} 种食材库存偏低，建议尽快采购补货",
+                    "impact_fen": 0,
+                    "confidence": 0.90,
+                }
+            )
 
         return decisions[:3]
 

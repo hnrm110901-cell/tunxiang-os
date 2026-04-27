@@ -8,6 +8,7 @@
   5. mark_paid：记录实际缴税（filed → paid）
   6. get_declaration_detail：申报详情含全部进项发票
 """
+
 from __future__ import annotations
 
 import uuid
@@ -96,17 +97,26 @@ class VATService:
                           note, created_at, updated_at
             """),
             {
-                "tid": self._tid, "sid": sid,
-                "period": period, "ptype": period_type,
-                "rate": tax_rate, "gross": gross_revenue_fen,
+                "tid": self._tid,
+                "sid": sid,
+                "period": period,
+                "ptype": period_type,
+                "rate": tax_rate,
+                "gross": gross_revenue_fen,
                 "output": output_tax_fen,
-                "note": note, "cb": cb,
+                "note": note,
+                "cb": cb,
             },
         )
         row = result.fetchone()
         await self.db.flush()
-        log.info("vat_declaration_created", store_id=store_id, period=period,
-                 output_tax_fen=output_tax_fen, tenant_id=self.tenant_id)
+        log.info(
+            "vat_declaration_created",
+            store_id=store_id,
+            period=period,
+            output_tax_fen=output_tax_fen,
+            tenant_id=self.tenant_id,
+        )
         return self._decl_row(row)
 
     async def get_declaration(self, declaration_id: str) -> Optional[Dict[str, Any]]:
@@ -189,8 +199,12 @@ class VATService:
             },
         )
         await self.db.flush()
-        log.info("vat_declaration_filed", declaration_id=declaration_id,
-                 nuonuo_no=nuonuo_declaration_no, tenant_id=self.tenant_id)
+        log.info(
+            "vat_declaration_filed",
+            declaration_id=declaration_id,
+            nuonuo_no=nuonuo_declaration_no,
+            tenant_id=self.tenant_id,
+        )
         return await self.get_declaration(declaration_id)  # type: ignore[return-value]
 
     async def mark_paid(self, declaration_id: str, paid_tax_fen: int) -> Dict[str, Any]:
@@ -213,8 +227,7 @@ class VATService:
             {"now": now, "paid": paid_tax_fen, "id": uuid.UUID(declaration_id), "tid": self._tid},
         )
         await self.db.flush()
-        log.info("vat_declaration_paid", declaration_id=declaration_id,
-                 paid_fen=paid_tax_fen, tenant_id=self.tenant_id)
+        log.info("vat_declaration_paid", declaration_id=declaration_id, paid_fen=paid_tax_fen, tenant_id=self.tenant_id)
         return await self.get_declaration(declaration_id)  # type: ignore[return-value]
 
     # ══════════════════════════════════════════════════════
@@ -263,19 +276,30 @@ class VATService:
                     invoice_date  = EXCLUDED.invoice_date
             """),
             {
-                "id": inv_id, "tid": self._tid, "did": uuid.UUID(declaration_id),
-                "inv_no": invoice_no, "inv_date": invoice_date,
-                "sup_name": supplier_name, "sup_tax": supplier_tax_no,
-                "amount": amount_fen, "rate": tax_rate,
-                "input_tax": input_tax_fen, "inv_type": invoice_type,
+                "id": inv_id,
+                "tid": self._tid,
+                "did": uuid.UUID(declaration_id),
+                "inv_no": invoice_no,
+                "inv_date": invoice_date,
+                "sup_name": supplier_name,
+                "sup_tax": supplier_tax_no,
+                "amount": amount_fen,
+                "rate": tax_rate,
+                "input_tax": input_tax_fen,
+                "inv_type": invoice_type,
             },
         )
 
         # 重算 input_tax_fen（只含 verified/pending 的发票）
         await self._recalc_declaration_tax(declaration_id)
         await self.db.flush()
-        log.info("vat_input_invoice_added", declaration_id=declaration_id,
-                 invoice_no=invoice_no, input_tax_fen=input_tax_fen, tenant_id=self.tenant_id)
+        log.info(
+            "vat_input_invoice_added",
+            declaration_id=declaration_id,
+            invoice_no=invoice_no,
+            input_tax_fen=input_tax_fen,
+            tenant_id=self.tenant_id,
+        )
 
         return {
             "invoice_id": str(inv_id),
@@ -318,9 +342,12 @@ class VATService:
                 WHERE id = :id AND tenant_id = :tid
             """),
             {
-                "status": new_status, "verified": verified,
-                "now": now, "reason": rejection_reason,
-                "id": uuid.UUID(invoice_id), "tid": self._tid,
+                "status": new_status,
+                "verified": verified,
+                "now": now,
+                "reason": rejection_reason,
+                "id": uuid.UUID(invoice_id),
+                "tid": self._tid,
             },
         )
         # 驳回时从计算中排除该发票

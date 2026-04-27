@@ -3,6 +3,7 @@
 AI推荐/套餐组合/最优优惠/AA分摊/制作进度/最近门店/等待时间
 所有路由需要 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/v1/self-order", tags=["self-order"])
 
 
 # ── 请求模型 ──────────────────────────────────────────────────
+
 
 class RecommendRequest(BaseModel):
     store_id: str
@@ -75,6 +77,7 @@ class NearestStoresRequest(BaseModel):
 
 # ── 1. AI 智能推荐 ───────────────────────────────────────────
 
+
 @router.post("/recommend")
 async def recommend_dishes(
     body: RecommendRequest,
@@ -96,6 +99,7 @@ async def recommend_dishes(
 
 # ── 2. 套餐智能组合 ─────────────────────────────────────────
 
+
 @router.post("/combo")
 async def combo_suggestion(
     body: ComboRequest,
@@ -115,6 +119,7 @@ async def combo_suggestion(
 
 # ── 3. 最优优惠方案 ─────────────────────────────────────────
 
+
 @router.post("/best-deal")
 async def best_deal(
     body: BestDealRequest,
@@ -132,6 +137,7 @@ async def best_deal(
 
 
 # ── 4. AA 分摊 ──────────────────────────────────────────────
+
 
 @router.post("/orders/{order_id}/aa-split")
 async def aa_split(
@@ -152,6 +158,7 @@ async def aa_split(
 
 # ── 5. 制作进度 ─────────────────────────────────────────────
 
+
 @router.get("/orders/{order_id}/preparation")
 async def preparation_progress(
     order_id: str,
@@ -168,6 +175,7 @@ async def preparation_progress(
 
 
 # ── 6. GPS 最近门店 ─────────────────────────────────────────
+
 
 @router.post("/nearest-stores")
 async def nearest_stores(
@@ -187,6 +195,7 @@ async def nearest_stores(
 
 
 # ── 7. 预计等待时间 ─────────────────────────────────────────
+
 
 @router.get("/stores/{store_id}/wait-time")
 async def wait_time(

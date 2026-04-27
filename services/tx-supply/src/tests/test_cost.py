@@ -1,4 +1,5 @@
 """理论成本 + 实际成本 纯函数测试"""
+
 import os
 import sys
 
@@ -18,14 +19,15 @@ from services.theoretical_cost import (
 # 理论成本测试
 # ═══════════════════════════════════════════════
 
+
 class TestTheoreticalCostPureFunctions:
     """测试 BOM 理论成本计算纯函数"""
 
     def test_basic_bom_cost(self):
         """基本 BOM 成本：2种原料，无损耗"""
         items = [
-            {"standard_qty": "0.5", "waste_factor": "0", "unit_cost_fen": 2000},   # 0.5kg * 20元/kg = 10元
-            {"standard_qty": "0.2", "waste_factor": "0", "unit_cost_fen": 5000},   # 0.2kg * 50元/kg = 10元
+            {"standard_qty": "0.5", "waste_factor": "0", "unit_cost_fen": 2000},  # 0.5kg * 20元/kg = 10元
+            {"standard_qty": "0.2", "waste_factor": "0", "unit_cost_fen": 5000},  # 0.2kg * 50元/kg = 10元
         ]
         result = compute_dish_theoretical_cost_from_bom(items)
         assert result == 2000  # 1000 + 1000 = 2000分 = 20元
@@ -76,6 +78,7 @@ class TestTheoreticalCostPureFunctions:
     def test_no_db_returns_zero(self):
         """无数据库连接时返回 0"""
         import uuid
+
         result = get_dish_theoretical_cost(uuid.uuid4(), uuid.uuid4(), None)
         assert result == 0
 
@@ -83,6 +86,7 @@ class TestTheoreticalCostPureFunctions:
 # ═══════════════════════════════════════════════
 # 实际成本测试
 # ═══════════════════════════════════════════════
+
 
 class TestActualCostPureFunctions:
     """测试实际成本计算纯函数"""
@@ -128,6 +132,7 @@ class TestActualCostPureFunctions:
     def test_no_db_returns_zero(self):
         """无数据库连接时返回 0"""
         import uuid
+
         result = get_ingredient_actual_price(uuid.uuid4(), uuid.uuid4(), None)
         assert result == 0
 
@@ -138,6 +143,7 @@ class TestActualCostPureFunctions:
 # ═══════════════════════════════════════════════
 # 理论 vs 实际对比测试
 # ═══════════════════════════════════════════════
+
 
 class TestCostComparison:
     """理论成本与实际成本对比"""

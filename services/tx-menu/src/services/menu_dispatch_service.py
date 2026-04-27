@@ -4,6 +4,7 @@
 门店列表来源：应由调用方传入（tenant store registry），
               此服务不直接访问 org 域 DB（单一职责）。
 """
+
 import random
 from typing import Optional
 
@@ -23,7 +24,6 @@ log = structlog.get_logger()
 
 
 class MenuDispatchService:
-
     @staticmethod
     async def pilot_dispatch(
         version_id: str,
@@ -191,10 +191,9 @@ class MenuDispatchService:
             raise ValueError("tenant_id 不能为空")
 
         records = [
-            r for r in _dispatch_records.values()
-            if r["tenant_id"] == tenant_id
-            and r["version_id"] == version_id
-            and not r["is_deleted"]
+            r
+            for r in _dispatch_records.values()
+            if r["tenant_id"] == tenant_id and r["version_id"] == version_id and not r["is_deleted"]
         ]
 
         total = len(records)

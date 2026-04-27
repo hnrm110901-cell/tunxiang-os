@@ -23,6 +23,7 @@ Endpoints:
   GET  /api/v1/brain/energy/mv-insight         — 能耗数据（mv_energy_efficiency）
   POST /api/v1/brain/patrol/mv-insight         — 巡店质检增强分析（mv_public_opinion背景注入）
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -39,12 +40,12 @@ from ..agents.crm_operator import crm_operator
 from ..agents.customer_service import customer_service
 from ..agents.discount_guardian import discount_guardian
 from ..agents.dispatch_predictor import dispatch_predictor
+from ..agents.energy_monitor import energy_monitor
 from ..agents.finance_auditor import finance_auditor
 from ..agents.inventory_sentinel import inventory_sentinel
 from ..agents.member_insight import member_insight
 from ..agents.menu_optimizer import menu_optimizer
 from ..agents.patrol_inspector import patrol_inspector
-from ..agents.energy_monitor import energy_monitor
 
 logger = structlog.get_logger()
 
@@ -74,8 +75,7 @@ class DispatchPredictRequest(BaseModel):
     order: dict[str, Any] = Field(
         ...,
         description=(
-            "订单信息：{id, items: [{dish_name, category, quantity, is_live_seafood}],"
-            " table_size, created_at}"
+            "订单信息：{id, items: [{dish_name, category, quantity, is_live_seafood}], table_size, created_at}"
         ),
     )
     kitchen_load: dict[str, Any] = Field(
@@ -89,10 +89,7 @@ class InventoryAnalyzeRequest(BaseModel):
     tenant_id: str = Field(..., description="租户ID")
     inventory: list[dict[str, Any]] = Field(
         ...,
-        description=(
-            "当前库存列表：[{ingredient_name, current_qty, unit,"
-            " min_qty, expiry_date, unit_cost_fen}]"
-        ),
+        description=("当前库存列表：[{ingredient_name, current_qty, unit, min_qty, expiry_date, unit_cost_fen}]"),
     )
     sales_history: list[dict[str, Any]] = Field(
         default_factory=list,
@@ -107,10 +104,7 @@ class PatrolAnalyzeRequest(BaseModel):
     inspector_name: str = Field(..., description="巡检员姓名")
     checklist_items: list[dict[str, Any]] = Field(
         ...,
-        description=(
-            "检查清单列表：[{category, item_name, result(pass|fail|na),"
-            " score(0-10), photo_count, notes}]"
-        ),
+        description=("检查清单列表：[{category, item_name, result(pass|fail|na), score(0-10), photo_count, notes}]"),
     )
     overall_score: float = Field(..., description="本次综合评分（0-100）")
     previous_score: float = Field(
@@ -334,10 +328,7 @@ class FinanceAuditRequest(BaseModel):
     )
     high_discount_orders: list[dict[str, Any]] = Field(
         default_factory=list,
-        description=(
-            "高折扣订单列表：[{order_id, operator_id, discount_rate,"
-            " amount_fen, created_at}]"
-        ),
+        description=("高折扣订单列表：[{order_id, operator_id, discount_rate, amount_fen, created_at}]"),
     )
 
 
@@ -508,10 +499,7 @@ class MenuOptimizeRequest(BaseModel):
     )
     current_inventory: list[dict[str, Any]] = Field(
         default_factory=list,
-        description=(
-            "当前库存列表："
-            "[{ingredient_id, name, quantity, unit, expiry_days, cost_per_unit_fen}]"
-        ),
+        description=("当前库存列表：[{ingredient_id, name, quantity, unit, expiry_days, cost_per_unit_fen}]"),
     )
     dish_performance: list[dict[str, Any]] = Field(
         ...,

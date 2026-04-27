@@ -3,6 +3,7 @@
 所有跨服务事件均通过 MemberEvent 传递，事件类型由 MemberEventType 枚举定义。
 Redis Stream key: member_events
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,31 +20,31 @@ class MemberEventType(str, Enum):
     """
 
     # ── 交易类 ─────────────────────────────────────────────────────
-    ORDER_PLACED = "member.order.placed"           # 下单（未支付）
-    ORDER_PAID = "member.order.paid"               # 支付成功
-    ORDER_CANCELLED = "member.order.cancelled"     # 取消订单
+    ORDER_PLACED = "member.order.placed"  # 下单（未支付）
+    ORDER_PAID = "member.order.paid"  # 支付成功
+    ORDER_CANCELLED = "member.order.cancelled"  # 取消订单
 
     # ── 会员类 ─────────────────────────────────────────────────────
-    MEMBER_REGISTERED = "member.registered"              # 新会员注册
-    MEMBER_LEVEL_UPGRADED = "member.level.upgraded"      # 等级升级
+    MEMBER_REGISTERED = "member.registered"  # 新会员注册
+    MEMBER_LEVEL_UPGRADED = "member.level.upgraded"  # 等级升级
     MEMBER_LEVEL_DOWNGRADED = "member.level.downgraded"  # 等级降级
 
     # ── 储值类 ─────────────────────────────────────────────────────
     STORED_VALUE_RECHARGED = "member.sv.recharged"  # 储值充值
-    STORED_VALUE_CONSUMED = "member.sv.consumed"    # 储值消费
+    STORED_VALUE_CONSUMED = "member.sv.consumed"  # 储值消费
 
     # ── 互动类 ─────────────────────────────────────────────────────
-    COUPON_ISSUED = "member.coupon.issued"          # 优惠券发放
-    COUPON_REDEEMED = "member.coupon.redeemed"      # 优惠券核销
-    POINTS_EARNED = "member.points.earned"          # 积分获得
-    POINTS_REDEEMED = "member.points.redeemed"      # 积分兑换
+    COUPON_ISSUED = "member.coupon.issued"  # 优惠券发放
+    COUPON_REDEEMED = "member.coupon.redeemed"  # 优惠券核销
+    POINTS_EARNED = "member.points.earned"  # 积分获得
+    POINTS_REDEEMED = "member.points.redeemed"  # 积分兑换
 
     # ── 私域类 ─────────────────────────────────────────────────────
-    WECOM_BOUND = "member.wecom.bound"              # 企微绑定
-    WECOM_UNBOUND = "member.wecom.unbound"          # 企微解绑
+    WECOM_BOUND = "member.wecom.bound"  # 企微绑定
+    WECOM_UNBOUND = "member.wecom.unbound"  # 企微解绑
 
     # ── 风险类 ─────────────────────────────────────────────────────
-    CHURN_RISK_DETECTED = "member.churn.risk"       # 流失风险检测
+    CHURN_RISK_DETECTED = "member.churn.risk"  # 流失风险检测
 
 
 @dataclass
@@ -65,7 +66,5 @@ class MemberEvent:
     customer_id: UUID
     event_data: dict
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source_service: str = "unknown"

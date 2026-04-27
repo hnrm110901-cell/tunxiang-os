@@ -1,11 +1,10 @@
 """共享数据库连接层 — 所有域微服务复用"""
+
 import os
 import uuid
-from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import structlog
-
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -131,5 +130,6 @@ class TenantSession:
 
 async def init_db() -> None:
     from .base import TenantBase
+
     async with engine.begin() as conn:
         await conn.run_sync(TenantBase.metadata.create_all)

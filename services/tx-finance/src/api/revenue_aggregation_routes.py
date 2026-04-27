@@ -8,6 +8,7 @@
 所有金额：分（fen）。统一响应格式：{"ok": bool, "data": {}}。
 tenant_id 从 X-Tenant-ID header 获取，由 get_db_with_tenant 设置 RLS 上下文。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -29,6 +30,7 @@ _service = RevenueAggregationService()
 
 
 # ── 依赖注入 ──────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     """从 header 提取 tenant_id，返回带 RLS 的 DB session"""
@@ -60,12 +62,12 @@ def _parse_uuid(value: str, field_name: str) -> uuid.UUID:
 
 # ── 端点 ──────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/daily-fast",
     summary="日营收快报",
     description=(
-        "聚合当日营收：毛收/折扣/退款/净营收/客单价，"
-        "并附支付方式分布（微信/支付宝/现金/会员/挂账等）和小时级流量分布。"
+        "聚合当日营收：毛收/折扣/退款/净营收/客单价，并附支付方式分布（微信/支付宝/现金/会员/挂账等）和小时级流量分布。"
     ),
 )
 async def get_daily_revenue_fast(
@@ -99,17 +101,14 @@ async def get_daily_revenue_fast(
     "/range",
     summary="多日期范围营收报表",
     description=(
-        "查询 start_date ~ end_date 区间内营收，支持按 day/week/month 聚合。"
-        "返回区间摘要（总量）+ 时序趋势数据。"
+        "查询 start_date ~ end_date 区间内营收，支持按 day/week/month 聚合。返回区间摘要（总量）+ 时序趋势数据。"
     ),
 )
 async def get_revenue_range(
     store_id: str = Query(..., description="门店 UUID"),
     start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
     end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
-    granularity: Literal["day", "week", "month"] = Query(
-        "day", description="聚合粒度: day / week / month"
-    ),
+    granularity: Literal["day", "week", "month"] = Query("day", description="聚合粒度: day / week / month"),
     db: AsyncSession = Depends(_get_tenant_db),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> dict:
@@ -130,9 +129,7 @@ async def get_revenue_range(
         )
 
     try:
-        report = await _service.get_revenue_range_report(
-            tid, sid, s_date, e_date, granularity, db
-        )
+        report = await _service.get_revenue_range_report(tid, sid, s_date, e_date, granularity, db)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
@@ -179,9 +176,7 @@ async def get_payment_reconciliation(
         )
 
     try:
-        report = await _service.get_payment_reconciliation(
-            tid, sid, s_date, e_date, db
-        )
+        report = await _service.get_payment_reconciliation(tid, sid, s_date, e_date, db)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:

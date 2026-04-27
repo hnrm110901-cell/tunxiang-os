@@ -4,6 +4,7 @@
 
 路由前缀: /api/v1/printers
 """
+
 import uuid
 from typing import Optional
 
@@ -20,6 +21,7 @@ logger = structlog.get_logger()
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -112,6 +114,7 @@ class PrinterRouteCreate(BaseModel):
 
 # ─── 序列化辅助 ───────────────────────────────────────────────────────────────
 
+
 def _row_to_printer(row) -> dict:
     return {
         "id": str(row.id),
@@ -151,6 +154,7 @@ def _row_to_route(row) -> dict:
 
 
 # ─── 打印机 CRUD ──────────────────────────────────────────────────────────────
+
 
 @router.get("")
 async def list_printers(
@@ -205,16 +209,19 @@ async def create_printer(
         RETURNING id, tenant_id, store_id, name, type, connection_type,
                   address, is_active, paper_width, created_at, updated_at
     """)
-    result = await db.execute(stmt, {
-        "id": printer_id,
-        "tenant_id": tid,
-        "store_id": sid,
-        "name": body.name,
-        "type": body.type,
-        "connection_type": body.connection_type,
-        "address": body.address,
-        "paper_width": body.paper_width,
-    })
+    result = await db.execute(
+        stmt,
+        {
+            "id": printer_id,
+            "tenant_id": tid,
+            "store_id": sid,
+            "name": body.name,
+            "type": body.type,
+            "connection_type": body.connection_type,
+            "address": body.address,
+            "paper_width": body.paper_width,
+        },
+    )
     await db.commit()
     row = result.fetchone()
     logger.info("printer.created", printer_id=str(printer_id), tenant_id=tenant_id, store_id=body.store_id)
@@ -330,7 +337,9 @@ async def test_printer(
         raise HTTPException(status_code=400, detail=f"UUID 格式错误: {exc}") from exc
 
     result = await db.execute(
-        text("SELECT id, name, address, connection_type FROM printers WHERE id = :id AND tenant_id = :tenant_id AND is_active = TRUE"),
+        text(
+            "SELECT id, name, address, connection_type FROM printers WHERE id = :id AND tenant_id = :tenant_id AND is_active = TRUE"
+        ),
         {"id": pid, "tenant_id": tid},
     )
     row = result.fetchone()
@@ -340,6 +349,7 @@ async def test_printer(
     # 通过现有 print_manager 触发测试打印
     try:
         from ..services.print_manager import get_print_manager
+
         mgr = get_print_manager()
         task = await mgr.test_print(printer_id)
         return {"ok": True, "data": task.to_dict()}
@@ -352,6 +362,7 @@ async def test_printer(
 
 
 # ─── 路由规则 CRUD ────────────────────────────────────────────────────────────
+
 
 @router.get("/routes")
 async def list_routes(
@@ -422,17 +433,20 @@ async def create_route(
                   category_id, category_name, dish_tag,
                   priority, is_default, created_at, updated_at
     """)
-    result = await db.execute(stmt, {
-        "id": route_id,
-        "tenant_id": tid,
-        "store_id": sid,
-        "printer_id": pid,
-        "category_id": cid,
-        "category_name": body.category_name,
-        "dish_tag": body.dish_tag,
-        "priority": body.priority,
-        "is_default": body.is_default,
-    })
+    result = await db.execute(
+        stmt,
+        {
+            "id": route_id,
+            "tenant_id": tid,
+            "store_id": sid,
+            "printer_id": pid,
+            "category_id": cid,
+            "category_name": body.category_name,
+            "dish_tag": body.dish_tag,
+            "priority": body.priority,
+            "is_default": body.is_default,
+        },
+    )
     await db.commit()
     row = result.fetchone()
     logger.info("printer_route.created", route_id=str(route_id), tenant_id=tenant_id)
@@ -468,6 +482,7 @@ async def delete_route(
 
 
 # ─── 路由解析（供打印执行时调用）────────────────────────────────────────────
+
 
 @router.get("/resolve")
 async def resolve_printer(
@@ -512,12 +527,15 @@ async def resolve_printer(
         )
         row = result.fetchone()
         if row:
-            return {"ok": True, "data": {
-                "printer_id": str(row.printer_id),
-                "printer_name": row.name,
-                "printer_type": row.type,
-                "match_type": "category",
-            }}
+            return {
+                "ok": True,
+                "data": {
+                    "printer_id": str(row.printer_id),
+                    "printer_name": row.name,
+                    "printer_type": row.type,
+                    "match_type": "category",
+                },
+            }
 
     # 2. dish_tag 标签匹配
     if tags:
@@ -535,13 +553,16 @@ async def resolve_printer(
         )
         row = result.fetchone()
         if row:
-            return {"ok": True, "data": {
-                "printer_id": str(row.printer_id),
-                "printer_name": row.name,
-                "printer_type": row.type,
-                "match_type": "dish_tag",
-                "matched_tag": row.dish_tag,
-            }}
+            return {
+                "ok": True,
+                "data": {
+                    "printer_id": str(row.printer_id),
+                    "printer_name": row.name,
+                    "printer_type": row.type,
+                    "match_type": "dish_tag",
+                    "matched_tag": row.dish_tag,
+                },
+            }
 
     # 3. 兜底默认规则
     result = await db.execute(
@@ -558,12 +579,15 @@ async def resolve_printer(
     )
     row = result.fetchone()
     if row:
-        return {"ok": True, "data": {
-            "printer_id": str(row.printer_id),
-            "printer_name": row.name,
-            "printer_type": row.type,
-            "match_type": "default",
-        }}
+        return {
+            "ok": True,
+            "data": {
+                "printer_id": str(row.printer_id),
+                "printer_name": row.name,
+                "printer_type": row.type,
+                "match_type": "default",
+            },
+        }
 
     # 未找到任何规则
     return {"ok": True, "data": None}

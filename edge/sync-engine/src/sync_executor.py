@@ -9,12 +9,12 @@
   - 使用 ON CONFLICT (id) DO UPDATE 实现幂等写入
   - 数据库操作封装为可替换接口（当前阶段使用 Mock）
 """
+
 from __future__ import annotations
 
 from typing import Any, List
 
 import structlog
-
 from change_tracker import DBConnection, MockDBConnection
 from config import BATCH_SIZE
 
@@ -45,9 +45,7 @@ class SyncExecutor:
 
     # ─── 公开接口 ──────────────────────────────────────────────────────────
 
-    async def push_to_cloud(
-        self, table: str, records: List[dict[str, Any]]
-    ) -> int:
+    async def push_to_cloud(self, table: str, records: List[dict[str, Any]]) -> int:
         """批量 UPSERT 记录到云端 PG
 
         单表操作在一个逻辑事务中完成。使用 ON CONFLICT (id) DO UPDATE
@@ -90,9 +88,7 @@ class SyncExecutor:
         )
         return total
 
-    async def pull_to_local(
-        self, table: str, records: List[dict[str, Any]]
-    ) -> int:
+    async def pull_to_local(self, table: str, records: List[dict[str, Any]]) -> int:
         """批量 UPSERT 记录到本地 PG
 
         单表操作在一个逻辑事务中完成。使用 ON CONFLICT (id) DO UPDATE
@@ -138,6 +134,7 @@ class SyncExecutor:
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────
 
+
 def _sanitize_table(table: str) -> str:
     """校验表名，防止 SQL 注入"""
     if not all(c.isalnum() or c == "_" for c in table):
@@ -151,14 +148,10 @@ def _validate_records(table: str, records: List[dict[str, Any]]) -> None:
         raise ValueError(f"Table {table!r}: empty records list")
     columns = set(records[0].keys())
     if "id" not in columns:
-        raise ValueError(
-            f"Table {table!r}: records must contain 'id' column for upsert"
-        )
+        raise ValueError(f"Table {table!r}: records must contain 'id' column for upsert")
 
 
-def _build_upsert_sql(
-    table: str, records: List[dict[str, Any]]
-) -> tuple[str, dict[str, Any]]:
+def _build_upsert_sql(table: str, records: List[dict[str, Any]]) -> tuple[str, dict[str, Any]]:
     """构造批量 UPSERT SQL（ON CONFLICT (id) DO UPDATE）
 
     生成形如：
@@ -177,9 +170,7 @@ def _build_upsert_sql(
     columns = list(records[0].keys())
 
     col_list = ", ".join(f'"{c}"' for c in columns)
-    update_set = ", ".join(
-        f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id"
-    )
+    update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
 
     # 构造多行 VALUES 子句
     value_rows: list[str] = []
@@ -192,10 +183,6 @@ def _build_upsert_sql(
 
     values_clause = ", ".join(value_rows)
 
-    sql = (
-        f'INSERT INTO "{safe_table}" ({col_list}) '
-        f"VALUES {values_clause} "
-        f"ON CONFLICT (id) DO UPDATE SET {update_set}"
-    )
+    sql = f'INSERT INTO "{safe_table}" ({col_list}) VALUES {values_clause} ON CONFLICT (id) DO UPDATE SET {update_set}'
 
     return sql, params

@@ -3,6 +3,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -57,6 +58,7 @@ class SendWecomReq(BaseModel):
 
 class SendNotificationReq(BaseModel):
     """统一发送接口"""
+
     channel: str = Field(..., pattern="^(sms|wechat|wecom)$")
     # SMS 字段
     phone: Optional[str] = None

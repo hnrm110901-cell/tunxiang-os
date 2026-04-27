@@ -3,6 +3,7 @@
 所有折扣必须通过毛利底线校验。
 金额统一存分（fen），展示时 /100 转元。
 """
+
 import math
 from datetime import date
 from typing import Optional
@@ -19,18 +20,18 @@ class DiscountEngine:
     """
 
     DISCOUNT_TYPES = {
-        "percent_off": "整单折扣",      # e.g., 8.8折
-        "amount_off": "整单减免",        # e.g., 满200减30
-        "item_percent": "单品折扣",      # e.g., 指定菜品7折
-        "item_free": "赠送/免单",        # e.g., 赠送甜品
-        "member_price": "会员价",        # e.g., 会员专享价
-        "coupon": "优惠券核销",          # e.g., 满100减15券
-        "manual": "手动改价",            # 需要审批
+        "percent_off": "整单折扣",  # e.g., 8.8折
+        "amount_off": "整单减免",  # e.g., 满200减30
+        "item_percent": "单品折扣",  # e.g., 指定菜品7折
+        "item_free": "赠送/免单",  # e.g., 赠送甜品
+        "member_price": "会员价",  # e.g., 会员专享价
+        "coupon": "优惠券核销",  # e.g., 满100减15券
+        "manual": "手动改价",  # 需要审批
     }
 
     # 审批阈值
-    APPROVAL_PERCENT_THRESHOLD = 0.30   # 折扣率 > 30% 需审批
-    APPROVAL_AMOUNT_THRESHOLD = 10000   # 减免 > ¥100 (10000分) 需审批
+    APPROVAL_PERCENT_THRESHOLD = 0.30  # 折扣率 > 30% 需审批
+    APPROVAL_AMOUNT_THRESHOLD = 10000  # 减免 > ¥100 (10000分) 需审批
 
     def calculate_discount(
         self,
@@ -69,9 +70,7 @@ class DiscountEngine:
             # discount_value 是减免金额(分)
             discount_fen = int(discount_value)
             if discount_fen > original_total_fen:
-                raise ValueError(
-                    f"减免金额({discount_fen}分)超过订单总额({original_total_fen}分)"
-                )
+                raise ValueError(f"减免金额({discount_fen}分)超过订单总额({original_total_fen}分)")
             # 按比例分摊到各菜品
             for item in items_after:
                 ratio = item["subtotal_fen"] / original_total_fen if original_total_fen > 0 else 0
@@ -80,7 +79,7 @@ class DiscountEngine:
             # 尾差修正：分摊后的折扣总和可能不等于discount_fen
             allocated = sum(item["discount_fen"] for item in items_after)
             if allocated != discount_fen and items_after:
-                items_after[0]["discount_fen"] += (discount_fen - allocated)
+                items_after[0]["discount_fen"] += discount_fen - allocated
                 items_after[0]["final_fen"] = items_after[0]["subtotal_fen"] - items_after[0]["discount_fen"]
 
         elif discount_type == "item_percent":
@@ -130,23 +129,21 @@ class DiscountEngine:
                 item["final_fen"] = item["subtotal_fen"] - item["discount_fen"]
             allocated = sum(item["discount_fen"] for item in items_after)
             if allocated != discount_fen and items_after:
-                items_after[0]["discount_fen"] += (discount_fen - allocated)
+                items_after[0]["discount_fen"] += discount_fen - allocated
                 items_after[0]["final_fen"] = items_after[0]["subtotal_fen"] - items_after[0]["discount_fen"]
 
         elif discount_type == "manual":
             # 手动改价: discount_value 是减免金额(分)
             discount_fen = int(discount_value)
             if discount_fen > original_total_fen:
-                raise ValueError(
-                    f"手动减免({discount_fen}分)超过订单总额({original_total_fen}分)"
-                )
+                raise ValueError(f"手动减免({discount_fen}分)超过订单总额({original_total_fen}分)")
             for item in items_after:
                 ratio = item["subtotal_fen"] / original_total_fen if original_total_fen > 0 else 0
                 item["discount_fen"] = math.floor(discount_fen * ratio)
                 item["final_fen"] = item["subtotal_fen"] - item["discount_fen"]
             allocated = sum(item["discount_fen"] for item in items_after)
             if allocated != discount_fen and items_after:
-                items_after[0]["discount_fen"] += (discount_fen - allocated)
+                items_after[0]["discount_fen"] += discount_fen - allocated
                 items_after[0]["final_fen"] = items_after[0]["subtotal_fen"] - items_after[0]["discount_fen"]
 
         new_total_fen = original_total_fen - discount_fen
@@ -288,7 +285,9 @@ class DiscountEngine:
             if discount_fen > self.APPROVAL_AMOUNT_THRESHOLD:
                 needs_approval = True
                 approval_required_role = "manager"
-                reason = f"减免{discount_fen / 100:.2f}元超过{self.APPROVAL_AMOUNT_THRESHOLD / 100:.0f}元阈值，需经理审批"
+                reason = (
+                    f"减免{discount_fen / 100:.2f}元超过{self.APPROVAL_AMOUNT_THRESHOLD / 100:.0f}元阈值，需经理审批"
+                )
 
         elif discount_type == "item_percent":
             if discount_rate > self.APPROVAL_PERCENT_THRESHOLD:
@@ -414,49 +413,51 @@ class DiscountEngine:
 
                 # 检查单笔折扣率 > 30%
                 if revenue > 0 and discount / revenue > 0.30:
-                    anomalies.append({
-                        "anomaly_type": "high_single_discount",
-                        "severity": "warning",
-                        "detail": (
-                            f"单笔折扣率{discount / revenue:.1%}超过30%阈值，"
-                            f"订单金额{revenue / 100:.2f}元，折扣{discount / 100:.2f}元"
-                        ),
-                        "waiter_id": waiter_id,
-                        "order_id": order.get("order_id"),
-                        "order_no": order.get("order_no"),
-                        "discount_rate": round(discount / revenue, 4),
-                    })
+                    anomalies.append(
+                        {
+                            "anomaly_type": "high_single_discount",
+                            "severity": "warning",
+                            "detail": (
+                                f"单笔折扣率{discount / revenue:.1%}超过30%阈值，"
+                                f"订单金额{revenue / 100:.2f}元，折扣{discount / 100:.2f}元"
+                            ),
+                            "waiter_id": waiter_id,
+                            "order_id": order.get("order_id"),
+                            "order_no": order.get("order_no"),
+                            "discount_rate": round(discount / revenue, 4),
+                        }
+                    )
 
         # 检查同一服务员折扣次数 > 5
         for waiter_id, discount_orders in waiter_discount_counts.items():
             if len(discount_orders) > 5:
-                anomalies.append({
-                    "anomaly_type": "frequent_waiter_discount",
-                    "severity": "critical",
-                    "detail": (
-                        f"服务员{waiter_id}当日折扣{len(discount_orders)}次，超过5次阈值"
-                    ),
-                    "waiter_id": waiter_id,
-                    "order_id": None,
-                    "discount_count": len(discount_orders),
-                    "total_discount_fen": sum(
-                        o.get("discount_amount_fen", 0) for o in discount_orders
-                    ),
-                })
+                anomalies.append(
+                    {
+                        "anomaly_type": "frequent_waiter_discount",
+                        "severity": "critical",
+                        "detail": (f"服务员{waiter_id}当日折扣{len(discount_orders)}次，超过5次阈值"),
+                        "waiter_id": waiter_id,
+                        "order_id": None,
+                        "discount_count": len(discount_orders),
+                        "total_discount_fen": sum(o.get("discount_amount_fen", 0) for o in discount_orders),
+                    }
+                )
 
         # 检查门店当日折扣总额 > 营收10%
         if total_revenue_fen > 0 and total_discount_fen / total_revenue_fen > 0.10:
-            anomalies.append({
-                "anomaly_type": "high_store_discount_rate",
-                "severity": "critical",
-                "detail": (
-                    f"门店当日折扣率{total_discount_fen / total_revenue_fen:.1%}超过10%阈值，"
-                    f"总营收{total_revenue_fen / 100:.2f}元，总折扣{total_discount_fen / 100:.2f}元"
-                ),
-                "waiter_id": None,
-                "order_id": None,
-                "store_discount_rate": round(total_discount_fen / total_revenue_fen, 4),
-            })
+            anomalies.append(
+                {
+                    "anomaly_type": "high_store_discount_rate",
+                    "severity": "critical",
+                    "detail": (
+                        f"门店当日折扣率{total_discount_fen / total_revenue_fen:.1%}超过10%阈值，"
+                        f"总营收{total_revenue_fen / 100:.2f}元，总折扣{total_discount_fen / 100:.2f}元"
+                    ),
+                    "waiter_id": None,
+                    "order_id": None,
+                    "store_discount_rate": round(total_discount_fen / total_revenue_fen, 4),
+                }
+            )
 
         if anomalies:
             logger.warning(
@@ -504,11 +505,13 @@ class DiscountEngine:
             total_discount_fen += result["discount_fen"]
             current_items = result["items_after_discount"]
 
-            applied_discounts.append({
-                "discount_type": disc["discount_type"],
-                "discount_type_label": self.DISCOUNT_TYPES.get(disc["discount_type"], ""),
-                "discount_fen": result["discount_fen"],
-            })
+            applied_discounts.append(
+                {
+                    "discount_type": disc["discount_type"],
+                    "discount_type_label": self.DISCOUNT_TYPES.get(disc["discount_type"], ""),
+                    "discount_fen": result["discount_fen"],
+                }
+            )
 
         # 毛利底线校验（基于原始成本和最终价格）
         margin_check = self.check_margin_floor(order_items, total_discount_fen, margin_floor_rate)

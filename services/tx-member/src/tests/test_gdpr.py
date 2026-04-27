@@ -7,11 +7,12 @@
 4. test_process_request_approve     — 批准请求（process endpoint）
 5. test_retention_policy_update     — 更新数据保留期策略
 """
+
 from __future__ import annotations
 
 import uuid
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,11 +54,12 @@ def _mock_request(
 
 # ─── 单路由级测试（不启动完整 app） ─────────────────────────────────────────────
 
+
 @pytest.fixture()
 def gdpr_client():
     """只挂载 gdpr_router 的轻量 FastAPI 应用，mock 掉数据库依赖。"""
+    from api.gdpr_routes import _get_tenant_db, router
     from fastapi import FastAPI
-    from api.gdpr_routes import router, _get_tenant_db
 
     mini_app = FastAPI()
     mini_app.include_router(router)
@@ -82,6 +84,7 @@ _HEADERS = {"X-Tenant-ID": _TENANT_ID}
 
 
 # ─── 1. 提交删除申请 ───────────────────────────────────────────────────────────
+
 
 class TestSubmitDeletionRequest:
     def test_submit_deletion_request(self, gdpr_client: TestClient):
@@ -122,6 +125,7 @@ class TestSubmitDeletionRequest:
 
 
 # ─── 2. 提交导出申请 ───────────────────────────────────────────────────────────
+
 
 class TestSubmitExportRequest:
     def test_submit_export_request(self, gdpr_client: TestClient):
@@ -167,6 +171,7 @@ class TestSubmitExportRequest:
 
 # ─── 3. 列出请求（管理员视角） ─────────────────────────────────────────────────
 
+
 class TestListRequests:
     def test_list_requests(self, gdpr_client: TestClient):
         """GET /requests — 返回 items + total"""
@@ -206,6 +211,7 @@ class TestListRequests:
 
 
 # ─── 4. 批准请求（process endpoint） ──────────────────────────────────────────
+
 
 class TestProcessRequestApprove:
     def test_process_request_approve(self, gdpr_client: TestClient):
@@ -263,6 +269,7 @@ class TestProcessRequestApprove:
 
 
 # ─── 5. 更新数据保留期策略 ─────────────────────────────────────────────────────
+
 
 class TestRetentionPolicyUpdate:
     def test_retention_policy_update(self, gdpr_client: TestClient):

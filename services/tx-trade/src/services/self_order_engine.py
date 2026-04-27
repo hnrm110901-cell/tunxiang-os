@@ -4,6 +4,7 @@
 AI推荐权重: 历史偏好0.3 + 时段0.2 + 毛利0.2 + 热度0.2 + 天气0.1
 制作进度: 5步(received -> preparing -> cooking -> plating -> ready)
 """
+
 from __future__ import annotations
 
 import math
@@ -45,6 +46,7 @@ MEAL_PERIODS = {
 
 # ── 工具函数 ──────────────────────────────────────────────────
 
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -74,9 +76,7 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     d_lng = math.radians(lng2 - lng1)
     a = (
         math.sin(d_lat / 2) ** 2
-        + math.cos(math.radians(lat1))
-        * math.cos(math.radians(lat2))
-        * math.sin(d_lng / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lng / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
@@ -165,7 +165,12 @@ async def ai_recommend_dishes(
 
         # 天气分 (0~1)
         s_weather = 0.0
-        if weather == "cold" and ("hot_pot" in tags or "soup" in tags or "warm" in tags) or weather == "hot" and ("cold" in tags or "refreshing" in tags or "iced" in tags):
+        if (
+            weather == "cold"
+            and ("hot_pot" in tags or "soup" in tags or "warm" in tags)
+            or weather == "hot"
+            and ("cold" in tags or "refreshing" in tags or "iced" in tags)
+        ):
             s_weather = 1.0
         elif weather == "rainy" and ("comfort" in tags or "soup" in tags):
             s_weather = 0.8
@@ -188,14 +193,16 @@ async def ai_recommend_dishes(
         if s_popularity > 0.7:
             reasons.append("人气热销")
 
-        scored.append({
-            "dish_id": str(dish["id"]),
-            "dish_name": dish["name"],
-            "category": dish.get("category", ""),
-            "price_fen": dish.get("price_fen", 0),
-            "score": round(total, 4),
-            "reason": "，".join(reasons) if reasons else "综合推荐",
-        })
+        scored.append(
+            {
+                "dish_id": str(dish["id"]),
+                "dish_name": dish["name"],
+                "category": dish.get("category", ""),
+                "price_fen": dish.get("price_fen", 0),
+                "score": round(total, 4),
+                "reason": "，".join(reasons) if reasons else "综合推荐",
+            }
+        )
 
     scored.sort(key=lambda x: x["score"], reverse=True)
 
@@ -274,29 +281,37 @@ async def calculate_combo_suggestion(
     combo_items: list[dict[str, Any]] = []
     total_fen = 0
 
-    for cat_key, need_count in [("meat", meat_count), ("vegetable", veg_count),
-                                 ("staple", staple_count), ("soup", soup_count)]:
+    for cat_key, need_count in [
+        ("meat", meat_count),
+        ("vegetable", veg_count),
+        ("staple", staple_count),
+        ("soup", soup_count),
+    ]:
         available = by_cat.get(cat_key, [])
         for d in available[:need_count]:
             item_cost = d.get("price_fen", 0)
             if total_fen + item_cost <= budget_fen:
-                combo_items.append({
-                    "dish_id": str(d["id"]),
-                    "dish_name": d["name"],
-                    "category": cat_key,
-                    "price_fen": item_cost,
-                    "quantity": 1,
-                })
+                combo_items.append(
+                    {
+                        "dish_id": str(d["id"]),
+                        "dish_name": d["name"],
+                        "category": cat_key,
+                        "price_fen": item_cost,
+                        "quantity": 1,
+                    }
+                )
                 total_fen += item_cost
 
     if combo_items:
-        combos.append({
-            "combo_name": f"{guest_count}人精选套餐",
-            "items": combo_items,
-            "total_fen": total_fen,
-            "savings_fen": max(0, budget_fen - total_fen),
-            "per_person_fen": total_fen // max(guest_count, 1),
-        })
+        combos.append(
+            {
+                "combo_name": f"{guest_count}人精选套餐",
+                "items": combo_items,
+                "total_fen": total_fen,
+                "savings_fen": max(0, budget_fen - total_fen),
+                "per_person_fen": total_fen // max(guest_count, 1),
+            }
+        )
 
     logger.info(
         "self_order.combo_suggestion",
@@ -363,11 +378,13 @@ async def find_best_deal(
 
     if coupon_values:
         best_value, best_coupon = coupon_values[0]
-        applied.append({
-            "coupon_id": best_coupon.get("coupon_id", ""),
-            "type": best_coupon.get("type", ""),
-            "discount_fen": best_value,
-        })
+        applied.append(
+            {
+                "coupon_id": best_coupon.get("coupon_id", ""),
+                "type": best_coupon.get("type", ""),
+                "discount_fen": best_value,
+            }
+        )
         total_discount = best_value
 
     final_fen = max(0, cart_total - total_discount)
@@ -570,15 +587,17 @@ async def get_nearest_stores(
             continue
         dist_km = _haversine_km(lat, lng, float(s_lat), float(s_lng))
         if dist_km <= radius_km:
-            results.append({
-                "store_id": str(store["id"]),
-                "name": store["name"],
-                "address": store.get("address", ""),
-                "distance_m": int(dist_km * 1000),
-                "is_open": store.get("is_open", False),
-                "current_queue_count": store.get("current_queue_count", 0),
-                "avg_wait_minutes": store.get("avg_wait_minutes", 0),
-            })
+            results.append(
+                {
+                    "store_id": str(store["id"]),
+                    "name": store["name"],
+                    "address": store.get("address", ""),
+                    "distance_m": int(dist_km * 1000),
+                    "is_open": store.get("is_open", False),
+                    "current_queue_count": store.get("current_queue_count", 0),
+                    "avg_wait_minutes": store.get("avg_wait_minutes", 0),
+                }
+            )
 
     results.sort(key=lambda s: s["distance_m"])
 

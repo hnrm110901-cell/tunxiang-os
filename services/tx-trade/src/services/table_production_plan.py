@@ -11,6 +11,7 @@
   - 不硬编码密钥
   - 异常用 structlog 记录，不静默吞没
 """
+
 import json
 import uuid
 from dataclasses import dataclass
@@ -30,15 +31,17 @@ logger = structlog.get_logger()
 
 # ─── 常量 ───
 
-COORD_BUFFER_SECONDS = 30       # 协调缓冲时间：给较慢档口30秒余量
-URGENT_TIME_FACTOR = 0.75       # 催菜时预计时间乘以此系数（缩短25%）
+COORD_BUFFER_SECONDS = 30  # 协调缓冲时间：给较慢档口30秒余量
+URGENT_TIME_FACTOR = 0.75  # 催菜时预计时间乘以此系数（缩短25%）
 
 
 # ─── 内存计划（供测试和跨请求协调使用）───
 
+
 @dataclass
 class TableProductionPlanInMemory:
     """内存中的协调计划（用于单次请求内的协调计算）"""
+
     id: uuid.UUID
     order_id: uuid.UUID
     table_no: str
@@ -47,26 +50,29 @@ class TableProductionPlanInMemory:
     target_completion: datetime
     status: str
     dept_readiness: dict  # {dept_id: bool}
-    dept_delays: dict     # {dept_id: seconds}
+    dept_delays: dict  # {dept_id: seconds}
 
 
 # ─── ExpoTicket：传菜督导视图票据 ───
 
+
 class ExpoTicket(BaseModel):
     """ExpoStation 传菜督导视图中一张桌的进度票据"""
+
     plan_id: str
     order_id: str
     table_no: str
     store_id: str
     tenant_id: str
-    status: str                   # coordinating / all_ready / served
+    status: str  # coordinating / all_ready / served
     total_depts: int
     ready_depts: int
-    target_completion: str        # ISO 8601
-    dept_progress: list[dict]     # [{"dept_id":..,"dept_name":..,"ready":bool}]
+    target_completion: str  # ISO 8601
+    dept_progress: list[dict]  # [{"dept_id":..,"dept_name":..,"ready":bool}]
 
 
 # ─── WebSocket 推送（可被测试 mock 替换）───
+
 
 async def push_table_ready_ws(
     store_id: str,
@@ -95,6 +101,7 @@ async def push_table_ready_ws(
 
 
 # ─── TableFireCoordinator ───
+
 
 class TableFireCoordinator:
     """同桌同出协调引擎
@@ -146,9 +153,7 @@ class TableFireCoordinator:
             items = dept_info.get("items", [])
             # 任意菜品催菜 → 整个档口预计时间乘以 URGENT_TIME_FACTOR
             has_urgent = any(item.get("urgent") for item in items)
-            effective_seconds = (
-                int(base_seconds * URGENT_TIME_FACTOR) if has_urgent else base_seconds
-            )
+            effective_seconds = int(base_seconds * URGENT_TIME_FACTOR) if has_urgent else base_seconds
             dept_estimates[dept_id] = effective_seconds
 
         # ── 2. 找到最慢档口（bottleneck）──
@@ -328,14 +333,18 @@ class TableFireCoordinator:
         log = logger.bind(store_id=store_id, tenant_id=tenant_id)
 
         try:
-            stmt = select(TableProductionPlan).where(
-                and_(
-                    TableProductionPlan.store_id == uuid.UUID(store_id),
-                    TableProductionPlan.tenant_id == uuid.UUID(tenant_id),
-                    TableProductionPlan.status.in_(["coordinating", "all_ready"]),
-                    TableProductionPlan.is_deleted == False,  # noqa: E712
+            stmt = (
+                select(TableProductionPlan)
+                .where(
+                    and_(
+                        TableProductionPlan.store_id == uuid.UUID(store_id),
+                        TableProductionPlan.tenant_id == uuid.UUID(tenant_id),
+                        TableProductionPlan.status.in_(["coordinating", "all_ready"]),
+                        TableProductionPlan.is_deleted == False,  # noqa: E712
+                    )
                 )
-            ).order_by(TableProductionPlan.target_completion.asc())
+                .order_by(TableProductionPlan.target_completion.asc())
+            )
 
             result = await db.execute(stmt)
             plans = result.scalars().all()
@@ -353,26 +362,22 @@ class TableFireCoordinator:
             total = len(readiness)
             ready = sum(1 for v in readiness.values() if v)
 
-            dept_progress = [
-                {"dept_id": dept_id, "ready": is_ready}
-                for dept_id, is_ready in readiness.items()
-            ]
+            dept_progress = [{"dept_id": dept_id, "ready": is_ready} for dept_id, is_ready in readiness.items()]
 
-            tickets.append({
-                "plan_id": str(plan.id),
-                "order_id": str(plan.order_id),
-                "table_no": plan.table_no,
-                "store_id": str(plan.store_id),
-                "tenant_id": str(plan.tenant_id),
-                "status": plan.status,
-                "total_depts": total,
-                "ready_depts": ready,
-                "target_completion": (
-                    plan.target_completion.isoformat()
-                    if plan.target_completion else None
-                ),
-                "dept_progress": dept_progress,
-            })
+            tickets.append(
+                {
+                    "plan_id": str(plan.id),
+                    "order_id": str(plan.order_id),
+                    "table_no": plan.table_no,
+                    "store_id": str(plan.store_id),
+                    "tenant_id": str(plan.tenant_id),
+                    "status": plan.status,
+                    "total_depts": total,
+                    "ready_depts": ready,
+                    "target_completion": (plan.target_completion.isoformat() if plan.target_completion else None),
+                    "dept_progress": dept_progress,
+                }
+            )
 
         log.info("table_fire.get_expo_view.done", ticket_count=len(tickets))
         return tickets

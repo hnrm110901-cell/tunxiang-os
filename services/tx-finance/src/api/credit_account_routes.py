@@ -10,9 +10,10 @@
   POST /api/v1/credit/bills/{id}/pay                — 还款
   GET  /api/v1/credit/agreements/{id}/statement     — 对账单（消费明细）
 """
+
 import asyncio
 import uuid
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Optional
 
 import structlog
@@ -36,6 +37,7 @@ _LIMIT_WARNING_RATIO = 0.80
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
         return uuid.UUID(val)
@@ -57,6 +59,7 @@ def _serialize_row(row: dict) -> dict:
 
 # ─── 依赖注入 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -64,12 +67,13 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 # ─── 请求模型 ──────────────────────────────────────────────────────────────────
 
+
 class AgreementCreate(BaseModel):
     brand_id: uuid.UUID
     company_name: str
     company_tax_no: Optional[str] = None
     credit_limit_fen: int = Field(..., gt=0, description="信用额度（分），必须大于0")
-    billing_cycle: str = "monthly"          # monthly/weekly/biweekly
+    billing_cycle: str = "monthly"  # monthly/weekly/biweekly
     due_day: int = Field(15, ge=1, le=28, description="账单日（1-28）")
     remark: Optional[str] = None
 
@@ -152,8 +156,7 @@ async def create_agreement(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("create_agreement.failed", company_name=body.company_name,
-                     error=str(exc), exc_info=True)
+        logger.error("create_agreement.failed", company_name=body.company_name, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="创建挂账协议失败") from exc
 
     agreement_id = str(row["id"])
@@ -167,19 +170,21 @@ async def create_agreement(
 
     # 大额协议旁路触发审批流（不阻塞响应）
     if needs_approval:
-        asyncio.create_task(emit_event(
-            event_type="approval.requested",
-            tenant_id=str(tid),
-            stream_id=agreement_id,
-            payload={
-                "approval_type": "credit_agreement",
-                "subject_id": agreement_id,
-                "company_name": body.company_name,
-                "credit_limit_fen": body.credit_limit_fen,
-                "requested_by": str(op_id),
-            },
-            source_service="tx-finance",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type="approval.requested",
+                tenant_id=str(tid),
+                stream_id=agreement_id,
+                payload={
+                    "approval_type": "credit_agreement",
+                    "subject_id": agreement_id,
+                    "company_name": body.company_name,
+                    "credit_limit_fen": body.credit_limit_fen,
+                    "requested_by": str(op_id),
+                },
+                source_service="tx-finance",
+            )
+        )
 
     return {
         "ok": True,
@@ -196,6 +201,7 @@ async def create_agreement(
 
 
 # ─── GET /agreements/ — 协议列表 ─────────────────────────────────────────────
+
 
 @router.get("/agreements/", summary="企业挂账协议列表")
 async def list_agreements(
@@ -267,6 +273,7 @@ async def list_agreements(
 
 # ─── GET /agreements/{id} — 协议详情 ─────────────────────────────────────────
 
+
 @router.get("/agreements/{agreement_id}", summary="协议详情")
 async def get_agreement(
     agreement_id: str = Path(..., description="协议ID"),
@@ -294,8 +301,7 @@ async def get_agreement(
         )
         row = result.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_agreement.failed", agreement_id=agreement_id,
-                     error=str(exc), exc_info=True)
+        logger.error("get_agreement.failed", agreement_id=agreement_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
 
     if row is None:
@@ -305,6 +311,7 @@ async def get_agreement(
 
 
 # ─── POST /agreements/{id}/charge — 挂账消费 ─────────────────────────────────
+
 
 @router.post("/agreements/{agreement_id}/charge", summary="挂账消费")
 async def charge_credit(
@@ -333,8 +340,7 @@ async def charge_credit(
         )
         agreement = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("charge_credit.fetch_failed", agreement_id=agreement_id,
-                     error=str(exc), exc_info=True)
+        logger.error("charge_credit.fetch_failed", agreement_id=agreement_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
 
     if agreement is None:
@@ -350,9 +356,7 @@ async def charge_credit(
     if body.charged_amount_fen > available:
         raise HTTPException(
             status_code=402,
-            detail=(
-                f"信用额度不足：可用 {available} 分，本次需 {body.charged_amount_fen} 分"
-            ),
+            detail=(f"信用额度不足：可用 {available} 分，本次需 {body.charged_amount_fen} 分"),
         )
 
     new_used = agreement["used_amount_fen"] + body.charged_amount_fen
@@ -394,51 +398,58 @@ async def charge_credit(
         charge_row = charge_result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("charge_credit.failed", agreement_id=agreement_id,
-                     error=str(exc), exc_info=True)
+        logger.error("charge_credit.failed", agreement_id=agreement_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="挂账消费失败") from exc
 
     charge_id = str(charge_row["id"])
     usage_rate = new_used / agreement["credit_limit_fen"] if agreement["credit_limit_fen"] else 0
 
-    logger.info("credit_charged", charge_id=charge_id, agreement_id=agreement_id,
-                charged_amount_fen=body.charged_amount_fen, usage_rate=usage_rate)
+    logger.info(
+        "credit_charged",
+        charge_id=charge_id,
+        agreement_id=agreement_id,
+        charged_amount_fen=body.charged_amount_fen,
+        usage_rate=usage_rate,
+    )
 
     # 旁路发射挂账消费事件
-    asyncio.create_task(emit_event(
-        event_type=CreditEventType.CHARGED,
-        tenant_id=tid,
-        stream_id=agreement_id,
-        payload={
-            "charge_id": charge_id,
-            "agreement_id": agreement_id,
-            "order_id": str(body.order_id),
-            "charged_amount_fen": body.charged_amount_fen,
-            "new_used_amount_fen": new_used,
-            "usage_rate": round(usage_rate, 4),
-        },
-        store_id=body.store_id,
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
-
-    # 额度使用率超过 80% → 发射预警事件
-    if usage_rate >= _LIMIT_WARNING_RATIO:
-        asyncio.create_task(emit_event(
-            event_type=CreditEventType.LIMIT_WARNING,
+    asyncio.create_task(
+        emit_event(
+            event_type=CreditEventType.CHARGED,
             tenant_id=tid,
             stream_id=agreement_id,
             payload={
+                "charge_id": charge_id,
                 "agreement_id": agreement_id,
-                "company_name": agreement["company_name"],
-                "credit_limit_fen": agreement["credit_limit_fen"],
-                "used_amount_fen": new_used,
-                "usage_rate_pct": round(usage_rate * 100, 2),
+                "order_id": str(body.order_id),
+                "charged_amount_fen": body.charged_amount_fen,
+                "new_used_amount_fen": new_used,
+                "usage_rate": round(usage_rate, 4),
             },
+            store_id=body.store_id,
             source_service="tx-finance",
-        ))
-        logger.warning("credit_limit_warning", agreement_id=agreement_id,
-                       usage_rate_pct=round(usage_rate * 100, 2))
+            metadata={"operator_id": str(op_id)},
+        )
+    )
+
+    # 额度使用率超过 80% → 发射预警事件
+    if usage_rate >= _LIMIT_WARNING_RATIO:
+        asyncio.create_task(
+            emit_event(
+                event_type=CreditEventType.LIMIT_WARNING,
+                tenant_id=tid,
+                stream_id=agreement_id,
+                payload={
+                    "agreement_id": agreement_id,
+                    "company_name": agreement["company_name"],
+                    "credit_limit_fen": agreement["credit_limit_fen"],
+                    "used_amount_fen": new_used,
+                    "usage_rate_pct": round(usage_rate * 100, 2),
+                },
+                source_service="tx-finance",
+            )
+        )
+        logger.warning("credit_limit_warning", agreement_id=agreement_id, usage_rate_pct=round(usage_rate * 100, 2))
 
     return {
         "ok": True,
@@ -456,6 +467,7 @@ async def charge_credit(
 
 
 # ─── POST /agreements/{id}/suspend — 暂停协议 ────────────────────────────────
+
 
 @router.post("/agreements/{agreement_id}/suspend", summary="暂停挂账协议")
 async def suspend_agreement(
@@ -490,8 +502,7 @@ async def suspend_agreement(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("suspend_agreement.failed", agreement_id=agreement_id,
-                     error=str(exc), exc_info=True)
+        logger.error("suspend_agreement.failed", agreement_id=agreement_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="暂停协议失败") from exc
 
     if row is None:
@@ -500,8 +511,7 @@ async def suspend_agreement(
             detail=f"协议不存在或非 active 状态: {agreement_id}",
         )
 
-    logger.info("credit_agreement_suspended", agreement_id=agreement_id,
-                operator_id=str(op_id))
+    logger.info("credit_agreement_suspended", agreement_id=agreement_id, operator_id=str(op_id))
 
     return {
         "ok": True,
@@ -515,6 +525,7 @@ async def suspend_agreement(
 
 
 # ─── GET /agreements/{id}/bills — 账单列表 ────────────────────────────────────
+
 
 @router.get("/agreements/{agreement_id}/bills", summary="挂账账单列表")
 async def list_bills(
@@ -572,8 +583,7 @@ async def list_bills(
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("list_bills.failed", agreement_id=agreement_id,
-                     error=str(exc), exc_info=True)
+        logger.error("list_bills.failed", agreement_id=agreement_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单列表失败") from exc
 
     return {
@@ -584,6 +594,7 @@ async def list_bills(
 
 
 # ─── POST /bills/{id}/pay — 还款 ─────────────────────────────────────────────
+
 
 @router.post("/bills/{bill_id}/pay", summary="账单还款")
 async def pay_bill(
@@ -611,8 +622,7 @@ async def pay_bill(
         )
         bill = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("pay_bill.fetch_failed", bill_id=bill_id,
-                     error=str(exc), exc_info=True)
+        logger.error("pay_bill.fetch_failed", bill_id=bill_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询账单失败") from exc
 
     if bill is None:
@@ -667,27 +677,29 @@ async def pay_bill(
         )
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("pay_bill.failed", bill_id=bill_id,
-                     error=str(exc), exc_info=True)
+        logger.error("pay_bill.failed", bill_id=bill_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="账单还款失败") from exc
 
-    logger.info("credit_payment_received", bill_id=bill_id,
-                pay_amount_fen=body.pay_amount_fen, new_status=new_bill_status)
+    logger.info(
+        "credit_payment_received", bill_id=bill_id, pay_amount_fen=body.pay_amount_fen, new_status=new_bill_status
+    )
 
-    asyncio.create_task(emit_event(
-        event_type=CreditEventType.PAYMENT_RECEIVED,
-        tenant_id=tid,
-        stream_id=str(bill["agreement_id"]),
-        payload={
-            "bill_id": bill_id,
-            "agreement_id": str(bill["agreement_id"]),
-            "pay_amount_fen": body.pay_amount_fen,
-            "new_bill_status": new_bill_status,
-            "new_used_amount_fen": new_used,
-        },
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=CreditEventType.PAYMENT_RECEIVED,
+            tenant_id=tid,
+            stream_id=str(bill["agreement_id"]),
+            payload={
+                "bill_id": bill_id,
+                "agreement_id": str(bill["agreement_id"]),
+                "pay_amount_fen": body.pay_amount_fen,
+                "new_bill_status": new_bill_status,
+                "new_used_amount_fen": new_used,
+            },
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -703,6 +715,7 @@ async def pay_bill(
 
 
 # ─── GET /agreements/{id}/statement — 对账单 ─────────────────────────────────
+
 
 @router.get("/agreements/{agreement_id}/statement", summary="企业消费对账单")
 async def get_statement(
@@ -809,8 +822,7 @@ async def get_statement(
     except HTTPException:
         raise
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_statement.failed", agreement_id=agreement_id,
-                     error=str(exc), exc_info=True)
+        logger.error("get_statement.failed", agreement_id=agreement_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="对账单查询失败") from exc
 
     return {

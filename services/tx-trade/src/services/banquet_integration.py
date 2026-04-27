@@ -12,6 +12,7 @@
 
 设计原则：包装 BanquetLifecycleService，不修改其1347行代码。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -47,12 +48,15 @@ class BanquetIntegrationService:
 
         # Agent: 企业价值评估（异步不阻塞）
         try:
-            await self._call_agent("enterprise_activation", {
-                "action": "evaluate_lead",
-                "lead_id": lead_id,
-                "company": kwargs.get("company_name", ""),
-                "budget_fen": kwargs.get("estimated_budget_fen", 0),
-            })
+            await self._call_agent(
+                "enterprise_activation",
+                {
+                    "action": "evaluate_lead",
+                    "lead_id": lead_id,
+                    "company": kwargs.get("company_name", ""),
+                    "budget_fen": kwargs.get("estimated_budget_fen", 0),
+                },
+            )
         except (ConnectionError, TimeoutError, OSError) as e:
             logger.warning("agent_call_failed", agent="enterprise_activation", error=str(e))
 
@@ -74,15 +78,13 @@ class BanquetIntegrationService:
                     "message": f"毛利率 {margin:.1%} 低于30%底线，建议调整报价",
                     "needs_approval": True,
                 }
-                logger.warning("banquet_margin_below_floor",
-                               lead_id=lead_id, margin=round(margin, 4))
+                logger.warning("banquet_margin_below_floor", lead_id=lead_id, margin=round(margin, 4))
 
         return result
 
     # ─── 3. 收定金 + 创建支付记录 ───
 
-    async def collect_deposit(self, contract_id: str, method: str = "wechat",
-                              amount_fen: int = 0, **kwargs) -> dict:
+    async def collect_deposit(self, contract_id: str, method: str = "wechat", amount_fen: int = 0, **kwargs) -> dict:
         result = self.lifecycle.collect_deposit(contract_id=contract_id, **kwargs)
 
         actual_amount = amount_fen or result.get("deposit_fen", 0)
@@ -94,23 +96,30 @@ class BanquetIntegrationService:
             try:
                 payment_id = str(uuid.uuid4())
                 payment_no = f"BQ-DEP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-                await self.db.execute(text("""
+                await self.db.execute(
+                    text("""
                     INSERT INTO payments (id, tenant_id, order_id, method, amount_fen, status, payment_no, extra, created_at)
                     VALUES (:id, :tid, :cid, :method, :amount, 'paid', :pno, :extra, NOW())
-                """), {
-                    "id": payment_id,
-                    "tid": self.tenant_id,
-                    "cid": contract_id,
-                    "method": method,
-                    "amount": actual_amount,
-                    "pno": payment_no,
-                    "extra": f'{{"type": "banquet_deposit", "contract_id": "{contract_id}"}}',
-                })
+                """),
+                    {
+                        "id": payment_id,
+                        "tid": self.tenant_id,
+                        "cid": contract_id,
+                        "method": method,
+                        "amount": actual_amount,
+                        "pno": payment_no,
+                        "extra": f'{{"type": "banquet_deposit", "contract_id": "{contract_id}"}}',
+                    },
+                )
                 await self.db.flush()
                 result["payment_id"] = payment_id
                 result["payment_no"] = payment_no
-                logger.info("banquet_deposit_payment_created",
-                            contract_id=contract_id, amount_fen=actual_amount, payment_no=payment_no)
+                logger.info(
+                    "banquet_deposit_payment_created",
+                    contract_id=contract_id,
+                    amount_fen=actual_amount,
+                    payment_no=payment_no,
+                )
             except (ValueError, OSError) as e:
                 logger.error("banquet_deposit_payment_failed", error=str(e))
                 result["payment_error"] = str(e)
@@ -147,18 +156,22 @@ class BanquetIntegrationService:
         for item in result["bom_items"]:
             # 简化：标记高价食材提醒
             if item.get("unit_cost_fen", 0) > 10000:  # 单价>100元的高价食材
-                shortage.append({
-                    "ingredient": item.get("name", ""),
-                    "required_qty": item.get("qty", 0),
-                    "warning": "高价食材，建议提前2周采购",
-                })
+                shortage.append(
+                    {
+                        "ingredient": item.get("name", ""),
+                        "required_qty": item.get("qty", 0),
+                        "warning": "高价食材，建议提前2周采购",
+                    }
+                )
         if shortage:
             result["shortage_warnings"] = shortage
 
-        logger.info("banquet_menu_confirmed_with_procurement",
-                     contract_id=contract_id,
-                     ingredients=len(result["bom_items"]),
-                     requisition_id=result.get("requisition_id"))
+        logger.info(
+            "banquet_menu_confirmed_with_procurement",
+            contract_id=contract_id,
+            ingredients=len(result["bom_items"]),
+            requisition_id=result.get("requisition_id"),
+        )
 
         return result
 
@@ -174,40 +187,46 @@ class BanquetIntegrationService:
                 order_no = f"BQ-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{contract_id[-4:]}"
                 table_no = result.get("venue", {}).get("hall_name", "宴会厅")
 
-                await self.db.execute(text("""
+                await self.db.execute(
+                    text("""
                     INSERT INTO orders (id, tenant_id, store_id, order_no, table_number,
                         order_type, status, total_amount_fen, final_amount_fen, order_time, created_at)
                     VALUES (:id, :tid, :sid, :ono, :tbl, 'banquet', 'confirmed',
                         :total, :final, NOW(), NOW())
-                """), {
-                    "id": order_id,
-                    "tid": self.tenant_id,
-                    "sid": self.store_id,
-                    "ono": order_no,
-                    "tbl": table_no,
-                    "total": result.get("total_price_fen", 0),
-                    "final": result.get("total_price_fen", 0),
-                })
+                """),
+                    {
+                        "id": order_id,
+                        "tid": self.tenant_id,
+                        "sid": self.store_id,
+                        "ono": order_no,
+                        "tbl": table_no,
+                        "total": result.get("total_price_fen", 0),
+                        "final": result.get("total_price_fen", 0),
+                    },
+                )
 
                 # 写入菜品到 order_items
                 menu_items = result.get("confirmed_menu", [])
                 for idx, item in enumerate(menu_items):
                     item_id = str(uuid.uuid4())
-                    await self.db.execute(text("""
+                    await self.db.execute(
+                        text("""
                         INSERT INTO order_items (id, tenant_id, order_id, dish_id, item_name,
                             quantity, unit_price_fen, subtotal_fen, sort_order, created_at)
                         VALUES (:id, :tid, :oid, :did, :name, :qty, :price, :sub, :sort, NOW())
-                    """), {
-                        "id": item_id,
-                        "tid": self.tenant_id,
-                        "oid": order_id,
-                        "did": item.get("dish_id", item_id),
-                        "name": item.get("name", f"宴会菜品{idx+1}"),
-                        "qty": item.get("quantity", 1),
-                        "price": item.get("price_fen", 0),
-                        "sub": item.get("price_fen", 0) * item.get("quantity", 1),
-                        "sort": idx,
-                    })
+                    """),
+                        {
+                            "id": item_id,
+                            "tid": self.tenant_id,
+                            "oid": order_id,
+                            "did": item.get("dish_id", item_id),
+                            "name": item.get("name", f"宴会菜品{idx + 1}"),
+                            "qty": item.get("quantity", 1),
+                            "price": item.get("price_fen", 0),
+                            "sub": item.get("price_fen", 0) * item.get("quantity", 1),
+                            "sort": idx,
+                        },
+                    )
 
                 await self.db.flush()
                 result["order_id"] = order_id
@@ -216,23 +235,27 @@ class BanquetIntegrationService:
                 # KDS 分单
                 try:
                     async with httpx.AsyncClient(timeout=10) as client:
-                        await client.post(f"{_MAC_MINI_API}/api/v1/kds/push", json={
-                            "station_id": "all",
-                            "message": {
-                                "type": "new_ticket",
-                                "payload": {
-                                    "order_id": order_id,
-                                    "order_no": order_no,
-                                    "order_type": "banquet",
-                                    "items": menu_items,
+                        await client.post(
+                            f"{_MAC_MINI_API}/api/v1/kds/push",
+                            json={
+                                "station_id": "all",
+                                "message": {
+                                    "type": "new_ticket",
+                                    "payload": {
+                                        "order_id": order_id,
+                                        "order_no": order_no,
+                                        "order_type": "banquet",
+                                        "items": menu_items,
+                                    },
                                 },
                             },
-                        })
+                        )
                 except (httpx.ConnectError, httpx.TimeoutException) as e:
                     logger.warning("banquet_kds_push_failed", error=str(e))
 
-                logger.info("banquet_execution_started",
-                            contract_id=contract_id, order_id=order_id, items=len(menu_items))
+                logger.info(
+                    "banquet_execution_started", contract_id=contract_id, order_id=order_id, items=len(menu_items)
+                )
 
             except (ValueError, OSError) as e:
                 logger.error("banquet_order_creation_failed", error=str(e))
@@ -258,31 +281,37 @@ class BanquetIntegrationService:
                 try:
                     pay_id = str(uuid.uuid4())
                     pay_no = f"BQ-BAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-                    await self.db.execute(text("""
+                    await self.db.execute(
+                        text("""
                         INSERT INTO payments (id, tenant_id, order_id, method, amount_fen, status, payment_no, extra, created_at)
                         VALUES (:id, :tid, :cid, :method, :amount, 'paid', :pno, :extra, NOW())
-                    """), {
-                        "id": pay_id,
-                        "tid": self.tenant_id,
-                        "cid": result.get("order_id", contract_id),
-                        "method": pay.get("method", "wechat"),
-                        "amount": pay.get("amount_fen", balance_due),
-                        "pno": pay_no,
-                        "extra": f'{{"type": "banquet_balance", "contract_id": "{contract_id}"}}',
-                    })
-                    result.setdefault("balance_payments", []).append({
-                        "payment_id": pay_id,
-                        "payment_no": pay_no,
-                        "method": pay.get("method"),
-                        "amount_fen": pay.get("amount_fen", balance_due),
-                    })
+                    """),
+                        {
+                            "id": pay_id,
+                            "tid": self.tenant_id,
+                            "cid": result.get("order_id", contract_id),
+                            "method": pay.get("method", "wechat"),
+                            "amount": pay.get("amount_fen", balance_due),
+                            "pno": pay_no,
+                            "extra": f'{{"type": "banquet_balance", "contract_id": "{contract_id}"}}',
+                        },
+                    )
+                    result.setdefault("balance_payments", []).append(
+                        {
+                            "payment_id": pay_id,
+                            "payment_no": pay_no,
+                            "method": pay.get("method"),
+                            "amount_fen": pay.get("amount_fen", balance_due),
+                        }
+                    )
                 except (ValueError, OSError) as e:
                     logger.error("banquet_balance_payment_failed", error=str(e))
 
             await self.db.flush()
 
-        logger.info("banquet_settled", contract_id=contract_id,
-                     total=total_fen, deposit=deposit_paid, balance=balance_due)
+        logger.info(
+            "banquet_settled", contract_id=contract_id, total=total_fen, deposit=deposit_paid, balance=balance_due
+        )
         return result
 
     # ─── 7. 回访 + 会员联动 ───
@@ -295,19 +324,22 @@ class BanquetIntegrationService:
         total_fen = result.get("total_spent_fen", 0)
         if customer_id and total_fen > 0 and self.db:
             try:
-                await self.db.execute(text("""
+                await self.db.execute(
+                    text("""
                     INSERT INTO member_transactions (id, tenant_id, customer_id, store_id,
                         transaction_type, points, amount_fen, description, created_at)
                     VALUES (:id, :tid, :cid, :sid, 'earn', :pts, :amt, :desc, NOW())
-                """), {
-                    "id": str(uuid.uuid4()),
-                    "tid": self.tenant_id,
-                    "cid": customer_id,
-                    "sid": self.store_id,
-                    "pts": total_fen // 100,  # 1元=1积分
-                    "amt": total_fen,
-                    "desc": f"宴会消费 合同{contract_id}",
-                })
+                """),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "tid": self.tenant_id,
+                        "cid": customer_id,
+                        "sid": self.store_id,
+                        "pts": total_fen // 100,  # 1元=1积分
+                        "amt": total_fen,
+                        "desc": f"宴会消费 合同{contract_id}",
+                    },
+                )
                 await self.db.flush()
                 result["member_points_earned"] = total_fen // 100
                 logger.info("banquet_member_updated", customer_id=customer_id, points=total_fen // 100)
@@ -322,31 +354,39 @@ class BanquetIntegrationService:
         """调用 tx-supply BOM 展开服务"""
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(f"{_SUPPLY_API}/api/v1/supply/bom/explode", json={
-                    "items": [{"dish_id": i.get("dish_id", ""), "qty": i.get("quantity", 1)}
-                              for i in menu_items],
-                })
+                resp = await client.post(
+                    f"{_SUPPLY_API}/api/v1/supply/bom/explode",
+                    json={
+                        "items": [{"dish_id": i.get("dish_id", ""), "qty": i.get("quantity", 1)} for i in menu_items],
+                    },
+                )
                 if resp.status_code == 200:
                     return resp.json().get("data", {})
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             logger.warning("bom_explode_failed", error=str(e))
 
         # 降级：返回菜品本身作为"原材料"
-        return {"items": [{"name": i.get("name", ""), "qty": i.get("quantity", 1),
-                           "unit_cost_fen": i.get("cost_fen", 0)} for i in menu_items]}
+        return {
+            "items": [
+                {"name": i.get("name", ""), "qty": i.get("quantity", 1), "unit_cost_fen": i.get("cost_fen", 0)}
+                for i in menu_items
+            ]
+        }
 
-    async def _create_requisition(self, items: list[dict], reason: str,
-                                   required_date: str = "") -> dict:
+    async def _create_requisition(self, items: list[dict], reason: str, required_date: str = "") -> dict:
         """调用 tx-supply 创建采购申请"""
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(f"{_SUPPLY_API}/api/v1/supply/requisitions", json={
-                    "store_id": self.store_id,
-                    "items": items,
-                    "reason": reason,
-                    "required_date": required_date,
-                    "source": "banquet",
-                })
+                resp = await client.post(
+                    f"{_SUPPLY_API}/api/v1/supply/requisitions",
+                    json={
+                        "store_id": self.store_id,
+                        "items": items,
+                        "reason": reason,
+                        "required_date": required_date,
+                        "source": "banquet",
+                    },
+                )
                 if resp.status_code == 200:
                     return resp.json().get("data", {})
         except (httpx.ConnectError, httpx.TimeoutException) as e:
@@ -358,8 +398,7 @@ class BanquetIntegrationService:
         """调用 Agent 服务"""
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.post(f"http://localhost:8008/api/v1/agent/{agent_name}/invoke",
-                                         json=payload)
+                resp = await client.post(f"http://localhost:8008/api/v1/agent/{agent_name}/invoke", json=payload)
                 if resp.status_code == 200:
                     return resp.json().get("data", {})
         except (httpx.ConnectError, httpx.TimeoutException) as e:

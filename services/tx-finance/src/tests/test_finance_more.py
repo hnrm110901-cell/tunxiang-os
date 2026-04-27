@@ -12,6 +12,7 @@
     cd /Users/lichun/tunxiang-os
     pytest services/tx-finance/src/tests/test_finance_more.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -19,8 +20,6 @@ import sys
 import types
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 路径注入：让 `src.*` 包可从 tx-finance/ 目录解析
@@ -43,9 +42,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # ── structlog 存根 ─────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _log_mock = MagicMock()
-    _log_mock.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _log_mock.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = _log_mock
 
 # ── sqlalchemy 系列存根 ────────────────────────────────────────────────────────
@@ -94,10 +91,10 @@ _budget_svc_stub = _make_stub(
 sys.modules["src.services.budget_service"] = _budget_svc_stub
 
 # ── 加载被测路由 ───────────────────────────────────────────────────────────────
-from src.api import budget_routes  # noqa: E402
-
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+from src.api import budget_routes  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 公共常量
@@ -134,9 +131,7 @@ def _budget_svc_instance(
     svc.upsert_plan = AsyncMock(return_value=upsert_val or {"id": PLAN_ID, "status": "draft"})
     svc.list_plans = AsyncMock(return_value=list_val if list_val is not None else [])
     svc.get_plan = AsyncMock(return_value=get_val)
-    svc.approve_plan = AsyncMock(
-        return_value=approve_val or {"id": PLAN_ID, "status": "approved"}
-    )
+    svc.approve_plan = AsyncMock(return_value=approve_val or {"id": PLAN_ID, "status": "approved"})
     svc.record_execution = AsyncMock(return_value={"id": PLAN_ID})
     svc.get_execution_progress = AsyncMock(
         return_value=progress_val

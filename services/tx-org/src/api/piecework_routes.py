@@ -17,6 +17,7 @@
   GET    /api/v1/org/piecework/stats/by-dish        — 按品项统计
   GET    /api/v1/org/piecework/daily-report         — 日报数据（TOP5员工+总金额）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,6 +42,7 @@ router = APIRouter(prefix="/api/v1/org/piecework", tags=["piecework"])
 # 工具函数
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _ok(data: Any) -> dict[str, Any]:
     return {"ok": True, "data": data}
 
@@ -51,8 +53,7 @@ def _err(msg: str, status: int = 400) -> HTTPException:
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     """设置 RLS session 变量。"""
-    await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"),
-                     {"tid": tenant_id})
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, TRUE)"), {"tid": tenant_id})
 
 
 def _serialize_row(row: Any) -> dict[str, Any]:
@@ -71,6 +72,7 @@ def _serialize_row(row: Any) -> dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Pydantic 模型
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class ZoneCreate(BaseModel):
     name: str = Field(..., max_length=50, description="区域名称，如：热菜区/传菜组")
@@ -97,10 +99,10 @@ class SchemeItemCreate(BaseModel):
 class SchemeCreate(BaseModel):
     name: str = Field(..., max_length=100)
     zone_id: uuid.UUID | None = None
-    calc_type: str = Field(..., pattern="^(by_dish|by_method)$",
-                           description="by_dish=按品项 / by_method=按做法")
-    applicable_role: str = Field(..., pattern="^(chef|waiter|runner)$",
-                                 description="chef=厨师 / waiter=服务员 / runner=传菜员")
+    calc_type: str = Field(..., pattern="^(by_dish|by_method)$", description="by_dish=按品项 / by_method=按做法")
+    applicable_role: str = Field(
+        ..., pattern="^(chef|waiter|runner)$", description="chef=厨师 / waiter=服务员 / runner=传菜员"
+    )
     effective_date: date | None = None
     is_active: bool = True
     items: list[SchemeItemCreate] = Field(default_factory=list)
@@ -132,6 +134,7 @@ class RecordCreate(BaseModel):
 # 区域管理
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/zones")
 async def list_zones(
     store_id: uuid.UUID | None = Query(None),
@@ -151,11 +154,14 @@ async def list_zones(
               AND (:store_id IS NULL OR store_id = :store_id OR store_id IS NULL)
             ORDER BY name
         """)
-        rows = await db.execute(q, {
-            "tid": x_tenant_id,
-            "active": is_active,
-            "store_id": str(store_id) if store_id else None,
-        })
+        rows = await db.execute(
+            q,
+            {
+                "tid": x_tenant_id,
+                "active": is_active,
+                "store_id": str(store_id) if store_id else None,
+            },
+        )
         items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
         logger.error("piecework.zones.list.db_error", error=str(exc))
@@ -174,16 +180,21 @@ async def create_zone(
     zone_id = uuid.uuid4()
     try:
         await _set_rls(db, x_tenant_id)
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO piecework_zones
                 (id, tenant_id, store_id, name, description, is_active)
             VALUES (:id, :tid, :store_id, :name, :desc, :active)
-        """), {
-            "id": str(zone_id), "tid": x_tenant_id,
-            "store_id": str(body.store_id) if body.store_id else None,
-            "name": body.name, "desc": body.description,
-            "active": body.is_active,
-        })
+        """),
+            {
+                "id": str(zone_id),
+                "tid": x_tenant_id,
+                "store_id": str(body.store_id) if body.store_id else None,
+                "name": body.name,
+                "desc": body.description,
+                "active": body.is_active,
+            },
+        )
         await db.commit()
         logger.info("piecework.zone.created", zone_id=str(zone_id), name=body.name)
     except SQLAlchemyError as exc:
@@ -222,8 +233,9 @@ async def update_zone(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text(f"UPDATE piecework_zones SET {set_clause}, updated_at = NOW() "
-                 f"WHERE id = :zone_id AND tenant_id = :tid"),
+            text(
+                f"UPDATE piecework_zones SET {set_clause}, updated_at = NOW() WHERE id = :zone_id AND tenant_id = :tid"
+            ),
             fields,
         )
         if result.rowcount == 0:
@@ -250,8 +262,10 @@ async def delete_zone(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text("UPDATE piecework_zones SET is_active = FALSE, updated_at = NOW() "
-                 "WHERE id = :zone_id AND tenant_id = :tid"),
+            text(
+                "UPDATE piecework_zones SET is_active = FALSE, updated_at = NOW() "
+                "WHERE id = :zone_id AND tenant_id = :tid"
+            ),
             {"zone_id": str(zone_id), "tid": x_tenant_id},
         )
         if result.rowcount == 0:
@@ -271,6 +285,7 @@ async def delete_zone(
 # ──────────────────────────────────────────────────────────────────────────────
 # 方案管理
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/schemes")
 async def list_schemes(
@@ -295,12 +310,15 @@ async def list_schemes(
               AND (:role IS NULL OR s.applicable_role = :role)
             ORDER BY s.created_at DESC
         """)
-        rows = await db.execute(q, {
-            "tid": x_tenant_id,
-            "active": is_active,
-            "zone_id": str(zone_id) if zone_id else None,
-            "role": applicable_role,
-        })
+        rows = await db.execute(
+            q,
+            {
+                "tid": x_tenant_id,
+                "active": is_active,
+                "zone_id": str(zone_id) if zone_id else None,
+                "role": applicable_role,
+            },
+        )
         items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
         logger.error("piecework.schemes.list.db_error", error=str(exc))
@@ -319,41 +337,48 @@ async def create_scheme(
     scheme_id = uuid.uuid4()
     try:
         await _set_rls(db, x_tenant_id)
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO piecework_schemes
                 (id, tenant_id, zone_id, name, calc_type, applicable_role,
                  effective_date, is_active)
             VALUES (:id, :tid, :zone_id, :name, :calc_type, :role,
                     :eff_date, :active)
-        """), {
-            "id": str(scheme_id), "tid": x_tenant_id,
-            "zone_id": str(body.zone_id) if body.zone_id else None,
-            "name": body.name, "calc_type": body.calc_type,
-            "role": body.applicable_role,
-            "eff_date": body.effective_date,
-            "active": body.is_active,
-        })
+        """),
+            {
+                "id": str(scheme_id),
+                "tid": x_tenant_id,
+                "zone_id": str(body.zone_id) if body.zone_id else None,
+                "name": body.name,
+                "calc_type": body.calc_type,
+                "role": body.applicable_role,
+                "eff_date": body.effective_date,
+                "active": body.is_active,
+            },
+        )
 
         for item in body.items:
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO piecework_scheme_items
                     (id, tenant_id, scheme_id, dish_id, method_id,
                      dish_name, unit_fee_fen, min_qty)
                 VALUES (gen_random_uuid(), :tid, :scheme_id, :dish_id, :method_id,
                         :dish_name, :unit_fee_fen, :min_qty)
-            """), {
-                "tid": x_tenant_id,
-                "scheme_id": str(scheme_id),
-                "dish_id": str(item.dish_id) if item.dish_id else None,
-                "method_id": str(item.method_id) if item.method_id else None,
-                "dish_name": item.dish_name,
-                "unit_fee_fen": item.unit_fee_fen,
-                "min_qty": item.min_qty,
-            })
+            """),
+                {
+                    "tid": x_tenant_id,
+                    "scheme_id": str(scheme_id),
+                    "dish_id": str(item.dish_id) if item.dish_id else None,
+                    "method_id": str(item.method_id) if item.method_id else None,
+                    "dish_name": item.dish_name,
+                    "unit_fee_fen": item.unit_fee_fen,
+                    "min_qty": item.min_qty,
+                },
+            )
 
         await db.commit()
-        logger.info("piecework.scheme.created", scheme_id=str(scheme_id),
-                    name=body.name, items=len(body.items))
+        logger.info("piecework.scheme.created", scheme_id=str(scheme_id), name=body.name, items=len(body.items))
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("piecework.scheme.create.failed", error=str(exc))
@@ -371,24 +396,30 @@ async def get_scheme(
     """方案详情（含明细列表）。"""
     try:
         await _set_rls(db, x_tenant_id)
-        scheme_row = await db.execute(text("""
+        scheme_row = await db.execute(
+            text("""
             SELECT s.id, s.tenant_id, s.zone_id, z.name AS zone_name,
                    s.name, s.calc_type, s.applicable_role,
                    s.effective_date, s.is_active, s.created_at, s.updated_at
             FROM piecework_schemes s
             LEFT JOIN piecework_zones z ON z.id = s.zone_id
             WHERE s.id = :sid AND s.tenant_id = :tid
-        """), {"sid": str(scheme_id), "tid": x_tenant_id})
+        """),
+            {"sid": str(scheme_id), "tid": x_tenant_id},
+        )
         scheme = scheme_row.fetchone()
         if scheme is None:
             raise _err("方案不存在", 404)
 
-        items_row = await db.execute(text("""
+        items_row = await db.execute(
+            text("""
             SELECT id, dish_id, method_id, dish_name, unit_fee_fen, min_qty, created_at
             FROM piecework_scheme_items
             WHERE scheme_id = :sid AND tenant_id = :tid
             ORDER BY created_at
-        """), {"sid": str(scheme_id), "tid": x_tenant_id})
+        """),
+            {"sid": str(scheme_id), "tid": x_tenant_id},
+        )
         items = [_serialize_row(r) for r in items_row]
 
         result = _serialize_row(scheme)
@@ -434,8 +465,10 @@ async def update_scheme(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text(f"UPDATE piecework_schemes SET {set_clause}, updated_at = NOW() "
-                 f"WHERE id = :scheme_id AND tenant_id = :tid"),
+            text(
+                f"UPDATE piecework_schemes SET {set_clause}, updated_at = NOW() "
+                f"WHERE id = :scheme_id AND tenant_id = :tid"
+            ),
             fields,
         )
         if result.rowcount == 0:
@@ -456,6 +489,7 @@ async def update_scheme(
 # 计件记录
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/records", status_code=201)
 async def create_record(
     body: RecordCreate,
@@ -466,45 +500,55 @@ async def create_record(
     record_id = uuid.uuid4()
     try:
         await _set_rls(db, x_tenant_id)
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO piecework_records
                 (id, tenant_id, store_id, employee_id, zone_id, scheme_id,
                  dish_id, dish_name, method_name, quantity, unit_fee_fen, order_id)
             VALUES (:id, :tid, :store_id, :employee_id, :zone_id, :scheme_id,
                     :dish_id, :dish_name, :method_name, :quantity, :unit_fee_fen,
                     :order_id)
-        """), {
-            "id": str(record_id), "tid": x_tenant_id,
-            "store_id": str(body.store_id),
-            "employee_id": str(body.employee_id),
-            "zone_id": str(body.zone_id) if body.zone_id else None,
-            "scheme_id": str(body.scheme_id) if body.scheme_id else None,
-            "dish_id": str(body.dish_id) if body.dish_id else None,
-            "dish_name": body.dish_name,
-            "method_name": body.method_name,
-            "quantity": body.quantity,
-            "unit_fee_fen": body.unit_fee_fen,
-            "order_id": str(body.order_id) if body.order_id else None,
-        })
+        """),
+            {
+                "id": str(record_id),
+                "tid": x_tenant_id,
+                "store_id": str(body.store_id),
+                "employee_id": str(body.employee_id),
+                "zone_id": str(body.zone_id) if body.zone_id else None,
+                "scheme_id": str(body.scheme_id) if body.scheme_id else None,
+                "dish_id": str(body.dish_id) if body.dish_id else None,
+                "dish_name": body.dish_name,
+                "method_name": body.method_name,
+                "quantity": body.quantity,
+                "unit_fee_fen": body.unit_fee_fen,
+                "order_id": str(body.order_id) if body.order_id else None,
+            },
+        )
         await db.commit()
         total_fee_fen = body.quantity * body.unit_fee_fen
-        logger.info("piecework.record.created", record_id=str(record_id),
-                    employee_id=str(body.employee_id),
-                    total_fee_fen=total_fee_fen)
+        logger.info(
+            "piecework.record.created",
+            record_id=str(record_id),
+            employee_id=str(body.employee_id),
+            total_fee_fen=total_fee_fen,
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("piecework.record.create.failed", error=str(exc))
         raise _err(f"写入计件记录失败：{exc}", 500) from exc
 
-    return _ok({
-        "id": str(record_id),
-        "total_fee_fen": body.quantity * body.unit_fee_fen,
-    })
+    return _ok(
+        {
+            "id": str(record_id),
+            "total_fee_fen": body.quantity * body.unit_fee_fen,
+        }
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 统计分析
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats/store")
 async def stats_store(
@@ -517,7 +561,8 @@ async def stats_store(
     """门店汇总统计：该门店期间各员工计件汇总（总金额/总件数/记录数）。"""
     try:
         await _set_rls(db, x_tenant_id)
-        rows = await db.execute(text("""
+        rows = await db.execute(
+            text("""
             SELECT
                 employee_id,
                 SUM(total_fee_fen)  AS total_fee_fen,
@@ -530,24 +575,28 @@ async def stats_store(
               AND recorded_at <  :end_dt + INTERVAL '1 day'
             GROUP BY employee_id
             ORDER BY total_fee_fen DESC
-        """), {
-            "tid": x_tenant_id,
-            "store_id": str(store_id),
-            "start_dt": start_date,
-            "end_dt": end_date,
-        })
+        """),
+            {
+                "tid": x_tenant_id,
+                "store_id": str(store_id),
+                "start_dt": start_date,
+                "end_dt": end_date,
+            },
+        )
         items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
         logger.error("piecework.stats.store.db_error", error=str(exc))
         raise _err(f"查询门店统计失败：{exc}", 500) from exc
 
-    return _ok({
-        "store_id": str(store_id),
-        "start_date": str(start_date),
-        "end_date": str(end_date),
-        "items": items,
-        "total": len(items),
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+            "items": items,
+            "total": len(items),
+        }
+    )
 
 
 @router.get("/stats/employee")
@@ -561,7 +610,8 @@ async def stats_employee(
     """员工汇总统计：该员工期间按品项汇总（总金额/总件数）。"""
     try:
         await _set_rls(db, x_tenant_id)
-        rows = await db.execute(text("""
+        rows = await db.execute(
+            text("""
             SELECT
                 dish_name,
                 SUM(quantity)       AS total_quantity,
@@ -574,25 +624,29 @@ async def stats_employee(
               AND recorded_at <  :end_dt + INTERVAL '1 day'
             GROUP BY dish_name, unit_fee_fen
             ORDER BY total_fee_fen DESC
-        """), {
-            "tid": x_tenant_id,
-            "employee_id": str(employee_id),
-            "start_dt": start_date,
-            "end_dt": end_date,
-        })
+        """),
+            {
+                "tid": x_tenant_id,
+                "employee_id": str(employee_id),
+                "start_dt": start_date,
+                "end_dt": end_date,
+            },
+        )
         items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
         logger.error("piecework.stats.employee.db_error", error=str(exc))
         raise _err(f"查询员工统计失败：{exc}", 500) from exc
 
-    return _ok({
-        "employee_id": str(employee_id),
-        "start_date": str(start_date),
-        "end_date": str(end_date),
-        "items": items,
-        "total": len(items),
-        "grand_total_fee_fen": sum(i.get("total_fee_fen", 0) for i in items),
-    })
+    return _ok(
+        {
+            "employee_id": str(employee_id),
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+            "items": items,
+            "total": len(items),
+            "grand_total_fee_fen": sum(i.get("total_fee_fen", 0) for i in items),
+        }
+    )
 
 
 @router.get("/stats/by-dish")
@@ -605,7 +659,8 @@ async def stats_by_dish(
     """按品项统计：指定门店当日各品项计件数量排行。"""
     try:
         await _set_rls(db, x_tenant_id)
-        rows = await db.execute(text("""
+        rows = await db.execute(
+            text("""
             SELECT
                 dish_name,
                 SUM(quantity)       AS total_quantity,
@@ -617,22 +672,26 @@ async def stats_by_dish(
               AND recorded_at::date = :query_date
             GROUP BY dish_name
             ORDER BY total_quantity DESC
-        """), {
-            "tid": x_tenant_id,
-            "store_id": str(store_id),
-            "query_date": query_date,
-        })
+        """),
+            {
+                "tid": x_tenant_id,
+                "store_id": str(store_id),
+                "query_date": query_date,
+            },
+        )
         items = [_serialize_row(r) for r in rows]
     except SQLAlchemyError as exc:
         logger.error("piecework.stats.by_dish.db_error", error=str(exc))
         raise _err(f"查询品项统计失败：{exc}", 500) from exc
 
-    return _ok({
-        "store_id": str(store_id),
-        "date": str(query_date),
-        "items": items,
-        "total": len(items),
-    })
+    return _ok(
+        {
+            "store_id": str(store_id),
+            "date": str(query_date),
+            "items": items,
+            "total": len(items),
+        }
+    )
 
 
 @router.get("/daily-report")
@@ -645,7 +704,8 @@ async def daily_report(
     """日报数据：TOP5员工 + 总金额 + 参与人数（供推送使用）。"""
     try:
         await _set_rls(db, x_tenant_id)
-        summary_row = await db.execute(text("""
+        summary_row = await db.execute(
+            text("""
             SELECT
                 COALESCE(SUM(total_fee_fen), 0)  AS total_fee_fen,
                 COALESCE(SUM(quantity), 0)       AS total_quantity,
@@ -654,10 +714,13 @@ async def daily_report(
             WHERE tenant_id  = :tid
               AND store_id   = :store_id
               AND recorded_at::date = :report_date
-        """), {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date})
+        """),
+            {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date},
+        )
         summary = summary_row.fetchone()
 
-        top5_rows = await db.execute(text("""
+        top5_rows = await db.execute(
+            text("""
             SELECT
                 employee_id,
                 SUM(total_fee_fen)  AS total_fee_fen,
@@ -670,7 +733,9 @@ async def daily_report(
             GROUP BY employee_id
             ORDER BY total_fee_fen DESC
             LIMIT 5
-        """), {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date})
+        """),
+            {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date},
+        )
         top5 = [_serialize_row(r) for r in top5_rows]
 
         data = {

@@ -1,4 +1,5 @@
 """预订模型 — 7状态机，支持包间分配与定金"""
+
 import uuid
 
 from sqlalchemy import Boolean, Index, Integer, String
@@ -12,22 +13,32 @@ from .enums import ReservationStatus, ReservationType
 
 class Reservation(TenantBase):
     """预订记录"""
+
     __tablename__ = "reservations"
 
     reservation_id: Mapped[str] = mapped_column(
-        String(20), unique=True, nullable=False, index=True,
+        String(20),
+        unique=True,
+        nullable=False,
+        index=True,
         comment="业务ID如RSV-XXXXXXXXXXXX",
     )
     store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
     )
     confirmation_code: Mapped[str] = mapped_column(
-        String(10), nullable=False, comment="6位确认码",
+        String(10),
+        nullable=False,
+        comment="6位确认码",
     )
     customer_name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=ReservationType.regular.value,
+        String(20),
+        nullable=False,
+        default=ReservationType.regular.value,
     )
     date: Mapped[str] = mapped_column(String(10), nullable=False, comment="YYYY-MM-DD")
     time: Mapped[str] = mapped_column(String(5), nullable=False, comment="HH:MM")
@@ -56,17 +67,23 @@ class Reservation(TenantBase):
 
     # 渠道（v118 新增）
     source_channel: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="phone",
+        String(20),
+        nullable=False,
+        default="phone",
         comment="来源渠道: meituan/dianping/wechat/phone/walkin",
     )
     platform_order_id: Mapped[str | None] = mapped_column(
-        String(100), nullable=True,
+        String(100),
+        nullable=True,
         comment="平台原始订单号，与 source_channel 联合唯一（去重用）",
     )
 
     # 状态
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=ReservationStatus.pending.value, index=True,
+        String(20),
+        nullable=False,
+        default=ReservationStatus.pending.value,
+        index=True,
     )
     confirmed_by: Mapped[str | None] = mapped_column(String(100))
     cancel_reason: Mapped[str | None] = mapped_column(String(500))
@@ -127,11 +144,14 @@ class Reservation(TenantBase):
 
 class NoShowRecord(TenantBase):
     """爽约记录"""
+
     __tablename__ = "no_show_records"
 
     phone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     reservation_id: Mapped[str] = mapped_column(
-        String(20), nullable=False, comment="关联预订业务ID",
+        String(20),
+        nullable=False,
+        comment="关联预订业务ID",
     )
 
     __table_args__ = (

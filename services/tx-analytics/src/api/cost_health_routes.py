@@ -14,6 +14,7 @@
   - 计算结果允许1小时缓存（Cache-Control 头）
   - AI 建议仅在 health_score < 65 时触发
 """
+
 from typing import Optional
 
 import structlog
@@ -38,6 +39,7 @@ _CACHE_MAX_AGE = 3600
 
 # ── 依赖注入 ──────────────────────────────────────────────────────────────────
 
+
 def _require_tenant(x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header 必填")
@@ -59,13 +61,11 @@ def _cached_response(data: dict, cache_seconds: int = _CACHE_MAX_AGE) -> JSONRes
 
 # ── 1. 单店成本健康报告 ───────────────────────────────────────────────────────
 
+
 @router.get(
     "/store/{store_id}",
     summary="单店成本健康报告",
-    description=(
-        "返回单店三维度（食材/人力/损耗）成本健康评分、健康等级、"
-        "与品牌基准的偏差分析，以及异常维度标记。"
-    ),
+    description=("返回单店三维度（食材/人力/损耗）成本健康评分、健康等级、与品牌基准的偏差分析，以及异常维度标记。"),
 )
 async def get_store_cost_health(
     store_id: str,
@@ -122,13 +122,11 @@ async def get_store_cost_health(
 
 # ── 2. 集团成本热力图 ─────────────────────────────────────────────────────────
 
+
 @router.get(
     "/group/heatmap",
     summary="集团成本热力图",
-    description=(
-        "返回该租户所有门店的成本健康状态，按 health_score 升序排列"
-        "（高风险门店排前）。支持跨品牌对比。"
-    ),
+    description=("返回该租户所有门店的成本健康状态，按 health_score 升序排列（高风险门店排前）。支持跨品牌对比。"),
 )
 async def get_group_cost_heatmap(
     days: int = Query(default=30, ge=7, le=365, description="统计周期（天）"),
@@ -184,13 +182,11 @@ async def get_group_cost_heatmap(
 
 # ── 3. 品牌成本基准 ───────────────────────────────────────────────────────────
 
+
 @router.get(
     "/brand/{brand_id}/benchmark",
     summary="品牌成本基准",
-    description=(
-        "返回该品牌所有门店的成本分布统计（中位数/均值/四分位数），"
-        "作为门店对标的参考线。"
-    ),
+    description=("返回该品牌所有门店的成本分布统计（中位数/均值/四分位数），作为门店对标的参考线。"),
 )
 async def get_brand_cost_benchmark(
     brand_id: str,
@@ -244,12 +240,12 @@ async def get_brand_cost_benchmark(
 
 # ── 4. 成本异常预警列表 ───────────────────────────────────────────────────────
 
+
 @router.get(
     "/alerts",
     summary="成本异常预警列表",
     description=(
-        "返回该租户所有成本异常门店（任意维度偏差超出品牌均值±15%）。"
-        "按异常严重程度（health_score 升序）排列。"
+        "返回该租户所有成本异常门店（任意维度偏差超出品牌均值±15%）。按异常严重程度（health_score 升序）排列。"
     ),
 )
 async def get_cost_alerts(
@@ -298,10 +294,7 @@ async def get_cost_alerts(
         raise HTTPException(status_code=500, detail="成本预警获取失败") from exc
 
     # 筛选有异常标记的门店
-    anomaly_reports = [
-        r for r in all_reports
-        if r.is_ingredient_anomaly or r.is_labor_anomaly or r.is_waste_anomaly
-    ]
+    anomaly_reports = [r for r in all_reports if r.is_ingredient_anomaly or r.is_labor_anomaly or r.is_waste_anomaly]
 
     # 按等级过滤
     if level == "critical":
@@ -313,39 +306,47 @@ async def get_cost_alerts(
     for r in anomaly_reports:
         anomaly_dimensions = []
         if r.is_ingredient_anomaly:
-            anomaly_dimensions.append({
-                "dimension": "ingredient_cost_rate",
-                "label": "食材成本率",
-                "actual": r.ingredient_cost_rate,
-                "benchmark": r.benchmark_ingredient,
-                "deviation": r.ingredient_deviation,
-            })
+            anomaly_dimensions.append(
+                {
+                    "dimension": "ingredient_cost_rate",
+                    "label": "食材成本率",
+                    "actual": r.ingredient_cost_rate,
+                    "benchmark": r.benchmark_ingredient,
+                    "deviation": r.ingredient_deviation,
+                }
+            )
         if r.is_labor_anomaly:
-            anomaly_dimensions.append({
-                "dimension": "labor_cost_rate",
-                "label": "人力成本率",
-                "actual": r.labor_cost_rate,
-                "benchmark": r.benchmark_labor,
-                "deviation": r.labor_deviation,
-            })
+            anomaly_dimensions.append(
+                {
+                    "dimension": "labor_cost_rate",
+                    "label": "人力成本率",
+                    "actual": r.labor_cost_rate,
+                    "benchmark": r.benchmark_labor,
+                    "deviation": r.labor_deviation,
+                }
+            )
         if r.is_waste_anomaly:
-            anomaly_dimensions.append({
-                "dimension": "waste_rate",
-                "label": "损耗率",
-                "actual": r.waste_rate,
-                "benchmark": r.benchmark_waste,
-                "deviation": r.waste_deviation,
-            })
+            anomaly_dimensions.append(
+                {
+                    "dimension": "waste_rate",
+                    "label": "损耗率",
+                    "actual": r.waste_rate,
+                    "benchmark": r.benchmark_waste,
+                    "deviation": r.waste_deviation,
+                }
+            )
 
-        alerts.append({
-            "store_id": r.store_id,
-            "store_name": r.store_name,
-            "brand_id": r.brand_id,
-            "health_score": r.health_score,
-            "health_level": r.health_level,
-            "anomaly_dimensions": anomaly_dimensions,
-            "needs_ai_suggestion": r.health_score < 65.0,
-        })
+        alerts.append(
+            {
+                "store_id": r.store_id,
+                "store_name": r.store_name,
+                "brand_id": r.brand_id,
+                "health_score": r.health_score,
+                "health_level": r.health_level,
+                "anomaly_dimensions": anomaly_dimensions,
+                "needs_ai_suggestion": r.health_score < 65.0,
+            }
+        )
 
     result = {
         "alerts": alerts,
@@ -356,6 +357,7 @@ async def get_cost_alerts(
 
 
 # ── 5. AI 成本优化建议 ────────────────────────────────────────────────────────
+
 
 @router.get(
     "/store/{store_id}/suggestions",
@@ -437,6 +439,7 @@ async def get_cost_suggestions(
         # ModelRouter 在 main.py 中挂载到 app.state
         # 此处通过模块导入获取实例
         from tx_agent.src.services.model_router import ModelRouter  # type: ignore[import]
+
         model_router = ModelRouter()
     except ImportError:
         logger.warning(
@@ -475,11 +478,13 @@ async def get_cost_suggestions(
             "labor_cost_rate": report.labor_cost_rate,
             "waste_rate": report.waste_rate,
             "anomaly_dimensions": [
-                dim for dim, is_anomaly in [
+                dim
+                for dim, is_anomaly in [
                     ("食材成本率", report.is_ingredient_anomaly),
                     ("人力成本率", report.is_labor_anomaly),
                     ("损耗率", report.is_waste_anomaly),
-                ] if is_anomaly
+                ]
+                if is_anomaly
             ],
         },
     }

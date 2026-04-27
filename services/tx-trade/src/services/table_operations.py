@@ -3,6 +3,7 @@
 所有操作记录操作日志，金额单位统一为分(fen)。
 桌台状态流: idle(empty) -> reserved -> occupied(dining) -> cleaning(pending_cleanup) -> idle
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -48,9 +49,7 @@ async def _log_operation(
 # ─── 内部工具 ───
 
 
-async def _get_table(
-    table_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession
-) -> Table:
+async def _get_table(table_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Table:
     """按 ID + tenant_id 查找桌台，不存在则抛 ValueError"""
     stmt = select(Table).where(
         Table.id == table_id,
@@ -240,7 +239,8 @@ async def split_table(
     original_seats = config.get("original_seats", main_table.seats)
     main_table.seats = original_seats
     main_table.config = {
-        k: v for k, v in config.items()
+        k: v
+        for k, v in config.items()
         if k not in ("merged_with", "is_main_table", "original_seats", "merged_total_seats")
     }
     db.add(main_table)
@@ -251,10 +251,7 @@ async def split_table(
         sub_id = uuid.UUID(sub_id_str)
         sub_table = await _get_table(sub_id, tenant_id, db)
         sub_config = sub_table.config or {}
-        sub_table.config = {
-            k: v for k, v in sub_config.items()
-            if k not in ("merged_with", "is_main_table")
-        }
+        sub_table.config = {k: v for k, v in sub_config.items() if k not in ("merged_with", "is_main_table")}
 
         # 查找是否有新订单分配
         new_order = next(
@@ -269,11 +266,13 @@ async def split_table(
             sub_table.current_order_id = None
 
         db.add(sub_table)
-        split_results.append({
-            "table_id": str(sub_id),
-            "table_no": sub_table.table_no,
-            "status": sub_table.status,
-        })
+        split_results.append(
+            {
+                "table_id": str(sub_id),
+                "table_no": sub_table.table_no,
+                "status": sub_table.status,
+            }
+        )
 
     await _log_operation(
         db,
@@ -314,7 +313,8 @@ async def clear_table(
     # 清除并台配置
     if table.config:
         table.config = {
-            k: v for k, v in table.config.items()
+            k: v
+            for k, v in table.config.items()
             if k not in ("merged_with", "is_main_table", "original_seats", "merged_total_seats")
         }
     db.add(table)
@@ -382,12 +382,16 @@ async def get_table_status_board(
     db: AsyncSession,
 ) -> dict:
     """全店桌态看板 — 返回按区域分组的桌台状态总览"""
-    stmt = select(Table).where(
-        Table.store_id == store_id,
-        Table.tenant_id == tenant_id,
-        Table.is_deleted.is_(False),
-        Table.is_active.is_(True),
-    ).order_by(Table.area, Table.sort_order, Table.table_no)
+    stmt = (
+        select(Table)
+        .where(
+            Table.store_id == store_id,
+            Table.tenant_id == tenant_id,
+            Table.is_deleted.is_(False),
+            Table.is_active.is_(True),
+        )
+        .order_by(Table.area, Table.sort_order, Table.table_no)
+    )
 
     result = await db.execute(stmt)
     tables = result.scalars().all()

@@ -17,7 +17,6 @@
 
 import os
 import time
-from collections import defaultdict
 from threading import Lock
 
 import structlog

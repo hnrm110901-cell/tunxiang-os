@@ -1,4 +1,5 @@
 """Event Bus 测试 — 发布/处理/链路追踪/事件流"""
+
 import os
 import sys
 
@@ -75,6 +76,7 @@ class TestHandlerErrors:
     @pytest.mark.asyncio
     async def test_handler_error_captured(self, bus, sample_event):
         """处理器抛异常不影响其他处理器"""
+
         def bad_handler(event: AgentEvent) -> dict:
             raise ValueError("模拟错误")
 
@@ -97,6 +99,7 @@ class TestAsyncHandler:
     @pytest.mark.asyncio
     async def test_async_handler(self, bus, sample_event):
         """支持 async handler"""
+
         async def async_handler(event: AgentEvent) -> dict:
             return {"async": True, "event_type": event.event_type}
 

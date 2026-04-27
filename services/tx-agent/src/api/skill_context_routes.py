@@ -14,6 +14,7 @@ GET /api/v1/agent/skill-context/dependencies/{skill_name}
 
 注：Skill 元数据是全局的（非租户相关），所有端点无需 X-Tenant-ID。
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/api/v1/agent/skill-context", tags=["skill-context"])
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /tools
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/tools")
 async def get_available_tools(
@@ -68,6 +70,7 @@ async def get_available_tools(
 # GET /ontology
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/ontology")
 async def get_ontology() -> dict[str, Any]:
     """
@@ -90,6 +93,7 @@ async def get_ontology() -> dict[str, Any]:
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /event/{event_type}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/event/{event_type:path}")
 async def get_event_skills(event_type: str) -> dict[str, Any]:
@@ -117,6 +121,7 @@ async def get_event_skills(event_type: str) -> dict[str, Any]:
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /dependencies/{skill_name}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/dependencies/{skill_name}")
 async def check_dependencies(skill_name: str) -> dict[str, Any]:

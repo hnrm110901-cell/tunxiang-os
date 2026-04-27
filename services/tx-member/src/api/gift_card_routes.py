@@ -1,4 +1,5 @@
 """礼品卡 API — 6端点"""
+
 from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 from services.gift_card import (
@@ -35,9 +36,7 @@ class ActivateReq(BaseModel):
 
 class SellCardReq(BaseModel):
     card_id: str
-    buyer_info: dict = Field(
-        ..., description="购买者信息: {name, phone, payment_method}"
-    )
+    buyer_info: dict = Field(..., description="购买者信息: {name, phone, payment_method}")
 
 
 class UseCardReq(BaseModel):

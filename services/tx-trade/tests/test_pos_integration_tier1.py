@@ -18,7 +18,6 @@ import sys
 import uuid
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -154,12 +153,12 @@ class TestPOSAdapterRobustnessTier1:
         场景：攻击者伪造美团回调，虚报订单。
         """
         # 模拟签名验证逻辑
-        import hmac
         import hashlib
+        import hmac
 
         secret = "meituan-webhook-secret"
         payload = '{"order_id":"12345","amount":"188.00"}'
-        
+
         # 正确签名
         valid_sig = hmac.new(
             secret.encode(), payload.encode(), hashlib.sha256

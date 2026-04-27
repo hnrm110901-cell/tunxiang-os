@@ -3,6 +3,7 @@
 所有跨服务事件的标准化载体。无论通过 Redis Streams 还是 PG NOTIFY 传输，
 事件格式统一为 TxEvent。
 """
+
 from __future__ import annotations
 
 import json
@@ -33,9 +34,7 @@ class TxEvent:
     source: str
     store_id: str | None = None
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     version: str = "1.0"
 
     # ------------------------------------------------------------------

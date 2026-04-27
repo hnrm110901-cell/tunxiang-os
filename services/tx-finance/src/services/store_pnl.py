@@ -15,6 +15,7 @@ P&L 结构：
 KPI:
   毛利率、营业利润率、净利率、人力成本占比、食材成本占比、RevPASH
 """
+
 from __future__ import annotations
 
 import structlog
@@ -23,11 +24,11 @@ logger = structlog.get_logger()
 
 # ── 异常检测阈值 ──────────────────────────────────────────────
 ANOMALY_THRESHOLDS = {
-    "food_cost_ratio_max": 0.35,        # 食材成本占比 > 35% 告警
-    "labor_cost_ratio_max": 0.30,        # 人力成本占比 > 30% 告警
-    "net_margin_min": 0.05,              # 净利率 < 5% 告警
-    "waste_ratio_max": 0.03,             # 损耗率 > 3% 告警
-    "utility_ratio_max": 0.05,           # 水电气占比 > 5% 告警
+    "food_cost_ratio_max": 0.35,  # 食材成本占比 > 35% 告警
+    "labor_cost_ratio_max": 0.30,  # 人力成本占比 > 30% 告警
+    "net_margin_min": 0.05,  # 净利率 < 5% 告警
+    "waste_ratio_max": 0.03,  # 损耗率 > 3% 告警
+    "utility_ratio_max": 0.05,  # 水电气占比 > 5% 告警
 }
 
 
@@ -89,10 +90,7 @@ class StorePnLService:
         platform_commission = opex.get("platform_commission", 0)
         payment_processing = opex.get("payment_processing", 0)
         supplies = opex.get("supplies", 0)
-        total_opex = (
-            labor_cost + rent + utilities + marketing
-            + platform_commission + payment_processing + supplies
-        )
+        total_opex = labor_cost + rent + utilities + marketing + platform_commission + payment_processing + supplies
 
         # ── Operating Profit ─────────────────────────────────
         operating_profit = gross_profit - total_opex
@@ -239,6 +237,7 @@ class StorePnLService:
         Returns:
             差异分析
         """
+
         def _variance(key_path: str) -> dict:
             """按路径提取两期值并计算差异"""
             parts = key_path.split(".")
@@ -308,43 +307,51 @@ class StorePnLService:
 
         food_cost_ratio = kpi.get("food_cost_ratio", 0)
         if food_cost_ratio > ANOMALY_THRESHOLDS["food_cost_ratio_max"]:
-            anomalies.append({
-                "metric": "food_cost_ratio",
-                "value": food_cost_ratio,
-                "threshold": ANOMALY_THRESHOLDS["food_cost_ratio_max"],
-                "severity": "high",
-                "message": f"食材成本占比 {food_cost_ratio:.1%} 超过阈值 {ANOMALY_THRESHOLDS['food_cost_ratio_max']:.0%}",
-            })
+            anomalies.append(
+                {
+                    "metric": "food_cost_ratio",
+                    "value": food_cost_ratio,
+                    "threshold": ANOMALY_THRESHOLDS["food_cost_ratio_max"],
+                    "severity": "high",
+                    "message": f"食材成本占比 {food_cost_ratio:.1%} 超过阈值 {ANOMALY_THRESHOLDS['food_cost_ratio_max']:.0%}",
+                }
+            )
 
         labor_cost_ratio = kpi.get("labor_cost_ratio", 0)
         if labor_cost_ratio > ANOMALY_THRESHOLDS["labor_cost_ratio_max"]:
-            anomalies.append({
-                "metric": "labor_cost_ratio",
-                "value": labor_cost_ratio,
-                "threshold": ANOMALY_THRESHOLDS["labor_cost_ratio_max"],
-                "severity": "high",
-                "message": f"人力成本占比 {labor_cost_ratio:.1%} 超过阈值 {ANOMALY_THRESHOLDS['labor_cost_ratio_max']:.0%}",
-            })
+            anomalies.append(
+                {
+                    "metric": "labor_cost_ratio",
+                    "value": labor_cost_ratio,
+                    "threshold": ANOMALY_THRESHOLDS["labor_cost_ratio_max"],
+                    "severity": "high",
+                    "message": f"人力成本占比 {labor_cost_ratio:.1%} 超过阈值 {ANOMALY_THRESHOLDS['labor_cost_ratio_max']:.0%}",
+                }
+            )
 
         net_margin = kpi.get("net_margin", 0)
         if net_margin < ANOMALY_THRESHOLDS["net_margin_min"]:
-            anomalies.append({
-                "metric": "net_margin",
-                "value": net_margin,
-                "threshold": ANOMALY_THRESHOLDS["net_margin_min"],
-                "severity": "critical",
-                "message": f"净利率 {net_margin:.1%} 低于阈值 {ANOMALY_THRESHOLDS['net_margin_min']:.0%}",
-            })
+            anomalies.append(
+                {
+                    "metric": "net_margin",
+                    "value": net_margin,
+                    "threshold": ANOMALY_THRESHOLDS["net_margin_min"],
+                    "severity": "critical",
+                    "message": f"净利率 {net_margin:.1%} 低于阈值 {ANOMALY_THRESHOLDS['net_margin_min']:.0%}",
+                }
+            )
 
         waste_ratio = kpi.get("waste_ratio", 0)
         if waste_ratio > ANOMALY_THRESHOLDS["waste_ratio_max"]:
-            anomalies.append({
-                "metric": "waste_ratio",
-                "value": waste_ratio,
-                "threshold": ANOMALY_THRESHOLDS["waste_ratio_max"],
-                "severity": "medium",
-                "message": f"损耗率 {waste_ratio:.1%} 超过阈值 {ANOMALY_THRESHOLDS['waste_ratio_max']:.0%}",
-            })
+            anomalies.append(
+                {
+                    "metric": "waste_ratio",
+                    "value": waste_ratio,
+                    "threshold": ANOMALY_THRESHOLDS["waste_ratio_max"],
+                    "severity": "medium",
+                    "message": f"损耗率 {waste_ratio:.1%} 超过阈值 {ANOMALY_THRESHOLDS['waste_ratio_max']:.0%}",
+                }
+            )
 
         return anomalies
 
@@ -360,18 +367,20 @@ class StorePnLService:
         trend = []
         for pnl in monthly_pnls:
             kpi = pnl.get("kpi", {})
-            trend.append({
-                "period": pnl.get("biz_date") or pnl.get("period_label", ""),
-                "total_revenue": pnl.get("revenue", {}).get("total", 0),
-                "gross_profit": pnl.get("gross_profit", 0),
-                "operating_profit": pnl.get("operating_profit", 0),
-                "net_profit": pnl.get("net_profit", 0),
-                "gross_margin": kpi.get("gross_margin", 0),
-                "operating_margin": kpi.get("operating_margin", 0),
-                "net_margin": kpi.get("net_margin", 0),
-                "food_cost_ratio": kpi.get("food_cost_ratio", 0),
-                "labor_cost_ratio": kpi.get("labor_cost_ratio", 0),
-            })
+            trend.append(
+                {
+                    "period": pnl.get("biz_date") or pnl.get("period_label", ""),
+                    "total_revenue": pnl.get("revenue", {}).get("total", 0),
+                    "gross_profit": pnl.get("gross_profit", 0),
+                    "operating_profit": pnl.get("operating_profit", 0),
+                    "net_profit": pnl.get("net_profit", 0),
+                    "gross_margin": kpi.get("gross_margin", 0),
+                    "operating_margin": kpi.get("operating_margin", 0),
+                    "net_margin": kpi.get("net_margin", 0),
+                    "food_cost_ratio": kpi.get("food_cost_ratio", 0),
+                    "labor_cost_ratio": kpi.get("labor_cost_ratio", 0),
+                }
+            )
         return trend
 
     # ─── 内部辅助 ─────────────────────────────────────────────

@@ -10,6 +10,7 @@
 
 所有端点需要 X-Tenant-ID header（由 TenantMiddleware 校验）。
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -70,6 +71,7 @@ def _get_tenant_id(request: Request) -> UUID:
 # Pydantic Schemas
 # ────────────────────────────────────────────────────────────────────
 
+
 class AuditLogExportRequest(BaseModel):
     actor_id: str | None = Field(None, description="按操作人过滤")
     action: str | None = Field(None, description="按操作类型过滤")
@@ -83,6 +85,7 @@ class AuditLogExportRequest(BaseModel):
 # ────────────────────────────────────────────────────────────────────
 # 路由
 # ────────────────────────────────────────────────────────────────────
+
 
 @router.get("/audit-logs", summary="查询审计日志")
 async def list_audit_logs(
@@ -99,9 +102,7 @@ async def list_audit_logs(
     audit_svc: AuditLogService = Depends(_get_audit_service),
     # 三权分立：只有 audit_admin（平台）或 auditor（租户内）可查看审计日志
     # system_admin 被明确排除（权限矩阵中无 AUDIT_LOGS 权限）
-    _user: UserContext = Depends(
-        require_roles(PlatformRole.AUDIT_ADMIN, TenantRole.AUDITOR)
-    ),
+    _user: UserContext = Depends(require_roles(PlatformRole.AUDIT_ADMIN, TenantRole.AUDITOR)),
 ) -> JSONResponse:
     """
     分页查询审计日志，支持多维度过滤。
@@ -149,15 +150,17 @@ async def get_security_alerts(
         hours=hours,
         db=db,
     )
-    return JSONResponse({
-        "ok": True,
-        "data": {
-            "alerts": alerts,
-            "total": len(alerts),
-            "hours_checked": hours,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-        },
-    })
+    return JSONResponse(
+        {
+            "ok": True,
+            "data": {
+                "alerts": alerts,
+                "total": len(alerts),
+                "hours_checked": hours,
+                "checked_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+    )
 
 
 @router.get("/compliance", summary="合规状态检查")
@@ -275,12 +278,14 @@ async def export_audit_logs(
         exported_count=result["total"],
     )
 
-    return JSONResponse({
-        "ok": True,
-        "data": {
-            "items": result["items"],
-            "total": result["total"],
-            "exported_at": datetime.now(timezone.utc).isoformat(),
-            "format": body.format,
-        },
-    })
+    return JSONResponse(
+        {
+            "ok": True,
+            "data": {
+                "items": result["items"],
+                "total": result["total"],
+                "exported_at": datetime.now(timezone.utc).isoformat(),
+                "format": body.format,
+            },
+        }
+    )

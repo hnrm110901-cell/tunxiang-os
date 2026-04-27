@@ -3,6 +3,7 @@
 典型场景: 消费满200送30元券, 满500送100元券
 支持多档位阶梯奖励。
 """
+
 from typing import Any
 
 import structlog

@@ -53,11 +53,16 @@ class TestRestockAlertGeneration:
         老项目: 缺货 -> CRITICAL, 低于最低库存 -> CRITICAL
         新项目: days_left <= 1 -> critical
         """
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [
-                {"name": "鲈鱼", "current_qty": 2, "min_qty": 5, "daily_usage": 3},  # <1天
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "鲈鱼", "current_qty": 2, "min_qty": 5, "daily_usage": 3},  # <1天
+                    ],
+                },
+            )
+        )
         assert result.success is True
         assert len(result.data["alerts"]) == 1
         assert result.data["alerts"][0]["level"] == "critical"
@@ -68,27 +73,35 @@ class TestRestockAlertGeneration:
 
         迁移自: test_restock_recommended_quantity_positive
         """
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [
-                {"name": "鲈鱼", "current_qty": 2, "min_qty": 5, "daily_usage": 3},
-                {"name": "鸡蛋", "current_qty": 5, "min_qty": 10, "daily_usage": 8},
-            ],
-        }))
-        for alert in result.data["alerts"]:
-            assert alert["suggested_restock_qty"] >= 0, (
-                f"物料 {alert['item_name']} 的建议补货量不能为负"
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "鲈鱼", "current_qty": 2, "min_qty": 5, "daily_usage": 3},
+                        {"name": "鸡蛋", "current_qty": 5, "min_qty": 10, "daily_usage": 8},
+                    ],
+                },
             )
+        )
+        for alert in result.data["alerts"]:
+            assert alert["suggested_restock_qty"] >= 0, f"物料 {alert['item_name']} 的建议补货量不能为负"
 
     def test_sufficient_stock_no_alert(self, agent):
         """库存充足的物料不应生成补货提醒
 
         迁移自: test_sufficient_stock_no_alert
         """
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [
-                {"name": "米", "current_qty": 200, "min_qty": 10, "daily_usage": 5},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "米", "current_qty": 200, "min_qty": 10, "daily_usage": 5},
+                    ],
+                },
+            )
+        )
         assert result.data["total"] == 0
 
     def test_alert_includes_days_left(self, agent):
@@ -98,11 +111,16 @@ class TestRestockAlertGeneration:
         老项目: estimated_stockout_date 字段
         新项目: days_left 字段
         """
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [
-                {"name": "鲈鱼", "current_qty": 6, "min_qty": 5, "daily_usage": 3},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "鲈鱼", "current_qty": 6, "min_qty": 5, "daily_usage": 3},
+                    ],
+                },
+            )
+        )
         for alert in result.data["alerts"]:
             assert "days_left" in alert, "补货告警必须包含剩余天数"
             assert alert["days_left"] >= 0
@@ -112,20 +130,23 @@ class TestRestockAlertGeneration:
 
         迁移自: test_expiration_alerts_sorted_by_urgency (应用到补货场景)
         """
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [
-                {"name": "白菜", "current_qty": 10, "min_qty": 5, "daily_usage": 2},   # ~5天 warning
-                {"name": "鲈鱼", "current_qty": 2, "min_qty": 5, "daily_usage": 3},    # <1天 critical
-                {"name": "鸡蛋", "current_qty": 10, "min_qty": 10, "daily_usage": 4},  # ~2.5天 urgent
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "白菜", "current_qty": 10, "min_qty": 5, "daily_usage": 2},  # ~5天 warning
+                        {"name": "鲈鱼", "current_qty": 2, "min_qty": 5, "daily_usage": 3},  # <1天 critical
+                        {"name": "鸡蛋", "current_qty": 10, "min_qty": 10, "daily_usage": 4},  # ~2.5天 urgent
+                    ],
+                },
+            )
+        )
         alerts = result.data["alerts"]
         assert len(alerts) >= 2
         level_order = {"critical": 0, "urgent": 1, "warning": 2}
         for i in range(len(alerts) - 1):
-            assert level_order[alerts[i]["level"]] <= level_order[alerts[i + 1]["level"]], (
-                "补货告警应按紧急程度排序"
-            )
+            assert level_order[alerts[i]["level"]] <= level_order[alerts[i + 1]["level"]], "补货告警应按紧急程度排序"
 
 
 # -- 临期食材预警 (迁移自 TestExpirationAlerts) --
@@ -139,12 +160,17 @@ class TestExpirationAlerts:
 
         迁移自: test_expiring_soon_triggers_alert
         """
-        result = asyncio.run(agent.execute("check_expiration", {
-            "items": [
-                {"name": "鲜牛奶", "remaining_hours": 12},
-                {"name": "大米", "remaining_hours": 720},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "鲜牛奶", "remaining_hours": 12},
+                        {"name": "大米", "remaining_hours": 720},
+                    ],
+                },
+            )
+        )
         assert result.data["total"] >= 1
         milk_warnings = [w for w in result.data["warnings"] if w["item"] == "鲜牛奶"]
         assert len(milk_warnings) == 1
@@ -155,11 +181,16 @@ class TestExpirationAlerts:
 
         迁移自: test_expired_item_triggers_critical_alert
         """
-        result = asyncio.run(agent.execute("check_expiration", {
-            "items": [
-                {"name": "过期牛奶", "remaining_hours": 0},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "过期牛奶", "remaining_hours": 0},
+                    ],
+                },
+            )
+        )
         assert result.data["total"] == 1
         assert result.data["warnings"][0]["status"] == "expired"
 
@@ -168,11 +199,16 @@ class TestExpirationAlerts:
 
         迁移自: test_no_expiration_date_no_alert
         """
-        result = asyncio.run(agent.execute("check_expiration", {
-            "items": [
-                {"name": "酱油", "remaining_hours": 2160},  # 90天
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "酱油", "remaining_hours": 2160},  # 90天
+                    ],
+                },
+            )
+        )
         assert result.data["total"] == 0
 
     def test_expiration_via_constraint_checker(self, constraint_checker):
@@ -182,12 +218,14 @@ class TestExpirationAlerts:
         新项目: ConstraintChecker.check_food_safety 直接校验
         """
         # 临期食材应触发违规
-        result = constraint_checker.check_food_safety({
-            "ingredients": [
-                {"name": "鲈鱼", "remaining_hours": 12},
-                {"name": "白菜", "remaining_hours": 48},
-            ],
-        })
+        result = constraint_checker.check_food_safety(
+            {
+                "ingredients": [
+                    {"name": "鲈鱼", "remaining_hours": 12},
+                    {"name": "白菜", "remaining_hours": 48},
+                ],
+            }
+        )
         assert result["passed"] is False
         assert len(result["items"]) == 1
         assert result["items"][0]["ingredient"] == "鲈鱼"
@@ -199,11 +237,16 @@ class TestExpirationAlerts:
         check_expiration 返回的 data 包含 ingredients 字段，
         SkillAgent.run() 自动将其传给 ConstraintChecker
         """
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [
-                {"name": "牛奶", "remaining_hours": 6},
-            ],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "牛奶", "remaining_hours": 6},
+                    ],
+                },
+            )
+        )
         assert result.success is True
         # data 中有 ingredients 列表，ConstraintChecker 会校验
         if result.constraints_detail.get("food_safety_check"):
@@ -225,11 +268,16 @@ class TestInventoryMonitoring:
 
         迁移自: test_inventory_status_boundary_out_of_stock
         """
-        result = asyncio.run(agent.execute("monitor_inventory", {
-            "items": [
-                {"name": "鲈鱼", "current_qty": 0, "min_qty": 10},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "monitor_inventory",
+                {
+                    "items": [
+                        {"name": "鲈鱼", "current_qty": 0, "min_qty": 10},
+                    ],
+                },
+            )
+        )
         assert result.data["status_counts"]["out"] == 1
 
     def test_critical_stock_detection(self, agent):
@@ -237,11 +285,16 @@ class TestInventoryMonitoring:
 
         迁移自: test_inventory_status_boundary_at_min
         """
-        result = asyncio.run(agent.execute("monitor_inventory", {
-            "items": [
-                {"name": "鲈鱼", "current_qty": 3, "min_qty": 10},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "monitor_inventory",
+                {
+                    "items": [
+                        {"name": "鲈鱼", "current_qty": 3, "min_qty": 10},
+                    ],
+                },
+            )
+        )
         assert result.data["status_counts"]["critical"] == 1
 
     def test_sufficient_stock_normal(self, agent):
@@ -249,11 +302,16 @@ class TestInventoryMonitoring:
 
         迁移自: test_inventory_status_boundary_above_safe
         """
-        result = asyncio.run(agent.execute("monitor_inventory", {
-            "items": [
-                {"name": "酱油", "current_qty": 100, "min_qty": 20},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "monitor_inventory",
+                {
+                    "items": [
+                        {"name": "酱油", "current_qty": 100, "min_qty": 20},
+                    ],
+                },
+            )
+        )
         assert result.data["status_counts"]["normal"] == 1
 
     def test_negative_stock_treated_as_out(self, agent):
@@ -261,11 +319,16 @@ class TestInventoryMonitoring:
 
         迁移自: test_inventory_status_boundary_negative_stock
         """
-        result = asyncio.run(agent.execute("monitor_inventory", {
-            "items": [
-                {"name": "负库存", "current_qty": -5, "min_qty": 10},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "monitor_inventory",
+                {
+                    "items": [
+                        {"name": "负库存", "current_qty": -5, "min_qty": 10},
+                    ],
+                },
+            )
+        )
         assert result.data["status_counts"]["out"] == 1
 
 
@@ -289,10 +352,15 @@ class TestAbnormalInputHandling:
 
         迁移自: test_execute_missing_required_params + test_prediction_empty_history
         """
-        result = asyncio.run(agent.execute("predict_consumption", {
-            "daily_usage": [10, 12],  # 少于3天
-            "days_ahead": 7,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "predict_consumption",
+                {
+                    "daily_usage": [10, 12],  # 少于3天
+                    "days_ahead": 7,
+                },
+            )
+        )
         assert result.success is False
         assert "3天" in result.error
 
@@ -301,11 +369,16 @@ class TestAbnormalInputHandling:
 
         迁移自: test_confidence_stable_data
         """
-        result = asyncio.run(agent.execute("predict_consumption", {
-            "daily_usage": [10, 12, 11, 13, 10, 14, 12, 11, 13, 10, 12, 11, 13, 14],
-            "days_ahead": 7,
-            "current_stock": 100,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "predict_consumption",
+                {
+                    "daily_usage": [10, 12, 11, 13, 10, 14, 12, 11, 13, 10, 12, 11, 13, 14],
+                    "days_ahead": 7,
+                    "current_stock": 100,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["algorithm"] in ("moving_avg", "weighted_avg", "linear", "seasonal")
         assert result.data["total_predicted"] > 0
@@ -317,18 +390,28 @@ class TestAbnormalInputHandling:
 
         迁移自: test_prediction_single_record
         """
-        result = asyncio.run(agent.execute("optimize_stock_levels", {
-            "daily_usage": [10, 12, 11],
-            "lead_days": 3,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "optimize_stock_levels",
+                {
+                    "daily_usage": [10, 12, 11],
+                    "lead_days": 3,
+                },
+            )
+        )
         assert result.success is False
 
     def test_optimize_stock_levels_correct_hierarchy(self, agent):
         """库存水位三条线的层级关系: safety < min < max"""
-        result = asyncio.run(agent.execute("optimize_stock_levels", {
-            "daily_usage": [10, 12, 11, 13, 10, 14, 12, 11, 13, 10, 12, 11, 13, 14],
-            "lead_days": 3,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "optimize_stock_levels",
+                {
+                    "daily_usage": [10, 12, 11, 13, 10, 14, 12, 11, 13, 10, 12, 11, 13, 14],
+                    "lead_days": 3,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["safety_stock"] > 0
         assert result.data["min_stock"] > result.data["safety_stock"]
@@ -341,8 +424,10 @@ class TestAbnormalInputHandling:
         """
         actions = agent.get_supported_actions()
         expected = [
-            "monitor_inventory", "predict_consumption",
-            "generate_restock_alerts", "check_expiration",
+            "monitor_inventory",
+            "predict_consumption",
+            "generate_restock_alerts",
+            "check_expiration",
             "optimize_stock_levels",
         ]
         for action in expected:
@@ -357,31 +442,50 @@ class TestSupplierManagement:
 
     def test_supplier_grade_a(self, agent):
         """优秀供应商评级为A"""
-        result = asyncio.run(agent.execute("evaluate_supplier", {
-            "on_time_rate": 0.95, "quality_rate": 0.98,
-            "price_stability": 0.9, "avg_response_hours": 4,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "evaluate_supplier",
+                {
+                    "on_time_rate": 0.95,
+                    "quality_rate": 0.98,
+                    "price_stability": 0.9,
+                    "avg_response_hours": 4,
+                },
+            )
+        )
         assert result.data["grade"] == "A"
         assert result.data["total_score"] >= 85
 
     def test_supplier_grade_d(self, agent):
         """差评供应商评级为D"""
-        result = asyncio.run(agent.execute("evaluate_supplier", {
-            "on_time_rate": 0.3, "quality_rate": 0.4,
-            "price_stability": 0.2, "avg_response_hours": 48,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "evaluate_supplier",
+                {
+                    "on_time_rate": 0.3,
+                    "quality_rate": 0.4,
+                    "price_stability": 0.2,
+                    "avg_response_hours": 48,
+                },
+            )
+        )
         assert result.data["grade"] == "D"
         assert result.data["total_score"] < 50
 
     def test_supplier_price_comparison(self, agent):
         """供应商比价"""
-        result = asyncio.run(agent.execute("compare_supplier_prices", {
-            "quotes": [
-                {"supplier": "供应商A", "price_fen": 1000},
-                {"supplier": "供应商B", "price_fen": 800},
-                {"supplier": "供应商C", "price_fen": 1200},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "compare_supplier_prices",
+                {
+                    "quotes": [
+                        {"supplier": "供应商A", "price_fen": 1000},
+                        {"supplier": "供应商B", "price_fen": 800},
+                        {"supplier": "供应商C", "price_fen": 1200},
+                    ],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["cheapest"]["supplier"] == "供应商B"
         assert result.data["potential_saving_pct"] > 0
@@ -412,9 +516,14 @@ class TestInventoryAgentInit:
     def test_agent_runs_without_db(self):
         """无DB连接时Agent应使用params降级而非崩溃"""
         agent = InventoryAlertAgent(tenant_id=TID, store_id="S1", db=None)
-        result = asyncio.run(agent.execute("check_expiration", {
-            "items": [{"name": "牛奶", "remaining_hours": 48}],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "check_expiration",
+                {
+                    "items": [{"name": "牛奶", "remaining_hours": 48}],
+                },
+            )
+        )
         assert result.success is True
 
 
@@ -423,12 +532,17 @@ class TestInventoryHardConstraints:
 
     def test_food_safety_blocks_expired_ingredient_via_run(self, agent):
         """食安约束：过期食材通过Agent.run()时触发食安违规"""
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [
-                {"name": "过期虾", "remaining_hours": 0},
-                {"name": "过期牛肉", "remaining_hours": -12},
-            ],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "过期虾", "remaining_hours": 0},
+                        {"name": "过期牛肉", "remaining_hours": -12},
+                    ],
+                },
+            )
+        )
         assert result.success is True
         food_check = result.constraints_detail.get("food_safety_check")
         if food_check:
@@ -437,12 +551,17 @@ class TestInventoryHardConstraints:
 
     def test_food_safety_passes_for_fresh_ingredients(self, agent):
         """食安约束：新鲜食材应通过校验"""
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [
-                {"name": "新鲜蔬菜", "remaining_hours": 72},
-                {"name": "调味料", "remaining_hours": 2160},
-            ],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "新鲜蔬菜", "remaining_hours": 72},
+                        {"name": "调味料", "remaining_hours": 2160},
+                    ],
+                },
+            )
+        )
         # data中warnings为空，ingredients也为空，所以food_safety_check应为None或passed
         food_check = result.constraints_detail.get("food_safety_check")
         if food_check:
@@ -450,16 +569,26 @@ class TestInventoryHardConstraints:
 
     def test_margin_constraint_not_triggered_by_inventory(self, agent):
         """库存操作不涉及价格/成本，毛利约束应跳过"""
-        result = asyncio.run(agent.run("monitor_inventory", {
-            "items": [{"name": "米", "current_qty": 100, "min_qty": 20}],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "monitor_inventory",
+                {
+                    "items": [{"name": "米", "current_qty": 100, "min_qty": 20}],
+                },
+            )
+        )
         assert result.constraints_detail.get("margin_check") is None
 
     def test_experience_constraint_not_triggered_by_inventory(self, agent):
         """库存操作不涉及出餐时间，出餐时限约束应跳过"""
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [{"name": "米", "remaining_hours": 500}],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [{"name": "米", "remaining_hours": 500}],
+                },
+            )
+        )
         assert result.constraints_detail.get("experience_check") is None
 
 
@@ -468,11 +597,16 @@ class TestInventoryDecisionLog:
 
     def test_restock_alert_has_full_audit_trail(self, agent):
         """补货告警决策必须有完整留痕"""
-        result = asyncio.run(agent.run("generate_restock_alerts", {
-            "items": [
-                {"name": "鲈鱼", "current_qty": 1, "min_qty": 10, "daily_usage": 5},
-            ],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "鲈鱼", "current_qty": 1, "min_qty": 10, "daily_usage": 5},
+                    ],
+                },
+            )
+        )
         assert result.action == "generate_restock_alerts"
         assert len(result.reasoning) > 0
         assert result.execution_ms >= 0
@@ -481,27 +615,42 @@ class TestInventoryDecisionLog:
 
     def test_expiration_check_audit_trail(self, agent):
         """保质期检查决策必须有留痕"""
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [{"name": "牛奶", "remaining_hours": 6}],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [{"name": "牛奶", "remaining_hours": 6}],
+                },
+            )
+        )
         assert result.action == "check_expiration"
         assert 0 <= result.confidence <= 1
         assert result.inference_layer in ("edge", "cloud")
 
     def test_failed_action_also_has_audit_trail(self, agent):
         """失败操作也必须有决策留痕"""
-        result = asyncio.run(agent.run("predict_consumption", {
-            "daily_usage": [],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "predict_consumption",
+                {
+                    "daily_usage": [],
+                },
+            )
+        )
         assert result.success is False
         assert result.execution_ms >= 0
         assert result.constraints_detail is not None
 
     def test_autonomy_level_marked_on_every_result(self, agent):
         """每个结果都应标注自治等级"""
-        result = asyncio.run(agent.run("monitor_inventory", {
-            "items": [{"name": "米", "current_qty": 50, "min_qty": 10}],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "monitor_inventory",
+                {
+                    "items": [{"name": "米", "current_qty": 50, "min_qty": 10}],
+                },
+            )
+        )
         assert result.agent_level in (1, 2, 3)
 
 
@@ -510,19 +659,29 @@ class TestInventoryInputDegradation:
 
     def test_empty_items_for_restock(self, agent):
         """空物料列表补货告警应返回0告警"""
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["alert_count"] == 0
 
     def test_zero_daily_usage_restock(self, agent):
         """日用量为0时不应崩溃"""
-        result = asyncio.run(agent.execute("generate_restock_alerts", {
-            "items": [
-                {"name": "罕见调料", "current_qty": 1, "min_qty": 5, "daily_usage": 0},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "generate_restock_alerts",
+                {
+                    "items": [
+                        {"name": "罕见调料", "current_qty": 1, "min_qty": 5, "daily_usage": 0},
+                    ],
+                },
+            )
+        )
         assert result.success is True
 
     def test_prediction_no_data_at_all(self, agent):
@@ -532,16 +691,26 @@ class TestInventoryInputDegradation:
 
     def test_empty_quotes_compare_prices(self, agent):
         """空报价列表比价应返回失败"""
-        result = asyncio.run(agent.execute("compare_supplier_prices", {
-            "quotes": [],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "compare_supplier_prices",
+                {
+                    "quotes": [],
+                },
+            )
+        )
         assert result.success is False
 
     def test_empty_contracts_scan(self, agent):
         """空合同列表风险扫描应返回0风险"""
-        result = asyncio.run(agent.execute("scan_contract_risks", {
-            "contracts": [],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "scan_contract_risks",
+                {
+                    "contracts": [],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["at_risk"] == 0
 
@@ -551,14 +720,19 @@ class TestWasteAnalysis:
 
     def test_waste_analysis_basic(self, agent):
         """基本损耗分析"""
-        result = asyncio.run(agent.execute("analyze_waste", {
-            "events": [
-                {"cause": "过期", "cost_fen": 5000},
-                {"cause": "过期", "cost_fen": 3000},
-                {"cause": "切割损耗", "cost_fen": 2000},
-                {"cause": "退菜", "cost_fen": 1500},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "analyze_waste",
+                {
+                    "events": [
+                        {"cause": "过期", "cost_fen": 5000},
+                        {"cause": "过期", "cost_fen": 3000},
+                        {"cause": "切割损耗", "cost_fen": 2000},
+                        {"cause": "退菜", "cost_fen": 1500},
+                    ],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["total_waste_yuan"] == 115.0
         assert result.data["event_count"] == 4
@@ -566,36 +740,51 @@ class TestWasteAnalysis:
 
     def test_waste_analysis_empty_events(self, agent):
         """无损耗事件"""
-        result = asyncio.run(agent.execute("analyze_waste", {
-            "events": [],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "analyze_waste",
+                {
+                    "events": [],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["total_waste_yuan"] == 0
 
     def test_shortage_severity_critical(self, agent):
         """主食材严重缺货应评为critical"""
-        result = asyncio.run(agent.execute("assess_shortage_severity", {
-            "ingredient_name": "鲈鱼",
-            "current_qty": 1,
-            "safety_stock": 20,
-            "daily_usage": 15,
-            "ingredient_type": "main_ingredient",
-            "has_substitute": False,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "assess_shortage_severity",
+                {
+                    "ingredient_name": "鲈鱼",
+                    "current_qty": 1,
+                    "safety_stock": 20,
+                    "daily_usage": 15,
+                    "ingredient_type": "main_ingredient",
+                    "has_substitute": False,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["severity_level"] in ("critical", "high")
         assert len(result.data["recommended_actions"]) > 0
 
     def test_shortage_severity_low_for_garnish(self, agent):
         """配菜轻微缺货评为low"""
-        result = asyncio.run(agent.execute("assess_shortage_severity", {
-            "ingredient_name": "香菜",
-            "current_qty": 8,
-            "safety_stock": 10,
-            "daily_usage": 2,
-            "ingredient_type": "garnish",
-            "has_substitute": True,
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "assess_shortage_severity",
+                {
+                    "ingredient_name": "香菜",
+                    "current_qty": 8,
+                    "safety_stock": 10,
+                    "daily_usage": 2,
+                    "ingredient_type": "garnish",
+                    "has_substitute": True,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["severity_level"] in ("low", "medium")
 
@@ -605,30 +794,45 @@ class TestContractRiskManagement:
 
     def test_expired_contract_flagged(self, agent):
         """已过期合同应标记风险"""
-        result = asyncio.run(agent.execute("scan_contract_risks", {
-            "contracts": [
-                {"supplier": "供应商A", "remaining_days": -10},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "scan_contract_risks",
+                {
+                    "contracts": [
+                        {"supplier": "供应商A", "remaining_days": -10},
+                    ],
+                },
+            )
+        )
         assert result.data["at_risk"] >= 1
         assert any(r["risk"] == "expired" for r in result.data["risks"])
 
     def test_expiring_soon_contract(self, agent):
         """即将到期合同应标记风险"""
-        result = asyncio.run(agent.execute("scan_contract_risks", {
-            "contracts": [
-                {"supplier": "供应商B", "remaining_days": 15},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "scan_contract_risks",
+                {
+                    "contracts": [
+                        {"supplier": "供应商B", "remaining_days": 15},
+                    ],
+                },
+            )
+        )
         assert any(r["risk"] == "expiring" for r in result.data["risks"])
 
     def test_single_source_risk(self, agent):
         """单一来源供应商应标记风险"""
-        result = asyncio.run(agent.execute("scan_contract_risks", {
-            "contracts": [
-                {"supplier": "独家供应商", "remaining_days": 365, "single_source": True},
-            ],
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "scan_contract_risks",
+                {
+                    "contracts": [
+                        {"supplier": "独家供应商", "remaining_days": 365, "single_source": True},
+                    ],
+                },
+            )
+        )
         assert any(r["risk"] == "single_source" for r in result.data["risks"])
 
 
@@ -637,8 +841,7 @@ class TestInventoryActionConfig:
 
     def test_high_risk_actions_require_human_confirm(self, agent):
         """高风险操作应要求人工确认"""
-        confirm_actions = ["monitor_inventory", "generate_restock_alerts",
-                           "urgent_reorder_notify", "check_expiration"]
+        confirm_actions = ["monitor_inventory", "generate_restock_alerts", "urgent_reorder_notify", "check_expiration"]
         for action in confirm_actions:
             config = agent.get_action_config(action)
             assert config.requires_human_confirm is True, f"{action} 应要求人工确认"

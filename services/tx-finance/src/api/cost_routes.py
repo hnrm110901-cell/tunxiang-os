@@ -9,6 +9,7 @@
   GET  /costs/summary?store_id=&date=   - 日成本汇总
   POST /costs/recompute?store_id=&date= - 触发批量重算
 """
+
 import uuid
 from datetime import date
 
@@ -26,6 +27,7 @@ _engine = CostEngine()
 
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     """从 X-Tenant-ID header 提取 tenant_id 并返回带 RLS 的 DB session"""
@@ -50,6 +52,7 @@ def _parse_date_param(d: str) -> date:
 
 
 # ─── GET /costs/order/{order_id} ─────────────────────────────────────────────
+
 
 @router.get("/order/{order_id}", summary="单订单成本明细")
 async def get_order_cost(
@@ -89,6 +92,7 @@ async def get_order_cost(
 
 
 # ─── GET /costs/summary ───────────────────────────────────────────────────────
+
 
 @router.get("/summary", summary="日成本汇总")
 async def get_cost_summary(
@@ -151,6 +155,7 @@ async def get_cost_summary(
 
 
 # ─── POST /costs/recompute ───────────────────────────────────────────────────
+
 
 @router.post("/recompute", summary="触发批量重算")
 async def recompute_costs(

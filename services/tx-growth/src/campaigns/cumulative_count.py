@@ -2,6 +2,7 @@
 
 典型场景: 累计消费5次送菜品兑换券
 """
+
 from typing import Any
 
 import structlog

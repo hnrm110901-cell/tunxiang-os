@@ -4,6 +4,7 @@ ROUTER REGISTRATION (在 tx-trade/src/main.py 中添加):
     from .api.delivery_ops_routes import router as delivery_ops_router
     app.include_router(delivery_ops_router)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -129,9 +130,7 @@ async def get_all_configs(
     tenant_id = _get_tenant_id(request)
     svc = DeliveryOpsService()
     try:
-        configs = await svc.get_all_store_configs(
-            store_id=store_id, tenant_id=tenant_id, db=db
-        )
+        configs = await svc.get_all_store_configs(store_id=store_id, tenant_id=tenant_id, db=db)
         await db.commit()
         return {
             "ok": True,
@@ -157,9 +156,7 @@ async def get_config(
     tenant_id = _get_tenant_id(request)
     svc = DeliveryOpsService()
     try:
-        config = await svc.get_store_config(
-            store_id=store_id, platform=platform, tenant_id=tenant_id, db=db
-        )
+        config = await svc.get_store_config(store_id=store_id, platform=platform, tenant_id=tenant_id, db=db)
         await db.commit()
         return {"ok": True, "data": config.model_dump(mode="json"), "error": None}
     except DeliveryOpsError as exc:
@@ -248,9 +245,7 @@ async def disable_busy_mode(
     tenant_id = _get_tenant_id(request)
     svc = DeliveryOpsService()
     try:
-        config = await svc.disable_busy_mode(
-            store_id=store_id, platform=platform, tenant_id=tenant_id, db=db
-        )
+        config = await svc.disable_busy_mode(store_id=store_id, platform=platform, tenant_id=tenant_id, db=db)
         await db.commit()
         return {"ok": True, "data": config.model_dump(mode="json"), "error": None}
     except ConfigNotFoundError as exc:
@@ -272,20 +267,14 @@ async def get_busy_mode_status(
     tenant_id = _get_tenant_id(request)
     svc = DeliveryOpsService()
     try:
-        configs = await svc.get_all_store_configs(
-            store_id=store_id, tenant_id=tenant_id, db=db
-        )
+        configs = await svc.get_all_store_configs(store_id=store_id, tenant_id=tenant_id, db=db)
         await db.commit()
         status_list = [
             {
                 "platform": c.platform,
                 "busy_mode": c.busy_mode,
                 "current_prep_time_min": c.current_prep_time_min,
-                "busy_mode_auto_off_at": (
-                    c.busy_mode_auto_off_at.isoformat()
-                    if c.busy_mode_auto_off_at
-                    else None
-                ),
+                "busy_mode_auto_off_at": (c.busy_mode_auto_off_at.isoformat() if c.busy_mode_auto_off_at else None),
             }
             for c in configs
         ]
@@ -382,9 +371,7 @@ async def get_alert_count(
     tenant_id = _get_tenant_id(request)
     svc = DeliveryOpsService()
     try:
-        count = await svc.get_unhandled_alert_count(
-            store_id=store_id, tenant_id=tenant_id, db=db
-        )
+        count = await svc.get_unhandled_alert_count(store_id=store_id, tenant_id=tenant_id, db=db)
         return {"ok": True, "data": {"count": count}, "error": None}
     except DeliveryOpsError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -412,9 +399,7 @@ async def get_health_dashboard(
     tenant_id = _get_tenant_id(request)
     svc = DeliveryOpsService()
     try:
-        dashboard = await svc.get_health_dashboard(
-            store_id=store_id, tenant_id=tenant_id, db=db
-        )
+        dashboard = await svc.get_health_dashboard(store_id=store_id, tenant_id=tenant_id, db=db)
         return {"ok": True, "data": dashboard.model_dump(mode="json"), "error": None}
     except DeliveryOpsError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -453,10 +438,14 @@ async def get_health_trend(
             serialized.append(
                 {
                     k: (
-                        v.isoformat() if hasattr(v, "isoformat") else
-                        float(v) if hasattr(v, "__float__") and not isinstance(v, (int, bool)) else
-                        str(v) if hasattr(v, "hex") else  # UUID
-                        v
+                        v.isoformat()
+                        if hasattr(v, "isoformat")
+                        else float(v)
+                        if hasattr(v, "__float__") and not isinstance(v, (int, bool))
+                        else str(v)
+                        if hasattr(v, "hex")
+                        # UUID
+                        else v
                     )
                     for k, v in row.items()
                 }

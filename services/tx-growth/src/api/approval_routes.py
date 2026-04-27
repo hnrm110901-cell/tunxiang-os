@@ -12,6 +12,7 @@
   POST /api/v1/growth/approvals/workflows          创建审批流模板
   POST /api/v1/growth/approvals/workflows/seed     插入内置默认模板（租户初始化用）
 """
+
 import uuid
 from typing import Any, Optional
 
@@ -62,6 +63,21 @@ class RejectRequest(BaseModel):
         if not v.strip():
             raise ValueError("拒绝原因不能为空")
         return v.strip()
+
+
+class BatchApproveRequest(BaseModel):
+    request_ids: list[uuid.UUID]
+    approver_id: uuid.UUID
+    comment: Optional[str] = None
+
+    @field_validator("request_ids")
+    @classmethod
+    def validate_request_ids(cls, v: list) -> list:
+        if not v:
+            raise ValueError("审批单 ID 列表不能为空")
+        if len(v) > 50:
+            raise ValueError("单次批量审批不能超过 50 条")
+        return v
 
 
 class CancelRequest(BaseModel):
@@ -123,21 +139,23 @@ async def list_workflows(
     result = await db.execute(stmt)
     workflows = result.scalars().all()
 
-    return ok_response({
-        "items": [
-            {
-                "workflow_id": str(wf.id),
-                "name": wf.name,
-                "trigger_conditions": wf.trigger_conditions,
-                "steps": wf.steps,
-                "is_active": wf.is_active,
-                "priority": wf.priority,
-                "created_at": wf.created_at.isoformat() if wf.created_at else None,
-            }
-            for wf in workflows
-        ],
-        "total": len(workflows),
-    })
+    return ok_response(
+        {
+            "items": [
+                {
+                    "workflow_id": str(wf.id),
+                    "name": wf.name,
+                    "trigger_conditions": wf.trigger_conditions,
+                    "steps": wf.steps,
+                    "is_active": wf.is_active,
+                    "priority": wf.priority,
+                    "created_at": wf.created_at.isoformat() if wf.created_at else None,
+                }
+                for wf in workflows
+            ],
+            "total": len(workflows),
+        }
+    )
 
 
 @router.post("/workflows")
@@ -168,12 +186,14 @@ async def create_workflow(
         name=wf.name,
         tenant_id=x_tenant_id,
     )
-    return ok_response({
-        "workflow_id": str(wf.id),
-        "name": wf.name,
-        "is_active": wf.is_active,
-        "priority": wf.priority,
-    })
+    return ok_response(
+        {
+            "workflow_id": str(wf.id),
+            "name": wf.name,
+            "is_active": wf.is_active,
+            "priority": wf.priority,
+        }
+    )
 
 
 @router.post("/workflows/seed")
@@ -223,11 +243,43 @@ async def list_pending_approvals(
     result = await db.execute(stmt)
     requests = result.scalars().all()
 
-    return ok_response({
-        "items": [_serialize_request(r) for r in requests],
-        "page": page,
-        "size": size,
-    })
+    return ok_response(
+        {
+            "items": [_serialize_request(r) for r in requests],
+            "page": page,
+            "size": size,
+        }
+    )
+
+
+@router.post("/batch-approve")
+async def batch_approve_requests(
+    req: BatchApproveRequest,
+    request: Request,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """批量审批通过（最多 50 条）"""
+    tenant_id = uuid.UUID(x_tenant_id)
+    db = request.state.db
+
+    result = await _svc.batch_approve(
+        request_ids=req.request_ids,
+        approver_id=req.approver_id,
+        comment=req.comment,
+        tenant_id=tenant_id,
+        db=db,
+    )
+    await db.commit()
+
+    log.info(
+        "approval.batch_approved_via_api",
+        total=result["total"],
+        succeeded=result["succeeded"],
+        failed=result["failed"],
+        approver_id=str(req.approver_id),
+        tenant_id=x_tenant_id,
+    )
+    return ok_response(result)
 
 
 @router.get("/my-requests")
@@ -261,11 +313,13 @@ async def list_my_requests(
     result = await db.execute(stmt)
     requests = result.scalars().all()
 
-    return ok_response({
-        "items": [_serialize_request(r) for r in requests],
-        "page": page,
-        "size": size,
-    })
+    return ok_response(
+        {
+            "items": [_serialize_request(r) for r in requests],
+            "page": page,
+            "size": size,
+        }
+    )
 
 
 @router.get("/{request_id}")

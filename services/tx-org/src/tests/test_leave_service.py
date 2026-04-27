@@ -176,14 +176,14 @@ class TestCountLeaveWorkDays:
     def test_weekday_range(self):
         """周一到周五，5个工作日"""
         start = datetime(2026, 3, 23, 9, 0)  # 周一
-        end = datetime(2026, 3, 28, 9, 0)    # 周六（不含）
+        end = datetime(2026, 3, 28, 9, 0)  # 周六（不含）
         result = count_leave_work_days(start, end)
         assert result == 5.0
 
     def test_with_weekend(self):
         """跨周末，周六日不计入"""
         start = datetime(2026, 3, 23, 9, 0)  # 周一
-        end = datetime(2026, 3, 30, 9, 0)    # 下周一（不含）
+        end = datetime(2026, 3, 30, 9, 0)  # 下周一（不含）
         result = count_leave_work_days(start, end)
         assert result >= 5.0  # 含或不含周末取决于行业
 

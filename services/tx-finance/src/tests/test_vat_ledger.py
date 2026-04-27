@@ -2,15 +2,14 @@
 
 8 个测试用例，覆盖销项/进项台账、月度汇总、抵扣状态、科目映射、诺诺 POC。
 """
+
 import uuid
-from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
-
 from api.vat_ledger_routes import router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 # ── 测试 App ──────────────────────────────────────────────────────────────────
 
@@ -52,6 +51,7 @@ def _mock_rows(rows: list[dict]):
 
 # ── 1. test_create_output_record ──────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_create_output_record():
     """POST /output 新增销项税记录应返回 201 和新记录 id。"""
@@ -84,6 +84,7 @@ async def test_create_output_record():
 
 # ── 2. test_create_input_record ───────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_create_input_record():
     """POST /input 新增进项税记录应返回 201 和新记录 id。"""
@@ -115,6 +116,7 @@ async def test_create_input_record():
 
 
 # ── 3. test_monthly_summary_calculation ──────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_monthly_summary_calculation():
@@ -165,6 +167,7 @@ async def test_monthly_summary_calculation():
 
 # ── 4. test_monthly_summary_all_integers ──────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_monthly_summary_all_integers():
     """所有金额字段必须是整数（无浮点）。"""
@@ -209,6 +212,7 @@ async def test_monthly_summary_all_integers():
 
 # ── 5. test_deduct_input_record ───────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_deduct_input_record():
     """PUT /input/{id}/deduct 标记抵扣，应返回 deduction_status=deducted。"""
@@ -237,6 +241,7 @@ async def test_deduct_input_record():
 
 # ── 6. test_pl_account_update ─────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_pl_account_update():
     """PUT /pl-accounts/{tax_code} 更新科目映射，应返回 tax_code 和 pl_account_code。"""
@@ -264,6 +269,7 @@ async def test_pl_account_update():
 
 # ── 7. test_nuonuo_poc_returns_mock_id ────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_nuonuo_poc_returns_mock_id():
     """POST /nuonuo/sync-poc 应返回 MOCK_ 前缀的流水号和 mock=True 标记。"""
@@ -289,6 +295,7 @@ async def test_nuonuo_poc_returns_mock_id():
 
 
 # ── 8. test_output_list_by_period ─────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_output_list_by_period():
@@ -332,6 +339,7 @@ async def test_output_list_by_period():
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
+
 
 async def _async_gen(value):
     """将普通值包装为异步生成器，用于 mock get_db_with_tenant。"""

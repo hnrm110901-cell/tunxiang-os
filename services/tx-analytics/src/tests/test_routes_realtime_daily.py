@@ -13,15 +13,14 @@
     GET  /api/v1/analytics/daily-reports/{date}
     POST /api/v1/analytics/daily-reports/generate
 """
+
 import sys
 import types
-from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, AsyncContextManager
-from contextlib import asynccontextmanager
-
-import pytest
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 # ─── Mock shared.ontology 数据库模块 ───
+
 
 def _build_mapping_result(rows):
     """构造模拟 mappings().all() / mappings().one() / scalar() 返回"""
@@ -82,11 +81,10 @@ _svc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _svc_root not in sys.path:
     sys.path.insert(0, _svc_root)
 
+import api.daily_report_routes as _daily_mod
+import api.realtime_routes as _realtime_mod
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-import api.realtime_routes as _realtime_mod
-import api.daily_report_routes as _daily_mod
 
 _app_rt = FastAPI()
 _app_rt.include_router(_realtime_mod.router)
@@ -119,25 +117,25 @@ def _configure_session_for_realtime_today():
     # set_config call, summary, new_members, top_dishes
     _fake_session.execute.side_effect = [
         _build_mapping_result([]),  # set_config
-        summary_result,             # main summary
-        new_members_result,         # new members scalar
-        top_dishes_result,          # top dishes
+        summary_result,  # main summary
+        new_members_result,  # new members scalar
+        top_dishes_result,  # top dishes
     ]
 
 
 def _configure_session_for_hourly():
     rows = [{"hour": 11, "revenue_fen": 20000, "order_count": 10}]
     _fake_session.execute.side_effect = [
-        _build_mapping_result([]),   # set_config
-        _build_mapping_result(rows), # hourly trend rows
+        _build_mapping_result([]),  # set_config
+        _build_mapping_result(rows),  # hourly trend rows
     ]
 
 
 def _configure_session_for_store_comparison():
     rows = [{"store_name": "旗舰店", "revenue_fen": 80000, "order_count": 40}]
     _fake_session.execute.side_effect = [
-        _build_mapping_result([]),   # set_config
-        _build_mapping_result(rows), # stores
+        _build_mapping_result([]),  # set_config
+        _build_mapping_result(rows),  # stores
     ]
 
 
@@ -152,37 +150,42 @@ def _configure_session_for_alerts():
         }
     ]
     _fake_session.execute.side_effect = [
-        _build_mapping_result([]),   # set_config
-        _build_mapping_result(rows), # alerts
+        _build_mapping_result([]),  # set_config
+        _build_mapping_result(rows),  # alerts
     ]
 
 
 def _configure_session_for_daily_list():
     """list_daily_reports - 每次 _query_daily_report 做 4 次 execute"""
+
     def _make_daily_row():
-        core = _build_mapping_result([{
-            "order_count": 30,
-            "revenue_fen": 60000,
-            "store_count": 2,
-        }])
+        core = _build_mapping_result(
+            [
+                {
+                    "order_count": 30,
+                    "revenue_fen": 60000,
+                    "store_count": 2,
+                }
+            ]
+        )
         pay = _build_mapping_result([{"method": "wechat", "amount_fen": 60000}])
         channel = _build_mapping_result([{"channel": "dine_in", "amount_fen": 60000}])
-        mem = MagicMock(); mem.scalar.return_value = 5
+        mem = MagicMock()
+        mem.scalar.return_value = 5
         return [_build_mapping_result([]), core, pay, channel, mem]
 
     # set_config + one day × 4
-    _fake_session.execute.side_effect = (
-        [_build_mapping_result([])] + _make_daily_row()
-    )
+    _fake_session.execute.side_effect = [_build_mapping_result([])] + _make_daily_row()
 
 
 def _configure_session_for_daily_summary():
     summary_row = {"total_orders": 150, "total_revenue_fen": 300000}
-    mem = MagicMock(); mem.scalar.return_value = 20
+    mem = MagicMock()
+    mem.scalar.return_value = 20
     _fake_session.execute.side_effect = [
-        _build_mapping_result([]),         # set_config
+        _build_mapping_result([]),  # set_config
         _build_mapping_result([summary_row]),  # summary
-        mem,                               # new_members scalar
+        mem,  # new_members scalar
     ]
 
 
@@ -191,15 +194,15 @@ def _configure_session_for_daily_get():
     core = _build_mapping_result([{"order_count": 20, "revenue_fen": 40000, "store_count": 1}])
     pay = _build_mapping_result([{"method": "alipay", "amount_fen": 40000}])
     channel = _build_mapping_result([{"channel": "takeaway", "amount_fen": 40000}])
-    mem = MagicMock(); mem.scalar.return_value = 2
-    _fake_session.execute.side_effect = [
-        _build_mapping_result([]), core, pay, channel, mem
-    ]
+    mem = MagicMock()
+    mem.scalar.return_value = 2
+    _fake_session.execute.side_effect = [_build_mapping_result([]), core, pay, channel, mem]
 
 
 # ═══════════════════════════════════════════════
 # realtime_routes 测试
 # ═══════════════════════════════════════════════
+
 
 class TestRealtimeToday:
     def setup_method(self):
@@ -227,6 +230,7 @@ class TestRealtimeToday:
     def test_today_db_error_graceful(self):
         """DB 抛异常时容错返回空结构"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("connection failed")
         resp = _client_rt.get("/api/v1/analytics/realtime/today", headers=HEADERS)
         assert resp.status_code == 200
@@ -257,6 +261,7 @@ class TestRealtimeHourlyTrend:
     def test_hourly_trend_db_error_graceful(self):
         """DB 错误容错"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("timeout")
         resp = _client_rt.get("/api/v1/analytics/realtime/hourly-trend", headers=HEADERS)
         assert resp.status_code == 200
@@ -279,6 +284,7 @@ class TestRealtimeStoreComparison:
     def test_store_comparison_db_error(self):
         """容错测试"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("err")
         resp = _client_rt.get("/api/v1/analytics/realtime/store-comparison", headers=HEADERS)
         assert resp.status_code == 200
@@ -301,6 +307,7 @@ class TestRealtimeAlerts:
     def test_alerts_db_error(self):
         """alerts 表不存在时容错"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("table not found")
         resp = _client_rt.get("/api/v1/analytics/realtime/alerts", headers=HEADERS)
         assert resp.status_code == 200
@@ -310,6 +317,7 @@ class TestRealtimeAlerts:
 # ═══════════════════════════════════════════════
 # daily_report_routes 测试
 # ═══════════════════════════════════════════════
+
 
 class TestDailyReportList:
     def setup_method(self):
@@ -335,6 +343,7 @@ class TestDailyReportList:
     def test_list_db_error_graceful(self):
         """DB 错误容错"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("db error")
         resp = _client_dr.get("/api/v1/analytics/daily-reports", headers=HEADERS)
         assert resp.status_code == 200
@@ -372,6 +381,7 @@ class TestDailyReportSummary:
     def test_summary_db_error(self):
         """汇总 DB 错误容错"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("timeout")
         resp = _client_dr.get(
             "/api/v1/analytics/daily-reports/summary",
@@ -408,6 +418,7 @@ class TestDailyReportGet:
     def test_get_db_error_graceful(self):
         """单日报表 DB 错误容错"""
         from sqlalchemy.exc import SQLAlchemyError
+
         _fake_session.execute.side_effect = SQLAlchemyError("err")
         resp = _client_dr.get(
             "/api/v1/analytics/daily-reports/2026-04-05",

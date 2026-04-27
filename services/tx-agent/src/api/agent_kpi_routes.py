@@ -11,6 +11,7 @@
   GET    /api/v1/agent-kpi/dashboard                  — KPI总览仪表盘
   GET    /api/v1/agent-kpi/roi-report                 — ROI报告
 """
+
 from __future__ import annotations
 
 import uuid
@@ -202,6 +203,7 @@ AGENT_NAMES: dict[str, str] = {
 
 # ── Pydantic V2 模型 ──────────────────────────────────────────────────────────
 
+
 class KpiConfigCreate(BaseModel):
     agent_id: str = Field(..., max_length=64)
     kpi_type: str = Field(..., max_length=64)
@@ -226,6 +228,7 @@ class KpiSnapshotCollectRequest(BaseModel):
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
+
 def _achievement_rate(measured: float, target: float, direction: str) -> float:
     """计算达成率（0-1）。"""
     if target == 0:
@@ -247,6 +250,7 @@ def _achievement_color(rate: float) -> str:
 
 
 # ── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/configs")
 async def get_kpi_configs(
@@ -422,20 +426,23 @@ async def create_kpi_config(
         )
         raise HTTPException(status_code=500, detail="KPI配置写入失败，请稍后重试") from exc
 
-    return {"ok": True, "data": {
-        "id": config_id,
-        "tenant_id": x_tenant_id,
-        "agent_id": body.agent_id,
-        "agent_name": AGENT_NAMES.get(body.agent_id, body.agent_id),
-        "kpi_type": body.kpi_type,
-        "target_value": body.target_value,
-        "unit": body.unit,
-        "alert_threshold": body.alert_threshold,
-        "is_active": body.is_active,
-        "source": "custom",
-        "created_at": now.isoformat(),
-        "updated_at": now.isoformat(),
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "id": config_id,
+            "tenant_id": x_tenant_id,
+            "agent_id": body.agent_id,
+            "agent_name": AGENT_NAMES.get(body.agent_id, body.agent_id),
+            "kpi_type": body.kpi_type,
+            "target_value": body.target_value,
+            "unit": body.unit,
+            "alert_threshold": body.alert_threshold,
+            "is_active": body.is_active,
+            "source": "custom",
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        },
+    }
 
 
 @router.put("/configs/{config_id}")
@@ -489,20 +496,23 @@ async def update_kpi_config(
     if row is None:
         raise HTTPException(status_code=404, detail=f"KPI配置不存在或无权访问: {config_id}")
 
-    return {"ok": True, "data": {
-        "id": row["id"],
-        "tenant_id": x_tenant_id,
-        "agent_id": row["agent_id"],
-        "agent_name": AGENT_NAMES.get(row["agent_id"], row["agent_id"]),
-        "kpi_type": row["kpi_type"],
-        "target_value": row["target_value"],
-        "unit": row["unit"],
-        "alert_threshold": row["alert_threshold"],
-        "is_active": row["is_active"],
-        "source": "custom",
-        "updated_at": row["updated_at"].isoformat() if row["updated_at"] else now.isoformat(),
-        "updated_fields": list(updates.keys()),
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "id": row["id"],
+            "tenant_id": x_tenant_id,
+            "agent_id": row["agent_id"],
+            "agent_name": AGENT_NAMES.get(row["agent_id"], row["agent_id"]),
+            "kpi_type": row["kpi_type"],
+            "target_value": row["target_value"],
+            "unit": row["unit"],
+            "alert_threshold": row["alert_threshold"],
+            "is_active": row["is_active"],
+            "source": "custom",
+            "updated_at": row["updated_at"].isoformat() if row["updated_at"] else now.isoformat(),
+            "updated_fields": list(updates.keys()),
+        },
+    }
 
 
 @router.get("/snapshots")
@@ -578,26 +588,28 @@ async def get_kpi_snapshots(
                 }
 
         for r in rows.mappings().all():
-            meta = _kpi_meta.get((r["agent_id"], r["kpi_type"]), {
-                "label": r["kpi_type"], "unit": "", "direction": "higher_better"
-            })
-            snapshots.append({
-                "id": r["id"],
-                "tenant_id": x_tenant_id,
-                "agent_id": r["agent_id"],
-                "agent_name": AGENT_NAMES.get(r["agent_id"], r["agent_id"]),
-                "kpi_type": r["kpi_type"],
-                "label": meta["label"],
-                "measured_value": r["measured_value"],
-                "target_value": r["target_value"],
-                "achievement_rate": r["achievement_rate"],
-                "unit": meta["unit"],
-                "direction": meta["direction"],
-                "store_id": r["store_id"],
-                "snapshot_date": r["snapshot_date"],
-                "color": _achievement_color(r["achievement_rate"]),
-                "metadata": r["metadata"],
-            })
+            meta = _kpi_meta.get(
+                (r["agent_id"], r["kpi_type"]), {"label": r["kpi_type"], "unit": "", "direction": "higher_better"}
+            )
+            snapshots.append(
+                {
+                    "id": r["id"],
+                    "tenant_id": x_tenant_id,
+                    "agent_id": r["agent_id"],
+                    "agent_name": AGENT_NAMES.get(r["agent_id"], r["agent_id"]),
+                    "kpi_type": r["kpi_type"],
+                    "label": meta["label"],
+                    "measured_value": r["measured_value"],
+                    "target_value": r["target_value"],
+                    "achievement_rate": r["achievement_rate"],
+                    "unit": meta["unit"],
+                    "direction": meta["direction"],
+                    "store_id": r["store_id"],
+                    "snapshot_date": r["snapshot_date"],
+                    "color": _achievement_color(r["achievement_rate"]),
+                    "metadata": r["metadata"],
+                }
+            )
     except SQLAlchemyError as exc:
         logger.warning(
             "agent_kpi.get_snapshots.db_error",
@@ -606,14 +618,17 @@ async def get_kpi_snapshots(
             exc_info=True,
         )
 
-    return {"ok": True, "data": {
-        "items": snapshots,
-        "total": total,
-        "page": page,
-        "size": size,
-        "date_from": date_from.isoformat(),
-        "date_to": date_to.isoformat(),
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "items": snapshots,
+            "total": total,
+            "page": page,
+            "size": size,
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+        },
+    }
 
 
 @router.post("/snapshots/collect")
@@ -633,8 +648,7 @@ async def collect_kpi_snapshots(
     store_id_val = body.store_id  # 可为 None
 
     agents_to_collect = (
-        [body.agent_id] if body.agent_id and body.agent_id in AGENT_KPI_DEFAULTS
-        else list(AGENT_KPI_DEFAULTS.keys())
+        [body.agent_id] if body.agent_id and body.agent_id in AGENT_KPI_DEFAULTS else list(AGENT_KPI_DEFAULTS.keys())
     )
 
     # ── 采集真实业务指标（部分 KPI 已接入 DB，其余估算） ──────────────────────
@@ -647,7 +661,8 @@ async def collect_kpi_snapshots(
     discount_exc_rate: float | None = None
     gross_margin_protect: float | None = None
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (
                     WHERE total_amount_fen > 0
@@ -658,7 +673,9 @@ async def collect_kpi_snapshots(
             WHERE tenant_id = :tid::uuid
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
               AND status = 'completed'
-        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        """),
+            {"tid": x_tenant_id, "d": target_date.isoformat()},
+        )
         row = r.mappings().fetchone()
         total = row["total_count"] or 0
         if total > 0:
@@ -670,7 +687,8 @@ async def collect_kpi_snapshots(
     # 2. member_insight — 复购率来源: orders (含 member_id 的去重客户)
     member_repurchase: float | None = None
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             WITH period AS (
                 SELECT member_id, COUNT(*) AS order_count
                 FROM orders
@@ -685,11 +703,13 @@ async def collect_kpi_snapshots(
                 COUNT(*) FILTER (WHERE order_count >= 2)::float AS repurchase_count,
                 COUNT(*)::float                                  AS total_members
             FROM period
-        """), {
-            "tid": x_tenant_id,
-            "d_start": (target_date - timedelta(days=29)).isoformat(),
-            "d_end": (target_date + timedelta(days=1)).isoformat(),
-        })
+        """),
+            {
+                "tid": x_tenant_id,
+                "d_start": (target_date - timedelta(days=29)).isoformat(),
+                "d_end": (target_date + timedelta(days=1)).isoformat(),
+            },
+        )
         row = r.mappings().fetchone()
         total_m = row["total_members"] or 0
         if total_m > 0:
@@ -700,13 +720,16 @@ async def collect_kpi_snapshots(
     # 3. store_inspect — 合规评分来源: compliance_alerts
     compliance_score: float | None = None
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT COUNT(*)::int AS open_alerts
             FROM compliance_alerts
             WHERE tenant_id = :tid::uuid
               AND status    = 'open'
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') <= :d
-        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        """),
+            {"tid": x_tenant_id, "d": target_date.isoformat()},
+        )
         open_alerts = r.scalar() or 0
         # 每个未处理预警扣5分，最低0分
         compliance_score = max(0.0, round(100 - open_alerts * 5, 2))
@@ -717,7 +740,8 @@ async def collect_kpi_snapshots(
     smart_dispatch_avg: float | None = None
     smart_dispatch_ontime: float | None = None
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 AVG(EXTRACT(EPOCH FROM (served_at - called_at)))::float AS avg_seconds,
                 COUNT(*) FILTER (WHERE promised_at IS NOT NULL AND served_at <= promised_at)::float
@@ -729,7 +753,9 @@ async def collect_kpi_snapshots(
               AND served_at IS NOT NULL
               AND called_at IS NOT NULL
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
-        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        """),
+            {"tid": x_tenant_id, "d": target_date.isoformat()},
+        )
         row = r.mappings().fetchone()
         if row and row["avg_seconds"] is not None:
             smart_dispatch_avg = round(float(row["avg_seconds"]), 1)
@@ -740,7 +766,8 @@ async def collect_kpi_snapshots(
     # 5. store_patrol — patrol_response_time 来源: compliance_alerts
     patrol_response: float | None = None
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60)::float AS avg_response_minutes
             FROM compliance_alerts
@@ -748,7 +775,9 @@ async def collect_kpi_snapshots(
               AND status = 'resolved'
               AND resolved_at IS NOT NULL
               AND DATE(resolved_at AT TIME ZONE 'Asia/Shanghai') = :d
-        """), {"tid": x_tenant_id, "d": target_date.isoformat()})
+        """),
+            {"tid": x_tenant_id, "d": target_date.isoformat()},
+        )
         row = r.mappings().fetchone()
         if row and row["avg_response_minutes"] is not None:
             patrol_response = round(float(row["avg_response_minutes"]), 1)
@@ -758,14 +787,17 @@ async def collect_kpi_snapshots(
     # 6. inventory_alert — stockout_rate 来源: dishes
     stockout_rate: float | None = None
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (WHERE is_available = false)::float
                   / GREATEST(COUNT(*), 1)::float * 100 AS stockout_rate_pct
             FROM dishes
             WHERE tenant_id = :tid::uuid
               AND is_deleted = false
-        """), {"tid": x_tenant_id})
+        """),
+            {"tid": x_tenant_id},
+        )
         row = r.mappings().fetchone()
         if row and row["stockout_rate_pct"] is not None:
             stockout_rate = round(float(row["stockout_rate_pct"]), 2)
@@ -806,18 +838,20 @@ async def collect_kpi_snapshots(
             else:
                 measured = round(target * 1.02, 2)
             rate = _achievement_rate(measured, target, direction)
-            rows_to_insert.append({
-                "id": str(uuid.uuid4()),
-                "tenant_id": x_tenant_id,
-                "agent_id": aid,
-                "kpi_type": kpi["kpi_type"],
-                "measured_value": measured,
-                "target_value": target,
-                "achievement_rate": rate,
-                "store_id": store_id_val,
-                "snapshot_date": target_date,
-                "metadata": '{"source": "real_db"}' if key in real_values else None,
-            })
+            rows_to_insert.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "tenant_id": x_tenant_id,
+                    "agent_id": aid,
+                    "kpi_type": kpi["kpi_type"],
+                    "measured_value": measured,
+                    "target_value": target,
+                    "achievement_rate": rate,
+                    "store_id": store_id_val,
+                    "snapshot_date": target_date,
+                    "metadata": '{"source": "real_db"}' if key in real_values else None,
+                }
+            )
 
     # ── 批量写入（ON CONFLICT 跳过重复） ──
     inserted_count = 0
@@ -879,12 +913,15 @@ async def collect_kpi_snapshots(
         for r in rows_to_insert
     ]
 
-    return {"ok": True, "data": {
-        "snapshot_date": target_date.isoformat(),
-        "inserted_count": inserted_count,
-        "skipped_count": skipped_count,
-        "snapshots": collected,
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "snapshot_date": target_date.isoformat(),
+            "inserted_count": inserted_count,
+            "skipped_count": skipped_count,
+            "snapshots": collected,
+        },
+    }
 
 
 @router.get("/dashboard")
@@ -919,44 +956,51 @@ async def get_kpi_dashboard(
                     v = round(target * (1.05 - 0.01 * i), 2)
                 trend.append({"date": d.isoformat(), "value": v})
 
-            kpi_items.append({
-                "kpi_type": kpi["kpi_type"],
-                "label": kpi["label"],
-                "measured_value": measured,
-                "target_value": target,
-                "unit": kpi["unit"],
-                "achievement_rate": rate,
-                "achievement_pct": round(rate * 100, 1),
-                "color": _achievement_color(rate),
-                "direction": direction,
-                "trend_7d": trend,
-            })
+            kpi_items.append(
+                {
+                    "kpi_type": kpi["kpi_type"],
+                    "label": kpi["label"],
+                    "measured_value": measured,
+                    "target_value": target,
+                    "unit": kpi["unit"],
+                    "achievement_rate": rate,
+                    "achievement_pct": round(rate * 100, 1),
+                    "color": _achievement_color(rate),
+                    "direction": direction,
+                    "trend_7d": trend,
+                }
+            )
 
         avg_rate = round(sum(overall_rates) / len(overall_rates), 4) if overall_rates else 0.0
 
-        agent_cards.append({
-            "agent_id": aid,
-            "agent_name": AGENT_NAMES.get(aid, aid),
-            "overall_achievement_rate": avg_rate,
-            "overall_achievement_pct": round(avg_rate * 100, 1),
-            "overall_color": _achievement_color(avg_rate),
-            "kpi_count": len(kpi_items),
-            "kpis": kpi_items,
-            "as_of": today.isoformat(),
-        })
+        agent_cards.append(
+            {
+                "agent_id": aid,
+                "agent_name": AGENT_NAMES.get(aid, aid),
+                "overall_achievement_rate": avg_rate,
+                "overall_achievement_pct": round(avg_rate * 100, 1),
+                "overall_color": _achievement_color(avg_rate),
+                "kpi_count": len(kpi_items),
+                "kpis": kpi_items,
+                "as_of": today.isoformat(),
+            }
+        )
 
     # 全局达成率
     all_rates = [c["overall_achievement_rate"] for c in agent_cards]
     global_rate = round(sum(all_rates) / len(all_rates), 4) if all_rates else 0.0
 
-    return {"ok": True, "data": {
-        "as_of": today.isoformat(),
-        "global_achievement_rate": global_rate,
-        "global_achievement_pct": round(global_rate * 100, 1),
-        "global_color": _achievement_color(global_rate),
-        "agent_count": len(agent_cards),
-        "agents": agent_cards,
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "as_of": today.isoformat(),
+            "global_achievement_rate": global_rate,
+            "global_achievement_pct": round(global_rate * 100, 1),
+            "global_color": _achievement_color(global_rate),
+            "agent_count": len(agent_cards),
+            "agents": agent_cards,
+        },
+    }
 
 
 @router.get("/roi-report")
@@ -980,6 +1024,7 @@ async def get_roi_report(
         raise HTTPException(status_code=400, detail="month 格式错误，请使用 YYYY-MM") from exc
 
     import calendar as _cal
+
     period_start = datetime(year, mon, 1)
     period_end = datetime(year, mon, _cal.monthrange(year, mon)[1], 23, 59, 59)
 
@@ -1025,28 +1070,46 @@ async def get_roi_report(
     # ── 指标元数据（静态配置，不随 DB 变化）──
     _META: dict[tuple[str, str], dict] = {
         ("discount_guardian", "intercepted_discount_fen"): {
-            "agent_name": "折扣守护", "label": "本月拦截异常折扣金额",
-            "unit": "元", "event_label": "折扣异常拦截次数", "is_fen": True,
+            "agent_name": "折扣守护",
+            "label": "本月拦截异常折扣金额",
+            "unit": "元",
+            "event_label": "折扣异常拦截次数",
+            "is_fen": True,
         },
         ("inventory_alert", "waste_saved_fen"): {
-            "agent_name": "库存预警", "label": "本月减少食材损耗金额",
-            "unit": "元", "event_label": "预警触发次数", "is_fen": True,
+            "agent_name": "库存预警",
+            "label": "本月减少食材损耗金额",
+            "unit": "元",
+            "event_label": "预警触发次数",
+            "is_fen": True,
         },
         ("smart_dispatch", "avg_time_reduced_seconds"): {
-            "agent_name": "出餐调度", "label": "平均出餐时间缩短",
-            "unit": "秒", "event_label": "优化订单数", "is_fen": False,
+            "agent_name": "出餐调度",
+            "label": "平均出餐时间缩短",
+            "unit": "秒",
+            "event_label": "优化订单数",
+            "is_fen": False,
         },
         ("member_insight", "incremental_revenue_fen"): {
-            "agent_name": "会员洞察", "label": "会员召回增量营收",
-            "unit": "元", "event_label": "召回会员数", "is_fen": True,
+            "agent_name": "会员洞察",
+            "label": "会员召回增量营收",
+            "unit": "元",
+            "event_label": "召回会员数",
+            "is_fen": True,
         },
         ("finance_audit", "anomaly_detected_fen"): {
-            "agent_name": "财务稽核", "label": "发现财务异常金额",
-            "unit": "元", "event_label": "异常检出次数", "is_fen": True,
+            "agent_name": "财务稽核",
+            "label": "发现财务异常金额",
+            "unit": "元",
+            "event_label": "异常检出次数",
+            "is_fen": True,
         },
         ("store_patrol", "compliance_improvement"): {
-            "agent_name": "巡店质检", "label": "合规评分提升",
-            "unit": "分", "event_label": "巡检任务完成数", "is_fen": False,
+            "agent_name": "巡店质检",
+            "label": "合规评分提升",
+            "unit": "分",
+            "event_label": "巡检任务完成数",
+            "is_fen": False,
         },
     }
 
@@ -1059,13 +1122,16 @@ async def get_roi_report(
 
     for row in roi_rows:
         key = (row["agent_id"], row["metric_type"])
-        meta = _META.get(key, {
-            "agent_name": row["agent_id"],
-            "label": row["metric_type"],
-            "unit": "",
-            "event_label": "事件数",
-            "is_fen": False,
-        })
+        meta = _META.get(
+            key,
+            {
+                "agent_name": row["agent_id"],
+                "label": row["metric_type"],
+                "unit": "",
+                "event_label": "事件数",
+                "is_fen": False,
+            },
+        )
         raw_value = float(row["total_value"] or 0)
         event_count = int(row["event_count"] or 0)
 
@@ -1096,23 +1162,29 @@ async def get_roi_report(
             member_recalled_count = event_count
         elif key == ("inventory_alert", "waste_saved_fen") and row.get("last_metadata"):
             import json as _json
+
             try:
-                md = _json.loads(row["last_metadata"]) if isinstance(row["last_metadata"], str) else row["last_metadata"]
+                md = (
+                    _json.loads(row["last_metadata"]) if isinstance(row["last_metadata"], str) else row["last_metadata"]
+                )
                 waste_reduction_pct = md.get("waste_reduction_pct")
             except (ValueError, TypeError, AttributeError):
                 pass
 
         items.append(item)
 
-    return {"ok": True, "data": {
-        "report_month": report_month,
-        "data_source": "db" if roi_rows else "empty",
-        "summary": {
-            "total_saved_fen": total_saved_fen,
-            "total_saved_yuan": round(total_saved_fen / 100, 2),
-            "discount_intercept_count": discount_intercept_count,
-            "waste_reduction_pct": waste_reduction_pct,
-            "member_recalled_count": member_recalled_count,
+    return {
+        "ok": True,
+        "data": {
+            "report_month": report_month,
+            "data_source": "db" if roi_rows else "empty",
+            "summary": {
+                "total_saved_fen": total_saved_fen,
+                "total_saved_yuan": round(total_saved_fen / 100, 2),
+                "discount_intercept_count": discount_intercept_count,
+                "waste_reduction_pct": waste_reduction_pct,
+                "member_recalled_count": member_recalled_count,
+            },
+            "items": items,
         },
-        "items": items,
-    }}
+    }

@@ -59,8 +59,8 @@ class LakalaClient:
     # ─── 超时配置 ────────────────────────────────────────────────────────────────
     PAY_TIMEOUT = 30.0
     QUERY_TIMEOUT = 10.0
-    POLL_INTERVAL = 2.0       # 轮询间隔（秒）
-    MAX_POLL_ATTEMPTS = 15    # 最多轮询次数（30秒内）
+    POLL_INTERVAL = 2.0  # 轮询间隔（秒）
+    MAX_POLL_ATTEMPTS = 15  # 最多轮询次数（30秒内）
 
     def __init__(
         self,
@@ -93,10 +93,7 @@ class LakalaClient:
         self.app_code = app_code
         self.term_no = term_no
 
-        self.base_url = (
-            base_url
-            or os.getenv("LAKALA_BASE_URL", "https://test.wsmsd.cn/sit/jhzf")
-        ).rstrip("/")
+        self.base_url = (base_url or os.getenv("LAKALA_BASE_URL", "https://test.wsmsd.cn/sit/jhzf")).rstrip("/")
 
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
@@ -426,10 +423,7 @@ class LakalaClient:
 
     def _sign(self, params: dict[str, Any]) -> str:
         """MD5签名（文档 §1.3）"""
-        filtered = {
-            k: v for k, v in params.items()
-            if k not in ("sign", "signType") and v is not None and str(v) != ""
-        }
+        filtered = {k: v for k, v in params.items() if k not in ("sign", "signType") and v is not None and str(v) != ""}
         sorted_keys = sorted(filtered.keys())
         parts = []
         for k in sorted_keys:

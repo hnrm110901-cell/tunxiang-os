@@ -13,6 +13,7 @@ V1迁入 550行 + 新写合并报表。
 7. 财务预测 (Forecast)
 8. 高管摘要 (Executive Summary)
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -183,12 +184,8 @@ class CFODashboardService:
         total_other = sum(p.get("other_expenses", {}).get("total", 0) for p in brand_pnls)
 
         # 品牌间交易抵消
-        inter_brand_revenue = sum(
-            p.get("inter_brand_revenue", 0) for p in brand_pnls
-        )
-        inter_brand_cogs = sum(
-            p.get("inter_brand_cogs", 0) for p in brand_pnls
-        )
+        inter_brand_revenue = sum(p.get("inter_brand_revenue", 0) for p in brand_pnls)
+        inter_brand_cogs = sum(p.get("inter_brand_cogs", 0) for p in brand_pnls)
 
         # 合并后数值
         consolidated_revenue = total_revenue - inter_brand_revenue
@@ -203,14 +200,16 @@ class CFODashboardService:
         for pnl in brand_pnls:
             brand_rev = pnl.get("revenue", {}).get("total", 0)
             brand_np = pnl.get("net_profit", 0)
-            brand_breakdown.append({
-                "brand_id": pnl.get("brand_id", "unknown"),
-                "revenue": brand_rev,
-                "net_profit": brand_np,
-                "net_margin": _safe_ratio(brand_np, brand_rev),
-                "revenue_share": _safe_ratio(brand_rev, consolidated_revenue),
-                "store_count": pnl.get("store_count", 0),
-            })
+            brand_breakdown.append(
+                {
+                    "brand_id": pnl.get("brand_id", "unknown"),
+                    "revenue": brand_rev,
+                    "net_profit": brand_np,
+                    "net_margin": _safe_ratio(brand_np, brand_rev),
+                    "revenue_share": _safe_ratio(brand_rev, consolidated_revenue),
+                    "store_count": pnl.get("store_count", 0),
+                }
+            )
 
         result = {
             "period": period,
@@ -280,10 +279,7 @@ class CFODashboardService:
         # 增值税 (餐饮业一般纳税人 6%)
         vat_rate = 0.06
         vat_output = int(revenue * vat_rate / (1 + vat_rate))  # 销项税
-        vat_input = sum(
-            item.get("amount", 0) for item in deductible_items
-            if item.get("type") == "vat_input"
-        )
+        vat_input = sum(item.get("amount", 0) for item in deductible_items if item.get("type") == "vat_input")
         vat_payable = max(0, vat_output - vat_input)
 
         # 企业所得税 (25%，小微企业可能更低)
@@ -399,10 +395,7 @@ class CFODashboardService:
         utilities = variable.get("utilities", 0)
         packaging = variable.get("packaging", 0)
         platform_commission = variable.get("platform_commission", 0)
-        total_variable = (
-            food_cost + beverage_cost + hourly_labor
-            + utilities + packaging + platform_commission
-        )
+        total_variable = food_cost + beverage_cost + hourly_labor + utilities + packaging + platform_commission
 
         total_cost = total_fixed + total_variable
 
@@ -413,11 +406,7 @@ class CFODashboardService:
 
         # 盈亏平衡点（收入）
         contribution_margin_ratio = _safe_ratio(revenue - total_variable, revenue)
-        breakeven_revenue = (
-            int(total_fixed / contribution_margin_ratio)
-            if contribution_margin_ratio > 0
-            else 0
-        )
+        breakeven_revenue = int(total_fixed / contribution_margin_ratio) if contribution_margin_ratio > 0 else 0
 
         result = {
             "brand_id": brand_id,
@@ -511,11 +500,7 @@ class CFODashboardService:
         # ROI & 回本周期
         annual_profit = net_profit  # 假设 period 为年，否则需年化
         roi = _safe_ratio(annual_profit, total_investment)
-        payback_months = (
-            int(total_investment / (annual_profit / 12))
-            if annual_profit > 0
-            else 999
-        )
+        payback_months = int(total_investment / (annual_profit / 12)) if annual_profit > 0 else 999
 
         # 同店增长
         ss_current = data.get("same_store_revenue_current", 0)
@@ -611,8 +596,13 @@ class CFODashboardService:
         actual = data.get("actual", {})
 
         line_items = [
-            "revenue", "cogs", "labor", "rent",
-            "marketing", "utilities", "net_profit",
+            "revenue",
+            "cogs",
+            "labor",
+            "rent",
+            "marketing",
+            "utilities",
+            "net_profit",
         ]
 
         variances: list[dict[str, Any]] = []
@@ -629,14 +619,16 @@ class CFODashboardService:
             else:
                 status = "favorable" if diff <= 0 else "unfavorable"
 
-            variances.append({
-                "item": item,
-                "budget": b_val,
-                "actual": a_val,
-                "variance": diff,
-                "variance_pct": pct,
-                "status": status,
-            })
+            variances.append(
+                {
+                    "item": item,
+                    "budget": b_val,
+                    "actual": a_val,
+                    "variance": diff,
+                    "variance_pct": pct,
+                    "status": status,
+                }
+            )
 
         # 总体评估
         rev_var = actual.get("revenue", 0) - budget.get("revenue", 0)
@@ -655,12 +647,8 @@ class CFODashboardService:
             "period": period,
             "variances": variances,
             "overall_assessment": overall,
-            "revenue_achievement": _safe_ratio(
-                actual.get("revenue", 0), budget.get("revenue", 1)
-            ),
-            "profit_achievement": _safe_ratio(
-                actual.get("net_profit", 0), budget.get("net_profit", 1)
-            ),
+            "revenue_achievement": _safe_ratio(actual.get("revenue", 0), budget.get("revenue", 1)),
+            "profit_achievement": _safe_ratio(actual.get("net_profit", 0), budget.get("net_profit", 1)),
         }
 
         logger.info(
@@ -741,9 +729,7 @@ class CFODashboardService:
             f_rev = forecast_entry.get("revenue", 0)
             f_cogs = forecast_entry.get("cogs", 0)
             forecast_entry["gross_margin"] = _safe_ratio(f_rev - f_cogs, f_rev)
-            forecast_entry["net_margin"] = _safe_ratio(
-                forecast_entry.get("net_profit", 0), f_rev
-            )
+            forecast_entry["net_margin"] = _safe_ratio(forecast_entry.get("net_profit", 0), f_rev)
 
             forecasts.append(forecast_entry)
 
@@ -844,9 +830,7 @@ class CFODashboardService:
         }
 
         # 建议
-        recommendations = self._generate_recommendations(
-            net_margin, ss_growth, yoy_rev, alerts
-        )
+        recommendations = self._generate_recommendations(net_margin, ss_growth, yoy_rev, alerts)
 
         result = {
             "period": period,
@@ -868,9 +852,7 @@ class CFODashboardService:
         )
         return result
 
-    def _generate_headline(
-        self, revenue: int, yoy_growth: float, net_margin: float
-    ) -> str:
+    def _generate_headline(self, revenue: int, yoy_growth: float, net_margin: float) -> str:
         """生成摘要标题。"""
         rev_str = _format_fen(revenue)
 

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -27,6 +26,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Pydantic Models
 # ---------------------------------------------------------------------------
+
 
 class DeviceCreate(BaseModel):
     store_id: str
@@ -56,6 +56,7 @@ class StreamRegister(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/devices")
 async def create_device(
@@ -162,15 +163,12 @@ async def list_alerts(
         params["limit"] = size
         params["offset"] = offset
 
-        count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM civic_kitchen_alerts WHERE {where}"), params
-        )
+        count_result = await db.execute(text(f"SELECT COUNT(*) FROM civic_kitchen_alerts WHERE {where}"), params)
         total = count_result.scalar() or 0
 
         rows = await db.execute(
             text(
-                f"SELECT * FROM civic_kitchen_alerts WHERE {where} "
-                f"ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+                f"SELECT * FROM civic_kitchen_alerts WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
             ),
             params,
         )

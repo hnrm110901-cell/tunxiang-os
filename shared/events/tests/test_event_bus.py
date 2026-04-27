@@ -1,11 +1,12 @@
 """统一事件总线框架测试 -- 全部 Mock 模式，不依赖 Redis / PG"""
+
 from __future__ import annotations
 
-import asyncio
 import json
 
 import pytest
 
+from shared.events.src.consumer import EventConsumer
 from shared.events.src.event_base import TxEvent
 from shared.events.src.event_types import (
     AgentEventType,
@@ -16,16 +17,14 @@ from shared.events.src.event_types import (
     PaymentEventType,
     resolve_stream_key,
 )
-from shared.events.src.publisher import EventPublisher
-from shared.events.src.consumer import EventConsumer
-from shared.events.src.pg_notify import PgNotifier, PgListener
 from shared.events.src.middleware import (
     DeduplicationMiddleware,
     LoggingMiddleware,
     TenantIsolationMiddleware,
     apply_middleware,
 )
-
+from shared.events.src.pg_notify import PgListener, PgNotifier
+from shared.events.src.publisher import EventPublisher
 
 # ------------------------------------------------------------------
 # TxEvent 序列化 / 反序列化
@@ -171,9 +170,7 @@ class TestEventPublisher:
     @pytest.mark.asyncio
     async def test_mock_clear(self) -> None:
         pub = EventPublisher(mock=True)
-        await pub.publish(
-            TxEvent(event_type="order.paid", tenant_id="t-1", payload={}, source="test")
-        )
+        await pub.publish(TxEvent(event_type="order.paid", tenant_id="t-1", payload={}, source="test"))
         pub.clear_mock()
         assert pub.get_mock_events() == []
 
@@ -197,12 +194,8 @@ class TestEventConsumer:
         consumer.subscribe("order.created", handler)
 
         # 发布事件
-        await pub.publish(
-            TxEvent(event_type="order.created", tenant_id="t-1", payload={"x": 1}, source="test")
-        )
-        await pub.publish(
-            TxEvent(event_type="order.created", tenant_id="t-1", payload={"x": 2}, source="test")
-        )
+        await pub.publish(TxEvent(event_type="order.created", tenant_id="t-1", payload={"x": 1}, source="test"))
+        await pub.publish(TxEvent(event_type="order.created", tenant_id="t-1", payload={"x": 2}, source="test"))
 
         # 消费
         count = await consumer.drain_mock(pub)
@@ -226,9 +219,7 @@ class TestEventConsumer:
         consumer.subscribe("order.created", handler_a)
         consumer.subscribe("order.created", handler_b)
 
-        await pub.publish(
-            TxEvent(event_type="order.created", tenant_id="t-1", payload={}, source="test")
-        )
+        await pub.publish(TxEvent(event_type="order.created", tenant_id="t-1", payload={}, source="test"))
         await consumer.drain_mock(pub)
 
         assert len(results_a) == 1
@@ -247,9 +238,7 @@ class TestEventConsumer:
         consumer.subscribe("order.created", handler)
 
         # 发布一个不匹配的事件类型（但在同一个 stream）
-        await pub.publish(
-            TxEvent(event_type="order.paid", tenant_id="t-1", payload={}, source="test")
-        )
+        await pub.publish(TxEvent(event_type="order.paid", tenant_id="t-1", payload={}, source="test"))
         await consumer.drain_mock(pub)
         # order.paid 在同一个 stream，但 handler 只注册了 order.created
         # drain_mock 逐条检查 event_type，所以不应触发
@@ -319,9 +308,7 @@ class TestPgListener:
     @pytest.mark.asyncio
     async def test_inject_mock_raises_outside_mock(self) -> None:
         listener = PgListener(mock=False)
-        event = TxEvent(
-            event_type="x.y", tenant_id="t", payload={}, source="s"
-        )
+        event = TxEvent(event_type="x.y", tenant_id="t", payload={}, source="s")
         with pytest.raises(RuntimeError, match="mock mode"):
             await listener.inject_mock("ch", event)
 
@@ -482,10 +469,7 @@ class TestDeduplicationMiddleware:
         mw = DeduplicationMiddleware(max_size=2)
         wrapped = mw.wrap(handler)
 
-        events = [
-            TxEvent(event_type="order.created", tenant_id="t-1", payload={}, source="test")
-            for _ in range(3)
-        ]
+        events = [TxEvent(event_type="order.created", tenant_id="t-1", payload={}, source="test") for _ in range(3)]
         for e in events:
             await wrapped(e)
         assert call_count == 3  # 全部不同 event_id

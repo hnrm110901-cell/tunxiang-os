@@ -17,6 +17,7 @@
 # from .api.smart_replenishment_routes import router as smart_replenishment_router
 # app.include_router(smart_replenishment_router, prefix="/api/v1/smart-replenishment")
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -28,6 +29,7 @@ router = APIRouter(tags=["smart-replenishment"])
 
 
 # ─── 请求模型 ───
+
 
 class SetThresholdRequest(BaseModel):
     safety_stock: float = Field(ge=0, description="安全库存量")
@@ -45,6 +47,7 @@ class SetThresholdRequest(BaseModel):
 #  GET /check/{store_id}
 #  检查并返回需补货清单
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/check/{store_id}")
 async def check_replenishment(
@@ -94,6 +97,7 @@ async def check_replenishment(
 #  自动创建 draft 申购单
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.post("/auto/{store_id}")
 async def auto_create_requisition(
     store_id: str,
@@ -131,6 +135,7 @@ async def auto_create_requisition(
 #  GET /thresholds/{store_id}
 #  查询阈值配置列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/thresholds/{store_id}")
 async def get_thresholds(
@@ -174,6 +179,7 @@ async def get_thresholds(
 #  设置/更新单个原料阈值
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @router.put("/thresholds/{store_id}/{ingredient_id}")
 async def set_threshold(
     store_id: str,
@@ -214,6 +220,7 @@ async def set_threshold(
 #  GET /forecast/{store_id}
 #  未来7天采购预测
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/forecast/{store_id}")
 async def get_procurement_forecast(
@@ -269,6 +276,7 @@ async def get_procurement_forecast(
 #  POST /draft-order/{store_id}
 #  生成采购草稿（按供应商分组）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class DraftOrderRequest(BaseModel):
     forecast_days: int = Field(default=7, ge=1, le=30, description="基于N天预测生成草稿")
@@ -337,6 +345,7 @@ async def create_draft_order(
 #  GET /urgent/{store_id}
 #  紧急补货预警（今日，实时，不走AI）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @router.get("/urgent/{store_id}")
 async def get_urgent_replenishment(

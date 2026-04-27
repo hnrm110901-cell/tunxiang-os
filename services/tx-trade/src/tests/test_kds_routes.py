@@ -17,14 +17,15 @@ POST/写入 端点（4个）：
 9.  GET  /api/v1/kds/task/{task_id}/rush/status — task_id非法UUID → 400
 10. POST /api/v1/kds/task/{task_id}/finish  — 服务层抛 HTTPException(404)
 """
+
 import os
 import sys
 import types
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -32,6 +33,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级 ──────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -41,12 +43,13 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",     _SRC_DIR)
+_ensure_pkg("src", _SRC_DIR)
 _ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 
 # ─── stub services (kds_routes 依赖的服务模块) ─────────────────────────────────
 # 以避免真实 import 链触发数据库/外部依赖
+
 
 def _stub_module(full_name: str, **attrs):
     """注入一个最小存根模块到 sys.modules，避免真实导入失败。"""
@@ -109,14 +112,15 @@ class _TestBase(DeclarativeBase):
 
 class _FakeKDSTask(_TestBase):
     """最小化 KDSTask 存根，让 select(KDSTask) 能正常构造 SQL 语句。"""
+
     __tablename__ = "kds_tasks"
-    id          = mapped_column(Integer, primary_key=True)
-    tenant_id   = mapped_column(Integer)
-    is_deleted  = mapped_column(Integer)
-    status      = mapped_column(String)
-    rush_count  = mapped_column(Integer)
+    id = mapped_column(Integer, primary_key=True)
+    tenant_id = mapped_column(Integer)
+    is_deleted = mapped_column(Integer)
+    status = mapped_column(String)
+    rush_count = mapped_column(Integer)
     last_rush_at = mapped_column(Integer)
-    promised_at  = mapped_column(Integer)
+    promised_at = mapped_column(Integer)
 
 
 _kds_task_mod = _stub_module("src.models.kds_task")
@@ -124,37 +128,35 @@ _kds_task_mod.KDSTask = _FakeKDSTask  # type: ignore[attr-defined]
 
 # ─── 正式导入 ──────────────────────────────────────────────────────────────────
 import uuid
-import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.kds_routes import router  # type: ignore[import]
 from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.kds_routes import router  # type: ignore[import]
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-TENANT_ID  = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID   = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-DEPT_ID    = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-ORDER_ID   = "dddddddd-dddd-dddd-dddd-dddddddddddd"
-TASK_ID    = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-DISH_ID    = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+STORE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+DEPT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+ORDER_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+TASK_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+DISH_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-HEADERS    = {"X-Tenant-ID": TENANT_ID}
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
@@ -172,6 +174,7 @@ def _make_app_with_db(db: AsyncMock) -> FastAPI:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1: GET /tasks?dept_id=xxx — 正常查询返回 items+total+page+size
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_kds_tasks_success():
     """KDS任务查询：按档口返回 pending+cooking 任务列表，含分页信息。"""
@@ -211,6 +214,7 @@ def test_get_kds_tasks_success():
 # 场景 2: GET /overview/{store_id} — 全店概览正常返回 depts 列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_store_overview_success():
     """全店概览：返回所有档口实时负载，含 depts 数组和 total。"""
     db = _make_mock_db()
@@ -244,6 +248,7 @@ def test_get_store_overview_success():
 # 场景 3: GET /task/{task_id}/rush/status — 正常催菜SLA状态查询
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_rush_status_success():
     """催菜SLA状态：任务存在，返回 rush_count、is_overdue 等字段。"""
     db = _make_mock_db()
@@ -251,10 +256,10 @@ def test_rush_status_success():
     now = datetime.now(timezone.utc)
 
     fake_task = MagicMock()
-    fake_task.status      = "cooking"
-    fake_task.rush_count  = 1
+    fake_task.status = "cooking"
+    fake_task.rush_count = 1
     fake_task.last_rush_at = now - timedelta(minutes=5)
-    fake_task.promised_at  = now + timedelta(minutes=10)  # 未超时
+    fake_task.promised_at = now + timedelta(minutes=10)  # 未超时
 
     scalar_result = MagicMock()
     scalar_result.scalar_one_or_none.return_value = fake_task
@@ -282,6 +287,7 @@ def test_rush_status_success():
 # 场景 4: POST /dispatch/{order_id} — 分单成功，返回 dept_tasks
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_dispatch_order_success():
     """分单：将订单菜品分配到档口，返回 dept_tasks（已排序）。"""
     db = _make_mock_db()
@@ -296,12 +302,15 @@ def test_dispatch_order_success():
     fake_dispatch_result = {"dept_tasks": fake_dept_tasks}
     fake_sorted_tasks = fake_dept_tasks  # 排序后相同
 
-    with patch(
-        "src.api.kds_routes.dispatch_order_to_kds",
-        new=AsyncMock(return_value=fake_dispatch_result),
-    ), patch(
-        "src.api.kds_routes.calculate_cooking_order",
-        new=AsyncMock(return_value=fake_sorted_tasks),
+    with (
+        patch(
+            "src.api.kds_routes.dispatch_order_to_kds",
+            new=AsyncMock(return_value=fake_dispatch_result),
+        ),
+        patch(
+            "src.api.kds_routes.calculate_cooking_order",
+            new=AsyncMock(return_value=fake_sorted_tasks),
+        ),
     ):
         client = TestClient(_make_app_with_db(db))
         resp = client.post(
@@ -333,6 +342,7 @@ def test_dispatch_order_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 5: POST /task/{task_id}/start — 开始制作成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_start_cooking_success():
     """开始制作：厨师点击开始，任务状态变为 cooking，返回服务层结果。"""
@@ -368,6 +378,7 @@ def test_start_cooking_success():
 # 场景 6: POST /task/{task_id}/finish — 完成出品成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_finish_cooking_success():
     """完成出品：KDS 确认菜品已端出，任务状态变为 done。"""
     db = _make_mock_db()
@@ -402,6 +413,7 @@ def test_finish_cooking_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 7: POST /task/{task_id}/rush — 催菜成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_request_rush_success():
     """催菜：服务员发起催单，推送到 KDS 和打印机，返回 ok=True。"""
@@ -439,6 +451,7 @@ def test_request_rush_success():
 # 场景 8: GET /tasks — 缺少 X-Tenant-ID → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_kds_tasks_missing_tenant_id():
     """缺少 X-Tenant-ID header 时，_get_tenant_id 抛 400 BadRequest。"""
     db = _make_mock_db()
@@ -460,6 +473,7 @@ def test_get_kds_tasks_missing_tenant_id():
 # 场景 9: GET /task/{task_id}/rush/status — task_id 非法 UUID → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_rush_status_invalid_task_id():
     """task_id 不是合法 UUID 时，端点返回 400（无效 task_id）。"""
     db = _make_mock_db()
@@ -479,6 +493,7 @@ def test_rush_status_invalid_task_id():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10: POST /task/{task_id}/finish — 服务层抛 HTTPException(404)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_finish_cooking_task_not_found():
     """完成出品：服务层找不到任务时抛 HTTPException(404)，端点透传 404。"""

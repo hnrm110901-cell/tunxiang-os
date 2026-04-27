@@ -6,9 +6,8 @@
 金额单位：分(fen)
 存储层：PostgreSQL journeys + journey_executions 表（v162 迁移创建）
 """
+
 import json
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
@@ -21,6 +20,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # JourneyOrchestratorService
 # ---------------------------------------------------------------------------
+
 
 class JourneyOrchestratorService:
     """触发式营销编排引擎 — 事件驱动，不做粗暴群发"""
@@ -496,41 +496,49 @@ class JourneyOrchestratorService:
             if node_type == "send_content":
                 open_rate = 0.35
                 click_rate = 0.12
-                node_simulations.append({
-                    "node_id": node.get("node_id"),
-                    "type": node_type,
-                    "estimated_reach": remaining,
-                    "estimated_open": int(remaining * open_rate),
-                    "estimated_click": int(remaining * click_rate),
-                })
+                node_simulations.append(
+                    {
+                        "node_id": node.get("node_id"),
+                        "type": node_type,
+                        "estimated_reach": remaining,
+                        "estimated_open": int(remaining * open_rate),
+                        "estimated_click": int(remaining * click_rate),
+                    }
+                )
                 remaining = int(remaining * click_rate)
             elif node_type == "send_offer":
                 redemption_rate = 0.25
-                node_simulations.append({
-                    "node_id": node.get("node_id"),
-                    "type": node_type,
-                    "estimated_reach": remaining,
-                    "estimated_redemption": int(remaining * redemption_rate),
-                })
+                node_simulations.append(
+                    {
+                        "node_id": node.get("node_id"),
+                        "type": node_type,
+                        "estimated_reach": remaining,
+                        "estimated_redemption": int(remaining * redemption_rate),
+                    }
+                )
                 remaining = int(remaining * redemption_rate)
             elif node_type == "condition":
                 true_rate = 0.6
-                node_simulations.append({
-                    "node_id": node.get("node_id"),
-                    "type": node_type,
-                    "estimated_true": int(remaining * true_rate),
-                    "estimated_false": int(remaining * (1 - true_rate)),
-                })
+                node_simulations.append(
+                    {
+                        "node_id": node.get("node_id"),
+                        "type": node_type,
+                        "estimated_true": int(remaining * true_rate),
+                        "estimated_false": int(remaining * (1 - true_rate)),
+                    }
+                )
                 remaining = int(remaining * true_rate)
             elif node_type == "wait":
                 drop_off = 0.1
                 remaining = int(remaining * (1 - drop_off))
-                node_simulations.append({
-                    "node_id": node.get("node_id"),
-                    "type": node_type,
-                    "wait_hours": node.get("wait_hours", 24),
-                    "estimated_continue": remaining,
-                })
+                node_simulations.append(
+                    {
+                        "node_id": node.get("node_id"),
+                        "type": node_type,
+                        "wait_hours": node.get("wait_hours", 24),
+                        "estimated_continue": remaining,
+                    }
+                )
 
         return {
             "journey_id": journey_id,

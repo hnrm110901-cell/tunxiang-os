@@ -16,18 +16,19 @@
   - emit_event 通过 patch 拦截，不实际发送
   - asyncio.create_task 通过 patch 拦截，验证旁路调用
 """
+
 from __future__ import annotations
 
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..api.public_opinion_routes import router as opinion_router
 from shared.ontology.src.database import get_db
+
+from ..api.public_opinion_routes import router as opinion_router
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────
 

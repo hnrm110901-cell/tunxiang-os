@@ -15,6 +15,7 @@
 金额单位：分(fen)
 环境变量：MINIAPP_BASE_URL（默认 https://miniapp.tunxiang.com）
 """
+
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -239,9 +240,7 @@ class ReferralService:
 
         # 同设备防刷
         if campaign.anti_fraud_same_device and device_id:
-            fraud_device = await self._check_fraud_device(
-                record.campaign_id, device_id, tenant_id, db
-            )
+            fraud_device = await self._check_fraud_device(record.campaign_id, device_id, tenant_id, db)
             if fraud_device:
                 record.status = "fraud_detected"
                 record.invitee_device_id = device_id
@@ -260,9 +259,7 @@ class ReferralService:
         # 同手机前7位防刷
         if campaign.anti_fraud_same_phone_prefix and phone and len(phone) >= 7:
             phone_prefix = phone[:7]
-            fraud_phone = await self._check_fraud_phone_prefix(
-                record.campaign_id, phone_prefix, tenant_id, db
-            )
+            fraud_phone = await self._check_fraud_phone_prefix(record.campaign_id, phone_prefix, tenant_id, db)
             if fraud_phone:
                 record.status = "fraud_detected"
                 record.invitee_device_id = device_id
@@ -280,9 +277,7 @@ class ReferralService:
 
         # 同IP防刷（可选，移动端不可靠）
         if campaign.anti_fraud_same_ip and ip:
-            fraud_ip = await self._check_fraud_ip(
-                record.campaign_id, ip, tenant_id, db
-            )
+            fraud_ip = await self._check_fraud_ip(record.campaign_id, ip, tenant_id, db)
             if fraud_ip:
                 record.status = "fraud_detected"
                 record.invitee_device_id = device_id
@@ -380,12 +375,15 @@ class ReferralService:
 
         # 1. 查该用户有无 status="registered" 的邀请记录
         record_result = await db.execute(
-            select(ReferralRecord).where(
+            select(ReferralRecord)
+            .where(
                 ReferralRecord.invitee_customer_id == customer_id,
                 ReferralRecord.status == "registered",
                 ReferralRecord.tenant_id == tenant_id,
                 ReferralRecord.is_deleted == False,  # noqa: E712
-            ).order_by(ReferralRecord.registered_at.desc()).limit(1)
+            )
+            .order_by(ReferralRecord.registered_at.desc())
+            .limit(1)
         )
         record: Optional[ReferralRecord] = record_result.scalar_one_or_none()
 
@@ -601,9 +599,7 @@ class ReferralService:
         status_counts: dict[str, int] = {row[0]: row[1] for row in counts_result.fetchall()}
 
         total_invites = sum(status_counts.values())
-        total_registered = (
-            status_counts.get("registered", 0) + status_counts.get("rewarded", 0)
-        )
+        total_registered = status_counts.get("registered", 0) + status_counts.get("rewarded", 0)
         total_rewarded = status_counts.get("rewarded", 0)
         fraud_detected = status_counts.get("fraud_detected", 0)
         conversion_rate = round(total_registered / total_invites, 4) if total_invites > 0 else 0.0
@@ -624,10 +620,7 @@ class ReferralService:
             .order_by(func.count(ReferralRecord.id).desc())
             .limit(10)
         )
-        top_referrers = [
-            {"customer_id": str(row[0]), "invite_count": row[1]}
-            for row in top_result.fetchall()
-        ]
+        top_referrers = [{"customer_id": str(row[0]), "invite_count": row[1]} for row in top_result.fetchall()]
 
         return {
             "total_invites": total_invites,
@@ -658,12 +651,14 @@ class ReferralService:
         from sqlalchemy import select
 
         result = await db.execute(
-            select(ReferralRecord).where(
+            select(ReferralRecord)
+            .where(
                 ReferralRecord.campaign_id == campaign_id,
                 ReferralRecord.referrer_customer_id == customer_id,
                 ReferralRecord.tenant_id == tenant_id,
                 ReferralRecord.is_deleted == False,  # noqa: E712
-            ).order_by(ReferralRecord.invited_at.desc())
+            )
+            .order_by(ReferralRecord.invited_at.desc())
         )
         records: list[ReferralRecord] = list(result.scalars().all())
 
@@ -768,9 +763,10 @@ class ReferralService:
 
         # 查 customers 表（共享 ontology）
         result = await db.execute(
-            select(text("total_order_count")).select_from(text("customers")).where(
-                text("id = :cid AND tenant_id = :tid AND is_deleted = FALSE")
-            ).bindparams(cid=customer_id, tid=tenant_id)
+            select(text("total_order_count"))
+            .select_from(text("customers"))
+            .where(text("id = :cid AND tenant_id = :tid AND is_deleted = FALSE"))
+            .bindparams(cid=customer_id, tid=tenant_id)
         )
         row = result.fetchone()
         if row is None:

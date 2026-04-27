@@ -13,21 +13,21 @@
 
 持久化: PostgreSQL + SQLAlchemy async
 """
+
 import math
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
 
 import structlog
-from sqlalchemy import select, func as sa_func, and_, update, text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_supply.src.models.distribution import (
     DistributionItem,
     DistributionPlan,
     DistributionTrip,
     DistributionWarehouse,
 )
+from sqlalchemy import and_, select, text, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger()
 
@@ -36,19 +36,19 @@ log = structlog.get_logger()
 
 
 class DistributionStatus(str, Enum):
-    planned = "planned"           # 已计划
-    dispatched = "dispatched"     # 已派车
-    in_transit = "in_transit"     # 配送中
-    delivered = "delivered"       # 已送达
-    cancelled = "cancelled"       # 已取消
+    planned = "planned"  # 已计划
+    dispatched = "dispatched"  # 已派车
+    in_transit = "in_transit"  # 配送中
+    delivered = "delivered"  # 已送达
+    cancelled = "cancelled"  # 已取消
 
 
 class DeliveryItemStatus(str, Enum):
     pending = "pending"
     loaded = "loaded"
     delivered = "delivered"
-    rejected = "rejected"       # 门店拒收
-    partial = "partial"         # 部分签收
+    rejected = "rejected"  # 门店拒收
+    partial = "partial"  # 部分签收
 
 
 # ─── 工具函数 ───
@@ -71,11 +71,7 @@ def _haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> f
     R = 6371.0  # 地球半径 km
     dlat = math.radians(lat2 - lat1)
     dlng = math.radians(lng2 - lng1)
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
-        * math.sin(dlng / 2) ** 2
-    )
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(R * c, 2)
 
@@ -213,22 +209,26 @@ async def create_distribution_plan(
             )
             db.add(di)
             await db.flush()
-            trip_items.append({
-                "item_id": di.item_id,
-                "item_name": di.item_name,
-                "quantity": float(di.quantity),
-                "unit": di.unit,
-                "status": di.status,
-            })
+            trip_items.append(
+                {
+                    "item_id": di.item_id,
+                    "item_name": di.item_name,
+                    "quantity": float(di.quantity),
+                    "unit": di.unit,
+                    "status": di.status,
+                }
+            )
 
-        store_deliveries.append({
-            "delivery_id": str(trip.id),
-            "store_id": store_id,
-            "items": trip_items,
-            "status": trip.status,
-            "scheduled_at": None,
-            "delivered_at": None,
-        })
+        store_deliveries.append(
+            {
+                "delivery_id": str(trip.id),
+                "store_id": store_id,
+                "items": trip_items,
+                "status": trip.status,
+                "scheduled_at": None,
+                "delivered_at": None,
+            }
+        )
 
     log.info(
         "distribution_plan_created",
@@ -332,11 +332,7 @@ async def optimize_route(
     store_lookup: dict[uuid.UUID, dict] = {}
     if store_ids:
         stores_result = await db.execute(
-            text(
-                "SELECT id, store_name, latitude, longitude"
-                " FROM stores"
-                " WHERE id = ANY(:ids) AND is_deleted = FALSE"
-            ),
+            text("SELECT id, store_name, latitude, longitude FROM stores WHERE id = ANY(:ids) AND is_deleted = FALSE"),
             {"ids": store_ids},
         )
         for row in stores_result.mappings():
@@ -350,13 +346,15 @@ async def optimize_route(
     stores_to_visit: list[dict] = []
     for trip in trips:
         info = store_lookup.get(trip.store_id, {})
-        stores_to_visit.append({
-            "store_id": str(trip.store_id),
-            "trip_id": trip.id,
-            "lat": info.get("lat", wh_lat),
-            "lng": info.get("lng", wh_lng),
-            "store_name": info.get("store_name", ""),
-        })
+        stores_to_visit.append(
+            {
+                "store_id": str(trip.store_id),
+                "trip_id": trip.id,
+                "lat": info.get("lat", wh_lat),
+                "lng": info.get("lng", wh_lng),
+                "store_name": info.get("store_name", ""),
+            }
+        )
 
     # 贪心最近邻排序
     route: list[dict] = []
@@ -372,21 +370,19 @@ async def optimize_route(
         )
         dist = _haversine_distance(current_lat, current_lng, nearest["lat"], nearest["lng"])
         cumulative_km += dist
-        route.append({
-            "store_id": nearest["store_id"],
-            "store_name": nearest.get("store_name", ""),
-            "distance_km": dist,
-            "cumulative_km": round(cumulative_km, 2),
-            "sequence": seq,
-        })
+        route.append(
+            {
+                "store_id": nearest["store_id"],
+                "store_name": nearest.get("store_name", ""),
+                "distance_km": dist,
+                "cumulative_km": round(cumulative_km, 2),
+                "sequence": seq,
+            }
+        )
 
         # 更新 trip 的 sequence
         trip_id = nearest["trip_id"]
-        update_stmt = (
-            update(DistributionTrip)
-            .where(DistributionTrip.id == trip_id)
-            .values(sequence=seq)
-        )
+        update_stmt = update(DistributionTrip).where(DistributionTrip.id == trip_id).values(sequence=seq)
         await db.execute(update_stmt)
 
         current_lat, current_lng = nearest["lat"], nearest["lng"]
@@ -456,9 +452,7 @@ async def dispatch_delivery(
         raise ValueError(f"配送计划不存在: {plan_id}")
 
     if plan.status != DistributionStatus.planned.value:
-        raise ValueError(
-            f"只有 planned 状态可以派车，当前状态: {plan.status}"
-        )
+        raise ValueError(f"只有 planned 状态可以派车，当前状态: {plan.status}")
 
     now = _now()
     plan.status = DistributionStatus.dispatched.value
@@ -546,9 +540,7 @@ async def confirm_delivery(
         DistributionStatus.dispatched.value,
         DistributionStatus.in_transit.value,
     ):
-        raise ValueError(
-            f"只有 dispatched/in_transit 状态可以签收，当前: {plan.status}"
-        )
+        raise ValueError(f"只有 dispatched/in_transit 状态可以签收，当前: {plan.status}")
 
     # 更新为配送中
     if plan.status == DistributionStatus.dispatched.value:
@@ -593,48 +585,57 @@ async def confirm_delivery(
             if status == "rejected":
                 db_item.status = DeliveryItemStatus.rejected.value
                 db_item.notes = received.get("notes", "")
-                rejected_items.append({
-                    "item_id": db_item.item_id,
-                    "item_name": db_item.item_name,
-                    "quantity": float(db_item.quantity),
-                    "unit": db_item.unit,
-                    "status": db_item.status,
-                    "reason": received.get("notes", ""),
-                })
+                rejected_items.append(
+                    {
+                        "item_id": db_item.item_id,
+                        "item_name": db_item.item_name,
+                        "quantity": float(db_item.quantity),
+                        "unit": db_item.unit,
+                        "status": db_item.status,
+                        "reason": received.get("notes", ""),
+                    }
+                )
             elif status == "partial":
                 db_item.status = DeliveryItemStatus.partial.value
                 db_item.received_quantity = received.get("received_quantity", 0)
-                confirmed_items.append({
-                    "item_id": db_item.item_id,
-                    "item_name": db_item.item_name,
-                    "quantity": float(db_item.quantity),
-                    "received_quantity": float(db_item.received_quantity),
-                    "unit": db_item.unit,
-                    "status": db_item.status,
-                })
+                confirmed_items.append(
+                    {
+                        "item_id": db_item.item_id,
+                        "item_name": db_item.item_name,
+                        "quantity": float(db_item.quantity),
+                        "received_quantity": float(db_item.received_quantity),
+                        "unit": db_item.unit,
+                        "status": db_item.status,
+                    }
+                )
             else:
                 db_item.status = DeliveryItemStatus.delivered.value
                 db_item.received_quantity = received.get(
-                    "received_quantity", float(db_item.quantity),
+                    "received_quantity",
+                    float(db_item.quantity),
                 )
-                confirmed_items.append({
-                    "item_id": db_item.item_id,
-                    "item_name": db_item.item_name,
-                    "quantity": float(db_item.quantity),
-                    "received_quantity": float(db_item.received_quantity),
-                    "unit": db_item.unit,
-                    "status": db_item.status,
-                })
+                confirmed_items.append(
+                    {
+                        "item_id": db_item.item_id,
+                        "item_name": db_item.item_name,
+                        "quantity": float(db_item.quantity),
+                        "received_quantity": float(db_item.received_quantity),
+                        "unit": db_item.unit,
+                        "status": db_item.status,
+                    }
+                )
         else:
             # 未在签收列表中的视为已签收
             db_item.status = DeliveryItemStatus.delivered.value
-            confirmed_items.append({
-                "item_id": db_item.item_id,
-                "item_name": db_item.item_name,
-                "quantity": float(db_item.quantity),
-                "unit": db_item.unit,
-                "status": db_item.status,
-            })
+            confirmed_items.append(
+                {
+                    "item_id": db_item.item_id,
+                    "item_name": db_item.item_name,
+                    "quantity": float(db_item.quantity),
+                    "unit": db_item.unit,
+                    "status": db_item.status,
+                }
+            )
 
     target_trip.status = DeliveryItemStatus.delivered.value
     target_trip.delivered_at = now
@@ -649,9 +650,7 @@ async def confirm_delivery(
     )
     all_trips_result = await db.execute(all_trips_stmt)
     all_trips = list(all_trips_result.scalars().all())
-    all_delivered = all(
-        t.status == DeliveryItemStatus.delivered.value for t in all_trips
-    )
+    all_delivered = all(t.status == DeliveryItemStatus.delivered.value for t in all_trips)
     if all_delivered:
         plan.status = DistributionStatus.delivered.value
         plan.completed_at = now

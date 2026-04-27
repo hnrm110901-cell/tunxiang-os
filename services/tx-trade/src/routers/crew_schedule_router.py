@@ -6,6 +6,7 @@
 - POST /api/v1/crew/shift-swap     — 创建换班申请
 - GET  /api/v1/crew/shift-swaps    — 查询我的换班申请列表
 """
+
 from datetime import date, datetime, timedelta
 from typing import Literal, Optional
 
@@ -24,6 +25,7 @@ router = APIRouter(tags=["crew-schedule"])
 
 # ---------- Pydantic 模型 ----------
 
+
 class CheckinRequest(BaseModel):
     type: Literal["clock_in", "clock_out"]
     lat: Optional[float] = Field(None, description="纬度")
@@ -39,6 +41,7 @@ class ShiftSwapRequest(BaseModel):
 
 # ---------- Mock 排班数据 ----------
 
+
 def _build_week_schedule(crew_id: str) -> list[dict]:
     """返回本周7天排班数据（Mock 实现）。"""
     today = date.today()
@@ -48,7 +51,7 @@ def _build_week_schedule(crew_id: str) -> list[dict]:
     shift_cycle = [
         {"shift": "午班", "start": "11:00", "end": "17:00"},
         {"shift": "晚班", "start": "17:00", "end": "22:00"},
-        {"shift": "",     "start": "",      "end": ""},
+        {"shift": "", "start": "", "end": ""},
         {"shift": "早班", "start": "09:00", "end": "14:00"},
         {"shift": "午班", "start": "11:00", "end": "17:00"},
         {"shift": "晚班", "start": "17:00", "end": "22:00"},
@@ -65,22 +68,24 @@ def _build_week_schedule(crew_id: str) -> list[dict]:
         else:
             status = "pending"
 
-        items.append({
-            "date": day.isoformat(),
-            "date_label": day.strftime("%m-%d"),
-            "weekday": weekday_names[i],
-            "shift": s["shift"],
-            "time_range": f"{s['start']}-{s['end']}" if s["shift"] else "",
-            "status": status,
-            "is_today": day == today,
-        })
+        items.append(
+            {
+                "date": day.isoformat(),
+                "date_label": day.strftime("%m-%d"),
+                "weekday": weekday_names[i],
+                "shift": s["shift"],
+                "time_range": f"{s['start']}-{s['end']}" if s["shift"] else "",
+                "status": status,
+                "is_today": day == today,
+            }
+        )
     return items
 
 
 # ---------- 时间窗口校验 ----------
 
-_CLOCK_WINDOW_HOURS_BEFORE = 1   # 班次开始前 N 小时内可打上班卡
-_CLOCK_WINDOW_HOURS_AFTER  = 2   # 班次结束后 N 小时内可打下班卡
+_CLOCK_WINDOW_HOURS_BEFORE = 1  # 班次开始前 N 小时内可打上班卡
+_CLOCK_WINDOW_HOURS_AFTER = 2  # 班次结束后 N 小时内可打下班卡
 
 
 def _validate_clock_window(checkin_type: str, now: datetime) -> bool:
@@ -97,6 +102,7 @@ def _validate_clock_window(checkin_type: str, now: datetime) -> bool:
 
 
 # ---------- DB 辅助 ----------
+
 
 async def _fetch_swaps_from_db(
     db: AsyncSession,
@@ -128,24 +134,27 @@ async def _fetch_swaps_from_db(
     rows = result.mappings().all()
     items = []
     for row in rows:
-        items.append({
-            "id":         row["id"],
-            "from_date":  row["from_date"].strftime("%m-%d") if row["from_date"] else "",
-            "to_crew":    row["to_crew_id"],
-            "reason":     row["reason"],
-            "status":     row["status"],
-            "created_at": row["created_at"] or "",
-        })
+        items.append(
+            {
+                "id": row["id"],
+                "from_date": row["from_date"].strftime("%m-%d") if row["from_date"] else "",
+                "to_crew": row["to_crew_id"],
+                "reason": row["reason"],
+                "status": row["status"],
+                "created_at": row["created_at"] or "",
+            }
+        )
     return items
 
 
 # ---------- 路由 ----------
 
+
 @router.post("/api/v1/crew/checkin")
 async def checkin(
     body: CheckinRequest,
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
 ):
     """
     记录打卡。
@@ -200,7 +209,7 @@ async def checkin(
 async def get_schedule(
     week: Literal["current", "next"] = Query("current", description="current=本周 / next=下周"),
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
 ):
     """
     返回指定周的排班数据。
@@ -234,7 +243,7 @@ async def get_schedule(
 async def create_shift_swap(
     body: ShiftSwapRequest,
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
 ):
     """
     创建换班申请。
@@ -281,11 +290,9 @@ async def create_shift_swap(
 
 @router.get("/api/v1/crew/shift-swaps")
 async def get_my_shift_swaps(
-    status: Optional[Literal["pending", "approved", "rejected"]] = Query(
-        None, description="筛选状态，不传则返回全部"
-    ),
+    status: Optional[Literal["pending", "approved", "rejected"]] = Query(None, description="筛选状态，不传则返回全部"),
     x_operator_id: str = Header(default="op-001", alias="X-Operator-ID"),
-    x_tenant_id: str   = Header(default="",       alias="X-Tenant-ID"),
+    x_tenant_id: str = Header(default="", alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
     """

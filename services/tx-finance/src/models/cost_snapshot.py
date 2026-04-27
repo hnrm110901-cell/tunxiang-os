@@ -23,6 +23,7 @@
 # CREATE POLICY cost_snapshots_tenant_isolation ON cost_snapshots
 #     USING (tenant_id = current_setting('app.tenant_id')::UUID);
 """
+
 import uuid
 from datetime import datetime
 
@@ -42,70 +43,38 @@ class CostSnapshot(Base):
     - 支持按订单、门店、日期聚合
     - bom_version_id=None 表示使用了菜品标准成本fallback
     """
+
     __tablename__ = "cost_snapshots"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
-    order_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
-    order_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
-    dish_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    order_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    dish_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
 
     # 成本分解
-    raw_material_cost: Mapped[float] = mapped_column(
-        Numeric(10, 4), nullable=False, default=0,
-        comment="原料成本(分)"
-    )
-    labor_cost_allocated: Mapped[float | None] = mapped_column(
-        Numeric(10, 4), default=0,
-        comment="分摊人工成本(分)"
-    )
-    overhead_allocated: Mapped[float | None] = mapped_column(
-        Numeric(10, 4), default=0,
-        comment="分摊管理费用(分)"
-    )
-    total_cost: Mapped[float] = mapped_column(
-        Numeric(10, 4), nullable=False,
-        comment="总成本=原料+人工+管理费(分)"
-    )
+    raw_material_cost: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, default=0, comment="原料成本(分)")
+    labor_cost_allocated: Mapped[float | None] = mapped_column(Numeric(10, 4), default=0, comment="分摊人工成本(分)")
+    overhead_allocated: Mapped[float | None] = mapped_column(Numeric(10, 4), default=0, comment="分摊管理费用(分)")
+    total_cost: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False, comment="总成本=原料+人工+管理费(分)")
 
     # 售价与毛利
-    selling_price: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False,
-        comment="实际销售价格(分)"
-    )
-    gross_margin_rate: Mapped[float | None] = mapped_column(
-        Numeric(5, 4),
-        comment="毛利率=(售价-成本)/售价"
-    )
+    selling_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, comment="实际销售价格(分)")
+    gross_margin_rate: Mapped[float | None] = mapped_column(Numeric(5, 4), comment="毛利率=(售价-成本)/售价")
 
     # BOM追溯
     bom_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="使用的BOM版本ID，NULL=fallback标准成本"
+        UUID(as_uuid=True), comment="使用的BOM版本ID，NULL=fallback标准成本"
     )
     cost_source: Mapped[str] = mapped_column(
-        String(20), default="bom",
-        comment="成本来源: bom | standard_cost | manual"
+        String(20), default="bom", comment="成本来源: bom | standard_cost | manual"
     )
 
     # 时间戳
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
-        comment="成本计算时间"
+        DateTime(timezone=True), server_default=func.now(), comment="成本计算时间"
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         Index("idx_cost_snapshots_tenant_order", "tenant_id", "order_id"),

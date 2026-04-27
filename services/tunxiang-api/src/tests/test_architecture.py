@@ -8,6 +8,7 @@
 - Store 虚拟门店支持
 - Module imports
 """
+
 import os
 import sys
 
@@ -30,6 +31,7 @@ client = TestClient(app)
 # Correction #2: MVP Monolith
 # ═══════════════════════════════════════════════
 
+
 class TestMonolithHealth:
     """验证单体入口正常启动"""
 
@@ -43,10 +45,13 @@ class TestMonolithHealth:
         assert body["data"]["version"] == "7.1.0"
 
     def test_auth_login(self):
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "admin",
-            "password": "admin123",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "admin",
+                "password": "admin123",
+            },
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -54,10 +59,13 @@ class TestMonolithHealth:
         assert "token" in body["data"]
 
     def test_auth_login_fail(self):
-        resp = client.post("/api/v1/auth/login", json={
-            "username": "admin",
-            "password": "wrong",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "admin",
+                "password": "wrong",
+            },
+        )
         assert resp.status_code == 401
 
     def test_trade_routes_exist(self):
@@ -81,11 +89,13 @@ class TestMonolithHealth:
 # Correction #1: Amount Convention
 # ═══════════════════════════════════════════════
 
+
 class TestAmountConvention:
     """验证金额单位公约 — 全系统统一存分"""
 
     def test_yuan_to_fen_basic(self):
         from amount_convention import yuan_to_fen
+
         assert yuan_to_fen(168.00) == 16800
         assert yuan_to_fen(0.01) == 1
         assert yuan_to_fen(99999.99) == 9999999
@@ -94,17 +104,20 @@ class TestAmountConvention:
     def test_yuan_to_fen_rounding(self):
         """浮点精度：round确保不出现 168.00 * 100 = 16799.999"""
         from amount_convention import yuan_to_fen
+
         assert yuan_to_fen(1.005) == 101  # round(100.5) = 100 or 101
         assert yuan_to_fen(19.99) == 1999
 
     def test_fen_to_yuan(self):
         from amount_convention import fen_to_yuan
+
         assert fen_to_yuan(16800) == 168.00
         assert fen_to_yuan(1) == 0.01
         assert fen_to_yuan(0) == 0.0
 
     def test_format_amount_small(self):
         from amount_convention import format_amount
+
         assert format_amount(16800) == "¥168.00"
         assert format_amount(1) == "¥0.01"
         assert format_amount(0) == "¥0.00"
@@ -112,6 +125,7 @@ class TestAmountConvention:
     def test_format_amount_large(self):
         """大金额加千分位"""
         from amount_convention import format_amount
+
         result = format_amount(1000000)  # ¥10,000.00
         assert result == "¥10,000.00"
         result2 = format_amount(12345678)  # ¥123,456.78
@@ -119,21 +133,25 @@ class TestAmountConvention:
 
     def test_validate_fen_ok(self):
         from amount_convention import validate_fen
+
         assert validate_fen(100) == 100
         assert validate_fen(0) == 0
 
     def test_validate_fen_not_int(self):
         from amount_convention import validate_fen
+
         with pytest.raises(ValueError, match="must be integer"):
             validate_fen(100.5)  # type: ignore
 
     def test_validate_fen_negative(self):
         from amount_convention import validate_fen
+
         with pytest.raises(ValueError, match="cannot be negative"):
             validate_fen(-1)
 
     def test_validate_fen_custom_field_name(self):
         from amount_convention import validate_fen
+
         with pytest.raises(ValueError, match="total_fen"):
             validate_fen(-1, field_name="total_fen")
 
@@ -142,15 +160,18 @@ class TestAmountConvention:
 # Correction #7: Data Model Flexibility
 # ═══════════════════════════════════════════════
 
+
 class TestSalesChannel:
     """验证渠道配置表 — 数据驱动，非枚举"""
 
     def test_default_channels_count(self):
         from sales_channel import DEFAULT_CHANNELS
+
         assert len(DEFAULT_CHANNELS) == 11
 
     def test_get_channel_by_id(self):
         from sales_channel import get_channel_by_id
+
         ch = get_channel_by_id("ch_meituan")
         assert ch is not None
         assert ch.channel_name == "美团外卖"
@@ -159,10 +180,12 @@ class TestSalesChannel:
 
     def test_get_channel_not_found(self):
         from sales_channel import get_channel_by_id
+
         assert get_channel_by_id("ch_nonexistent") is None
 
     def test_get_channels_by_type(self):
         from sales_channel import get_channels_by_type
+
         delivery = get_channels_by_type("delivery")
         assert len(delivery) == 3  # 美团, 饿了么, 抖音
         names = {ch.channel_name for ch in delivery}
@@ -191,6 +214,7 @@ class TestSalesChannel:
 
     def test_dine_in_zero_commission(self):
         from sales_channel import get_channel_by_id
+
         ch = get_channel_by_id("ch_dine_in")
         assert ch is not None
         assert ch.commission_rate == 0.0
@@ -198,6 +222,7 @@ class TestSalesChannel:
 
     def test_b2b_channel(self):
         from sales_channel import get_channel_by_id
+
         ch = get_channel_by_id("ch_central_kitchen")
         assert ch is not None
         assert ch.channel_type == "b2b"
@@ -316,24 +341,28 @@ class TestModuleImports:
     def test_import_ontology_entities(self):
         """Ontology entities importable"""
         from entities import Order, Store
+
         assert Order is not None
         assert Store is not None
 
     def test_import_amount_convention(self):
         """Amount convention importable"""
         from amount_convention import fen_to_yuan, yuan_to_fen
+
         assert callable(yuan_to_fen)
         assert callable(fen_to_yuan)
 
     def test_import_sales_channel(self):
         """SalesChannel importable"""
         from sales_channel import DEFAULT_CHANNELS, SalesChannel
+
         assert SalesChannel is not None
         assert len(DEFAULT_CHANNELS) > 0
 
     def test_import_monolith_modules(self):
         """All monolith module packages importable"""
         from services.tunxiang_api.src.modules import brain, gateway, ops, trade
+
         assert trade is not None
         assert ops is not None
         assert brain is not None
@@ -348,6 +377,7 @@ class TestModuleImports:
             ops_routes,
             trade_routes,
         )
+
         assert auth_routes.router is not None
         assert hub_routes.router is not None
         assert trade_routes.router is not None
@@ -357,6 +387,7 @@ class TestModuleImports:
     def test_import_shared(self):
         """Shared utilities importable"""
         from services.tunxiang_api.src.shared.response import err, ok, paginated
+
         assert callable(ok)
         assert callable(err)
         assert callable(paginated)

@@ -16,6 +16,7 @@
   GET  /api/v1/finance/pl/mom?store_id=&month=
        → 月度环比分析（当月 vs 上月 vs 同期去年）
 """
+
 import calendar
 import uuid
 from datetime import date
@@ -35,6 +36,7 @@ _pl_svc = PLService()
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -53,28 +55,23 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
 
 
 def _validate_month(month: str) -> str:
     """验证 YYYY-MM 格式"""
     if len(month) != 7 or month[4] != "-":
-        raise HTTPException(
-            status_code=400, detail=f"month 格式错误: {month}，请使用 YYYY-MM"
-        )
+        raise HTTPException(status_code=400, detail=f"month 格式错误: {month}，请使用 YYYY-MM")
     try:
         int(month[:4])
         int(month[5:7])
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"month 格式错误: {month}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"month 格式错误: {month}") from exc
     return month
 
 
 # ─── GET /pl/store ────────────────────────────────────────────────────────────
+
 
 @router.get("/pl/store", summary="门店 P&L 损益表")
 async def get_store_pl(
@@ -121,9 +118,7 @@ async def get_store_pl(
 
     max_days = 366
     if (end - start).days > max_days:
-        raise HTTPException(
-            status_code=400, detail=f"查询区间不能超过 {max_days} 天"
-        )
+        raise HTTPException(status_code=400, detail=f"查询区间不能超过 {max_days} 天")
 
     try:
         pl = await _pl_svc.get_store_pl(sid, start, end, tid, db)
@@ -134,6 +129,7 @@ async def get_store_pl(
 
 
 # ─── GET /pl/brand ────────────────────────────────────────────────────────────
+
 
 @router.get("/pl/brand", summary="品牌级 P&L（多门店汇总）")
 async def get_brand_pl(
@@ -167,6 +163,7 @@ async def get_brand_pl(
 
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
+
 
 def _month_to_date_range(month: str) -> tuple[date, date]:
     """YYYY-MM → (首日, 末日)"""
@@ -213,6 +210,7 @@ def _pct_change(current: int | float, previous: int | float) -> float | None:
 
 # ─── GET /pl/monthly ──────────────────────────────────────────────────────────
 
+
 @router.get("/pl/monthly", summary="月度门店 P&L（便捷端点）")
 async def get_monthly_store_pl(
     store_id: str = Query(..., description="门店ID"),
@@ -240,6 +238,7 @@ async def get_monthly_store_pl(
 
 
 # ─── GET /pl/monthly-trend ────────────────────────────────────────────────────
+
 
 @router.get("/pl/monthly-trend", summary="月度 P&L 趋势序列")
 async def get_monthly_pl_trend(
@@ -284,6 +283,7 @@ async def get_monthly_pl_trend(
 
 
 # ─── GET /pl/mom ──────────────────────────────────────────────────────────────
+
 
 @router.get("/pl/mom", summary="月度环比分析（当月 vs 上月 vs 去年同月）")
 async def get_pl_mom(
@@ -337,7 +337,8 @@ async def get_pl_mom(
                 "gross_profit_pct": _diff(current, prev, "gross_profit_fen"),
                 "gross_margin_rate_pct_delta": (
                     round(current["gross_margin_rate_pct"] - prev["gross_margin_rate_pct"], 2)
-                    if current and prev else None
+                    if current and prev
+                    else None
                 ),
                 "operating_profit_pct": _diff(current, prev, "operating_profit_fen"),
             },
@@ -346,7 +347,8 @@ async def get_pl_mom(
                 "gross_profit_pct": _diff(current, yoy, "gross_profit_fen"),
                 "gross_margin_rate_pct_delta": (
                     round(current["gross_margin_rate_pct"] - yoy["gross_margin_rate_pct"], 2)
-                    if current and yoy else None
+                    if current and yoy
+                    else None
                 ),
                 "operating_profit_pct": _diff(current, yoy, "operating_profit_fen"),
             },

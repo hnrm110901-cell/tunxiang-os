@@ -20,10 +20,13 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis  # noqa: F401 — 仅供类型注解
 from models.journey_instance import JourneyInstance
 from services.journey_orchestrator import (
     _journey_executions,
@@ -115,9 +118,7 @@ class JourneyExecutor:
         now = datetime.now(timezone.utc)
         created_count = 0
 
-        published_journeys = [
-            j for j in _journeys.values() if j.get("status") == "published"
-        ]
+        published_journeys = [j for j in _journeys.values() if j.get("status") == "published"]
 
         for journey in published_journeys:
             journey_id: str = journey["journey_id"]
@@ -230,7 +231,8 @@ class JourneyExecutor:
 
         # 找到该租户下所有 published 状态、匹配 trigger_type 的旅程
         matching_journeys = [
-            j for j in _journeys.values()
+            j
+            for j in _journeys.values()
             if j.get("status") == "published"
             and j.get("trigger", {}).get("type") == trigger_type
             and j.get("tenant_id") == str(tenant_id)
@@ -301,65 +303,43 @@ class JourneyExecutor:
             customer_id 字符串列表
         """
         if trigger_type == "no_visit_30d":
-            return await self._fetch_no_visit_customers(
-                days=30, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=30, tenant_id=tenant_id)
 
         elif trigger_type == "no_visit_15d":
-            return await self._fetch_no_visit_customers(
-                days=15, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=15, tenant_id=tenant_id)
 
         elif trigger_type == "no_visit_7d":
-            return await self._fetch_no_visit_customers(
-                days=7, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=7, tenant_id=tenant_id)
 
         elif trigger_type == "birthday_approaching":
-            return await self._fetch_birthday_approaching_customers(
-                within_days=7, tenant_id=tenant_id
-            )
+            return await self._fetch_birthday_approaching_customers(within_days=7, tenant_id=tenant_id)
 
         elif trigger_type == "first_visit_no_repeat_48h":
-            return await self._fetch_first_visit_no_repeat_customers(
-                hours=48, tenant_id=tenant_id
-            )
+            return await self._fetch_first_visit_no_repeat_customers(hours=48, tenant_id=tenant_id)
 
         elif trigger_type == "dish_repurchase_cycle":
             # 招牌菜复购周期到期：复用未到店逻辑，默认周期14天
             days = trigger_params.get("params", {}).get("cycle_days", 14)
-            return await self._fetch_no_visit_customers(
-                days=days, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=days, tenant_id=tenant_id)
 
         elif trigger_type == "reservation_abandoned":
-            return await self._fetch_reservation_abandoned_customers(
-                tenant_id=tenant_id
-            )
+            return await self._fetch_reservation_abandoned_customers(tenant_id=tenant_id)
 
         elif trigger_type == "banquet_lead_no_close":
             days = trigger_params.get("params", {}).get("days", 3)
-            return await self._fetch_banquet_lead_no_close_customers(
-                days=days, tenant_id=tenant_id
-            )
+            return await self._fetch_banquet_lead_no_close_customers(days=days, tenant_id=tenant_id)
 
         elif trigger_type == "review_improved":
             # 门店评分改善属于全员广播类，返回近30天活跃客户
-            return await self._fetch_no_visit_customers(
-                days=30, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=30, tenant_id=tenant_id)
 
         elif trigger_type == "new_dish_launch":
             # 新品上线广播：近60天活跃客户
-            return await self._fetch_no_visit_customers(
-                days=60, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=60, tenant_id=tenant_id)
 
         elif trigger_type == "weather_change":
             # 天气触发：近30天活跃客户（天气 API 集成留待后续）
-            return await self._fetch_no_visit_customers(
-                days=30, tenant_id=tenant_id
-            )
+            return await self._fetch_no_visit_customers(days=30, tenant_id=tenant_id)
 
         else:
             logger.warning(
@@ -567,7 +547,9 @@ class JourneyExecutor:
                     journey_id=journey_id,
                 )
                 await self._db_mark_instance(
-                    db, instance, "failed",
+                    db,
+                    instance,
+                    "failed",
                     error="journey_not_found",
                     now=now,
                 )
@@ -582,9 +564,7 @@ class JourneyExecutor:
             current_node_id: str | None = instance.current_node_id
             if not current_node_id:
                 # 无下一节点，旅程完成
-                await self._db_mark_instance(
-                    db, instance, "completed", now=now, set_completed_at=True
-                )
+                await self._db_mark_instance(db, instance, "completed", now=now, set_completed_at=True)
                 logger.info(
                     "journey_instance_completed",
                     instance_id=str(instance_id),
@@ -601,7 +581,9 @@ class JourneyExecutor:
                     node_id=current_node_id,
                 )
                 await self._db_mark_instance(
-                    db, instance, "failed",
+                    db,
+                    instance,
+                    "failed",
                     error=f"node_not_found:{current_node_id}",
                     now=now,
                     set_completed_at=True,
@@ -661,10 +643,7 @@ class JourneyExecutor:
                 continue
 
             # 执行成功，写执行日志，推进实例状态
-            _append_execution_log(
-                journey_id, str(instance_id),
-                str(instance.customer_id), node, result_data
-            )
+            _append_execution_log(journey_id, str(instance_id), str(instance.customer_id), node, result_data)
             await self._db_advance_instance(db, instance, node, result_data, now)
             advanced += 1
 
@@ -690,11 +669,7 @@ class JourneyExecutor:
             values["last_error"] = error
         if set_completed_at:
             values["completed_at"] = now
-        await db.execute(
-            update(JourneyInstance)
-            .where(JourneyInstance.id == instance.id)
-            .values(**values)
-        )
+        await db.execute(update(JourneyInstance).where(JourneyInstance.id == instance.id).values(**values))
 
     async def _db_advance_instance(
         self,
@@ -720,9 +695,7 @@ class JourneyExecutor:
         if action == "wait":
             resume_at_str: str = result.get("resume_at", now.isoformat())
             try:
-                resume_at = datetime.fromisoformat(
-                    resume_at_str.replace("Z", "+00:00")
-                )
+                resume_at = datetime.fromisoformat(resume_at_str.replace("Z", "+00:00"))
             except ValueError:
                 resume_at = now
             next_node = node.get("next")
@@ -783,9 +756,7 @@ class JourneyExecutor:
 
         if node_type == "wait":
             wait_hours: int = int(node.get("wait_hours", 24))
-            resume_at = (
-                datetime.now(timezone.utc) + timedelta(hours=wait_hours)
-            ).isoformat()
+            resume_at = (datetime.now(timezone.utc) + timedelta(hours=wait_hours)).isoformat()
             return {"action": "wait", "resume_at": resume_at}
 
         elif node_type == "send_content":
@@ -933,9 +904,7 @@ class JourneyExecutor:
 
         if channel == "wecom":
             # 2. 查询企微 external_userid
-            wecom_user_id: str | None = await self._get_wecom_user_id(
-                instance.customer_id, tenant_id
-            )
+            wecom_user_id: str | None = await self._get_wecom_user_id(instance.customer_id, tenant_id)
             if not wecom_user_id:
                 logger.warning(
                     "send_content_no_wecom_binding",
@@ -1056,9 +1025,7 @@ class JourneyExecutor:
 
         if condition_type == "is_converted":
             is_converted = await self._query_is_converted(instance, tenant_id)
-            next_node_id = (
-                node.get("true_next") if is_converted else node.get("false_next")
-            )
+            next_node_id = node.get("true_next") if is_converted else node.get("false_next")
             return {
                 "action": "branch",
                 "condition_type": condition_type,
@@ -1098,9 +1065,7 @@ class JourneyExecutor:
             last_order_at: str | None = customer.get("last_order_at")
             if not last_order_at:
                 return False
-            last_order_dt = datetime.fromisoformat(
-                last_order_at.replace("Z", "+00:00")
-            )
+            last_order_dt = datetime.fromisoformat(last_order_at.replace("Z", "+00:00"))
             started_at: datetime = instance.started_at
             if started_at.tzinfo is None:
                 started_at = started_at.replace(tzinfo=timezone.utc)
@@ -1227,9 +1192,7 @@ def _append_execution_log(
     journey = _journeys.get(journey_id)
     if journey:
         journey.setdefault("stats", {})
-        journey["stats"]["executed_count"] = (
-            journey["stats"].get("executed_count", 0) + 1
-        )
+        journey["stats"]["executed_count"] = journey["stats"].get("executed_count", 0) + 1
 
 
 # ── JourneyEventListener ─────────────────────────────────────────────────────
@@ -1259,7 +1222,7 @@ class JourneyEventListener:
     EVENT_TO_TRIGGER: dict[str, str | None] = {
         "member.registered": "first_visit_no_repeat_48h",
         "member.order.paid": "dish_repurchase_cycle",
-        "member.sv.recharged": None,   # 储值充值不触发旅程
+        "member.sv.recharged": None,  # 储值充值不触发旅程
         "member.order.placed": None,
         "member.order.cancelled": None,
     }
@@ -1318,10 +1281,7 @@ class JourneyEventListener:
 
             for _stream, entries in messages:
                 for entry_id, fields in entries:
-                    await self._handle_event(
-                        redis, entry_id, fields, db,
-                        STREAM_KEY, DLQ_STREAM_KEY
-                    )
+                    await self._handle_event(redis, entry_id, fields, db, STREAM_KEY, DLQ_STREAM_KEY)
 
     async def _handle_event(
         self,
@@ -1382,6 +1342,7 @@ class JourneyEventListener:
             )
             from datetime import datetime
             from datetime import timezone as tz
+
             await redis.xadd(
                 dlq_key,
                 {

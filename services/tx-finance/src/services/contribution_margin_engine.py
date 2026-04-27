@@ -28,22 +28,24 @@ logger = structlog.get_logger(__name__)
 # 枚举 & 常量
 # ---------------------------------------------------------------------------
 
+
 class CostBehaviorType(str, Enum):
-    FIXED = "fixed"                    # 固定成本（与营业额无关）
-    VARIABLE = "variable"              # 完全变动成本（随营业额线性变化）
-    SEMI_VARIABLE = "semi_variable"    # 半变动成本（底薪 + 绩效）
+    FIXED = "fixed"  # 固定成本（与营业额无关）
+    VARIABLE = "variable"  # 完全变动成本（随营业额线性变化）
+    SEMI_VARIABLE = "semi_variable"  # 半变动成本（底薪 + 绩效）
 
 
 class MealPeriod(str, Enum):
-    LUNCH = "lunch"      # 午市
-    DINNER = "dinner"    # 晚市
-    SUPPER = "supper"    # 宵夜
+    LUNCH = "lunch"  # 午市
+    DINNER = "dinner"  # 晚市
+    SUPPER = "supper"  # 宵夜
     ALL_DAY = "all_day"  # 全天（用于不区分时段的场景）
 
 
 # ---------------------------------------------------------------------------
 # 配置数据模型
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CostBehaviorConfig:
@@ -81,17 +83,11 @@ class CostBehaviorConfig:
     def validate(self) -> None:
         """校验配置合法性，不合法时抛出 ValueError。"""
         if not (0.0 <= self.variable_rate <= 1.0):
-            raise ValueError(
-                f"variable_rate 必须在 [0, 1]，当前值：{self.variable_rate}"
-            )
+            raise ValueError(f"variable_rate 必须在 [0, 1]，当前值：{self.variable_rate}")
         if not (0.0 <= self.semi_variable_variable_rate <= 1.0):
-            raise ValueError(
-                f"semi_variable_variable_rate 必须在 [0, 1]，当前值：{self.semi_variable_variable_rate}"
-            )
+            raise ValueError(f"semi_variable_variable_rate 必须在 [0, 1]，当前值：{self.semi_variable_variable_rate}")
         if self.semi_variable_base_fen < 0:
-            raise ValueError(
-                f"semi_variable_base_fen 不能为负数，当前值：{self.semi_variable_base_fen}"
-            )
+            raise ValueError(f"semi_variable_base_fen 不能为负数，当前值：{self.semi_variable_base_fen}")
         for key, val in self.fixed_costs.items():
             if val < 0:
                 raise ValueError(f"fixed_costs[{key}] 不能为负数，当前值：{val}")
@@ -111,14 +107,15 @@ class CostBehaviorConfig:
 # 结果数据模型
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class DishContributionResult:
     """单品边际贡献计算结果"""
 
     dish_name: str
     selling_price_fen: int
-    variable_cost_fen: int          # 该品的变动成本（分）
-    contribution_margin_fen: int    # 边际贡献额（分）
+    variable_cost_fen: int  # 该品的变动成本（分）
+    contribution_margin_fen: int  # 边际贡献额（分）
     contribution_margin_rate: float  # 边际贡献率
 
 
@@ -127,31 +124,31 @@ class StoreBreakEvenResult:
     """门店保本点计算结果"""
 
     # 输入汇总
-    total_fixed_cost_fen: int        # 月度总固定成本（分）
-    weighted_avg_cm_rate: float      # 加权平均边际贡献率
-    avg_check_fen: int               # 平均客单价（分）
+    total_fixed_cost_fen: int  # 月度总固定成本（分）
+    weighted_avg_cm_rate: float  # 加权平均边际贡献率
+    avg_check_fen: int  # 平均客单价（分）
 
     # 保本点
-    break_even_revenue_fen: int      # 保本营业额（分）
-    break_even_covers: int           # 保本客单数（桌/单）
+    break_even_revenue_fen: int  # 保本营业额（分）
+    break_even_covers: int  # 保本客单数（桌/单）
 
     # 安全边际相关（若传入实际营业额则计算）
     actual_revenue_fen: int | None = None
-    safety_margin_fen: int | None = None      # 安全边际额（分）
-    safety_margin_rate: float | None = None   # 安全边际率
+    safety_margin_fen: int | None = None  # 安全边际额（分）
+    safety_margin_rate: float | None = None  # 安全边际率
 
 
 @dataclass(frozen=True)
 class PeriodBreakEvenResult:
     """单时段保本分析结果"""
 
-    period: str                       # 时段标识（MealPeriod）
-    period_fixed_cost_fen: int        # 分摊到本时段的固定成本（分）
-    period_variable_rate: float       # 本时段综合变动成本率
-    avg_check_fen: int                # 本时段平均客单价（分）
+    period: str  # 时段标识（MealPeriod）
+    period_fixed_cost_fen: int  # 分摊到本时段的固定成本（分）
+    period_variable_rate: float  # 本时段综合变动成本率
+    avg_check_fen: int  # 本时段平均客单价（分）
 
-    break_even_revenue_fen: int       # 时段保本营业额（分）
-    break_even_covers: int            # 时段保本客单数
+    break_even_revenue_fen: int  # 时段保本营业额（分）
+    break_even_covers: int  # 时段保本客单数
 
     actual_revenue_fen: int | None = None
     is_profitable: bool | None = None  # 实际营收是否覆盖时段固定成本
@@ -160,6 +157,7 @@ class PeriodBreakEvenResult:
 # ---------------------------------------------------------------------------
 # 引擎类
 # ---------------------------------------------------------------------------
+
 
 class ContributionMarginEngine:
     """
@@ -201,9 +199,7 @@ class ContributionMarginEngine:
         selling_price_fen: int = dish_data["selling_price_fen"]
 
         if selling_price_fen <= 0:
-            raise ValueError(
-                f"selling_price_fen 必须大于 0，菜品：{dish_name}，当前值：{selling_price_fen}"
-            )
+            raise ValueError(f"selling_price_fen 必须大于 0，菜品：{dish_name}，当前值：{selling_price_fen}")
 
         # 变动成本：优先使用精确值，否则按比率估算
         if "custom_variable_cost_fen" in dish_data:
@@ -212,9 +208,7 @@ class ContributionMarginEngine:
             variable_cost_fen = int(selling_price_fen * config.total_variable_rate)
 
         contribution_margin_fen: int = selling_price_fen - variable_cost_fen
-        contribution_margin_rate: float = (
-            contribution_margin_fen / selling_price_fen if selling_price_fen > 0 else 0.0
-        )
+        contribution_margin_rate: float = contribution_margin_fen / selling_price_fen if selling_price_fen > 0 else 0.0
 
         log = logger.bind(
             dish_name=dish_name,
@@ -257,14 +251,8 @@ class ContributionMarginEngine:
                 f"sales_volumes 长度 ({len(sales_volumes)}) 不一致"
             )
 
-        total_revenue_fen: int = sum(
-            d.selling_price_fen * v
-            for d, v in zip(dish_contributions, sales_volumes)
-        )
-        total_cm_fen: int = sum(
-            d.contribution_margin_fen * v
-            for d, v in zip(dish_contributions, sales_volumes)
-        )
+        total_revenue_fen: int = sum(d.selling_price_fen * v for d, v in zip(dish_contributions, sales_volumes))
+        total_cm_fen: int = sum(d.contribution_margin_fen * v for d, v in zip(dish_contributions, sales_volumes))
 
         if total_revenue_fen <= 0:
             raise ValueError("总营收为 0，无法计算加权平均边际贡献率")
@@ -317,9 +305,7 @@ class ContributionMarginEngine:
 
         # 加权平均边际贡献率：未提供则按成本结构估算
         cm_rate: float = (
-            weighted_avg_cm_rate
-            if weighted_avg_cm_rate is not None
-            else (1.0 - config.total_variable_rate)
+            weighted_avg_cm_rate if weighted_avg_cm_rate is not None else (1.0 - config.total_variable_rate)
         )
         if cm_rate <= 0:
             raise ValueError(
@@ -336,9 +322,7 @@ class ContributionMarginEngine:
         safety_margin_rate: float | None = None
         if actual_revenue_fen is not None:
             safety_margin_fen = actual_revenue_fen - break_even_revenue_fen
-            safety_margin_rate = (
-                safety_margin_fen / actual_revenue_fen if actual_revenue_fen > 0 else 0.0
-            )
+            safety_margin_rate = safety_margin_fen / actual_revenue_fen if actual_revenue_fen > 0 else 0.0
 
         logger.info(
             "store_break_even_calculated",
@@ -399,9 +383,7 @@ class ContributionMarginEngine:
         # 校验权重之和
         total_weight: float = sum(p.get("weight", 0.0) for p in periods)
         if abs(total_weight - 1.0) > 0.01:
-            raise ValueError(
-                f"各时段 weight 之和应为 1.0，当前合计：{total_weight:.4f}"
-            )
+            raise ValueError(f"各时段 weight 之和应为 1.0，当前合计：{total_weight:.4f}")
 
         total_fixed = config.total_fixed_fen
         results: list[PeriodBreakEvenResult] = []
@@ -413,28 +395,21 @@ class ContributionMarginEngine:
             actual_revenue_fen: int | None = period_data.get("actual_revenue_fen")
 
             if avg_check_fen <= 0:
-                raise ValueError(
-                    f"时段 {period_label} 的 avg_check_fen 必须大于 0，当前值：{avg_check_fen}"
-                )
+                raise ValueError(f"时段 {period_label} 的 avg_check_fen 必须大于 0，当前值：{avg_check_fen}")
 
             # 分摊固定成本
             period_fixed_cost_fen: int = math.ceil(total_fixed * weight)
 
             # 本时段变动成本率（允许覆盖，用于外卖占比高的时段）
-            period_variable_rate: float = float(
-                period_data.get("variable_rate_override", config.total_variable_rate)
-            )
+            period_variable_rate: float = float(period_data.get("variable_rate_override", config.total_variable_rate))
             if not (0.0 <= period_variable_rate < 1.0):
                 raise ValueError(
-                    f"时段 {period_label} 的 variable_rate_override 必须在 [0, 1)，"
-                    f"当前值：{period_variable_rate}"
+                    f"时段 {period_label} 的 variable_rate_override 必须在 [0, 1)，当前值：{period_variable_rate}"
                 )
 
             period_cm_rate: float = 1.0 - period_variable_rate
             if period_cm_rate <= 0:
-                raise ValueError(
-                    f"时段 {period_label} 的边际贡献率为 0 或负数，请检查变动成本率配置"
-                )
+                raise ValueError(f"时段 {period_label} 的边际贡献率为 0 或负数，请检查变动成本率配置")
 
             # 时段保本点
             break_even_revenue_fen: int = math.ceil(period_fixed_cost_fen / period_cm_rate)

@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -98,7 +97,9 @@ async def get_today_dashboard(
 
 
 async def _query_store_info(
-    db: AsyncSession, tenant_id: str, store_id: str,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
 ) -> Dict[str, Any]:
     sql = text("""
         SELECT id, store_name
@@ -116,7 +117,10 @@ async def _query_store_info(
 
 
 async def _query_headcount(
-    db: AsyncSession, tenant_id: str, store_id: str, d: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    d: date,
 ) -> Dict[str, Any]:
     """查排班数、实到、缺勤、请假、迟到。"""
     # 应排班人数
@@ -185,7 +189,10 @@ async def _query_headcount(
 
 
 async def _query_positions(
-    db: AsyncSession, tenant_id: str, store_id: str, d: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    d: date,
 ) -> List[Dict[str, Any]]:
     """按岗位统计应到/实到/缺口。"""
     sql = text("""
@@ -227,18 +234,23 @@ async def _query_positions(
     out: List[Dict[str, Any]] = []
     for row in rows:
         gap_val = row["gap"]
-        out.append({
-            "position": row["position"],
-            "required": row["required"],
-            "actual": row["actual"],
-            "gap": gap_val,
-            "status": "gap" if gap_val > 0 else "ok",
-        })
+        out.append(
+            {
+                "position": row["position"],
+                "required": row["required"],
+                "actual": row["actual"],
+                "gap": gap_val,
+                "status": "gap" if gap_val > 0 else "ok",
+            }
+        )
     return out
 
 
 async def _query_gaps(
-    db: AsyncSession, tenant_id: str, store_id: str, d: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    d: date,
 ) -> List[Dict[str, Any]]:
     """查当前未填补缺口。"""
     sql = text("""
@@ -269,7 +281,10 @@ async def _query_gaps(
 
 
 async def _query_pending_actions(
-    db: AsyncSession, tenant_id: str, store_id: str, d: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    d: date,
 ) -> Dict[str, int]:
     """查待处理事项数量。"""
     pending_leaves_sql = text("""
@@ -326,7 +341,10 @@ async def _query_pending_actions(
 
 
 async def _query_labor_cost(
-    db: AsyncSession, tenant_id: str, store_id: str, d: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    d: date,
 ) -> Dict[str, Any]:
     """今日预估人工成本 + 本月累计。"""
     # 今日：按出勤员工的日薪标准估算
@@ -370,7 +388,10 @@ async def _query_labor_cost(
 
 
 async def _query_timeline(
-    db: AsyncSession, tenant_id: str, store_id: str, d: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    d: date,
 ) -> List[Dict[str, str]]:
     """今日事件时间线（打卡+请假，最近50条）。"""
     sql = text("""
@@ -563,11 +584,13 @@ async def get_fill_suggestions(
     time_end = gap_row["end_time"] or time(17, 0)
 
     candidates = await find_available_employees(
-        db, tenant_id,
+        db,
+        tenant_id,
         str(gap_row["store_id"]),
         gap_row["schedule_date"],
         gap_row["position"],
-        time_start, time_end,
+        time_start,
+        time_end,
     )
 
     gap_info = {
@@ -604,17 +627,19 @@ async def execute_fill_gap(
 
     # 发射事件（不阻塞主流程）
     publisher = UniversalPublisher(tenant_id=tenant_id)
-    asyncio.create_task(publisher.publish(
-        event_type=OrgEventType.SHIFT_GAP_FILLED,
-        payload={
-            "gap_id": gap_id,
-            "employee_id": employee_id,
-            "fill_type": fill_type,
-            "store_id": result["store_id"],
-            "position": result["position"],
-            "schedule_date": result["schedule_date"],
-        },
-    ))
+    asyncio.create_task(
+        publisher.publish(
+            event_type=OrgEventType.SHIFT_GAP_FILLED,
+            payload={
+                "gap_id": gap_id,
+                "employee_id": employee_id,
+                "fill_type": fill_type,
+                "store_id": result["store_id"],
+                "position": result["position"],
+                "schedule_date": result["schedule_date"],
+            },
+        )
+    )
 
     # 异步通知
     asyncio.create_task(notify_fill(tenant_id, employee_id, result))
@@ -662,7 +687,11 @@ async def execute_quick_action(
 
 
 async def _action_acknowledge_late(
-    db: AsyncSession, tenant_id: str, target_id: str, operator_id: str, note: Optional[str],
+    db: AsyncSession,
+    tenant_id: str,
+    target_id: str,
+    operator_id: str,
+    note: Optional[str],
 ) -> Dict[str, Any]:
     """确认迟到（添加备注，不改变状态）。"""
     sql = text("""
@@ -675,9 +704,14 @@ async def _action_acknowledge_late(
         RETURNING id, employee_id, status
     """)
     note_append = f"\n[店长确认] {note or ''} (by {operator_id})"
-    result = await db.execute(sql, {
-        "target_id": target_id, "tid": tenant_id, "note_append": note_append,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "target_id": target_id,
+            "tid": tenant_id,
+            "note_append": note_append,
+        },
+    )
     row = result.mappings().first()
     await db.commit()
     if not row:
@@ -686,7 +720,11 @@ async def _action_acknowledge_late(
 
 
 async def _action_mark_absent(
-    db: AsyncSession, tenant_id: str, target_id: str, operator_id: str, note: Optional[str],
+    db: AsyncSession,
+    tenant_id: str,
+    target_id: str,
+    operator_id: str,
+    note: Optional[str],
 ) -> Dict[str, Any]:
     """手动标记旷工。"""
     sql = text("""
@@ -700,9 +738,14 @@ async def _action_mark_absent(
         RETURNING id, employee_id
     """)
     note_append = f"\n[手动标记旷工] {note or ''} (by {operator_id})"
-    result = await db.execute(sql, {
-        "target_id": target_id, "tid": tenant_id, "note_append": note_append,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "target_id": target_id,
+            "tid": tenant_id,
+            "note_append": note_append,
+        },
+    )
     row = result.mappings().first()
     await db.commit()
     if not row:
@@ -710,19 +753,25 @@ async def _action_mark_absent(
 
     # 发事件
     publisher = UniversalPublisher(tenant_id=tenant_id)
-    asyncio.create_task(publisher.publish(
-        event_type=OrgEventType.ATTENDANCE_ABSENT,
-        payload={
-            "attendance_id": target_id,
-            "employee_id": row["employee_id"],
-            "operator_id": operator_id,
-        },
-    ))
+    asyncio.create_task(
+        publisher.publish(
+            event_type=OrgEventType.ATTENDANCE_ABSENT,
+            payload={
+                "attendance_id": target_id,
+                "employee_id": row["employee_id"],
+                "operator_id": operator_id,
+            },
+        )
+    )
     return {"ok": True, "action": "mark_absent", "target_id": target_id}
 
 
 async def _action_approve_leave(
-    db: AsyncSession, tenant_id: str, target_id: str, operator_id: str, note: Optional[str],
+    db: AsyncSession,
+    tenant_id: str,
+    target_id: str,
+    operator_id: str,
+    note: Optional[str],
 ) -> Dict[str, Any]:
     """快速审批请假。"""
     sql = text("""
@@ -736,31 +785,42 @@ async def _action_approve_leave(
           AND status = 'pending'
         RETURNING id, employee_id, leave_type, start_date, end_date
     """)
-    result = await db.execute(sql, {
-        "target_id": target_id, "tid": tenant_id, "operator_id": operator_id,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "target_id": target_id,
+            "tid": tenant_id,
+            "operator_id": operator_id,
+        },
+    )
     row = result.mappings().first()
     await db.commit()
     if not row:
         return {"ok": False, "error": "leave_not_found_or_not_pending"}
 
     publisher = UniversalPublisher(tenant_id=tenant_id)
-    asyncio.create_task(publisher.publish(
-        event_type=OrgEventType.LEAVE_APPROVED,
-        payload={
-            "leave_id": target_id,
-            "employee_id": row["employee_id"],
-            "leave_type": row["leave_type"],
-            "start_date": str(row["start_date"]),
-            "end_date": str(row["end_date"]),
-            "approved_by": operator_id,
-        },
-    ))
+    asyncio.create_task(
+        publisher.publish(
+            event_type=OrgEventType.LEAVE_APPROVED,
+            payload={
+                "leave_id": target_id,
+                "employee_id": row["employee_id"],
+                "leave_type": row["leave_type"],
+                "start_date": str(row["start_date"]),
+                "end_date": str(row["end_date"]),
+                "approved_by": operator_id,
+            },
+        )
+    )
     return {"ok": True, "action": "approve_leave", "target_id": target_id}
 
 
 async def _action_assign_fill(
-    db: AsyncSession, tenant_id: str, target_id: str, operator_id: str, note: Optional[str],
+    db: AsyncSession,
+    tenant_id: str,
+    target_id: str,
+    operator_id: str,
+    note: Optional[str],
 ) -> Dict[str, Any]:
     """快速指派补位（target_id = gap_id，note 中包含 employee_id）。"""
     if not note:
@@ -771,7 +831,11 @@ async def _action_assign_fill(
         employee_id = employee_id.split("=", 1)[1].strip()
 
     result = await execute_fill_gap(
-        db, tenant_id, target_id, employee_id, "internal_transfer",
+        db,
+        tenant_id,
+        target_id,
+        employee_id,
+        "internal_transfer",
     )
     return {"ok": True, "action": "assign_fill", "target_id": target_id, "fill_result": result}
 
@@ -833,24 +897,31 @@ async def get_weekly_summary(
         LEFT JOIN daily_scheduled dsc ON dsc.schedule_date = ds.schedule_date
         ORDER BY ds.schedule_date
     """)
-    result = await db.execute(sql, {
-        "tid": tenant_id, "store_id": store_id,
-        "week_start": week_start, "week_end": week_end,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "tid": tenant_id,
+            "store_id": store_id,
+            "week_start": week_start,
+            "week_end": week_end,
+        },
+    )
     rows = result.mappings().all()
 
     daily_data = []
     for row in rows:
-        daily_data.append({
-            "date": str(row["date"]),
-            "scheduled": row["scheduled"],
-            "attended": row["attended"],
-            "total_hours": float(row["total_hours"]),
-            "overtime_hours": float(row["overtime_hours"]),
-            "late_cnt": row["late_cnt"],
-            "absent_cnt": row["absent_cnt"],
-            "attendance_rate": float(row["attendance_rate"]),
-        })
+        daily_data.append(
+            {
+                "date": str(row["date"]),
+                "scheduled": row["scheduled"],
+                "attended": row["attended"],
+                "total_hours": float(row["total_hours"]),
+                "overtime_hours": float(row["overtime_hours"]),
+                "late_cnt": row["late_cnt"],
+                "absent_cnt": row["absent_cnt"],
+                "attendance_rate": float(row["attendance_rate"]),
+            }
+        )
 
     # 汇总
     total_scheduled = sum(d["scheduled"] for d in daily_data)
@@ -934,8 +1005,10 @@ async def get_labor_metrics(
     """)
 
     params = {
-        "tid": tenant_id, "store_id": store_id,
-        "month_start": month_start, "month_end": month_end,
+        "tid": tenant_id,
+        "store_id": store_id,
+        "month_start": month_start,
+        "month_end": month_end,
         "month": month,
     }
 

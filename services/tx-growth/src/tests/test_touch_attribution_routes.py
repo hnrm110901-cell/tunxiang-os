@@ -21,6 +21,7 @@
 18. POST /api/v1/growth/attribution/attribute-conversion      — 无触达记录 attributed=False
 19. POST /api/v1/growth/attribution/attribute-conversion      — 非法 conversion_type → 422
 """
+
 import os
 import sys
 import types
@@ -34,7 +35,6 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -111,6 +111,7 @@ def _rows_result(rows):
 # 场景 1-3: POST /track-click/{touch_id}
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_track_click_ok():
     """记录点击成功，counted=True"""
     event = MagicMock()
@@ -166,6 +167,7 @@ def test_track_click_redis_dedup():
 # 场景 4-6: GET /touches
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_touches_ok():
     """正常返回触达列表"""
     touch_row = MagicMock()
@@ -215,6 +217,7 @@ def test_list_touches_invalid_campaign_id():
 # 场景 7-8: GET /conversions
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_conversions_ok():
     """正常返回空转化列表"""
     count_r = _count_row(0)
@@ -243,6 +246,7 @@ def test_list_conversions_invalid_date():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 9-11: GET /campaigns/{id}/summary
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_get_campaign_summary_from_cache():
     """命中预聚合缓存，返回 source=cache"""
@@ -322,6 +326,7 @@ def test_get_campaign_summary_invalid_id():
 # 场景 12: GET /performance/channels
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_channel_performance_ok():
     """正常返回各渠道效果对比数据"""
     ch = MagicMock()
@@ -353,6 +358,7 @@ def test_get_channel_performance_ok():
 # 场景 13: GET /performance/segments
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_segment_performance_ok():
     """正常返回各人群效果对比数据"""
     seg = MagicMock()
@@ -382,6 +388,7 @@ def test_get_segment_performance_ok():
 # 场景 14-16: POST /touch-record
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_record_touch_ok():
     """正常记录营销触达，返回 touch_id"""
     event = MagicMock()
@@ -391,9 +398,7 @@ def test_record_touch_ok():
     event.sent_at = _NOW
 
     _fake_tracker.record_touch = AsyncMock(return_value=event)
-    _fake_tracker.generate_tracked_url = MagicMock(
-        return_value="https://t.tunxiang.com/c/abc123"
-    )
+    _fake_tracker.generate_tracked_url = MagicMock(return_value="https://t.tunxiang.com/c/abc123")
 
     mock_db = _make_async_ctx([])
     _fake_session_factory.return_value = mock_db

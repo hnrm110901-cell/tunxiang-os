@@ -9,6 +9,7 @@ CoreML Bridge Python 层 — FastAPI 服务
   POST /predict/traffic         — 客流量预测（规则引擎）
   GET  /model-status            — 各模型当前推理方式（coreml / rule_fallback）
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -18,7 +19,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .dish_time_predictor import (
-    DishTimePredictor,
     PredictionInput,
     get_predictor,
 )

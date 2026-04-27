@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
+from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -28,6 +27,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # Pydantic Models
 # ---------------------------------------------------------------------------
 
+
 class BatchSubmitRequest(BaseModel):
     store_id: str
     domain: str
@@ -37,6 +37,7 @@ class BatchSubmitRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_submissions(
@@ -69,16 +70,11 @@ async def list_submissions(
         params["limit"] = size
         params["offset"] = offset
 
-        count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM civic_submissions WHERE {where}"), params
-        )
+        count_result = await db.execute(text(f"SELECT COUNT(*) FROM civic_submissions WHERE {where}"), params)
         total = count_result.scalar() or 0
 
         rows = await db.execute(
-            text(
-                f"SELECT * FROM civic_submissions WHERE {where} "
-                f"ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
-            ),
+            text(f"SELECT * FROM civic_submissions WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"),
             params,
         )
         items = [dict(r._mapping) for r in rows]
@@ -100,10 +96,7 @@ async def retry_submission(
     try:
         # Verify the submission exists and is in failed state
         check = await db.execute(
-            text(
-                "SELECT id, status, retry_count FROM civic_submissions "
-                "WHERE id = :id AND tenant_id = :tid"
-            ),
+            text("SELECT id, status, retry_count FROM civic_submissions WHERE id = :id AND tenant_id = :tid"),
             {"id": submission_id, "tid": x_tenant_id},
         )
         row = check.fetchone()
@@ -185,9 +178,7 @@ async def get_submission_stats(
         recent_row = recent.fetchone()
         recent_total = recent_row.total if recent_row else 0
         recent_success = recent_row.success if recent_row else 0
-        success_rate = round(
-            (recent_success / recent_total * 100) if recent_total > 0 else 0, 2
-        )
+        success_rate = round((recent_success / recent_total * 100) if recent_total > 0 else 0, 2)
 
         log.info("submission_stats", total=total_all)
         return {
@@ -270,10 +261,7 @@ async def get_submission_detail(
     await _set_tenant(db, x_tenant_id)
     try:
         row = await db.execute(
-            text(
-                "SELECT * FROM civic_submissions "
-                "WHERE id = :id AND tenant_id = :tid"
-            ),
+            text("SELECT * FROM civic_submissions WHERE id = :id AND tenant_id = :tid"),
             {"id": submission_id, "tid": x_tenant_id},
         )
         result = row.fetchone()

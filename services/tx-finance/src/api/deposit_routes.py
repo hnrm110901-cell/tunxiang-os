@@ -11,6 +11,7 @@
   GET  /api/v1/deposits/report/aging            — 押金账龄分析
   GET  /api/v1/deposits/report/shift-summary    — 结班押金汇总
 """
+
 import asyncio
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/deposits", tags=["押金管理"])
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
         return uuid.UUID(val)
@@ -56,6 +58,7 @@ def _serialize_row(row: dict) -> dict:
 
 # ─── 依赖注入 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -63,26 +66,27 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 # ─── 请求/响应模型 ─────────────────────────────────────────────────────────────
 
+
 class DepositCreate(BaseModel):
     store_id: uuid.UUID
     customer_id: Optional[uuid.UUID] = None
     reservation_id: Optional[uuid.UUID] = None
     order_id: Optional[uuid.UUID] = None
-    amount_fen: int                      # 押金金额（分）
-    payment_method: str                  # wechat/alipay/cash/card
-    payment_ref: Optional[str] = None   # 支付流水号
-    expires_days: int = 30              # 有效期天数，默认 30 天
+    amount_fen: int  # 押金金额（分）
+    payment_method: str  # wechat/alipay/cash/card
+    payment_ref: Optional[str] = None  # 支付流水号
+    expires_days: int = 30  # 有效期天数，默认 30 天
     remark: Optional[str] = None
 
 
 class DepositApply(BaseModel):
     order_id: uuid.UUID
-    apply_amount_fen: int               # 本次抵扣金额（分）
+    apply_amount_fen: int  # 本次抵扣金额（分）
     remark: Optional[str] = None
 
 
 class DepositRefund(BaseModel):
-    refund_amount_fen: int              # 本次退还金额（分）
+    refund_amount_fen: int  # 本次退还金额（分）
     remark: Optional[str] = None
 
 
@@ -91,6 +95,7 @@ class DepositConvert(BaseModel):
 
 
 # ─── POST / — 收取押金 ────────────────────────────────────────────────────────
+
 
 @router.post("/", summary="收取押金")
 async def collect_deposit(
@@ -149,29 +154,29 @@ async def collect_deposit(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("collect_deposit.failed", store_id=str(body.store_id),
-                     error=str(exc), exc_info=True)
+        logger.error("collect_deposit.failed", store_id=str(body.store_id), error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金收取失败") from exc
 
     deposit_id = str(row["id"])
-    logger.info("deposit_collected", deposit_id=deposit_id,
-                amount_fen=body.amount_fen, store_id=str(body.store_id))
+    logger.info("deposit_collected", deposit_id=deposit_id, amount_fen=body.amount_fen, store_id=str(body.store_id))
 
-    asyncio.create_task(emit_event(
-        event_type=DepositEventType.COLLECTED,
-        tenant_id=tid,
-        stream_id=deposit_id,
-        payload={
-            "deposit_id": deposit_id,
-            "amount_fen": body.amount_fen,
-            "store_id": str(body.store_id),
-            "customer_id": str(body.customer_id) if body.customer_id else None,
-            "payment_method": body.payment_method,
-        },
-        store_id=body.store_id,
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=DepositEventType.COLLECTED,
+            tenant_id=tid,
+            stream_id=deposit_id,
+            payload={
+                "deposit_id": deposit_id,
+                "amount_fen": body.amount_fen,
+                "store_id": str(body.store_id),
+                "customer_id": str(body.customer_id) if body.customer_id else None,
+                "payment_method": body.payment_method,
+            },
+            store_id=body.store_id,
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -187,6 +192,7 @@ async def collect_deposit(
 
 
 # ─── POST /{id}/apply — 押金抵扣 ──────────────────────────────────────────────
+
 
 @router.post("/{deposit_id}/apply", summary="押金抵扣消费")
 async def apply_deposit(
@@ -216,8 +222,7 @@ async def apply_deposit(
         )
         deposit = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("apply_deposit.fetch_failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("apply_deposit.fetch_failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
 
     if deposit is None:
@@ -229,11 +234,7 @@ async def apply_deposit(
             detail=f"押金状态 {deposit['status']} 不允许继续抵扣",
         )
 
-    remaining = (
-        deposit["amount_fen"]
-        - deposit["applied_amount_fen"]
-        - deposit["refunded_amount_fen"]
-    )
+    remaining = deposit["amount_fen"] - deposit["applied_amount_fen"] - deposit["refunded_amount_fen"]
     if body.apply_amount_fen > remaining:
         raise HTTPException(
             status_code=400,
@@ -266,26 +267,28 @@ async def apply_deposit(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("apply_deposit.update_failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("apply_deposit.update_failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金抵扣失败") from exc
 
-    logger.info("deposit_applied", deposit_id=deposit_id,
-                apply_amount_fen=body.apply_amount_fen, order_id=str(body.order_id))
+    logger.info(
+        "deposit_applied", deposit_id=deposit_id, apply_amount_fen=body.apply_amount_fen, order_id=str(body.order_id)
+    )
 
-    asyncio.create_task(emit_event(
-        event_type=DepositEventType.APPLIED,
-        tenant_id=tid,
-        stream_id=deposit_id,
-        payload={
-            "deposit_id": deposit_id,
-            "applied_amount_fen": body.apply_amount_fen,
-            "order_id": str(body.order_id),
-            "new_status": new_status,
-        },
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=DepositEventType.APPLIED,
+            tenant_id=tid,
+            stream_id=deposit_id,
+            payload={
+                "deposit_id": deposit_id,
+                "applied_amount_fen": body.apply_amount_fen,
+                "order_id": str(body.order_id),
+                "new_status": new_status,
+            },
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -295,17 +298,14 @@ async def apply_deposit(
             "amount_fen": row["amount_fen"],
             "applied_amount_fen": row["applied_amount_fen"],
             "refunded_amount_fen": row["refunded_amount_fen"],
-            "remaining_fen": (
-                row["amount_fen"]
-                - row["applied_amount_fen"]
-                - row["refunded_amount_fen"]
-            ),
+            "remaining_fen": (row["amount_fen"] - row["applied_amount_fen"] - row["refunded_amount_fen"]),
         },
         "error": None,
     }
 
 
 # ─── POST /{id}/refund — 退还押金 ─────────────────────────────────────────────
+
 
 @router.post("/{deposit_id}/refund", summary="退还押金")
 async def refund_deposit(
@@ -334,8 +334,7 @@ async def refund_deposit(
         )
         deposit = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("refund_deposit.fetch_failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("refund_deposit.fetch_failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
 
     if deposit is None:
@@ -347,11 +346,7 @@ async def refund_deposit(
             detail=f"押金状态 {deposit['status']} 不允许退还",
         )
 
-    remaining = (
-        deposit["amount_fen"]
-        - deposit["applied_amount_fen"]
-        - deposit["refunded_amount_fen"]
-    )
+    remaining = deposit["amount_fen"] - deposit["applied_amount_fen"] - deposit["refunded_amount_fen"]
     if body.refund_amount_fen > remaining:
         raise HTTPException(
             status_code=400,
@@ -382,26 +377,26 @@ async def refund_deposit(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("refund_deposit.update_failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("refund_deposit.update_failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金退还失败") from exc
 
-    logger.info("deposit_refunded", deposit_id=deposit_id,
-                refund_amount_fen=body.refund_amount_fen)
+    logger.info("deposit_refunded", deposit_id=deposit_id, refund_amount_fen=body.refund_amount_fen)
 
-    asyncio.create_task(emit_event(
-        event_type=DepositEventType.REFUNDED,
-        tenant_id=tid,
-        stream_id=deposit_id,
-        payload={
-            "deposit_id": deposit_id,
-            "refund_amount_fen": body.refund_amount_fen,
-            "new_status": new_status,
-            "remark": body.remark,
-        },
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=DepositEventType.REFUNDED,
+            tenant_id=tid,
+            stream_id=deposit_id,
+            payload={
+                "deposit_id": deposit_id,
+                "refund_amount_fen": body.refund_amount_fen,
+                "new_status": new_status,
+                "remark": body.remark,
+            },
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -411,17 +406,14 @@ async def refund_deposit(
             "amount_fen": row["amount_fen"],
             "applied_amount_fen": row["applied_amount_fen"],
             "refunded_amount_fen": row["refunded_amount_fen"],
-            "remaining_fen": (
-                row["amount_fen"]
-                - row["applied_amount_fen"]
-                - row["refunded_amount_fen"]
-            ),
+            "remaining_fen": (row["amount_fen"] - row["applied_amount_fen"] - row["refunded_amount_fen"]),
         },
         "error": None,
     }
 
 
 # ─── POST /{id}/convert — 押金转收入 ──────────────────────────────────────────
+
 
 @router.post("/{deposit_id}/convert", summary="押金转收入")
 async def convert_deposit(
@@ -447,8 +439,7 @@ async def convert_deposit(
         )
         deposit = fetch.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("convert_deposit.fetch_failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("convert_deposit.fetch_failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
 
     if deposit is None:
@@ -460,11 +451,7 @@ async def convert_deposit(
             detail=f"押金状态 {deposit['status']} 不允许转收入",
         )
 
-    remaining = (
-        deposit["amount_fen"]
-        - deposit["applied_amount_fen"]
-        - deposit["refunded_amount_fen"]
-    )
+    remaining = deposit["amount_fen"] - deposit["applied_amount_fen"] - deposit["refunded_amount_fen"]
     if remaining <= 0:
         raise HTTPException(status_code=400, detail="押金余额为0，无需转收入")
 
@@ -482,24 +469,25 @@ async def convert_deposit(
         row = result.mappings().first()
         await db.commit()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("convert_deposit.update_failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("convert_deposit.update_failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金转收入失败") from exc
 
     logger.info("deposit_converted", deposit_id=deposit_id, converted_fen=remaining)
 
-    asyncio.create_task(emit_event(
-        event_type=DepositEventType.CONVERTED_TO_REVENUE,
-        tenant_id=tid,
-        stream_id=deposit_id,
-        payload={
-            "deposit_id": deposit_id,
-            "converted_amount_fen": remaining,
-            "remark": body.remark,
-        },
-        source_service="tx-finance",
-        metadata={"operator_id": str(op_id)},
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=DepositEventType.CONVERTED_TO_REVENUE,
+            tenant_id=tid,
+            stream_id=deposit_id,
+            payload={
+                "deposit_id": deposit_id,
+                "converted_amount_fen": remaining,
+                "remark": body.remark,
+            },
+            source_service="tx-finance",
+            metadata={"operator_id": str(op_id)},
+        )
+    )
 
     return {
         "ok": True,
@@ -513,6 +501,7 @@ async def convert_deposit(
 
 
 # ─── GET /{id} — 押金详情 ─────────────────────────────────────────────────────
+
 
 @router.get("/{deposit_id}", summary="押金详情")
 async def get_deposit(
@@ -540,8 +529,7 @@ async def get_deposit(
         )
         row = result.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("get_deposit.failed", deposit_id=deposit_id,
-                     error=str(exc), exc_info=True)
+        logger.error("get_deposit.failed", deposit_id=deposit_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询押金失败") from exc
 
     if row is None:
@@ -551,6 +539,7 @@ async def get_deposit(
 
 
 # ─── GET /store/{store_id} — 门店押金列表 ────────────────────────────────────
+
 
 @router.get("/store/{store_id}", summary="门店押金列表")
 async def list_by_store(
@@ -570,8 +559,12 @@ async def list_by_store(
 
     if status:
         valid_statuses = {
-            "collected", "partially_applied", "fully_applied",
-            "refunded", "converted", "written_off",
+            "collected",
+            "partially_applied",
+            "fully_applied",
+            "refunded",
+            "converted",
+            "written_off",
         }
         if status not in valid_statuses:
             raise HTTPException(
@@ -608,8 +601,7 @@ async def list_by_store(
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("list_deposits_by_store.failed", store_id=store_id,
-                     error=str(exc), exc_info=True)
+        logger.error("list_deposits_by_store.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="查询门店押金列表失败") from exc
 
     return {
@@ -620,6 +612,7 @@ async def list_by_store(
 
 
 # ─── GET /report/ledger — 押金台账 ───────────────────────────────────────────
+
 
 @router.get("/report/ledger", summary="押金台账报表")
 async def ledger_report(
@@ -666,8 +659,7 @@ async def ledger_report(
         )
         row = result.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("deposit_ledger_report.failed", store_id=store_id,
-                     error=str(exc), exc_info=True)
+        logger.error("deposit_ledger_report.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金台账报表生成失败") from exc
 
     return {
@@ -683,6 +675,7 @@ async def ledger_report(
 
 
 # ─── GET /report/aging — 押金账龄分析 ────────────────────────────────────────
+
 
 @router.get("/report/aging", summary="押金账龄分析")
 async def aging_report(
@@ -721,8 +714,7 @@ async def aging_report(
         )
         row = result.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("deposit_aging_report.failed", store_id=store_id,
-                     error=str(exc), exc_info=True)
+        logger.error("deposit_aging_report.failed", store_id=store_id, error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="押金账龄分析失败") from exc
 
     return {
@@ -730,9 +722,9 @@ async def aging_report(
         "data": {
             "store_id": store_id,
             "aging": {
-                "0_7_days":   {"count": row["cnt_0_7d"],    "amount_fen": row["amt_0_7d"]},
-                "8_30_days":  {"count": row["cnt_8_30d"],   "amount_fen": row["amt_8_30d"]},
-                "31_90_days": {"count": row["cnt_31_90d"],  "amount_fen": row["amt_31_90d"]},
+                "0_7_days": {"count": row["cnt_0_7d"], "amount_fen": row["amt_0_7d"]},
+                "8_30_days": {"count": row["cnt_8_30d"], "amount_fen": row["amt_8_30d"]},
+                "31_90_days": {"count": row["cnt_31_90d"], "amount_fen": row["amt_31_90d"]},
                 "over_90_days": {"count": row["cnt_over_90d"], "amount_fen": row["amt_over_90d"]},
             },
         },
@@ -741,6 +733,7 @@ async def aging_report(
 
 
 # ─── GET /report/shift-summary — 结班押金汇总 ────────────────────────────────
+
 
 @router.get("/report/shift-summary", summary="结班押金汇总")
 async def shift_summary_report(
@@ -757,14 +750,17 @@ async def shift_summary_report(
 
     try:
         import zoneinfo
+
         cst = zoneinfo.ZoneInfo("Asia/Shanghai")
     except (ImportError, KeyError):
         cst = timezone(timedelta(hours=8))
 
-    shift_start = datetime(shift_date.year, shift_date.month, shift_date.day,
-                           0, 0, 0, tzinfo=cst).astimezone(timezone.utc)
-    shift_end = datetime(shift_date.year, shift_date.month, shift_date.day,
-                         23, 59, 59, tzinfo=cst).astimezone(timezone.utc)
+    shift_start = datetime(shift_date.year, shift_date.month, shift_date.day, 0, 0, 0, tzinfo=cst).astimezone(
+        timezone.utc
+    )
+    shift_end = datetime(shift_date.year, shift_date.month, shift_date.day, 23, 59, 59, tzinfo=cst).astimezone(
+        timezone.utc
+    )
 
     try:
         result = await db.execute(
@@ -796,8 +792,9 @@ async def shift_summary_report(
         )
         row = result.mappings().first()
     except (OperationalError, SQLAlchemyError) as exc:
-        logger.error("shift_summary_report.failed", store_id=store_id,
-                     shift_date=str(shift_date), error=str(exc), exc_info=True)
+        logger.error(
+            "shift_summary_report.failed", store_id=store_id, shift_date=str(shift_date), error=str(exc), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="结班押金汇总失败") from exc
 
     received_fen = int(row["received_fen"] or 0)

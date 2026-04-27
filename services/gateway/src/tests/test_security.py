@@ -18,6 +18,7 @@ Phase 4-B 安全合规测试套件
   - query_logs 分页正确
   - 跨租户审计日志隔离
 """
+
 from __future__ import annotations
 
 import copy
@@ -103,6 +104,7 @@ def _make_entry(
 # 1. AuditLogService.log — 写入正确字段
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestAuditLogServiceLog:
     @pytest.mark.asyncio
     async def test_log_calls_db_execute(self):
@@ -149,6 +151,7 @@ class TestAuditLogServiceLog:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 2. 敏感字段自动脱敏
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestSensitiveFieldMasking:
     @pytest.mark.asyncio
@@ -207,6 +210,7 @@ class TestSensitiveFieldMasking:
 # 3. CONSTRAINT_OVERRIDE severity 强制 critical
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestConstraintOverrideSeverity:
     @pytest.mark.asyncio
     async def test_constraint_override_forces_critical(self):
@@ -237,13 +241,13 @@ class TestConstraintOverrideSeverity:
 # 4. audit_logs 不允许 DELETE（RLS 合规验证，逻辑层面）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestAuditLogsImmutability:
     def test_no_delete_method_on_service(self):
         """AuditLogService 不应暴露 delete_log 或类似方法（防止误用）。"""
         svc = AuditLogService()
         delete_method_names = [
-            name for name in dir(svc)
-            if "delete" in name.lower() or "remove" in name.lower() or "purge" in name.lower()
+            name for name in dir(svc) if "delete" in name.lower() or "remove" in name.lower() or "purge" in name.lower()
         ]
         assert len(delete_method_names) == 0, f"发现了不应存在的删除方法: {delete_method_names}"
 
@@ -251,7 +255,8 @@ class TestAuditLogsImmutability:
         """AuditLogService 不应暴露 update_log 或 patch_log 方法。"""
         svc = AuditLogService()
         update_method_names = [
-            name for name in dir(svc)
+            name
+            for name in dir(svc)
             if ("update" in name.lower() or "patch" in name.lower() or "modify" in name.lower())
             and not name.startswith("_")
         ]
@@ -261,7 +266,14 @@ class TestAuditLogsImmutability:
         """v070 迁移文件中不应包含 UPDATE 或 DELETE RLS policy 创建语句。"""
         migration_path = os.path.join(
             os.path.dirname(__file__),
-            "..", "..", "..", "..", "shared", "db-migrations", "versions", "v070_audit_logs.py"
+            "..",
+            "..",
+            "..",
+            "..",
+            "shared",
+            "db-migrations",
+            "versions",
+            "v070_audit_logs.py",
         )
         migration_path = os.path.normpath(migration_path)
         assert os.path.exists(migration_path), f"迁移文件不存在: {migration_path}"
@@ -278,6 +290,7 @@ class TestAuditLogsImmutability:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 5. get_security_alerts — 登录失败告警
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestSecurityAlerts:
     @pytest.mark.asyncio
@@ -296,6 +309,7 @@ class TestSecurityAlerts:
 
         # 第1次 execute 返回登录失败行，后续返回空列表
         call_count = {"n": 0}
+
         async def execute_side_effect(sql, params=None):
             call_count["n"] += 1
             r = MagicMock()
@@ -335,6 +349,7 @@ class TestSecurityAlerts:
         }
 
         call_count = {"n": 0}
+
         async def execute_side_effect(sql, params=None):
             call_count["n"] += 1
             r = MagicMock()
@@ -371,6 +386,7 @@ class TestSecurityAlerts:
         }
 
         call_count = {"n": 0}
+
         async def execute_side_effect(sql, params=None):
             call_count["n"] += 1
             r = MagicMock()
@@ -397,6 +413,7 @@ class TestSecurityAlerts:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 6. DataMasker 单元测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestDataMaskerPhone:
     def test_standard_11_digit_phone(self):
@@ -510,14 +527,17 @@ class TestDataMaskerMaskDict:
 # 7. compliance_check 检测
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestComplianceCheck:
     @pytest.mark.asyncio
     async def test_expired_token_detected(self):
         """当存在超过90天未吊销的 token 时，has_expired_tokens = True。"""
         from services.security_report_service import SecurityReportService
+
         svc = SecurityReportService()
 
         call_count = {"n": 0}
+
         async def execute_side_effect(sql, params=None):
             call_count["n"] += 1
             r = MagicMock()
@@ -544,9 +564,11 @@ class TestComplianceCheck:
     async def test_unused_app_detected(self):
         """当存在超30天未使用的 api_app 时，has_unused_apps = True。"""
         from services.security_report_service import SecurityReportService
+
         svc = SecurityReportService()
 
         call_count = {"n": 0}
+
         async def execute_side_effect(sql, params=None):
             call_count["n"] += 1
             r = MagicMock()
@@ -574,6 +596,7 @@ class TestComplianceCheck:
     async def test_compliance_score_perfect_when_all_clean(self):
         """所有检查项正常时，overall_score 应为 100。"""
         from services.security_report_service import SecurityReportService
+
         svc = SecurityReportService()
 
         async def execute_side_effect(sql, params=None):
@@ -593,6 +616,7 @@ class TestComplianceCheck:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 8. weekly_report 包含所有字段
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestWeeklyReport:
     @pytest.mark.asyncio
@@ -623,9 +647,16 @@ class TestWeeklyReport:
         )
 
         required_fields = {
-            "tenant_id", "week_start", "week_end", "generated_at",
-            "login_failures", "api_calls_by_app", "data_export_count",
-            "critical_events", "critical_event_count", "compliance",
+            "tenant_id",
+            "week_start",
+            "week_end",
+            "generated_at",
+            "login_failures",
+            "api_calls_by_app",
+            "data_export_count",
+            "critical_events",
+            "critical_event_count",
+            "compliance",
         }
         missing = required_fields - set(report.keys())
         assert not missing, f"周报缺少字段: {missing}"
@@ -664,6 +695,7 @@ class TestWeeklyReport:
 # 9. query_logs 分页正确
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestQueryLogsPagination:
     @pytest.mark.asyncio
     async def test_query_logs_returns_pagination_structure(self):
@@ -671,6 +703,7 @@ class TestQueryLogsPagination:
         svc = AuditLogService()
 
         call_count = {"n": 0}
+
         async def execute_side_effect(sql, params=None):
             call_count["n"] += 1
             r = MagicMock()
@@ -689,9 +722,15 @@ class TestQueryLogsPagination:
 
         result = await svc.query_logs(
             tenant_id=TENANT_A,
-            actor_id=None, action=None, resource_type=None,
-            severity=None, start_time=None, end_time=None,
-            page=2, size=10, db=db,
+            actor_id=None,
+            action=None,
+            resource_type=None,
+            severity=None,
+            start_time=None,
+            end_time=None,
+            page=2,
+            size=10,
+            db=db,
         )
         assert result["total"] == 42
         assert result["page"] == 2
@@ -716,9 +755,15 @@ class TestQueryLogsPagination:
 
         result = await svc.query_logs(
             tenant_id=TENANT_A,
-            actor_id=None, action=None, resource_type=None,
-            severity=None, start_time=None, end_time=None,
-            page=-5, size=20, db=db,
+            actor_id=None,
+            action=None,
+            resource_type=None,
+            severity=None,
+            start_time=None,
+            end_time=None,
+            page=-5,
+            size=20,
+            db=db,
         )
         assert result["page"] == 1
 
@@ -740,9 +785,15 @@ class TestQueryLogsPagination:
 
         result = await svc.query_logs(
             tenant_id=TENANT_A,
-            actor_id=None, action=None, resource_type=None,
-            severity=None, start_time=None, end_time=None,
-            page=1, size=9999, db=db,
+            actor_id=None,
+            action=None,
+            resource_type=None,
+            severity=None,
+            start_time=None,
+            end_time=None,
+            page=1,
+            size=9999,
+            db=db,
         )
         assert result["size"] == 200
 
@@ -750,6 +801,7 @@ class TestQueryLogsPagination:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 10. 跨租户审计日志隔离
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestCrossTenantIsolation:
     @pytest.mark.asyncio
@@ -774,15 +826,19 @@ class TestCrossTenantIsolation:
         # 用 TENANT_B 查询
         await svc.query_logs(
             tenant_id=TENANT_B,
-            actor_id=None, action=None, resource_type=None,
-            severity=None, start_time=None, end_time=None,
-            page=1, size=20, db=db,
+            actor_id=None,
+            action=None,
+            resource_type=None,
+            severity=None,
+            start_time=None,
+            end_time=None,
+            page=1,
+            size=20,
+            db=db,
         )
         assert len(captured_params) >= 1
         for p in captured_params:
-            assert p.get("tenant_id") == str(TENANT_B), (
-                f"查询参数中 tenant_id 不正确: {p.get('tenant_id')}"
-            )
+            assert p.get("tenant_id") == str(TENANT_B), f"查询参数中 tenant_id 不正确: {p.get('tenant_id')}"
 
     @pytest.mark.asyncio
     async def test_log_inserts_correct_tenant_not_other(self):

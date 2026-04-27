@@ -16,6 +16,7 @@
   TX_OPS_URL  — tx-ops 服务地址（默认 http://localhost:8008）
   DEFAULT_TENANT_ID — P2 阶段单租户 ID
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,7 +38,7 @@ TX_OPS_URL = os.getenv("TX_OPS_URL", "http://localhost:8008")
 DEFAULT_TENANT_ID = os.getenv("DEFAULT_TENANT_ID")
 
 # 成本异常阈值
-_FOOD_COST_RATE_ALERT = Decimal("0.40")   # 食材成本率 >40% 预警
+_FOOD_COST_RATE_ALERT = Decimal("0.40")  # 食材成本率 >40% 预警
 _GROSS_MARGIN_RATE_ALERT = Decimal("0.50")  # 毛利率 <50% 预警
 
 # 费控申请 cost_type 映射（category_code → cost_type）
@@ -59,6 +60,7 @@ _CATEGORY_TO_COST_TYPE: dict[str, str] = {
 # 主 Worker 类
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class DailyCostAttributionWorker:
     """每日成本归集批量处理器。
 
@@ -76,6 +78,7 @@ class DailyCostAttributionWorker:
         查询失败时降级为 DEFAULT_TENANT_ID 环境变量（向后兼容单租户部署）。
         """
         from sqlalchemy import text as _text
+
         from shared.ontology.src.database import get_db_no_rls
 
         try:
@@ -122,7 +125,6 @@ class DailyCostAttributionWorker:
         多租户扩展时可优先从 tx-org /api/v1/org/stores 拉取，此处作兜底。
         """
         from ..models.expense_application import ExpenseApplication
-        from ..models.expense_enums import ExpenseStatus
 
         stmt = (
             select(ExpenseApplication.store_id)
@@ -138,9 +140,7 @@ class DailyCostAttributionWorker:
 
     # ── 2. POS 日结数据拉取 ────────────────────────────────────────────────
 
-    async def _fetch_pos_daily_close(
-        self, store_id: UUID, target_date: date
-    ) -> Optional[dict[str, Any]]:
+    async def _fetch_pos_daily_close(self, store_id: UUID, target_date: date) -> Optional[dict[str, Any]]:
         """从 tx-ops 拉取指定门店指定日期的 POS 日结数据。
 
         失败时返回 None（降级），不中断整体流程。
@@ -224,20 +224,20 @@ class DailyCostAttributionWorker:
         for row in rows:
             category_code = row[1] or "other"
             cost_type = _CATEGORY_TO_COST_TYPE.get(category_code.lower(), "other")
-            expenses.append({
-                "application_id": row[0],
-                "category_code": category_code,
-                "cost_type": cost_type,
-                "amount_fen": row[2] or 0,
-                "description": row[3] or "",
-            })
+            expenses.append(
+                {
+                    "application_id": row[0],
+                    "category_code": category_code,
+                    "cost_type": cost_type,
+                    "amount_fen": row[2] or 0,
+                    "description": row[3] or "",
+                }
+            )
         return expenses
 
     # ── 4. 成本归集计算 ────────────────────────────────────────────────────
 
-    def _aggregate_costs(
-        self, expenses: list[dict[str, Any]]
-    ) -> dict[str, int]:
+    def _aggregate_costs(self, expenses: list[dict[str, Any]]) -> dict[str, int]:
         """按成本类型汇总费控申请金额（分）。"""
         costs: dict[str, int] = {
             "food": 0,
@@ -296,40 +296,45 @@ class DailyCostAttributionWorker:
         data_status = "complete" if pos_data is not None else "pending"
 
         # Upsert via PostgreSQL INSERT ... ON CONFLICT
-        stmt = pg_insert(DailyCostReport.__table__).values(
-            tenant_id=tenant_id,
-            store_id=store_id,
-            report_date=report_date,
-            total_revenue_fen=total_revenue_fen,
-            table_count=table_count,
-            customer_count=customer_count,
-            food_cost_fen=food_cost_fen,
-            labor_cost_fen=labor_cost_fen,
-            other_cost_fen=other_cost_fen,
-            total_cost_fen=total_cost_fen,
-            food_cost_rate=food_cost_rate,
-            labor_cost_rate=labor_cost_rate,
-            gross_margin_rate=gross_margin_rate,
-            pos_data_source=pos_source,
-            data_status=data_status,
-        ).on_conflict_do_update(
-            constraint="uq_daily_cost_reports_tenant_store_date",
-            set_={
-                "total_revenue_fen": total_revenue_fen,
-                "table_count": table_count,
-                "customer_count": customer_count,
-                "food_cost_fen": food_cost_fen,
-                "labor_cost_fen": labor_cost_fen,
-                "other_cost_fen": other_cost_fen,
-                "total_cost_fen": total_cost_fen,
-                "food_cost_rate": food_cost_rate,
-                "labor_cost_rate": labor_cost_rate,
-                "gross_margin_rate": gross_margin_rate,
-                "pos_data_source": pos_source,
-                "data_status": data_status,
-                "updated_at": datetime.now(timezone.utc),
-            },
-        ).returning(DailyCostReport.__table__.c.id)
+        stmt = (
+            pg_insert(DailyCostReport.__table__)
+            .values(
+                tenant_id=tenant_id,
+                store_id=store_id,
+                report_date=report_date,
+                total_revenue_fen=total_revenue_fen,
+                table_count=table_count,
+                customer_count=customer_count,
+                food_cost_fen=food_cost_fen,
+                labor_cost_fen=labor_cost_fen,
+                other_cost_fen=other_cost_fen,
+                total_cost_fen=total_cost_fen,
+                food_cost_rate=food_cost_rate,
+                labor_cost_rate=labor_cost_rate,
+                gross_margin_rate=gross_margin_rate,
+                pos_data_source=pos_source,
+                data_status=data_status,
+            )
+            .on_conflict_do_update(
+                constraint="uq_daily_cost_reports_tenant_store_date",
+                set_={
+                    "total_revenue_fen": total_revenue_fen,
+                    "table_count": table_count,
+                    "customer_count": customer_count,
+                    "food_cost_fen": food_cost_fen,
+                    "labor_cost_fen": labor_cost_fen,
+                    "other_cost_fen": other_cost_fen,
+                    "total_cost_fen": total_cost_fen,
+                    "food_cost_rate": food_cost_rate,
+                    "labor_cost_rate": labor_cost_rate,
+                    "gross_margin_rate": gross_margin_rate,
+                    "pos_data_source": pos_source,
+                    "data_status": data_status,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+            )
+            .returning(DailyCostReport.__table__.c.id)
+        )
 
         result = await db.execute(stmt)
         report_id: UUID = result.scalar_one()
@@ -375,14 +380,10 @@ class DailyCostAttributionWorker:
         alerts: list[str] = []
 
         if food_cost_rate is not None and food_cost_rate > _FOOD_COST_RATE_ALERT:
-            alerts.append(
-                f"食材成本率 {float(food_cost_rate):.1%} 超过阈值 {float(_FOOD_COST_RATE_ALERT):.0%}"
-            )
+            alerts.append(f"食材成本率 {float(food_cost_rate):.1%} 超过阈值 {float(_FOOD_COST_RATE_ALERT):.0%}")
 
         if gross_margin_rate is not None and gross_margin_rate < _GROSS_MARGIN_RATE_ALERT:
-            alerts.append(
-                f"综合毛利率 {float(gross_margin_rate):.1%} 低于阈值 {float(_GROSS_MARGIN_RATE_ALERT):.0%}"
-            )
+            alerts.append(f"综合毛利率 {float(gross_margin_rate):.1%} 低于阈值 {float(_GROSS_MARGIN_RATE_ALERT):.0%}")
 
         if not alerts:
             return
@@ -442,9 +443,7 @@ class DailyCostAttributionWorker:
 
             costs = self._aggregate_costs(expenses)
 
-            report_id = await self._upsert_daily_report(
-                db, tenant_id, store_id, target_date, pos_data, costs, expenses
-            )
+            report_id = await self._upsert_daily_report(db, tenant_id, store_id, target_date, pos_data, costs, expenses)
             await db.commit()
 
             # 计算用于预警的指标（重新算以确保一致）
@@ -599,6 +598,7 @@ class DailyCostAttributionWorker:
 # ─────────────────────────────────────────────────────────────────────────────
 # 模块级入口（供 APScheduler / Celery Beat 调用）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def run_daily_cost_attribution(target_date: date | None = None) -> dict[str, Any]:
     """模块级入口函数，供调度器直接调用。

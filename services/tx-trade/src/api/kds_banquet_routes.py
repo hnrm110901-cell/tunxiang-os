@@ -10,6 +10,7 @@
   3. 厨师长在控菜大屏点击「推进到下一节」→ 触发该节所有档口同步开始制作
   4. KDS任务在「宴席节」维度协同，而非单个任务维度
 """
+
 import uuid as _uuid
 from datetime import datetime
 from typing import Optional
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/kds", tags=["kds-banquet"])
 
 # ─── 工具 ─────────────────────────────────────────────────────────────────────
 
+
 def _tenant(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -45,16 +47,20 @@ async def _rls(db: AsyncSession, tid: str) -> None:
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class BanquetOpenReq(BaseModel):
     """开席 — 为所有桌台创建宴席订单并分发KDS任务（第一节）"""
+
     session_id: str
     operator_id: Optional[str] = None
-    first_section_delay_minutes: int = Field(0, ge=0,
-        description="开席后多少分钟推送第一节（凉菜通常立即，热菜延迟10分钟）")
+    first_section_delay_minutes: int = Field(
+        0, ge=0, description="开席后多少分钟推送第一节（凉菜通常立即，热菜延迟10分钟）"
+    )
 
 
 class PushSectionReq(BaseModel):
     """推进到指定节 — 所有桌台同步触发该节出品"""
+
     session_id: str
     section_id: str
     operator_id: Optional[str] = None
@@ -63,6 +69,7 @@ class PushSectionReq(BaseModel):
 
 class BanquetTaskStatusReq(BaseModel):
     """批量更新宴席任务状态（厨师长统一操作整桌）"""
+
     session_id: str
     section_id: str
     dept_id: Optional[str] = Field(None, description="仅操作指定档口，None=全部档口")
@@ -71,6 +78,7 @@ class BanquetTaskStatusReq(BaseModel):
 
 
 # ─── 宴席KDS核心端点 ──────────────────────────────────────────────────────────
+
 
 @router.get("/banquet-sessions/{store_id}", summary="查询门店今日宴席场次（KDS大屏用）")
 async def list_today_banquet_sessions(
@@ -82,7 +90,8 @@ async def list_today_banquet_sessions(
     tid = _tenant(request)
     await _rls(db, tid)
 
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT bs.id, bs.session_name, bs.scheduled_at, bs.actual_open_at,
                bs.status, bs.guest_count, bs.table_count,
                bs.current_section_id, bs.next_section_at,
@@ -97,7 +106,9 @@ async def list_today_banquet_sessions(
           AND bs.is_deleted = false
           AND bs.status NOT IN ('cancelled')
         ORDER BY bs.scheduled_at
-    """), {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)})
+    """),
+        {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)},
+    )
 
     rows = result.fetchall()
     sessions = []
@@ -108,23 +119,25 @@ async def list_today_banquet_sessions(
             delta = r[2].replace(tzinfo=None) - datetime.utcnow()
             countdown_seconds = max(0, int(delta.total_seconds()))
 
-        sessions.append({
-            "id": str(r[0]),
-            "session_name": r[1],
-            "scheduled_at": r[2].isoformat() if r[2] else None,
-            "actual_open_at": r[3].isoformat() if r[3] else None,
-            "status": r[4],
-            "guest_count": r[5],
-            "table_count": r[6],
-            "current_section_id": str(r[7]) if r[7] else None,
-            "current_section_name": r[11],
-            "current_serve_sequence": r[12],
-            "next_section_at": r[8].isoformat() if r[8] else None,
-            "menu_name": r[9],
-            "per_person_fen": r[10],
-            "countdown_seconds": countdown_seconds,
-            "is_urgent": countdown_seconds is not None and countdown_seconds < 1800,  # 30分钟内
-        })
+        sessions.append(
+            {
+                "id": str(r[0]),
+                "session_name": r[1],
+                "scheduled_at": r[2].isoformat() if r[2] else None,
+                "actual_open_at": r[3].isoformat() if r[3] else None,
+                "status": r[4],
+                "guest_count": r[5],
+                "table_count": r[6],
+                "current_section_id": str(r[7]) if r[7] else None,
+                "current_section_name": r[11],
+                "current_serve_sequence": r[12],
+                "next_section_at": r[8].isoformat() if r[8] else None,
+                "menu_name": r[9],
+                "per_person_fen": r[10],
+                "countdown_seconds": countdown_seconds,
+                "is_urgent": countdown_seconds is not None and countdown_seconds < 1800,  # 30分钟内
+            }
+        )
 
     return _ok({"sessions": sessions, "total": len(sessions)})
 
@@ -147,12 +160,15 @@ async def banquet_open(
     tiduid = _uuid.UUID(tid)
 
     # 查宴席场次
-    session_result = await db.execute(text("""
+    session_result = await db.execute(
+        text("""
         SELECT bs.id, bs.status, bs.table_ids, bs.order_ids,
                bs.banquet_menu_id, bs.table_count, bs.guest_count
         FROM banquet_sessions bs
         WHERE bs.id = :sid AND bs.tenant_id = :tid AND bs.is_deleted = false
-    """), {"sid": _uuid.UUID(req.session_id), "tid": tiduid})
+    """),
+        {"sid": _uuid.UUID(req.session_id), "tid": tiduid},
+    )
     session = session_result.fetchone()
     if not session:
         raise HTTPException(status_code=404, detail="宴席场次不存在")
@@ -160,7 +176,8 @@ async def banquet_open(
         raise HTTPException(status_code=400, detail=f"场次状态为 {session[1]}，无法开席")
 
     # 获取宴席菜单第一节菜品
-    first_section_result = await db.execute(text("""
+    first_section_result = await db.execute(
+        text("""
         SELECT s.id AS section_id, s.section_name, s.serve_delay_minutes,
                mi.dish_id, mi.dish_name, mi.quantity_per_table, mi.note
         FROM banquet_menu_sections s
@@ -171,7 +188,9 @@ async def banquet_open(
             WHERE menu_id = :mid AND tenant_id = :tid
           )
         ORDER BY mi.sort_order
-    """), {"mid": session[4], "tid": tiduid})
+    """),
+        {"mid": session[4], "tid": tiduid},
+    )
     first_section_items = first_section_result.fetchall()
 
     if not first_section_items:
@@ -187,11 +206,14 @@ async def banquet_open(
         section_id, section_name, _, dish_id, dish_name, qty_per_table, note = item
 
         # 查找菜品对应档口
-        dept_result = await db.execute(text("""
+        dept_result = await db.execute(
+            text("""
             SELECT dept_id FROM dish_dept_mappings
             WHERE dish_id = :did AND tenant_id = :tid
             LIMIT 1
-        """), {"did": dish_id, "tid": tiduid})
+        """),
+            {"did": dish_id, "tid": tiduid},
+        )
         dept_row = dept_result.fetchone()
         dept_id = dept_row[0] if dept_row else None
 
@@ -200,15 +222,17 @@ async def banquet_open(
             table_no = f"宴席-{table_idx + 1}桌"
             if table_ids and table_idx < len(table_ids):
                 # 查实际桌号
-                t_result = await db.execute(text(
-                    "SELECT table_no FROM tables WHERE id = :tid_t AND tenant_id = :tid"
-                ), {"tid_t": _uuid.UUID(str(table_ids[table_idx])), "tid": tiduid})
+                t_result = await db.execute(
+                    text("SELECT table_no FROM tables WHERE id = :tid_t AND tenant_id = :tid"),
+                    {"tid_t": _uuid.UUID(str(table_ids[table_idx])), "tid": tiduid},
+                )
                 t_row = t_result.fetchone()
                 if t_row:
                     table_no = t_row[0]
 
             task_id = _uuid.uuid4()
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO kds_tasks
                     (id, tenant_id, dept_id, dish_id, dish_name,
                      quantity, table_number, notes, status, priority,
@@ -218,42 +242,54 @@ async def banquet_open(
                      :qty, :tno, :notes, 'pending', 'normal',
                      :session_id, :section_id)
                 ON CONFLICT DO NOTHING
-            """), {
-                "id": task_id, "tid": tiduid,
-                "dept": dept_id, "did": dish_id, "dname": dish_name,
-                "qty": qty_per_table, "tno": table_no,
-                "notes": note or "",
-                "session_id": _uuid.UUID(req.session_id),
-                "section_id": section_id,
-            })
+            """),
+                {
+                    "id": task_id,
+                    "tid": tiduid,
+                    "dept": dept_id,
+                    "did": dish_id,
+                    "dname": dish_name,
+                    "qty": qty_per_table,
+                    "tno": table_no,
+                    "notes": note or "",
+                    "session_id": _uuid.UUID(req.session_id),
+                    "section_id": section_id,
+                },
+            )
             tasks_created += 1
 
     # 更新场次状态
-    await db.execute(text("""
+    await db.execute(
+        text("""
         UPDATE banquet_sessions SET
             status = 'serving',
             actual_open_at = now(),
             current_section_id = :section_id,
             updated_at = now()
         WHERE id = :sid AND tenant_id = :tid
-    """), {"section_id": _uuid.UUID(first_section_id),
-           "sid": _uuid.UUID(req.session_id), "tid": tiduid})
+    """),
+        {"section_id": _uuid.UUID(first_section_id), "sid": _uuid.UUID(req.session_id), "tid": tiduid},
+    )
 
     await db.commit()
 
-    log.info("banquet.opened",
-             session_id=req.session_id,
-             first_section=first_section_items[0][1],
-             tasks_created=tasks_created)
+    log.info(
+        "banquet.opened",
+        session_id=req.session_id,
+        first_section=first_section_items[0][1],
+        tasks_created=tasks_created,
+    )
 
-    return _ok({
-        "session_id": req.session_id,
-        "status": "serving",
-        "first_section_name": first_section_items[0][1],
-        "tasks_created": tasks_created,
-        "table_count": table_count,
-        "message": f"宴席已开席，{first_section_items[0][1]}（{tasks_created}个出品任务）已下发到各档口KDS",
-    })
+    return _ok(
+        {
+            "session_id": req.session_id,
+            "status": "serving",
+            "first_section_name": first_section_items[0][1],
+            "tasks_created": tasks_created,
+            "table_count": table_count,
+            "message": f"宴席已开席，{first_section_items[0][1]}（{tasks_created}个出品任务）已下发到各档口KDS",
+        }
+    )
 
 
 @router.post("/banquet-sessions/push-section", summary="推进到下一节（所有档口同步出品）")
@@ -271,14 +307,17 @@ async def push_next_section(
     tiduid = _uuid.UUID(tid)
 
     # 查该节菜品
-    items_result = await db.execute(text("""
+    items_result = await db.execute(
+        text("""
         SELECT mi.dish_id, mi.dish_name, mi.quantity_per_table, mi.note,
                s.section_name, s.serve_sequence
         FROM banquet_menu_items mi
         JOIN banquet_menu_sections s ON s.id = mi.section_id
         WHERE mi.section_id = :sec_id AND mi.tenant_id = :tid
         ORDER BY mi.sort_order
-    """), {"sec_id": _uuid.UUID(req.section_id), "tid": tiduid})
+    """),
+        {"sec_id": _uuid.UUID(req.section_id), "tid": tiduid},
+    )
     items = items_result.fetchall()
     if not items:
         raise HTTPException(status_code=404, detail="该节无菜品配置")
@@ -286,10 +325,13 @@ async def push_next_section(
     section_name = items[0][4]
 
     # 获取场次桌台信息
-    session_result = await db.execute(text("""
+    session_result = await db.execute(
+        text("""
         SELECT table_count, table_ids FROM banquet_sessions
         WHERE id = :sid AND tenant_id = :tid
-    """), {"sid": _uuid.UUID(req.session_id), "tid": tiduid})
+    """),
+        {"sid": _uuid.UUID(req.session_id), "tid": tiduid},
+    )
     session = session_result.fetchone()
     if not session:
         raise HTTPException(status_code=404, detail="宴席场次不存在")
@@ -302,25 +344,30 @@ async def push_next_section(
         dish_id, dish_name, qty_per_table, note = item[0], item[1], item[2], item[3]
 
         # 查档口映射
-        dept_result = await db.execute(text("""
+        dept_result = await db.execute(
+            text("""
             SELECT dept_id FROM dish_dept_mappings
             WHERE dish_id = :did AND tenant_id = :tid LIMIT 1
-        """), {"did": dish_id, "tid": tiduid})
+        """),
+            {"did": dish_id, "tid": tiduid},
+        )
         dept_row = dept_result.fetchone()
         dept_id = dept_row[0] if dept_row else None
 
         for table_idx in range(table_count):
             table_no = f"宴席-{table_idx + 1}桌"
             if table_ids and table_idx < len(table_ids):
-                t_result = await db.execute(text(
-                    "SELECT table_no FROM tables WHERE id = :tid_t AND tenant_id = :tid"
-                ), {"tid_t": _uuid.UUID(str(table_ids[table_idx])), "tid": tiduid})
+                t_result = await db.execute(
+                    text("SELECT table_no FROM tables WHERE id = :tid_t AND tenant_id = :tid"),
+                    {"tid_t": _uuid.UUID(str(table_ids[table_idx])), "tid": tiduid},
+                )
                 t_row = t_result.fetchone()
                 if t_row:
                     table_no = t_row[0]
 
             task_id = _uuid.uuid4()
-            await db.execute(text("""
+            await db.execute(
+                text("""
                 INSERT INTO kds_tasks
                     (id, tenant_id, dept_id, dish_id, dish_name,
                      quantity, table_number, notes, status, priority,
@@ -329,37 +376,47 @@ async def push_next_section(
                     (:id, :tid, :dept, :did, :dname,
                      :qty, :tno, :notes, 'pending', 'normal',
                      :session_id, :section_id)
-            """), {
-                "id": task_id, "tid": tiduid,
-                "dept": dept_id, "did": dish_id, "dname": dish_name,
-                "qty": qty_per_table, "tno": table_no,
-                "notes": note or "",
-                "session_id": _uuid.UUID(req.session_id),
-                "section_id": _uuid.UUID(req.section_id),
-            })
+            """),
+                {
+                    "id": task_id,
+                    "tid": tiduid,
+                    "dept": dept_id,
+                    "did": dish_id,
+                    "dname": dish_name,
+                    "qty": qty_per_table,
+                    "tno": table_no,
+                    "notes": note or "",
+                    "session_id": _uuid.UUID(req.session_id),
+                    "section_id": _uuid.UUID(req.section_id),
+                },
+            )
             tasks_created += 1
 
     # 更新场次当前节
-    await db.execute(text("""
+    await db.execute(
+        text("""
         UPDATE banquet_sessions SET
             current_section_id = :sec_id, updated_at = now()
         WHERE id = :sid AND tenant_id = :tid
-    """), {"sec_id": _uuid.UUID(req.section_id),
-           "sid": _uuid.UUID(req.session_id), "tid": tiduid})
+    """),
+        {"sec_id": _uuid.UUID(req.section_id), "sid": _uuid.UUID(req.session_id), "tid": tiduid},
+    )
 
     await db.commit()
 
-    log.info("banquet.section_pushed",
-             session_id=req.session_id, section_name=section_name,
-             tasks_created=tasks_created)
+    log.info(
+        "banquet.section_pushed", session_id=req.session_id, section_name=section_name, tasks_created=tasks_created
+    )
 
-    return _ok({
-        "session_id": req.session_id,
-        "section_id": req.section_id,
-        "section_name": section_name,
-        "tasks_created": tasks_created,
-        "message": f"「{section_name}」已同步下发到所有档口KDS（{tasks_created}个任务）",
-    })
+    return _ok(
+        {
+            "session_id": req.session_id,
+            "section_id": req.section_id,
+            "section_name": section_name,
+            "tasks_created": tasks_created,
+            "message": f"「{section_name}」已同步下发到所有档口KDS（{tasks_created}个任务）",
+        }
+    )
 
 
 @router.get("/banquet-sessions/{session_id}/progress", summary="宴席出品进度总览")
@@ -372,7 +429,8 @@ async def get_banquet_progress(
     tid = _tenant(request)
     await _rls(db, tid)
 
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT
             s.section_name,
             s.serve_sequence,
@@ -390,7 +448,9 @@ async def get_banquet_progress(
         ) AND s.tenant_id = :tid
         GROUP BY s.id, s.section_name, s.serve_sequence
         ORDER BY s.serve_sequence
-    """), {"sid": _uuid.UUID(session_id), "tid": _uuid.UUID(tid)})
+    """),
+        {"sid": _uuid.UUID(session_id), "tid": _uuid.UUID(tid)},
+    )
 
     rows = result.fetchall()
     sections = []
@@ -399,29 +459,36 @@ async def get_banquet_progress(
         done = r[3] or 0
         cooking = r[4] or 0
         pending = r[5] or 0
-        sections.append({
-            "section_name": r[0],
-            "serve_sequence": r[1],
-            "total_tasks": total,
-            "done_tasks": done,
-            "cooking_tasks": cooking,
-            "pending_tasks": pending,
-            "completion_pct": round(done / total * 100) if total > 0 else 0,
-            "status": (
-                "not_started" if total == 0
-                else "completed" if done == total
-                else "in_progress" if cooking + done > 0
-                else "pending"
-            ),
-        })
+        sections.append(
+            {
+                "section_name": r[0],
+                "serve_sequence": r[1],
+                "total_tasks": total,
+                "done_tasks": done,
+                "cooking_tasks": cooking,
+                "pending_tasks": pending,
+                "completion_pct": round(done / total * 100) if total > 0 else 0,
+                "status": (
+                    "not_started"
+                    if total == 0
+                    else "completed"
+                    if done == total
+                    else "in_progress"
+                    if cooking + done > 0
+                    else "pending"
+                ),
+            }
+        )
 
     overall_total = sum(s["total_tasks"] for s in sections)
     overall_done = sum(s["done_tasks"] for s in sections)
 
-    return _ok({
-        "session_id": session_id,
-        "sections": sections,
-        "overall_completion_pct": round(overall_done / overall_total * 100) if overall_total > 0 else 0,
-        "overall_total": overall_total,
-        "overall_done": overall_done,
-    })
+    return _ok(
+        {
+            "session_id": session_id,
+            "sections": sections,
+            "overall_completion_pct": round(overall_done / overall_total * 100) if overall_total > 0 else 0,
+            "overall_total": overall_total,
+            "overall_done": overall_done,
+        }
+    )

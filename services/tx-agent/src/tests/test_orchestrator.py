@@ -3,6 +3,7 @@
 运行：
   pytest services/tx-agent/src/tests/test_orchestrator.py -v
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,6 +30,7 @@ from agents.orchestrator import (
 # 辅助工具
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_mock_router_response(plan_json: str) -> MagicMock:
     """构造 ModelRouter.complete 返回的 mock 响应"""
     response = MagicMock()
@@ -42,14 +44,13 @@ _SIMPLE_PLAN_JSON = (
     ' "action": "assess", "params": {}, "depends_on": [], "timeout_seconds": 30}]}'
 )
 
-_EMPTY_PLAN_JSON = (
-    '{"trigger_summary": "empty", "estimated_impact": "none", "steps": []}'
-)
+_EMPTY_PLAN_JSON = '{"trigger_summary": "empty", "estimated_impact": "none", "steps": []}'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. ExecutionPlan / ExecutionStep 数据结构
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestExecutionPlan:
     """ExecutionPlan 数据结构测试"""
@@ -111,23 +112,20 @@ class TestExecutionPlan:
 # 2. AgentOrchestrator fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_master():
     master = MagicMock()
     master.tenant_id = "test-tenant"
     master.store_id = "test-store"
-    master.dispatch = AsyncMock(return_value=AgentResult(
-        success=True, action="test", data={"confidence": 0.9}
-    ))
+    master.dispatch = AsyncMock(return_value=AgentResult(success=True, action="test", data={"confidence": 0.9}))
     return master
 
 
 @pytest.fixture
 def mock_router():
     router = MagicMock()
-    router.complete = AsyncMock(
-        return_value=_make_mock_router_response(_SIMPLE_PLAN_JSON)
-    )
+    router.complete = AsyncMock(return_value=_make_mock_router_response(_SIMPLE_PLAN_JSON))
     return router
 
 
@@ -144,6 +142,7 @@ def orchestrator(mock_master, mock_router):
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. orchestrate() 主入口
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestOrchestrateEntry:
     """orchestrate() 主入口集成路径"""
@@ -179,6 +178,7 @@ class TestOrchestrateEntry:
 # 4. _plan() — 规划阶段
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPlanPhase:
     """_plan() 规划阶段"""
 
@@ -212,9 +212,7 @@ class TestPlanPhase:
     async def test_plan_json_decode_error_returns_empty_plan(self, mock_master):
         """JSON 解析失败时降级为空计划"""
         bad_router = MagicMock()
-        bad_router.complete = AsyncMock(
-            return_value=_make_mock_router_response("not valid json {{{{")
-        )
+        bad_router.complete = AsyncMock(return_value=_make_mock_router_response("not valid json {{{{"))
         orc = AgentOrchestrator(
             master_agent=mock_master,
             model_router=bad_router,
@@ -245,6 +243,7 @@ class TestPlanPhase:
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. _execute() — 执行阶段
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestExecutePhase:
     """_execute() 执行阶段"""
@@ -300,6 +299,7 @@ class TestExecutePhase:
     @pytest.mark.asyncio
     async def test_execute_step_timeout_returns_failure_result(self, orchestrator, mock_master):
         """单个步骤超时应返回 success=False 且 error 含 'timeout'"""
+
         async def slow_dispatch(*args, **kwargs):
             await asyncio.sleep(100)
             return AgentResult(success=True, action="test")
@@ -326,9 +326,7 @@ class TestExecutePhase:
         assert "agent crashed" in (results["step_1"].error or "")
 
     @pytest.mark.asyncio
-    async def test_execute_one_failure_does_not_block_parallel_steps(
-        self, orchestrator, mock_master
-    ):
+    async def test_execute_one_failure_does_not_block_parallel_steps(self, orchestrator, mock_master):
         """一个步骤失败不影响其他无依赖步骤执行"""
         call_log: list[str] = []
 
@@ -354,6 +352,7 @@ class TestExecutePhase:
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. _synthesize() — 综合阶段
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestSynthesizePhase:
     """_synthesize() 综合阶段"""
@@ -397,9 +396,7 @@ class TestSynthesizePhase:
             steps=[ExecutionStep("step_1", "agent_a", "action", {})],
         )
         step_results = {
-            "step_1": AgentResult(
-                success=True, action="action", constraints_passed=False
-            ),
+            "step_1": AgentResult(success=True, action="action", constraints_passed=False),
         }
         final = await orchestrator._synthesize(plan, step_results)
         assert final.constraints_passed is False

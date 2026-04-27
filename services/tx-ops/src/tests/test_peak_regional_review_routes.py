@@ -10,6 +10,7 @@
   - app.dependency_overrides[get_db] 覆盖数据库依赖
   - X-Tenant-ID header 必须传递（Header(...)）
 """
+
 from __future__ import annotations
 
 import sys
@@ -42,8 +43,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 # sqlalchemy 存根（路由文件有 AsyncSession type hint）
@@ -108,10 +111,11 @@ _monthly_review.generate_monthly_review = AsyncMock(return_value={"report_id": "
 _monthly_review.generate_regional_review = AsyncMock(return_value={"report_id": "rr-001"})
 
 # ── 导入路由 ────────────────────────────────────────────────────────────────────
+from shared.ontology.src.database import get_db  # noqa: E402
+
 from ..api.peak_routes import router as peak_router  # noqa: E402
 from ..api.regional_routes import router as regional_router  # noqa: E402
 from ..api.review_routes import router as review_router  # noqa: E402
-from shared.ontology.src.database import get_db  # noqa: E402
 
 # ── FastAPI 应用 ─────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -128,9 +132,11 @@ HEADERS = {"X-Tenant-ID": TENANT}
 
 # ── 辅助 ─────────────────────────────────────────────────────────────────────────
 
+
 def _override_db(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
@@ -216,9 +222,7 @@ class TestStaffDispatch:
         """正常返回加派建议。"""
         db = _make_db()
         app.dependency_overrides[get_db] = _override_db(db)
-        _peak_svc.suggest_staff_dispatch = AsyncMock(
-            return_value={"suggestions": [{"role": "服务员", "count": 2}]}
-        )
+        _peak_svc.suggest_staff_dispatch = AsyncMock(return_value={"suggestions": [{"role": "服务员", "count": 2}]})
         resp = client_for(app).get(f"/api/v1/peak/stores/{STORE}/staff-dispatch", headers=HEADERS)
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
@@ -239,9 +243,7 @@ class TestHandlePeakEvent:
         app.dependency_overrides[get_db] = _override_db(db)
         _peak_svc.handle_peak_event = AsyncMock(return_value={"event_id": "evt-123", "status": "handled"})
         payload = {"event_type": "temp_menu_switch", "params": {"menu_id": "m-001"}}
-        resp = client_for(app).post(
-            f"/api/v1/peak/stores/{STORE}/events", json=payload, headers=HEADERS
-        )
+        resp = client_for(app).post(f"/api/v1/peak/stores/{STORE}/events", json=payload, headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -253,9 +255,7 @@ class TestHandlePeakEvent:
         app.dependency_overrides[get_db] = _override_db(db)
         _peak_svc.handle_peak_event = AsyncMock(side_effect=ValueError("invalid event type"))
         payload = {"event_type": "unknown_event"}
-        resp = client_for(app).post(
-            f"/api/v1/peak/stores/{STORE}/events", json=payload, headers=HEADERS
-        )
+        resp = client_for(app).post(f"/api/v1/peak/stores/{STORE}/events", json=payload, headers=HEADERS)
         assert resp.status_code == 400
 
 
@@ -331,7 +331,7 @@ class TestTrackRectification:
         )
         payload = {"new_status": "in_progress", "note": "已开始处理"}
         resp = client_for(app).put(
-            f"/api/v1/regional/rectifications/rect-001/track",
+            "/api/v1/regional/rectifications/rect-001/track",
             json=payload,
             headers=HEADERS,
         )
@@ -355,9 +355,7 @@ class TestRegionalScorecard:
         _regional_svc.get_regional_scorecard = AsyncMock(
             return_value={"scorecard": [{"store_id": STORE, "grade": "green"}]}
         )
-        resp = client_for(app).get(
-            f"/api/v1/regional/regions/{REGION}/scorecard", headers=HEADERS
-        )
+        resp = client_for(app).get(f"/api/v1/regional/regions/{REGION}/scorecard", headers=HEADERS)
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
 
@@ -479,9 +477,7 @@ class TestGetIssueBoard:
         """正常返回门店问题看板（红黄绿）。"""
         db = _make_db()
         app.dependency_overrides[get_db] = _override_db(db)
-        _issue_tracker.get_store_issue_board = AsyncMock(
-            return_value={"red": [], "yellow": ["iss-002"], "green": []}
-        )
+        _issue_tracker.get_store_issue_board = AsyncMock(return_value={"red": [], "yellow": ["iss-002"], "green": []})
         resp = client_for(app).get(f"/api/v1/review/issues/board/{STORE}", headers=HEADERS)
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
@@ -511,6 +507,7 @@ class TestSopSuggestions:
 
 
 # ── 辅助：每次测试隔离 dependency_overrides ─────────────────────────────────────
+
 
 def client_for(application: FastAPI) -> TestClient:
     """返回 TestClient，raise_server_exceptions=True（默认）。"""

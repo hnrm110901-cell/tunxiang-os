@@ -24,14 +24,13 @@
 19. GET  /api/v1/group-buy/my-orders       — 我的团购列表
 20. GET  /api/v1/group-buy/my-orders       — DB 表不存在 fallback 空列表
 """
+
 import os
 import sys
 import types
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -42,7 +41,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 _shared_mod = sys.modules.get("shared") or types.ModuleType("shared")
 _shared_ontology = sys.modules.get("shared.ontology") or types.ModuleType("shared.ontology")
 _shared_ontology_src = sys.modules.get("shared.ontology.src") or types.ModuleType("shared.ontology.src")
-_shared_ontology_src_db = sys.modules.get("shared.ontology.src.database") or types.ModuleType("shared.ontology.src.database")
+_shared_ontology_src_db = sys.modules.get("shared.ontology.src.database") or types.ModuleType(
+    "shared.ontology.src.database"
+)
 
 TENANT_ID = str(uuid.uuid4())
 CAMPAIGN_ID = str(uuid.uuid4())
@@ -136,7 +137,6 @@ sys.modules["src.services.campaign_repository"] = _repo_mod
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import OperationalError
 
 # -- campaign_routes --
 # Patch relative imports by temporarily setting __package__ trick via sys.modules
@@ -156,8 +156,8 @@ _campaign_repo_top.CampaignRepository = _MockCampaignRepository
 sys.modules.setdefault("campaign_repository", _campaign_repo_top)
 
 # We patch the relative-import resolution by loading via importlib after package setup
-import importlib.util
 import importlib
+import importlib.util
 
 
 def _load_route_module(filepath, modname):
@@ -182,7 +182,9 @@ _base = os.path.join(os.path.dirname(__file__), "..", "api")
 # So we stub them in a dummy parent package.
 
 _api_pkg = types.ModuleType("api")
-_api_services_pkg = types.ModuleType("api.services") if "api.services" not in sys.modules else sys.modules["api.services"]
+_api_services_pkg = (
+    types.ModuleType("api.services") if "api.services" not in sys.modules else sys.modules["api.services"]
+)
 _api_campaign_engine = types.ModuleType("api.services.campaign_engine")
 _api_campaign_engine.CampaignEngine = _MockCampaignEngine
 _api_campaign_repo = types.ModuleType("api.services.campaign_repository")
@@ -272,7 +274,8 @@ def _exec_returning_all(rows):
 
 def test_create_campaign_success(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "create_campaign",
+        _campaign_engine_instance,
+        "create_campaign",
         AsyncMock(return_value={"id": CAMPAIGN_ID, "status": "draft"}),
     )
     resp = campaign_client.post(
@@ -286,7 +289,8 @@ def test_create_campaign_success(monkeypatch):
 
 def test_create_campaign_engine_error(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "create_campaign",
+        _campaign_engine_instance,
+        "create_campaign",
         AsyncMock(return_value={"error": "类型不支持"}),
     )
     resp = campaign_client.post(
@@ -300,7 +304,8 @@ def test_create_campaign_engine_error(monkeypatch):
 
 def test_start_campaign_success(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "start_campaign",
+        _campaign_engine_instance,
+        "start_campaign",
         AsyncMock(return_value={"id": CAMPAIGN_ID, "status": "active"}),
     )
     resp = campaign_client.post(f"/api/v1/campaigns/{CAMPAIGN_ID}/start", headers=_H)
@@ -310,7 +315,8 @@ def test_start_campaign_success(monkeypatch):
 
 def test_start_campaign_error(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "start_campaign",
+        _campaign_engine_instance,
+        "start_campaign",
         AsyncMock(return_value={"error": "状态非法"}),
     )
     resp = campaign_client.post(f"/api/v1/campaigns/{CAMPAIGN_ID}/start", headers=_H)
@@ -319,7 +325,8 @@ def test_start_campaign_error(monkeypatch):
 
 def test_pause_campaign_success(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "pause_campaign",
+        _campaign_engine_instance,
+        "pause_campaign",
         AsyncMock(return_value={"id": CAMPAIGN_ID, "status": "paused"}),
     )
     resp = campaign_client.post(f"/api/v1/campaigns/{CAMPAIGN_ID}/pause", headers=_H)
@@ -329,7 +336,8 @@ def test_pause_campaign_success(monkeypatch):
 
 def test_end_campaign_success(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "end_campaign",
+        _campaign_engine_instance,
+        "end_campaign",
         AsyncMock(return_value={"id": CAMPAIGN_ID, "status": "ended"}),
     )
     resp = campaign_client.post(f"/api/v1/campaigns/{CAMPAIGN_ID}/end", headers=_H)
@@ -366,7 +374,8 @@ def test_list_campaigns(monkeypatch):
 
 def test_check_eligibility(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "check_eligibility",
+        _campaign_engine_instance,
+        "check_eligibility",
         AsyncMock(return_value={"eligible": True}),
     )
     resp = campaign_client.post(
@@ -380,7 +389,8 @@ def test_check_eligibility(monkeypatch):
 
 def test_get_campaign_analytics_success(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "get_campaign_analytics",
+        _campaign_engine_instance,
+        "get_campaign_analytics",
         AsyncMock(return_value={"total_participants": 50}),
     )
     resp = campaign_client.get(f"/api/v1/campaigns/{CAMPAIGN_ID}/analytics", headers=_H)
@@ -390,7 +400,8 @@ def test_get_campaign_analytics_success(monkeypatch):
 
 def test_get_campaign_analytics_error(monkeypatch):
     monkeypatch.setattr(
-        _campaign_engine_instance, "get_campaign_analytics",
+        _campaign_engine_instance,
+        "get_campaign_analytics",
         AsyncMock(return_value={"error": "活动不存在"}),
     )
     resp = campaign_client.get(f"/api/v1/campaigns/{CAMPAIGN_ID}/analytics", headers=_H)
@@ -491,9 +502,7 @@ def test_get_group_buy_campaign_table_not_ready():
 
     db = AsyncMock()
     set_cfg = _res()
-    db.execute = AsyncMock(
-        side_effect=[set_cfg, OperationalError("relation does not exist", None, None)]
-    )
+    db.execute = AsyncMock(side_effect=[set_cfg, OperationalError("relation does not exist", None, None)])
 
     gb_app.dependency_overrides[_gb_mod.get_db] = lambda: db
     try:
@@ -644,9 +653,7 @@ def test_get_my_orders_table_not_ready():
 
     db = AsyncMock()
     set_cfg = _res()
-    db.execute = AsyncMock(
-        side_effect=[set_cfg, OperationalError("relation does not exist", None, None)]
-    )
+    db.execute = AsyncMock(side_effect=[set_cfg, OperationalError("relation does not exist", None, None)])
 
     gb_app.dependency_overrides[_gb_mod.get_db] = lambda: db
     try:

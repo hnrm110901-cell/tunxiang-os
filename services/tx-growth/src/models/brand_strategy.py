@@ -3,6 +3,7 @@
 涵盖 brand_profiles / brand_seasonal_calendar / brand_content_constraints
 三张表的 Create / Update / Response 模型。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 # ---------------------------------------------------------------------------
 # 嵌套结构体（JSONB 字段的类型声明，用于文档/验证）
 # ---------------------------------------------------------------------------
+
 
 class TargetSegmentItem(BaseModel):
     segment_name: str = Field(..., description="客群名称，如「高价值常客」")
@@ -44,6 +46,7 @@ class ColorPalette(BaseModel):
 # BrandProfile — 品牌档案
 # ---------------------------------------------------------------------------
 
+
 class BrandProfileCreate(BaseModel):
     brand_name: str = Field(..., max_length=100, description="品牌名称")
     brand_slogan: Optional[str] = Field(default=None, description="品牌口号")
@@ -52,20 +55,16 @@ class BrandProfileCreate(BaseModel):
     price_tier: str = Field(default="mid", description="价格带：budget/mid/upscale/luxury")
     core_value_proposition: Optional[str] = Field(default=None, description="核心价值主张")
     target_segments: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="目标客群列表，每项包含 segment_name/description/proportion"
+        default_factory=list, description="目标客群列表，每项包含 segment_name/description/proportion"
     )
     key_scenarios: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="主打场景列表，每项包含 scenario/importance"
+        default_factory=list, description="主打场景列表，每项包含 scenario/importance"
     )
     brand_voice: dict[str, Any] = Field(
-        default_factory=dict,
-        description="品牌语气配置：{tone, style, forbidden_words[], preferred_words[]}"
+        default_factory=dict, description="品牌语气配置：{tone, style, forbidden_words[], preferred_words[]}"
     )
     color_palette: dict[str, Any] = Field(
-        default_factory=dict,
-        description="品牌色配置：{primary, secondary, accent, background}"
+        default_factory=dict, description="品牌色配置：{primary, secondary, accent, background}"
     )
     is_active: bool = Field(default=True, description="是否为当前激活档案")
 
@@ -127,6 +126,7 @@ class BrandProfileResponse(BaseModel):
 # BrandSeasonalCalendar — 营销日历
 # ---------------------------------------------------------------------------
 
+
 class BrandSeasonalCalendarCreate(BaseModel):
     brand_profile_id: uuid.UUID = Field(..., description="关联的品牌档案 ID")
     period_type: str = Field(..., description="节点类型：节气/节日/自定义")
@@ -135,13 +135,11 @@ class BrandSeasonalCalendarCreate(BaseModel):
     end_date: date = Field(..., description="结束日期")
     campaign_theme: Optional[str] = Field(default=None, description="营销主题")
     recommended_dishes: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="推荐菜品：[{dish_name, reason, discount_pct}]"
+        default_factory=list, description="推荐菜品：[{dish_name, reason, discount_pct}]"
     )
     marketing_focus: Optional[str] = Field(default=None, description="主推内容方向")
     target_segments: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="本次活动目标人群：[{segment_name, priority}]"
+        default_factory=list, description="本次活动目标人群：[{segment_name, priority}]"
     )
 
     @field_validator("period_type")
@@ -193,22 +191,16 @@ class BrandSeasonalCalendarResponse(BaseModel):
 # BrandContentConstraints — 内容约束规则
 # ---------------------------------------------------------------------------
 
+
 class BrandContentConstraintsCreate(BaseModel):
     brand_profile_id: uuid.UUID = Field(..., description="关联的品牌档案 ID")
     constraint_type: str = Field(..., description="约束类型：tone/format/channel")
     channel: str = Field(..., description="渠道：wechat/miniapp/sms/poster/wecom/douyin/xiaohongshu/all")
     max_length: Optional[int] = Field(default=None, gt=0, description="最大字符数")
-    required_elements: list[Any] = Field(
-        default_factory=list,
-        description="必须包含的元素列表"
-    )
-    forbidden_elements: list[Any] = Field(
-        default_factory=list,
-        description="禁止出现的内容列表"
-    )
+    required_elements: list[Any] = Field(default_factory=list, description="必须包含的元素列表")
+    forbidden_elements: list[Any] = Field(default_factory=list, description="禁止出现的内容列表")
     template_hints: dict[str, Any] = Field(
-        default_factory=dict,
-        description="内容模板提示：{opening_line, closing_line, cta_style, tone_examples[]}"
+        default_factory=dict, description="内容模板提示：{opening_line, closing_line, cta_style, tone_examples[]}"
     )
 
     @field_validator("constraint_type")
@@ -256,8 +248,10 @@ class BrandContentConstraintsResponse(BaseModel):
 # ContentBrief — build_content_brief 的返回结构
 # ---------------------------------------------------------------------------
 
+
 class ContentBrief(BaseModel):
     """完整的内容生成简报，供 content_generation agent 直接消费"""
+
     tenant_id: uuid.UUID
     channel: str
     target_segment: str

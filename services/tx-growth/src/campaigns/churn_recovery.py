@@ -3,6 +3,7 @@
 典型场景: 60天未消费会员自动发送召回短信+高面额优惠券
 支持多级流失(30天/60天/90天)差异化召回策略。
 """
+
 from typing import Any
 
 import structlog

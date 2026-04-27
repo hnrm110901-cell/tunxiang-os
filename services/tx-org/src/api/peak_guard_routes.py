@@ -20,12 +20,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, List, Optional
 from uuid import uuid4
 
-import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -51,6 +51,7 @@ PEAK_TYPE_LABELS = {
 
 
 # ── helpers ───────────────────────────────────────────────────────────────
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -104,6 +105,7 @@ def _enrich_risk_positions(positions: list[dict]) -> list[dict]:
 
 # ── request models ────────────────────────────────────────────────────────
 
+
 class PeakGuardCreateReq(BaseModel):
     store_id: str = Field(..., min_length=1)
     guard_date: date
@@ -131,6 +133,7 @@ class EvaluateReq(BaseModel):
 
 
 # ── GET /api/v1/peak-guard — 高峰记录列表 ─────────────────────────────────
+
 
 @router.get("")
 async def list_peak_guard(
@@ -169,14 +172,22 @@ async def list_peak_guard(
     params["limit"] = size
     params["offset"] = offset
 
-    total_row = (await db.execute(
-        text(f"SELECT COUNT(*) AS cnt FROM peak_guard_records WHERE {where}"),
-        params,
-    )).mappings().first()
+    total_row = (
+        (
+            await db.execute(
+                text(f"SELECT COUNT(*) AS cnt FROM peak_guard_records WHERE {where}"),
+                params,
+            )
+        )
+        .mappings()
+        .first()
+    )
     total = total_row["cnt"] if total_row else 0
 
-    rows = (await db.execute(
-        text(f"""
+    rows = (
+        (
+            await db.execute(
+                text(f"""
             SELECT id::text, tenant_id::text, store_id::text, guard_date,
                    peak_type, expected_traffic, coverage_score,
                    risk_positions, actions_taken, result_score,
@@ -186,8 +197,12 @@ async def list_peak_guard(
             ORDER BY guard_date DESC, created_at DESC
             LIMIT :limit OFFSET :offset
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     items = []
     for r in rows:
@@ -199,6 +214,7 @@ async def list_peak_guard(
 
 
 # ── POST /api/v1/peak-guard — 创建高峰保障记录 ───────────────────────────
+
 
 @router.post("")
 async def create_peak_guard(
@@ -241,18 +257,26 @@ async def create_peak_guard(
     )
     await db.commit()
 
-    log.info("peak_guard.created", record_id=record_id, store_id=body.store_id,
-             peak_type=body.peak_type, coverage_score=coverage_score)
+    log.info(
+        "peak_guard.created",
+        record_id=record_id,
+        store_id=body.store_id,
+        peak_type=body.peak_type,
+        coverage_score=coverage_score,
+    )
 
-    return _ok({
-        "id": record_id,
-        "coverage_score": coverage_score,
-        "risk_positions": risk_positions,
-        "peak_type_label": PEAK_TYPE_LABELS.get(body.peak_type, ""),
-    })
+    return _ok(
+        {
+            "id": record_id,
+            "coverage_score": coverage_score,
+            "risk_positions": risk_positions,
+            "peak_type_label": PEAK_TYPE_LABELS.get(body.peak_type, ""),
+        }
+    )
 
 
 # ── GET /api/v1/peak-guard/dashboard — 高峰保障总览 ──────────────────────
+
 
 @router.get("/dashboard")
 async def peak_guard_dashboard(
@@ -262,8 +286,10 @@ async def peak_guard_dashboard(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    row = (await db.execute(
-        text("""
+    row = (
+        (
+            await db.execute(
+                text("""
             SELECT
                 COUNT(*) FILTER (WHERE guard_date = CURRENT_DATE) AS today_count,
                 COUNT(*) FILTER (WHERE guard_date BETWEEN date_trunc('week', CURRENT_DATE) AND date_trunc('week', CURRENT_DATE) + INTERVAL '6 days') AS week_count,
@@ -272,12 +298,18 @@ async def peak_guard_dashboard(
             FROM peak_guard_records
             WHERE tenant_id = :tid AND is_deleted = FALSE
         """),
-        {"tid": tenant_id},
-    )).mappings().first()
+                {"tid": tenant_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     # 覆盖不足门店
-    low_stores = (await db.execute(
-        text("""
+    low_stores = (
+        (
+            await db.execute(
+                text("""
             SELECT DISTINCT store_id::text, MIN(coverage_score) AS min_coverage
             FROM peak_guard_records
             WHERE tenant_id = :tid AND is_deleted = FALSE
@@ -287,12 +319,18 @@ async def peak_guard_dashboard(
             ORDER BY min_coverage ASC
             LIMIT 20
         """),
-        {"tid": tenant_id},
-    )).mappings().all()
+                {"tid": tenant_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     # 按 peak_type 分布
-    by_type = (await db.execute(
-        text("""
+    by_type = (
+        (
+            await db.execute(
+                text("""
             SELECT peak_type, COUNT(*) AS cnt,
                    COALESCE(AVG(coverage_score), 0) AS avg_coverage
             FROM peak_guard_records
@@ -301,20 +339,24 @@ async def peak_guard_dashboard(
             GROUP BY peak_type
             ORDER BY cnt DESC
         """),
-        {"tid": tenant_id},
-    )).mappings().all()
+                {"tid": tenant_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     dashboard = _row_to_dict(row) if row else {}
     dashboard["low_coverage_stores"] = [_row_to_dict(s) for s in low_stores]
     dashboard["by_peak_type"] = [
-        {**_row_to_dict(t), "peak_type_label": PEAK_TYPE_LABELS.get(t["peak_type"], "")}
-        for t in by_type
+        {**_row_to_dict(t), "peak_type_label": PEAK_TYPE_LABELS.get(t["peak_type"], "")} for t in by_type
     ]
 
     return _ok(dashboard)
 
 
 # ── GET /api/v1/peak-guard/upcoming — 即将到来的高峰 ─────────────────────
+
 
 @router.get("/upcoming")
 async def upcoming_peaks(
@@ -338,26 +380,30 @@ async def upcoming_peaks(
 
     where = " AND ".join(conditions)
 
-    rows = (await db.execute(
-        text(f"""
+    rows = (
+        (
+            await db.execute(
+                text(f"""
             SELECT id::text, store_id::text, guard_date, peak_type,
                    expected_traffic, coverage_score, risk_positions, notes
             FROM peak_guard_records
             WHERE {where}
             ORDER BY guard_date ASC, peak_type ASC
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
 
-    items = [
-        {**_row_to_dict(r), "peak_type_label": PEAK_TYPE_LABELS.get(r["peak_type"], "")}
-        for r in rows
-    ]
+    items = [{**_row_to_dict(r), "peak_type_label": PEAK_TYPE_LABELS.get(r["peak_type"], "")} for r in rows]
 
     return _ok({"items": items, "total": len(items)})
 
 
 # ── GET /api/v1/peak-guard/alerts — 覆盖度预警 ──────────────────────────
+
 
 @router.get("/alerts")
 async def peak_guard_alerts(
@@ -388,14 +434,22 @@ async def peak_guard_alerts(
     params["limit"] = size
     params["offset"] = offset
 
-    total_row = (await db.execute(
-        text(f"SELECT COUNT(*) AS cnt FROM peak_guard_records WHERE {where}"),
-        params,
-    )).mappings().first()
+    total_row = (
+        (
+            await db.execute(
+                text(f"SELECT COUNT(*) AS cnt FROM peak_guard_records WHERE {where}"),
+                params,
+            )
+        )
+        .mappings()
+        .first()
+    )
     total = total_row["cnt"] if total_row else 0
 
-    rows = (await db.execute(
-        text(f"""
+    rows = (
+        (
+            await db.execute(
+                text(f"""
             SELECT id::text, store_id::text, guard_date, peak_type,
                    expected_traffic, coverage_score, risk_positions, notes
             FROM peak_guard_records
@@ -403,18 +457,20 @@ async def peak_guard_alerts(
             ORDER BY coverage_score ASC, guard_date ASC
             LIMIT :limit OFFSET :offset
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
 
-    items = [
-        {**_row_to_dict(r), "peak_type_label": PEAK_TYPE_LABELS.get(r["peak_type"], "")}
-        for r in rows
-    ]
+    items = [{**_row_to_dict(r), "peak_type_label": PEAK_TYPE_LABELS.get(r["peak_type"], "")} for r in rows]
 
     return _ok({"items": items, "total": total, "page": page, "size": size})
 
 
 # ── GET /api/v1/peak-guard/{record_id} — 高峰记录详情 ────────────────────
+
 
 @router.get("/{record_id}")
 async def get_peak_guard(
@@ -425,8 +481,10 @@ async def get_peak_guard(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    row = (await db.execute(
-        text("""
+    row = (
+        (
+            await db.execute(
+                text("""
             SELECT id::text, tenant_id::text, store_id::text, guard_date,
                    peak_type, expected_traffic, coverage_score,
                    risk_positions, actions_taken, result_score,
@@ -434,8 +492,12 @@ async def get_peak_guard(
             FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         """),
-        {"rid": record_id, "tid": tenant_id},
-    )).mappings().first()
+                {"rid": record_id, "tid": tenant_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not row:
         raise HTTPException(status_code=404, detail="Peak guard record not found")
@@ -450,6 +512,7 @@ async def get_peak_guard(
 
 # ── PUT /api/v1/peak-guard/{record_id} — 更新记录 ───────────────────────
 
+
 @router.put("/{record_id}")
 async def update_peak_guard(
     request: Request,
@@ -461,13 +524,19 @@ async def update_peak_guard(
     await _set_tenant(db, tenant_id)
 
     # 验证记录存在
-    existing = (await db.execute(
-        text("""
+    existing = (
+        (
+            await db.execute(
+                text("""
             SELECT id FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         """),
-        {"rid": record_id, "tid": tenant_id},
-    )).mappings().first()
+                {"rid": record_id, "tid": tenant_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not existing:
         raise HTTPException(status_code=404, detail="Peak guard record not found")
@@ -499,7 +568,7 @@ async def update_peak_guard(
     await db.execute(
         text(f"""
             UPDATE peak_guard_records
-            SET {', '.join(sets)}
+            SET {", ".join(sets)}
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         """),
         params,
@@ -512,6 +581,7 @@ async def update_peak_guard(
 
 # ── POST /api/v1/peak-guard/{record_id}/actions — 追加保障行动 ──────────
 
+
 @router.post("/{record_id}/actions")
 async def add_action(
     request: Request,
@@ -522,13 +592,19 @@ async def add_action(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    existing = (await db.execute(
-        text("""
+    existing = (
+        (
+            await db.execute(
+                text("""
             SELECT id FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         """),
-        {"rid": record_id, "tid": tenant_id},
-    )).mappings().first()
+                {"rid": record_id, "tid": tenant_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not existing:
         raise HTTPException(status_code=404, detail="Peak guard record not found")
@@ -562,6 +638,7 @@ async def add_action(
 
 # ── PUT /api/v1/peak-guard/{record_id}/evaluate — 事后评估 ──────────────
 
+
 @router.put("/{record_id}/evaluate")
 async def evaluate_peak_guard(
     request: Request,
@@ -572,14 +649,20 @@ async def evaluate_peak_guard(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    row = (await db.execute(
-        text("""
+    row = (
+        (
+            await db.execute(
+                text("""
             SELECT coverage_score
             FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         """),
-        {"rid": record_id, "tid": tenant_id},
-    )).mappings().first()
+                {"rid": record_id, "tid": tenant_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not row:
         raise HTTPException(status_code=404, detail="Peak guard record not found")
@@ -603,18 +686,20 @@ async def evaluate_peak_guard(
     )
     await db.commit()
 
-    log.info("peak_guard.evaluated", record_id=record_id,
-             result_score=body.result_score, effectiveness=effectiveness)
+    log.info("peak_guard.evaluated", record_id=record_id, result_score=body.result_score, effectiveness=effectiveness)
 
-    return _ok({
-        "id": record_id,
-        "result_score": body.result_score,
-        "coverage_score": coverage,
-        "effectiveness": effectiveness,
-    })
+    return _ok(
+        {
+            "id": record_id,
+            "result_score": body.result_score,
+            "coverage_score": coverage,
+            "effectiveness": effectiveness,
+        }
+    )
 
 
 # ── DELETE /api/v1/peak-guard/{record_id} — 软删除 ──────────────────────
+
 
 @router.delete("/{record_id}")
 async def delete_peak_guard(

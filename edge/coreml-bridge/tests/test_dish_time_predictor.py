@@ -56,20 +56,28 @@ sys.modules.setdefault("structlog", _structlog)
 
 # ─── 正式 import ──────────────────────────────────────────────────────────────
 import pytest  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-
-from dish_time_predictor import DishTimePredictor, PredictionInput  # type: ignore[import]  # noqa: E402
-from rule_fallback import RuleBasedDiscountRisk, DiscountRiskInput  # type: ignore[import]  # noqa: E402
+from dish_time_predictor import (  # type: ignore[import]  # noqa: E402  # type: ignore[import]  # noqa: E402
+    DishTimePredictor,
+    PredictionInput,
+    get_predictor,
+)
+from dish_time_predictor import PredictionInput as _PI
 
 # main.py uses relative imports — build standalone FastAPI test app instead
-from fastapi import HTTPException  # noqa: E402
-from dish_time_predictor import get_predictor, PredictionInput as _PI  # type: ignore[import]  # noqa: E402
+from fastapi import (
+    FastAPI,  # noqa: E402
+    )
+from fastapi.testclient import TestClient  # noqa: E402
+from rule_fallback import (  # type: ignore[import]  # noqa: E402
+    DiscountRiskInput,
+    RuleBasedDiscountRisk,
+    RuleBasedTrafficPredict,
+)
+from rule_fallback import (
+    DiscountRiskInput as _DRI,
+)
 from rule_fallback import (  # type: ignore[import]  # noqa: E402
     RuleBasedDiscountRisk as _RDR,
-    DiscountRiskInput as _DRI,
-    RuleBasedTrafficPredict,
-    TrafficPredictInput,
 )
 
 # ─── 独立测试 FastAPI App（避免相对导入问题）────────────────────────────────

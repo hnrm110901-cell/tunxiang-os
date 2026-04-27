@@ -5,6 +5,7 @@
 
 金额单位：分(fen)
 """
+
 import asyncio
 import re
 from datetime import datetime, timezone
@@ -12,11 +13,11 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 import structlog
+from services.growth_cross_brand_service import GrowthCrossBrandService
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
-from services.growth_cross_brand_service import GrowthCrossBrandService
 
 GROWTH_EVT_PREFIX = "growth"
 ATTRIBUTION_WINDOW_HOURS = 168  # 7天归因窗口
@@ -33,11 +34,21 @@ class GrowthTouchService:
     """增长触达服务 — 执行触达 + 频控 + 归因"""
 
     VALID_EXECUTION_STATES = (
-        "pending", "sent", "delivered", "failed", "blocked", "opted_out",
+        "pending",
+        "sent",
+        "delivered",
+        "failed",
+        "blocked",
+        "opted_out",
     )
     VALID_CHANNELS = (
-        "wecom", "sms", "miniapp", "app_push", "pos_receipt",
-        "reservation_page", "store_task",
+        "wecom",
+        "sms",
+        "miniapp",
+        "app_push",
+        "pos_receipt",
+        "reservation_page",
+        "store_task",
     )
 
     # ------------------------------------------------------------------
@@ -140,9 +151,7 @@ class GrowthTouchService:
         rendered_content: Optional[str] = None
         if touch_template_code:
             try:
-                rendered_content = await self.render_template(
-                    touch_template_code, variables, tenant_id, db
-                )
+                rendered_content = await self.render_template(touch_template_code, variables, tenant_id, db)
             except ValueError:
                 logger.warning(
                     "touch_template_not_found",
@@ -185,7 +194,9 @@ class GrowthTouchService:
         if execution_state == "pending":
             cross_brand_svc = GrowthCrossBrandService()
             cross_check = await cross_brand_svc.check_cross_brand_frequency(
-                customer_id, tenant_id, db,
+                customer_id,
+                tenant_id,
+                db,
             )
             if not cross_check["can_touch"]:
                 execution_state = "blocked"
@@ -193,11 +204,14 @@ class GrowthTouchService:
 
         # ── 品牌级频控（V2.3）──
         if execution_state == "pending" and brand_id:
-            brand_config = await db.execute(text("""
+            brand_config = await db.execute(
+                text("""
                 SELECT max_touch_per_customer_day, max_touch_per_customer_week, daily_touch_budget
                 FROM growth_brand_configs
                 WHERE brand_id = :bid AND tenant_id = :tid AND is_deleted = FALSE
-            """), {"bid": str(brand_id), "tid": tenant_id})
+            """),
+                {"bid": str(brand_id), "tid": tenant_id},
+            )
             bc = brand_config.fetchone()
 
             if bc:
@@ -206,28 +220,33 @@ class GrowthTouchService:
                 daily_budget = bc[2] or 100
 
                 # 检查该客户在该品牌下今日触达次数
-                today_count_result = await db.execute(text("""
+                today_count_result = await db.execute(
+                    text("""
                     SELECT COUNT(*) FROM growth_touch_executions
                     WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
                       AND created_at::date = CURRENT_DATE
                       AND execution_state NOT IN ('blocked', 'skipped')
-                """), {"cid": str(customer_id), "bid": str(brand_id)})
+                """),
+                    {"cid": str(customer_id), "bid": str(brand_id)},
+                )
                 tc = today_count_result.scalar() or 0
 
                 if tc >= max_day:
                     execution_state = "blocked"
                     block_reason = "brand_frequency_day_limit"
-                    logger.info("touch_blocked_brand_frequency",
-                                customer_id=str(customer_id), brand_id=str(brand_id))
+                    logger.info("touch_blocked_brand_frequency", customer_id=str(customer_id), brand_id=str(brand_id))
 
                 # 检查该品牌今日总触达预算
                 if execution_state == "pending":
-                    brand_today_result = await db.execute(text("""
+                    brand_today_result = await db.execute(
+                        text("""
                         SELECT COUNT(*) FROM growth_touch_executions
                         WHERE brand_id = :bid AND is_deleted = FALSE
                           AND created_at::date = CURRENT_DATE
                           AND execution_state NOT IN ('blocked', 'skipped')
-                    """), {"bid": str(brand_id)})
+                    """),
+                        {"bid": str(brand_id)},
+                    )
                     bt = brand_today_result.scalar() or 0
 
                     if bt >= daily_budget:
@@ -357,9 +376,7 @@ class GrowthTouchService:
     # 更新执行状态
     # ------------------------------------------------------------------
 
-    async def update_execution_state(
-        self, execution_id: UUID, state: str, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def update_execution_state(self, execution_id: UUID, state: str, tenant_id: str, db: AsyncSession) -> dict:
         """更新触达执行状态"""
         if state not in self.VALID_EXECUTION_STATES:
             raise ValueError(f"Invalid execution_state: {state}")

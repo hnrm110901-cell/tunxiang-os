@@ -16,6 +16,7 @@
   PUT  /api/v1/finance/store-cost-config
        → 门店固定成本配置写入
 """
+
 import uuid
 from datetime import date
 
@@ -37,6 +38,7 @@ _cost_svc = CostEngineService()
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
 
+
 class StoreCostConfigRequest(BaseModel):
     store_id: str = Field(..., description="门店ID（UUID）")
     monthly_rent_fen: int = Field(ge=0, description="月租金（分）")
@@ -45,6 +47,7 @@ class StoreCostConfigRequest(BaseModel):
 
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -64,12 +67,11 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
 
 
 # ─── GET /cost/daily ──────────────────────────────────────────────────────────
+
 
 @router.get("/cost/daily", summary="日成本快报")
 async def get_daily_cost(
@@ -102,6 +104,7 @@ async def get_daily_cost(
 
 
 # ─── GET /cost/breakdown ──────────────────────────────────────────────────────
+
 
 @router.get("/cost/breakdown", summary="成本明细（菜品占比）")
 async def get_cost_breakdown(
@@ -137,6 +140,7 @@ async def get_cost_breakdown(
 
 
 # ─── GET /health/cost-rate ────────────────────────────────────────────────────
+
 
 @router.get("/health/cost-rate", summary="成本健康指数")
 async def get_cost_health(
@@ -181,6 +185,7 @@ async def get_cost_health(
 
 # ─── GET /store-cost-config ───────────────────────────────────────────────────
 
+
 @router.get("/store-cost-config", summary="门店固定成本配置读取")
 async def get_store_cost_config(
     store_id: str = Query(..., description="门店ID"),
@@ -203,6 +208,7 @@ async def get_store_cost_config(
 
 
 # ─── PUT /store-cost-config ───────────────────────────────────────────────────
+
 
 @router.put("/store-cost-config", summary="门店固定成本配置写入")
 async def update_store_cost_config(

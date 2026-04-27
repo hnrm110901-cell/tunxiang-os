@@ -1,4 +1,5 @@
 """沽清记录模型"""
+
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -23,6 +24,5 @@ class SoldoutRecord(TenantBase):
     reported_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     source: Mapped[str] = mapped_column(String(20), nullable=False, default="kds")
     sync_status: Mapped[dict] = mapped_column(
-        JSONB, nullable=False,
-        default=lambda: {"pos": False, "miniapp": False, "kds": False}
+        JSONB, nullable=False, default=lambda: {"pos": False, "miniapp": False, "kds": False}
     )

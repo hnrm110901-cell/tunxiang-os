@@ -13,21 +13,20 @@
   - 不连接真实 PostgreSQL
   - AsyncSession 以 AsyncMock 替代
 """
+
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
+# ── 构建最小化 FastAPI 应用（只挂载 dispatch_router）──────────────────────────
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
-# ── 构建最小化 FastAPI 应用（只挂载 dispatch_router）──────────────────────────
-
-from fastapi import FastAPI
+from shared.ontology.src.database import get_db
 
 from ..api.dispatch_routes import router as dispatch_router
-from shared.ontology.src.database import get_db
 
 app = FastAPI()
 app.include_router(dispatch_router)
@@ -84,8 +83,10 @@ def _make_mock_db(
 
 def _override_get_db(mock_db: AsyncMock):
     """替换 get_db 依赖，注入 mock AsyncSession。"""
+
     async def _dep():
         yield mock_db
+
     return _dep
 
 

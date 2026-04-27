@@ -9,6 +9,7 @@
 使用 SmartMenuAgent 的 push_expiry_specials action 生成方案，
 同时调用 suggest_alternatives 补充缺货菜品替代方案。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -7,6 +7,7 @@
   POST /api/v1/reports/stream  — 流式 AI 解读指定报告数据
   GET  /api/v1/reports/stream/health — 健康检查
 """
+
 from __future__ import annotations
 
 import json
@@ -24,9 +25,10 @@ router = APIRouter(prefix="/api/v1/reports/stream", tags=["reports-stream"])
 
 class StreamReportRequest(BaseModel):
     """流式报告解读请求"""
-    prompt: str                          # 解读指令（用户自然语言，如"解读本月P&L异常"）
-    report_data: dict = {}               # 报告数据（如 finance_profit_loss 输出）
-    report_type: str = "auto"           # 报告类型（auto=自动检测，或 pl/inventory/cost_health）
+
+    prompt: str  # 解读指令（用户自然语言，如"解读本月P&L异常"）
+    report_data: dict = {}  # 报告数据（如 finance_profit_loss 输出）
+    report_type: str = "auto"  # 报告类型（auto=自动检测，或 pl/inventory/cost_health）
     store_id: Optional[str] = None
 
 
@@ -34,6 +36,7 @@ def _get_model_router():
     """获取 ModelRouter 实例（不可用时返回 None，降级处理）"""
     try:
         from tx_agent.src.services.model_router import ModelRouter  # type: ignore[import]
+
         return ModelRouter()
     except ImportError:
         logger.warning("stream_report_routes.model_router_not_available")
@@ -43,11 +46,11 @@ def _get_model_router():
 def _report_type_to_task_type(report_type: str) -> str:
     """将报告类型映射到 ModelRouter 任务类型。"""
     mapping = {
-        "pl":           "cost_analysis",
-        "inventory":    "standard_analysis",
-        "cost_health":  "cost_analysis",
-        "dashboard":    "dashboard_brief",
-        "auto":         "auto",
+        "pl": "cost_analysis",
+        "inventory": "standard_analysis",
+        "cost_health": "cost_analysis",
+        "dashboard": "dashboard_brief",
+        "auto": "auto",
     }
     return mapping.get(report_type, "standard_analysis")
 
@@ -88,11 +91,7 @@ async def stream_report_analysis(
         )
 
     # 构建消息：将报告数据作为上下文注入 prompt
-    report_text = (
-        json.dumps(body.report_data, ensure_ascii=False, indent=2)
-        if body.report_data
-        else ""
-    )
+    report_text = json.dumps(body.report_data, ensure_ascii=False, indent=2) if body.report_data else ""
     content = body.prompt
     if report_text:
         content = f"{body.prompt}\n\n报告数据：\n{report_text}"

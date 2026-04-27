@@ -14,6 +14,7 @@ POST /api/v1/service/suggestions/{order_id}/{suggestion_type}/dismiss
 GET  /api/v1/orders/{order_id}/constraint-status
      快速返回三约束状态（聚合查询，目标 < 100ms）
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -33,6 +34,7 @@ router = APIRouter()
 
 # ─── 依赖注入辅助 ───
 
+
 async def _get_db():
     """
     尝试获取数据库会话。
@@ -41,54 +43,57 @@ async def _get_db():
     """
     try:
         from shared.ontology.src.database import async_session_factory
+
         async with async_session_factory() as session:
             yield session
     except Exception:  # noqa: BLE001 — MLPS3-P0: 离线/测试环境DB不可用，降级为None
         yield None
 
 
-def _get_tenant_id(x_tenant_id: str = Header(default='demo-tenant')) -> str:
+def _get_tenant_id(x_tenant_id: str = Header(default="demo-tenant")) -> str:
     return x_tenant_id
 
 
 # ─── 响应序列化辅助 ───
 
+
 def _suggestion_to_dict(s: ServiceSuggestion) -> dict[str, Any]:
     return {
-        'type': s.type,
-        'message': s.message,
-        'urgency': s.urgency,
-        'action_label': s.action_label,
-        'action_data': s.action_data,
+        "type": s.type,
+        "message": s.message,
+        "urgency": s.urgency,
+        "action_label": s.action_label,
+        "action_data": s.action_data,
     }
 
 
 def _constraint_to_dict(cs: ConstraintStatus) -> dict[str, Any]:
     return {
-        'margin': {
-            'ok': cs.margin.ok,
-            'pct': cs.margin.pct,
-            'level': cs.margin.level,
+        "margin": {
+            "ok": cs.margin.ok,
+            "pct": cs.margin.pct,
+            "level": cs.margin.level,
         },
-        'food_safety': {
-            'ok': cs.food_safety.ok,
-            'issues': cs.food_safety.issues,
-            'level': cs.food_safety.level,
+        "food_safety": {
+            "ok": cs.food_safety.ok,
+            "issues": cs.food_safety.issues,
+            "level": cs.food_safety.level,
         },
-        'service_time': {
-            'ok': cs.service_time.ok,
-            'elapsed_min': cs.service_time.elapsed_min,
-            'limit_min': cs.service_time.limit_min,
-            'level': cs.service_time.level,
+        "service_time": {
+            "ok": cs.service_time.ok,
+            "elapsed_min": cs.service_time.elapsed_min,
+            "limit_min": cs.service_time.limit_min,
+            "level": cs.service_time.level,
         },
     }
 
 
 # ─── 路由 ───
 
-@router.get('/api/v1/service/suggestions/all')
+
+@router.get("/api/v1/service/suggestions/all")
 async def list_all_suggestions(
-    store_id: str = Query(..., description='门店ID'),
+    store_id: str = Query(..., description="门店ID"),
     tenant_id: str = Depends(_get_tenant_id),
     db=Depends(_get_db),
 ):
@@ -101,14 +106,11 @@ async def list_all_suggestions(
         tenant_id=tenant_id,
         db=db,
     )
-    serialized = {
-        table_no: [_suggestion_to_dict(s) for s in suggs]
-        for table_no, suggs in result.items()
-    }
-    return {'ok': True, 'data': serialized}
+    serialized = {table_no: [_suggestion_to_dict(s) for s in suggs] for table_no, suggs in result.items()}
+    return {"ok": True, "data": serialized}
 
 
-@router.get('/api/v1/service/suggestions/{order_id}')
+@router.get("/api/v1/service/suggestions/{order_id}")
 async def get_order_suggestions(
     order_id: str,
     tenant_id: str = Depends(_get_tenant_id),
@@ -123,12 +125,12 @@ async def get_order_suggestions(
         db=db,
     )
     return {
-        'ok': True,
-        'data': [_suggestion_to_dict(s) for s in suggestions],
+        "ok": True,
+        "data": [_suggestion_to_dict(s) for s in suggestions],
     }
 
 
-@router.post('/api/v1/service/suggestions/{order_id}/{suggestion_type}/dismiss')
+@router.post("/api/v1/service/suggestions/{order_id}/{suggestion_type}/dismiss")
 async def dismiss_order_suggestion(
     order_id: str,
     suggestion_type: str,
@@ -145,10 +147,10 @@ async def dismiss_order_suggestion(
         tenant_id=tenant_id,
         db=db,
     )
-    return {'ok': True, 'data': {'dismissed': suggestion_type}}
+    return {"ok": True, "data": {"dismissed": suggestion_type}}
 
 
-@router.get('/api/v1/orders/{order_id}/constraint-status')
+@router.get("/api/v1/orders/{order_id}/constraint-status")
 async def get_order_constraint_status(
     order_id: str,
     tenant_id: str = Depends(_get_tenant_id),
@@ -164,4 +166,4 @@ async def get_order_constraint_status(
         tenant_id=tenant_id,
         db=db,
     )
-    return {'ok': True, 'data': _constraint_to_dict(status)}
+    return {"ok": True, "data": _constraint_to_dict(status)}

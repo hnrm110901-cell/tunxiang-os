@@ -1,15 +1,16 @@
 """Coach Sessions — 店长教练Agent API"""
 
+import json
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Any, List, Optional
+from uuid import uuid4
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Optional, List
-from uuid import uuid4
-from datetime import datetime, date, timezone
-from decimal import Decimal
-import json
-import structlog
 
 from shared.ontology.src.database import get_db
 
@@ -142,26 +143,38 @@ async def list_coach_sessions(
 
     where = " AND ".join(conditions)
 
-    cnt_row = (await db.execute(
-        text(f"SELECT COUNT(*)::int AS total FROM coach_sessions WHERE {where}"),
-        params,
-    )).mappings().first()
+    cnt_row = (
+        (
+            await db.execute(
+                text(f"SELECT COUNT(*)::int AS total FROM coach_sessions WHERE {where}"),
+                params,
+            )
+        )
+        .mappings()
+        .first()
+    )
     total = cnt_row["total"] if cnt_row else 0
 
     offset = (page - 1) * size
     params["lim"] = size
     params["off"] = offset
 
-    rows = (await db.execute(
-        text(f"""
+    rows = (
+        (
+            await db.execute(
+                text(f"""
             SELECT {_FIELDS}
             FROM coach_sessions
             WHERE {where}
             ORDER BY session_date DESC, created_at DESC
             LIMIT :lim OFFSET :off
         """),
-        params,
-    )).mappings().all()
+                params,
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     items = [_row_to_dict(r) for r in rows]
     return _ok({"items": items, "total": total, "page": page, "size": size})
@@ -200,22 +213,33 @@ async def create_coach_session(
              FALSE, :now, :now)
         RETURNING id::text
     """)
-    result = (await db.execute(sql, {
-        "id": rec_id, "tid": tenant_id,
-        "store_id": body.store_id, "manager_id": body.manager_id,
-        "session_date": s_date, "session_type": body.session_type,
-        "suggestions": json.dumps(suggestions),
-        "focus_employees": json.dumps(focus_employees),
-        "readiness_before": body.readiness_before,
-        "readiness_after": body.readiness_after,
-        "notes": body.notes,
-        "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "id": rec_id,
+                    "tid": tenant_id,
+                    "store_id": body.store_id,
+                    "manager_id": body.manager_id,
+                    "session_date": s_date,
+                    "session_type": body.session_type,
+                    "suggestions": json.dumps(suggestions),
+                    "focus_employees": json.dumps(focus_employees),
+                    "readiness_before": body.readiness_before,
+                    "readiness_after": body.readiness_after,
+                    "notes": body.notes,
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     await db.commit()
 
-    log.info("coach_session.created",
-             session_id=rec_id, manager_id=body.manager_id, tenant_id=tenant_id)
+    log.info("coach_session.created", session_id=rec_id, manager_id=body.manager_id, tenant_id=tenant_id)
 
     return _ok({"id": result["id"] if result else rec_id})
 
@@ -289,14 +313,16 @@ async def coach_dashboard(
     top_rows = (await db.execute(top_sql, {"tid": tenant_id})).mappings().all()
     top_managers = [{"manager_id": r["manager_id"], "session_count": r["session_count"]} for r in top_rows]
 
-    return _ok({
-        "this_week_count": counts["this_week_count"] if counts else 0,
-        "this_month_count": counts["this_month_count"] if counts else 0,
-        "acceptance_rate": acceptance_rate,
-        "avg_readiness_lift": float(lift["avg_readiness_lift"]) if lift else 0,
-        "by_session_type": by_session_type,
-        "top_managers": top_managers,
-    })
+    return _ok(
+        {
+            "this_week_count": counts["this_week_count"] if counts else 0,
+            "this_month_count": counts["this_month_count"] if counts else 0,
+            "acceptance_rate": acceptance_rate,
+            "avg_readiness_lift": float(lift["avg_readiness_lift"]) if lift else 0,
+            "by_session_type": by_session_type,
+            "top_managers": top_managers,
+        }
+    )
 
 
 # -- 4. GET /manager-summary -- 店长教练汇总 -----------------------------------
@@ -357,13 +383,15 @@ async def manager_summary(
     recent_rows = (await db.execute(recent_sql, {"tid": tenant_id, "mid": manager_id})).mappings().all()
     recent_sessions = [_row_to_dict(r) for r in recent_rows]
 
-    return _ok({
-        "manager_id": manager_id,
-        "total_sessions": total_row["total_sessions"] if total_row else 0,
-        "acceptance_rate": acceptance_rate,
-        "avg_readiness_lift": float(stats["avg_readiness_lift"]) if stats else 0,
-        "recent_sessions": recent_sessions,
-    })
+    return _ok(
+        {
+            "manager_id": manager_id,
+            "total_sessions": total_row["total_sessions"] if total_row else 0,
+            "acceptance_rate": acceptance_rate,
+            "avg_readiness_lift": float(stats["avg_readiness_lift"]) if stats else 0,
+            "recent_sessions": recent_sessions,
+        }
+    )
 
 
 # -- 5. GET /effectiveness -- 教练有效性分析 ------------------------------------
@@ -388,11 +416,14 @@ async def coach_effectiveness(
     """)
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
-    by_type = [{
-        "session_type": r["session_type"],
-        "session_count": r["session_count"],
-        "avg_readiness_lift": float(r["avg_lift"]),
-    } for r in rows]
+    by_type = [
+        {
+            "session_type": r["session_type"],
+            "session_count": r["session_count"],
+            "avg_readiness_lift": float(r["avg_lift"]),
+        }
+        for r in rows
+    ]
 
     # Overall average
     overall_sql = text("""
@@ -403,10 +434,12 @@ async def coach_effectiveness(
     """)
     overall = (await db.execute(overall_sql, {"tid": tenant_id})).mappings().first()
 
-    return _ok({
-        "overall_avg_lift": float(overall["avg_lift"]) if overall else 0,
-        "by_session_type": by_type,
-    })
+    return _ok(
+        {
+            "overall_avg_lift": float(overall["avg_lift"]) if overall else 0,
+            "by_session_type": by_type,
+        }
+    )
 
 
 # -- 6. GET /{session_id} -- 会话详情 -----------------------------------------
@@ -501,7 +534,9 @@ async def accept_suggestion(
     if not check:
         raise HTTPException(status_code=404, detail="Coach session not found")
     if sug_idx < 0 or sug_idx >= check["sug_len"]:
-        raise HTTPException(status_code=400, detail=f"Suggestion index {sug_idx} out of range (0-{check['sug_len'] - 1})")
+        raise HTTPException(
+            status_code=400, detail=f"Suggestion index {sug_idx} out of range (0-{check['sug_len'] - 1})"
+        )
 
     # Use jsonb_set to update accepted flag
     sql = text("""
@@ -511,20 +546,28 @@ async def accept_suggestion(
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, suggestions
     """)
-    result = (await db.execute(sql, {
-        "sid": session_id,
-        "tid": tenant_id,
-        "path": f'{{{sug_idx},accepted}}',
-        "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "sid": session_id,
+                    "tid": tenant_id,
+                    "path": f"{{{sug_idx},accepted}}",
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
         raise HTTPException(status_code=404, detail="Coach session not found")
 
     await db.commit()
 
-    log.info("coach_session.suggestion_accepted",
-             session_id=session_id, sug_idx=sug_idx, tenant_id=tenant_id)
+    log.info("coach_session.suggestion_accepted", session_id=session_id, sug_idx=sug_idx, tenant_id=tenant_id)
 
     suggestions = result["suggestions"]
     if isinstance(suggestions, str):
@@ -562,20 +605,28 @@ async def append_action(
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, actions_taken
     """)
-    result = (await db.execute(sql, {
-        "sid": session_id,
-        "tid": tenant_id,
-        "new_action": json.dumps([new_action]),
-        "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "sid": session_id,
+                    "tid": tenant_id,
+                    "new_action": json.dumps([new_action]),
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
         raise HTTPException(status_code=404, detail="Coach session not found")
 
     await db.commit()
 
-    log.info("coach_session.action_appended",
-             session_id=session_id, tenant_id=tenant_id)
+    log.info("coach_session.action_appended", session_id=session_id, tenant_id=tenant_id)
 
     actions_taken = result["actions_taken"]
     if isinstance(actions_taken, str):
@@ -624,23 +675,31 @@ async def complete_action(
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, actions_taken
     """)
-    result = (await db.execute(sql, {
-        "sid": session_id,
-        "tid": tenant_id,
-        "result_path": f'{{{act_idx},result}}',
-        "result_val": json.dumps(body.result),
-        "completed_path": f'{{{act_idx},completed_at}}',
-        "completed_val": json.dumps(now.isoformat()),
-        "now": now,
-    })).mappings().first()
+    result = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "sid": session_id,
+                    "tid": tenant_id,
+                    "result_path": f"{{{act_idx},result}}",
+                    "result_val": json.dumps(body.result),
+                    "completed_path": f"{{{act_idx},completed_at}}",
+                    "completed_val": json.dumps(now.isoformat()),
+                    "now": now,
+                },
+            )
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
         raise HTTPException(status_code=404, detail="Coach session not found")
 
     await db.commit()
 
-    log.info("coach_session.action_completed",
-             session_id=session_id, act_idx=act_idx, tenant_id=tenant_id)
+    log.info("coach_session.action_completed", session_id=session_id, act_idx=act_idx, tenant_id=tenant_id)
 
     actions_taken = result["actions_taken"]
     if isinstance(actions_taken, str):

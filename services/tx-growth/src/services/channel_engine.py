@@ -7,10 +7,11 @@ v144 DB 化：移除内存存储，改为 async SQLAlchemy
   - channel_configs 表存储渠道配置（替换 _channel_configs dict）
   - message_send_logs 表存储发送日志（替换 _send_logs + _daily_send_counts）
 """
+
 import json
 import os
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -27,19 +28,20 @@ _logger = structlog.get_logger(__name__)
 # ChannelEngine
 # ---------------------------------------------------------------------------
 
+
 class ChannelEngine:
     """渠道触达引擎 — 统一渠道配置、发送能力和合规频控"""
 
     GATEWAY_URL: str = os.getenv("GATEWAY_SERVICE_URL", "http://gateway:8000")
 
     CHANNELS = {
-        "wecom":            {"name": "企业微信",     "max_daily": 3},
-        "sms":              {"name": "短信",          "max_daily": 2},
-        "miniapp":          {"name": "小程序订阅消息", "max_daily": 5},
-        "app_push":         {"name": "App Push",      "max_daily": 3},
-        "pos_receipt":      {"name": "POS小票二维码",  "max_daily": 999},
-        "reservation_page": {"name": "预订确认页",     "max_daily": 1},
-        "store_task":       {"name": "门店人工任务",   "max_daily": 1},
+        "wecom": {"name": "企业微信", "max_daily": 3},
+        "sms": {"name": "短信", "max_daily": 2},
+        "miniapp": {"name": "小程序订阅消息", "max_daily": 5},
+        "app_push": {"name": "App Push", "max_daily": 3},
+        "pos_receipt": {"name": "POS小票二维码", "max_daily": 999},
+        "reservation_page": {"name": "预订确认页", "max_daily": 1},
+        "store_task": {"name": "门店人工任务", "max_daily": 1},
     }
 
     # ------------------------------------------------------------------
@@ -555,16 +557,19 @@ class ChannelEngine:
                 )
                 result = resp.json()
                 # 记录发送日志
-                await db.execute(text("""
+                await db.execute(
+                    text("""
                     INSERT INTO message_send_logs
                         (tenant_id, channel, external_user_id, content_summary, status, sent_at)
                     VALUES (:tid, 'wecom_group', :gid, :content, :status, NOW())
-                """), {
-                    "tid": tenant_id,
-                    "gid": group_chat_id,
-                    "content": content[:200],
-                    "status": "sent" if result.get("ok") else "failed",
-                })
+                """),
+                    {
+                        "tid": tenant_id,
+                        "gid": group_chat_id,
+                        "content": content[:200],
+                        "status": "sent" if result.get("ok") else "failed",
+                    },
+                )
                 return result
         except (httpx.HTTPError, OSError) as exc:
             _logger.error("wecom_group_send_error", error=str(exc), exc_info=True)
@@ -583,16 +588,19 @@ class ChannelEngine:
     ) -> dict:
         """创建门店店长待办任务 -- 用于服务修复/高价值客户跟进"""
         _logger.info("create_store_task", store_id=store_id, task_type=task_type, tenant_id=tenant_id)
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             INSERT INTO message_send_logs
                 (tenant_id, channel, external_user_id, content_summary, status, sent_at)
             VALUES (:tid, 'store_task', :store_id, :summary, 'pending', NOW())
             RETURNING id
-        """), {
-            "tid": tenant_id,
-            "store_id": store_id,
-            "summary": f"[{task_type}] {task_title}: {task_description[:100]}",
-        })
+        """),
+            {
+                "tid": tenant_id,
+                "store_id": store_id,
+                "summary": f"[{task_type}] {task_title}: {task_description[:100]}",
+            },
+        )
         row = result.fetchone()
         task_id = str(row[0]) if row else None
 

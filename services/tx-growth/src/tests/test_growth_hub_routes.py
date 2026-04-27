@@ -32,6 +32,7 @@
 29. POST /api/v1/growth/agent-suggestions/{id}/publish  — 发布策略建议
 30. PATCH /api/v1/growth/customers/{id}/profile         — ValueError 路径返回 err
 """
+
 import os
 import sys
 
@@ -40,9 +41,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import types as _types
 import uuid
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -53,6 +53,7 @@ sys.modules.setdefault("structlog", _structlog_mod)
 
 # ── stub: sqlalchemy ─────────────────────────────────────────────────────────
 import sqlalchemy as _sa
+
 sys.modules.setdefault("sqlalchemy", _sa)
 
 # ── stub: shared.ontology.src.database (async_session_factory) ──────────────
@@ -384,6 +385,7 @@ def _reset_db():
 # Customer Growth Profile 端点
 # ===========================================================================
 
+
 class TestGetGrowthProfile:
     def test_get_profile_ok(self):
         _reset_db()
@@ -404,6 +406,7 @@ class TestGetGrowthProfile:
         """当 service 返回 None 时，响应 ok=False。"""
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._profile_svc.get_profile
 
         async def _return_none(*a, **kw):
@@ -411,9 +414,7 @@ class TestGetGrowthProfile:
 
         _mod._profile_svc.get_profile = _return_none
         try:
-            resp = client.get(
-                f"/api/v1/growth/customers/{CUSTOMER_ID}/profile", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/customers/{CUSTOMER_ID}/profile", headers=HEADERS)
             assert resp.status_code == 200
             body = resp.json()
             assert body["ok"] is False
@@ -437,6 +438,7 @@ class TestUpdateGrowthProfile:
         """service 抛出 ValueError 时，响应 ok=False。"""
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._profile_svc.update_profile
 
         async def _raise(*a, **kw):
@@ -459,6 +461,7 @@ class TestUpdateGrowthProfile:
 # ===========================================================================
 # Journey Templates 端点
 # ===========================================================================
+
 
 class TestJourneyTemplates:
     _TEMPLATE_PAYLOAD = {
@@ -502,9 +505,7 @@ class TestJourneyTemplates:
 
     def test_get_template_ok(self):
         _reset_db()
-        resp = client.get(
-            f"/api/v1/growth/journey-templates/{TEMPLATE_ID}", headers=HEADERS
-        )
+        resp = client.get(f"/api/v1/growth/journey-templates/{TEMPLATE_ID}", headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -513,6 +514,7 @@ class TestJourneyTemplates:
     def test_get_template_not_found(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._journey_svc.get_template
 
         async def _none(*a, **kw):
@@ -520,9 +522,7 @@ class TestJourneyTemplates:
 
         _mod._journey_svc.get_template = _none
         try:
-            resp = client.get(
-                f"/api/v1/growth/journey-templates/{TEMPLATE_ID}", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/journey-templates/{TEMPLATE_ID}", headers=HEADERS)
             assert resp.status_code == 200
             assert resp.json()["ok"] is False
         finally:
@@ -565,6 +565,7 @@ class TestJourneyTemplates:
 # Journey Enrollments 端点
 # ===========================================================================
 
+
 class TestJourneyEnrollments:
     _ENROLLMENT_PAYLOAD = {
         "customer_id": CUSTOMER_ID,
@@ -591,9 +592,7 @@ class TestJourneyEnrollments:
 
     def test_get_enrollment_ok(self):
         _reset_db()
-        resp = client.get(
-            f"/api/v1/growth/journey-enrollments/{ENROLLMENT_ID}", headers=HEADERS
-        )
+        resp = client.get(f"/api/v1/growth/journey-enrollments/{ENROLLMENT_ID}", headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -602,6 +601,7 @@ class TestJourneyEnrollments:
     def test_get_enrollment_not_found(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._journey_svc.get_enrollment
 
         async def _none(*a, **kw):
@@ -609,9 +609,7 @@ class TestJourneyEnrollments:
 
         _mod._journey_svc.get_enrollment = _none
         try:
-            resp = client.get(
-                f"/api/v1/growth/journey-enrollments/{ENROLLMENT_ID}", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/journey-enrollments/{ENROLLMENT_ID}", headers=HEADERS)
             assert resp.status_code == 200
             assert resp.json()["ok"] is False
         finally:
@@ -631,6 +629,7 @@ class TestJourneyEnrollments:
 # ===========================================================================
 # Touch Executions 端点
 # ===========================================================================
+
 
 class TestTouchExecutions:
     _TOUCH_PAYLOAD = {
@@ -694,6 +693,7 @@ class TestTouchExecutions:
 # Service Repair Cases 端点
 # ===========================================================================
 
+
 class TestServiceRepairCases:
     _CASE_PAYLOAD = {
         "customer_id": CUSTOMER_ID,
@@ -720,9 +720,7 @@ class TestServiceRepairCases:
 
     def test_get_repair_case_ok(self):
         _reset_db()
-        resp = client.get(
-            f"/api/v1/growth/service-repair-cases/{CASE_ID}", headers=HEADERS
-        )
+        resp = client.get(f"/api/v1/growth/service-repair-cases/{CASE_ID}", headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -731,6 +729,7 @@ class TestServiceRepairCases:
     def test_get_repair_case_not_found(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._repair_svc.get_case
 
         async def _none(*a, **kw):
@@ -738,9 +737,7 @@ class TestServiceRepairCases:
 
         _mod._repair_svc.get_case = _none
         try:
-            resp = client.get(
-                f"/api/v1/growth/service-repair-cases/{CASE_ID}", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/service-repair-cases/{CASE_ID}", headers=HEADERS)
             assert resp.status_code == 200
             assert resp.json()["ok"] is False
         finally:
@@ -773,6 +770,7 @@ class TestServiceRepairCases:
 # ===========================================================================
 # Agent Strategy Suggestions 端点
 # ===========================================================================
+
 
 class TestAgentSuggestions:
     _SUGGESTION_PAYLOAD = {
@@ -809,9 +807,7 @@ class TestAgentSuggestions:
 
     def test_get_suggestion_ok(self):
         _reset_db()
-        resp = client.get(
-            f"/api/v1/growth/agent-suggestions/{SUGGESTION_ID}", headers=HEADERS
-        )
+        resp = client.get(f"/api/v1/growth/agent-suggestions/{SUGGESTION_ID}", headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -820,6 +816,7 @@ class TestAgentSuggestions:
     def test_get_suggestion_not_found(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._suggestion_svc.get_suggestion
 
         async def _none(*a, **kw):
@@ -827,9 +824,7 @@ class TestAgentSuggestions:
 
         _mod._suggestion_svc.get_suggestion = _none
         try:
-            resp = client.get(
-                f"/api/v1/growth/agent-suggestions/{SUGGESTION_ID}", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/agent-suggestions/{SUGGESTION_ID}", headers=HEADERS)
             assert resp.status_code == 200
             assert resp.json()["ok"] is False
         finally:
@@ -873,8 +868,10 @@ class TestAgentSuggestions:
 # 辅助：Mock DB 结果构造器
 # ===========================================================================
 
+
 class _MockRow:
     """模拟 SQLAlchemy Row 对象，支持索引访问。"""
+
     def __init__(self, *values):
         self._values = values
 
@@ -887,6 +884,7 @@ class _MockRow:
 
 class _MockResult:
     """模拟 SQLAlchemy CursorResult。"""
+
     def __init__(self, rows=None, scalar_value=None):
         self._rows = rows or []
         self._scalar_value = scalar_value
@@ -920,17 +918,17 @@ def _setup_dashboard_mocks():
 
     call_count = {"n": 0}
     results = [
-        _MockResult(),                              # set_config
-        _MockResult(rows=[profile_row]),             # profile_stats
-        _MockResult(rows=[enrollment_row]),          # enrollment_stats
-        _MockResult(rows=[touch_row]),               # touch_stats
-        _MockResult(rows=[suggestion_row]),          # suggestion_stats
-        _MockResult(rows=mech_rows),                 # mech_stats
-        _MockResult(rows=[id_row]),                  # identifiable
-        _MockResult(rows=[fj_row]),                  # first_join
-        _MockResult(rows=[td_row]),                  # thirty_day
-        _MockResult(rows=[rc_row]),                  # recall
-        _MockResult(rows=[pc_row]),                  # per_customer
+        _MockResult(),  # set_config
+        _MockResult(rows=[profile_row]),  # profile_stats
+        _MockResult(rows=[enrollment_row]),  # enrollment_stats
+        _MockResult(rows=[touch_row]),  # touch_stats
+        _MockResult(rows=[suggestion_row]),  # suggestion_stats
+        _MockResult(rows=mech_rows),  # mech_stats
+        _MockResult(rows=[id_row]),  # identifiable
+        _MockResult(rows=[fj_row]),  # first_join
+        _MockResult(rows=[td_row]),  # thirty_day
+        _MockResult(rows=[rc_row]),  # recall
+        _MockResult(rows=[pc_row]),  # per_customer
     ]
 
     async def _mock_execute(*a, **kw):
@@ -945,8 +943,10 @@ def _setup_dashboard_mocks():
 
 def _setup_empty_db_mocks(num_calls=20):
     """所有 db.execute 返回空结果。"""
+
     async def _mock_execute(*a, **kw):
         return _MockResult()
+
     _MOCK_DB.execute = AsyncMock(side_effect=_mock_execute)
 
 
@@ -970,6 +970,7 @@ STORE_ID = str(uuid.uuid4())
 # ===========================================================================
 # Dashboard Stats 端点
 # ===========================================================================
+
 
 class TestDashboardStats:
     def test_dashboard_stats_ok(self):
@@ -1007,6 +1008,7 @@ class TestDashboardStats:
 # ===========================================================================
 # Attribution 端点
 # ===========================================================================
+
 
 class TestAttributionByMechanism:
     def test_by_mechanism_ok(self):
@@ -1170,11 +1172,13 @@ class TestRepairEffectiveness:
 # Brand Config 端点
 # ===========================================================================
 
+
 class TestBrandConfigs:
     def test_list_brand_configs_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._brand_svc.list_brand_configs
 
         async def _mock_list(*a, **kw):
@@ -1194,6 +1198,7 @@ class TestBrandConfigs:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._brand_svc.list_brand_configs
 
         async def _mock_list(*a, **kw):
@@ -1217,6 +1222,7 @@ class TestBrandConfigs:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._brand_svc.upsert_brand_config
 
         async def _mock_upsert(*a, **kw):
@@ -1259,6 +1265,7 @@ class TestBrandConfigs:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._brand_svc.get_brand_config
 
         async def _mock_get(*a, **kw):
@@ -1284,6 +1291,7 @@ class TestBrandConfigs:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._brand_svc.get_brand_config
 
         async def _mock_none(*a, **kw):
@@ -1300,6 +1308,7 @@ class TestBrandConfigs:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._brand_svc.check_brand_budget
 
         async def _mock_budget(*a, **kw):
@@ -1333,6 +1342,7 @@ class TestBrandConfigs:
 # Dashboard Stats by Brand 端点
 # ===========================================================================
 
+
 class TestDashboardStatsByBrand:
     def test_by_brand_ok(self):
         _reset_db()
@@ -1344,11 +1354,11 @@ class TestDashboardStatsByBrand:
 
         call_count = {"n": 0}
         all_results = [
-            _MockResult(),                            # SET LOCAL
-            _MockResult(rows=profiles_row),            # profiles by brand
-            _MockResult(rows=enrollments_row),         # enrollments by brand
-            _MockResult(rows=touches_row),             # touches by brand
-            _MockResult(rows=suggestions_row),         # suggestions by brand
+            _MockResult(),  # SET LOCAL
+            _MockResult(rows=profiles_row),  # profiles by brand
+            _MockResult(rows=enrollments_row),  # enrollments by brand
+            _MockResult(rows=touches_row),  # touches by brand
+            _MockResult(rows=suggestions_row),  # suggestions by brand
         ]
 
         async def _mock_exec(*a, **kw):
@@ -1386,11 +1396,13 @@ class TestDashboardStatsByBrand:
 # Cross-Brand 端点
 # ===========================================================================
 
+
 class TestCrossBrand:
     def test_opportunities_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._cross_brand_svc.find_cross_brand_opportunities
 
         async def _mock_find(*a, **kw):
@@ -1419,6 +1431,7 @@ class TestCrossBrand:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._cross_brand_svc.find_cross_brand_opportunities
 
         async def _mock_empty(*a, **kw):
@@ -1442,6 +1455,7 @@ class TestCrossBrand:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._cross_brand_svc.get_customer_cross_brand_profile
 
         async def _mock_profile(*a, **kw):
@@ -1478,6 +1492,7 @@ class TestCrossBrand:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._cross_brand_svc.get_customer_cross_brand_profile
 
         async def _mock_err(*a, **kw):
@@ -1500,11 +1515,13 @@ class TestCrossBrand:
 # Experiment 端点
 # ===========================================================================
 
+
 class TestExperiments:
     def test_experiment_summary_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.get_experiment_summary
 
         async def _mock_summary(*a, **kw):
@@ -1520,9 +1537,7 @@ class TestExperiments:
 
         _mod._experiment_svc.get_experiment_summary = _mock_summary
         try:
-            resp = client.get(
-                f"/api/v1/growth/experiments/{TEMPLATE_ID}/summary", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/experiments/{TEMPLATE_ID}/summary", headers=HEADERS)
             assert resp.status_code == 200
             body = resp.json()
             assert body["ok"] is True
@@ -1535,6 +1550,7 @@ class TestExperiments:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.get_experiment_summary
 
         async def _mock_err(*a, **kw):
@@ -1542,9 +1558,7 @@ class TestExperiments:
 
         _mod._experiment_svc.get_experiment_summary = _mock_err
         try:
-            resp = client.get(
-                f"/api/v1/growth/experiments/{TEMPLATE_ID}/summary", headers=HEADERS
-            )
+            resp = client.get(f"/api/v1/growth/experiments/{TEMPLATE_ID}/summary", headers=HEADERS)
             assert resp.status_code == 200
             body = resp.json()
             assert body["ok"] is False
@@ -1562,6 +1576,7 @@ class TestExperiments:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.select_variant
 
         async def _mock_select(*a, **kw):
@@ -1588,6 +1603,7 @@ class TestExperiments:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.select_variant
 
         async def _mock_err(*a, **kw):
@@ -1609,6 +1625,7 @@ class TestExperiments:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.auto_iterate
 
         async def _mock_iterate(*a, **kw):
@@ -1639,6 +1656,7 @@ class TestExperiments:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.auto_adjust_journey_params
 
         async def _mock_adjust(*a, **kw):
@@ -1667,6 +1685,7 @@ class TestExperiments:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._experiment_svc.auto_adjust_journey_params
 
         async def _mock_empty(*a, **kw):
@@ -1687,18 +1706,19 @@ class TestExperiments:
 # Segment Rules & Offer Packs 端点
 # ===========================================================================
 
+
 class TestSegmentRulesPresets:
     def test_presets_ok(self):
         _reset_db()
         # segment-rules/presets 内部执行: SET LOCAL + 5次查询
         call_count = {"n": 0}
         results = [
-            _MockResult(),                            # SET LOCAL
-            _MockResult(scalar_value=25),              # preset_no_second_visit_7d
-            _MockResult(scalar_value=10),              # preset_silent_with_benefit
-            _MockResult(scalar_value=8),               # preset_high_priority_reactivation
-            _MockResult(scalar_value=15),              # preset_active_repair
-            _MockResult(scalar_value=5),               # preset 5
+            _MockResult(),  # SET LOCAL
+            _MockResult(scalar_value=25),  # preset_no_second_visit_7d
+            _MockResult(scalar_value=10),  # preset_silent_with_benefit
+            _MockResult(scalar_value=8),  # preset_high_priority_reactivation
+            _MockResult(scalar_value=15),  # preset_active_repair
+            _MockResult(scalar_value=5),  # preset 5
         ]
 
         async def _mock_exec(*a, **kw):
@@ -1738,10 +1758,10 @@ class TestTagDistribution:
 
         call_count = {"n": 0}
         results = [
-            _MockResult(),                              # SET LOCAL
-            _MockResult(rows=repurchase_rows),           # repurchase_stage
-            _MockResult(rows=reactivation_rows),         # reactivation_priority
-            _MockResult(rows=repair_rows),               # service_repair_status
+            _MockResult(),  # SET LOCAL
+            _MockResult(rows=repurchase_rows),  # repurchase_stage
+            _MockResult(rows=reactivation_rows),  # reactivation_priority
+            _MockResult(rows=repair_rows),  # service_repair_status
         ]
 
         async def _mock_exec(*a, **kw):
@@ -1804,6 +1824,7 @@ class TestOfferPacks:
 # P1 Distribution & Recompute 端点
 # ===========================================================================
 
+
 class TestP1Distribution:
     def test_p1_distribution_ok(self):
         _reset_db()
@@ -1814,11 +1835,11 @@ class TestP1Distribution:
 
         call_count = {"n": 0}
         results = [
-            _MockResult(),                              # SET LOCAL
-            _MockResult(rows=psych_rows),                # psych_distance
-            _MockResult(rows=super_rows),                # super_user
-            _MockResult(rows=milestone_rows),             # milestones
-            _MockResult(rows=referral_rows),              # referral
+            _MockResult(),  # SET LOCAL
+            _MockResult(rows=psych_rows),  # psych_distance
+            _MockResult(rows=super_rows),  # super_user
+            _MockResult(rows=milestone_rows),  # milestones
+            _MockResult(rows=referral_rows),  # referral
         ]
 
         async def _mock_exec(*a, **kw):
@@ -1858,6 +1879,7 @@ class TestP1Recompute:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._profile_svc.batch_compute_p1_fields
 
         async def _mock_compute(*a, **kw):
@@ -1877,6 +1899,7 @@ class TestP1Recompute:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._profile_svc.batch_compute_p1_fields
 
         async def _mock_err(*a, **kw):
@@ -1900,10 +1923,12 @@ class TestP1Recompute:
 # Signals — 天气 & 日历 端点
 # ===========================================================================
 
+
 class TestWeatherSignal:
     def test_weather_signal_ok(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._weather_svc.get_weather_signal
 
         async def _mock_weather(*a, **kw):
@@ -1931,6 +1956,7 @@ class TestWeatherSignal:
     def test_weather_signal_error(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._weather_svc.get_weather_signal
 
         async def _mock_err(*a, **kw):
@@ -1954,6 +1980,7 @@ class TestCalendarTriggers:
     def test_calendar_triggers_ok(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._calendar_svc.get_growth_triggers
 
         def _mock_triggers():
@@ -1980,6 +2007,7 @@ class TestCalendarTriggers:
     def test_calendar_triggers_empty(self):
         _reset_db()
         from api import growth_hub_routes as _mod
+
         original = _mod._calendar_svc.get_growth_triggers
 
         def _mock_empty():
@@ -2004,11 +2032,13 @@ class TestCalendarTriggers:
 # Stores — 就绪度排行 端点
 # ===========================================================================
 
+
 class TestStoresReadinessRanking:
     def test_readiness_ranking_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._store_cap_svc.get_all_stores_readiness
 
         async def _mock_ranking(*a, **kw):
@@ -2035,6 +2065,7 @@ class TestStoresReadinessRanking:
         _reset_db()
         _setup_empty_db_mocks(2)
         from api import growth_hub_routes as _mod
+
         original = _mod._store_cap_svc.get_all_stores_readiness
 
         async def _mock_empty(*a, **kw):

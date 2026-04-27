@@ -37,6 +37,7 @@ _store_assignments: Dict[str, str] = {}  # store_id -> company_id
 #  法人实体
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def create_legal_entity(
     name: str,
     tax_id: str,
@@ -97,6 +98,7 @@ def create_legal_entity(
 #  公司
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def create_company(
     name: str,
     legal_entity_id: str,
@@ -150,6 +152,7 @@ def create_company(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  门店归属
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def assign_store_to_company(
     store_id: str,
@@ -206,6 +209,7 @@ def assign_store_to_company(
 #  架构查询
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def get_entity_structure(
     tenant_id: str,
     db: Any = None,
@@ -242,9 +246,7 @@ def get_entity_structure(
     log.info("entity_structure.requested")
 
     # 筛选该租户的法人实体
-    tenant_entities = [
-        e for e in _legal_entities.values() if e["tenant_id"] == tenant_id
-    ]
+    tenant_entities = [e for e in _legal_entities.values() if e["tenant_id"] == tenant_id]
 
     # 构建公司到门店的映射
     company_stores: Dict[str, List[str]] = {}
@@ -257,29 +259,32 @@ def get_entity_structure(
     for entity in tenant_entities:
         # 该法人实体下的公司
         entity_companies = [
-            c for c in _companies.values()
-            if c["legal_entity_id"] == entity["id"] and c["tenant_id"] == tenant_id
+            c for c in _companies.values() if c["legal_entity_id"] == entity["id"] and c["tenant_id"] == tenant_id
         ]
 
         companies_data = []
         for company in entity_companies:
-            companies_data.append({
-                "id": company["id"],
-                "name": company["name"],
-                "status": company["status"],
-                "store_ids": company_stores.get(company["id"], []),
-                "store_count": len(company_stores.get(company["id"], [])),
-            })
+            companies_data.append(
+                {
+                    "id": company["id"],
+                    "name": company["name"],
+                    "status": company["status"],
+                    "store_ids": company_stores.get(company["id"], []),
+                    "store_count": len(company_stores.get(company["id"], [])),
+                }
+            )
 
-        entities_tree.append({
-            "id": entity["id"],
-            "name": entity["name"],
-            "tax_id": entity["tax_id"],
-            "type": entity["type"],
-            "status": entity["status"],
-            "companies": companies_data,
-            "company_count": len(companies_data),
-        })
+        entities_tree.append(
+            {
+                "id": entity["id"],
+                "name": entity["name"],
+                "tax_id": entity["tax_id"],
+                "type": entity["type"],
+                "status": entity["status"],
+                "companies": companies_data,
+                "company_count": len(companies_data),
+            }
+        )
 
     log.info("entity_structure.generated", entity_count=len(entities_tree))
 
@@ -314,9 +319,7 @@ def get_company_stores(
     if company["tenant_id"] != tenant_id:
         raise ValueError("无权查询该公司")
 
-    store_ids = [
-        sid for sid, cid in _store_assignments.items() if cid == company_id
-    ]
+    store_ids = [sid for sid, cid in _store_assignments.items() if cid == company_id]
 
     log.info("company_stores.found", store_count=len(store_ids))
 

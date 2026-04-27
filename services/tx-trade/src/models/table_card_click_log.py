@@ -22,11 +22,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, Float, ForeignKey, Index, String, event
+from app.models.base import TenantBase
+from sqlalchemy import JSON, Float, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.models.base import TenantBase
 
 
 class TableCardClickLog(TenantBase):
@@ -67,60 +66,38 @@ class TableCardClickLog(TenantBase):
     __tablename__ = "table_card_click_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        doc="日志唯一标识符"
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, doc="日志唯一标识符"
     )
 
     store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("stores.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        doc="所属店铺ID"
+        UUID(as_uuid=True), ForeignKey("stores.id", ondelete="CASCADE"), nullable=False, index=True, doc="所属店铺ID"
     )
 
-    table_no: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        index=True,
-        doc="桌号（如 A01, B05）"
-    )
+    table_no: Mapped[str] = mapped_column(String(20), nullable=False, index=True, doc="桌号（如 A01, B05）")
 
     field_key: Mapped[str] = mapped_column(
-        String(50),
-        nullable=False,
-        index=True,
-        doc="被点击的字段键（如 amount, duration, customer_name）"
+        String(50), nullable=False, index=True, doc="被点击的字段键（如 amount, duration, customer_name）"
     )
 
-    clicked_at: Mapped[datetime] = mapped_column(
-        nullable=False,
-        index=True,
-        doc="点击时间戳"
-    )
+    clicked_at: Mapped[datetime] = mapped_column(nullable=False, index=True, doc="点击时间戳")
 
     meal_period: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         default="unknown",
         index=True,
-        doc="点击时的用餐时段（breakfast/lunch/afternoon/dinner/late_night）"
+        doc="点击时的用餐时段（breakfast/lunch/afternoon/dinner/late_night）",
     )
 
     score: Mapped[float] = mapped_column(
-        Float,
-        nullable=False,
-        default=100.0,
-        doc="点击权重分数（初始100，每天衰减20%，最低5）"
+        Float, nullable=False, default=100.0, doc="点击权重分数（初始100，每天衰减20%，最低5）"
     )
 
     metadata: Mapped[dict] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
-        doc="可选的上下文数据（table_status, order_duration_min, customer_rfm_level等）"
+        doc="可选的上下文数据（table_status, order_duration_min, customer_rfm_level等）",
     )
 
     # 复合索引：加速按店铺+时段+字殥查询

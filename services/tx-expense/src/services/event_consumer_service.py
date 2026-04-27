@@ -14,6 +14,7 @@
   - 失败隔离：单个事件处理失败不影响其他事件
   - 审计日志：每条事件消费记录都写日志
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -190,9 +191,11 @@ async def _handle_daily_close(
             "pos_summary": {
                 "pos_petty_cash_balance": pos_declared,
                 "pos_session_id": pos_session_id,
-                **{k: v for k, v in payload.items()
-                   if k not in ("store_id", "pos_session_id", "close_date",
-                                "pos_petty_cash_declared")},
+                **{
+                    k: v
+                    for k, v in payload.items()
+                    if k not in ("store_id", "pos_session_id", "close_date", "pos_petty_cash_declared")
+                },
             },
         }
         await a6.handle_daily_close(a6_event_data, db)
@@ -373,9 +376,7 @@ async def _handle_employee_departure(
         return
 
     employee_id = UUID(payload["employee_id"])
-    store_id = UUID(
-        payload.get("store_id", "00000000-0000-0000-0000-000000000000")
-    )
+    store_id = UUID(payload.get("store_id", "00000000-0000-0000-0000-000000000000"))
     departure_date_str = payload.get("departure_date", str(date.today()))
     departure_date = date.fromisoformat(departure_date_str)
 

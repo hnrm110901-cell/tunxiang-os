@@ -72,9 +72,7 @@ from pydantic import BaseModel, Field
 
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 
-VALID_BUSINESS_TYPES = frozenset(
-    ["discount", "purchase", "salary_adjust", "menu_change"]
-)
+VALID_BUSINESS_TYPES = frozenset(["discount", "purchase", "salary_adjust", "menu_change"])
 
 VALID_STEP_OPS = frozenset([">", ">=", "<", "<=", "==", "!="])
 
@@ -129,9 +127,7 @@ class FlowStep(BaseModel):
     step: int = Field(..., ge=1, description="步骤序号，从 1 开始")
     role: str = Field(..., description="审批角色，如 store_manager/area_director/hq_finance")
     timeout_hours: int = Field(default=48, ge=1, description="超时催办时间（小时）")
-    condition: Optional[StepCondition] = Field(
-        None, description="步骤触发条件，为 None 时表示无条件执行"
-    )
+    condition: Optional[StepCondition] = Field(None, description="步骤触发条件，为 None 时表示无条件执行")
 
 
 # ── 流程定义模型 ───────────────────────────────────────────────────────────────

@@ -122,6 +122,7 @@ class EventBridge:
                 bridge.make_agent_event_handler("order_completed"),
             )
         """
+
         async def handler(agent_event: Any) -> dict:
             payload = {
                 "tenant_id": agent_event.data.get("tenant_id"),
@@ -251,8 +252,6 @@ def get_event_bridge(
     global _bridge_instance
     if _bridge_instance is None:
         if journey_engine is None or db_session_factory is None:
-            raise RuntimeError(
-                "EventBridge 尚未初始化，请传入 journey_engine 和 db_session_factory"
-            )
+            raise RuntimeError("EventBridge 尚未初始化，请传入 journey_engine 和 db_session_factory")
         _bridge_instance = EventBridge(journey_engine, db_session_factory)
     return _bridge_instance

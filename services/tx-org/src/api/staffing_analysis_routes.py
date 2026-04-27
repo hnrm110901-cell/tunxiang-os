@@ -1,14 +1,15 @@
 """Staffing Analysis — Human Hub / staffing_snapshots + store_staffing_templates"""
 
+import json
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, List, Optional
+from uuid import uuid4
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Optional, List
-from uuid import uuid4
-from datetime import datetime, date, timezone, timedelta
-import json
-import structlog
 
 from shared.ontology.src.database import get_db
 
@@ -56,18 +57,26 @@ async def _generate_snapshot_for_store(
     (matched by store.store_type), count actual employees and compute gap.
     """
     # 1. Get store_type for this store
-    store_row = (await db.execute(
-        text("SELECT store_type FROM stores WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE"),
-        {"sid": store_id, "tid": tenant_id},
-    )).mappings().first()
+    store_row = (
+        (
+            await db.execute(
+                text("SELECT store_type FROM stores WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE"),
+                {"sid": store_id, "tid": tenant_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
     if not store_row:
         raise HTTPException(status_code=404, detail=f"Store {store_id} not found")
 
     store_type = store_row["store_type"]
 
     # 2. Get all active template entries for this store_type
-    templates = (await db.execute(
-        text("""
+    templates = (
+        (
+            await db.execute(
+                text("""
             SELECT id::text AS template_id, position, shift,
                    COALESCE(recommended_count, min_count, 0) AS required_count,
                    min_skill_level
@@ -78,8 +87,12 @@ async def _generate_snapshot_for_store(
               AND is_deleted = FALSE
             ORDER BY position, shift
         """),
-        {"tid": tenant_id, "stype": store_type},
-    )).mappings().all()
+                {"tid": tenant_id, "stype": store_type},
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     if not templates:
         return []
@@ -94,8 +107,10 @@ async def _generate_snapshot_for_store(
         min_skill = tpl["min_skill_level"]
 
         # 3. Count actual employees with matching position in this store
-        actual_row = (await db.execute(
-            text("""
+        actual_row = (
+            (
+                await db.execute(
+                    text("""
                 SELECT COUNT(*)::int AS cnt
                 FROM employees
                 WHERE tenant_id = :tid
@@ -103,8 +118,12 @@ async def _generate_snapshot_for_store(
                   AND position = :pos
                   AND is_deleted = FALSE
             """),
-            {"tid": tenant_id, "sid": store_id, "pos": position},
-        )).mappings().first()
+                    {"tid": tenant_id, "sid": store_id, "pos": position},
+                )
+            )
+            .mappings()
+            .first()
+        )
         actual = int(actual_row["cnt"]) if actual_row else 0
 
         gap = actual - required
@@ -112,8 +131,10 @@ async def _generate_snapshot_for_store(
         # 4. Build skill_gap_detail if min_skill_level is set
         skill_gap_detail = None
         if min_skill:
-            qualified_row = (await db.execute(
-                text("""
+            qualified_row = (
+                (
+                    await db.execute(
+                        text("""
                     SELECT COUNT(*)::int AS cnt
                     FROM employees
                     WHERE tenant_id = :tid
@@ -122,14 +143,20 @@ async def _generate_snapshot_for_store(
                       AND is_deleted = FALSE
                       AND COALESCE((meta->>'skill_level')::int, 0) >= :min_level
                 """),
-                {"tid": tenant_id, "sid": store_id, "pos": position, "min_level": min_skill},
-            )).mappings().first()
+                        {"tid": tenant_id, "sid": store_id, "pos": position, "min_level": min_skill},
+                    )
+                )
+                .mappings()
+                .first()
+            )
             qualified = int(qualified_row["cnt"]) if qualified_row else 0
-            skill_gap_detail = json.dumps({
-                "min_level": min_skill,
-                "qualified_count": qualified,
-                "unqualified_count": actual - qualified,
-            })
+            skill_gap_detail = json.dumps(
+                {
+                    "min_level": min_skill,
+                    "qualified_count": qualified,
+                    "unqualified_count": actual - qualified,
+                }
+            )
 
         # 5. Calculate impact_score: abs(gap) * 2, capped at 10
         impact_score = min(abs(gap) * 2, 10) if gap < 0 else 0
@@ -150,25 +177,35 @@ async def _generate_snapshot_for_store(
                      :now, :now, FALSE)
             """),
             {
-                "id": snap_id, "tid": tenant_id, "sid": store_id,
-                "tpl_id": tpl["template_id"], "position": position, "shift": shift,
-                "snap_date": snapshot_date, "required": required, "actual": actual,
-                "gap": gap, "skill_detail": skill_gap_detail, "impact": impact_score,
+                "id": snap_id,
+                "tid": tenant_id,
+                "sid": store_id,
+                "tpl_id": tpl["template_id"],
+                "position": position,
+                "shift": shift,
+                "snap_date": snapshot_date,
+                "required": required,
+                "actual": actual,
+                "gap": gap,
+                "skill_detail": skill_gap_detail,
+                "impact": impact_score,
                 "now": now,
             },
         )
 
-        snapshots.append({
-            "snapshot_id": snap_id,
-            "store_id": store_id,
-            "position": position,
-            "shift": shift,
-            "required": required,
-            "actual": actual,
-            "gap": gap,
-            "impact_score": impact_score,
-            "snapshot_date": str(snapshot_date),
-        })
+        snapshots.append(
+            {
+                "snapshot_id": snap_id,
+                "store_id": store_id,
+                "position": position,
+                "shift": shift,
+                "required": required,
+                "actual": actual,
+                "gap": gap,
+                "impact_score": impact_score,
+                "snapshot_date": str(snapshot_date),
+            }
+        )
 
     return snapshots
 
@@ -187,8 +224,7 @@ async def generate_snapshot(
     snapshots = await _generate_snapshot_for_store(db, tenant_id, body.store_id, snapshot_date)
     await db.commit()
 
-    log.info("staffing_analysis.snapshot_generated",
-             store_id=body.store_id, count=len(snapshots), tenant_id=tenant_id)
+    log.info("staffing_analysis.snapshot_generated", store_id=body.store_id, count=len(snapshots), tenant_id=tenant_id)
 
     return _ok({"snapshots": snapshots, "count": len(snapshots)})
 
@@ -214,14 +250,20 @@ async def batch_generate_snapshots(
 
     await db.commit()
 
-    log.info("staffing_analysis.batch_snapshot_generated",
-             store_count=len(body.store_ids), total_positions=total_positions, tenant_id=tenant_id)
+    log.info(
+        "staffing_analysis.batch_snapshot_generated",
+        store_count=len(body.store_ids),
+        total_positions=total_positions,
+        tenant_id=tenant_id,
+    )
 
-    return _ok({
-        "total_stores": len(body.store_ids),
-        "total_positions": total_positions,
-        "total_gaps": total_gaps,
-    })
+    return _ok(
+        {
+            "total_stores": len(body.store_ids),
+            "total_positions": total_positions,
+            "total_gaps": total_gaps,
+        }
+    )
 
 
 # -- 3. GET /compare -- staffing benchmark comparison ----------------------
@@ -253,9 +295,20 @@ async def staffing_compare(
           AND ss.is_deleted = FALSE
         ORDER BY ss.position, ss.shift
     """)
-    rows = (await db.execute(sql, {
-        "tid": tenant_id, "sid": store_id, "snap_date": snap_date,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "sid": store_id,
+                    "snap_date": snap_date,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     items = []
     total_required = 0
@@ -266,34 +319,42 @@ async def staffing_compare(
         skill_detail = None
         if r["skill_gap_detail"]:
             try:
-                skill_detail = json.loads(r["skill_gap_detail"]) if isinstance(r["skill_gap_detail"], str) else r["skill_gap_detail"]
+                skill_detail = (
+                    json.loads(r["skill_gap_detail"])
+                    if isinstance(r["skill_gap_detail"], str)
+                    else r["skill_gap_detail"]
+                )
             except (json.JSONDecodeError, TypeError):
                 skill_detail = None
 
-        items.append({
-            "position": r["position"],
-            "shift": r["shift"],
-            "required": r["required"],
-            "actual": r["actual"],
-            "gap": r["gap"],
-            "skill_gap_detail": skill_detail,
-            "impact_score": r["impact_score"],
-        })
+        items.append(
+            {
+                "position": r["position"],
+                "shift": r["shift"],
+                "required": r["required"],
+                "actual": r["actual"],
+                "gap": r["gap"],
+                "skill_gap_detail": skill_detail,
+                "impact_score": r["impact_score"],
+            }
+        )
         total_required += r["required"]
         total_actual += r["actual"]
         total_gap += r["gap"]
 
     gap_rate_pct = round((abs(total_gap) / total_required * 100), 2) if total_required > 0 else 0.0
 
-    return _ok({
-        "items": items,
-        "summary": {
-            "total_required": total_required,
-            "total_actual": total_actual,
-            "total_gap": total_gap,
-            "gap_rate_pct": gap_rate_pct,
-        },
-    })
+    return _ok(
+        {
+            "items": items,
+            "summary": {
+                "total_required": total_required,
+                "total_actual": total_actual,
+                "total_gap": total_gap,
+                "gap_rate_pct": gap_rate_pct,
+            },
+        }
+    )
 
 
 # -- 4. GET /gap-ranking -- gap ranking across stores ----------------------
@@ -325,24 +386,37 @@ async def gap_ranking(
         ORDER BY total_gap ASC
         LIMIT :lim
     """)
-    rows = (await db.execute(sql, {
-        "tid": tenant_id, "snap_date": snap_date, "lim": limit,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "snap_date": snap_date,
+                    "lim": limit,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     ranked = []
     for idx, r in enumerate(rows, 1):
         total_req = r["total_required"]
         total_gap = r["total_gap"]
         gap_rate = round((abs(total_gap) / total_req * 100), 2) if total_req > 0 else 0.0
-        ranked.append({
-            "rank": idx,
-            "store_id": r["store_id"],
-            "store_name": r["store_name"],
-            "total_required": total_req,
-            "total_actual": r["total_actual"],
-            "total_gap": total_gap,
-            "gap_rate_pct": gap_rate,
-        })
+        ranked.append(
+            {
+                "rank": idx,
+                "store_id": r["store_id"],
+                "store_name": r["store_name"],
+                "total_required": total_req,
+                "total_actual": r["total_actual"],
+                "total_gap": total_gap,
+                "gap_rate_pct": gap_rate,
+            }
+        )
 
     return _ok({"items": ranked})
 
@@ -376,22 +450,36 @@ async def staffing_trend(
         GROUP BY snapshot_date
         ORDER BY snapshot_date
     """)
-    rows = (await db.execute(sql, {
-        "tid": tenant_id, "sid": store_id, "sd": sd, "ed": ed,
-    })).mappings().all()
+    rows = (
+        (
+            await db.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "sid": store_id,
+                    "sd": sd,
+                    "ed": ed,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     series = []
     for r in rows:
         total_req = r["total_required"]
         gap_val = r["gap"]
         gap_rate = round((abs(gap_val) / total_req * 100), 2) if total_req > 0 else 0.0
-        series.append({
-            "date": str(r["snapshot_date"]),
-            "total_required": total_req,
-            "total_actual": r["total_actual"],
-            "gap": gap_val,
-            "gap_rate_pct": gap_rate,
-        })
+        series.append(
+            {
+                "date": str(r["snapshot_date"]),
+                "total_required": total_req,
+                "total_actual": r["total_actual"],
+                "gap": gap_val,
+                "gap_rate_pct": gap_rate,
+            }
+        )
 
     return _ok({"series": series})
 
@@ -444,18 +532,17 @@ async def skill_gaps(
         if pos not in position_map:
             position_map[pos] = []
 
-        position_map[pos].append({
-            "shift": r["shift"],
-            "min_level": detail.get("min_level"),
-            "qualified_count": detail.get("qualified_count", 0),
-            "unqualified_count": detail.get("unqualified_count", 0),
-            "gap": detail.get("unqualified_count", 0),
-        })
+        position_map[pos].append(
+            {
+                "shift": r["shift"],
+                "min_level": detail.get("min_level"),
+                "qualified_count": detail.get("qualified_count", 0),
+                "unqualified_count": detail.get("unqualified_count", 0),
+                "gap": detail.get("unqualified_count", 0),
+            }
+        )
 
-    items = [
-        {"position": pos, "required_skills": skills}
-        for pos, skills in position_map.items()
-    ]
+    items = [{"position": pos, "required_skills": skills} for pos, skills in position_map.items()]
 
     return _ok({"items": items})
 
@@ -512,14 +599,16 @@ async def impact_analysis(
         else:
             risk_level = "normal"
 
-        items.append({
-            "store_id": r["store_id"],
-            "store_name": r["store_name"],
-            "position": r["position"],
-            "shift": r["shift"],
-            "gap": r["gap"],
-            "impact_score": score,
-            "risk_level": risk_level,
-        })
+        items.append(
+            {
+                "store_id": r["store_id"],
+                "store_name": r["store_name"],
+                "position": r["position"],
+                "shift": r["shift"],
+                "gap": r["gap"],
+                "impact_score": score,
+                "risk_level": risk_level,
+            }
+        )
 
     return _ok({"items": items})

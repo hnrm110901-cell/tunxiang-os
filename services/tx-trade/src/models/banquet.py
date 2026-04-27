@@ -1,4 +1,5 @@
 """宴会ORM模型 — 映射v004+v013+v160迁移表"""
+
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -12,6 +13,7 @@ from shared.ontology.src.base import TenantBase
 
 class BanquetLead(TenantBase):
     """宴会线索 — 13阶段流水线"""
+
     __tablename__ = "banquet_leads"
 
     store_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -36,6 +38,7 @@ class BanquetLead(TenantBase):
 
 class BanquetContract(TenantBase):
     """宴会合同"""
+
     __tablename__ = "banquet_contracts"
 
     store_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -72,6 +75,7 @@ class BanquetContract(TenantBase):
 
 class BanquetProposalRecord(TenantBase):
     """宴会方案（v013新建）"""
+
     __tablename__ = "banquet_proposals"
 
     store_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -85,6 +89,7 @@ class BanquetProposalRecord(TenantBase):
 
 class BanquetQuotation(TenantBase):
     """宴会报价单（v013新建）"""
+
     __tablename__ = "banquet_quotations"
 
     store_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -106,6 +111,7 @@ class BanquetQuotation(TenantBase):
 
 class BanquetChecklist(TenantBase):
     """宴会筹备检查清单"""
+
     __tablename__ = "banquet_checklists"
 
     contract_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
@@ -123,6 +129,7 @@ class BanquetChecklist(TenantBase):
 
 class BanquetFeedback(TenantBase):
     """宴会客户反馈（v013新建）"""
+
     __tablename__ = "banquet_feedbacks"
 
     store_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -137,6 +144,7 @@ class BanquetFeedback(TenantBase):
 
 class BanquetCase(TenantBase):
     """宴会案例归档（v013新建）"""
+
     __tablename__ = "banquet_cases"
 
     store_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -161,16 +169,15 @@ class BanquetCase(TenantBase):
 
 class BanquetMenuTemplate(TenantBase):
     """宴席套餐模板主表 — 映射v160迁移"""
+
     __tablename__ = "banquet_menu_templates"
 
     store_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True,
-        comment="NULL=集团通用，非NULL=门店专属"
+        UUID(as_uuid=True), nullable=True, index=True, comment="NULL=集团通用，非NULL=门店专属"
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     category: Mapped[str] = mapped_column(
-        String(50), nullable=False,
-        comment="wedding/business/birthday/festival/other"
+        String(50), nullable=False, comment="wedding/business/birthday/festival/other"
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     guest_count_min: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -182,13 +189,12 @@ class BanquetMenuTemplate(TenantBase):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    items: Mapped[list["BanquetTemplateItem"]] = relationship(
-        back_populates="template", lazy="selectin"
-    )
+    items: Mapped[list["BanquetTemplateItem"]] = relationship(back_populates="template", lazy="selectin")
 
 
 class BanquetTemplateItem(TenantBase):
     """套餐模板菜品明细 — 映射v160迁移"""
+
     __tablename__ = "banquet_template_items"
 
     template_id: Mapped[uuid.UUID] = mapped_column(
@@ -199,8 +205,7 @@ class BanquetTemplateItem(TenantBase):
     )
     dish_name: Mapped[str] = mapped_column(String(200), nullable=False)
     dish_category: Mapped[str | None] = mapped_column(
-        String(50), nullable=True,
-        comment="cold/hot/soup/staple/dessert/drink"
+        String(50), nullable=True, comment="cold/hot/soup/staple/dessert/drink"
     )
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("1"))
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="道")

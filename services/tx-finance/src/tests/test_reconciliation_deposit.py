@@ -9,6 +9,7 @@ tx-finance 对账与押金路由测试
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_reconciliation_deposit.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -19,7 +20,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ─── 存根工具 ─────────────────────────────────────────────────────────────────
 
@@ -34,9 +34,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # ── structlog 存根 ────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _stub_log = MagicMock()
-    _stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _stub_log.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = _stub_log
 
 # ── sqlalchemy 系列存根 ───────────────────────────────────────────────────────
@@ -124,10 +122,10 @@ sys.modules["models.three_way_match"] = _match_record_stub
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 
-from src.api import reconciliation_routes, deposit_routes  # noqa: E402
-
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+from src.api import deposit_routes, reconciliation_routes  # noqa: E402
 
 # ─── 公共常量 ─────────────────────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ ROUTER REGISTRATION (在tx-trade/src/main.py中添加):
     from .api.omni_channel_routes import router as omni_channel_router
     app.include_router(omni_channel_router, prefix="/api/v1")
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -299,12 +300,8 @@ async def get_orders(
 
     target_date = order_date or datetime.now().date()
     local_tz = datetime.now().astimezone().tzinfo
-    day_start = datetime(
-        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz
-    )
-    day_end = datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz
-    )
+    day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz)
+    day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz)
 
     conditions = [
         OrderModel.tenant_id == tid,
@@ -339,8 +336,7 @@ async def get_orders(
     items = [
         {
             "order_id": str(row.id),
-            "platform": row_omni_platform_key(row, OmniChannelService.PLATFORMS)
-            or (row.sales_channel_id or ""),
+            "platform": row_omni_platform_key(row, OmniChannelService.PLATFORMS) or (row.sales_channel_id or ""),
             "platform_order_id": row_omni_platform_order_id(row) or row.order_no,
             "status": row.status,
             "total_fen": getattr(row, "total_amount_fen", 0),
@@ -424,12 +420,8 @@ async def get_channel_stats(
 
     target_date = stat_date or datetime.now().date()
     local_tz = datetime.now().astimezone().tzinfo
-    day_start = datetime(
-        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz
-    )
-    day_end = datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz
-    )
+    day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz)
+    day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz)
 
     stats_by_platform = {}
     for platform in OmniChannelService.PLATFORMS:
@@ -591,8 +583,7 @@ async def get_unmapped_items(
     )
 
     platforms_to_check = (
-        [platform] if platform and platform in OmniChannelService.PLATFORMS
-        else OmniChannelService.PLATFORMS
+        [platform] if platform and platform in OmniChannelService.PLATFORMS else OmniChannelService.PLATFORMS
     )
 
     all_unmapped: list[dict] = []
@@ -610,14 +601,16 @@ async def get_unmapped_items(
             {"tid": tid, "sid": sid, "platform": plat},
         )
         for row in result.fetchall():
-            all_unmapped.append({
-                "platform": plat,
-                "platform_item_id": row[0],
-                "platform_item_name": row[1],
-                "first_seen_at": row[2].isoformat() if row[2] else None,
-                "last_seen_at": row[3].isoformat() if row[3] else None,
-                "suggestions": [],
-            })
+            all_unmapped.append(
+                {
+                    "platform": plat,
+                    "platform_item_id": row[0],
+                    "platform_item_name": row[1],
+                    "first_seen_at": row[2].isoformat() if row[2] else None,
+                    "last_seen_at": row[3].isoformat() if row[3] else None,
+                    "suggestions": [],
+                }
+            )
 
     # 自动匹配建议（仅当 include_suggestions=True 且有未映射条目时）
     if include_suggestions and all_unmapped:

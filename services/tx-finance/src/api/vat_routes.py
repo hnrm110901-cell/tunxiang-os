@@ -11,6 +11,7 @@
 8. POST   /api/v1/finance/vat/invoices/{id}/verify      验证进项发票
 9. GET    /api/v1/finance/vat/tax-rates                 查看适用税率参考
 """
+
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
@@ -26,12 +27,14 @@ router = APIRouter(prefix="/api/v1/finance/vat", tags=["enterprise_vat"])
 
 # ─── DB 依赖 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class CreateDeclarationRequest(BaseModel):
     store_id: str = Field(..., description="门店 ID")
@@ -67,6 +70,7 @@ class VerifyInvoiceRequest(BaseModel):
 
 # ─── 1. 创建/重算申报单 ───────────────────────────────────────────────────────
 
+
 @router.post("/declarations", summary="创建/重算增值税申报单", status_code=201)
 async def create_declaration(
     body: CreateDeclarationRequest,
@@ -95,6 +99,7 @@ async def create_declaration(
 
 # ─── 2. 申报单列表 ────────────────────────────────────────────────────────────
 
+
 @router.get("/declarations", summary="增值税申报单列表")
 async def list_declarations(
     store_id: Optional[str] = Query(None, description="按门店过滤"),
@@ -111,6 +116,7 @@ async def list_declarations(
 
 # ─── 3. 申报单详情 ────────────────────────────────────────────────────────────
 
+
 @router.get("/declarations/{declaration_id}", summary="申报单详情（含进项发票）")
 async def get_declaration(
     declaration_id: str = Path(..., description="申报单 ID"),
@@ -126,6 +132,7 @@ async def get_declaration(
 
 
 # ─── 4. 提交申报 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/declarations/{declaration_id}/submit", summary="提交增值税申报")
 async def submit_declaration(
@@ -152,6 +159,7 @@ async def submit_declaration(
 
 # ─── 5. 记录已缴税 ────────────────────────────────────────────────────────────
 
+
 @router.post("/declarations/{declaration_id}/pay", summary="记录实际缴税")
 async def mark_paid(
     declaration_id: str = Path(..., description="申报单 ID"),
@@ -170,6 +178,7 @@ async def mark_paid(
 
 
 # ─── 6. 录入进项发票 ──────────────────────────────────────────────────────────
+
 
 @router.post("/declarations/{declaration_id}/invoices", summary="录入进项发票", status_code=201)
 async def add_input_invoice(
@@ -202,6 +211,7 @@ async def add_input_invoice(
 
 # ─── 7. 进项发票列表 ──────────────────────────────────────────────────────────
 
+
 @router.get("/declarations/{declaration_id}/invoices", summary="进项发票列表")
 async def list_input_invoices(
     declaration_id: str = Path(..., description="申报单 ID"),
@@ -225,6 +235,7 @@ async def list_input_invoices(
 
 
 # ─── 8. 验证进项发票 ──────────────────────────────────────────────────────────
+
 
 @router.post("/invoices/{invoice_id}/verify", summary="验证/驳回进项发票")
 async def verify_invoice(
@@ -252,6 +263,7 @@ async def verify_invoice(
 
 
 # ─── 9. 税率参考 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/tax-rates", summary="增值税率参考表")
 async def get_tax_rates(

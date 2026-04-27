@@ -5,9 +5,9 @@
 
 金额单位：分(fen)
 """
+
 import asyncio
 import json
-from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -31,9 +31,9 @@ _REVIEW_TRANSITIONS: dict[str, set[str]] = {
     "pending_review": {"approved", "rejected", "revised"},
     "approved": {"published"},
     "revised": {"published"},
-    "rejected": set(),       # 终态
-    "published": set(),      # 终态
-    "expired": set(),        # 终态
+    "rejected": set(),  # 终态
+    "published": set(),  # 终态
+    "expired": set(),  # 终态
 }
 
 
@@ -46,12 +46,22 @@ class GrowthSuggestionService:
     """Agent策略建议管理"""
 
     VALID_REVIEW_STATES = (
-        "draft", "pending_review", "approved", "rejected",
-        "revised", "published", "expired",
+        "draft",
+        "pending_review",
+        "approved",
+        "rejected",
+        "revised",
+        "published",
+        "expired",
     )
     VALID_SUGGESTION_TYPES = (
-        "repurchase", "reactivation", "repair", "upsell",
-        "referral", "retention", "winback",
+        "repurchase",
+        "reactivation",
+        "repair",
+        "upsell",
+        "referral",
+        "retention",
+        "winback",
     )
 
     # ------------------------------------------------------------------
@@ -68,17 +78,14 @@ class GrowthSuggestionService:
         allowed = _REVIEW_TRANSITIONS.get(current, set())
         if target not in allowed:
             raise ValueError(
-                f"Invalid review_state transition: '{current}' -> '{target}'. "
-                f"Allowed from '{current}': {allowed}"
+                f"Invalid review_state transition: '{current}' -> '{target}'. Allowed from '{current}': {allowed}"
             )
 
     # ------------------------------------------------------------------
     # 创建建议
     # ------------------------------------------------------------------
 
-    async def create_suggestion(
-        self, data: dict, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def create_suggestion(self, data: dict, tenant_id: str, db: AsyncSession) -> dict:
         """创建策略建议 (初始 review_state='draft')"""
         await self._set_tenant(db, tenant_id)
 
@@ -148,9 +155,7 @@ class GrowthSuggestionService:
     # 提交审核（draft -> pending_review）
     # ------------------------------------------------------------------
 
-    async def submit_for_review(
-        self, suggestion_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def submit_for_review(self, suggestion_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """提交审核: draft -> pending_review"""
         await self._set_tenant(db, tenant_id)
 
@@ -245,9 +250,7 @@ class GrowthSuggestionService:
     # 查询单个建议
     # ------------------------------------------------------------------
 
-    async def get_suggestion(
-        self, suggestion_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> Optional[dict]:
+    async def get_suggestion(self, suggestion_id: UUID, tenant_id: str, db: AsyncSession) -> Optional[dict]:
         """查询单个建议"""
         await self._set_tenant(db, tenant_id)
 
@@ -382,9 +385,7 @@ class GrowthSuggestionService:
     # 发布建议（创建enrollment）
     # ------------------------------------------------------------------
 
-    async def publish_suggestion(
-        self, suggestion_id: UUID, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def publish_suggestion(self, suggestion_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """发布建议: approved/revised -> published，创建enrollment"""
         await self._set_tenant(db, tenant_id)
 
@@ -405,10 +406,7 @@ class GrowthSuggestionService:
         current_state = suggestion["review_state"]
 
         if current_state not in ("approved", "revised"):
-            raise ValueError(
-                f"Cannot publish suggestion in state '{current_state}', "
-                "must be 'approved' or 'revised'"
-            )
+            raise ValueError(f"Cannot publish suggestion in state '{current_state}', must be 'approved' or 'revised'")
 
         customer_id = suggestion["customer_id"]
         template_id = suggestion["template_id"]
@@ -485,9 +483,7 @@ class GrowthSuggestionService:
     # 过期处理
     # ------------------------------------------------------------------
 
-    async def expire_stale(
-        self, hours: int, tenant_id: str, db: AsyncSession
-    ) -> dict:
+    async def expire_stale(self, hours: int, tenant_id: str, db: AsyncSession) -> dict:
         """超时未审核的建议自动expired"""
         await self._set_tenant(db, tenant_id)
 

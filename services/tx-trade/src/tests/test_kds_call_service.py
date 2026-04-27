@@ -10,6 +10,7 @@
 7. 出单模式默认 IMMEDIATE
 8. POST_PAYMENT 模式：下单不推，收银后推
 """
+
 import os
 import sys
 
@@ -23,18 +24,20 @@ import pytest
 
 # ─── 工具 ───
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
 
 TENANT_ID = _uid()
-STORE_ID  = _uid()
-ORDER_ID  = _uid()
-DEPT_ID   = _uid()
+STORE_ID = _uid()
+ORDER_ID = _uid()
+DEPT_ID = _uid()
 
 
 class FakeResult:
     """模拟 SQLAlchemy execute() 返回值。"""
+
     def __init__(self, rows=None, scalar=None):
         self._rows = rows or []
         self._scalar = scalar
@@ -81,6 +84,7 @@ def _make_task(status: str, called_at: datetime | None = None) -> MagicMock:
 
 # ─── 场景 1: cooking → calling 成功 ───
 
+
 @pytest.mark.asyncio
 async def test_mark_calling_from_cooking_succeeds():
     """cooking 状态的任务可以成功转为 calling，call_count +1。"""
@@ -102,6 +106,7 @@ async def test_mark_calling_from_cooking_succeeds():
 
 # ─── 场景 2: pending → calling 被拒绝 ───
 
+
 @pytest.mark.asyncio
 async def test_mark_calling_from_pending_raises():
     """pending 状态的任务不允许直接转为 calling，应抛出 RuntimeError。"""
@@ -118,6 +123,7 @@ async def test_mark_calling_from_pending_raises():
 
 
 # ─── 场景 3: calling → done 确认上桌 ───
+
 
 @pytest.mark.asyncio
 async def test_confirm_served_from_calling_succeeds():
@@ -141,6 +147,7 @@ async def test_confirm_served_from_calling_succeeds():
 
 # ─── 场景 4: done → calling 被拒绝（confirm_served 也验证状态来源） ───
 
+
 @pytest.mark.asyncio
 async def test_confirm_served_from_done_raises():
     """已完成（done）的任务不可再次确认上桌，应抛出 RuntimeError。"""
@@ -157,6 +164,7 @@ async def test_confirm_served_from_done_raises():
 
 
 # ─── 场景 5: 等叫等待时间计算正确 ───
+
 
 @pytest.mark.asyncio
 async def test_calling_stats_wait_time_calculation():
@@ -178,16 +186,14 @@ async def test_calling_stats_wait_time_calculation():
 
 # ─── 场景 6: 批量等叫任务查询 ───
 
+
 @pytest.mark.asyncio
 async def test_get_calling_tasks_returns_list():
     """get_calling_tasks 应返回所有 calling 状态任务的列表。"""
     from services.kds_call_service import KdsCallService
 
     now = datetime.now(timezone.utc)
-    tasks = [
-        _make_task("calling", called_at=now - timedelta(minutes=i))
-        for i in range(3)
-    ]
+    tasks = [_make_task("calling", called_at=now - timedelta(minutes=i)) for i in range(3)]
 
     db = _fake_db()
     mock_result = FakeResult()
@@ -200,6 +206,7 @@ async def test_get_calling_tasks_returns_list():
 
 
 # ─── 场景 7: 出单模式默认 IMMEDIATE ───
+
 
 @pytest.mark.asyncio
 async def test_order_push_mode_default_is_immediate():
@@ -221,6 +228,7 @@ async def test_order_push_mode_default_is_immediate():
 
 
 # ─── 场景 8: POST_PAYMENT 模式 ───
+
 
 @pytest.mark.asyncio
 async def test_post_payment_mode_no_push_then_deferred():
@@ -257,18 +265,20 @@ async def test_post_payment_mode_no_push_then_deferred():
 
     db_deferred.execute = AsyncMock(side_effect=_execute_side_effect)
 
-
-    with patch("services.order_push_config.OrderPushConfigService.get_store_mode",
-               new=AsyncMock(return_value=OrderPushMode.POST_PAYMENT)), patch("httpx.AsyncClient") as mock_client_cls:
+    with (
+        patch(
+            "services.order_push_config.OrderPushConfigService.get_store_mode",
+            new=AsyncMock(return_value=OrderPushMode.POST_PAYMENT),
+        ),
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.post = AsyncMock(return_value=MagicMock(status_code=200))
         mock_client_cls.return_value = mock_client
 
-        count = await OrderPushConfigService.push_deferred_tasks(
-            ORDER_ID, TENANT_ID, db_deferred
-        )
+        count = await OrderPushConfigService.push_deferred_tasks(ORDER_ID, TENANT_ID, db_deferred)
 
     assert count == 1
     db_deferred.flush.assert_called_once()

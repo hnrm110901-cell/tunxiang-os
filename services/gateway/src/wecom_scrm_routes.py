@@ -5,6 +5,7 @@ POST /api/v1/wecom/contacts/bind               手动绑定企微 ID 与会员 I
 POST /api/v1/wecom/contacts/qrcode             生成门店企微活码（导购专属）
 GET  /api/v1/wecom/contacts/staff/{user_id}    获取某导购的所有客户列表
 """
+
 from __future__ import annotations
 
 import httpx
@@ -25,6 +26,7 @@ _MEMBER_SERVICE_URL: str = __import__("os").getenv("TX_MEMBER_URL", "http://tx-m
 # Request / Response schemas
 # ─────────────────────────────────────────────────────────────────
 
+
 class BindWecomRequest(BaseModel):
     customer_id: str
     wecom_external_userid: str
@@ -33,14 +35,15 @@ class BindWecomRequest(BaseModel):
 
 
 class QrcodeRequest(BaseModel):
-    store_id: str                     # 作为 state 传递，回调时可识别来源
-    user_id: str | None = None        # 导购专属时指定企微 userid
+    store_id: str  # 作为 state 传递，回调时可识别来源
+    user_id: str | None = None  # 导购专属时指定企微 userid
     remark: str = "门店扫码"
 
 
 # ─────────────────────────────────────────────────────────────────
 # 路由
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/{customer_id}")
 async def get_wecom_binding(

@@ -22,6 +22,7 @@
     # 全量重建所有投影器（灾难恢复）
     totals = await registry.rebuild_all()
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -30,19 +31,18 @@ from uuid import UUID
 
 import structlog
 
+from .projector import ProjectorBase
 from .projectors import (
-    DiscountHealthProjector,
     ChannelMarginProjector,
+    DailySettlementProjector,
+    DiscountHealthProjector,
+    EnergyEfficiencyProjector,
     InventoryBomProjector,
     MemberClvProjector,
-    StorePnlProjector,
-    DailySettlementProjector,
-    SafetyComplianceProjector,
-    EnergyEfficiencyProjector,
     PublicOpinionProjector,
-    ALL_PROJECTORS,
+    SafetyComplianceProjector,
+    StorePnlProjector,
 )
-from .projector import ProjectorBase
 
 logger = structlog.get_logger(__name__)
 
@@ -215,6 +215,7 @@ class ProjectorRegistry:
 # ──────────────────────────────────────────────────────────────────────────
 # 便捷工厂函数
 # ──────────────────────────────────────────────────────────────────────────
+
 
 async def start_all_projectors(tenant_id: UUID | str) -> ProjectorRegistry:
     """工厂函数：创建注册中心并在后台启动所有投影器。

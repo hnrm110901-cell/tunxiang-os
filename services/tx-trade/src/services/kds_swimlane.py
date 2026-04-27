@@ -14,6 +14,7 @@
   每行 = 一个任务
   单元格颜色 = 当前工序状态（pending/in_progress/done）
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -30,6 +31,7 @@ logger = structlog.get_logger()
 
 
 # ─── 工序定义管理 ───
+
 
 async def get_steps_for_dept(
     tenant_id: str,
@@ -104,6 +106,7 @@ async def upsert_step(
 
 # ─── 任务工序实例管理 ───
 
+
 async def init_task_steps(
     tenant_id: str,
     task_id: str,
@@ -128,10 +131,7 @@ async def init_task_steps(
         instances.append(instance)
 
     await db.commit()
-    return [
-        {"step_id": s["step_id"], "step_order": s["step_order"], "status": "pending"}
-        for s in steps
-    ]
+    return [{"step_id": s["step_id"], "step_order": s["step_order"], "status": "pending"} for s in steps]
 
 
 async def advance_step(
@@ -228,12 +228,14 @@ async def get_swimlane_board(
     for ts in task_steps:
         sid = str(ts.step_id)
         if sid in lanes:
-            lanes[sid].append({
-                "task_step_id": str(ts.id),
-                "task_id": str(ts.task_id),
-                "status": ts.status,
-                "operator_id": str(ts.operator_id) if ts.operator_id else None,
-                "started_at": ts.started_at.isoformat() if ts.started_at else None,
-            })
+            lanes[sid].append(
+                {
+                    "task_step_id": str(ts.id),
+                    "task_id": str(ts.task_id),
+                    "status": ts.status,
+                    "operator_id": str(ts.operator_id) if ts.operator_id else None,
+                    "started_at": ts.started_at.isoformat() if ts.started_at else None,
+                }
+            )
 
     return {"steps": steps, "lanes": lanes}

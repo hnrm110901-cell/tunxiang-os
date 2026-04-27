@@ -9,12 +9,13 @@
   from services.gateway.src.core.exceptions import POSAdapterError, MarginViolationError
   # 或在各服务中直接 from gateway.src.core.exceptions import ...
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 根异常
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TunxiangBaseError(Exception):
     """屯象OS 根异常。所有自定义异常均继承自此类。"""
@@ -30,6 +31,7 @@ class TunxiangBaseError(Exception):
 # ─────────────────────────────────────────────────────────────────────────────
 # 外部 API / 适配器异常
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ExternalAPIError(TunxiangBaseError):
     """调用外部 API 失败（超时、认证、格式错误等）。"""
@@ -79,6 +81,7 @@ class AlipayError(ExternalAPIError):
 # 数据异常
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class DataValidationError(TunxiangBaseError):
     """数据校验失败（字段缺失、格式非法、业务规则不满足等）。"""
 
@@ -95,6 +98,7 @@ class ImportParseError(DataValidationError):
 # 安全 / 权限异常
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TenantIsolationError(TunxiangBaseError):
     """租户隔离违规——安全事件，必须记录到 audit_logs。"""
 
@@ -106,6 +110,7 @@ class PermissionDeniedError(TunxiangBaseError):
 # ─────────────────────────────────────────────────────────────────────────────
 # 业务规则异常（对应三条硬约束）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class BusinessRuleError(TunxiangBaseError):
     """业务规则违规基类。Agent 决策必须通过三条硬约束校验。"""
@@ -135,6 +140,7 @@ class ScheduleConflictError(BusinessRuleError):
 # Agent / 任务异常
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class CeleryTaskError(TunxiangBaseError):
     """Celery 异步任务执行失败（超时、重试耗尽、序列化错误等）。"""
 
@@ -150,6 +156,7 @@ class BanquetSyncError(TunxiangBaseError):
 # ─────────────────────────────────────────────────────────────────────────────
 # 基础设施异常
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class CacheConnectionError(TunxiangBaseError):
     """Redis / 缓存连接失败（可降级处理）。"""

@@ -2,6 +2,7 @@
 
 新原料发现、原料趋势分析、原料替代建议、供应商对比、原料成本预测、原料合规检查。
 """
+
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
@@ -55,22 +56,25 @@ class IngredientRadarAgent(SkillAgent):
             if name in current_ingredients:
                 continue
 
-            discoveries.append({
-                "ingredient_name": name,
-                "category": item.get("category", "其他"),
-                "origin": item.get("origin", ""),
-                "market_popularity": item.get("popularity_score", 0),
-                "price_per_kg_yuan": round(item.get("price_per_kg_fen", 0) / 100, 2),
-                "seasonality": item.get("season", "全年"),
-                "potential_dishes": item.get("potential_dishes", []),
-                "health_benefits": item.get("health_benefits", []),
-                "novelty_score": item.get("novelty_score", 0),
-            })
+            discoveries.append(
+                {
+                    "ingredient_name": name,
+                    "category": item.get("category", "其他"),
+                    "origin": item.get("origin", ""),
+                    "market_popularity": item.get("popularity_score", 0),
+                    "price_per_kg_yuan": round(item.get("price_per_kg_fen", 0) / 100, 2),
+                    "seasonality": item.get("season", "全年"),
+                    "potential_dishes": item.get("potential_dishes", []),
+                    "health_benefits": item.get("health_benefits", []),
+                    "novelty_score": item.get("novelty_score", 0),
+                }
+            )
 
         discoveries.sort(key=lambda x: x["novelty_score"], reverse=True)
 
         return AgentResult(
-            success=True, action="discover_new_ingredients",
+            success=True,
+            action="discover_new_ingredients",
             data={
                 "discoveries": discoveries[:15],
                 "total_scanned": len(market_data),
@@ -93,26 +97,41 @@ class IngredientRadarAgent(SkillAgent):
 
             if len(price_history) >= 2:
                 price_change = round((price_history[-1] - price_history[0]) / max(1, price_history[0]) * 100, 1)
-                volatility = round(max(price_history) / max(1, min(p for p in price_history if p > 0)) - 1, 2) * 100 if price_history else 0
+                volatility = (
+                    round(max(price_history) / max(1, min(p for p in price_history if p > 0)) - 1, 2) * 100
+                    if price_history
+                    else 0
+                )
             else:
                 price_change = 0
                 volatility = 0
 
-            trends.append({
-                "ingredient": name,
-                "category": ing.get("category", ""),
-                "price_change_pct": price_change,
-                "price_volatility_pct": round(volatility, 1),
-                "demand_trend": demand_trend,
-                "supply_status": ing.get("supply_status", "正常"),
-                "risk_level": "高" if abs(price_change) > 20 or demand_trend == "短缺" else "中" if abs(price_change) > 10 else "低",
-                "action": "寻找替代/锁价" if price_change > 20 else "增加库存" if price_change < -10 else "维持现状",
-            })
+            trends.append(
+                {
+                    "ingredient": name,
+                    "category": ing.get("category", ""),
+                    "price_change_pct": price_change,
+                    "price_volatility_pct": round(volatility, 1),
+                    "demand_trend": demand_trend,
+                    "supply_status": ing.get("supply_status", "正常"),
+                    "risk_level": "高"
+                    if abs(price_change) > 20 or demand_trend == "短缺"
+                    else "中"
+                    if abs(price_change) > 10
+                    else "低",
+                    "action": "寻找替代/锁价"
+                    if price_change > 20
+                    else "增加库存"
+                    if price_change < -10
+                    else "维持现状",
+                }
+            )
 
         trends.sort(key=lambda x: abs(x["price_change_pct"]), reverse=True)
 
         return AgentResult(
-            success=True, action="analyze_ingredient_trends",
+            success=True,
+            action="analyze_ingredient_trends",
             data={
                 "trends": trends[:20],
                 "rising_count": sum(1 for t in trends if t["price_change_pct"] > 5),
@@ -120,8 +139,8 @@ class IngredientRadarAgent(SkillAgent):
                 "high_risk_count": sum(1 for t in trends if t["risk_level"] == "高"),
             },
             reasoning=f"原料趋势: 涨价 {sum(1 for t in trends if t['price_change_pct'] > 5)} 种，"
-                      f"降价 {sum(1 for t in trends if t['price_change_pct'] < -5)} 种，"
-                      f"高风险 {sum(1 for t in trends if t['risk_level'] == '高')} 种",
+            f"降价 {sum(1 for t in trends if t['price_change_pct'] < -5)} 种，"
+            f"高风险 {sum(1 for t in trends if t['risk_level'] == '高')} 种",
             confidence=0.75,
         )
 
@@ -137,22 +156,27 @@ class IngredientRadarAgent(SkillAgent):
             price = c.get("price_per_kg_fen", 0)
             cost_saving = round((current_price_fen - price) / max(1, current_price_fen) * 100, 1)
 
-            substitutes.append({
-                "ingredient": c.get("name", ""),
-                "price_per_kg_yuan": round(price / 100, 2),
-                "cost_saving_pct": cost_saving,
-                "taste_similarity_pct": c.get("taste_similarity", 0),
-                "nutrition_similarity_pct": c.get("nutrition_similarity", 0),
-                "availability": c.get("availability", "充足"),
-                "overall_score": round(
-                    cost_saving * 0.3 + c.get("taste_similarity", 0) * 0.4 + c.get("nutrition_similarity", 0) * 0.3, 1),
-                "notes": c.get("notes", ""),
-            })
+            substitutes.append(
+                {
+                    "ingredient": c.get("name", ""),
+                    "price_per_kg_yuan": round(price / 100, 2),
+                    "cost_saving_pct": cost_saving,
+                    "taste_similarity_pct": c.get("taste_similarity", 0),
+                    "nutrition_similarity_pct": c.get("nutrition_similarity", 0),
+                    "availability": c.get("availability", "充足"),
+                    "overall_score": round(
+                        cost_saving * 0.3 + c.get("taste_similarity", 0) * 0.4 + c.get("nutrition_similarity", 0) * 0.3,
+                        1,
+                    ),
+                    "notes": c.get("notes", ""),
+                }
+            )
 
         substitutes.sort(key=lambda x: x["overall_score"], reverse=True)
 
         return AgentResult(
-            success=True, action="suggest_substitutes",
+            success=True,
+            action="suggest_substitutes",
             data={
                 "target_ingredient": target_ingredient,
                 "reason": reason,
@@ -161,7 +185,7 @@ class IngredientRadarAgent(SkillAgent):
                 "best_substitute": substitutes[0]["ingredient"] if substitutes else "无",
             },
             reasoning=f"为「{target_ingredient}」找到 {len(substitutes)} 种替代方案，"
-                      f"最佳: {substitutes[0]['ingredient'] if substitutes else '无'}",
+            f"最佳: {substitutes[0]['ingredient'] if substitutes else '无'}",
             confidence=0.7,
         )
 
@@ -179,24 +203,31 @@ class IngredientRadarAgent(SkillAgent):
 
             # 综合评分
             overall = round(
-                quality_score * 0.3 + (100 - min(100, price_fen / 100)) * 0.25 +
-                reliability * 0.25 + max(0, 100 - delivery_days * 10) * 0.2, 1)
+                quality_score * 0.3
+                + (100 - min(100, price_fen / 100)) * 0.25
+                + reliability * 0.25
+                + max(0, 100 - delivery_days * 10) * 0.2,
+                1,
+            )
 
-            compared.append({
-                "supplier_name": s.get("name", ""),
-                "price_per_kg_yuan": round(price_fen / 100, 2),
-                "quality_score": quality_score,
-                "avg_delivery_days": delivery_days,
-                "on_time_rate_pct": reliability,
-                "min_order_kg": s.get("min_order_kg", 0),
-                "payment_terms": s.get("payment_terms", "月结30天"),
-                "overall_score": overall,
-            })
+            compared.append(
+                {
+                    "supplier_name": s.get("name", ""),
+                    "price_per_kg_yuan": round(price_fen / 100, 2),
+                    "quality_score": quality_score,
+                    "avg_delivery_days": delivery_days,
+                    "on_time_rate_pct": reliability,
+                    "min_order_kg": s.get("min_order_kg", 0),
+                    "payment_terms": s.get("payment_terms", "月结30天"),
+                    "overall_score": overall,
+                }
+            )
 
         compared.sort(key=lambda x: x["overall_score"], reverse=True)
 
         return AgentResult(
-            success=True, action="compare_suppliers",
+            success=True,
+            action="compare_suppliers",
             data={
                 "ingredient": ingredient,
                 "suppliers": compared,
@@ -232,26 +263,33 @@ class IngredientRadarAgent(SkillAgent):
         predicted_fen = int(recent_avg * (1 + trend_pct / 200) * season_factor)
 
         return AgentResult(
-            success=True, action="predict_ingredient_cost",
+            success=True,
+            action="predict_ingredient_cost",
             data={
                 "ingredient": ingredient,
                 "current_price_yuan": round(price_history[-1] / 100, 2),
                 "predicted_price_yuan": round(predicted_fen / 100, 2),
                 "change_pct": round((predicted_fen - price_history[-1]) / max(1, price_history[-1]) * 100, 1),
-                "trend_direction": "上涨" if predicted_fen > price_history[-1] * 1.02 else
-                                  "下降" if predicted_fen < price_history[-1] * 0.98 else "持平",
+                "trend_direction": "上涨"
+                if predicted_fen > price_history[-1] * 1.02
+                else "下降"
+                if predicted_fen < price_history[-1] * 0.98
+                else "持平",
                 "supply_outlook": supply_outlook,
                 "season": season,
                 "confidence_range": {
                     "low_yuan": round(predicted_fen * 0.9 / 100, 2),
                     "high_yuan": round(predicted_fen * 1.1 / 100, 2),
                 },
-                "recommendation": "提前锁价/囤货" if predicted_fen > price_history[-1] * 1.1 else
-                                 "等待降价再采购" if predicted_fen < price_history[-1] * 0.9 else "正常采购",
+                "recommendation": "提前锁价/囤货"
+                if predicted_fen > price_history[-1] * 1.1
+                else "等待降价再采购"
+                if predicted_fen < price_history[-1] * 0.9
+                else "正常采购",
             },
             reasoning=f"「{ingredient}」预测价格 ¥{predicted_fen / 100:.2f}/kg，"
-                      f"{'上涨' if predicted_fen > price_history[-1] else '下降'} "
-                      f"{abs(round((predicted_fen - price_history[-1]) / max(1, price_history[-1]) * 100, 1))}%",
+            f"{'上涨' if predicted_fen > price_history[-1] else '下降'} "
+            f"{abs(round((predicted_fen - price_history[-1]) / max(1, price_history[-1]) * 100, 1))}%",
             confidence=0.65,
         )
 
@@ -297,7 +335,8 @@ class IngredientRadarAgent(SkillAgent):
         has_critical = any(i["severity"] == "critical" for i in issues)
 
         return AgentResult(
-            success=True, action="check_compliance",
+            success=True,
+            action="check_compliance",
             data={
                 "ingredient": ingredient,
                 "overall_status": "不合规" if has_critical else "有风险" if issues else "合规",
@@ -308,6 +347,6 @@ class IngredientRadarAgent(SkillAgent):
                 "applicable_standards": COMPLIANCE_STANDARDS,
             },
             reasoning=f"「{ingredient}」合规检查: {'不合规' if has_critical else '有风险' if issues else '合规'}，"
-                      f"问题 {len(issues)} 项",
+            f"问题 {len(issues)} 项",
             confidence=0.85,
         )

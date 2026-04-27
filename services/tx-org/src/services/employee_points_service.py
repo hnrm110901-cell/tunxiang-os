@@ -3,6 +3,7 @@
 扩展版：支持 v253 新表（point_transactions / point_rewards / horse_race_seasons / point_redemptions）
 保留与旧表 employee_point_logs 的向后兼容。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -635,9 +636,15 @@ async def award_points_v2(
                 (:id, :tid, :eid, :rcode, :pts, :bal, :reason, :src, :oid, NOW())
         """),
         {
-            "id": tx_id, "tid": tid, "eid": eid, "rcode": rule_code,
-            "pts": base, "bal": new_balance, "reason": reason or None,
-            "src": source, "oid": oid,
+            "id": tx_id,
+            "tid": tid,
+            "eid": eid,
+            "rcode": rule_code,
+            "pts": base,
+            "bal": new_balance,
+            "reason": reason or None,
+            "src": source,
+            "oid": oid,
         },
     )
     await db.flush()
@@ -645,8 +652,11 @@ async def award_points_v2(
     lvl = compute_level(new_balance)
     logger.info(
         "employee_points_v2.award",
-        tenant_id=tenant_id, employee_id=employee_id,
-        rule_code=rule_code, points=base, balance=new_balance,
+        tenant_id=tenant_id,
+        employee_id=employee_id,
+        rule_code=rule_code,
+        points=base,
+        balance=new_balance,
     )
     return {
         "transaction_id": str(tx_id),
@@ -690,9 +700,15 @@ async def deduct_points_v2(
                 (:id, :tid, :eid, :rcode, :pts, :bal, :reason, :src, :oid, NOW())
         """),
         {
-            "id": tx_id, "tid": tid, "eid": eid, "rcode": rule_code,
-            "pts": base, "bal": new_balance, "reason": reason or None,
-            "src": source, "oid": oid,
+            "id": tx_id,
+            "tid": tid,
+            "eid": eid,
+            "rcode": rule_code,
+            "pts": base,
+            "bal": new_balance,
+            "reason": reason or None,
+            "src": source,
+            "oid": oid,
         },
     )
     await db.flush()
@@ -700,8 +716,11 @@ async def deduct_points_v2(
     lvl = compute_level(new_balance)
     logger.info(
         "employee_points_v2.deduct",
-        tenant_id=tenant_id, employee_id=employee_id,
-        rule_code=rule_code, points=base, balance=new_balance,
+        tenant_id=tenant_id,
+        employee_id=employee_id,
+        rule_code=rule_code,
+        points=base,
+        balance=new_balance,
     )
     return {
         "transaction_id": str(tx_id),
@@ -764,16 +783,18 @@ async def get_points_history_v2(
     for row in r.mappings().all():
         rc = str(row["rule_code"])
         ca = row["created_at"]
-        items.append({
-            "id": str(row["id"]),
-            "rule_code": rc,
-            "rule_name": _rule_name(rc) if rc in POINT_RULES else rc,
-            "points": int(row["points"]),
-            "balance_after": int(row["balance_after"]),
-            "reason": row["reason"] or "",
-            "source": row["source"] or "manual",
-            "date": ca.isoformat() if hasattr(ca, "isoformat") else str(ca),
-        })
+        items.append(
+            {
+                "id": str(row["id"]),
+                "rule_code": rc,
+                "rule_name": _rule_name(rc) if rc in POINT_RULES else rc,
+                "points": int(row["points"]),
+                "balance_after": int(row["balance_after"]),
+                "reason": row["reason"] or "",
+                "source": row["source"] or "manual",
+                "date": ca.isoformat() if hasattr(ca, "isoformat") else str(ca),
+            }
+        )
     return {"items": items, "total": total}
 
 
@@ -821,16 +842,18 @@ async def get_leaderboard_v2(
     items: list[dict[str, Any]] = []
     for row in r.mappings().all():
         tp = int(row["total_points"])
-        items.append({
-            "employee_id": str(row["employee_id"]),
-            "emp_name": row["emp_name"],
-            "store_id": str(row["store_id"]) if row["store_id"] else None,
-            "total_points": tp,
-            "earned": int(row["earned"]),
-            "consumed": int(row["consumed"]),
-            "rank": int(row["rank"]),
-            "level": compute_level(tp),
-        })
+        items.append(
+            {
+                "employee_id": str(row["employee_id"]),
+                "emp_name": row["emp_name"],
+                "store_id": str(row["store_id"]) if row["store_id"] else None,
+                "total_points": tp,
+                "earned": int(row["earned"]),
+                "consumed": int(row["consumed"]),
+                "rank": int(row["rank"]),
+                "level": compute_level(tp),
+            }
+        )
     return items
 
 
@@ -904,8 +927,11 @@ async def redeem_reward(
                 (:id, :tid, :eid, 'redeem', :pts, :bal, :reason, 'auto', NOW())
         """),
         {
-            "id": tx_id, "tid": tid, "eid": eid,
-            "pts": -cost, "bal": new_balance,
+            "id": tx_id,
+            "tid": tid,
+            "eid": eid,
+            "pts": -cost,
+            "bal": new_balance,
             "reason": f"兑换: {reward['reward_name']}",
         },
     )
@@ -925,8 +951,11 @@ async def redeem_reward(
 
     logger.info(
         "employee_points_v2.redeem",
-        tenant_id=tenant_id, employee_id=employee_id,
-        reward_id=reward_id, cost=cost, balance=new_balance,
+        tenant_id=tenant_id,
+        employee_id=employee_id,
+        reward_id=reward_id,
+        cost=cost,
+        balance=new_balance,
     )
     return {
         "redemption_id": str(redemption_id),
@@ -938,6 +967,7 @@ async def redeem_reward(
 
 
 # ── 兑换商品 CRUD ─────────────────────────────────────────────────────────────
+
 
 async def list_rewards(
     db: AsyncSession,
@@ -960,16 +990,18 @@ async def list_rewards(
     items: list[dict[str, Any]] = []
     for row in r.mappings().all():
         ca = row["created_at"]
-        items.append({
-            "id": str(row["id"]),
-            "reward_name": row["reward_name"],
-            "reward_type": row["reward_type"],
-            "points_cost": int(row["points_cost"]),
-            "stock": int(row["stock"]),
-            "description": row["description"] or "",
-            "is_active": bool(row["is_active"]),
-            "created_at": ca.isoformat() if hasattr(ca, "isoformat") else str(ca),
-        })
+        items.append(
+            {
+                "id": str(row["id"]),
+                "reward_name": row["reward_name"],
+                "reward_type": row["reward_type"],
+                "points_cost": int(row["points_cost"]),
+                "stock": int(row["stock"]),
+                "description": row["description"] or "",
+                "is_active": bool(row["is_active"]),
+                "created_at": ca.isoformat() if hasattr(ca, "isoformat") else str(ca),
+            }
+        )
     return items
 
 
@@ -994,9 +1026,13 @@ async def create_reward(
                 (:id, :tid, :name, :rtype, :cost, :stock, :desc, NOW(), NOW())
         """),
         {
-            "id": rid, "tid": tid, "name": reward_name,
-            "rtype": reward_type, "cost": points_cost,
-            "stock": stock, "desc": description or None,
+            "id": rid,
+            "tid": tid,
+            "name": reward_name,
+            "rtype": reward_type,
+            "cost": points_cost,
+            "stock": stock,
+            "desc": description or None,
         },
     )
     await db.flush()
@@ -1030,6 +1066,7 @@ async def toggle_reward(
 
 # ── 赛马赛季 CRUD ─────────────────────────────────────────────────────────────
 
+
 async def create_horse_race_season(
     db: AsyncSession,
     tenant_id: str,
@@ -1050,6 +1087,7 @@ async def create_horse_race_season(
     await _set_tenant(db, tenant_id)
 
     import json
+
     season_id = uuid.uuid4()
     await db.execute(
         text(f"""
@@ -1060,9 +1098,13 @@ async def create_horse_race_season(
                 (:id, :tid, :name, :stype, :sid, :sd, :ed, :dim, :prizes::jsonb, :rules::jsonb, 'upcoming', NOW(), NOW())
         """),
         {
-            "id": season_id, "tid": tid, "name": season_name,
-            "stype": scope_type, "sid": sid,
-            "sd": start_date, "ed": end_date,
+            "id": season_id,
+            "tid": tid,
+            "name": season_name,
+            "stype": scope_type,
+            "sid": sid,
+            "sd": start_date,
+            "ed": end_date,
             "dim": ranking_dimension,
             "prizes": json.dumps(prizes or []),
             "rules": json.dumps(rules or {}),
@@ -1097,18 +1139,24 @@ async def list_horse_race_seasons(
     )
     items: list[dict[str, Any]] = []
     for row in r.mappings().all():
-        items.append({
-            "id": str(row["id"]),
-            "season_name": row["season_name"],
-            "scope_type": row["scope_type"],
-            "scope_id": str(row["scope_id"]) if row["scope_id"] else None,
-            "start_date": row["start_date"].isoformat() if hasattr(row["start_date"], "isoformat") else str(row["start_date"]),
-            "end_date": row["end_date"].isoformat() if hasattr(row["end_date"], "isoformat") else str(row["end_date"]),
-            "ranking_dimension": row["ranking_dimension"],
-            "status": row["status"],
-            "prizes": row["prizes"] or [],
-            "rules": row["rules"] or {},
-        })
+        items.append(
+            {
+                "id": str(row["id"]),
+                "season_name": row["season_name"],
+                "scope_type": row["scope_type"],
+                "scope_id": str(row["scope_id"]) if row["scope_id"] else None,
+                "start_date": row["start_date"].isoformat()
+                if hasattr(row["start_date"], "isoformat")
+                else str(row["start_date"]),
+                "end_date": row["end_date"].isoformat()
+                if hasattr(row["end_date"], "isoformat")
+                else str(row["end_date"]),
+                "ranking_dimension": row["ranking_dimension"],
+                "status": row["status"],
+                "prizes": row["prizes"] or [],
+                "rules": row["rules"] or {},
+            }
+        )
     return items
 
 
@@ -1170,20 +1218,26 @@ async def get_horse_race_season_ranking(
     )
     items: list[dict[str, Any]] = []
     for row in r.mappings().all():
-        items.append({
-            "employee_id": str(row["employee_id"]),
-            "emp_name": row["emp_name"],
-            "store_id": str(row["store_id"]) if row["store_id"] else None,
-            "season_points": int(row["season_points"]),
-            "rank": int(row["rank"]),
-        })
+        items.append(
+            {
+                "employee_id": str(row["employee_id"]),
+                "emp_name": row["emp_name"],
+                "store_id": str(row["store_id"]) if row["store_id"] else None,
+                "season_points": int(row["season_points"]),
+                "rank": int(row["rank"]),
+            }
+        )
     return {
         "season": {
             "id": str(season["id"]),
             "season_name": season["season_name"],
             "status": season["status"],
-            "start_date": season["start_date"].isoformat() if hasattr(season["start_date"], "isoformat") else str(season["start_date"]),
-            "end_date": season["end_date"].isoformat() if hasattr(season["end_date"], "isoformat") else str(season["end_date"]),
+            "start_date": season["start_date"].isoformat()
+            if hasattr(season["start_date"], "isoformat")
+            else str(season["start_date"]),
+            "end_date": season["end_date"].isoformat()
+            if hasattr(season["end_date"], "isoformat")
+            else str(season["end_date"]),
         },
         "ranking": items,
     }
@@ -1219,6 +1273,7 @@ async def update_horse_race_status(
 
 
 # ── 积分统计概览 ───────────────────────────────────────────────────────────────
+
 
 async def get_points_stats(
     db: AsyncSession,

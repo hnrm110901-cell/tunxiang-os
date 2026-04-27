@@ -15,6 +15,7 @@
   40 = 黑金会员
   -10 = 过号降级
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -39,14 +40,14 @@ router = APIRouter(tags=["waitlist"])
 # ─── 优先级映射 ──────────────────────────────────────────────────────────────
 
 _MEMBER_LEVEL_PRIORITY: dict[str, int] = {
-    "normal":   10,
-    "silver":   20,
-    "gold":     30,
-    "black":    40,
+    "normal": 10,
+    "silver": 20,
+    "gold": 30,
+    "black": 40,
     "普通会员": 10,
-    "银卡":     20,
-    "金卡":     30,
-    "黑金":     40,
+    "银卡": 20,
+    "金卡": 30,
+    "黑金": 40,
 }
 
 _AVG_TURNOVER_MIN = 30
@@ -168,18 +169,20 @@ async def list_waitlist(
         for r in rows:
             item = dict(r._mapping)
             for k, v in item.items():
-                if hasattr(v, 'isoformat'):
+                if hasattr(v, "isoformat"):
                     item[k] = v.isoformat()
                 elif v is not None:
                     item[k] = str(v) if not isinstance(v, (int, float, bool, str)) else v
             items.append(item)
 
-        return _ok({
-            "items": items,
-            "total": len(items),
-            "waiting_count": waiting_count,
-            "estimated_wait_min": est_wait,
-        })
+        return _ok(
+            {
+                "items": items,
+                "total": len(items),
+                "waiting_count": waiting_count,
+                "estimated_wait_min": est_wait,
+            }
+        )
     except SQLAlchemyError as exc:
         logger.error("waitlist_list_error", error=str(exc))
         _err("查询等位列表失败", 500)
@@ -244,13 +247,15 @@ async def create_waitlist_entry(
         new_row = insert_result.mappings().one()
         await db.commit()
 
-        return _ok({
-            "entry_id": str(new_row["id"]),
-            "queue_no": new_row["queue_no"],
-            "estimated_wait_min": new_row["estimated_wait_min"],
-            "status": "waiting",
-            "created_at": new_row["created_at"].isoformat() if new_row["created_at"] else _now_iso(),
-        })
+        return _ok(
+            {
+                "entry_id": str(new_row["id"]),
+                "queue_no": new_row["queue_no"],
+                "estimated_wait_min": new_row["estimated_wait_min"],
+                "status": "waiting",
+                "created_at": new_row["created_at"].isoformat() if new_row["created_at"] else _now_iso(),
+            }
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("waitlist_create_error", error=str(exc))
@@ -307,12 +312,14 @@ async def call_entry(
         )
         await db.commit()
 
-        return _ok({
-            "entry_id": entry_id,
-            "status": "called",
-            "call_count": int(entry["call_count"]) + 1,
-            "called_at": now.isoformat(),
-        })
+        return _ok(
+            {
+                "entry_id": entry_id,
+                "status": "called",
+                "call_count": int(entry["call_count"]) + 1,
+                "called_at": now.isoformat(),
+            }
+        )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
@@ -334,7 +341,9 @@ async def seat_entry(
         await _set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("SELECT id, store_id, status, pre_order_items, pre_order_total_fen FROM waitlist_entries WHERE id = :eid"),
+            text(
+                "SELECT id, store_id, status, pre_order_items, pre_order_total_fen FROM waitlist_entries WHERE id = :eid"
+            ),
             {"eid": entry_id},
         )
         entry = result.mappings().one_or_none()
@@ -363,7 +372,9 @@ async def seat_entry(
         if pre_order_items:
             total_fen = int(entry["pre_order_total_fen"] or 0)
             order_id = str(uuid4())
-            order_no = f"WL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{entry_id.replace('-', '')[-4:].upper()}"
+            order_no = (
+                f"WL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{entry_id.replace('-', '')[-4:].upper()}"
+            )
             store_id = str(entry["store_id"])
 
             await db.execute(
@@ -422,6 +433,7 @@ async def seat_entry(
             try:
                 from shared.events.src.emitter import emit_event
                 from shared.events.src.event_types import OrderEventType
+
                 asyncio.create_task(
                     emit_event(
                         event_type=OrderEventType.CREATED,
@@ -443,14 +455,16 @@ async def seat_entry(
 
         await db.commit()
 
-        return _ok({
-            "entry_id": entry_id,
-            "status": "seated",
-            "seated_at": now.isoformat(),
-            "pre_order_merged": len(pre_order_items) > 0,
-            "pre_order_items_count": len(pre_order_items),
-            "order_id": created_order_id,
-        })
+        return _ok(
+            {
+                "entry_id": entry_id,
+                "status": "seated",
+                "seated_at": now.isoformat(),
+                "pre_order_merged": len(pre_order_items) > 0,
+                "pre_order_items_count": len(pre_order_items),
+                "order_id": created_order_id,
+            }
+        )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
@@ -538,44 +552,50 @@ async def expire_overdue(
             if member_id and not entry.get("coupon_issued_on_timeout"):
                 try:
                     import asyncio
+
                     from shared.events.src.emitter import emit_event
                     from shared.events.src.event_types import MemberEventType
 
-                    asyncio.create_task(emit_event(
-                        event_type=MemberEventType.VOUCHER_ISSUED,
-                        tenant_id=tenant_id,
-                        stream_id=str(member_id),
-                        payload={
-                            "member_id": str(member_id),
-                            "voucher_type": "waitlist_timeout_compensation",
-                            "amount_fen": 1000,  # 10元
-                            "validity_days": 30,
-                            "reason": "排队超时补偿",
-                            "waitlist_entry_id": str(entry["id"]),
-                        },
-                        source_service="tx-trade",
-                    ))
+                    asyncio.create_task(
+                        emit_event(
+                            event_type=MemberEventType.VOUCHER_ISSUED,
+                            tenant_id=tenant_id,
+                            stream_id=str(member_id),
+                            payload={
+                                "member_id": str(member_id),
+                                "voucher_type": "waitlist_timeout_compensation",
+                                "amount_fen": 1000,  # 10元
+                                "validity_days": 30,
+                                "reason": "排队超时补偿",
+                                "waitlist_entry_id": str(entry["id"]),
+                            },
+                            source_service="tx-trade",
+                        )
+                    )
 
                     # 标记已发券
-                    await db.execute(text("""
+                    await db.execute(
+                        text("""
                         UPDATE waitlist_entries SET coupon_issued_on_timeout = TRUE, updated_at = NOW()
                         WHERE id = :eid
-                    """), {"eid": str(entry["id"])})
+                    """),
+                        {"eid": str(entry["id"])},
+                    )
 
                     coupon_issued_count += 1
-                    logger.info("waitlist_timeout_coupon_issued",
-                                member_id=str(member_id), entry_id=str(entry["id"]))
+                    logger.info("waitlist_timeout_coupon_issued", member_id=str(member_id), entry_id=str(entry["id"]))
                 except (ValueError, RuntimeError, OSError) as exc:
-                    logger.warning("waitlist_timeout_coupon_failed",
-                                   error=str(exc), member_id=str(member_id))
+                    logger.warning("waitlist_timeout_coupon_failed", error=str(exc), member_id=str(member_id))
 
         await db.commit()
 
-        return _ok({
-            "expired_count": len(expired_ids),
-            "expired_ids": expired_ids,
-            "coupon_issued_count": coupon_issued_count,
-        })
+        return _ok(
+            {
+                "expired_count": len(expired_ids),
+                "expired_ids": expired_ids,
+                "coupon_issued_count": coupon_issued_count,
+            }
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("waitlist_expire_error", error=str(exc))
@@ -659,8 +679,9 @@ async def add_pre_order(
         for new_item in new_items:
             merged = False
             for existing in existing_items:
-                if (existing["dish_id"] == new_item["dish_id"]
-                        and existing.get("modifiers", []) == new_item.get("modifiers", [])):
+                if existing["dish_id"] == new_item["dish_id"] and existing.get("modifiers", []) == new_item.get(
+                    "modifiers", []
+                ):
                     existing["quantity"] += new_item["quantity"]
                     existing["notes"] = new_item["notes"] or existing.get("notes", "")
                     merged = True
@@ -694,12 +715,14 @@ async def add_pre_order(
         await db.commit()
 
         # 5. 返回合并后的预点菜列表
-        return _ok({
-            "entry_id": entry_id,
-            "pre_order_items": existing_items,
-            "pre_order_total_fen": total_fen,
-            "items_count": len(existing_items),
-        })
+        return _ok(
+            {
+                "entry_id": entry_id,
+                "pre_order_items": existing_items,
+                "pre_order_total_fen": total_fen,
+                "items_count": len(existing_items),
+            }
+        )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
@@ -732,13 +755,15 @@ async def get_pre_order(
         if raw_items:
             items = raw_items if isinstance(raw_items, list) else json.loads(raw_items)
 
-        return _ok({
-            "entry_id": entry_id,
-            "status": entry["status"],
-            "pre_order_items": items,
-            "pre_order_total_fen": int(entry["pre_order_total_fen"] or 0),
-            "items_count": len(items),
-        })
+        return _ok(
+            {
+                "entry_id": entry_id,
+                "status": entry["status"],
+                "pre_order_items": items,
+                "pre_order_total_fen": int(entry["pre_order_total_fen"] or 0),
+                "items_count": len(items),
+            }
+        )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
@@ -805,14 +830,16 @@ async def remove_pre_order_item(
         )
         await db.commit()
 
-        return _ok({
-            "entry_id": entry_id,
-            "removed_dish_id": dish_id,
-            "removed_count": removed_count,
-            "pre_order_items": updated_items,
-            "pre_order_total_fen": total_fen,
-            "items_count": len(updated_items),
-        })
+        return _ok(
+            {
+                "entry_id": entry_id,
+                "removed_dish_id": dish_id,
+                "removed_count": removed_count,
+                "pre_order_items": updated_items,
+                "pre_order_total_fen": total_fen,
+                "items_count": len(updated_items),
+            }
+        )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:

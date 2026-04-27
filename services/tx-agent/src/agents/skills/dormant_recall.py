@@ -2,6 +2,7 @@
 
 检测沉睡用户，分析沉睡原因，生成召回策略，执行召回活动，追踪召回效果，预测流失风险。
 """
+
 import uuid
 from typing import Any
 
@@ -17,16 +18,25 @@ DORMANT_TIERS = {
 # 召回策略模板
 RECALL_STRATEGIES = {
     "light": {
-        "offer": "满100减15", "offer_fen": 1500, "threshold_fen": 10000,
-        "channels": ["wechat"], "content": "好久不见，为您准备了一份小惊喜",
+        "offer": "满100减15",
+        "offer_fen": 1500,
+        "threshold_fen": 10000,
+        "channels": ["wechat"],
+        "content": "好久不见，为您准备了一份小惊喜",
     },
     "medium": {
-        "offer": "满80减25", "offer_fen": 2500, "threshold_fen": 8000,
-        "channels": ["wechat", "sms"], "content": "想念您的味蕾，特惠回馈老朋友",
+        "offer": "满80减25",
+        "offer_fen": 2500,
+        "threshold_fen": 8000,
+        "channels": ["wechat", "sms"],
+        "content": "想念您的味蕾，特惠回馈老朋友",
     },
     "deep": {
-        "offer": "满60减30+赠甜品", "offer_fen": 3000, "threshold_fen": 6000,
-        "channels": ["wechat", "sms", "phone"], "content": "诚意满满的回归礼，期待与您重逢",
+        "offer": "满60减30+赠甜品",
+        "offer_fen": 3000,
+        "threshold_fen": 6000,
+        "channels": ["wechat", "sms", "phone"],
+        "content": "诚意满满的回归礼，期待与您重逢",
     },
 }
 
@@ -40,6 +50,9 @@ class DormantRecallAgent(SkillAgent):
     description = "沉睡用户检测、原因分析、召回策略生成、活动执行、效果追踪、流失预测"
     priority = "P0"
     run_location = "cloud"
+
+    # Sprint D1 / PR Overflow：召回策略发券/折扣直接冲击毛利
+    constraint_scope = {"margin"}
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -88,22 +101,25 @@ class DormantRecallAgent(SkillAgent):
                 tier = "light"
 
             tier_counts[tier] += 1
-            dormant_list.append({
-                "customer_id": m.get("customer_id"),
-                "name": m.get("name", ""),
-                "last_visit_days_ago": last_visit_days,
-                "tier": tier,
-                "tier_label": DORMANT_TIERS[tier]["label"],
-                "total_spent_yuan": round(m.get("total_spent_fen", 0) / 100, 2),
-                "visit_count": m.get("visit_count", 0),
-                "urgency": DORMANT_TIERS[tier]["urgency"],
-            })
+            dormant_list.append(
+                {
+                    "customer_id": m.get("customer_id"),
+                    "name": m.get("name", ""),
+                    "last_visit_days_ago": last_visit_days,
+                    "tier": tier,
+                    "tier_label": DORMANT_TIERS[tier]["label"],
+                    "total_spent_yuan": round(m.get("total_spent_fen", 0) / 100, 2),
+                    "visit_count": m.get("visit_count", 0),
+                    "urgency": DORMANT_TIERS[tier]["urgency"],
+                }
+            )
 
         dormant_list.sort(key=lambda x: x["last_visit_days_ago"], reverse=True)
         total = len(dormant_list)
 
         return AgentResult(
-            success=True, action="detect_dormant_users",
+            success=True,
+            action="detect_dormant_users",
             data={
                 "dormant_users": dormant_list[:100],
                 "total": total,
@@ -111,7 +127,7 @@ class DormantRecallAgent(SkillAgent):
                 "dormant_rate_pct": round(total / max(1, len(members)) * 100, 1),
             },
             reasoning=f"检测到 {total} 位沉睡用户：轻度{tier_counts['light']}、"
-                      f"中度{tier_counts['medium']}、深度{tier_counts['deep']}",
+            f"中度{tier_counts['medium']}、深度{tier_counts['deep']}",
             confidence=0.9,
         )
 
@@ -160,7 +176,8 @@ class DormantRecallAgent(SkillAgent):
 
         primary_reason = reasons[0]
         return AgentResult(
-            success=True, action="analyze_dormant_reason",
+            success=True,
+            action="analyze_dormant_reason",
             data={
                 "customer_id": customer_id,
                 "primary_reason": primary_reason,
@@ -198,7 +215,8 @@ class DormantRecallAgent(SkillAgent):
             extra_offer = {"type": "差异化权益", "detail": "会员专属菜品+积分翻倍"}
 
         return AgentResult(
-            success=True, action="generate_recall_strategy",
+            success=True,
+            action="generate_recall_strategy",
             data={
                 "strategy_id": strategy_id,
                 "customer_id": customer_id,
@@ -214,7 +232,7 @@ class DormantRecallAgent(SkillAgent):
                 "valid_days": 14,
             },
             reasoning=f"为{DORMANT_TIERS.get(tier, {}).get('label', tier)}用户 {customer_name} "
-                      f"生成召回策略: {base_strategy['offer']}",
+            f"生成召回策略: {base_strategy['offer']}",
             confidence=0.8,
         )
 
@@ -233,7 +251,8 @@ class DormantRecallAgent(SkillAgent):
             channel_status[ch] = {"status": "queued", "target_count": target_count}
 
         return AgentResult(
-            success=True, action="execute_recall_campaign",
+            success=True,
+            action="execute_recall_campaign",
             data={
                 "campaign_id": campaign_id,
                 "strategy_id": strategy_id,
@@ -263,7 +282,8 @@ class DormantRecallAgent(SkillAgent):
         roi = round((total_spend_fen - cost_fen) / max(1, cost_fen), 2)
 
         return AgentResult(
-            success=True, action="track_recall_effectiveness",
+            success=True,
+            action="track_recall_effectiveness",
             data={
                 "campaign_id": campaign_id,
                 "sent_count": sent_count,
@@ -274,7 +294,13 @@ class DormantRecallAgent(SkillAgent):
                 "returned_spend_yuan": round(total_spend_fen / 100, 2),
                 "campaign_cost_yuan": round(cost_fen / 100, 2),
                 "roi": roi,
-                "effectiveness": "优秀" if return_rate >= 15 else "良好" if return_rate >= 8 else "一般" if return_rate >= 3 else "较差",
+                "effectiveness": "优秀"
+                if return_rate >= 15
+                else "良好"
+                if return_rate >= 8
+                else "一般"
+                if return_rate >= 3
+                else "较差",
             },
             reasoning=f"召回效果: 触达{sent_count}人，回流{returned_count}人（{return_rate}%），ROI {roi}",
             confidence=0.85,
@@ -309,13 +335,15 @@ class DormantRecallAgent(SkillAgent):
 
             risk = min(0.98, risk)
 
-            predictions.append({
-                "customer_id": m.get("customer_id"),
-                "name": m.get("name", ""),
-                "churn_risk": round(risk, 2),
-                "risk_level": "极高" if risk >= 0.8 else "高" if risk >= 0.6 else "中" if risk >= 0.4 else "低",
-                "key_signals": [],
-            })
+            predictions.append(
+                {
+                    "customer_id": m.get("customer_id"),
+                    "name": m.get("name", ""),
+                    "churn_risk": round(risk, 2),
+                    "risk_level": "极高" if risk >= 0.8 else "高" if risk >= 0.6 else "中" if risk >= 0.4 else "低",
+                    "key_signals": [],
+                }
+            )
             if last_days >= 30:
                 predictions[-1]["key_signals"].append(f"已{last_days}天未到店")
             if spend_trend < -10:
@@ -327,7 +355,8 @@ class DormantRecallAgent(SkillAgent):
         high_risk = sum(1 for p in predictions if p["risk_level"] in ("极高", "高"))
 
         return AgentResult(
-            success=True, action="predict_churn_risk",
+            success=True,
+            action="predict_churn_risk",
             data={
                 "predictions": predictions[:50],
                 "total": len(predictions),
@@ -353,8 +382,7 @@ class DormantRecallAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_reactivation_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_reactivation_suggestion", error="缺少 customer_id")
 
         priority = params.get("reactivation_priority", "medium")
         reason = params.get("reactivation_reason", "silent_30d")
@@ -377,8 +405,8 @@ class DormantRecallAgent(SkillAgent):
 
         # 三条硬约束校验
         constraints_check = {
-            "margin_safe": True,       # 召回建议不涉及折扣，毛利安全
-            "food_safety_ok": True,    # 触达类操作不涉及食材
+            "margin_safe": True,  # 召回建议不涉及折扣，毛利安全
+            "food_safety_ok": True,  # 触达类操作不涉及食材
             "customer_experience_ok": True,  # 触达频率受旅程引擎控制，不会过度打扰
         }
 
@@ -414,7 +442,8 @@ class DormantRecallAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_reactivation_suggestion",
+                success=False,
+                action="generate_reactivation_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=True,
                 constraints_detail=constraints_check,
@@ -428,7 +457,7 @@ class DormantRecallAgent(SkillAgent):
                 "api_response": result,
             },
             reasoning=f"沉默召回建议: {mechanism}机制，{'有' if has_benefit else '无'}已有权益，"
-                      f"优先级={priority}，原因={reason}",
+            f"优先级={priority}，原因={reason}",
             confidence=0.85,
             constraints_passed=True,
             constraints_detail=constraints_check,

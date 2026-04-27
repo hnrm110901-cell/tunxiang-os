@@ -1,4 +1,5 @@
 """档口毛利核算 API 路由"""
+
 from datetime import date, timedelta
 from typing import Literal, Optional
 

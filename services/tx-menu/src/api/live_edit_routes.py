@@ -1,4 +1,5 @@
 """菜单实时编辑 API — PATCH /api/v1/menu/dishes/{dish_id}/live"""
+
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -21,24 +22,26 @@ MAC_STATION_URL = os.getenv("MAC_STATION_URL", "")
 
 # ─── 请求体 ───
 
+
 class LiveDishUpdate(BaseModel):
     name: Optional[str] = None
-    price: Optional[int] = None          # 单位：分（整数）
+    price: Optional[int] = None  # 单位：分（整数）
     description: Optional[str] = None
     is_available: Optional[bool] = None  # 是否上架
-    daily_limit: Optional[int] = None    # 每日限量，None=不限
+    daily_limit: Optional[int] = None  # 每日限量，None=不限
     image_url: Optional[str] = None
-    updated_by: Optional[str] = None     # 操作员名称（用于广播消息）
+    updated_by: Optional[str] = None  # 操作员名称（用于广播消息）
 
 
 class BulkAvailabilityUpdate(BaseModel):
     dish_ids: list[str] = Field(..., min_length=1)
     is_available: bool
-    reason: Optional[str] = None         # 例如 "今日估清" / "食材到货恢复"
+    reason: Optional[str] = None  # 例如 "今日估清" / "食材到货恢复"
     updated_by: Optional[str] = None
 
 
 # ─── 广播工具 ───
+
 
 async def _broadcast_menu_update(dish_id: str, changes: dict, updated_by: str) -> None:
     """向 mac-station 广播菜单变更事件，失败不影响主流程。"""
@@ -91,6 +94,7 @@ async def _broadcast_bulk_update(dish_ids: list[str], is_available: bool, reason
 
 # ─── 端点 ───
 
+
 @router.patch("/dishes/{dish_id}/live")
 async def live_update_dish(
     dish_id: str,
@@ -125,11 +129,11 @@ async def live_update_dish(
         "daily_limit": "daily_limit",
         "image_url": "image_url",
     }
-    set_clauses = ", ".join(
-        f"{col_map.get(k, k)} = :{k}" for k in changes
-    )
+    set_clauses = ", ".join(f"{col_map.get(k, k)} = :{k}" for k in changes)
     await db.execute(
-        text(f"UPDATE dishes SET {set_clauses}, updated_at = NOW() WHERE id = :dish_id AND tenant_id = :tid::uuid AND is_deleted = false"),
+        text(
+            f"UPDATE dishes SET {set_clauses}, updated_at = NOW() WHERE id = :dish_id AND tenant_id = :tid::uuid AND is_deleted = false"
+        ),
         {**changes, "dish_id": dish_id, "tid": x_tenant_id},
     )
     await db.commit()

@@ -7,6 +7,7 @@
 所有接口需 X-Tenant-ID header。
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from fastapi import APIRouter, HTTPException, Request
 
 from ..services.booking_prep_service import BookingPrepService
@@ -15,6 +16,7 @@ router = APIRouter(tags=["booking-prep"])
 
 
 # ─── 通用辅助 ───
+
 
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
@@ -36,6 +38,7 @@ def _err(msg: str, code: int = 400) -> None:
 
 
 # ─── 端点 ───
+
 
 @router.get("/today-summary/{store_id}")
 async def get_today_summary(store_id: str, request: Request) -> dict:

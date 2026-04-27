@@ -1,4 +1,5 @@
 """日清日结服务测试"""
+
 import os
 import sys
 
@@ -37,8 +38,16 @@ class TestFlowProgress:
         assert result["current_node"] == "E1"
 
     def test_in_progress(self):
-        statuses = {"E1": "completed", "E2": "completed", "E3": "in_progress",
-                     "E4": "pending", "E5": "pending", "E6": "pending", "E7": "pending", "E8": "pending"}
+        statuses = {
+            "E1": "completed",
+            "E2": "completed",
+            "E3": "in_progress",
+            "E4": "pending",
+            "E5": "pending",
+            "E6": "pending",
+            "E7": "pending",
+            "E8": "pending",
+        }
         result = compute_flow_progress(statuses)
         assert result["completed"] == 2
         assert result["pct"] == 25.0
@@ -51,8 +60,16 @@ class TestFlowProgress:
         assert result["status"] == "completed"
 
     def test_skipped_counts(self):
-        statuses = {"E1": "completed", "E2": "skipped", "E3": "completed",
-                     "E4": "pending", "E5": "pending", "E6": "pending", "E7": "pending", "E8": "pending"}
+        statuses = {
+            "E1": "completed",
+            "E2": "skipped",
+            "E3": "completed",
+            "E4": "pending",
+            "E5": "pending",
+            "E6": "pending",
+            "E7": "pending",
+            "E8": "pending",
+        }
         result = compute_flow_progress(statuses)
         assert result["completed"] == 3  # skipped 也算
 
@@ -92,8 +109,16 @@ class TestTimeline:
         assert tl[7]["code"] == "E8"
 
     def test_current_node_marking(self):
-        statuses = {"E1": "completed", "E2": "completed", "E3": "pending",
-                     "E4": "pending", "E5": "pending", "E6": "pending", "E7": "pending", "E8": "pending"}
+        statuses = {
+            "E1": "completed",
+            "E2": "completed",
+            "E3": "pending",
+            "E4": "pending",
+            "E5": "pending",
+            "E6": "pending",
+            "E7": "pending",
+            "E8": "pending",
+        }
         tl = get_flow_timeline(statuses)
         current = [n for n in tl if n["is_current"]]
         assert len(current) == 1

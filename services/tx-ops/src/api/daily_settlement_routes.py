@@ -7,6 +7,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -32,6 +33,7 @@ from .performance_routes import (
     _aggregate_waiter_performance,
     _calc_commission_fen,
 )
+
 # 以下路由均已迁移至真实DB，此处保留本地空字典供各 fallback 降级使用
 _shifts: dict = {}
 _local_summaries: dict = {}
@@ -60,9 +62,7 @@ class RunSettlementRequest(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-async def _check_e1_status_db(
-    repo: OpsRepository, store_id: str, shift_date: date
-) -> Dict[str, Any]:
+async def _check_e1_status_db(repo: OpsRepository, store_id: str, shift_date: date) -> Dict[str, Any]:
     """E1: 检查当日所有班次是否已交班确认（DB版）。"""
     day_shifts = await repo.list_shifts(store_id, shift_date)
     if not day_shifts:
@@ -87,9 +87,12 @@ async def _check_e1_status_db(
 def _check_e1_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     """E1 fallback: 内存版。"""
     day_shifts = [
-        s for s in _shifts.values()
-        if s["tenant_id"] == tenant_id and s["store_id"] == store_id
-        and s["shift_date"] == date_str and not s.get("is_deleted", False)
+        s
+        for s in _shifts.values()
+        if s["tenant_id"] == tenant_id
+        and s["store_id"] == store_id
+        and s["shift_date"] == date_str
+        and not s.get("is_deleted", False)
     ]
     if not day_shifts:
         return {"completed": False, "message": "无班次记录", "detail": []}
@@ -100,14 +103,16 @@ def _check_e1_status_fallback(store_id: str, date_str: str, tenant_id: str) -> D
     return {
         "completed": completed,
         "message": "已完成" if completed else f"{len(pending)} 个班次未确认，{len(disputed)} 个班次有争议",
-        "detail": {"total_shifts": len(day_shifts), "confirmed": len(confirmed),
-                   "pending": len(pending), "disputed": len(disputed)},
+        "detail": {
+            "total_shifts": len(day_shifts),
+            "confirmed": len(confirmed),
+            "pending": len(pending),
+            "disputed": len(disputed),
+        },
     }
 
 
-async def _check_e2_status_db(
-    repo: OpsRepository, store_id: str, summary_date: date
-) -> Dict[str, Any]:
+async def _check_e2_status_db(repo: OpsRepository, store_id: str, summary_date: date) -> Dict[str, Any]:
     """E2: 检查日汇总是否已生成并锁定（DB版）。"""
     summary = await repo.get_daily_summary(store_id, summary_date)
     if not summary:
@@ -127,9 +132,7 @@ def _check_e2_status_fallback(store_id: str, date_str: str, tenant_id: str) -> D
     return {"completed": False, "message": f"日汇总状态: {summary['status']}，尚未锁定", "detail": summary}
 
 
-async def _check_e5_status_db(
-    repo: OpsRepository, store_id: str, issue_date: date
-) -> Dict[str, Any]:
+async def _check_e5_status_db(repo: OpsRepository, store_id: str, issue_date: date) -> Dict[str, Any]:
     """E5: 检查当日未处理关键问题（DB版）。"""
     counts = await repo.count_open_critical_issues(store_id, issue_date)
     completed = counts["open_critical_high"] == 0
@@ -142,26 +145,33 @@ async def _check_e5_status_db(
 
 def _check_e5_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     day_issues = [
-        i for i in _local_issues.values()
-        if i["tenant_id"] == tenant_id and i["store_id"] == store_id
-        and i["issue_date"] == date_str and not i.get("is_deleted", False)
+        i
+        for i in _local_issues.values()
+        if i["tenant_id"] == tenant_id
+        and i["store_id"] == store_id
+        and i["issue_date"] == date_str
+        and not i.get("is_deleted", False)
     ]
     open_critical = [
-        i for i in day_issues
-        if i["status"] in {"open", "in_progress"} and i["severity"] in {"critical", "high"}
+        i for i in day_issues if i["status"] in {"open", "in_progress"} and i["severity"] in {"critical", "high"}
     ]
     open_all = [i for i in day_issues if i["status"] in {"open", "in_progress"}]
     completed = len(open_critical) == 0
     return {
         "completed": completed,
         "message": "已完成" if completed else f"存在 {len(open_critical)} 个未处理的 critical/high 问题",
-        "detail": {"total_issues": len(day_issues), "open_critical_high": len(open_critical), "open_all": len(open_all)},
+        "detail": {
+            "total_issues": len(day_issues),
+            "open_critical_high": len(open_critical),
+            "open_all": len(open_all),
+        },
     }
 
 
 def _check_e7_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     day_perfs = [
-        p for p in _local_performance.values()
+        p
+        for p in _local_performance.values()
         if p["tenant_id"] == tenant_id and p["store_id"] == store_id and p["perf_date"] == date_str
     ]
     completed = len(day_perfs) > 0
@@ -174,9 +184,12 @@ def _check_e7_status_fallback(store_id: str, date_str: str, tenant_id: str) -> D
 
 def _check_e8_status_fallback(store_id: str, date_str: str, tenant_id: str) -> Dict[str, Any]:
     day_reports = [
-        r for r in _local_reports.values()
-        if r["tenant_id"] == tenant_id and r["store_id"] == store_id
-        and r["inspection_date"] == date_str and not r.get("is_deleted", False)
+        r
+        for r in _local_reports.values()
+        if r["tenant_id"] == tenant_id
+        and r["store_id"] == store_id
+        and r["inspection_date"] == date_str
+        and not r.get("is_deleted", False)
     ]
     if not day_reports:
         return {"completed": True, "message": "今日无巡店计划（可选节点）", "detail": []}
@@ -189,8 +202,12 @@ def _check_e8_status_fallback(store_id: str, date_str: str, tenant_id: str) -> D
 
 
 async def _build_node_statuses(
-    store_id: str, settlement_date: date, date_str: str, tenant_id: str,
-    repo: Optional[OpsRepository] = None, use_db: bool = False,
+    store_id: str,
+    settlement_date: date,
+    date_str: str,
+    tenant_id: str,
+    repo: Optional[OpsRepository] = None,
+    use_db: bool = False,
 ) -> Dict[str, Dict[str, Any]]:
     """构建各节点状态，优先DB，fallback内存。"""
     if use_db and repo:
@@ -208,8 +225,11 @@ async def _build_node_statuses(
                 "detail": {"employee_count": len(perfs_all)},
             }
             inspections, _ = await repo.list_inspections(
-                store_id=store_id, start_date=settlement_date, end_date=settlement_date,
-                page=1, size=10000,
+                store_id=store_id,
+                start_date=settlement_date,
+                end_date=settlement_date,
+                page=1,
+                size=10000,
             )
             if not inspections:
                 e8 = {"completed": True, "message": "今日无巡店计划（可选节点）", "detail": []}
@@ -256,9 +276,13 @@ async def run_daily_settlement(
     steps: List[Dict[str, Any]] = []
     use_db = True
 
-    log.info("settlement_run_started", store_id=body.store_id,
-             settlement_date=date_str, operator_id=body.operator_id,
-             tenant_id=x_tenant_id)
+    log.info(
+        "settlement_run_started",
+        store_id=body.store_id,
+        settlement_date=date_str,
+        operator_id=body.operator_id,
+        tenant_id=x_tenant_id,
+    )
 
     try:
         repo = OpsRepository(db, x_tenant_id)
@@ -282,9 +306,15 @@ async def run_daily_settlement(
         if not existing_summary or (body.force_regenerate and existing_summary["status"] != "locked"):
             aggregated = await _aggregate_orders(body.store_id, body.settlement_date, x_tenant_id, db=db)
             record = await repo.upsert_daily_summary(body.store_id, body.settlement_date, aggregated)
-            steps.append({"node": "E2_日营业汇总", "action": "generated", "completed": True,
-                          "message": "日汇总已自动生成（草稿状态，需手动确认锁定）",
-                          "summary_id": record["id"]})
+            steps.append(
+                {
+                    "node": "E2_日营业汇总",
+                    "action": "generated",
+                    "completed": True,
+                    "message": "日汇总已自动生成（草稿状态，需手动确认锁定）",
+                    "summary_id": record["id"],
+                }
+            )
         else:
             e2 = await _check_e2_status_db(repo, body.store_id, body.settlement_date)
             steps.append({"node": "E2_日营业汇总", "action": "check", **e2})
@@ -293,41 +323,68 @@ async def run_daily_settlement(
         e2_existing = _local_summaries.get(e2_key)
         if not e2_existing or (body.force_regenerate and e2_existing["status"] != "locked"):
             import uuid as _uuid
+
             # fallback 路径无 DB 连接，返回空聚合结构
             aggregated = {
-                "total_orders": 0, "dine_in_orders": 0, "takeaway_orders": 0,
-                "banquet_orders": 0, "total_revenue_fen": 0, "actual_revenue_fen": 0,
-                "total_discount_fen": 0, "max_discount_pct": None,
-                "abnormal_discounts": 0, "avg_table_value_fen": None,
+                "total_orders": 0,
+                "dine_in_orders": 0,
+                "takeaway_orders": 0,
+                "banquet_orders": 0,
+                "total_revenue_fen": 0,
+                "actual_revenue_fen": 0,
+                "total_discount_fen": 0,
+                "max_discount_pct": None,
+                "abnormal_discounts": 0,
+                "avg_table_value_fen": None,
             }
             summary_id = e2_existing["id"] if e2_existing else str(_uuid.uuid4())
             record = {
-                "id": summary_id, "tenant_id": x_tenant_id, "store_id": body.store_id,
-                "summary_date": date_str, **aggregated, "status": "draft",
-                "confirmed_by": None, "confirmed_at": None,
+                "id": summary_id,
+                "tenant_id": x_tenant_id,
+                "store_id": body.store_id,
+                "summary_date": date_str,
+                **aggregated,
+                "status": "draft",
+                "confirmed_by": None,
+                "confirmed_at": None,
                 "created_at": e2_existing["created_at"] if e2_existing else now.isoformat(),
-                "updated_at": now.isoformat(), "is_deleted": False,
+                "updated_at": now.isoformat(),
+                "is_deleted": False,
             }
             _local_summaries[e2_key] = record
-            steps.append({"node": "E2_日营业汇总", "action": "generated", "completed": True,
-                          "message": "日汇总已自动生成（草稿状态，需手动确认锁定）",
-                          "summary_id": summary_id})
+            steps.append(
+                {
+                    "node": "E2_日营业汇总",
+                    "action": "generated",
+                    "completed": True,
+                    "message": "日汇总已自动生成（草稿状态，需手动确认锁定）",
+                    "summary_id": summary_id,
+                }
+            )
         else:
             e2 = _check_e2_status_fallback(body.store_id, date_str, x_tenant_id)
             steps.append({"node": "E2_日营业汇总", "action": "check", **e2})
 
     # ── E5: 自动扫描预警 ──────────────────────────────────────────────
     from .issues_routes import _scan_discount_abuse, _scan_kds_timeout, _scan_low_inventory
+
     kds_timeouts = await _scan_kds_timeout(body.store_id, x_tenant_id)
     discount_abuses = await _scan_discount_abuse(body.store_id, x_tenant_id)
     low_inventory = await _scan_low_inventory(body.store_id, x_tenant_id)
     auto_created = len(kds_timeouts) + len(discount_abuses) + len(low_inventory)
-    steps.append({
-        "node": "E5_问题预警", "action": "auto_scan", "completed": True,
-        "message": f"自动扫描完成，新增 {auto_created} 条预警",
-        "breakdown": {"kds_timeout": len(kds_timeouts), "discount_abuse": len(discount_abuses),
-                      "low_inventory": len(low_inventory)},
-    })
+    steps.append(
+        {
+            "node": "E5_问题预警",
+            "action": "auto_scan",
+            "completed": True,
+            "message": f"自动扫描完成，新增 {auto_created} 条预警",
+            "breakdown": {
+                "kds_timeout": len(kds_timeouts),
+                "discount_abuse": len(discount_abuses),
+                "low_inventory": len(low_inventory),
+            },
+        }
+    )
 
     # ── E6: 整改跟踪状态检查 ─────────────────────────────────────────
     if use_db and repo:
@@ -347,9 +404,12 @@ async def run_daily_settlement(
             for emp in emp_list:
                 commission = _calc_commission_fen(role, emp)
                 await repo.upsert_performance(
-                    store_id=body.store_id, perf_date=body.settlement_date,
-                    employee_id=emp["employee_id"], employee_name=emp.get("employee_name", ""),
-                    role=role, orders_handled=emp.get("orders_handled", 0),
+                    store_id=body.store_id,
+                    perf_date=body.settlement_date,
+                    employee_id=emp["employee_id"],
+                    employee_name=emp.get("employee_name", ""),
+                    role=role,
+                    orders_handled=emp.get("orders_handled", 0),
                     revenue_generated_fen=emp.get("revenue_generated_fen", 0),
                     dishes_completed=emp.get("dishes_completed", 0),
                     tables_served=emp.get("tables_served", 0),
@@ -359,6 +419,7 @@ async def run_daily_settlement(
                 perf_count += 1
     else:
         import uuid as _uuid2
+
         for role, emp_list in [("cashier", cashier_data), ("chef", chef_data), ("waiter", waiter_data)]:
             for emp in emp_list:
                 emp_id = emp["employee_id"]
@@ -368,10 +429,13 @@ async def run_daily_settlement(
                     existing = _local_performance.get(key)
                     _local_performance[key] = {
                         "id": existing["id"] if existing else str(_uuid2.uuid4()),
-                        "tenant_id": x_tenant_id, "store_id": body.store_id,
-                        "perf_date": date_str, "employee_id": emp_id,
+                        "tenant_id": x_tenant_id,
+                        "store_id": body.store_id,
+                        "perf_date": date_str,
+                        "employee_id": emp_id,
                         "employee_name": emp.get("employee_name", ""),
-                        "role": role, "orders_handled": emp.get("orders_handled", 0),
+                        "role": role,
+                        "orders_handled": emp.get("orders_handled", 0),
                         "revenue_generated_fen": emp.get("revenue_generated_fen", 0),
                         "dishes_completed": emp.get("dishes_completed", 0),
                         "tables_served": emp.get("tables_served", 0),
@@ -382,16 +446,24 @@ async def run_daily_settlement(
                     }
                     perf_count += 1
 
-    steps.append({
-        "node": "E7_员工绩效", "action": "calculated", "completed": True,
-        "message": f"已计算 {perf_count} 名员工绩效", "employee_count": perf_count,
-    })
+    steps.append(
+        {
+            "node": "E7_员工绩效",
+            "action": "calculated",
+            "completed": True,
+            "message": f"已计算 {perf_count} 名员工绩效",
+            "employee_count": perf_count,
+        }
+    )
 
     # ── E8: 巡店质检 ───────────────────────────────────────
     if use_db and repo:
         inspections, _ = await repo.list_inspections(
-            store_id=body.store_id, start_date=body.settlement_date,
-            end_date=body.settlement_date, page=1, size=10000,
+            store_id=body.store_id,
+            start_date=body.settlement_date,
+            end_date=body.settlement_date,
+            page=1,
+            size=10000,
         )
         if not inspections:
             e8 = {"completed": True, "message": "今日无巡店计划（可选节点）", "detail": []}
@@ -407,34 +479,38 @@ async def run_daily_settlement(
     steps.append({"node": "E8_巡店质检", "action": "check", **e8})
 
     # ── 汇总整体状态 ──────────────────────────────────────────────────
-    blocking_incomplete = [
-        s for s in steps
-        if not s.get("completed", False) and s["node"] not in {"E8_巡店质检"}
-    ]
+    blocking_incomplete = [s for s in steps if not s.get("completed", False) and s["node"] not in {"E8_巡店质检"}]
     overall_done = len(blocking_incomplete) == 0
 
-    log.info("settlement_run_completed", store_id=body.store_id,
-             settlement_date=date_str, overall_done=overall_done,
-             blocking_count=len(blocking_incomplete), tenant_id=x_tenant_id,
-             source="db" if use_db else "fallback")
+    log.info(
+        "settlement_run_completed",
+        store_id=body.store_id,
+        settlement_date=date_str,
+        overall_done=overall_done,
+        blocking_count=len(blocking_incomplete),
+        tenant_id=x_tenant_id,
+        source="db" if use_db else "fallback",
+    )
 
     # ─── Phase 1 平行事件写入：日清日结完成 ───
     if overall_done:
-        asyncio.create_task(emit_event(
-            event_type=SettlementEventType.DAILY_CLOSED,
-            tenant_id=x_tenant_id,
-            stream_id=f"{body.store_id}:{date_str}",
-            payload={
-                "settlement_date": date_str,
-                "store_id": body.store_id,
-                "operator_id": body.operator_id,
-                "steps_completed": len(steps),
-                "overall_completed": overall_done,
-            },
-            store_id=body.store_id,
-            source_service="tx-ops",
-            metadata={"trigger": "manual_run"},
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=SettlementEventType.DAILY_CLOSED,
+                tenant_id=x_tenant_id,
+                stream_id=f"{body.store_id}:{date_str}",
+                payload={
+                    "settlement_date": date_str,
+                    "store_id": body.store_id,
+                    "operator_id": body.operator_id,
+                    "steps_completed": len(steps),
+                    "overall_completed": overall_done,
+                },
+                store_id=body.store_id,
+                source_service="tx-ops",
+                metadata={"trigger": "manual_run"},
+            )
+        )
 
     return {
         "ok": True,
@@ -469,9 +545,7 @@ async def get_settlement_status(
     except (ConnectionRefusedError, OSError, RuntimeError, ValueError):
         use_db = False
 
-    nodes = await _build_node_statuses(
-        store_id, target_date, date_str, x_tenant_id, repo=repo, use_db=use_db
-    )
+    nodes = await _build_node_statuses(store_id, target_date, date_str, x_tenant_id, repo=repo, use_db=use_db)
     completed_count = sum(1 for n in nodes.values() if n.get("completed", False))
     total_count = len(nodes)
 
@@ -506,18 +580,18 @@ async def get_settlement_checklist(
     except (ConnectionRefusedError, OSError, RuntimeError, ValueError):
         use_db = False
 
-    nodes = await _build_node_statuses(
-        store_id, target_date, date_str, x_tenant_id, repo=repo, use_db=use_db
-    )
+    nodes = await _build_node_statuses(store_id, target_date, date_str, x_tenant_id, repo=repo, use_db=use_db)
 
     checklist: List[Dict[str, Any]] = []
     for node_name, status in nodes.items():
-        checklist.append({
-            "node": node_name,
-            "completed": status.get("completed", False),
-            "message": status.get("message", ""),
-            "action_hint": _get_action_hint(node_name, status),
-        })
+        checklist.append(
+            {
+                "node": node_name,
+                "completed": status.get("completed", False),
+                "message": status.get("message", ""),
+                "action_hint": _get_action_hint(node_name, status),
+            }
+        )
 
     pending_items = [c for c in checklist if not c["completed"]]
     completed_items = [c for c in checklist if c["completed"]]

@@ -56,9 +56,7 @@ _LEAVE_BUSINESS_TYPE = "leave"
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -182,10 +180,7 @@ async def create_leave(
         if float(balance["remaining_days"]) < work_days:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"{req.leave_type} 余额不足：剩余 {balance['remaining_days']} 天，"
-                    f"申请 {work_days} 天"
-                ),
+                detail=(f"{req.leave_type} 余额不足：剩余 {balance['remaining_days']} 天，申请 {work_days} 天"),
             )
 
     # 4. 创建 leave_request
@@ -209,6 +204,7 @@ async def create_leave(
     initiator_id = req.initiator_id or req.employee_id
     try:
         from ..services.approval_workflow_engine import ApprovalEngine
+
         instance = await ApprovalEngine.create_instance(
             tenant_id=tenant_id,
             business_type=_LEAVE_BUSINESS_TYPE,
@@ -242,16 +238,18 @@ async def create_leave(
             db=db,
         )
 
-    return _ok({
-        "id": str(leave["id"]),
-        "employee_id": req.employee_id,
-        "leave_type": req.leave_type,
-        "start_date": req.start_date.isoformat(),
-        "end_date": req.end_date.isoformat(),
-        "days_requested": work_days,
-        "status": "pending",
-        "approval_instance_id": approval_instance_id,
-    })
+    return _ok(
+        {
+            "id": str(leave["id"]),
+            "employee_id": req.employee_id,
+            "leave_type": req.leave_type,
+            "start_date": req.start_date.isoformat(),
+            "end_date": req.end_date.isoformat(),
+            "days_requested": work_days,
+            "status": "pending",
+            "approval_instance_id": approval_instance_id,
+        }
+    )
 
 
 @router.get("/api/v1/leave-requests/balance")
@@ -268,12 +266,14 @@ async def get_balance(
     target_year = year or date.today().year
     balances = await get_all_leave_balances(employee_id, target_year, tenant_id, db)
 
-    return _ok({
-        "employee_id": employee_id,
-        "year": target_year,
-        "balances": balances,
-        "total": len(balances),
-    })
+    return _ok(
+        {
+            "employee_id": employee_id,
+            "year": target_year,
+            "balances": balances,
+            "total": len(balances),
+        }
+    )
 
 
 @router.get("/api/v1/leave-requests")

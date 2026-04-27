@@ -55,9 +55,7 @@ router = APIRouter(prefix="/api/v1/schedules", tags=["schedules"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -196,28 +194,34 @@ async def get_week_schedule(
                 "role": row.get("role"),
                 "shifts": [],
             }
-        emp_map[eid]["shifts"].append({
-            "schedule_id": str(row["id"]),
-            "date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
-            "start": str(row["shift_start"]),
-            "end": str(row["shift_end"]),
-            "status": row.get("status", "planned"),
-            "notes": row.get("notes"),
-        })
+        emp_map[eid]["shifts"].append(
+            {
+                "schedule_id": str(row["id"]),
+                "date": row["schedule_date"].isoformat()
+                if hasattr(row["schedule_date"], "isoformat")
+                else str(row["schedule_date"]),
+                "start": str(row["shift_start"]),
+                "end": str(row["shift_end"]),
+                "status": row.get("status", "planned"),
+                "notes": row.get("notes"),
+            }
+        )
 
     log.info(
         "week_schedule_queried",
         extra={"store_id": store_id, "week_start": str(week_start), "tenant_id": tenant_id},
     )
 
-    return _ok({
-        "store_id": store_id,
-        "week_start": week_start.isoformat(),
-        "week_end": week_end.isoformat(),
-        "dates": dates,
-        "employees": list(emp_map.values()),
-        "total_shifts": len(rows),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "week_start": week_start.isoformat(),
+            "week_end": week_end.isoformat(),
+            "dates": dates,
+            "employees": list(emp_map.values()),
+            "total_shifts": len(rows),
+        }
+    )
 
 
 # ── POST / ────────────────────────────────────────────────────────────────────
@@ -276,15 +280,17 @@ async def create_schedule(
         },
     )
 
-    return _ok({
-        "schedule_id": str(row["id"]),
-        "employee_id": req.employee_id,
-        "store_id": req.store_id,
-        "schedule_date": req.schedule_date.isoformat(),
-        "shift_start": str(row["shift_start"]),
-        "shift_end": str(row["shift_end"]),
-        "status": row["status"],
-    })
+    return _ok(
+        {
+            "schedule_id": str(row["id"]),
+            "employee_id": req.employee_id,
+            "store_id": req.store_id,
+            "schedule_date": req.schedule_date.isoformat(),
+            "shift_start": str(row["shift_start"]),
+            "shift_end": str(row["shift_end"]),
+            "status": row["status"],
+        }
+    )
 
 
 # ── POST /batch ───────────────────────────────────────────────────────────────
@@ -358,13 +364,15 @@ async def batch_create_schedules(
         },
     )
 
-    return _ok({
-        "store_id": req.store_id,
-        "week_start": req.week_start.isoformat(),
-        "inserted": inserted,
-        "skipped_conflicts": skipped,
-        "total_attempted": inserted + skipped,
-    })
+    return _ok(
+        {
+            "store_id": req.store_id,
+            "week_start": req.week_start.isoformat(),
+            "inserted": inserted,
+            "skipped_conflicts": skipped,
+            "total_attempted": inserted + skipped,
+        }
+    )
 
 
 # ── PUT /{schedule_id} ────────────────────────────────────────────────────────
@@ -452,16 +460,20 @@ async def update_schedule(
         },
     )
 
-    return _ok({
-        "schedule_id": str(row["id"]),
-        "employee_id": str(row["employee_id"]),
-        "schedule_date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
-        "shift_start": str(row["shift_start"]),
-        "shift_end": str(row["shift_end"]),
-        "status": row["status"],
-        "role": row.get("role"),
-        "notes": row.get("notes"),
-    })
+    return _ok(
+        {
+            "schedule_id": str(row["id"]),
+            "employee_id": str(row["employee_id"]),
+            "schedule_date": row["schedule_date"].isoformat()
+            if hasattr(row["schedule_date"], "isoformat")
+            else str(row["schedule_date"]),
+            "shift_start": str(row["shift_start"]),
+            "shift_end": str(row["shift_end"]),
+            "status": row["status"],
+            "role": row.get("role"),
+            "notes": row.get("notes"),
+        }
+    )
 
 
 # ── DELETE /{schedule_id} ─────────────────────────────────────────────────────
@@ -509,12 +521,16 @@ async def delete_schedule(
         },
     )
 
-    return _ok({
-        "schedule_id": str(row["id"]),
-        "employee_id": str(row["employee_id"]),
-        "schedule_date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
-        "status": "cancelled",
-    })
+    return _ok(
+        {
+            "schedule_id": str(row["id"]),
+            "employee_id": str(row["employee_id"]),
+            "schedule_date": row["schedule_date"].isoformat()
+            if hasattr(row["schedule_date"], "isoformat")
+            else str(row["schedule_date"]),
+            "status": "cancelled",
+        }
+    )
 
 
 # ── GET /conflicts ────────────────────────────────────────────────────────────
@@ -574,7 +590,9 @@ async def get_schedule_conflicts(
     conflicts = [
         {
             "employee_id": str(row["employee_id"]),
-            "date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
+            "date": row["schedule_date"].isoformat()
+            if hasattr(row["schedule_date"], "isoformat")
+            else str(row["schedule_date"]),
             "conflict_a": {
                 "schedule_id": str(row["schedule_id_a"]),
                 "shift_start": str(row["start_a"]),
@@ -599,11 +617,13 @@ async def get_schedule_conflicts(
         },
     )
 
-    return _ok({
-        "store_id": store_id,
-        "week_start": week_start.isoformat(),
-        "week_end": week_end.isoformat(),
-        "conflicts": conflicts,
-        "conflict_count": len(conflicts),
-        "has_conflicts": len(conflicts) > 0,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "week_start": week_start.isoformat(),
+            "week_end": week_end.isoformat(),
+            "conflicts": conflicts,
+            "conflict_count": len(conflicts),
+            "has_conflicts": len(conflicts) > 0,
+        }
+    )

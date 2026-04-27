@@ -46,7 +46,7 @@ class StartHandoverReq(BaseModel):
 class CashCountReq(BaseModel):
     denominations: dict = Field(
         ...,
-        description="按面额录入: {\"100\": 5, \"50\": 3, \"20\": 2}",
+        description='按面额录入: {"100": 5, "50": 3, "20": 2}',
         examples=[{"100": 5, "50": 3, "20": 2, "10": 5, "1": 8}],
     )
 
@@ -139,11 +139,13 @@ async def get_reconciliation(
         cash_detail = await recon_svc.get_cash_variance_detail(handover_id)
         suspicious = await recon_svc.flag_suspicious_transactions(handover_id)
 
-        return _ok({
-            "reconciliation": reconciliation,
-            "cash_variance": cash_detail,
-            "suspicious_transactions": suspicious,
-        })
+        return _ok(
+            {
+                "reconciliation": reconciliation,
+                "cash_variance": cash_detail,
+                "suspicious_transactions": suspicious,
+            }
+        )
     except ValueError as e:
         _err(str(e))
 

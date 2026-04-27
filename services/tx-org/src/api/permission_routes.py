@@ -10,6 +10,7 @@
 所有接口需 X-Tenant-ID header。
 统一响应格式: {"ok": bool, "data": {}, "error": null}
 """
+
 from __future__ import annotations
 
 from typing import Literal, Optional
@@ -66,7 +67,8 @@ def _result_to_dict(result: PermissionCheckResult) -> dict:
 class CheckDiscountReq(BaseModel):
     employee_id: UUID
     discount_rate: float = Field(
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="折扣率百分比，如 85.0 = 打85折（即8.5折）",
     )
     store_id: Optional[UUID] = None
@@ -80,7 +82,8 @@ class CheckOperationReq(BaseModel):
     employee_id: UUID
     operation: OperationType = Field(description="操作类型")
     amount_fen: Optional[int] = Field(
-        default=None, ge=0,
+        default=None,
+        ge=0,
         description="涉及金额（分），gift/wipeoff 时必填",
     )
     store_id: Optional[UUID] = None
@@ -257,18 +260,20 @@ async def get_role_limits(
     if row is None:
         raise HTTPException(status_code=404, detail="角色不存在")
 
-    return _ok({
-        "role_config_id": str(row["id"]),
-        "role_name": row["role_name"],
-        "level": row["level"],
-        "max_discount_rate": float(row["max_discount_rate"]),
-        "max_wipeoff_fen": int(row["max_wipeoff_fen"]),
-        "max_gift_fen": int(row["max_gift_fen"]),
-        "data_query_days": int(row["data_query_days"]),
-        "can_void_order": bool(row["can_void_order"]),
-        "can_modify_price": bool(row["can_modify_price"]),
-        "can_override_discount": bool(row["can_override_discount"]),
-    })
+    return _ok(
+        {
+            "role_config_id": str(row["id"]),
+            "role_name": row["role_name"],
+            "level": row["level"],
+            "max_discount_rate": float(row["max_discount_rate"]),
+            "max_wipeoff_fen": int(row["max_wipeoff_fen"]),
+            "max_gift_fen": int(row["max_gift_fen"]),
+            "data_query_days": int(row["data_query_days"]),
+            "can_void_order": bool(row["can_void_order"]),
+            "can_modify_price": bool(row["can_modify_price"]),
+            "can_override_discount": bool(row["can_override_discount"]),
+        }
+    )
 
 
 @role_limits_router.put("/{role_id}/limits", response_model=None)
@@ -290,9 +295,7 @@ async def update_role_limits(
         SELECT id, level FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
     """)
-    target_result = await db.execute(
-        sql_target, {"role_id": str(role_id), "tenant_id": str(tenant_id)}
-    )
+    target_result = await db.execute(sql_target, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     target_row = target_result.mappings().first()
     if target_row is None:
         raise HTTPException(status_code=404, detail="角色不存在")
@@ -368,16 +371,18 @@ async def update_role_limits(
         updates=list(updates.keys()),
     )
 
-    return _ok({
-        "role_config_id": str(updated_row["id"]),
-        "role_name": updated_row["role_name"],
-        "level": updated_row["level"],
-        "max_discount_rate": float(updated_row["max_discount_rate"]),
-        "max_wipeoff_fen": int(updated_row["max_wipeoff_fen"]),
-        "max_gift_fen": int(updated_row["max_gift_fen"]),
-        "data_query_days": int(updated_row["data_query_days"]),
-        "can_void_order": bool(updated_row["can_void_order"]),
-        "can_modify_price": bool(updated_row["can_modify_price"]),
-        "can_override_discount": bool(updated_row["can_override_discount"]),
-        "updated_by_level": operator_role.level,
-    })
+    return _ok(
+        {
+            "role_config_id": str(updated_row["id"]),
+            "role_name": updated_row["role_name"],
+            "level": updated_row["level"],
+            "max_discount_rate": float(updated_row["max_discount_rate"]),
+            "max_wipeoff_fen": int(updated_row["max_wipeoff_fen"]),
+            "max_gift_fen": int(updated_row["max_gift_fen"]),
+            "data_query_days": int(updated_row["data_query_days"]),
+            "can_void_order": bool(updated_row["can_void_order"]),
+            "can_modify_price": bool(updated_row["can_modify_price"]),
+            "can_override_discount": bool(updated_row["can_override_discount"]),
+            "updated_by_level": operator_role.level,
+        }
+    )

@@ -10,6 +10,7 @@
 
 测试用例总计：19个
 """
+
 import sys
 import types
 import uuid
@@ -21,8 +22,10 @@ _shared_ontology = types.ModuleType("shared.ontology")
 _shared_ontology_src = types.ModuleType("shared.ontology.src")
 _shared_ontology_src_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _shared_ontology_src_db.get_db_with_tenant = _fake_get_db_with_tenant
 
@@ -34,11 +37,20 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_ontology_src_db)
 # ── Mock structlog ──────────────────────────────────────────────────────────
 _structlog = types.ModuleType("structlog")
 
+
 class _FakeLogger:
-    def info(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
-    def debug(self, *a, **kw): pass
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
+
+    def warning(self, *a, **kw):
+        pass
+
+    def debug(self, *a, **kw):
+        pass
+
 
 _structlog.get_logger = lambda *a, **kw: _FakeLogger()
 sys.modules.setdefault("structlog", _structlog)
@@ -46,6 +58,7 @@ sys.modules.setdefault("structlog", _structlog)
 # ── Mock services.revenue_aggregation_service ───────────────────────────────
 _svc_mod = types.ModuleType("services")
 _svc_ra_mod = types.ModuleType("services.revenue_aggregation_service")
+
 
 class _FakeDailyReport:
     def to_dict(self):
@@ -60,12 +73,14 @@ class _FakeDailyReport:
             "hourly_distribution": {},
         }
 
+
 class _FakeRangeReport:
     def to_dict(self):
         return {
             "summary": {"total_net_fen": 500000},
             "series": [],
         }
+
 
 class _FakePaymentReport:
     def to_dict(self):
@@ -74,6 +89,7 @@ class _FakePaymentReport:
             "total_orders": 100,
             "total_net_fen": 250000,
         }
+
 
 class _FakeRevenueService:
     async def get_daily_revenue_fast(self, tenant_id, store_id, query_date, db):
@@ -85,6 +101,7 @@ class _FakeRevenueService:
     async def get_payment_reconciliation(self, tenant_id, store_id, s_date, e_date, db):
         return _FakePaymentReport()
 
+
 _svc_ra_mod.RevenueAggregationService = _FakeRevenueService
 sys.modules.setdefault("services", _svc_mod)
 sys.modules.setdefault("services.revenue_aggregation_service", _svc_ra_mod)
@@ -94,8 +111,10 @@ _shared_events = types.ModuleType("shared.events")
 _shared_events_src = types.ModuleType("shared.events.src")
 _shared_events_src_emitter = types.ModuleType("shared.events.src.emitter")
 
+
 async def _fake_emit_event(**kwargs):
     pass
+
 
 _shared_events_src_emitter.emit_event = _fake_emit_event
 sys.modules.setdefault("shared.events", _shared_events)
@@ -116,9 +135,7 @@ _rev_mod = importlib.util.module_from_spec(_rev_spec)
 _rev_spec.loader.exec_module(_rev_mod)
 
 # Load approval_callback_routes
-_cb_spec = importlib.util.spec_from_file_location(
-    "approval_callback_routes", _api_base / "approval_callback_routes.py"
-)
+_cb_spec = importlib.util.spec_from_file_location("approval_callback_routes", _api_base / "approval_callback_routes.py")
 _cb_mod = importlib.util.module_from_spec(_cb_spec)
 _cb_spec.loader.exec_module(_cb_mod)
 
@@ -132,6 +149,7 @@ _AGREEMENT_ID = str(uuid.uuid4())
 _APPROVER_ID = str(uuid.uuid4())
 _HEADERS = {"X-Tenant-ID": _TENANT_ID}
 
+
 def _make_rev_client(svc_override=None):
     app = FastAPI()
     app.include_router(_rev_mod.router)
@@ -140,6 +158,7 @@ def _make_rev_client(svc_override=None):
     app.dependency_overrides[_rev_mod._get_tenant_db] = lambda: None
     # patch _service on the module
     return TestClient(app, raise_server_exceptions=False)
+
 
 def _make_cb_client(db_override=None):
     app = FastAPI()
@@ -152,6 +171,7 @@ def _make_cb_client(db_override=None):
 # ══════════════════════════════════════════════════════════════════════════════
 # revenue_aggregation_routes 测试
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestDailyRevenueFast:
     """GET /api/v1/finance/revenue/daily-fast"""
@@ -341,6 +361,7 @@ class TestPaymentReconciliation:
 # ══════════════════════════════════════════════════════════════════════════════
 # approval_callback_routes 测试
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _make_mock_db_with_row(status="pending_approval"):
     """创建带有 row 的 mock db session"""

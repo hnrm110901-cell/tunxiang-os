@@ -16,6 +16,7 @@
 13. 日统计聚合正确
 14. 多租户隔离 — 不同 tenant_id 查不到对方的订单
 """
+
 import os
 import sys
 
@@ -141,12 +142,14 @@ def _mock_order_model(
 
 # ─── 适配器解析测试 ───────────────────────────────────────────────────────────
 
+
 class TestAdapterParsing:
     """测试三个平台适配器的订单解析逻辑"""
 
     def test_meituan_parse_order_ok(self):
         """美团订单解析：金额单位为分，直接使用"""
         from services.tx_trade.src.services.delivery_adapters.meituan_adapter import MeituanAdapter
+
         adapter = MeituanAdapter(APP_ID, APP_SECRET, SHOP_ID)
         order = adapter.parse_order(_make_meituan_payload())
 
@@ -165,12 +168,13 @@ class TestAdapterParsing:
     def test_eleme_parse_order_yuan_to_fen_conversion(self):
         """饿了么订单解析：金额单位为元（字符串），需转换为分"""
         from services.tx_trade.src.services.delivery_adapters.eleme_adapter import ElemeAdapter
+
         adapter = ElemeAdapter(APP_ID, APP_SECRET, SHOP_ID)
         order = adapter.parse_order(_make_eleme_payload())
 
         assert order.platform == "eleme"
         assert order.platform_order_id == "EL789012"
-        assert order.total_fen == 4800   # 48.00元 × 100
+        assert order.total_fen == 4800  # 48.00元 × 100
         assert order.delivery_fee_fen == 500  # 5.00元 × 100
         assert order.customer_name == "李四"
         assert len(order.items) == 2
@@ -179,6 +183,7 @@ class TestAdapterParsing:
     def test_douyin_parse_order_ok(self):
         """抖音订单解析：金额单位为分"""
         from services.tx_trade.src.services.delivery_adapters.douyin_adapter import DouyinAdapter
+
         adapter = DouyinAdapter(APP_ID, APP_SECRET, SHOP_ID)
         order = adapter.parse_order(_make_douyin_payload())
 
@@ -193,6 +198,7 @@ class TestAdapterParsing:
     def test_meituan_parse_order_missing_order_id_raises(self):
         """缺少 order_id 字段应抛出 ValueError"""
         from services.tx_trade.src.services.delivery_adapters.meituan_adapter import MeituanAdapter
+
         adapter = MeituanAdapter(APP_ID, APP_SECRET, SHOP_ID)
         bad_payload = {"price_info": {"total": 1000}}
         with pytest.raises(ValueError, match="美团订单解析失败"):
@@ -201,6 +207,7 @@ class TestAdapterParsing:
     def test_eleme_parse_order_empty_groups(self):
         """饿了么空 groups 仍可解析（items 为空列表）"""
         from services.tx_trade.src.services.delivery_adapters.eleme_adapter import ElemeAdapter
+
         adapter = ElemeAdapter(APP_ID, APP_SECRET, SHOP_ID)
         payload = {"id": "EL_EMPTY", "totalPrice": "10.00", "deliverFee": "0", "groups": []}
         order = adapter.parse_order(payload)
@@ -209,6 +216,7 @@ class TestAdapterParsing:
 
 
 # ─── Service 层测试 ───────────────────────────────────────────────────────────
+
 
 class TestDeliveryPanelServiceAccept:
     """手动接单和拒单逻辑"""
@@ -234,9 +242,7 @@ class TestDeliveryPanelServiceAccept:
                 "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.update_status",
                 new=AsyncMock(return_value=True),
             ),
-            patch(
-                "services.tx_trade.src.services.delivery_panel_service._get_adapter"
-            ) as mock_get_adapter,
+            patch("services.tx_trade.src.services.delivery_panel_service._get_adapter") as mock_get_adapter,
             patch(
                 "services.tx_trade.src.services.delivery_panel_service._trigger_delivery_print",
                 new=AsyncMock(),
@@ -274,12 +280,15 @@ class TestDeliveryPanelServiceAccept:
         mock_order = _mock_order_model(order_id=order_id, status="accepted")  # 已接单
         mock_db = AsyncMock()
 
-        with patch(
-            "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.get_by_id",
-            new=AsyncMock(return_value=mock_order),
-        ), patch(
-            "services.tx_trade.src.services.delivery_panel_service._get_adapter",
-        ) as mock_get_adapter:
+        with (
+            patch(
+                "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.get_by_id",
+                new=AsyncMock(return_value=mock_order),
+            ),
+            patch(
+                "services.tx_trade.src.services.delivery_panel_service._get_adapter",
+            ) as mock_get_adapter,
+        ):
             mock_get_adapter.return_value = AsyncMock()
             with pytest.raises(DeliveryOrderStatusError, match="不允许接单"):
                 await DeliveryPanelService.accept_order(
@@ -313,9 +322,7 @@ class TestDeliveryPanelServiceAccept:
                 "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.update_status",
                 new=AsyncMock(return_value=True),
             ),
-            patch(
-                "services.tx_trade.src.services.delivery_panel_service._get_adapter"
-            ) as mock_get_adapter,
+            patch("services.tx_trade.src.services.delivery_panel_service._get_adapter") as mock_get_adapter,
         ):
             mock_adapter = AsyncMock()
             mock_adapter.reject_order = AsyncMock(return_value=True)
@@ -410,18 +417,15 @@ class TestAutoAcceptLogic:
 
         with (
             patch(
-                "services.tx_trade.src.services.delivery_panel_service."
-                "DeliveryAutoAcceptRuleRepository.get_by_store",
+                "services.tx_trade.src.services.delivery_panel_service.DeliveryAutoAcceptRuleRepository.get_by_store",
                 new=AsyncMock(return_value=rule),
             ),
             patch(
-                "services.tx_trade.src.services.delivery_panel_service."
-                "DeliveryOrderRepository.count_active_orders",
+                "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.count_active_orders",
                 new=AsyncMock(return_value=3),  # 3 < 10
             ),
             patch(
-                "services.tx_trade.src.services.delivery_panel_service."
-                "DeliveryOrderRepository.update_status",
+                "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.update_status",
                 new=AsyncMock(return_value=True),
             ),
             patch(
@@ -432,9 +436,7 @@ class TestAutoAcceptLogic:
                 "services.tx_trade.src.services.delivery_panel_service._push_kds_event",
                 new=AsyncMock(),
             ),
-            patch(
-                "services.tx_trade.src.services.delivery_panel_service.datetime"
-            ) as mock_dt,
+            patch("services.tx_trade.src.services.delivery_panel_service.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 3, 31, 12, 0, 0)
             mock_dt.now.return_value.time.return_value = time(12, 0)
@@ -461,8 +463,7 @@ class TestAutoAcceptLogic:
         mock_adapter = AsyncMock()
 
         with patch(
-            "services.tx_trade.src.services.delivery_panel_service."
-            "DeliveryAutoAcceptRuleRepository.get_by_store",
+            "services.tx_trade.src.services.delivery_panel_service.DeliveryAutoAcceptRuleRepository.get_by_store",
             new=AsyncMock(return_value=rule),
         ):
             result = await DeliveryPanelService._check_and_auto_accept(
@@ -488,13 +489,11 @@ class TestAutoAcceptLogic:
 
         with (
             patch(
-                "services.tx_trade.src.services.delivery_panel_service."
-                "DeliveryAutoAcceptRuleRepository.get_by_store",
+                "services.tx_trade.src.services.delivery_panel_service.DeliveryAutoAcceptRuleRepository.get_by_store",
                 new=AsyncMock(return_value=rule),
             ),
             patch(
-                "services.tx_trade.src.services.delivery_panel_service."
-                "DeliveryOrderRepository.count_active_orders",
+                "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.count_active_orders",
                 new=AsyncMock(return_value=6),  # 6 > 5
             ),
         ):
@@ -520,8 +519,7 @@ class TestAutoAcceptLogic:
         mock_adapter = AsyncMock()
 
         with patch(
-            "services.tx_trade.src.services.delivery_panel_service."
-            "DeliveryAutoAcceptRuleRepository.get_by_store",
+            "services.tx_trade.src.services.delivery_panel_service.DeliveryAutoAcceptRuleRepository.get_by_store",
             new=AsyncMock(return_value=rule),
         ):
             result = await DeliveryPanelService._check_and_auto_accept(
@@ -545,8 +543,7 @@ class TestAutoAcceptLogic:
         mock_adapter = AsyncMock()
 
         with patch(
-            "services.tx_trade.src.services.delivery_panel_service."
-            "DeliveryAutoAcceptRuleRepository.get_by_store",
+            "services.tx_trade.src.services.delivery_panel_service.DeliveryAutoAcceptRuleRepository.get_by_store",
             new=AsyncMock(return_value=None),
         ):
             result = await DeliveryPanelService._check_and_auto_accept(
@@ -588,8 +585,7 @@ class TestDailyStats:
         ]
 
         with patch(
-            "services.tx_trade.src.services.delivery_panel_service."
-            "DeliveryOrderRepository.get_daily_stats_by_platform",
+            "services.tx_trade.src.services.delivery_panel_service.DeliveryOrderRepository.get_daily_stats_by_platform",
             new=AsyncMock(return_value=mock_rows),
         ):
             stats = await DeliveryPanelService.get_daily_stats(
@@ -629,9 +625,7 @@ class TestDuplicateOrderHandling:
         mock_db = AsyncMock()
 
         with (
-            patch(
-                "services.tx_trade.src.services.delivery_panel_service._get_adapter"
-            ) as mock_get_adapter,
+            patch("services.tx_trade.src.services.delivery_panel_service._get_adapter") as mock_get_adapter,
             patch(
                 "services.tx_trade.src.services.delivery_panel_service."
                 "DeliveryOrderRepository.get_by_platform_order_id",

@@ -3,6 +3,7 @@
 整改状态机: dispatched → in_progress → submitted → reviewed → closed
 评分卡分级: 绿(≥80) / 黄(60-79) / 红(<60)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -20,7 +21,11 @@ log = structlog.get_logger(__name__)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 RECTIFICATION_STATUSES = (
-    "dispatched", "in_progress", "submitted", "reviewed", "closed",
+    "dispatched",
+    "in_progress",
+    "submitted",
+    "reviewed",
+    "closed",
 )
 
 RECTIFICATION_TRANSITIONS: Dict[str, tuple[str, ...]] = {
@@ -123,12 +128,16 @@ async def dispatch_rectification(
                 },
             )
         except SQLAlchemyError as exc:
-            log.error("dispatch_rectification_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("dispatch_rectification_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
-    log.info("rectification_dispatched", rectification_id=rectification_id,
-             region_id=region_id, store_id=store_id, tenant_id=tenant_id,
-             assignee_id=assignee_id)
+    log.info(
+        "rectification_dispatched",
+        rectification_id=rectification_id,
+        region_id=region_id,
+        store_id=store_id,
+        tenant_id=tenant_id,
+        assignee_id=assignee_id,
+    )
     return record
 
 
@@ -184,8 +193,7 @@ async def track_rectification(
         except ValueError:
             raise
         except SQLAlchemyError as exc:
-            log.error("track_rectification_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("track_rectification_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
     elif record is not None and new_status:
         current = record.get("status", "dispatched")
         if not _can_transition(current, new_status):
@@ -193,14 +201,15 @@ async def track_rectification(
         record["status"] = new_status
         record["updated_at"] = _now_iso()
         if note:
-            record.setdefault("progress_notes", []).append({
-                "text": note,
-                "status": new_status,
-                "timestamp": _now_iso(),
-            })
+            record.setdefault("progress_notes", []).append(
+                {
+                    "text": note,
+                    "status": new_status,
+                    "timestamp": _now_iso(),
+                }
+            )
 
-    log.info("rectification_tracked", rectification_id=rectification_id,
-             tenant_id=tenant_id, new_status=new_status)
+    log.info("rectification_tracked", rectification_id=rectification_id, tenant_id=tenant_id, new_status=new_status)
 
     return {
         "rectification_id": rectification_id,
@@ -274,8 +283,7 @@ async def submit_review(
         except ValueError:
             raise
         except SQLAlchemyError as exc:
-            log.error("submit_review_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("submit_review_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
     elif record is not None:
         current = record.get("status", "dispatched")
         if current != "submitted":
@@ -287,8 +295,13 @@ async def submit_review(
         record["reviewed_at"] = now
         record["updated_at"] = now
 
-    log.info("rectification_reviewed", rectification_id=rectification_id,
-             tenant_id=tenant_id, reviewer_id=reviewer_id, result=result)
+    log.info(
+        "rectification_reviewed",
+        rectification_id=rectification_id,
+        tenant_id=tenant_id,
+        reviewer_id=reviewer_id,
+        result=result,
+    )
 
     return {
         "rectification_id": rectification_id,
@@ -344,8 +357,7 @@ async def get_regional_scorecard(
             )
             scores = [{"store_id": row.store_id, "score": float(row.score)} for row in rows_result]
         except SQLAlchemyError as exc:
-            log.error("regional_scorecard_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("regional_scorecard_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
     cards: List[Dict[str, Any]] = []
     color_counts = {"green": 0, "yellow": 0, "red": 0}
@@ -354,20 +366,25 @@ async def get_regional_scorecard(
         score = entry.get("score", 0)
         color = _score_to_color(score)
         color_counts[color] += 1
-        cards.append({
-            "store_id": entry.get("store_id", ""),
-            "score": score,
-            "color": color,
-        })
+        cards.append(
+            {
+                "store_id": entry.get("store_id", ""),
+                "score": score,
+                "color": color,
+            }
+        )
 
     cards.sort(key=lambda c: c["score"])
 
-    avg_score = round(
-        sum(e.get("score", 0) for e in scores) / len(scores), 1
-    ) if scores else 0.0
+    avg_score = round(sum(e.get("score", 0) for e in scores) / len(scores), 1) if scores else 0.0
 
-    log.info("regional_scorecard_generated", region_id=region_id, tenant_id=tenant_id,
-             store_count=len(scores), avg_score=avg_score)
+    log.info(
+        "regional_scorecard_generated",
+        region_id=region_id,
+        tenant_id=tenant_id,
+        store_count=len(scores),
+        avg_score=avg_score,
+    )
 
     return {
         "region_id": region_id,
@@ -414,12 +431,9 @@ async def cross_store_benchmark(
             )
             data = {row.store_id: float(row.avg_val) for row in rows_result}
         except SQLAlchemyError as exc:
-            log.error("cross_store_benchmark_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("cross_store_benchmark_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
-    ranked: List[Dict[str, Any]] = [
-        {"store_id": sid, "value": val} for sid, val in data.items()
-    ]
+    ranked: List[Dict[str, Any]] = [{"store_id": sid, "value": val} for sid, val in data.items()]
     ranked.sort(key=lambda x: x["value"], reverse=True)
 
     for idx, item in enumerate(ranked, 1):
@@ -429,8 +443,7 @@ async def cross_store_benchmark(
     total = sum(values) if values else 0.0
     avg = round(total / len(values), 2) if values else 0.0
 
-    log.info("cross_store_benchmark", metric=metric, region_id=region_id,
-             tenant_id=tenant_id, store_count=len(data))
+    log.info("cross_store_benchmark", metric=metric, region_id=region_id, tenant_id=tenant_id, store_count=len(data))
 
     return {
         "metric": metric,
@@ -482,8 +495,7 @@ async def generate_regional_report(
             )
             rects = [_serialize_row(dict(row._mapping)) for row in rows_result]
         except SQLAlchemyError as exc:
-            log.error("regional_report_rects_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("regional_report_rects_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
     if db is not None and not store_scores:
         try:
@@ -504,8 +516,7 @@ async def generate_regional_report(
             )
             scores = [{"store_id": row.store_id, "score": float(row.score)} for row in rows_result]
         except SQLAlchemyError as exc:
-            log.error("regional_report_scores_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("regional_report_scores_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
     total_rects = len(rects)
     closed = sum(1 for r in rects if r.get("status") == "closed")
@@ -513,12 +524,16 @@ async def generate_regional_report(
     reviewed_fail = sum(1 for r in rects if r.get("status") == "reviewed" and r.get("review_result") == "fail")
     closure_rate = round(closed / total_rects * 100, 1) if total_rects else 0.0
 
-    avg_score = round(
-        sum(s.get("score", 0) for s in scores) / len(scores), 1
-    ) if scores else 0.0
+    avg_score = round(sum(s.get("score", 0) for s in scores) / len(scores), 1) if scores else 0.0
 
-    log.info("regional_report_generated", region_id=region_id, month=month,
-             tenant_id=tenant_id, total_rects=total_rects, closure_rate=closure_rate)
+    log.info(
+        "regional_report_generated",
+        region_id=region_id,
+        month=month,
+        tenant_id=tenant_id,
+        total_rects=total_rects,
+        closure_rate=closure_rate,
+    )
 
     return {
         "region_id": region_id,
@@ -574,14 +589,18 @@ async def get_rectification_archive(
             )
             all_rects = [_serialize_row(dict(row._mapping)) for row in rows_result]
         except SQLAlchemyError as exc:
-            log.error("rectification_archive_db_error", exc_info=True,
-                      error=str(exc), tenant_id=tenant_id)
+            log.error("rectification_archive_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
     archived = [r for r in all_rects if r.get("status") == "closed"]
     pending = [r for r in all_rects if r.get("status") != "closed"]
 
-    log.info("rectification_archive_queried", region_id=region_id, tenant_id=tenant_id,
-             archived_count=len(archived), pending_count=len(pending))
+    log.info(
+        "rectification_archive_queried",
+        region_id=region_id,
+        tenant_id=tenant_id,
+        archived_count=len(archived),
+        pending_count=len(pending),
+    )
 
     return {
         "region_id": region_id,

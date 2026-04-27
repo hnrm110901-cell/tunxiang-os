@@ -7,19 +7,17 @@
   4. TestCreateOrderNoSuggestions  — 无有效建议时返回404
   5. TestWasteReductionReport      — 浪费分析报表返回正确结构
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
+from api.smart_procurement_routes import _generate_waste_insight, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.smart_procurement_routes import router, _generate_waste_insight
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 STORE_ID = "22222222-2222-2222-2222-222222222222"
@@ -63,6 +61,7 @@ def _make_db_mock() -> AsyncMock:
 # Test 1: 无BOM数据时返回空建议
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestSuggestionNoBOM:
     def test_no_bom_returns_empty(self) -> None:
         """无BOM数据或无销售记录时，应返回空建议列表+提示信息。"""
@@ -70,6 +69,7 @@ class TestSuggestionNoBOM:
         mock_db = _make_db_mock()
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -92,6 +92,7 @@ class TestSuggestionNoBOM:
 # Test 2: 有BOM+库存时返回采购建议
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestSuggestionWithData:
     def test_suggestion_with_bom_data(self) -> None:
         """有菜品销量+BOM数据+库存时，应返回具体采购建议。"""
@@ -107,22 +108,30 @@ class TestSuggestionWithData:
         rls_result = MagicMock()
 
         # 菜品需求预测
-        dish_rows = [_MockRow({
-            "dish_id": dish_id,
-            "dish_name": "宫保鸡丁",
-            "total_sold": 70,
-            "predicted_demand": Decimal("30.0"),
-        })]
+        dish_rows = [
+            _MockRow(
+                {
+                    "dish_id": dish_id,
+                    "dish_name": "宫保鸡丁",
+                    "total_sold": 70,
+                    "predicted_demand": Decimal("30.0"),
+                }
+            )
+        ]
         dish_result = MagicMock()
         dish_result.__iter__ = MagicMock(return_value=iter(dish_rows))
 
         # BOM分解
-        bom_rows = [_MockRow({
-            "ingredient_id": uuid.UUID(ingredient_id),
-            "ingredient_name": "鸡胸肉",
-            "standard_qty": Decimal("0.3"),
-            "unit": "kg",
-        })]
+        bom_rows = [
+            _MockRow(
+                {
+                    "ingredient_id": uuid.UUID(ingredient_id),
+                    "ingredient_name": "鸡胸肉",
+                    "standard_qty": Decimal("0.3"),
+                    "unit": "kg",
+                }
+            )
+        ]
         bom_result = MagicMock()
         bom_result.__iter__ = MagicMock(return_value=iter(bom_rows))
 
@@ -132,11 +141,13 @@ class TestSuggestionWithData:
         stock_result.__iter__ = MagicMock(return_value=iter(stock_rows))
 
         # 供应商
-        supplier_row = _MockRow({
-            "supplier_id": uuid.uuid4(),
-            "supplier_name": "优质鸡肉供应商",
-            "unit_price_fen": 1500,
-        })
+        supplier_row = _MockRow(
+            {
+                "supplier_id": uuid.uuid4(),
+                "supplier_name": "优质鸡肉供应商",
+                "unit_price_fen": 1500,
+            }
+        )
         supplier_result = MagicMock()
         supplier_result.fetchone.return_value = supplier_row
 
@@ -144,19 +155,26 @@ class TestSuggestionWithData:
         write_result = MagicMock()
 
         call_count = 0
+
         async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1: return rls_result      # set_rls
-            if call_count == 2: return dish_result      # dish demand
-            if call_count == 3: return bom_result       # BOM
-            if call_count == 4: return stock_result     # stock
-            if call_count == 5: return supplier_result  # supplier
+            if call_count == 1:
+                return rls_result  # set_rls
+            if call_count == 2:
+                return dish_result  # dish demand
+            if call_count == 3:
+                return bom_result  # BOM
+            if call_count == 4:
+                return stock_result  # stock
+            if call_count == 5:
+                return supplier_result  # supplier
             return write_result
 
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -181,6 +199,7 @@ class TestSuggestionWithData:
 # Test 3: 一键生成采购订单
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestCreateOrderSuccess:
     def test_create_order_from_suggestions(self) -> None:
         """基于有效建议创建采购订单应成功。"""
@@ -195,32 +214,38 @@ class TestCreateOrderSuccess:
         rls_result = MagicMock()
 
         # 查询建议
-        suggestion_row = _MockRow({
-            "id": uuid.UUID(suggestion_id),
-            "ingredient_id": ingredient_id,
-            "ingredient_name": "鸡胸肉",
-            "suggested_qty": Decimal("7.7"),
-            "unit": "kg",
-            "supplier_id": uuid.uuid4(),
-            "supplier_name": "优质供应商",
-            "estimated_cost_fen": 11550,
-        })
+        suggestion_row = _MockRow(
+            {
+                "id": uuid.UUID(suggestion_id),
+                "ingredient_id": ingredient_id,
+                "ingredient_name": "鸡胸肉",
+                "suggested_qty": Decimal("7.7"),
+                "unit": "kg",
+                "supplier_id": uuid.uuid4(),
+                "supplier_name": "优质供应商",
+                "estimated_cost_fen": 11550,
+            }
+        )
         suggestions_result = MagicMock()
         suggestions_result.fetchall.return_value = [suggestion_row]
 
         write_result = MagicMock()
 
         call_count = 0
+
         async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1: return rls_result
-            if call_count == 2: return suggestions_result
+            if call_count == 1:
+                return rls_result
+            if call_count == 2:
+                return suggestions_result
             return write_result
 
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -244,6 +269,7 @@ class TestCreateOrderSuccess:
 # Test 4: 无有效建议时返回404
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestCreateOrderNoSuggestions:
     def test_no_valid_suggestions_returns_404(self) -> None:
         """suggestion_ids 无匹配记录时应返回404。"""
@@ -257,15 +283,18 @@ class TestCreateOrderNoSuggestions:
         empty_result.fetchall.return_value = []
 
         call_count = 0
+
         async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1: return rls_result
+            if call_count == 1:
+                return rls_result
             return empty_result
 
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -281,6 +310,7 @@ class TestCreateOrderNoSuggestions:
 # Test 5: 浪费分析报表
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestWasteReductionReport:
     def test_waste_report_structure(self) -> None:
         """浪费分析报表应返回AI建议统计+库存流向+洞察。"""
@@ -291,36 +321,45 @@ class TestWasteReductionReport:
         rls_result = MagicMock()
 
         # AI建议汇总
-        suggestion_stats = _MockRow({
-            "total_suggestions": 50,
-            "adopted_count": 35,
-            "total_suggested_cost_fen": 500000,
-            "adopted_cost_fen": 350000,
-        })
+        suggestion_stats = _MockRow(
+            {
+                "total_suggestions": 50,
+                "adopted_count": 35,
+                "total_suggested_cost_fen": 500000,
+                "adopted_cost_fen": 350000,
+            }
+        )
         suggestion_result = MagicMock()
         suggestion_result.fetchone.return_value = suggestion_stats
 
         # 库存流水
-        waste_stats = _MockRow({
-            "total_inbound": Decimal("1000"),
-            "total_usage": Decimal("900"),
-            "total_waste": Decimal("60"),
-        })
+        waste_stats = _MockRow(
+            {
+                "total_inbound": Decimal("1000"),
+                "total_usage": Decimal("900"),
+                "total_waste": Decimal("60"),
+            }
+        )
         waste_result = MagicMock()
         waste_result.fetchone.return_value = waste_stats
 
         call_count = 0
+
         async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1: return rls_result
-            if call_count == 2: return suggestion_result
-            if call_count == 3: return waste_result
+            if call_count == 1:
+                return rls_result
+            if call_count == 2:
+                return suggestion_result
+            if call_count == 3:
+                return waste_result
             return MagicMock()
 
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
         from shared.ontology.src.database import get_db
+
         app.dependency_overrides[get_db] = lambda: mock_db
 
         client = TestClient(app)
@@ -355,6 +394,7 @@ class TestWasteReductionReport:
 # ──────────────────────────────────────────────────────────────────────────────
 # 辅助函数测试
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestWasteInsight:
     def test_high_waste_insight(self) -> None:

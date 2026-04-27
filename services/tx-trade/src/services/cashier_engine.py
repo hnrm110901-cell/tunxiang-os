@@ -3,6 +3,7 @@
 完整实现10个API端点的后端逻辑，覆盖开台→点单→结算全流程。
 所有金额单位：分（fen）。三条硬约束在此层校验。
 """
+
 import asyncio
 import math
 import os
@@ -161,9 +162,7 @@ class CashierEngine:
         await self.db.flush()
 
         # 自动加茶位费（如果门店配置了）
-        store_result = await self.db.execute(
-            select(Store).where(Store.id == store_uuid)
-        )
+        store_result = await self.db.execute(select(Store).where(Store.id == store_uuid))
         store = store_result.scalar_one_or_none()
         tea_charge_fen = 0
         if store and store.config and store.config.get("tea_charge_per_person_fen"):
@@ -181,35 +180,39 @@ class CashierEngine:
         )
 
         # ─── Phase 1 平行事件写入：开台 ───
-        asyncio.create_task(emit_event(
-            event_type=OrderEventType.CREATED,
-            tenant_id=self.tenant_id,
-            stream_id=str(order.id),
-            payload={
-                "order_no": order_no,
-                "table_no": table_no,
-                "waiter_id": waiter_id,
-                "guest_count": guest_count,
-                "order_type": order_type,
-                "tea_charge_fen": tea_charge_fen,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.OPENED,
-            tenant_id=self.tenant_id,
-            stream_id=str(table.id),
-            payload={
-                "order_id": str(order.id),
-                "order_no": order_no,
-                "table_no": table_no,
-                "guest_count": guest_count,
-                "waiter_id": waiter_id,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.CREATED,
+                tenant_id=self.tenant_id,
+                stream_id=str(order.id),
+                payload={
+                    "order_no": order_no,
+                    "table_no": table_no,
+                    "waiter_id": waiter_id,
+                    "guest_count": guest_count,
+                    "order_type": order_type,
+                    "tea_charge_fen": tea_charge_fen,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.OPENED,
+                tenant_id=self.tenant_id,
+                stream_id=str(table.id),
+                payload={
+                    "order_id": str(order.id),
+                    "order_no": order_no,
+                    "table_no": table_no,
+                    "guest_count": guest_count,
+                    "waiter_id": waiter_id,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         return {
             "order_id": str(order.id),
@@ -224,11 +227,13 @@ class CashierEngine:
         """获取桌台地图 — 所有桌台及当前状态、订单信息、用餐时长"""
         store_uuid = uuid.UUID(store_id)
         result = await self.db.execute(
-            select(Table).where(
+            select(Table)
+            .where(
                 Table.store_id == store_uuid,
                 Table.tenant_id == self.tenant_id,
                 Table.is_active == True,  # noqa: E712
-            ).order_by(Table.sort_order, Table.table_no)
+            )
+            .order_by(Table.sort_order, Table.table_no)
         )
         tables = result.scalars().all()
 
@@ -248,9 +253,7 @@ class CashierEngine:
             }
 
             if t.current_order_id:
-                order_result = await self.db.execute(
-                    select(Order).where(Order.id == t.current_order_id)
-                )
+                order_result = await self.db.execute(select(Order).where(Order.id == t.current_order_id))
                 order = order_result.scalar_one_or_none()
                 if order:
                     duration = (now - order.order_time).total_seconds() / 60 if order.order_time else 0
@@ -368,6 +371,12 @@ class CashierEngine:
         else:
             subtotal_fen = unit_price_fen * qty
 
+        # 做法加价：从 customizations 中提取做法附加费用（加蛋/加芝士等）
+        practice_extra_fen = 0
+        if customizations and "total_extra_price_fen" in customizations:
+            practice_extra_fen = customizations["total_extra_price_fen"]
+            subtotal_fen += practice_extra_fen
+
         # BOM 成本（从已加载的 dish 对象取，无额外查询）
         food_cost_fen = None
         gross_margin = None
@@ -412,22 +421,24 @@ class CashierEngine:
         )
 
         # ─── Phase 1 平行事件写入：加菜 ───
-        asyncio.create_task(emit_event(
-            event_type=OrderEventType.ITEM_ADDED,
-            tenant_id=self.tenant_id,
-            stream_id=order_id,
-            payload={
-                "item_id": str(item.id),
-                "dish_id": dish_id,
-                "dish_name": dish_name,
-                "qty": qty,
-                "unit_price_fen": unit_price_fen,
-                "subtotal_fen": subtotal_fen,
-                "pricing_mode": pricing_mode,
-                "order_total_fen": new_total,
-            },
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.ITEM_ADDED,
+                tenant_id=self.tenant_id,
+                stream_id=order_id,
+                payload={
+                    "item_id": str(item.id),
+                    "dish_id": dish_id,
+                    "dish_name": dish_name,
+                    "qty": qty,
+                    "unit_price_fen": unit_price_fen,
+                    "subtotal_fen": subtotal_fen,
+                    "pricing_mode": pricing_mode,
+                    "order_total_fen": new_total,
+                },
+                source_service="tx-trade",
+            )
+        )
 
         return {
             "item_id": str(item.id),
@@ -525,9 +536,7 @@ class CashierEngine:
         new_final = new_total - order.discount_amount_fen
 
         await self.db.execute(
-            update(Order)
-            .where(Order.id == order_uuid)
-            .values(total_amount_fen=new_total, final_amount_fen=new_final)
+            update(Order).where(Order.id == order_uuid).values(total_amount_fen=new_total, final_amount_fen=new_final)
         )
 
         # 真删除明细
@@ -600,9 +609,7 @@ class CashierEngine:
             margin_check["margin"] = round(margin, 4)
 
             # 查门店自定义毛利底线
-            store_result = await self.db.execute(
-                select(Store).where(Store.id == order.store_id)
-            )
+            store_result = await self.db.execute(select(Store).where(Store.id == order.store_id))
             store = store_result.scalar_one_or_none()
             floor = self.DEFAULT_MARGIN_FLOOR
             if store and store.cost_ratio_target:
@@ -622,9 +629,8 @@ class CashierEngine:
                 # 创建审批单而非直接拒绝
                 try:
                     from .approval_service import ApprovalService
-                    approval_svc = ApprovalService(
-                        self.db, str(self.tenant_id), str(order.store_id)
-                    )
+
+                    approval_svc = ApprovalService(self.db, str(self.tenant_id), str(order.store_id))
                     approval_result = await approval_svc.create_approval(
                         order_id=order_id,
                         discount_info={
@@ -666,9 +672,7 @@ class CashierEngine:
         order.discount_amount_fen = discount_fen
         order.final_amount_fen = new_final
         order.discount_type = discount_type
-        order.gross_margin_before = (
-            round((total - total_cost_fen) / total, 4) if total_cost_fen and total > 0 else None
-        )
+        order.gross_margin_before = round((total - total_cost_fen) / total, 4) if total_cost_fen and total > 0 else None
         order.gross_margin_after = margin_check.get("margin")
         order.margin_alert_flag = not margin_check["passed"]
         order.order_metadata = {
@@ -687,25 +691,27 @@ class CashierEngine:
         )
 
         # ─── Phase 1 平行事件写入：折扣应用事件 ───
-        asyncio.create_task(emit_event(
-            event_type=DiscountEventType.APPLIED,
-            tenant_id=self.tenant_id,
-            stream_id=order_id,
-            payload={
-                "discount_type": discount_type,
-                "discount_fen": discount_fen,
-                "original_total_fen": total,
-                "new_total_fen": new_final,
-                "reason": reason,
-                "approval_id": approval_id,
-                "margin_after": margin_check.get("margin"),
-                "margin_passed": margin_check["passed"],
-                "threshold_exceeded": not margin_check["passed"],
-            },
-            store_id=str(order.store_id) if order.store_id else None,
-            source_service="tx-trade",
-            metadata={"order_no": order.order_no},
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=DiscountEventType.APPLIED,
+                tenant_id=self.tenant_id,
+                stream_id=order_id,
+                payload={
+                    "discount_type": discount_type,
+                    "discount_fen": discount_fen,
+                    "original_total_fen": total,
+                    "new_total_fen": new_final,
+                    "reason": reason,
+                    "approval_id": approval_id,
+                    "margin_after": margin_check.get("margin"),
+                    "margin_passed": margin_check["passed"],
+                    "threshold_exceeded": not margin_check["passed"],
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+                metadata={"order_no": order.order_no},
+            )
+        )
 
         return {
             "applied": True,
@@ -750,17 +756,17 @@ class CashierEngine:
             )
             if auto_pay_result and auto_pay_result.get("success"):
                 # 自动扣款成功，构造支付记录
-                payments = [{
-                    "method": "member_balance",
-                    "amount_fen": order.final_amount_fen,
-                }]
+                payments = [
+                    {
+                        "method": "member_balance",
+                        "amount_fen": order.final_amount_fen,
+                    }
+                ]
 
         # 验证支付总额 >= 应付金额
         total_paid = sum(p["amount_fen"] for p in payments)
         if total_paid < order.final_amount_fen:
-            raise ValueError(
-                f"支付金额 {total_paid} 不足，应付 {order.final_amount_fen}"
-            )
+            raise ValueError(f"支付金额 {total_paid} 不足，应付 {order.final_amount_fen}")
 
         # 计算找零（仅现金）
         change_fen = 0
@@ -789,13 +795,15 @@ class CashierEngine:
                 payment_category=self._method_to_category(p["method"]),
             )
             self.db.add(payment)
-            payment_records.append({
-                "payment_id": str(payment.id),
-                "payment_no": pay_no,
-                "method": p["method"],
-                "amount_fen": p["amount_fen"],
-                "trade_no": p.get("trade_no"),
-            })
+            payment_records.append(
+                {
+                    "payment_id": str(payment.id),
+                    "payment_no": pay_no,
+                    "method": p["method"],
+                    "amount_fen": p["amount_fen"],
+                    "trade_no": p.get("trade_no"),
+                }
+            )
 
         # 更新订单状态
         order.status = OrderStatus.completed.value
@@ -829,50 +837,54 @@ class CashierEngine:
 
         # ─── Phase 1 平行事件写入：订单完成 + 支付确认 ───
         payment_methods = [p["method"] for p in payments]
-        asyncio.create_task(emit_event(
-            event_type=OrderEventType.PAID,
-            tenant_id=self.tenant_id,
-            stream_id=order_id,
-            payload={
-                "order_no": order.order_no,
-                "final_amount_fen": order.final_amount_fen,
-                "discount_amount_fen": order.discount_amount_fen,
-                "total_amount_fen": order.total_amount_fen,
-                "payment_methods": payment_methods,
-                "customer_id": str(order.customer_id) if order.customer_id else None,
-                "table_number": order.table_number,
-                "change_fen": change_fen,
-            },
-            store_id=str(order.store_id) if order.store_id else None,
-            source_service="tx-trade",
-            metadata={"auto_pay": auto_pay},
-        ))
-        asyncio.create_task(emit_event(
-            event_type=PaymentEventType.CONFIRMED,
-            tenant_id=self.tenant_id,
-            stream_id=order_id,
-            payload={
-                "order_no": order.order_no,
-                "amount_fen": order.final_amount_fen,
-                "payment_records": payment_records,
-                "channel": payment_methods[0] if payment_methods else "unknown",
-            },
-            store_id=str(order.store_id) if order.store_id else None,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.PAID,
+                tenant_id=self.tenant_id,
+                stream_id=order_id,
+                payload={
+                    "order_no": order.order_no,
+                    "final_amount_fen": order.final_amount_fen,
+                    "discount_amount_fen": order.discount_amount_fen,
+                    "total_amount_fen": order.total_amount_fen,
+                    "payment_methods": payment_methods,
+                    "customer_id": str(order.customer_id) if order.customer_id else None,
+                    "table_number": order.table_number,
+                    "change_fen": change_fen,
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+                metadata={"auto_pay": auto_pay},
+            )
+        )
+        asyncio.create_task(
+            emit_event(
+                event_type=PaymentEventType.CONFIRMED,
+                tenant_id=self.tenant_id,
+                stream_id=order_id,
+                payload={
+                    "order_no": order.order_no,
+                    "amount_fen": order.final_amount_fen,
+                    "payment_records": payment_records,
+                    "channel": payment_methods[0] if payment_methods else "unknown",
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+            )
+        )
 
         # ─── 营销归因（火花旁路，不阻塞结算）───
-        effective_customer_id = customer_id or (
-            str(order.customer_id) if order.customer_id else None
-        )
+        effective_customer_id = customer_id or (str(order.customer_id) if order.customer_id else None)
         if effective_customer_id:
-            asyncio.create_task(_trigger_marketing_attribution(
-                tenant_id=str(self.tenant_id),
-                member_id=effective_customer_id,
-                order_id=order_id,
-                order_amount_fen=order.final_amount_fen,
-                store_id=str(order.store_id) if order.store_id else "",
-            ))
+            asyncio.create_task(
+                _trigger_marketing_attribution(
+                    tenant_id=str(self.tenant_id),
+                    member_id=effective_customer_id,
+                    order_id=order_id,
+                    order_amount_fen=order.final_amount_fen,
+                    store_id=str(order.store_id) if order.store_id else "",
+                )
+            )
 
         # ─── 支付后推券（异步不阻塞） ───
         if effective_customer_id:
@@ -933,18 +945,20 @@ class CashierEngine:
         logger.info("order_cancelled", order_no=order.order_no, reason=reason)
 
         # ─── Phase 1 平行事件写入：取消订单 ───
-        asyncio.create_task(emit_event(
-            event_type=OrderEventType.CANCELLED,
-            tenant_id=self.tenant_id,
-            stream_id=order_id,
-            payload={
-                "order_no": order.order_no,
-                "reason": reason,
-                "table_number": order.table_number,
-            },
-            store_id=str(order.store_id) if order.store_id else None,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.CANCELLED,
+                tenant_id=self.tenant_id,
+                stream_id=order_id,
+                payload={
+                    "order_no": order.order_no,
+                    "reason": reason,
+                    "table_number": order.table_number,
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+            )
+        )
 
         return {
             "order_id": order_id,
@@ -963,16 +977,13 @@ class CashierEngine:
         order = await self._get_order(order_uuid)
 
         # 查明细
-        items_result = await self.db.execute(
-            select(OrderItem).where(OrderItem.order_id == order_uuid)
-        )
+        items_result = await self.db.execute(select(OrderItem).where(OrderItem.order_id == order_uuid))
         items = items_result.scalars().all()
 
         # 查支付记录
         from ..models.payment import Payment
-        payments_result = await self.db.execute(
-            select(Payment).where(Payment.order_id == order_uuid)
-        )
+
+        payments_result = await self.db.execute(select(Payment).where(Payment.order_id == order_uuid))
         payments = payments_result.scalars().all()
 
         # 查桌台
@@ -1065,9 +1076,7 @@ class CashierEngine:
 
         if date_str:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            conditions.append(
-                cast(Order.order_time, Date) == target_date
-            )
+            conditions.append(cast(Order.order_time, Date) == target_date)
 
         # 总数
         count_q = select(func.count()).select_from(Order).where(and_(*conditions))
@@ -1076,13 +1085,7 @@ class CashierEngine:
 
         # 分页查询
         offset = (page - 1) * size
-        query = (
-            select(Order)
-            .where(and_(*conditions))
-            .order_by(Order.order_time.desc())
-            .offset(offset)
-            .limit(size)
-        )
+        query = select(Order).where(and_(*conditions)).order_by(Order.order_time.desc()).offset(offset).limit(size)
         result = await self.db.execute(query)
         orders = result.scalars().all()
 
@@ -1116,9 +1119,7 @@ class CashierEngine:
     # ─────────────────────────────────────
 
     async def _get_order(self, order_id: uuid.UUID) -> Order:
-        result = await self.db.execute(
-            select(Order).where(Order.id == order_id, Order.tenant_id == self.tenant_id)
-        )
+        result = await self.db.execute(select(Order).where(Order.id == order_id, Order.tenant_id == self.tenant_id))
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
@@ -1159,9 +1160,7 @@ class CashierEngine:
 
     async def _calc_order_cost(self, order_id: uuid.UUID) -> Optional[int]:
         """计算订单BOM总成本，用于毛利校验"""
-        result = await self.db.execute(
-            select(OrderItem).where(OrderItem.order_id == order_id)
-        )
+        result = await self.db.execute(select(OrderItem).where(OrderItem.order_id == order_id))
         items = result.scalars().all()
 
         total_cost = 0
@@ -1345,10 +1344,7 @@ class CashierEngine:
             raise ValueError(f"目标桌台不存在: {target_table_no}")
 
         if target_table.status != TableStatus.free.value:
-            raise ValueError(
-                f"目标桌台 {target_table_no} 当前状态 {target_table.status}，"
-                f"不是空闲状态，无法转入"
-            )
+            raise ValueError(f"目标桌台 {target_table_no} 当前状态 {target_table.status}，不是空闲状态，无法转入")
 
         # 释放原桌
         await self._release_table(str(store_uuid), old_table_no)
@@ -1388,4 +1384,269 @@ class CashierEngine:
             "to_table": target_table_no,
             "status": order.status,
             "operator_id": operator_id,
+        }
+
+    # ─────────────────────────────────────
+    # 8. 多模式收银（Phase 2: 区域服务模式）
+    # ─────────────────────────────────────
+
+    async def create_retail_order(
+        self,
+        store_id: str,
+        items: list[dict],
+        payment_method: str = "wechat",
+        payment_amount_fen: int = 0,
+        auth_code: Optional[str] = None,
+    ) -> dict:
+        """零售快速收银 — 无桌台无会话，扫码→付款→完成
+
+        适用场景：便利店窗口、外带柜台、伴手礼/预制菜零售。
+        一步完成：创建订单 + 添加商品 + 结算支付。
+
+        Args:
+            store_id:           门店ID
+            items:              商品列表 [{barcode?, name, qty, unit_price_fen}]
+            payment_method:     支付方式（cash/wechat/alipay）
+            payment_amount_fen: 支付金额（分）
+            auth_code:          B扫C付款码（wechat/alipay 时使用）
+
+        Returns:
+            {order_id, order_no, total_fen, payment_status, items_count}
+        """
+        store_uuid = uuid.UUID(store_id)
+        order_no = _gen_order_no()
+        order_id = uuid.uuid4()
+
+        # 计算商品总额
+        total_fen = 0
+        order_items: list[OrderItem] = []
+        for item in items:
+            qty = int(item.get("qty", 1))
+            unit_price = int(item.get("unit_price_fen", 0))
+            subtotal = unit_price * qty
+            total_fen += subtotal
+
+            oi = OrderItem(
+                id=uuid.uuid4(),
+                tenant_id=self.tenant_id,
+                order_id=order_id,
+                dish_id=None,
+                item_name=item.get("name", "零售商品"),
+                quantity=qty,
+                unit_price_fen=unit_price,
+                subtotal_fen=subtotal,
+                notes=item.get("barcode", ""),
+                customizations={},
+                pricing_mode="fixed",
+            )
+            order_items.append(oi)
+
+        if not order_items:
+            raise ValueError("商品列表不能为空")
+
+        # 创建零售订单（无桌台关联）
+        order = Order(
+            id=order_id,
+            tenant_id=self.tenant_id,
+            order_no=order_no,
+            store_id=store_uuid,
+            table_number=None,
+            customer_id=None,
+            sales_channel="retail",
+            guest_count=0,
+            total_amount_fen=total_fen,
+            discount_amount_fen=0,
+            final_amount_fen=total_fen,
+            status=OrderStatus.pending.value,
+        )
+        self.db.add(order)
+        for oi in order_items:
+            self.db.add(oi)
+
+        await self.db.flush()
+
+        # 自动结算
+        payment_result = await self.settle_order(
+            order_id=str(order_id),
+            payments=[
+                {
+                    "method": payment_method,
+                    "amount_fen": payment_amount_fen or total_fen,
+                    "trade_no": auth_code,
+                }
+            ],
+        )
+
+        # 旁路事件
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.PAID,
+                tenant_id=self.tenant_id,
+                stream_id=str(order_id),
+                payload={
+                    "order_no": order_no,
+                    "order_type": "retail",
+                    "total_fen": total_fen,
+                    "items_count": len(order_items),
+                    "payment_method": payment_method,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
+
+        logger.info(
+            "retail_order_created",
+            order_no=order_no,
+            store_id=store_id,
+            items_count=len(order_items),
+            total_fen=total_fen,
+            payment_method=payment_method,
+        )
+
+        return {
+            "order_id": str(order_id),
+            "order_no": order_no,
+            "total_fen": total_fen,
+            "items_count": len(order_items),
+            "payment_status": payment_result.get("status", "completed"),
+        }
+
+    async def create_pre_order(
+        self,
+        store_id: str,
+        table_no: str,
+        booking_id: Optional[str] = None,
+        items: Optional[list[dict]] = None,
+        customer_phone: Optional[str] = None,
+        expected_arrival: Optional[str] = None,
+    ) -> dict:
+        """预点单 — 包厢客人到店前预选菜品（dine_first 模式专属）
+
+        流程：客人电话/小程序预点 → 订单状态 pre_ordered → 客人到店 → fire 起菜。
+        预点单不锁桌（桌台仍保持 reserved），不扣库存。
+
+        Args:
+            store_id:          门店ID
+            table_no:          预订桌号
+            booking_id:        关联预订单ID
+            items:             预点菜品 [{dish_id, dish_name, qty, unit_price_fen}]
+            customer_phone:    顾客手机号
+            expected_arrival:  预计到店时间
+
+        Returns:
+            {order_id, order_no, items_count, status, table_no}
+        """
+        store_uuid = uuid.UUID(store_id)
+        items = items or []
+
+        # 验证桌台存在
+        result = await self.db.execute(
+            select(Table).where(
+                Table.store_id == store_uuid,
+                Table.table_no == table_no,
+                Table.tenant_id == self.tenant_id,
+                Table.is_active == True,  # noqa: E712
+            )
+        )
+        table = result.scalar_one_or_none()
+        if not table:
+            raise ValueError(f"桌台不存在: {table_no}")
+
+        # 预点单允许 free 和 reserved 两种桌态
+        if table.status not in (TableStatus.free.value, TableStatus.reserved.value):
+            raise ValueError(f"桌台 {table_no} 当前状态 {table.status}，预点单仅允许空闲或已预订状态的桌台")
+
+        # 创建预点订单（status=pre_ordered，不锁桌）
+        order_no = _gen_order_no()
+        order_id = uuid.uuid4()
+
+        total_fen = 0
+        order_items: list[OrderItem] = []
+        for item in items:
+            qty = int(item.get("qty", 1))
+            unit_price = int(item.get("unit_price_fen", 0))
+            subtotal = unit_price * qty
+            total_fen += subtotal
+
+            oi = OrderItem(
+                id=uuid.uuid4(),
+                tenant_id=self.tenant_id,
+                order_id=order_id,
+                dish_id=uuid.UUID(item["dish_id"]) if item.get("dish_id") else None,
+                item_name=item.get("dish_name", ""),
+                quantity=qty,
+                unit_price_fen=unit_price,
+                subtotal_fen=subtotal,
+                notes=f"预点单 | 到店时间: {expected_arrival or '未定'}",
+                customizations=item.get("customizations", {}),
+                pricing_mode="fixed",
+            )
+            order_items.append(oi)
+
+        order = Order(
+            id=order_id,
+            tenant_id=self.tenant_id,
+            order_no=order_no,
+            store_id=store_uuid,
+            table_number=table_no,
+            customer_id=None,
+            customer_phone=customer_phone,
+            sales_channel="dine_in",
+            guest_count=0,
+            total_amount_fen=total_fen,
+            discount_amount_fen=0,
+            final_amount_fen=total_fen,
+            status="pre_ordered",
+            order_metadata={
+                "is_pre_order": True,
+                "booking_id": booking_id,
+                "expected_arrival": expected_arrival,
+                "customer_phone": customer_phone,
+            },
+        )
+        self.db.add(order)
+        for oi in order_items:
+            self.db.add(oi)
+
+        await self.db.flush()
+
+        # 旁路事件
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.CREATED,
+                tenant_id=self.tenant_id,
+                stream_id=str(order_id),
+                payload={
+                    "order_no": order_no,
+                    "order_type": "pre_order",
+                    "table_no": table_no,
+                    "booking_id": booking_id,
+                    "items_count": len(order_items),
+                    "total_fen": total_fen,
+                    "expected_arrival": expected_arrival,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
+
+        logger.info(
+            "pre_order_created",
+            order_no=order_no,
+            store_id=store_id,
+            table_no=table_no,
+            booking_id=booking_id,
+            items_count=len(order_items),
+            total_fen=total_fen,
+        )
+
+        return {
+            "order_id": str(order_id),
+            "order_no": order_no,
+            "items_count": len(order_items),
+            "total_fen": total_fen,
+            "status": "pre_ordered",
+            "table_no": table_no,
+            "booking_id": booking_id,
         }

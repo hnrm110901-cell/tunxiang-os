@@ -3,6 +3,7 @@
 支持60+报表的统一定义、参数化SQL执行、多格式导出、定时调度。
 所有SQL使用 sqlalchemy.text() 参数化，金额字段自动 /100 转元。
 """
+
 from __future__ import annotations
 
 import csv
@@ -22,6 +23,7 @@ log = structlog.get_logger()
 # ──────────────────────────────────────────────
 # 数据结构
 # ──────────────────────────────────────────────
+
 
 class ReportCategory(str, Enum):
     REVENUE = "revenue"
@@ -50,9 +52,10 @@ class SortDirection(str, Enum):
 @dataclass
 class FilterDef:
     """筛选器定义"""
-    name: str               # 参数名 (SQL中的 :name)
-    label: str              # 显示名
-    field_type: str         # string / date / date_range / select / number
+
+    name: str  # 参数名 (SQL中的 :name)
+    label: str  # 显示名
+    field_type: str  # string / date / date_range / select / number
     required: bool = False
     default: Any = None
     options: list[str] = field(default_factory=list)  # field_type=select 时可用选项
@@ -61,27 +64,30 @@ class FilterDef:
 @dataclass
 class MetricDef:
     """指标定义"""
-    name: str               # SQL列名
-    label: str              # 显示名
-    unit: str = ""          # 单位: yuan / count / pct / minutes
+
+    name: str  # SQL列名
+    label: str  # 显示名
+    unit: str = ""  # 单位: yuan / count / pct / minutes
     is_money_fen: bool = False  # True表示原始值为分，展示时自动/100
 
 
 @dataclass
 class DimensionDef:
     """维度定义"""
-    name: str               # SQL列名
-    label: str              # 显示名
+
+    name: str  # SQL列名
+    label: str  # 显示名
 
 
 @dataclass
 class ReportDefinition:
     """报表定义 — 描述一张报表的元数据和SQL模板"""
+
     report_id: str
     name: str
     category: ReportCategory
     description: str
-    sql_template: str           # SQL模板，支持 :param 参数 + {dim_clause} 动态维度
+    sql_template: str  # SQL模板，支持 :param 参数 + {dim_clause} 动态维度
     dimensions: list[DimensionDef] = field(default_factory=list)
     metrics: list[MetricDef] = field(default_factory=list)
     filters: list[FilterDef] = field(default_factory=list)
@@ -94,11 +100,12 @@ class ReportDefinition:
 @dataclass
 class ReportResult:
     """报表执行结果"""
+
     report_id: str
     report_name: str
     executed_at: datetime
     params: dict[str, Any]
-    columns: list[str]          # 列名列表
+    columns: list[str]  # 列名列表
     rows: list[dict[str, Any]]  # 数据行(金额已转元)
     total_rows: int
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -107,6 +114,7 @@ class ReportResult:
 # ──────────────────────────────────────────────
 # 报表引擎核心
 # ──────────────────────────────────────────────
+
 
 class ReportEngine:
     """报表引擎 — 解析定义、构建SQL、执行查询、转换结果"""
@@ -169,9 +177,13 @@ class ReportEngine:
 
         # 构建完整SQL
         sql, bind_params = self._build_sql(
-            definition, params, tenant_id,
-            page=page, page_size=page_size,
-            sort_by=sort_by, sort_dir=sort_dir,
+            definition,
+            params,
+            tenant_id,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
 
         # 执行查询
@@ -238,15 +250,15 @@ class ReportEngine:
                 "description": d.description,
                 "is_active": d.is_active,
                 "dimensions": [{"name": dim.name, "label": dim.label} for dim in d.dimensions],
-                "metrics": [
-                    {"name": m.name, "label": m.label, "unit": m.unit}
-                    for m in d.metrics
-                ],
+                "metrics": [{"name": m.name, "label": m.label, "unit": m.unit} for m in d.metrics],
                 "filters": [
                     {
-                        "name": f.name, "label": f.label,
-                        "field_type": f.field_type, "required": f.required,
-                        "default": f.default, "options": f.options,
+                        "name": f.name,
+                        "label": f.label,
+                        "field_type": f.field_type,
+                        "required": f.required,
+                        "default": f.default,
+                        "options": f.options,
                     }
                     for f in d.filters
                 ],
@@ -274,14 +286,16 @@ class ReportEngine:
             "sql_template": d.sql_template,
             "dimensions": [{"name": dim.name, "label": dim.label} for dim in d.dimensions],
             "metrics": [
-                {"name": m.name, "label": m.label, "unit": m.unit, "is_money_fen": m.is_money_fen}
-                for m in d.metrics
+                {"name": m.name, "label": m.label, "unit": m.unit, "is_money_fen": m.is_money_fen} for m in d.metrics
             ],
             "filters": [
                 {
-                    "name": f.name, "label": f.label,
-                    "field_type": f.field_type, "required": f.required,
-                    "default": f.default, "options": f.options,
+                    "name": f.name,
+                    "label": f.label,
+                    "field_type": f.field_type,
+                    "required": f.required,
+                    "default": f.default,
+                    "options": f.options,
                 }
                 for f in d.filters
             ],
@@ -375,6 +389,7 @@ class ReportEngine:
 # ──────────────────────────────────────────────
 # 报表渲染器
 # ──────────────────────────────────────────────
+
 
 class ReportRenderer:
     """将 ReportResult 渲染为不同格式"""
@@ -496,14 +511,16 @@ class ReportRenderer:
 # 报表定时调度器
 # ──────────────────────────────────────────────
 
+
 @dataclass
 class ScheduleConfig:
     """定时报表配置"""
+
     schedule_id: str
     report_id: str
-    cron_expression: str        # cron表达式 (如 "0 8 * * *" 每天8点)
-    recipients: list[str]       # 接收人列表 (user_id / email / webhook_url)
-    channel: str                # 推送渠道: email / webhook / wechat
+    cron_expression: str  # cron表达式 (如 "0 8 * * *" 每天8点)
+    recipients: list[str]  # 接收人列表 (user_id / email / webhook_url)
+    channel: str  # 推送渠道: email / webhook / wechat
     params: dict[str, Any] = field(default_factory=dict)  # 报表参数
     export_format: ExportFormat = ExportFormat.JSON
     is_active: bool = True
@@ -588,15 +605,15 @@ class ReportScheduler:
             执行结果列表 [{"schedule_id", "report_id", "status", "detail"}]
         """
         results = []
-        tenant_schedules = [
-            s for s in self._schedules.values()
-            if s.tenant_id == tenant_id and s.is_active
-        ]
+        tenant_schedules = [s for s in self._schedules.values() if s.tenant_id == tenant_id and s.is_active]
 
         for config in tenant_schedules:
             try:
                 report_result = await self._engine.execute_report(
-                    config.report_id, config.params, tenant_id, db,
+                    config.report_id,
+                    config.params,
+                    tenant_id,
+                    db,
                 )
                 # 渲染
                 if config.export_format == ExportFormat.CSV:
@@ -615,12 +632,14 @@ class ReportScheduler:
                     recipients_count=len(config.recipients),
                     tenant_id=tenant_id,
                 )
-                results.append({
-                    "schedule_id": config.schedule_id,
-                    "report_id": config.report_id,
-                    "status": "success",
-                    "rows_generated": report_result.total_rows,
-                })
+                results.append(
+                    {
+                        "schedule_id": config.schedule_id,
+                        "report_id": config.report_id,
+                        "status": "success",
+                        "rows_generated": report_result.total_rows,
+                    }
+                )
             except (ReportNotFoundError, ReportParamError) as e:
                 log.error(
                     "report_scheduler.failed",
@@ -628,12 +647,14 @@ class ReportScheduler:
                     error=str(e),
                     tenant_id=tenant_id,
                 )
-                results.append({
-                    "schedule_id": config.schedule_id,
-                    "report_id": config.report_id,
-                    "status": "error",
-                    "detail": str(e),
-                })
+                results.append(
+                    {
+                        "schedule_id": config.schedule_id,
+                        "report_id": config.report_id,
+                        "status": "error",
+                        "detail": str(e),
+                    }
+                )
 
         return results
 
@@ -672,16 +693,20 @@ class ReportScheduler:
 # 异常类
 # ──────────────────────────────────────────────
 
+
 class ReportNotFoundError(ValueError):
     """报表定义不存在"""
+
     pass
 
 
 class ReportInactiveError(ValueError):
     """报表已停用"""
+
     pass
 
 
 class ReportParamError(ValueError):
     """报表参数错误"""
+
     pass

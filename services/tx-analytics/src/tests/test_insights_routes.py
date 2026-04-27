@@ -1,8 +1,8 @@
 """经营洞察API测试"""
+
 import os
 import sys
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

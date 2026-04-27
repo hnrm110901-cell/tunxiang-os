@@ -1,4 +1,5 @@
 """tx-org 合规预警扫描服务。"""
+
 from __future__ import annotations
 
 import uuid
@@ -268,10 +269,7 @@ async def scan_attendance_anomalies(
         absent_sql,
         {"start_d": start, "end_d": end, "tid": tenant_id},
     )
-    absent_by_emp = {
-        str(r["employee_id"]): int(r["absent_count"] or 0)
-        for r in absent_result.mappings().all()
-    }
+    absent_by_emp = {str(r["employee_id"]): int(r["absent_count"] or 0) for r in absent_result.mappings().all()}
     late_map = await _daily_attendance_late_rollup(db, tenant_id, start, end)
     emp_ids: set[str] = set(absent_by_emp.keys()) | set(late_map.keys())
     out: list[dict[str, Any]] = []
@@ -351,11 +349,11 @@ async def scan_all(
     documents = await scan_expiring_documents(db, tenant_id)
     performance = await scan_low_performers(db, tenant_id)
     attendance = await scan_attendance_anomalies(db, tenant_id, month_tuple)
-    all_items: list[dict[str, Any]] = [
-        {**x, "category": "documents"} for x in documents
-    ] + [{**x, "category": "performance"} for x in performance] + [
-        {**x, "category": "attendance"} for x in attendance
-    ]
+    all_items: list[dict[str, Any]] = (
+        [{**x, "category": "documents"} for x in documents]
+        + [{**x, "category": "performance"} for x in performance]
+        + [{**x, "category": "attendance"} for x in attendance]
+    )
     summary = {
         "total": len(all_items),
         "critical": sum(1 for x in all_items if x["severity"] == "critical"),

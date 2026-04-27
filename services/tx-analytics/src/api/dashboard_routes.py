@@ -9,6 +9,7 @@ GET /dashboard/top-dishes/{store_id}    — Top 菜品排行
 GET /dashboard/alerts/stats             — 异常统计
 GET /dashboard/alerts/{store_id}        — 今日异常摘要
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -17,9 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 
 from ..services.alert_summary import get_alert_stats, get_today_alerts
+from ..services.sql_queries import query_revenue_trend, query_top_dishes
 from ..services.store_ranking import get_store_comparison, get_store_ranking
 from ..services.today_overview import get_multi_store_overview, get_today_overview
-from ..services.sql_queries import query_revenue_trend, query_top_dishes
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
@@ -32,6 +33,7 @@ def _require_tenant(tenant_id: Optional[str]) -> str:
 
 
 # ─── 今日总览（单店） ───
+
 
 @router.get("/today/{store_id}")
 async def api_today_overview(
@@ -47,6 +49,7 @@ async def api_today_overview(
 
 # ─── 多店概览（总部视角） ───
 
+
 @router.get("/stores")
 async def api_multi_store_overview(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
@@ -59,6 +62,7 @@ async def api_multi_store_overview(
 
 
 # ─── 门店排行 ───
+
 
 @router.get("/ranking")
 async def api_store_ranking(
@@ -78,6 +82,7 @@ async def api_store_ranking(
 
 
 # ─── 门店对比 ───
+
 
 @router.get("/comparison")
 async def api_store_comparison(
@@ -99,6 +104,7 @@ async def api_store_comparison(
 
 
 # ─── 营收趋势图 ───
+
 
 @router.get("/trend/{store_id}")
 async def api_revenue_trend(
@@ -126,6 +132,7 @@ async def api_revenue_trend(
 
 
 # ─── Top 菜品排行 ───
+
 
 @router.get("/top-dishes/{store_id}")
 async def api_top_dishes(
@@ -162,6 +169,7 @@ async def api_top_dishes(
 
 
 # ─── 异常摘要（注意：stats 必须在 {store_id} 路由前注册） ───
+
 
 @router.get("/alerts/stats")
 async def api_alert_stats(

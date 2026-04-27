@@ -3,6 +3,7 @@
 典型场景: 生日当天送长寿面+生日蛋糕+双倍积分
 支持提前N天触发, 生日当天触发, 生日月触发。
 """
+
 from typing import Any
 
 import structlog

@@ -11,6 +11,7 @@
   GET  /erp/queue                          — 待重试凭证队列（用友专用）
   POST /erp/queue/drain                    — 触发队列重试
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -249,6 +250,7 @@ async def get_push_queue() -> dict:
 
     adapter = YonyouAdapter.__new__(YonyouAdapter)
     import pathlib
+
     queue_path = os.environ.get("YONYOU_QUEUE_PATH", "/tmp/yonyou_push_queue.jsonl")  # noqa: S108 — pre-existing, tmp dir for ERP export
     adapter._queue_path = pathlib.Path(queue_path)
 

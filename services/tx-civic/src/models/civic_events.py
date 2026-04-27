@@ -1,8 +1,11 @@
 """tx-civic 事件类型定义 — 接入屯象OS统一事件总线"""
+
 from enum import Enum
+
 
 class CivicEventType(str, Enum):
     """合规事件类型"""
+
     # 追溯事件
     INBOUND_RECORDED = "civic.trace.inbound_recorded"
     SUPPLIER_REGISTERED = "civic.trace.supplier_registered"

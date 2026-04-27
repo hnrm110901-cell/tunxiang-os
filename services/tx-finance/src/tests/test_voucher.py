@@ -1,4 +1,5 @@
 """自动凭证生成测试"""
+
 import os
 import sys
 
@@ -30,8 +31,11 @@ class TestVoucherGeneration:
         settlement = {
             "settlement_date": "2026-03-23",
             "cash_fen": 100000,
-            "wechat_fen": 0, "alipay_fen": 0, "unionpay_fen": 0,
-            "credit_fen": 0, "member_balance_fen": 0,
+            "wechat_fen": 0,
+            "alipay_fen": 0,
+            "unionpay_fen": 0,
+            "credit_fen": 0,
+            "member_balance_fen": 0,
             "net_revenue_fen": 100000,
             "total_discount_fen": 10000,
             "total_refund_fen": 0,
@@ -44,10 +48,14 @@ class TestVoucherGeneration:
         settlement = {
             "settlement_date": "2026-03-23",
             "cash_fen": 50000,
-            "wechat_fen": 0, "alipay_fen": 0, "unionpay_fen": 0,
-            "credit_fen": 0, "member_balance_fen": 0,
+            "wechat_fen": 0,
+            "alipay_fen": 0,
+            "unionpay_fen": 0,
+            "credit_fen": 0,
+            "member_balance_fen": 0,
             "net_revenue_fen": 50000,
-            "total_discount_fen": 0, "total_refund_fen": 0,
+            "total_discount_fen": 0,
+            "total_refund_fen": 0,
         }
         voucher = generate_voucher_from_settlement(settlement)
         kingdee = format_for_kingdee(voucher)

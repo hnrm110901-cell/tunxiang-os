@@ -12,6 +12,7 @@
   GET    /invoices                           查询订单下的发票（?order_id=）
   POST   /invoices/{invoice_id}/cancel      红冲作废
 """
+
 import uuid
 from decimal import Decimal
 from typing import Any, Optional
@@ -41,6 +42,7 @@ _invoice_service = InvoiceService()
 
 # ── 依赖 ──────────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     """从 Header 提取 tenant_id，返回带 RLS 的 DB session。"""
     async for session in get_db_with_tenant(x_tenant_id):
@@ -58,6 +60,7 @@ def _parse_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> uui
 
 
 # ── Pydantic 请求/响应 Schema ─────────────────────────────────────────────────
+
 
 class InvoiceRequestBody(BaseModel):
     order_id: uuid.UUID
@@ -99,6 +102,7 @@ def _handle_service_error(exc: Exception) -> HTTPException:
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("/request", status_code=status.HTTP_201_CREATED)
 async def request_invoice(

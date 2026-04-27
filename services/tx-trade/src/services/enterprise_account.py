@@ -6,7 +6,7 @@
 v251 迁移后全部操作持久化到 DB（enterprise_accounts / enterprise_sign_records /
 enterprise_agreement_prices），内存存储已完全移除。
 """
-from datetime import datetime, timezone
+
 from typing import Optional
 
 import structlog
@@ -119,7 +119,7 @@ class EnterpriseAccountService:
             result = await self.db.execute(
                 text(f"""
                     UPDATE enterprise_accounts
-                    SET {', '.join(set_clauses)}
+                    SET {", ".join(set_clauses)}
                     WHERE id = :eid::uuid
                       AND tenant_id = :tid::uuid
                       AND is_deleted = FALSE
@@ -330,8 +330,11 @@ class EnterpriseAccountService:
                     (gen_random_uuid(), :tid::uuid, :eid::uuid, :oid::uuid, :signer, :amount)
             """),
             {
-                "tid": self.tenant_id, "eid": enterprise_id,
-                "oid": order_id, "signer": signer_name, "amount": amount_fen,
+                "tid": self.tenant_id,
+                "eid": enterprise_id,
+                "oid": order_id,
+                "signer": signer_name,
+                "amount": amount_fen,
             },
         )
         await self.db.commit()

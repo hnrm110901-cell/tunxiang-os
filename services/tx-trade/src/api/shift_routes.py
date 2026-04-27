@@ -3,6 +3,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header，通过 get_db_with_tenant 实现 RLS 租户隔离。
 """
+
 from typing import AsyncGenerator
 
 import structlog

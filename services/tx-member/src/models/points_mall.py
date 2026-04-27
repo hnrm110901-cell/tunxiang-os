@@ -1,22 +1,45 @@
 """积分商城数据模型
 
-两张核心表：
-  points_mall_products  — 商城商品（实物/优惠券/菜品兑换/储值金）
-  points_mall_orders    — 兑换订单
+四张核心表：
+  points_mall_categories          — 商品分类
+  points_mall_products            — 商城商品（实物/优惠券/菜品兑换/储值金）
+  points_mall_orders              — 兑换订单
+  points_mall_achievement_configs — 成就配置（可配置化）
 
 金额单位：分（fen）。库存 -1 表示不限库存。
 """
+
 import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
 
 PRODUCT_TYPES = ("physical", "coupon", "dish", "stored_value")
 ORDER_STATUSES = ("pending", "fulfilled", "cancelled", "expired")
+SCOPE_TYPES = ("brand", "store", "region")
+FULFILLMENT_STATUSES = ("pending", "shipped", "delivered", "returned")
+TRIGGER_TYPES = ("order_count", "total_spent_fen", "share_count", "review_count")
+
+
+class PointsMallCategory(TenantBase):
+    """积分商城商品分类"""
+
+    __tablename__ = "points_mall_categories"
+
+    category_name: Mapped[str] = mapped_column(String(50), nullable=False, comment="分类名称")
+    category_code: Mapped[str] = mapped_column(String(30), nullable=False, comment="分类编码")
+    icon_url: Mapped[str | None] = mapped_column(String(500), comment="分类图标URL")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="排序权重")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, comment="是否启用")
+
+    __table_args__ = (
+        Index("idx_pmc_tenant_sort", "tenant_id", "sort_order"),
+        {"comment": "积分商城商品分类"},
+    )
 
 
 class PointsMallProduct(TenantBase):
@@ -28,6 +51,7 @@ class PointsMallProduct(TenantBase):
       dish:         {"dish_id": "xxx", "dish_name": "辣子鸡"}
       stored_value: {"amount_fen": 500}
     """
+
     __tablename__ = "points_mall_products"
 
     name: Mapped[str] = mapped_column(String(100), nullable=False, comment="商品名称")
@@ -35,7 +59,8 @@ class PointsMallProduct(TenantBase):
     image_url: Mapped[str | None] = mapped_column(String(500), comment="商品图片URL")
 
     product_type: Mapped[str] = mapped_column(
-        String(20), nullable=False,
+        String(20),
+        nullable=False,
         comment="physical=实物 | coupon=优惠券 | dish=菜品兑换 | stored_value=储值金",
     )
 
@@ -48,15 +73,40 @@ class PointsMallProduct(TenantBase):
     # 商品内容（JSONB，根据 product_type 不同内容不同）
     product_content: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, comment="商品内容详情")
 
+    # 分类（v345新增）
+    category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="商品分类ID")
+
+    # 连锁scope（v345新增）
+    scope_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="brand",
+        comment="brand=全品牌 | store=指定门店 | region=区域",
+    )
+    scope_store_ids: Mapped[list | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)),
+        default=list,
+        comment="scope_type=store时的门店ID列表",
+    )
+
     # 兑换限制
     limit_per_customer: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="每人最多兑换次数（0=不限）",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="每人最多兑换次数（0=不限）",
     )
     limit_per_period: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, comment="每周期最多兑换次数（0=不限）",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="每周期最多兑换次数（0=不限）",
     )
     limit_period_days: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=30, comment="限制周期（天数）",
+        Integer,
+        nullable=False,
+        default=30,
+        comment="限制周期（天数）",
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, comment="是否上架")
@@ -68,6 +118,8 @@ class PointsMallProduct(TenantBase):
     __table_args__ = (
         Index("idx_pm_products_tenant_active", "tenant_id", "is_active"),
         Index("idx_pm_products_tenant_sort", "tenant_id", "sort_order"),
+        Index("idx_pmp_category", "tenant_id", "category_id"),
+        Index("idx_pmp_scope", "tenant_id", "scope_type"),
         {"comment": "积分商城商品主档"},
     )
 
@@ -76,32 +128,67 @@ class PointsMallOrder(TenantBase):
     """积分商城兑换订单
 
     status 流转：
-      pending  → fulfilled（门店核销 / 自动发放）
-      pending  → cancelled（退款退积分）
-      pending  → expired（超期未核销）
+      pending  -> fulfilled（门店核销 / 自动发放）
+      pending  -> cancelled（退款退积分）
+      pending  -> expired（超期未核销）
+
+    fulfillment_status 流转（实物）：
+      pending -> shipped -> delivered
+      pending -> shipped -> returned
     """
+
     __tablename__ = "points_mall_orders"
 
     order_no: Mapped[str] = mapped_column(
-        String(40), unique=True, nullable=False, index=True,
+        String(40),
+        unique=True,
+        nullable=False,
+        index=True,
         comment="订单号 PM-{YYYYMMDD}-{6位}",
     )
     customer_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="兑换顾客ID",
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+        comment="兑换顾客ID",
     )
     product_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True, comment="兑换商品ID",
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+        comment="兑换商品ID",
     )
     store_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), comment="兑换门店（实物需要）",
+        UUID(as_uuid=True),
+        comment="兑换门店（实物需要）",
     )
 
     points_deducted: Mapped[int] = mapped_column(Integer, nullable=False, comment="扣除积分")
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1, comment="兑换数量")
 
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending", index=True,
+        String(20),
+        nullable=False,
+        default="pending",
+        index=True,
         comment="pending | fulfilled | cancelled | expired",
+    )
+
+    # 实物发货状态（v345新增）
+    fulfillment_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="pending",
+        comment="pending | shipped | delivered | returned",
+    )
+    shipping_info: Mapped[dict | None] = mapped_column(
+        JSONB,
+        default=dict,
+        comment="发货信息：{carrier, tracking_no, shipped_at, ...}",
+    )
+    expired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="过期时间",
     )
 
     # 配送信息（实物商品）
@@ -123,4 +210,39 @@ class PointsMallOrder(TenantBase):
         Index("idx_pm_orders_status", "tenant_id", "status"),
         Index("idx_pm_orders_product", "tenant_id", "product_id"),
         {"comment": "积分商城兑换订单"},
+    )
+
+
+class PointsMallAchievementConfig(TenantBase):
+    """积分商城成就配置（可配置化，替代硬编码）"""
+
+    __tablename__ = "points_mall_achievement_configs"
+
+    achievement_code: Mapped[str] = mapped_column(String(50), nullable=False, comment="成就编码")
+    achievement_name: Mapped[str] = mapped_column(String(100), nullable=False, comment="成就名称")
+    description: Mapped[str | None] = mapped_column(Text, comment="成就描述")
+    trigger_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        comment="触发指标: order_count | total_spent_fen | share_count | review_count",
+    )
+    trigger_threshold: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        comment="触发阈值",
+    )
+    reward_points: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="奖励积分",
+    )
+    badge_icon_url: Mapped[str | None] = mapped_column(String(500), comment="徽章图标URL")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, comment="是否启用")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="排序权重")
+
+    __table_args__ = (
+        Index("idx_pmac_tenant_active", "tenant_id", "is_active"),
+        {"comment": "积分商城成就配置"},
     )

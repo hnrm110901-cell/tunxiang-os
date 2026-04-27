@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
+from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
@@ -27,6 +27,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Pydantic Models
 # ---------------------------------------------------------------------------
+
 
 class InboundRecordCreate(BaseModel):
     store_id: str
@@ -76,6 +77,7 @@ class SubmitRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/inbound")
 async def create_inbound_record(
@@ -159,9 +161,7 @@ async def list_inbound_records(
         params["limit"] = size
         params["offset"] = offset
 
-        count_result = await db.execute(
-            text(f"SELECT COUNT(*) FROM civic_inbound_records WHERE {where}"), params
-        )
+        count_result = await db.execute(text(f"SELECT COUNT(*) FROM civic_inbound_records WHERE {where}"), params)
         total = count_result.scalar() or 0
 
         rows = await db.execute(
@@ -189,10 +189,7 @@ async def trace_batch(
     await _set_tenant(db, x_tenant_id)
     try:
         inbound = await db.execute(
-            text(
-                "SELECT * FROM civic_inbound_records "
-                "WHERE tenant_id = :tenant_id AND batch_no = :batch_no"
-            ),
+            text("SELECT * FROM civic_inbound_records WHERE tenant_id = :tenant_id AND batch_no = :batch_no"),
             {"tenant_id": x_tenant_id, "batch_no": batch_no},
         )
         inbound_rows = [dict(r._mapping) for r in inbound]

@@ -23,6 +23,7 @@ P2 — 7个场景模板 (V2.1 Sprint A):
 - banquet x3               宴席复购（宴后感谢/节庆提醒/再预订）
 - channel_reflow x2        渠道回流（入会邀请/品牌权益）
 """
+
 from typing import Any
 
 SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
@@ -51,7 +52,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 2. 最小承诺·回访引导
     # 心理机制: 用极低门槛的承诺引导行动（"不需要额外消费"）
@@ -77,7 +77,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 3. 多样化奖励·随机惊喜
     # 心理机制: 不确定性奖励比固定奖励更有吸引力（多巴胺驱动）
@@ -92,8 +91,7 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "channel": "miniapp",  # 小程序
         "tone": "warm",
         "content_template": (
-            "{customer_name}，我们为您准备了一份专属惊喜礼遇，"
-            "点击查看是什么 → {link}。每位贵宾的礼遇都不同哦。"
+            "{customer_name}，我们为您准备了一份专属惊喜礼遇，点击查看是什么 → {link}。每位贵宾的礼遇都不同哦。"
         ),
         "variables_schema_json": [
             {"name": "customer_name", "type": "string", "required": True},
@@ -103,7 +101,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 4. 损失厌恶·权益到期提醒
     # 心理机制: 人对失去的恐惧大于获得的快乐（"即将失效">"给您一张券"）
@@ -133,7 +130,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 5. 关系唤醒·轻问候
     # 心理机制: 用人情味唤醒关系，不提任何促销
@@ -162,7 +158,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 6. 最小行动·一键操作
     # 心理机制: 将行动门槛降到最低（一键完成，不需要思考）
@@ -177,8 +172,7 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "channel": "miniapp",
         "tone": "neutral",
         "content_template": (
-            "{customer_name}，{brand_name}为您保留了一个便捷入口。"
-            "一键即可完成：{action_description} → {action_link}"
+            "{customer_name}，{brand_name}为您保留了一个便捷入口。一键即可完成：{action_description} → {action_link}"
         ),
         "variables_schema_json": [
             {"name": "customer_name", "type": "string", "required": True},
@@ -190,7 +184,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 7. 服务修复·情绪承接
     # 心理机制: 先接住情绪，不急于解决问题
@@ -222,7 +215,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": True,  # 修复类必须人工审核
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 8. 服务修复·补偿方案
     # 心理机制: 给客户选择权（控制感恢复）
@@ -251,11 +243,9 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": True,  # 补偿方案必须人工审核
         "is_system": True,
     },
-
     # ══════════════════════════════════════════════════════════
     # P1 扩展模板
     # ══════════════════════════════════════════════════════════
-
     # ──────────────────────────────────────────────────────────
     # 9. 超级用户·身份仪式
     # 心理机制: 身份仪式感（恭喜晋升+专属权益一览）
@@ -283,7 +273,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 10. 超级用户·特权体验
     # 心理机制: 专属体验（新品试菜/主厨晚宴）
@@ -311,7 +300,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 11. 超级用户·推荐赋能
     # 心理机制: 社交赋能（让超级用户成为品牌大使）
@@ -341,7 +329,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 12. 超级用户·季节专属
     # 心理机制: 季节限定体验（稀缺性+专属感）
@@ -369,7 +356,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 13. 心理距离修复·轻触达
     # 心理机制: 低侵入性信息分享（不打扰，只告知）
@@ -384,8 +370,7 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "channel": "sms",
         "tone": "neutral",
         "content_template": (
-            "{customer_name}，{brand_name}有些新变化想和您分享。"
-            "不打扰，只是想让您知道。\u2192 {info_link}"
+            "{customer_name}，{brand_name}有些新变化想和您分享。不打扰，只是想让您知道。\u2192 {info_link}"
         ),
         "variables_schema_json": [
             {"name": "customer_name", "type": "string", "required": True},
@@ -396,7 +381,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 14. 心理距离修复·关系重建
     # 心理机制: 人情味关系重建（有名有姓的店员问候）
@@ -425,7 +409,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 15. 里程碑·进阶恭喜
     # 心理机制: 成就庆祝（让客户感受到进步与认可）
@@ -453,7 +436,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 16. 里程碑·进度可见性
     # 心理机制: 进度可见性（告知距下一里程碑的距离，激发内驱力）
@@ -480,7 +462,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 17. 裂变·生日组织者
     # 心理机制: 场景化社交赋能（帮生日组织者创造惊喜）
@@ -506,7 +487,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 18. 裂变·家庭聚餐达人
     # 心理机制: 场景化权益（家庭聚餐场景的专属权益）
@@ -533,7 +513,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 19. 裂变·通用推荐
     # 心理机制: 双向激励（推荐人+被推荐人双方得益）
@@ -546,10 +525,7 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "mechanism_type": "referral_activation",
         "channel": "miniapp",
         "tone": "warm",
-        "content_template": (
-            "{customer_name}，分享{brand_name}给您的朋友，"
-            "双方均可获得专属权益。\u2192 {share_link}"
-        ),
+        "content_template": ("{customer_name}，分享{brand_name}给您的朋友，双方均可获得专属权益。\u2192 {share_link}"),
         "variables_schema_json": [
             {"name": "customer_name", "type": "string", "required": True},
             {"name": "brand_name", "type": "string", "required": True},
@@ -559,11 +535,9 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ══════════════════════════════════════════════════════════
     # P2 场景模板 (V2.1 Sprint A)
     # ══════════════════════════════════════════════════════════
-
     # ──────────────────────────────────────────────────────────
     # 20. 储值余额提醒
     # 心理机制: 损失厌恶（提醒已有储值资金，激发使用动力）
@@ -590,7 +564,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 21. 储值专属体验
     # 心理机制: 最小承诺（储值余额直接抵扣，零额外支付门槛）
@@ -618,7 +591,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 22. 宴后感谢
     # 心理机制: 身份锚定（强化"尊贵宴请主人"身份，建立长期关系）
@@ -651,7 +623,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": True,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 23. 节庆再订台
     # 心理机制: 多样化奖励（季节限定体验+场景化唤醒记忆）
@@ -681,7 +652,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 24. 宴席再预订引导
     # 心理机制: 最小行动（一键预订包厢/大桌，降低行动门槛）
@@ -708,7 +678,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 25. 渠道客入会邀请
     # 心理机制: 身份锚定（赋予"品牌会员"身份，区别于平台用户）
@@ -737,7 +706,6 @@ SYSTEM_TOUCH_TEMPLATES: list[dict[str, Any]] = [
         "requires_human_review": False,
         "is_system": True,
     },
-
     # ──────────────────────────────────────────────────────────
     # 26. 品牌专属权益
     # 心理机制: 最小承诺（引导到店体验品牌专属权益，建立品牌直连）

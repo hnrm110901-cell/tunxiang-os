@@ -88,7 +88,7 @@ class IMNotificationService:
             f"**时段**：{time_slot}\n"
             f"**岗位**：{position}\n\n"
             f"您被推荐为补位候选人，请在30分钟内确认是否可以到岗。\n"
-            f"> 回复\"接受\"确认补位"
+            f'> 回复"接受"确认补位'
         )
 
     async def notify_compliance_alert(
@@ -164,10 +164,10 @@ class IMNotificationService:
         Agent Level 3 完全自主执行，仅推送结果
         """
         trend_text = "上升" if trend == "up" else ("下降" if trend == "down" else "持平")
-        grade = "卓越" if total_score >= 90 else (
-            "优秀" if total_score >= 80 else (
-                "良好" if total_score >= 60 else "加油"
-            )
+        grade = (
+            "卓越"
+            if total_score >= 90
+            else ("优秀" if total_score >= 80 else ("良好" if total_score >= 60 else "加油"))
         )
         return (
             f"### 本周贡献度报告\n"

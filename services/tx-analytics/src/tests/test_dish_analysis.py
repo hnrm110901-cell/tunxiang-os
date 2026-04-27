@@ -1,4 +1,5 @@
 """菜品经营分析纯函数测试 — 销量排行、退菜率、四象限、优化建议"""
+
 import os
 import sys
 from decimal import Decimal
@@ -15,6 +16,7 @@ from services.dish_analysis import (
 # ═══════════════════════════════════════════════
 # 销量排行纯函数测试
 # ═══════════════════════════════════════════════
+
 
 class TestComputeSalesRanking:
     """测试菜品销量排行"""
@@ -67,6 +69,7 @@ class TestComputeSalesRanking:
 # 退菜率计算测试
 # ═══════════════════════════════════════════════
 
+
 class TestComputeReturnRate:
     """测试退菜率计算"""
 
@@ -91,46 +94,57 @@ class TestComputeReturnRate:
 # 四象限分类测试
 # ═══════════════════════════════════════════════
 
+
 class TestClassifyQuadrant:
     """测试菜品四象限分类"""
 
     def test_star(self):
         """高销量 + 高毛利 = 明星"""
         q = classify_quadrant(
-            sales_qty=100, margin_rate=Decimal("65.00"),
-            sales_median=50, margin_threshold=Decimal("50.00"),
+            sales_qty=100,
+            margin_rate=Decimal("65.00"),
+            sales_median=50,
+            margin_threshold=Decimal("50.00"),
         )
         assert q == "star"
 
     def test_cash_cow(self):
         """低销量 + 高毛利 = 金牛"""
         q = classify_quadrant(
-            sales_qty=20, margin_rate=Decimal("70.00"),
-            sales_median=50, margin_threshold=Decimal("50.00"),
+            sales_qty=20,
+            margin_rate=Decimal("70.00"),
+            sales_median=50,
+            margin_threshold=Decimal("50.00"),
         )
         assert q == "cash_cow"
 
     def test_question(self):
         """高销量 + 低毛利 = 问号"""
         q = classify_quadrant(
-            sales_qty=80, margin_rate=Decimal("30.00"),
-            sales_median=50, margin_threshold=Decimal("50.00"),
+            sales_qty=80,
+            margin_rate=Decimal("30.00"),
+            sales_median=50,
+            margin_threshold=Decimal("50.00"),
         )
         assert q == "question"
 
     def test_dog(self):
         """低销量 + 低毛利 = 瘦狗"""
         q = classify_quadrant(
-            sales_qty=10, margin_rate=Decimal("20.00"),
-            sales_median=50, margin_threshold=Decimal("50.00"),
+            sales_qty=10,
+            margin_rate=Decimal("20.00"),
+            sales_median=50,
+            margin_threshold=Decimal("50.00"),
         )
         assert q == "dog"
 
     def test_boundary_star(self):
         """边界值：销量=中位数 且 毛利=阈值 → 明星（>=）"""
         q = classify_quadrant(
-            sales_qty=50, margin_rate=Decimal("50.00"),
-            sales_median=50, margin_threshold=Decimal("50.00"),
+            sales_qty=50,
+            margin_rate=Decimal("50.00"),
+            sales_median=50,
+            margin_threshold=Decimal("50.00"),
         )
         assert q == "star"
 
@@ -139,6 +153,7 @@ class TestClassifyQuadrant:
 # 优化建议生成测试
 # ═══════════════════════════════════════════════
 
+
 class TestGenerateOptimizationSuggestion:
     """测试菜单优化建议生成"""
 
@@ -146,8 +161,10 @@ class TestGenerateOptimizationSuggestion:
         """瘦狗 + 高退菜率 → 汰换"""
         dish = {"dish_id": "d1", "dish_name": "红烧蹄膀"}
         result = generate_optimization_suggestion(
-            dish, quadrant="dog",
-            return_rate=Decimal("8.00"), negative_review_count=1,
+            dish,
+            quadrant="dog",
+            return_rate=Decimal("8.00"),
+            negative_review_count=1,
         )
         assert result["action"] == "eliminate"
         assert result["priority"] == "high"
@@ -156,8 +173,10 @@ class TestGenerateOptimizationSuggestion:
         """瘦狗 + 多差评 → 汰换"""
         dish = {"dish_id": "d2", "dish_name": "糖醋排骨"}
         result = generate_optimization_suggestion(
-            dish, quadrant="dog",
-            return_rate=Decimal("2.00"), negative_review_count=5,
+            dish,
+            quadrant="dog",
+            return_rate=Decimal("2.00"),
+            negative_review_count=5,
         )
         assert result["action"] == "eliminate"
         assert result["priority"] == "high"
@@ -166,8 +185,10 @@ class TestGenerateOptimizationSuggestion:
         """瘦狗（无严重问题）→ 观察"""
         dish = {"dish_id": "d3", "dish_name": "凉拌木耳"}
         result = generate_optimization_suggestion(
-            dish, quadrant="dog",
-            return_rate=Decimal("1.00"), negative_review_count=0,
+            dish,
+            quadrant="dog",
+            return_rate=Decimal("1.00"),
+            negative_review_count=0,
         )
         assert result["action"] == "observe"
         assert result["priority"] == "medium"
@@ -176,8 +197,10 @@ class TestGenerateOptimizationSuggestion:
         """问号菜 → 提价"""
         dish = {"dish_id": "d4", "dish_name": "水煮鱼"}
         result = generate_optimization_suggestion(
-            dish, quadrant="question",
-            return_rate=Decimal("2.00"), negative_review_count=0,
+            dish,
+            quadrant="question",
+            return_rate=Decimal("2.00"),
+            negative_review_count=0,
         )
         assert result["action"] == "raise_price"
         assert result["priority"] == "high"
@@ -186,8 +209,10 @@ class TestGenerateOptimizationSuggestion:
         """金牛菜 → 推广"""
         dish = {"dish_id": "d5", "dish_name": "佛跳墙"}
         result = generate_optimization_suggestion(
-            dish, quadrant="cash_cow",
-            return_rate=Decimal("0.00"), negative_review_count=0,
+            dish,
+            quadrant="cash_cow",
+            return_rate=Decimal("0.00"),
+            negative_review_count=0,
         )
         assert result["action"] == "promote"
         assert result["priority"] == "medium"
@@ -196,8 +221,10 @@ class TestGenerateOptimizationSuggestion:
         """明星菜 → 保持"""
         dish = {"dish_id": "d6", "dish_name": "剁椒鱼头"}
         result = generate_optimization_suggestion(
-            dish, quadrant="star",
-            return_rate=Decimal("1.00"), negative_review_count=0,
+            dish,
+            quadrant="star",
+            return_rate=Decimal("1.00"),
+            negative_review_count=0,
         )
         assert result["action"] == "keep"
         assert result["priority"] == "low"

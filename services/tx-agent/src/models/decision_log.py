@@ -1,4 +1,5 @@
 """Agent 决策留痕 — 每个决策必须有完整审计记录"""
+
 import uuid
 
 from sqlalchemy import DateTime, Float, String, Text, func
@@ -10,6 +11,7 @@ from shared.ontology.src.base import TenantBase
 
 class AgentDecisionLog(TenantBase):
     """Agent 决策日志 — 强制留痕（V3.0 CLAUDE.md 第九章）"""
+
     __tablename__ = "agent_decision_logs"
 
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="Agent标识")
@@ -31,8 +33,8 @@ class AgentDecisionLog(TenantBase):
     model_id: Mapped[str | None] = mapped_column(String(100), comment="使用的模型ID")
 
     # 关联 ExecutionPlan
-    plan_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True, comment="关联的 ExecutionPlan.plan_id")
-
-    decided_at: Mapped[str] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+    plan_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True, comment="关联的 ExecutionPlan.plan_id"
     )
+
+    decided_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())

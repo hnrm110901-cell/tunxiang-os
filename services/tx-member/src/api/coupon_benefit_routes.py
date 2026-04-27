@@ -9,6 +9,7 @@
   GET  /gift-cards             — 礼品卡列表
   GET  /points/config          — 积分规则
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/api/v1/member", tags=["coupon-benefit"])
 
 # ─── 请求模型 ────────────────────────────────────────────────
 
+
 class CreateCouponRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="优惠券名称")
     type: str = Field(..., description="类型: full_reduction/discount/free/gift")
@@ -47,6 +49,7 @@ class CreateCouponRequest(BaseModel):
 
 
 # ─── 辅助函数 ────────────────────────────────────────────────
+
 
 def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
     if not x_tenant_id:
@@ -65,6 +68,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ─── 端点 ────────────────────────────────────────────────────
+
 
 @router.get("/coupons")
 async def list_coupons(
@@ -497,10 +501,7 @@ async def get_points_config(
             """),
         )
         tier_rows = list(tier_result.mappings())
-        tier_multiplier = [
-            {"tier": r["level_name"], "multiplier": float(r["multiplier"])}
-            for r in tier_rows
-        ]
+        tier_multiplier = [{"tier": r["level_name"], "multiplier": float(r["multiplier"])} for r in tier_rows]
 
         # Aggregate points balance stats
         stats_result = await db.execute(
@@ -519,8 +520,13 @@ async def get_points_config(
             "data": {
                 "earn_rules": earn_rules,
                 "redeem_rules": [
-                    {"type": "cash_deduction", "label": "积分抵现", "rate": 100,
-                     "description": "100积分抵1元", "max_deduction_ratio": 0.5},
+                    {
+                        "type": "cash_deduction",
+                        "label": "积分抵现",
+                        "rate": 100,
+                        "description": "100积分抵1元",
+                        "max_deduction_ratio": 0.5,
+                    },
                     {"type": "gift_exchange", "label": "积分换礼", "description": "指定礼品兑换"},
                     {"type": "coupon_exchange", "label": "积分换券", "description": "积分兑换优惠券"},
                 ],

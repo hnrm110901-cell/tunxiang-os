@@ -6,12 +6,13 @@ Endpoints:
   GET  /status               — 边缘推理可用性 + 模型状态 + 调用统计
   POST /predict/{predict_type} — 代理预测请求（用于测试/调试）
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Header, Path
+from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 
 from ..services.edge_inference_client import EdgeInferenceClient
@@ -118,7 +119,11 @@ async def proxy_predict_dish_time(
         },
     )
     if result is None:
-        return {"ok": False, "data": None, "error": {"code": "EDGE_UNAVAILABLE", "message": "Edge inference unavailable"}}
+        return {
+            "ok": False,
+            "data": None,
+            "error": {"code": "EDGE_UNAVAILABLE", "message": "Edge inference unavailable"},
+        }
     return {"ok": True, "data": result}
 
 
@@ -139,7 +144,11 @@ async def proxy_predict_discount_risk(
         },
     )
     if result is None:
-        return {"ok": False, "data": None, "error": {"code": "EDGE_UNAVAILABLE", "message": "Edge inference unavailable"}}
+        return {
+            "ok": False,
+            "data": None,
+            "error": {"code": "EDGE_UNAVAILABLE", "message": "Edge inference unavailable"},
+        }
     return {"ok": True, "data": result}
 
 
@@ -156,5 +165,9 @@ async def proxy_predict_traffic(
         hour=body.hour,
     )
     if result is None:
-        return {"ok": False, "data": None, "error": {"code": "EDGE_UNAVAILABLE", "message": "Edge inference unavailable"}}
+        return {
+            "ok": False,
+            "data": None,
+            "error": {"code": "EDGE_UNAVAILABLE", "message": "Edge inference unavailable"},
+        }
     return {"ok": True, "data": result}

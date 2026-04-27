@@ -1,4 +1,5 @@
 """Agent OS 框架测试 — 约束校验 + Memory Bus + Master 编排 + Skill Agent"""
+
 import asyncio
 import os
 import sys
@@ -13,6 +14,7 @@ from agents.skills.serve_dispatch import ServeDispatchAgent
 from agents.skills.smart_menu import SmartMenuAgent
 
 # ─── 约束校验测试 ───
+
 
 class TestConstraintChecker:
     def test_all_pass_when_no_data(self):
@@ -35,20 +37,20 @@ class TestConstraintChecker:
 
     def test_food_safety_violation(self):
         checker = ConstraintChecker(expiry_buffer_hours=24)
-        result = checker.check_food_safety({
-            "ingredients": [
-                {"name": "鲈鱼", "remaining_hours": 12},
-                {"name": "白菜", "remaining_hours": 48},
-            ]
-        })
+        result = checker.check_food_safety(
+            {
+                "ingredients": [
+                    {"name": "鲈鱼", "remaining_hours": 12},
+                    {"name": "白菜", "remaining_hours": 48},
+                ]
+            }
+        )
         assert result["passed"] is False
         assert len(result["items"]) == 1
 
     def test_food_safety_pass(self):
         checker = ConstraintChecker()
-        result = checker.check_food_safety({
-            "ingredients": [{"name": "鲈鱼", "remaining_hours": 72}]
-        })
+        result = checker.check_food_safety({"ingredients": [{"name": "鲈鱼", "remaining_hours": 72}]})
         assert result["passed"] is True
 
     def test_experience_violation(self):
@@ -63,29 +65,34 @@ class TestConstraintChecker:
 
     def test_all_violations(self):
         checker = ConstraintChecker(min_margin_rate=0.5, expiry_buffer_hours=48, max_serve_minutes=10)
-        result = checker.check_all({
-            "price_fen": 1000,
-            "cost_fen": 800,
-            "ingredients": [{"name": "鱼", "remaining_hours": 12}],
-            "estimated_serve_minutes": 25,
-        })
+        result = checker.check_all(
+            {
+                "price_fen": 1000,
+                "cost_fen": 800,
+                "ingredients": [{"name": "鱼", "remaining_hours": 12}],
+                "estimated_serve_minutes": 25,
+            }
+        )
         assert result.passed is False
         assert len(result.violations) == 3
 
 
 # ─── Memory Bus 测试 ───
 
+
 class TestMemoryBus:
     def test_publish_and_get(self):
         bus = MemoryBus()
         bus.clear()
-        bus.publish(Finding(
-            agent_id="inventory_alert",
-            finding_type="low_stock",
-            data={"item": "鲈鱼", "remaining_kg": 2},
-            confidence=0.9,
-            store_id="store1",
-        ))
+        bus.publish(
+            Finding(
+                agent_id="inventory_alert",
+                finding_type="low_stock",
+                data={"item": "鲈鱼", "remaining_kg": 2},
+                confidence=0.9,
+                store_id="store1",
+            )
+        )
         results = bus.get_recent("low_stock")
         assert len(results) == 1
         assert results[0].data["item"] == "鲈鱼"
@@ -112,13 +119,14 @@ class TestMemoryBus:
 
 # ─── Skill Agent 测试 ───
 
+
 class TestDiscountGuard:
     def test_normal_discount(self):
         agent = DiscountGuardAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         result = asyncio.run(
-            agent.execute("detect_discount_anomaly", {
-                "order": {"total_amount_fen": 10000, "discount_amount_fen": 1000}
-            })
+            agent.execute(
+                "detect_discount_anomaly", {"order": {"total_amount_fen": 10000, "discount_amount_fen": 1000}}
+            )
         )
         assert result.success is True
         assert result.data["is_anomaly"] is False
@@ -126,9 +134,9 @@ class TestDiscountGuard:
     def test_excessive_discount(self):
         agent = DiscountGuardAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         result = asyncio.run(
-            agent.execute("detect_discount_anomaly", {
-                "order": {"total_amount_fen": 10000, "discount_amount_fen": 6000}
-            })
+            agent.execute(
+                "detect_discount_anomaly", {"order": {"total_amount_fen": 10000, "discount_amount_fen": 6000}}
+            )
         )
         assert result.data["is_anomaly"] is True
 
@@ -137,13 +145,16 @@ class TestSmartMenu:
     def test_cost_simulation(self):
         agent = SmartMenuAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         result = asyncio.run(
-            agent.execute("simulate_cost", {
-                "bom_items": [
-                    {"cost_fen": 500, "quantity": 1},
-                    {"cost_fen": 300, "quantity": 2},
-                ],
-                "target_price_fen": 3800,
-            })
+            agent.execute(
+                "simulate_cost",
+                {
+                    "bom_items": [
+                        {"cost_fen": 500, "quantity": 1},
+                        {"cost_fen": 300, "quantity": 2},
+                    ],
+                    "target_price_fen": 3800,
+                },
+            )
         )
         assert result.success is True
         assert result.data["total_cost_fen"] == 1100
@@ -152,20 +163,30 @@ class TestSmartMenu:
     def test_quadrant_star(self):
         agent = SmartMenuAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         result = asyncio.run(
-            agent.execute("classify_quadrant", {
-                "total_sales": 200, "margin_rate": 0.5,
-                "avg_sales": 100, "avg_margin": 0.3,
-            })
+            agent.execute(
+                "classify_quadrant",
+                {
+                    "total_sales": 200,
+                    "margin_rate": 0.5,
+                    "avg_sales": 100,
+                    "avg_margin": 0.3,
+                },
+            )
         )
         assert result.data["quadrant"] == "star"
 
     def test_quadrant_dog(self):
         agent = SmartMenuAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         result = asyncio.run(
-            agent.execute("classify_quadrant", {
-                "total_sales": 10, "margin_rate": 0.1,
-                "avg_sales": 100, "avg_margin": 0.3,
-            })
+            agent.execute(
+                "classify_quadrant",
+                {
+                    "total_sales": 10,
+                    "margin_rate": 0.1,
+                    "avg_sales": 100,
+                    "avg_margin": 0.3,
+                },
+            )
         )
         assert result.data["quadrant"] == "dog"
 
@@ -173,15 +194,14 @@ class TestSmartMenu:
 class TestServeDispatch:
     def test_serve_time_prediction(self):
         agent = ServeDispatchAgent(tenant_id="00000000-0000-0000-0000-000000000001")
-        result = asyncio.run(
-            agent.execute("predict_serve_time", {"dish_count": 5})
-        )
+        result = asyncio.run(agent.execute("predict_serve_time", {"dish_count": 5}))
         assert result.success is True
         assert result.data["estimated_serve_minutes"] == 18  # 5 + 5*2.5 rounded
         assert result.inference_layer == "edge"
 
 
 # ─── Master Agent 测试 ───
+
 
 class TestMasterAgent:
     def test_register_and_list(self):
@@ -196,17 +216,17 @@ class TestMasterAgent:
         master = MasterAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         master.register(DiscountGuardAgent(tenant_id="00000000-0000-0000-0000-000000000001"))
         result = asyncio.run(
-            master.dispatch("discount_guard", "detect_discount_anomaly", {
-                "order": {"total_amount_fen": 10000, "discount_amount_fen": 1000}
-            })
+            master.dispatch(
+                "discount_guard",
+                "detect_discount_anomaly",
+                {"order": {"total_amount_fen": 10000, "discount_amount_fen": 1000}},
+            )
         )
         assert result.success is True
 
     def test_dispatch_unknown_agent(self):
         master = MasterAgent(tenant_id="00000000-0000-0000-0000-000000000001")
-        result = asyncio.run(
-            master.dispatch("nonexistent", "action", {})
-        )
+        result = asyncio.run(master.dispatch("nonexistent", "action", {}))
         assert result.success is False
         assert "not found" in result.error
 
@@ -214,9 +234,7 @@ class TestMasterAgent:
         master = MasterAgent(tenant_id="00000000-0000-0000-0000-000000000001")
         master.register(DiscountGuardAgent(tenant_id="00000000-0000-0000-0000-000000000001"))
         result = asyncio.run(
-            master.route_intent("discount_detect", {
-                "order": {"total_amount_fen": 5000, "discount_amount_fen": 500}
-            })
+            master.route_intent("discount_detect", {"order": {"total_amount_fen": 5000, "discount_amount_fen": 500}})
         )
         # intent "discount_detect" → agent "discount_guard" → action "discount_detect"
         # Agent 收到未知 action 返回 error，但路由本身成功
@@ -228,12 +246,16 @@ class TestMasterAgent:
         master.register(SmartMenuAgent(tenant_id="00000000-0000-0000-0000-000000000001"))
 
         results = asyncio.run(
-            master.multi_agent_execute([
-                {"agent_id": "discount_guard", "action": "scan_store_licenses", "params": {}},
-                {"agent_id": "smart_menu", "action": "classify_quadrant", "params": {
-                    "total_sales": 150, "margin_rate": 0.4, "avg_sales": 100, "avg_margin": 0.3
-                }},
-            ])
+            master.multi_agent_execute(
+                [
+                    {"agent_id": "discount_guard", "action": "scan_store_licenses", "params": {}},
+                    {
+                        "agent_id": "smart_menu",
+                        "action": "classify_quadrant",
+                        "params": {"total_sales": 150, "margin_rate": 0.4, "avg_sales": 100, "avg_margin": 0.3},
+                    },
+                ]
+            )
         )
         assert len(results) == 2
         assert all(r.success for r in results)

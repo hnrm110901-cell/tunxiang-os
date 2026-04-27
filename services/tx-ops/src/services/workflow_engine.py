@@ -34,9 +34,10 @@ class WorkflowStatus(str, Enum):
 
 class ApprovalNodeType(str, Enum):
     """审批节点类型"""
-    SINGLE = "single"           # 单人审批
+
+    SINGLE = "single"  # 单人审批
     COUNTERSIGN = "countersign"  # 多人会签（全部通过才算通过）
-    AUTO = "auto"               # 自动审批（满足条件自动通过）
+    AUTO = "auto"  # 自动审批（满足条件自动通过）
 
 
 class PhaseStatus(str, Enum):
@@ -109,9 +110,7 @@ def transition(
         ValueError: 如果转换不合法
     """
     if not can_transition(current, target):
-        raise ValueError(
-            f"非法状态转换: {current.value} -> {target.value}"
-        )
+        raise ValueError(f"非法状态转换: {current.value} -> {target.value}")
     return target
 
 
@@ -147,12 +146,14 @@ def build_approval_chain(
             extra_role = threshold.get("extra_approver_role")
             if amount_fen >= thr and extra_role and extra_role not in existing_roles:
                 new_level = max((s.get("level", 0) for s in chain), default=0) + 1
-                chain.append({
-                    "level": new_level,
-                    "role": extra_role,
-                    "timeout_hours": threshold.get("timeout_hours", 72),
-                    "node_type": threshold.get("node_type", "single"),
-                })
+                chain.append(
+                    {
+                        "level": new_level,
+                        "role": extra_role,
+                        "timeout_hours": threshold.get("timeout_hours", 72),
+                        "node_type": threshold.get("node_type", "single"),
+                    }
+                )
                 existing_roles.add(extra_role)
 
     chain.sort(key=lambda s: s.get("level", 0))
@@ -491,11 +492,7 @@ def simple_diff(
     """
     added = {k: curr[k] for k in curr if k not in prev}
     removed = {k: prev[k] for k in prev if k not in curr}
-    modified = {
-        k: {"before": prev[k], "after": curr[k]}
-        for k in curr
-        if k in prev and prev[k] != curr[k]
-    }
+    modified = {k: {"before": prev[k], "after": curr[k]} for k in curr if k in prev and prev[k] != curr[k]}
     return {
         "added": added,
         "removed": removed,

@@ -2,6 +2,7 @@
 
 封装 bom_templates / bom_items 的查询与管理。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -140,13 +141,15 @@ class BOMService:
                     "now": now,
                 },
             )
-            created_items.append({
-                "id": str(item_id),
-                "ingredient_id": item["ingredient_id"],
-                "standard_qty": item["standard_qty"],
-                "unit": item["unit"],
-                "unit_cost_fen": item.get("unit_cost_fen"),
-            })
+            created_items.append(
+                {
+                    "id": str(item_id),
+                    "ingredient_id": item["ingredient_id"],
+                    "standard_qty": item["standard_qty"],
+                    "unit": item["unit"],
+                    "unit_cost_fen": item.get("unit_cost_fen"),
+                }
+            )
 
         await self.db.flush()
 
@@ -373,7 +376,7 @@ class BOMService:
         await self.db.execute(
             text(f"""
                 UPDATE bom_templates
-                SET {', '.join(update_fields)}
+                SET {", ".join(update_fields)}
                 WHERE id = :id AND tenant_id = :tenant_id
             """),
             update_params,
@@ -428,13 +431,15 @@ class BOMService:
                     "now": now,
                 },
             )
-            created_items.append({
-                "id": str(item_id),
-                "ingredient_id": item["ingredient_id"],
-                "standard_qty": item["standard_qty"],
-                "unit": item["unit"],
-                "unit_cost_fen": item.get("unit_cost_fen"),
-            })
+            created_items.append(
+                {
+                    "id": str(item_id),
+                    "ingredient_id": item["ingredient_id"],
+                    "standard_qty": item["standard_qty"],
+                    "unit": item["unit"],
+                    "unit_cost_fen": item.get("unit_cost_fen"),
+                }
+            )
 
         await self.db.flush()
 

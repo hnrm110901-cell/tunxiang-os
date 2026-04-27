@@ -10,17 +10,15 @@ tx-finance 资金分账、收入分析、企业挂账路由测试
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_fund_revenue_credit.py -v
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
-from datetime import datetime, date, timezone
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-
 
 # ─── 存根工具 ─────────────────────────────────────────────────────────────────
 
@@ -35,9 +33,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # ── structlog 存根 ────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _stub_log = MagicMock()
-    _stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _stub_log.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = _stub_log
 
 # ── sqlalchemy 系列存根 ───────────────────────────────────────────────────────
@@ -116,10 +112,10 @@ sys.modules["src.services.fund_settlement_service"] = _make_stub(
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 
-from src.api import fund_settlement_routes, revenue_routes, credit_account_routes  # noqa: E402
-
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+from src.api import credit_account_routes, fund_settlement_routes, revenue_routes  # noqa: E402
 
 # ─── 公共常量 ─────────────────────────────────────────────────────────────────
 
@@ -169,11 +165,13 @@ class TestFundSettlementRoutes:
         """POST /api/v1/finance/split-rules — 正常创建分账规则"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.create_split_rule = AsyncMock(return_value={
-            "rule_id": str(uuid.uuid4()),
-            "rule_type": "platform_fee",
-            "rate_permil": 50,
-        })
+        svc_inst.create_split_rule = AsyncMock(
+            return_value={
+                "rule_id": str(uuid.uuid4()),
+                "rule_type": "platform_fee",
+                "rate_permil": 50,
+            }
+        )
         mock_db = _mock_db_single()
 
         with (
@@ -217,9 +215,9 @@ class TestFundSettlementRoutes:
         """GET /api/v1/finance/split-rules — 正常返回规则列表"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.list_split_rules = AsyncMock(return_value=[
-            {"rule_id": str(uuid.uuid4()), "rule_type": "brand_royalty", "rate_permil": 30}
-        ])
+        svc_inst.list_split_rules = AsyncMock(
+            return_value=[{"rule_id": str(uuid.uuid4()), "rule_type": "brand_royalty", "rate_permil": 30}]
+        )
         mock_db = _mock_db_single()
 
         with (
@@ -240,10 +238,12 @@ class TestFundSettlementRoutes:
         """POST /api/v1/finance/split/order/{order_id} — 单笔订单分账"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.split_order = AsyncMock(return_value={
-            "order_id": ORDER_ID,
-            "splits": [{"party": "platform", "amount_fen": 500}],
-        })
+        svc_inst.split_order = AsyncMock(
+            return_value={
+                "order_id": ORDER_ID,
+                "splits": [{"party": "platform", "amount_fen": 500}],
+            }
+        )
         mock_db = _mock_db_single()
 
         with (
@@ -264,9 +264,7 @@ class TestFundSettlementRoutes:
         """POST /api/v1/finance/split/batch — 批量分账"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.batch_split = AsyncMock(return_value={
-            "processed": 10, "skipped": 0, "total_split_fen": 5000
-        })
+        svc_inst.batch_split = AsyncMock(return_value={"processed": 10, "skipped": 0, "total_split_fen": 5000})
         mock_db = _mock_db_single()
 
         with (
@@ -288,9 +286,9 @@ class TestFundSettlementRoutes:
         """POST /api/v1/finance/settlements — 生成结算批次"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.create_settlement_batch = AsyncMock(return_value={
-            "batch_id": BATCH_ID, "status": "draft", "total_split_fen": 80000
-        })
+        svc_inst.create_settlement_batch = AsyncMock(
+            return_value={"batch_id": BATCH_ID, "status": "draft", "total_split_fen": 80000}
+        )
         mock_db = _mock_db_single()
 
         with (
@@ -312,13 +310,15 @@ class TestFundSettlementRoutes:
         """GET /api/v1/finance/settlements/{batch_id}/summary — 结算汇总"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.get_settlement_summary = AsyncMock(return_value={
-            "batch_id": BATCH_ID,
-            "status": "draft",
-            "platform_fee_fen": 4000,
-            "brand_royalty_fen": 3000,
-            "franchise_share_fen": 2000,
-        })
+        svc_inst.get_settlement_summary = AsyncMock(
+            return_value={
+                "batch_id": BATCH_ID,
+                "status": "draft",
+                "platform_fee_fen": 4000,
+                "brand_royalty_fen": 3000,
+                "franchise_share_fen": 2000,
+            }
+        )
         mock_db = _mock_db_single()
 
         with (
@@ -339,9 +339,9 @@ class TestFundSettlementRoutes:
         """POST /api/v1/finance/settlements/{batch_id}/confirm — 确认结算"""
         client = _make_fund_client()
         svc_inst = MagicMock()
-        svc_inst.confirm_settlement = AsyncMock(return_value={
-            "batch_id": BATCH_ID, "status": "confirmed", "confirmed_at": "2026-04-01T10:00:00"
-        })
+        svc_inst.confirm_settlement = AsyncMock(
+            return_value={"batch_id": BATCH_ID, "status": "confirmed", "confirmed_at": "2026-04-01T10:00:00"}
+        )
         mock_db = _mock_db_single()
 
         with (

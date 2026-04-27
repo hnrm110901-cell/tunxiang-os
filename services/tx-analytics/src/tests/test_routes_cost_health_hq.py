@@ -13,11 +13,11 @@
     GET /api/v1/analytics/store-ranking
     GET /api/v1/analytics/category-sales
 """
+
 import sys
 import types
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -26,8 +26,12 @@ from fastapi.testclient import TestClient
 # src.db（通用兜底）
 _fake_src = types.ModuleType("src")
 _fake_src_db = types.ModuleType("src.db")
+
+
 async def _fake_get_db():
     yield None
+
+
 _fake_src_db.get_db = _fake_get_db
 sys.modules.setdefault("src", _fake_src)
 sys.modules.setdefault("src.db", _fake_src_db)
@@ -39,8 +43,11 @@ sys.modules.setdefault("structlog", _fake_structlog)
 
 # shared.ontology
 for _mod in [
-    "shared", "shared.ontology", "shared.ontology.src",
-    "shared.ontology.src.database", "shared.ontology.src.entities",
+    "shared",
+    "shared.ontology",
+    "shared.ontology.src",
+    "shared.ontology.src.database",
+    "shared.ontology.src.entities",
     "shared.ontology.src.enums",
 ]:
     sys.modules.setdefault(_mod, types.ModuleType(_mod))
@@ -62,6 +69,7 @@ _fake_enums.OrderStatus = MagicMock(cancelled=_fake_enum_val)
 
 # cost_health_engine stub
 _fake_engine_mod = types.ModuleType("src.services.cost_health_engine")
+
 
 class _FakeCostHealthEngine:
     async def calc_store_cost_health(self, **kw):
@@ -158,6 +166,7 @@ from src.api.hq_overview_routes import router as hq_router  # noqa: E402
 
 # ─── TestClient 工厂 ─────────────────────────────────────────────────────────
 
+
 def _make_client(router):
     app = FastAPI()
     app.include_router(router)
@@ -172,6 +181,7 @@ _HEADERS = {"X-Tenant-ID": _TENANT}
 # cost_health_routes 测试
 # ════════════════════════════════════════════════════════════════════════════
 
+
 class TestCostHealthStoreCostHealth:
     """GET /api/v1/cost-health/store/{store_id}"""
 
@@ -180,8 +190,10 @@ class TestCostHealthStoreCostHealth:
 
     def _override_tenant_db(self, app):
         from src.api.cost_health_routes import _get_tenant_db
+
         async def _fake_db():
             yield None
+
         app.dependency_overrides[_get_tenant_db] = _fake_db
 
     def test_missing_tenant_header_returns_400(self):
@@ -344,6 +356,7 @@ class TestCostHealthSuggestions:
 # ════════════════════════════════════════════════════════════════════════════
 # hq_overview_routes 测试 — 该路由内部异常时回退为 mock 数据，永远不返回 500
 # ════════════════════════════════════════════════════════════════════════════
+
 
 class TestHqOverview:
     """GET /api/v1/analytics/overview"""

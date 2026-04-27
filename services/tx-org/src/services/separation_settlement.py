@@ -23,6 +23,7 @@
 
 金额单位：分（fen）
 """
+
 from __future__ import annotations
 
 import math
@@ -74,10 +75,10 @@ MONTHLY_TAX_BRACKETS: List[Tuple[float, float, float]] = [
 # ── 年假天数表（工龄 → 年假天数） ────────────────────────────
 # 依据《职工带薪年休假条例》
 ANNUAL_LEAVE_TABLE = [
-    (1, 0),    # 不满1年：0天
-    (10, 5),   # 1-9年：5天
+    (1, 0),  # 不满1年：0天
+    (10, 5),  # 1-9年：5天
     (20, 10),  # 10-19年：10天
-    (999, 15), # 20年以上：15天
+    (999, 15),  # 20年以上：15天
 ]
 
 
@@ -344,19 +345,11 @@ class SeparationSettlementService:
 
         # 总扣款
         total_deductions = (
-            social_insurance_deduction_fen
-            + housing_fund_deduction_fen
-            + other_deductions_fen
-            + compensation_tax_fen
+            social_insurance_deduction_fen + housing_fund_deduction_fen + other_deductions_fen + compensation_tax_fen
         )
 
         # 净结算金额
-        gross_final = (
-            base_prorate_fen
-            + compensation_fen
-            + leave_payout_fen
-            + prorated_13th_month_fen
-        )
+        gross_final = base_prorate_fen + compensation_fen + leave_payout_fen + prorated_13th_month_fen
         net_final_pay = gross_final - total_deductions
 
         result = {
@@ -473,10 +466,7 @@ class SeparationSettlementService:
 
         return {
             "total": total,
-            "by_type": {
-                k: {"count": v, "label": SEPARATION_TYPES.get(k, k)}
-                for k, v in by_type.items()
-            },
+            "by_type": {k: {"count": v, "label": SEPARATION_TYPES.get(k, k)} for k, v in by_type.items()},
             "avg_tenure_years": round(total_tenure / total, 1),
             "avg_compensation_fen": int(total_compensation / compensated_count) if compensated_count > 0 else 0,
             "turnover_count": total,

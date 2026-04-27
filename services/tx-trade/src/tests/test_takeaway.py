@@ -18,6 +18,7 @@
 15. 自动接单规则 — 无效模式报错
 16. 自动接单 — 全自动模式自动接单
 """
+
 import os
 import sys
 
@@ -30,6 +31,7 @@ import pytest
 
 # ─── 工具 ───
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -39,6 +41,7 @@ STORE_ID = _uid()
 
 
 # ─── 测试 1: 同步美团订单 — 空结果 ───
+
 
 @pytest.mark.asyncio
 async def test_sync_meituan_orders_empty():
@@ -61,6 +64,7 @@ async def test_sync_meituan_orders_empty():
 
 # ─── 测试 2: 同步饿了么订单 — 空结果 ───
 
+
 @pytest.mark.asyncio
 async def test_sync_eleme_orders_empty():
     """验证饿了么无新订单时返回空列表"""
@@ -81,6 +85,7 @@ async def test_sync_eleme_orders_empty():
 
 
 # ─── 测试 3: 同步美团订单 — 有订单 ───
+
 
 @pytest.mark.asyncio
 async def test_sync_meituan_orders_with_data():
@@ -104,6 +109,7 @@ async def test_sync_meituan_orders_with_data():
 
     # 确保不自动接单
     from services.takeaway_manager import _auto_accept_rules
+
     _auto_accept_rules.clear()
 
     try:
@@ -124,15 +130,14 @@ async def test_sync_meituan_orders_with_data():
 
 # ─── 测试 4: 接单 — 美团成功 ───
 
+
 @pytest.mark.asyncio
 async def test_accept_order_meituan():
     """验证美团接单调用成功"""
     from services.takeaway_manager import _meituan_client, accept_order
 
     original = _meituan_client.confirm_order
-    _meituan_client.confirm_order = AsyncMock(
-        return_value={"code": "ok", "order_id": "MT001"}
-    )
+    _meituan_client.confirm_order = AsyncMock(return_value={"code": "ok", "order_id": "MT001"})
 
     try:
         result = await accept_order(
@@ -150,6 +155,7 @@ async def test_accept_order_meituan():
 
 # ─── 测试 5: 接单 — 不支持的平台 ───
 
+
 @pytest.mark.asyncio
 async def test_accept_order_invalid_platform():
     """验证不支持的平台报 ValueError"""
@@ -165,15 +171,14 @@ async def test_accept_order_invalid_platform():
 
 # ─── 测试 6: 拒单 — 饿了么成功 ───
 
+
 @pytest.mark.asyncio
 async def test_reject_order_eleme():
     """验证饿了么拒单调用成功"""
     from services.takeaway_manager import _eleme_client, reject_order
 
     original = _eleme_client.cancel_order
-    _eleme_client.cancel_order = AsyncMock(
-        return_value={"code": "ok", "order_id": "EL001"}
-    )
+    _eleme_client.cancel_order = AsyncMock(return_value={"code": "ok", "order_id": "EL001"})
 
     try:
         result = await reject_order(
@@ -191,6 +196,7 @@ async def test_reject_order_eleme():
 
 
 # ─── 测试 7: 沽清同步 — 双平台 ───
+
 
 @pytest.mark.asyncio
 async def test_sync_stockout_to_both_platforms():
@@ -223,6 +229,7 @@ async def test_sync_stockout_to_both_platforms():
 
 # ─── 测试 8: 配送状态更新 — 正常 ───
 
+
 @pytest.mark.asyncio
 async def test_update_delivery_status_ok():
     """验证配送状态正常流转"""
@@ -239,6 +246,7 @@ async def test_update_delivery_status_ok():
 
 # ─── 测试 9: 配送状态更新 — 无效状态 ───
 
+
 @pytest.mark.asyncio
 async def test_update_delivery_status_invalid():
     """验证无效状态报 ValueError"""
@@ -253,6 +261,7 @@ async def test_update_delivery_status_invalid():
 
 
 # ─── 测试 10: 外卖仪表盘 ───
+
 
 @pytest.mark.asyncio
 async def test_takeaway_dashboard():
@@ -288,6 +297,7 @@ async def test_takeaway_dashboard():
 
 # ─── 测试 11: 平台对账 ───
 
+
 @pytest.mark.asyncio
 async def test_platform_reconciliation():
     """验证平台对账正常返回"""
@@ -297,11 +307,13 @@ async def test_platform_reconciliation():
     )
 
     original = _meituan_client.get_bill
-    _meituan_client.get_bill = AsyncMock(return_value={
-        "total_fen": 10000,
-        "commission_fen": 1800,
-        "orders": [],
-    })
+    _meituan_client.get_bill = AsyncMock(
+        return_value={
+            "total_fen": 10000,
+            "commission_fen": 1800,
+            "orders": [],
+        }
+    )
 
     try:
         result = await get_platform_reconciliation(
@@ -320,6 +332,7 @@ async def test_platform_reconciliation():
 
 
 # ─── 测试 12: 菜品上下架 — 美团上架 ───
+
 
 @pytest.mark.asyncio
 async def test_manage_menu_on_sale():
@@ -344,6 +357,7 @@ async def test_manage_menu_on_sale():
 
 # ─── 测试 13: 菜品上下架 — 无效操作 ───
 
+
 @pytest.mark.asyncio
 async def test_manage_menu_invalid_action():
     """验证无效操作被标记为 failed"""
@@ -360,6 +374,7 @@ async def test_manage_menu_invalid_action():
 
 
 # ─── 测试 14: 自动接单规则 — 全自动 ───
+
 
 @pytest.mark.asyncio
 async def test_set_auto_accept_rules_all():
@@ -379,6 +394,7 @@ async def test_set_auto_accept_rules_all():
 
 # ─── 测试 15: 自动接单规则 — 无效模式 ───
 
+
 @pytest.mark.asyncio
 async def test_set_auto_accept_rules_invalid_mode():
     """验证无效模式报 ValueError"""
@@ -393,6 +409,7 @@ async def test_set_auto_accept_rules_invalid_mode():
 
 
 # ─── 测试 16: 自动接单 — 全自动模式 ───
+
 
 @pytest.mark.asyncio
 async def test_auto_accept_all_mode():
@@ -416,21 +433,21 @@ async def test_auto_accept_all_mode():
     # Mock 拉取订单和接单
     orig_pull = _meituan_client.pull_new_orders
     orig_confirm = _meituan_client.confirm_order
-    _meituan_client.pull_new_orders = AsyncMock(return_value=[
-        {
-            "order_id": "MT_AUTO_001",
-            "status": 1,
-            "order_total_price": 3200,
-            "recipient_phone": "139****5678",
-            "recipient_address": "长沙市天心区xxx",
-            "delivery_time": "",
-            "caution": "",
-            "detail": [],
-        }
-    ])
-    _meituan_client.confirm_order = AsyncMock(
-        return_value={"code": "ok", "order_id": "MT_AUTO_001"}
+    _meituan_client.pull_new_orders = AsyncMock(
+        return_value=[
+            {
+                "order_id": "MT_AUTO_001",
+                "status": 1,
+                "order_total_price": 3200,
+                "recipient_phone": "139****5678",
+                "recipient_address": "长沙市天心区xxx",
+                "delivery_time": "",
+                "caution": "",
+                "detail": [],
+            }
+        ]
     )
+    _meituan_client.confirm_order = AsyncMock(return_value={"code": "ok", "order_id": "MT_AUTO_001"})
 
     try:
         result = await sync_meituan_orders(

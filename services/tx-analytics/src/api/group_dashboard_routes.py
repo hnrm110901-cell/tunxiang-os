@@ -4,6 +4,7 @@ GET /api/v1/analytics/group/today?brand_id=   — 所有门店今日实时汇总
 GET /api/v1/analytics/group/trend?brand_id=&days=7  — 7/30天营收趋势
 GET /api/v1/analytics/group/alerts?brand_id=  — 集团级异常告警
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/v1/analytics/group", tags=["group-dashboard"])
 
 # ─── 依赖 ────────────────────────────────────────────────────────────────────
 
+
 async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -34,6 +36,7 @@ def _get_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 工具 ────────────────────────────────────────────────────────────────────
+
 
 def _require_tenant(tenant_id: Optional[str]) -> str:
     if not tenant_id:
@@ -51,10 +54,11 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── Pydantic 响应模型 ────────────────────────────────────────────────────────
 
+
 class StoreTodayData(BaseModel):
     store_id: str
     store_name: str
-    status: str                   # open | closed
+    status: str  # open | closed
     revenue_fen: int
     order_count: int
     table_turnover: float
@@ -88,7 +92,7 @@ class GroupTrendResponse(BaseModel):
 
 
 class AlertItem(BaseModel):
-    severity: str                 # danger | warning | info
+    severity: str  # danger | warning | info
     store_name: str
     type: str
     title: str
@@ -101,6 +105,7 @@ class GroupAlertsResponse(BaseModel):
 
 
 # ─── 路由处理器 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/today", response_model=dict)
 async def get_group_today(
@@ -131,35 +136,45 @@ async def get_group_today(
         else:
             store_rows = (
                 await db.execute(
-                    text(
-                        "SELECT id, store_name, brand_id "
-                        "FROM stores "
-                        "WHERE tenant_id = :tid AND is_deleted = FALSE"
-                    ),
+                    text("SELECT id, store_name, brand_id FROM stores WHERE tenant_id = :tid AND is_deleted = FALSE"),
                     {"tid": tenant_id},
                 )
             ).fetchall()
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.warning("group_today.stores_query_failed", tenant_id=tenant_id, error=str(exc))
-        return {"ok": True, "data": GroupTodayResponse(
-            summary=GroupSummary(
-                total_revenue_fen=0, total_orders=0, avg_table_turnover=0.0,
-                active_stores=0, total_stores=0, revenue_vs_yesterday_pct=0.0,
-                current_diners=0,
-            ),
-            stores=[],
-        ).model_dump()}
+        return {
+            "ok": True,
+            "data": GroupTodayResponse(
+                summary=GroupSummary(
+                    total_revenue_fen=0,
+                    total_orders=0,
+                    avg_table_turnover=0.0,
+                    active_stores=0,
+                    total_stores=0,
+                    revenue_vs_yesterday_pct=0.0,
+                    current_diners=0,
+                ),
+                stores=[],
+            ).model_dump(),
+        }
 
     if not store_rows:
-        return {"ok": True, "data": GroupTodayResponse(
-            summary=GroupSummary(
-                total_revenue_fen=0, total_orders=0, avg_table_turnover=0.0,
-                active_stores=0, total_stores=0, revenue_vs_yesterday_pct=0.0,
-                current_diners=0,
-            ),
-            stores=[],
-        ).model_dump()}
+        return {
+            "ok": True,
+            "data": GroupTodayResponse(
+                summary=GroupSummary(
+                    total_revenue_fen=0,
+                    total_orders=0,
+                    avg_table_turnover=0.0,
+                    active_stores=0,
+                    total_stores=0,
+                    revenue_vs_yesterday_pct=0.0,
+                    current_diners=0,
+                ),
+                stores=[],
+            ).model_dump(),
+        }
 
     store_id_list = [str(r.id) for r in store_rows]
     store_name_map = {str(r.id): r.store_name for r in store_rows}
@@ -208,7 +223,7 @@ async def get_group_today(
                 status="open" if cnt > 0 else "closed",
                 revenue_fen=rev,
                 order_count=cnt,
-                table_turnover=0.0,       # 需接桌台系统，暂留 0
+                table_turnover=0.0,  # 需接桌台系统，暂留 0
                 occupied_tables=0,
                 total_tables=0,
                 current_diners=0,
@@ -256,6 +271,7 @@ async def get_group_trend(
 
     # ── 1. 构造日期序列 ──────────────────────────────────────────────────────
     from datetime import date
+
     today = date.today()
     date_list = [(today - timedelta(days=days - 1 - i)) for i in range(days)]
     dates = [d.isoformat() for d in date_list]
@@ -278,28 +294,20 @@ async def get_group_trend(
         else:
             store_rows = (
                 await db.execute(
-                    text(
-                        "SELECT id, store_name "
-                        "FROM stores "
-                        "WHERE tenant_id = :tid AND is_deleted = FALSE"
-                    ),
+                    text("SELECT id, store_name FROM stores WHERE tenant_id = :tid AND is_deleted = FALSE"),
                     {"tid": tenant_id},
                 )
             ).fetchall()
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.warning("group_trend.stores_query_failed", tenant_id=tenant_id, error=str(exc))
-        return {"ok": True, "data": GroupTrendResponse(
-            dates=dates, total_revenue=[0] * days, by_store={}
-        ).model_dump()}
+        return {"ok": True, "data": GroupTrendResponse(dates=dates, total_revenue=[0] * days, by_store={}).model_dump()}
 
     store_id_list = [str(r.id) for r in store_rows]
     store_name_map = {str(r.id): r.store_name for r in store_rows}
 
     if not store_id_list:
-        return {"ok": True, "data": GroupTrendResponse(
-            dates=dates, total_revenue=[0] * days, by_store={}
-        ).model_dump()}
+        return {"ok": True, "data": GroupTrendResponse(dates=dates, total_revenue=[0] * days, by_store={}).model_dump()}
 
     # ── 3. 检查物化视图是否存在 ──────────────────────────────────────────────
     try:
@@ -431,11 +439,7 @@ async def get_group_alerts(
         else:
             store_rows = (
                 await db.execute(
-                    text(
-                        "SELECT id, store_name "
-                        "FROM stores "
-                        "WHERE tenant_id = :tid AND is_deleted = FALSE"
-                    ),
+                    text("SELECT id, store_name FROM stores WHERE tenant_id = :tid AND is_deleted = FALSE"),
                     {"tid": tenant_id},
                 )
             ).fetchall()
@@ -489,11 +493,7 @@ async def get_group_alerts(
     for row in alert_rows:
         sid = str(row.store_id) if row.store_id else ""
         store_name = store_name_map.get(sid, sid or "未知门店")
-        created_str = (
-            row.created_at.isoformat()
-            if hasattr(row.created_at, "isoformat")
-            else str(row.created_at)
-        )
+        created_str = row.created_at.isoformat() if hasattr(row.created_at, "isoformat") else str(row.created_at)
         alerts.append(
             AlertItem(
                 severity=_level_map.get(str(row.level), "info"),

@@ -10,6 +10,7 @@ D4: 美团/饿了么外卖
 D5: 电子发票(诺诺)
 D6: 钉钉/飞书登录
 """
+
 import base64
 import json
 import os
@@ -28,6 +29,7 @@ logger = structlog.get_logger()
 # 自定义异常
 # ═══════════════════════════════════════
 
+
 class WecomAPIError(Exception):
     def __init__(self, errcode: int, errmsg: str):
         self.errcode = errcode
@@ -38,6 +40,7 @@ class WecomAPIError(Exception):
 # ═══════════════════════════════════════
 # D1: 微信支付
 # ═══════════════════════════════════════
+
 
 @dataclass
 class WechatPayConfig:
@@ -51,6 +54,7 @@ class WechatPayConfig:
 
 class WechatPaySDK:
     """微信支付 V3 API"""
+
     BASE = "https://api.mch.weixin.qq.com"
 
     def __init__(self, config: WechatPayConfig = None):
@@ -79,9 +83,7 @@ class WechatPaySDK:
         with open(private_key_path, "rb") as f:
             private_key = load_pem_private_key(f.read(), password=None)
 
-        signature = base64.b64encode(
-            private_key.sign(message.encode("utf-8"), PKCS1v15(), SHA256())
-        ).decode("utf-8")
+        signature = base64.b64encode(private_key.sign(message.encode("utf-8"), PKCS1v15(), SHA256())).decode("utf-8")
 
         return (
             f'WECHATPAY2-SHA256-RSA2048 mchid="{self.config.mch_id}",'
@@ -156,6 +158,7 @@ class WechatPaySDK:
 # D2: 企业微信
 # ═══════════════════════════════════════
 
+
 @dataclass
 class WecomConfig:
     corp_id: str = os.getenv("WECOM_CORP_ID", "")
@@ -168,6 +171,7 @@ _token_cache: dict = {"token": None, "expires_at": 0}
 
 class WecomSDK:
     """企业微信 API"""
+
     BASE = "https://qyapi.weixin.qq.com/cgi-bin"
 
     def __init__(self, config: WecomConfig = None):
@@ -533,6 +537,7 @@ class WecomSDK:
 # D3: 支付宝
 # ═══════════════════════════════════════
 
+
 class AlipaySDK:
     """支付宝 SDK"""
 
@@ -551,8 +556,10 @@ class AlipaySDK:
 # D4: 美团外卖
 # ═══════════════════════════════════════
 
+
 class MeituanWaimaiSDK:
     """美团外卖开放平台"""
+
     BASE = "https://waimaiopen.meituan.com/api/v1"
 
     async def receive_order(self, order_data: dict) -> dict:
@@ -574,6 +581,7 @@ class MeituanWaimaiSDK:
 # D5: 诺诺电子发票
 # ═══════════════════════════════════════
 
+
 class NuonuoInvoiceSDK:
     """诺诺电子发票"""
 
@@ -591,6 +599,7 @@ class NuonuoInvoiceSDK:
 # ═══════════════════════════════════════
 # D6: 钉钉/飞书扫码登录
 # ═══════════════════════════════════════
+
 
 class DingtalkSDK:
     """钉钉 SDK"""
@@ -616,6 +625,7 @@ class FeishuSDK:
 # ═══════════════════════════════════════
 # 统一入口
 # ═══════════════════════════════════════
+
 
 class ExternalSDKManager:
     """外部 SDK 统一管理"""

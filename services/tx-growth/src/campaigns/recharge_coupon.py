@@ -3,6 +3,7 @@
 典型场景: 充值500送3张20元满减券
 区别于 stored_value_gift(充值送储值金额), 本模板充值送优惠券。
 """
+
 from typing import Any
 
 import structlog

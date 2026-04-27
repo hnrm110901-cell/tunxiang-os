@@ -10,6 +10,7 @@
 7.  跨租户隔离 — 租户 A 的 code 不能被租户 B 扫
 8.  待确认列表 — 只返回未确认订单
 """
+
 import os
 import sys
 
@@ -23,6 +24,7 @@ import pytest
 
 # ─── 工具 ───
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -34,11 +36,13 @@ TENANT_B = _uid()
 def _clear_stores():
     """在测试间清理内存存储，避免状态污染"""
     from services.dispatch_code_service import _store_by_code, _store_by_order
+
     _store_by_order.clear()
     _store_by_code.clear()
 
 
 # ─── 测试 1: 生成出餐码格式 ───
+
 
 @pytest.mark.asyncio
 async def test_generate_code_format():
@@ -54,9 +58,7 @@ async def test_generate_code_format():
     )
 
     assert len(dc.code) == 6, f"出餐码长度应为 6，实际: {len(dc.code)}"
-    assert re.fullmatch(r"[A-Za-z0-9]{6}", dc.code), (
-        f"出餐码应为字母数字，实际: {dc.code}"
-    )
+    assert re.fullmatch(r"[A-Za-z0-9]{6}", dc.code), f"出餐码应为字母数字，实际: {dc.code}"
     assert dc.order_id == order_id
     assert dc.tenant_id == TENANT_A
     assert dc.platform == "meituan"
@@ -65,6 +67,7 @@ async def test_generate_code_format():
 
 
 # ─── 测试 2: 幂等生成 ───
+
 
 @pytest.mark.asyncio
 async def test_generate_idempotent():
@@ -89,6 +92,7 @@ async def test_generate_idempotent():
 
 
 # ─── 测试 3: 扫码确认成功路径 ───
+
 
 @pytest.mark.asyncio
 async def test_confirm_by_scan_success():
@@ -132,6 +136,7 @@ async def test_confirm_by_scan_success():
 
 # ─── 测试 4: 重复扫码 ───
 
+
 @pytest.mark.asyncio
 async def test_confirm_already_confirmed():
     """重复扫码应返回 already_confirmed=True，不报错"""
@@ -169,6 +174,7 @@ async def test_confirm_already_confirmed():
 
 # ─── 测试 5: 错误 code ───
 
+
 @pytest.mark.asyncio
 async def test_confirm_invalid_code():
     """不存在的出餐码，ScanResult.success=False，error 有说明"""
@@ -188,6 +194,7 @@ async def test_confirm_invalid_code():
 
 
 # ─── 测试 6: 平台回调失败不阻塞 ───
+
 
 @pytest.mark.asyncio
 async def test_platform_notify_failure_does_not_block():
@@ -212,6 +219,7 @@ async def test_platform_notify_failure_does_not_block():
 
     original_client = None
     from services import dispatch_code_service as _svc
+
     original_client = _svc._platform_client
     set_platform_client(_FailingClient())
 
@@ -230,6 +238,7 @@ async def test_platform_notify_failure_does_not_block():
 
 
 # ─── 测试 7: 跨租户隔离 ───
+
 
 @pytest.mark.asyncio
 async def test_cross_tenant_isolation():
@@ -269,6 +278,7 @@ async def test_cross_tenant_isolation():
 
 # ─── 测试 8: 待确认列表只返回未确认订单 ───
 
+
 @pytest.mark.asyncio
 async def test_list_pending_only_unconfirmed():
     """list_pending 只返回 confirmed=False 的出餐码"""
@@ -280,15 +290,9 @@ async def test_list_pending_only_unconfirmed():
     store_id = _uid()
 
     # 创建 3 条出餐码
-    dc1 = await DispatchCodeService.generate(
-        order_id=_uid(), tenant_id=tenant_id, platform="meituan"
-    )
-    dc2 = await DispatchCodeService.generate(
-        order_id=_uid(), tenant_id=tenant_id, platform="eleme"
-    )
-    dc3 = await DispatchCodeService.generate(
-        order_id=_uid(), tenant_id=tenant_id, platform="douyin"
-    )
+    dc1 = await DispatchCodeService.generate(order_id=_uid(), tenant_id=tenant_id, platform="meituan")
+    dc2 = await DispatchCodeService.generate(order_id=_uid(), tenant_id=tenant_id, platform="eleme")
+    dc3 = await DispatchCodeService.generate(order_id=_uid(), tenant_id=tenant_id, platform="douyin")
 
     # 确认 dc1
     await DispatchCodeService.confirm_by_scan(
@@ -311,6 +315,7 @@ async def test_list_pending_only_unconfirmed():
 
 # ─── 测试 9: get_by_order 不存在时返回 None ───
 
+
 @pytest.mark.asyncio
 async def test_get_by_order_not_found():
     """不存在的 order_id 返回 None"""
@@ -325,6 +330,7 @@ async def test_get_by_order_not_found():
 
 
 # ─── 测试 10: 生成出餐码包含纯数字字串也有效 ───
+
 
 @pytest.mark.asyncio
 async def test_generate_code_base62_chars():

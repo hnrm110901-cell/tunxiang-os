@@ -8,17 +8,17 @@
   POST /api/v1/pay/split           — 多方式拆单支付
   GET  /api/v1/pay/daily-summary   — 当日支付汇总
 """
+
 from __future__ import annotations
 
-import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from ..channels.base import PayMethod, PayStatus, TradeType
+from ..channels.base import PayMethod, TradeType
 
 logger = structlog.get_logger(__name__)
 
@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/v1/pay", tags=["支付中枢"])
 
 
 # ─── 请求/响应模型 ─────────────────────────────────────────────────
+
 
 class CreatePaymentReq(BaseModel):
     store_id: str
@@ -77,6 +78,7 @@ class DailySummaryQuery(BaseModel):
 
 # ─── 标准响应 ───────────────────────────────────────────────────────
 
+
 def ok(data: dict | list | None = None) -> dict:
     return {"ok": True, "data": data or {}}
 
@@ -86,6 +88,7 @@ def err(code: str, message: str, status: int = 400) -> None:
 
 
 # ─── 端点 ───────────────────────────────────────────────────────────
+
 
 @router.post("/create")
 async def create_payment(

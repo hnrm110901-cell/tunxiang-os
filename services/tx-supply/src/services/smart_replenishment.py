@@ -25,6 +25,7 @@ Schema SQL:
 # from .api.smart_replenishment_routes import router as smart_replenishment_router
 # app.include_router(smart_replenishment_router, prefix="/api/v1/smart-replenishment")
 """
+
 from __future__ import annotations
 
 import math
@@ -60,6 +61,7 @@ def _gen_id(prefix: str) -> str:
 
 class ReplenishmentItem(BaseModel):
     """单条补货建议"""
+
     ingredient_id: str
     ingredient_name: str
     current_stock: float
@@ -73,6 +75,7 @@ class ReplenishmentItem(BaseModel):
 
 class InventoryThreshold(BaseModel):
     """库存阈值配置"""
+
     id: Optional[str] = None
     tenant_id: str
     store_id: str
@@ -87,6 +90,7 @@ class InventoryThreshold(BaseModel):
 
 class AutoRequisitionResult(BaseModel):
     """自动申购单结果"""
+
     requisition_id: Optional[str] = None
     store_id: str
     tenant_id: str
@@ -137,9 +141,7 @@ class SmartReplenishmentService:
 
         # 2. 查询当前库存（批量）
         ingredient_ids = [t.ingredient_id for t in thresholds]
-        current_stocks = await self._fetch_current_stocks(
-            store_id, tenant_id, ingredient_ids, db
-        )
+        current_stocks = await self._fetch_current_stocks(store_id, tenant_id, ingredient_ids, db)
 
         # 3. dual 规则：查询近7日消耗速度
         consumption_map: dict[str, float] = {}
@@ -346,7 +348,9 @@ class SmartReplenishmentService:
                     target_stock=float(row.target_stock),
                     min_order_qty=float(row.min_order_qty),
                     trigger_rule=row.trigger_rule,
-                    updated_at=row.updated_at.isoformat() if hasattr(row.updated_at, "isoformat") else str(row.updated_at),
+                    updated_at=row.updated_at.isoformat()
+                    if hasattr(row.updated_at, "isoformat")
+                    else str(row.updated_at),
                 )
             )
         return thresholds

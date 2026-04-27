@@ -7,6 +7,7 @@
 5. GET    /api/v1/stamp-cards/my                  我的集点卡
 6. POST   /api/v1/stamp-cards/{id}/redeem         集满兑换
 """
+
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
@@ -37,6 +38,7 @@ def error_response(msg: str) -> dict:
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class CreateTemplateReq(BaseModel):
     name: str
     target_stamps: int = Field(ge=2, le=50, default=5)
@@ -59,6 +61,7 @@ class RedeemReq(BaseModel):
 
 
 # ── 1. 创建集点卡模板 ────────────────────────────────────────
+
 
 @router.post("/templates")
 async def api_create_template(
@@ -86,6 +89,7 @@ async def api_create_template(
 
 # ── 2. 模板列表 ──────────────────────────────────────────────
 
+
 @router.get("/templates")
 async def api_list_templates(
     status: Optional[str] = Query(None),
@@ -97,6 +101,7 @@ async def api_list_templates(
 
 
 # ── 3. 自动盖章（订单完成后调用） ────────────────────────────
+
 
 @router.post("/auto-stamp")
 async def api_auto_stamp(
@@ -118,6 +123,7 @@ async def api_auto_stamp(
 
 # ── 4. 我的集点卡 ────────────────────────────────────────────
 
+
 @router.get("/my")
 async def api_my_cards(
     customer_id: str = Query(...),
@@ -125,12 +131,15 @@ async def api_my_cards(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     result = await get_my_cards(
-        customer_id=customer_id, tenant_id=x_tenant_id, db=db,
+        customer_id=customer_id,
+        tenant_id=x_tenant_id,
+        db=db,
     )
     return ok_response(result)
 
 
 # ── 5. 手动兑换 ──────────────────────────────────────────────
+
 
 @router.post("/{instance_id}/redeem")
 async def api_redeem(

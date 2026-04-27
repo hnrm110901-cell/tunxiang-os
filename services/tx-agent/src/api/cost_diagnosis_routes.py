@@ -14,6 +14,7 @@ prefix: /api/v1/agent/cost
   POST /price-trend-alert    — 采购价趋势预警
   POST /channel-cost-compare — 渠道成本对比
 """
+
 from __future__ import annotations
 
 import structlog
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/v1/agent/cost", tags=["cost-diagnosis-agent"])
 
 # ─── 通用请求/响应模型 ─────────────────────────────────────────────────────────
 
+
 class CostAgentRequest(BaseModel):
     store_id: str = Field(default="", description="门店ID")
     params: dict = Field(default_factory=dict, description="action参数")
@@ -43,6 +45,7 @@ class CostAgentResponse(BaseModel):
 
 
 # ─── 辅助函数 ──────────────────────────────────────────────────────────────────
+
 
 async def _run(
     action: str,
@@ -70,6 +73,7 @@ async def _run(
 # ═══════════════════════════════════════════════════════════════════════════════
 # 端点定义
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @router.post("/diagnose", response_model=CostAgentResponse)
 async def diagnose_cost_variance(
@@ -162,6 +166,7 @@ async def compare_channel_cost(
 
 
 # ─── 信息查询端点 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/info", response_model=CostAgentResponse)
 async def get_agent_info(

@@ -12,6 +12,7 @@
 9. ReportScheduler 执行定时任务
 10. 多维度交叉查询(门店x日期)
 """
+
 import os
 import sys
 from datetime import date, datetime, timezone
@@ -38,6 +39,7 @@ from services.report_engine import (
 from services.report_registry import ReportRegistry, create_default_registry
 
 # ─── Mock 工具 ───
+
 
 def _make_mock_db(rows: list[dict], scalar_value=None):
     """构建 mock AsyncSession"""
@@ -84,6 +86,7 @@ def _make_simple_report() -> ReportDefinition:
 
 
 # ─── 1. 注册中心测试 ───
+
 
 def test_registry_register_and_get():
     """注册报表后能通过ID获取"""
@@ -135,6 +138,7 @@ def test_default_registry_has_builtin_reports():
 
 # ─── 2. 报表引擎测试 ───
 
+
 @pytest.mark.asyncio
 async def test_engine_execute_report():
     """执行报表返回正确结果(含金额fen→yuan转换)"""
@@ -142,9 +146,11 @@ async def test_engine_execute_report():
     registry.register(_make_simple_report())
     engine = ReportEngine(registry=registry)
 
-    mock_db = _make_mock_db([
-        {"report_date": date(2026, 3, 27), "revenue_fen": 150000, "order_count": 50},
-    ])
+    mock_db = _make_mock_db(
+        [
+            {"report_date": date(2026, 3, 27), "revenue_fen": 150000, "order_count": 50},
+        ]
+    )
 
     result = await engine.execute_report(
         report_id="test_revenue",
@@ -221,6 +227,7 @@ async def test_engine_inactive_report():
 
 
 # ─── 3. 渲染器测试 ───
+
 
 def test_renderer_to_json():
     """to_json 返回标准JSON结构"""
@@ -299,6 +306,7 @@ def test_renderer_to_summary():
 
 # ─── 4. 调度器测试 ───
 
+
 @pytest.mark.asyncio
 async def test_scheduler_create_and_list():
     """创建定时任务后能从列表中查到"""
@@ -336,9 +344,11 @@ async def test_scheduler_run_scheduled():
     renderer = ReportRenderer()
     scheduler = ReportScheduler(engine=engine, renderer=renderer)
 
-    mock_db = _make_mock_db([
-        {"report_date": date(2026, 3, 27), "revenue_fen": 100000, "order_count": 30},
-    ])
+    mock_db = _make_mock_db(
+        [
+            {"report_date": date(2026, 3, 27), "revenue_fen": 100000, "order_count": 30},
+        ]
+    )
 
     await scheduler.schedule_report(
         report_id="test_revenue",
@@ -357,6 +367,7 @@ async def test_scheduler_run_scheduled():
 
 
 # ─── 5. 多维度交叉查询 ───
+
 
 @pytest.mark.asyncio
 async def test_cross_dimension_store_date():
@@ -395,11 +406,13 @@ async def test_cross_dimension_store_date():
     registry.register(cross_report)
     engine = ReportEngine(registry=registry)
 
-    mock_db = _make_mock_db([
-        {"store_name": "旗舰店", "report_date": date(2026, 3, 27), "revenue_fen": 200000},
-        {"store_name": "旗舰店", "report_date": date(2026, 3, 28), "revenue_fen": 180000},
-        {"store_name": "分店A", "report_date": date(2026, 3, 27), "revenue_fen": 120000},
-    ])
+    mock_db = _make_mock_db(
+        [
+            {"store_name": "旗舰店", "report_date": date(2026, 3, 27), "revenue_fen": 200000},
+            {"store_name": "旗舰店", "report_date": date(2026, 3, 28), "revenue_fen": 180000},
+            {"store_name": "分店A", "report_date": date(2026, 3, 27), "revenue_fen": 120000},
+        ]
+    )
 
     result = await engine.execute_report(
         report_id="cross_store_date",
@@ -417,6 +430,7 @@ async def test_cross_dimension_store_date():
 
 
 # ─── 6. 引擎元数据 ───
+
 
 @pytest.mark.asyncio
 async def test_engine_list_reports():

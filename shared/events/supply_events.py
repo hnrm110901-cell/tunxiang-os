@@ -3,6 +3,7 @@
 供应链域所有跨服务事件均通过 SupplyEvent 传递，事件类型由 SupplyEventType 枚举定义。
 Redis Stream key: supply_events
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,19 +20,19 @@ class SupplyEventType(str, Enum):
     """
 
     # ── 库存类 ─────────────────────────────────────────────────────
-    STOCK_LOW = "supply.stock.low"                          # 库存低于阈值
-    STOCK_ZERO = "supply.stock.zero"                        # 库存清零
+    STOCK_LOW = "supply.stock.low"  # 库存低于阈值
+    STOCK_ZERO = "supply.stock.zero"  # 库存清零
 
     # ── 食材类 ─────────────────────────────────────────────────────
-    INGREDIENT_EXPIRING = "supply.ingredient.expiring"      # 食材临期
-    INGREDIENT_EXPIRED = "supply.ingredient.expired"        # 食材过期
+    INGREDIENT_EXPIRING = "supply.ingredient.expiring"  # 食材临期
+    INGREDIENT_EXPIRED = "supply.ingredient.expired"  # 食材过期
 
     # ── 收货类 ─────────────────────────────────────────────────────
-    RECEIVING_COMPLETED = "supply.receiving.completed"      # 收货完成
-    RECEIVING_VARIANCE = "supply.receiving.variance"        # 收货差异超5%
+    RECEIVING_COMPLETED = "supply.receiving.completed"  # 收货完成
+    RECEIVING_VARIANCE = "supply.receiving.variance"  # 收货差异超5%
 
     # ── 调拨类 ─────────────────────────────────────────────────────
-    TRANSFER_COMPLETED = "supply.transfer.completed"        # 门店调拨完成
+    TRANSFER_COMPLETED = "supply.transfer.completed"  # 门店调拨完成
     TRANSFER_LOSS_DETECTED = "supply.transfer.loss_detected"  # 调拨损耗超标
 
     # ── 采购类 ─────────────────────────────────────────────────────
@@ -59,7 +60,5 @@ class SupplyEvent:
     entity_id: UUID
     event_data: dict
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source_service: str = "tx-supply"

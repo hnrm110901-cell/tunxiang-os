@@ -8,6 +8,7 @@
 
 所有金额单位：分（int）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,8 +43,8 @@ class MappingSuggestion(BaseModel):
     platform_item_name: str
     dish_id: uuid.UUID
     dish_name: str
-    confidence: float   # 0.0 ~ 1.0
-    reason: str         # "exact_match" / "edit_distance:2" / ...
+    confidence: float  # 0.0 ~ 1.0
+    reason: str  # "exact_match" / "edit_distance:2" / ...
 
 
 class AutoMatchResult(BaseModel):
@@ -72,8 +73,8 @@ class ChannelMenuVersion(BaseModel):
 class DishChannelRow(BaseModel):
     dish_id: uuid.UUID
     dish_name: str
-    prices_by_channel: dict[str, Optional[int]]        # channel_id → price_fen
-    availability_by_channel: dict[str, bool]           # channel_id → is_available
+    prices_by_channel: dict[str, Optional[int]]  # channel_id → price_fen
+    availability_by_channel: dict[str, bool]  # channel_id → is_available
 
 
 class ChannelDiff(BaseModel):
@@ -674,9 +675,7 @@ class ChannelMappingService:
                     if str(item.get("dish_id", "")) == dish_id_str:
                         override_price = item.get("channel_price_fen")
                         prices_by_channel[ch] = (
-                            int(override_price)
-                            if override_price is not None
-                            else dish_prices.get(dish_id_str)
+                            int(override_price) if override_price is not None else dish_prices.get(dish_id_str)
                         )
                         availability_by_channel[ch] = bool(item.get("is_available", True))
                         found = True
@@ -748,8 +747,7 @@ class ChannelMappingService:
                 channel_id=r[2],
                 version_no=r[3],
                 dish_overrides=[
-                    DishOverride(**o)
-                    for o in (r[4] if isinstance(r[4], list) else _json.loads(r[4] or "[]"))
+                    DishOverride(**o) for o in (r[4] if isinstance(r[4], list) else _json.loads(r[4] or "[]"))
                 ],
                 published_at=r[5].isoformat() if r[5] else None,
                 published_by=r[6],

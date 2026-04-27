@@ -7,12 +7,13 @@ P3-02: 差异化护城河
   GET  /api/v1/analytics/narrative/anomaly       — 异常叙事（偏差检测）
   POST /api/v1/analytics/narrative/daily-report  — 完整日报（企微推送格式）
 """
-import structlog
-from fastapi import APIRouter, Depends, Query, Header
-from pydantic import BaseModel
-from typing import Optional
-from datetime import date, timedelta
 
+from datetime import date, timedelta
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Depends, Header, Query
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/v1/analytics/narrative", tags=["narrative-enhanc
 
 
 # ─── DB 查询辅助 ──────────────────────────────────────────────────────────────
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -73,22 +75,25 @@ async def _query_today_metrics(
 
     order_row = (await db.execute(order_sql, order_params)).fetchone()
 
-    revenue_fen    = int(order_row.revenue_fen)    if order_row else 0
-    order_count    = int(order_row.order_count)    if order_row else 0
-    guest_count    = int(order_row.guest_count)    if order_row else 0
-    avg_order_fen  = int(order_row.avg_order_fen)  if order_row else 0
-    discount_rate  = float(order_row.discount_rate)  if order_row else 0.0
+    revenue_fen = int(order_row.revenue_fen) if order_row else 0
+    order_count = int(order_row.order_count) if order_row else 0
+    guest_count = int(order_row.guest_count) if order_row else 0
+    avg_order_fen = int(order_row.avg_order_fen) if order_row else 0
+    discount_rate = float(order_row.discount_rate) if order_row else 0.0
     void_order_rate = float(order_row.void_order_rate) if order_row else 0.0
 
     # ── 翻台率：当日有客订单数 / 门店座位数（近似） ────────────────
     turn_rate = 0.0
     try:
-        seats_sql = text("""
+        seats_sql = text(
+            """
             SELECT COALESCE(SUM(seats), 0) AS total_seats
             FROM stores
             WHERE is_deleted = false
               AND status     = 'active'
-        """ + (" AND id = :store_id::uuid" if store_id else ""))
+        """
+            + (" AND id = :store_id::uuid" if store_id else "")
+        )
         seats_params = {"store_id": store_id} if store_id else {}
         seats_row = (await db.execute(seats_sql, seats_params)).fetchone()
         total_seats = int(seats_row.total_seats) if seats_row else 0
@@ -102,7 +107,7 @@ async def _query_today_metrics(
     try:
         ps_filter = "AND store_id = :store_id::uuid" if store_id else ""
         ps_params: dict = {
-            "period_year":  target_date.year,
+            "period_year": target_date.year,
             "period_month": target_date.month,
         }
         if store_id:
@@ -121,6 +126,7 @@ async def _query_today_metrics(
 
         # Monthly revenue estimate: scale today's revenue by days in month
         import calendar
+
         days_in_month = calendar.monthrange(target_date.year, target_date.month)[1]
         monthly_rev_est = revenue_fen * days_in_month
         if monthly_rev_est > 0:
@@ -129,19 +135,19 @@ async def _query_today_metrics(
         pass
 
     return {
-        "revenue_fen":          revenue_fen,
-        "order_count":          order_count,
-        "customer_count":       guest_count,
-        "avg_order_value_fen":  avg_order_fen,
-        "guest_count":          guest_count,
-        "turn_rate":            turn_rate,
-        "labor_cost_rate":      labor_cost_rate,
-        "discount_rate":        discount_rate,
-        "void_order_rate":      void_order_rate,
+        "revenue_fen": revenue_fen,
+        "order_count": order_count,
+        "customer_count": guest_count,
+        "avg_order_value_fen": avg_order_fen,
+        "guest_count": guest_count,
+        "turn_rate": turn_rate,
+        "labor_cost_rate": labor_cost_rate,
+        "discount_rate": discount_rate,
+        "void_order_rate": void_order_rate,
         # Kept for narrative compatibility; derived from order data
-        "cost_rate":            0.0,
+        "cost_rate": 0.0,
         "dinner_traffic_growth": 0.0,
-        "lunch_traffic_change":  0.0,
+        "lunch_traffic_change": 0.0,
     }
 
 
@@ -169,10 +175,11 @@ async def _query_compare_revenue(
             compare_date = target_date.replace(year=target_date.year - 1, month=12)
         else:
             import calendar
+
             last_month = target_date.month - 1
-            last_year  = target_date.year
-            max_day    = calendar.monthrange(last_year, last_month)[1]
-            day        = min(target_date.day, max_day)
+            last_year = target_date.year
+            max_day = calendar.monthrange(last_year, last_month)[1]
+            day = min(target_date.day, max_day)
             compare_date = target_date.replace(year=last_year, month=last_month, day=day)
         date_filter = "DATE(o.order_time AT TIME ZONE 'Asia/Shanghai') = :cmp_date"
         params = {"cmp_date": compare_date}
@@ -220,9 +227,9 @@ async def _query_historical_stats(
     """
     store_clause = "AND o.store_id = :store_id::uuid" if store_id else ""
     params: dict = {
-        "start_7":  target_date - timedelta(days=7),
+        "start_7": target_date - timedelta(days=7),
         "start_30": target_date - timedelta(days=30),
-        "end":      target_date,
+        "end": target_date,
     }
     if store_id:
         params["store_id"] = store_id
@@ -307,6 +314,7 @@ async def _query_historical_stats(
 
 
 # ─── 叙事生成函数 ────────────────────────────────────────────────────────────────
+
 
 def _change_label(rate: float) -> str:
     """根据变化率生成定性描述"""
@@ -413,6 +421,7 @@ def _extract_concerns(today: dict) -> list[str]:
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────────
 
+
 class DailyReportRequest(BaseModel):
     store_id: Optional[str] = None
     date: Optional[date] = None
@@ -422,6 +431,7 @@ class DailyReportRequest(BaseModel):
 
 
 # ─── 端点1：对比叙事 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/comparison", summary="对比叙事（昨日/上周同期/上月同期）")
 async def get_comparison_narrative(
@@ -458,9 +468,9 @@ async def get_comparison_narrative(
         revenue_fen = today["revenue_fen"]
 
         dim_label_map = {
-            "yesterday":   "昨日",
-            "last_week":   "上周同期",
-            "last_month":  "上月同期",
+            "yesterday": "昨日",
+            "last_week": "上周同期",
+            "last_month": "上月同期",
         }
         valid_dims = [d for d in compare_with if d in dim_label_map]
 
@@ -508,16 +518,16 @@ async def get_comparison_narrative(
         return {
             "ok": True,
             "data": {
-                "date":               target_date.isoformat(),
-                "store_id":           store_id or "all",
-                "headline":           headline,
-                "revenue_fen":        revenue_fen,
-                "customer_count":     today["customer_count"],
+                "date": target_date.isoformat(),
+                "store_id": store_id or "all",
+                "headline": headline,
+                "revenue_fen": revenue_fen,
+                "customer_count": today["customer_count"],
                 "avg_order_value_fen": today["avg_order_value_fen"],
-                "comparisons":        comparisons,
-                "key_drivers":        key_drivers,
-                "concerns":           concerns,
-                "full_narrative":     full_narrative,
+                "comparisons": comparisons,
+                "key_drivers": key_drivers,
+                "concerns": concerns,
+                "full_narrative": full_narrative,
             },
             "error": None,
         }
@@ -527,22 +537,23 @@ async def get_comparison_narrative(
         return {
             "ok": True,
             "data": {
-                "date":               target_date.isoformat(),
-                "store_id":           store_id or "all",
-                "headline":           "数据暂不可用",
-                "revenue_fen":        0,
-                "customer_count":     0,
+                "date": target_date.isoformat(),
+                "store_id": store_id or "all",
+                "headline": "数据暂不可用",
+                "revenue_fen": 0,
+                "customer_count": 0,
                 "avg_order_value_fen": 0,
-                "comparisons":        [],
-                "key_drivers":        [],
-                "concerns":           [],
-                "full_narrative":     "数据查询失败，请稍后重试。",
+                "comparisons": [],
+                "key_drivers": [],
+                "concerns": [],
+                "full_narrative": "数据查询失败，请稍后重试。",
             },
             "error": None,
         }
 
 
 # ─── 端点2：异常叙事 ─────────────────────────────────────────────────────────────
+
 
 @router.get("/anomaly", summary="异常叙事（指标偏差检测）")
 async def get_anomaly_narrative(
@@ -571,44 +582,44 @@ async def get_anomaly_narrative(
     try:
         await _set_tenant(db, x_tenant_id)
         today = await _query_today_metrics(store_id, x_tenant_id, target_date, db)
-        hist  = await _query_historical_stats(store_id, target_date, db)
+        hist = await _query_historical_stats(store_id, target_date, db)
 
         check_metrics = [
             {
-                "metric":        "discount_rate",
-                "label":         "折扣率",
-                "current":       today["discount_rate"],
-                "hist_key":      "discount_rate",
-                "format":        "pct",
+                "metric": "discount_rate",
+                "label": "折扣率",
+                "current": today["discount_rate"],
+                "hist_key": "discount_rate",
+                "format": "pct",
                 "related_agent": "discount_guard",
-                "anomaly_hint":  "折扣",
+                "anomaly_hint": "折扣",
             },
             {
-                "metric":        "void_order_rate",
-                "label":         "废单率",
-                "current":       today["void_order_rate"],
-                "hist_key":      "void_order_rate",
-                "format":        "pct",
+                "metric": "void_order_rate",
+                "label": "废单率",
+                "current": today["void_order_rate"],
+                "hist_key": "void_order_rate",
+                "format": "pct",
                 "related_agent": "anomaly_detector",
-                "anomaly_hint":  "废单",
+                "anomaly_hint": "废单",
             },
             {
-                "metric":        "revenue_fen",
-                "label":         "营业额",
-                "current":       today["revenue_fen"],
-                "hist_key":      "revenue_fen",
-                "format":        "fen",
+                "metric": "revenue_fen",
+                "label": "营业额",
+                "current": today["revenue_fen"],
+                "hist_key": "revenue_fen",
+                "format": "fen",
                 "related_agent": "revenue_monitor",
-                "anomaly_hint":  "营业额",
+                "anomaly_hint": "营业额",
             },
             {
-                "metric":        "customer_count",
-                "label":         "客流量",
-                "current":       today["customer_count"],
-                "hist_key":      "customer_count",
-                "format":        "int",
+                "metric": "customer_count",
+                "label": "客流量",
+                "current": today["customer_count"],
+                "hist_key": "customer_count",
+                "format": "int",
                 "related_agent": "traffic_monitor",
-                "anomaly_hint":  "客流",
+                "anomaly_hint": "客流",
             },
         ]
 
@@ -641,7 +652,7 @@ async def get_anomaly_narrative(
 
             sev = _severity(deviation)
             curr_display = _format_value(current, item["format"])
-            avg_display  = _format_value(avg, item["format"])
+            avg_display = _format_value(avg, item["format"])
 
             direction = "偏高" if current > avg else "偏低"
             if item["format"] == "pct":
@@ -651,8 +662,7 @@ async def get_anomaly_narrative(
                 )
             else:
                 narrative = (
-                    f"今日{item['label']}{curr_display}，较历史均值{avg_display}"
-                    f"偏差{deviation:.1f}σ（{direction}）。"
+                    f"今日{item['label']}{curr_display}，较历史均值{avg_display}偏差{deviation:.1f}σ（{direction}）。"
                 )
 
             if item["metric"] == "discount_rate" and current > avg:
@@ -662,17 +672,19 @@ async def get_anomaly_narrative(
             elif item["metric"] == "revenue_fen" and current < avg:
                 narrative += "建议检查营业时段覆盖是否完整，对比同期外卖/堂食占比变化。"
 
-            anomalies.append({
-                "metric":         item["metric"],
-                "label":          item["label"],
-                "current_value":  current,
-                "historical_avg": avg,
-                "deviation":      round(deviation, 2),
-                "severity":       sev,
-                "direction":      direction,
-                "narrative":      narrative,
-                "related_agent":  item["related_agent"],
-            })
+            anomalies.append(
+                {
+                    "metric": item["metric"],
+                    "label": item["label"],
+                    "current_value": current,
+                    "historical_avg": avg,
+                    "deviation": round(deviation, 2),
+                    "severity": sev,
+                    "direction": direction,
+                    "narrative": narrative,
+                    "related_agent": item["related_agent"],
+                }
+            )
 
         anomalies.sort(key=lambda x: x["deviation"], reverse=True)
         has_anomaly = len(anomalies) > 0
@@ -690,8 +702,7 @@ async def get_anomaly_narrative(
         date_str = target_date.strftime("%m月%d日")
         if has_anomaly:
             anomaly_lines = "\n".join(
-                f"  {'🔴' if a['severity'] == 'critical' else '⚠️'} {a['label']}：{a['narrative']}"
-                for a in anomalies
+                f"  {'🔴' if a['severity'] == 'critical' else '⚠️'} {a['label']}：{a['narrative']}" for a in anomalies
             )
             full_narrative = (
                 f"【异常播报·{date_str}】今日发现{len(anomalies)}项经营异常：\n"
@@ -711,13 +722,13 @@ async def get_anomaly_narrative(
         return {
             "ok": True,
             "data": {
-                "date":          target_date.isoformat(),
-                "store_id":      store_id or "all",
-                "threshold":     threshold,
-                "has_anomaly":   has_anomaly,
+                "date": target_date.isoformat(),
+                "store_id": store_id or "all",
+                "threshold": threshold,
+                "has_anomaly": has_anomaly,
                 "anomaly_count": len(anomalies),
-                "anomalies":     anomalies,
-                "biggest_drag":  biggest_drag,
+                "anomalies": anomalies,
+                "biggest_drag": biggest_drag,
                 "full_narrative": full_narrative,
             },
             "error": None,
@@ -728,13 +739,13 @@ async def get_anomaly_narrative(
         return {
             "ok": True,
             "data": {
-                "date":          target_date.isoformat(),
-                "store_id":      store_id or "all",
-                "threshold":     threshold,
-                "has_anomaly":   False,
+                "date": target_date.isoformat(),
+                "store_id": store_id or "all",
+                "threshold": threshold,
+                "has_anomaly": False,
                 "anomaly_count": 0,
-                "anomalies":     [],
-                "biggest_drag":  None,
+                "anomalies": [],
+                "biggest_drag": None,
                 "full_narrative": "数据查询失败，请稍后重试。",
             },
             "error": None,
@@ -742,6 +753,7 @@ async def get_anomaly_narrative(
 
 
 # ─── 端点3：日报完整版 ───────────────────────────────────────────────────────────
+
 
 @router.post("/daily-report", summary="完整日报（企微推送格式）")
 async def generate_daily_report(
@@ -769,11 +781,11 @@ async def generate_daily_report(
     try:
         await _set_tenant(db, x_tenant_id)
         today = await _query_today_metrics(store_id, x_tenant_id, target_date, db)
-        hist  = await _query_historical_stats(store_id, target_date, db)
+        hist = await _query_historical_stats(store_id, target_date, db)
 
-        revenue_fen    = today["revenue_fen"]
+        revenue_fen = today["revenue_fen"]
         customer_count = today["customer_count"]
-        avg_order      = today["avg_order_value_fen"]
+        avg_order = today["avg_order_value_fen"]
 
         rev_yesterday = await _query_compare_revenue(store_id, target_date, "yesterday", db)
         rev_change = (revenue_fen - rev_yesterday) / rev_yesterday if rev_yesterday else 0.0
@@ -781,22 +793,20 @@ async def generate_daily_report(
         anomaly_summary_parts: list[str] = []
         if req.include_anomaly:
             hist_discount = hist["discount_rate"]["avg_7d"]
-            hist_void     = hist["void_order_rate"]["avg_7d"]
-            std_discount  = hist["discount_rate"]["std"]
-            std_void      = hist["void_order_rate"]["std"]
+            hist_void = hist["void_order_rate"]["avg_7d"]
+            std_discount = hist["discount_rate"]["std"]
+            std_void = hist["void_order_rate"]["std"]
 
             disc_dev = (today["discount_rate"] - hist_discount) / std_discount if std_discount else 0.0
-            void_dev = (today["void_order_rate"] - hist_void)   / std_void     if std_void     else 0.0
+            void_dev = (today["void_order_rate"] - hist_void) / std_void if std_void else 0.0
 
             if disc_dev >= 2.0:
                 anomaly_summary_parts.append(
-                    f"折扣率偏高(×{today['discount_rate'] / hist_discount:.1f})"
-                    if hist_discount > 0 else "折扣率偏高"
+                    f"折扣率偏高(×{today['discount_rate'] / hist_discount:.1f})" if hist_discount > 0 else "折扣率偏高"
                 )
             if void_dev >= 2.0:
                 anomaly_summary_parts.append(
-                    f"废单率偏高(×{today['void_order_rate'] / hist_void:.1f})"
-                    if hist_void > 0 else "废单率偏高"
+                    f"废单率偏高(×{today['void_order_rate'] / hist_void:.1f})" if hist_void > 0 else "废单率偏高"
                 )
 
         anomaly_line = " | ".join(anomaly_summary_parts) if anomaly_summary_parts else "无异常"
@@ -805,7 +815,7 @@ async def generate_daily_report(
         if rev_change > 0:
             dummy_comps.append({"dimension": "yesterday", "change_rate": rev_change})
         key_drivers = _extract_key_drivers(today, dummy_comps)
-        concerns    = _extract_concerns(today)
+        concerns = _extract_concerns(today)
 
         agent_tips: list[str] = []
         if anomaly_summary_parts:
@@ -817,7 +827,7 @@ async def generate_daily_report(
             agent_tips.append("维持当前节奏")
 
         date_str = target_date.strftime("%Y-%m-%d")
-        rev_pct  = f"{rev_change:+.1%}"
+        rev_pct = f"{rev_change:+.1%}"
         template = req.template_id or "default"
 
         if template == "compact":
@@ -834,9 +844,9 @@ async def generate_daily_report(
                 f"{'⚠️ 关注：' + '、'.join(concerns) if concerns else '✅ 无异常'}"
             )
         else:
-            highlights   = " / ".join(key_drivers) if key_drivers else "稳定经营"
+            highlights = " / ".join(key_drivers) if key_drivers else "稳定经营"
             concerns_str = " / ".join(concerns) if concerns else "暂无"
-            agent_str    = " | ".join(agent_tips)
+            agent_str = " | ".join(agent_tips)
 
             full_narrative = (
                 f"【屯象OS · 门店日报 · {date_str}】\n"
@@ -866,18 +876,18 @@ async def generate_daily_report(
         return {
             "ok": True,
             "data": {
-                "date":                   target_date.isoformat(),
-                "store_id":               store_id or "all",
-                "template_id":            template,
-                "revenue_fen":            revenue_fen,
-                "customer_count":         customer_count,
-                "avg_order_value_fen":    avg_order,
-                "revenue_vs_yesterday":   round(rev_change, 4),
-                "anomaly_summary":        anomaly_summary_parts,
-                "key_drivers":            key_drivers,
-                "concerns":               concerns,
-                "agent_tips":             agent_tips,
-                "full_narrative":         full_narrative,
+                "date": target_date.isoformat(),
+                "store_id": store_id or "all",
+                "template_id": template,
+                "revenue_fen": revenue_fen,
+                "customer_count": customer_count,
+                "avg_order_value_fen": avg_order,
+                "revenue_vs_yesterday": round(rev_change, 4),
+                "anomaly_summary": anomaly_summary_parts,
+                "key_drivers": key_drivers,
+                "concerns": concerns,
+                "agent_tips": agent_tips,
+                "full_narrative": full_narrative,
             },
             "error": None,
         }
@@ -887,18 +897,18 @@ async def generate_daily_report(
         return {
             "ok": True,
             "data": {
-                "date":                target_date.isoformat(),
-                "store_id":            store_id or "all",
-                "template_id":         req.template_id or "default",
-                "revenue_fen":         0,
-                "customer_count":      0,
+                "date": target_date.isoformat(),
+                "store_id": store_id or "all",
+                "template_id": req.template_id or "default",
+                "revenue_fen": 0,
+                "customer_count": 0,
                 "avg_order_value_fen": 0,
                 "revenue_vs_yesterday": 0.0,
-                "anomaly_summary":     [],
-                "key_drivers":         [],
-                "concerns":            [],
-                "agent_tips":          ["数据暂不可用，请稍后重试"],
-                "full_narrative":      "数据查询失败，请稍后重试。",
+                "anomaly_summary": [],
+                "key_drivers": [],
+                "concerns": [],
+                "agent_tips": ["数据暂不可用，请稍后重试"],
+                "full_narrative": "数据查询失败，请稍后重试。",
             },
             "error": None,
         }

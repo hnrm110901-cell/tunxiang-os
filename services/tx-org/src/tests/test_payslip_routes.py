@@ -6,6 +6,7 @@
   GET    /api/v1/org/payslips/{pid}          - 查询单条工资条
   PATCH  /api/v1/org/payslips/{pid}/status   - 更新工资条状态
 """
+
 import os
 import sys
 import types
@@ -29,21 +30,28 @@ _pe_stub.compute_full_attendance_bonus = lambda absence, late, early, bonus: (
 )
 _pe_stub.compute_monthly_tax = lambda **kw: 0.0
 _pe_stub.summarize_payroll = lambda **kw: {
-    "gross_pay_fen": sum(v for k, v in kw.items() if "fen" in k and "deduction" not in k and "insurance" not in k and "fund" not in k and "tax" not in k),
-    "deductions_fen": sum(v for k, v in kw.items() if "deduction" in k or "insurance" in k or "fund" in k or "tax" in k),
+    "gross_pay_fen": sum(
+        v
+        for k, v in kw.items()
+        if "fen" in k and "deduction" not in k and "insurance" not in k and "fund" not in k and "tax" not in k
+    ),
+    "deductions_fen": sum(
+        v for k, v in kw.items() if "deduction" in k or "insurance" in k or "fund" in k or "tax" in k
+    ),
     "net_pay_fen": 300000,
 }
 sys.modules.setdefault("services.payroll_engine", _pe_stub)
 # 也注册非包形式
 sys.modules.setdefault("payroll_engine", _pe_stub)
 
-import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from api.payslip import router as payslip_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 # ── App fixture ──
@@ -72,16 +80,12 @@ def _make_result_mock(rows=None, scalar_value=None):
     if scalar_value is not None:
         result.scalar_one = MagicMock(return_value=scalar_value)
     if rows is not None:
-        result.mappings.return_value.first = MagicMock(
-            return_value=rows[0] if rows else None
-        )
+        result.mappings.return_value.first = MagicMock(return_value=rows[0] if rows else None)
         # 用于 list_payslips 的 for row in rows 遍历
         _mappings = MagicMock()
         _mappings.__iter__ = MagicMock(return_value=iter(rows))
         result.mappings.return_value = _mappings
-        result.mappings.return_value.first = MagicMock(
-            return_value=rows[0] if rows else None
-        )
+        result.mappings.return_value.first = MagicMock(return_value=rows[0] if rows else None)
     return result
 
 
@@ -128,12 +132,8 @@ async def test_generate_payslips_success():
         "employees": [_emp("emp-001"), _emp("emp-002")],
     }
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.post(
-            "/api/v1/org/payslips/generate", json=payload, headers=HEADERS
-        )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/v1/org/payslips/generate", json=payload, headers=HEADERS)
 
     assert resp.status_code == 200
     body = resp.json()
@@ -155,12 +155,8 @@ async def test_generate_payslips_empty():
 
     payload = {"store_id": STORE_ID, "month": MONTH, "employees": []}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.post(
-            "/api/v1/org/payslips/generate", json=payload, headers=HEADERS
-        )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/api/v1/org/payslips/generate", json=payload, headers=HEADERS)
 
     # payslip.py 明确校验空列表，返回 400
     assert resp.status_code == 400
@@ -221,11 +217,9 @@ async def test_list_payslips_success():
 
     app.dependency_overrides[get_db] = lambda: db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
-            f"/api/v1/org/payslips",
+            "/api/v1/org/payslips",
             params={"store_id": STORE_ID, "month": MONTH},
             headers=HEADERS,
         )
@@ -269,9 +263,7 @@ async def test_list_payslips_empty():
 
     app.dependency_overrides[get_db] = lambda: db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
             "/api/v1/org/payslips",
             params={"store_id": STORE_ID, "month": MONTH},
@@ -328,12 +320,8 @@ async def test_get_payslip_success():
 
     app.dependency_overrides[get_db] = lambda: db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.get(
-            f"/api/v1/org/payslips/{PAYSLIP_ID}", headers=HEADERS
-        )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/api/v1/org/payslips/{PAYSLIP_ID}", headers=HEADERS)
 
     assert resp.status_code == 200
     body = resp.json()
@@ -369,12 +357,8 @@ async def test_get_payslip_not_found():
     app.dependency_overrides[get_db] = lambda: db
 
     nonexistent_id = str(uuid4())
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.get(
-            f"/api/v1/org/payslips/{nonexistent_id}", headers=HEADERS
-        )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/api/v1/org/payslips/{nonexistent_id}", headers=HEADERS)
 
     assert resp.status_code == 404
     body = resp.json()
@@ -413,9 +397,7 @@ async def test_update_payslip_status_success():
 
     app.dependency_overrides[get_db] = lambda: db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.patch(
             f"/api/v1/org/payslips/{PAYSLIP_ID}/status",
             json={"status": "issued"},

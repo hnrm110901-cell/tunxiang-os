@@ -9,14 +9,12 @@ config JSON 字段支持灵活的布局和卡片显示配置。
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Optional, Any
-
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, event
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import Any, Optional
 
 from app.models.base import TenantBase
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Table(TenantBase):
@@ -62,62 +60,35 @@ class Table(TenantBase):
     __tablename__ = "tables"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        doc="桌台唯一标识符"
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, doc="桌台唯一标识符"
     )
 
     store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("stores.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        doc="所属店铺ID"
+        UUID(as_uuid=True), ForeignKey("stores.id", ondelete="CASCADE"), nullable=False, index=True, doc="所属店铺ID"
     )
 
     table_no: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        index=True,
-        doc="桌号，如 A01, B05 (store_id内唯一)"
+        String(20), nullable=False, index=True, doc="桌号，如 A01, B05 (store_id内唯一)"
     )
 
-    area: Mapped[str] = mapped_column(
-        String(50),
-        nullable=False,
-        default="大厅",
-        doc="桌台所在区域"
-    )
+    area: Mapped[str] = mapped_column(String(50), nullable=False, default="大厅", doc="桌台所在区域")
 
-    seats: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=4,
-        doc="桌台座位数"
-    )
+    seats: Mapped[int] = mapped_column(Integer, nullable=False, default=4, doc="桌台座位数")
 
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         default="empty",
         index=True,
-        doc="桌台状态: empty/dining/reserved/pending_checkout/pending_cleanup"
+        doc="桌台状态: empty/dining/reserved/pending_checkout/pending_cleanup",
     )
 
     is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        index=True,
-        doc="是否活跃（逻辑删除标记）"
+        Boolean, nullable=False, default=True, index=True, doc="是否活跃（逻辑删除标记）"
     )
 
     config: Mapped[dict[str, Any]] = mapped_column(
-        JSON,
-        nullable=False,
-        default=dict,
-        doc="JSON配置：包含layout(布局)和card_overrides(卡片显示设置)"
+        JSON, nullable=False, default=dict, doc="JSON配置：包含layout(布局)和card_overrides(卡片显示设置)"
     )
 
     # 继承自 TenantBase 的字段：
@@ -127,10 +98,7 @@ class Table(TenantBase):
     # - is_deleted: 软删除标记
 
     def __repr__(self) -> str:
-        return (
-            f"<Table(id={self.id}, store_id={self.store_id}, "
-            f"table_no='{self.table_no}', status='{self.status}')>"
-        )
+        return f"<Table(id={self.id}, store_id={self.store_id}, table_no='{self.table_no}', status='{self.status}')>"
 
     def get_layout(self) -> dict[str, Any]:
         """
@@ -139,14 +107,9 @@ class Table(TenantBase):
         返回:
             dict: 包含 pos_x, pos_y, width, height, rotation, shape 的布局字典
         """
-        return self.config.get("layout", {
-            "pos_x": 0.0,
-            "pos_y": 0.0,
-            "width": 8.0,
-            "height": 8.0,
-            "rotation": 0,
-            "shape": "rect"
-        })
+        return self.config.get(
+            "layout", {"pos_x": 0.0, "pos_y": 0.0, "width": 8.0, "height": 8.0, "rotation": 0, "shape": "rect"}
+        )
 
     def get_card_overrides(self) -> dict[str, Any]:
         """
@@ -155,11 +118,7 @@ class Table(TenantBase):
         返回:
             dict: 包含 pin_fields, hide_fields, custom_labels 的配置字典
         """
-        return self.config.get("card_overrides", {
-            "pin_fields": [],
-            "hide_fields": [],
-            "custom_labels": {}
-        })
+        return self.config.get("card_overrides", {"pin_fields": [], "hide_fields": [], "custom_labels": {}})
 
     def update_layout(
         self,
@@ -168,7 +127,7 @@ class Table(TenantBase):
         width: Optional[float] = None,
         height: Optional[float] = None,
         rotation: Optional[int] = None,
-        shape: Optional[str] = None
+        shape: Optional[str] = None,
     ) -> None:
         """
         更新布局配置
@@ -202,7 +161,7 @@ class Table(TenantBase):
         self,
         pin_fields: Optional[list[str]] = None,
         hide_fields: Optional[list[str]] = None,
-        custom_labels: Optional[dict[str, str]] = None
+        custom_labels: Optional[dict[str, str]] = None,
     ) -> None:
         """
         更新卡片显示配置

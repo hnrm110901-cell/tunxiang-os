@@ -9,6 +9,7 @@
 运行：
   pytest services/tx-agent/src/tests/test_operation_planner.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -32,6 +33,7 @@ from services.operation_planner import (
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助工具
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _make_mock_router(json_text: str) -> MagicMock:
     """构造返回指定 JSON 文本的 ModelRouter mock"""
@@ -114,6 +116,7 @@ def _make_mock_db(record=None) -> AsyncMock:
 # 1. PLAN_MODE_RULES / should_plan()
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPlanModeRules:
     """触发规则阈值测试"""
 
@@ -187,6 +190,7 @@ class TestPlanModeRules:
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. submit()
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestOperationPlannerSubmit:
     """submit() 提交操作计划"""
@@ -286,10 +290,14 @@ class TestOperationPlannerSubmit:
             record.tenant_id = uuid4()
             record.operation_params = {}
             record.impact_analysis = {
-                "affected_stores": 0, "affected_employees": 0,
-                "affected_members": 0, "financial_impact_fen": 0,
-                "risk_level": "low", "impact_summary": "",
-                "warnings": [], "reversible": True,
+                "affected_stores": 0,
+                "affected_employees": 0,
+                "affected_members": 0,
+                "financial_impact_fen": 0,
+                "risk_level": "low",
+                "impact_summary": "",
+                "warnings": [],
+                "reversible": True,
             }
             record.confirmed_by = None
             record.confirmed_at = None
@@ -316,6 +324,7 @@ class TestOperationPlannerSubmit:
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. _analyze_impact()
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestAnalyzeImpact:
     """_analyze_impact() AI 影响分析"""
@@ -377,6 +386,7 @@ class TestAnalyzeImpact:
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. confirm()
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestOperationPlanConfirm:
     """confirm() 确认操作计划"""
@@ -455,6 +465,7 @@ class TestOperationPlanConfirm:
 # 5. cancel()
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestOperationPlanCancel:
     """cancel() 取消操作计划"""
 
@@ -504,6 +515,7 @@ class TestOperationPlanCancel:
 # 6. get_plan()
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestGetPlan:
     """get_plan() 查询计划"""
 
@@ -533,6 +545,7 @@ class TestGetPlan:
 # 7. PLAN_MODE_RULES 配置完整性
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPlanModeRulesConfig:
     """PLAN_MODE_RULES 配置完整性"""
 
@@ -547,9 +560,7 @@ class TestPlanModeRulesConfig:
         """always 规则 threshold_value 应为 0"""
         for op_type, rule in PLAN_MODE_RULES.items():
             if rule["threshold_field"] == "always":
-                assert rule["threshold_value"] == 0, (
-                    f"{op_type} always 规则 threshold_value 应为 0"
-                )
+                assert rule["threshold_value"] == 0, f"{op_type} always 规则 threshold_value 应为 0"
 
     def test_six_operation_types_defined(self):
         """PLAN_MODE_RULES 应包含 6 种操作类型"""

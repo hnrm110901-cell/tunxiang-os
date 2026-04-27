@@ -14,6 +14,7 @@ v2 新增：
 - list_recharge_plans：查询有效套餐列表
 - create_recharge_plan：新建套餐
 """
+
 from __future__ import annotations
 
 import uuid
@@ -45,6 +46,7 @@ class TransferNotAllowedError(Exception):
 
 class CardNotFoundError(ValueError):
     """储值卡不存在（ValueError 子类，兼容现有 except ValueError 捕获）"""
+
     pass
 
 
@@ -240,18 +242,20 @@ class StoredValueService:
         from shared.events.event_publisher import MemberEventPublisher
         from shared.events.member_events import MemberEventType
 
-        asyncio.create_task(MemberEventPublisher.publish(
-            MemberEventType.STORED_VALUE_RECHARGED,
-            tenant_id=tenant_id,
-            customer_id=card.customer_id,
-            event_data={
-                "amount_fen": plan.recharge_amount_fen,
-                "gift_fen": plan.gift_amount_fen,
-                "card_id": str(card.id),
-                "plan_id": str(plan_id),
-            },
-            source_service="tx-member",
-        ))
+        asyncio.create_task(
+            MemberEventPublisher.publish(
+                MemberEventType.STORED_VALUE_RECHARGED,
+                tenant_id=tenant_id,
+                customer_id=card.customer_id,
+                event_data={
+                    "amount_fen": plan.recharge_amount_fen,
+                    "gift_fen": plan.gift_amount_fen,
+                    "card_id": str(card.id),
+                    "plan_id": str(plan_id),
+                },
+                source_service="tx-member",
+            )
+        )
 
         return _txn_to_dict(txn)
 
@@ -307,18 +311,20 @@ class StoredValueService:
         from shared.events.event_publisher import MemberEventPublisher
         from shared.events.member_events import MemberEventType
 
-        asyncio.create_task(MemberEventPublisher.publish(
-            MemberEventType.STORED_VALUE_RECHARGED,
-            tenant_id=card.tenant_id,
-            customer_id=card.customer_id,
-            event_data={
-                "amount_fen": amount_fen,
-                "gift_fen": gift_fen,
-                "card_id": str(card.id),
-                "card_no": card_no,
-            },
-            source_service="tx-member",
-        ))
+        asyncio.create_task(
+            MemberEventPublisher.publish(
+                MemberEventType.STORED_VALUE_RECHARGED,
+                tenant_id=card.tenant_id,
+                customer_id=card.customer_id,
+                event_data={
+                    "amount_fen": amount_fen,
+                    "gift_fen": gift_fen,
+                    "card_id": str(card.id),
+                    "card_no": card_no,
+                },
+                source_service="tx-member",
+            )
+        )
 
         return {
             "card_no": card_no,
@@ -352,9 +358,7 @@ class StoredValueService:
         _check_card_active_and_not_expired(card)
 
         if card.balance_fen < amount_fen:
-            raise InsufficientBalanceError(
-                f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
-            )
+            raise InsufficientBalanceError(f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元")
 
         gift_deduct = min(card.gift_balance_fen, amount_fen)
         principal_deduct = amount_fen - gift_deduct
@@ -383,7 +387,21 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_consume", card_no=card_no, amount=amount_fen, gift_deduct=gift_deduct)
-        return {
+
+        # ─── 跨店分账：消费店 != 充值店时自动触发 ───
+        split_result = None
+        consume_store_uuid = uuid.UUID(store_id) if store_id else None
+        if consume_store_uuid and card.store_id and consume_store_uuid != card.store_id:
+            split_result = await self._trigger_cross_store_split(
+                db=db,
+                tenant_id=card.tenant_id,
+                transaction_id=txn.id,
+                recharge_store_id=card.store_id,
+                consume_store_id=consume_store_uuid,
+                amount_fen=amount_fen,
+            )
+
+        result = {
             "card_no": card_no,
             "consume_fen": amount_fen,
             "gift_deducted_fen": gift_deduct,
@@ -392,6 +410,9 @@ class StoredValueService:
             "gift_balance_fen": card.gift_balance_fen,
             "txn_id": str(txn.id),
         }
+        if split_result:
+            result["split"] = split_result
+        return result
 
     async def consume_by_id(
         self,
@@ -412,9 +433,7 @@ class StoredValueService:
         _check_card_active_and_not_expired(card)
 
         if card.balance_fen < amount_fen:
-            raise InsufficientBalanceError(
-                f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
-            )
+            raise InsufficientBalanceError(f"余额不足：可用{card.balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元")
 
         gift_deduct = min(card.gift_balance_fen, amount_fen)
         principal_deduct = amount_fen - gift_deduct
@@ -442,7 +461,23 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_consume_by_id", card_id=str(card_id), amount=amount_fen)
-        return _txn_to_dict(txn)
+
+        # ─── 跨店分账：消费店 != 充值店时自动触发 ───
+        split_result = None
+        if store_id and card.store_id and store_id != card.store_id:
+            split_result = await self._trigger_cross_store_split(
+                db=db,
+                tenant_id=tenant_id,
+                transaction_id=txn.id,
+                recharge_store_id=card.store_id,
+                consume_store_id=store_id,
+                amount_fen=amount_fen,
+            )
+
+        result = _txn_to_dict(txn)
+        if split_result:
+            result["split"] = split_result
+        return result
 
     # ──────────────────────────────────────────────────────────────
     # 退款
@@ -486,13 +521,28 @@ class StoredValueService:
         db.add(txn)
 
         logger.info("stored_value_refund", card_no=card_no, amount=amount_fen)
-        return {
+
+        # ─── 退款分账冲正：如关联订单有分账记录则反向冲正 ───
+        reversal_result = None
+        if order_id:
+            reversal_result = await self._trigger_split_reversal(
+                db=db,
+                tenant_id=card.tenant_id,
+                original_order_id=order_id,
+                refund_transaction_id=str(txn.id),
+                refund_amount_fen=amount_fen,
+            )
+
+        result = {
             "card_no": card_no,
             "refund_fen": amount_fen,
             "balance_fen": card.balance_fen,
             "gift_balance_fen": card.gift_balance_fen,
             "txn_id": str(txn.id),
         }
+        if reversal_result:
+            result["split_reversal"] = reversal_result
+        return result
 
     async def refund_by_transaction(
         self,
@@ -524,9 +574,7 @@ class StoredValueService:
 
         orig_amount = abs(orig_txn.amount_fen)
         if refund_amount_fen > orig_amount:
-            raise ValueError(
-                f"退款金额({refund_amount_fen / 100:.2f}元)超过原始消费额({orig_amount / 100:.2f}元)"
-            )
+            raise ValueError(f"退款金额({refund_amount_fen / 100:.2f}元)超过原始消费额({orig_amount / 100:.2f}元)")
 
         # 加锁查卡
         card = await self._get_card_by_id_for_update(db, orig_txn.card_id, tenant_id)
@@ -558,21 +606,38 @@ class StoredValueService:
             orig_txn_id=str(transaction_id),
             refund_amount=refund_amount_fen,
         )
-        return _txn_to_dict(refund_txn)
+
+        # ─── 退款分账冲正：如原始消费有分账记录则反向冲正 ───
+        reversal_result = None
+        if orig_txn.order_id:
+            reversal_result = await self._trigger_split_reversal(
+                db=db,
+                tenant_id=tenant_id,
+                original_order_id=str(orig_txn.order_id),
+                refund_transaction_id=str(refund_txn.id),
+                refund_amount_fen=refund_amount_fen,
+            )
+
+        result = _txn_to_dict(refund_txn)
+        if reversal_result:
+            result["split_reversal"] = reversal_result
+        return result
 
     # ──────────────────────────────────────────────────────────────
     # 流水查询
     # ──────────────────────────────────────────────────────────────
 
     async def get_transactions(
-        self, db: AsyncSession, card_no: str, limit: int = 20, offset: int = 0,
+        self,
+        db: AsyncSession,
+        card_no: str,
+        limit: int = 20,
+        offset: int = 0,
     ) -> dict:
         """查询储值卡流水（按卡号，v1 兼容）"""
         from models.stored_value import StoredValueCard, StoredValueTransaction
 
-        card_result = await db.execute(
-            select(StoredValueCard.id).where(StoredValueCard.card_no == card_no)
-        )
+        card_result = await db.execute(select(StoredValueCard.id).where(StoredValueCard.card_no == card_no))
         card_id = card_result.scalar_one_or_none()
         if not card_id:
             raise ValueError(f"储值卡不存在: {card_no}")
@@ -672,8 +737,7 @@ class StoredValueService:
         return [
             _plan_to_dict(p)
             for p in plans
-            if (p.valid_from is None or p.valid_from <= now)
-            and (p.valid_until is None or p.valid_until >= now)
+            if (p.valid_from is None or p.valid_from <= now) and (p.valid_until is None or p.valid_until >= now)
         ]
 
     async def create_recharge_plan(
@@ -751,8 +815,7 @@ class StoredValueService:
 
         total_fen = amount_fen + gift_amount_fen
         auto_remark = remark or (
-            f"充值{amount_fen / 100:.2f}元"
-            + (f"，赠送{gift_amount_fen / 100:.2f}元" if gift_amount_fen else "")
+            f"充值{amount_fen / 100:.2f}元" + (f"，赠送{gift_amount_fen / 100:.2f}元" if gift_amount_fen else "")
         )
 
         txn = StoredValueTransaction(
@@ -890,8 +953,7 @@ class StoredValueService:
 
         if from_card.main_balance_fen < amount_fen:
             raise InsufficientBalanceError(
-                f"本金余额不足以转赠：可用{from_card.main_balance_fen / 100:.2f}元"
-                f"，需{amount_fen / 100:.2f}元"
+                f"本金余额不足以转赠：可用{from_card.main_balance_fen / 100:.2f}元，需{amount_fen / 100:.2f}元"
             )
 
         # 扣出
@@ -1222,10 +1284,7 @@ class StoredValueService:
 
         amount_fen = points // points_to_fen_ratio
         if amount_fen <= 0:
-            raise ValueError(
-                f"积分不足以兑换（需至少 {points_to_fen_ratio} 积分兑换 1 分钱，"
-                f"当前 {points} 积分）"
-            )
+            raise ValueError(f"积分不足以兑换（需至少 {points_to_fen_ratio} 积分兑换 1 分钱，当前 {points} 积分）")
 
         # 1. 查找会员 active 储值卡（customer_id = member_id）
         card_result = await db.execute(
@@ -1242,9 +1301,7 @@ class StoredValueService:
         )
         card = card_result.scalar_one_or_none()
         if not card:
-            raise CardNotFoundError(
-                f"会员 {member_id} 没有有效的储值卡，请先开卡"
-            )
+            raise CardNotFoundError(f"会员 {member_id} 没有有效的储值卡，请先开卡")
 
         # 2. 从 member_cards 扣积分（raw SQL，兼容现有积分体系）
         deduct_result = await db.execute(
@@ -1264,9 +1321,7 @@ class StoredValueService:
         )
         row = deduct_result.fetchone()
         if not row:
-            raise InsufficientBalanceError(
-                f"积分余额不足（需 {points} 积分）或会员卡不存在"
-            )
+            raise InsufficientBalanceError(f"积分余额不足（需 {points} 积分）或会员卡不存在")
 
         # 3. 充入储值卡（仅充本金）
         balance_before = card.balance_fen
@@ -1303,6 +1358,76 @@ class StoredValueService:
             "points_deducted": points,
             "balance_before_fen": balance_before,
         }
+
+    # ──────────────────────────────────────────────────────────────
+    # 跨店分账辅助方法
+    # ──────────────────────────────────────────────────────────────
+
+    async def _trigger_cross_store_split(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        transaction_id: uuid.UUID,
+        recharge_store_id: uuid.UUID,
+        consume_store_id: uuid.UUID,
+        amount_fen: int,
+    ) -> dict | None:
+        """跨店消费时触发分账（异常不阻塞主流程）"""
+        try:
+            from services.tx_finance_client import get_split_service
+
+            split_svc = get_split_service(db, str(tenant_id))
+            return await split_svc.trigger_split_on_consume(
+                transaction_id=str(transaction_id),
+                recharge_store_id=str(recharge_store_id),
+                consume_store_id=str(consume_store_id),
+                amount_fen=amount_fen,
+            )
+        except ImportError:
+            # tx-finance 客户端未配置，降级跳过
+            logger.warning(
+                "sv_split.client_unavailable",
+                transaction_id=str(transaction_id),
+            )
+            return None
+        except Exception:
+            # 分账失败不阻塞消费主流程，记录日志后续人工处理
+            logger.exception(
+                "sv_split.trigger_failed",
+                transaction_id=str(transaction_id),
+            )
+            return None
+
+    async def _trigger_split_reversal(
+        self,
+        db: AsyncSession,
+        tenant_id: uuid.UUID,
+        original_order_id: str,
+        refund_transaction_id: str,
+        refund_amount_fen: int,
+    ) -> dict | None:
+        """退款时触发分账冲正（异常不阻塞主流程）"""
+        try:
+            from services.tx_finance_client import get_split_service
+
+            split_svc = get_split_service(db, str(tenant_id))
+            return await split_svc.create_reversal_record(
+                original_transaction_id=original_order_id,
+                refund_transaction_id=refund_transaction_id,
+                refund_amount_fen=refund_amount_fen,
+            )
+        except ImportError:
+            logger.warning(
+                "sv_split_reversal.client_unavailable",
+                original_order_id=original_order_id,
+            )
+            return None
+        except Exception:
+            logger.exception(
+                "sv_split_reversal.trigger_failed",
+                original_order_id=original_order_id,
+            )
+            return None
 
     # ──────────────────────────────────────────────────────────────
     # 内部辅助方法
@@ -1348,7 +1473,10 @@ class StoredValueService:
         return card
 
     async def _match_recharge_gift(
-        self, db: AsyncSession, amount_fen: int, store_id: str | None,
+        self,
+        db: AsyncSession,
+        amount_fen: int,
+        store_id: str | None,
     ) -> int:
         """匹配充值赠送规则，返回赠送金额（v1 兼容）"""
         from models.stored_value import RechargeRule
@@ -1377,6 +1505,7 @@ class StoredValueService:
 # ──────────────────────────────────────────────────────────────────
 # 序列化辅助函数
 # ──────────────────────────────────────────────────────────────────
+
 
 def _card_to_dict(card) -> dict:
     return {

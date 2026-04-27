@@ -17,6 +17,7 @@ Agent铁律：
 
 量化目标：备用金未核销率 70%→<5%，异常识别周期 月末→当日
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,13 +31,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.expense_enums import (
     AgentType,
-    ExpenseStatus,
     NotificationEventType,
     PettyCashAccountStatus,
 )
-from ..models.petty_cash import PettyCashAccount, PettyCashTransaction
-from ..services import notification_service
-from ..services import petty_cash_service
+from ..models.petty_cash import PettyCashAccount
+from ..services import notification_service, petty_cash_service
 
 log = structlog.get_logger(__name__)
 
@@ -44,7 +43,7 @@ log = structlog.get_logger(__name__)
 _MIN_ALERT_INTERVAL_HOURS = 4
 
 # POS日结对账差异触发人工预警的阈值（分），与 petty_cash_service 保持一致
-_POS_DIFF_ALERT_THRESHOLD = 5000   # 50元
+_POS_DIFF_ALERT_THRESHOLD = 5000  # 50元
 
 # 单笔异常检测：超过日均50%视为异常
 _ANOMALY_RATE_THRESHOLD = 0.5
@@ -53,6 +52,7 @@ _ANOMALY_RATE_THRESHOLD = 0.5
 # =============================================================================
 # 1. Agent 任务日志记录
 # =============================================================================
+
 
 async def _log_agent_job(
     db: AsyncSession,
@@ -84,6 +84,7 @@ async def _log_agent_job(
 # =============================================================================
 # 2. POS日结触发的对账处理
 # =============================================================================
+
 
 async def handle_pos_daily_close(
     db: AsyncSession,
@@ -172,10 +173,7 @@ async def handle_pos_daily_close(
             tenant_id=tenant_id,
             store_id=store_id,
         )
-        if (
-            account.status == PettyCashAccountStatus.ACTIVE.value
-            and account.balance < account.warning_threshold
-        ):
+        if account.status == PettyCashAccountStatus.ACTIVE.value and account.balance < account.warning_threshold:
             draft_result = await petty_cash_service.draft_replenishment_request(
                 db=db,
                 tenant_id=tenant_id,
@@ -222,6 +220,7 @@ async def handle_pos_daily_close(
 # 3. 员工离职触发的账户冻结
 # =============================================================================
 
+
 async def handle_employee_departure(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -264,10 +263,7 @@ async def handle_employee_departure(
                     db=db,
                     tenant_id=tenant_id,
                     account_id=account.id,
-                    reason=(
-                        f"保管人离职（员工ID：{employee_id}，离职日期：{departure_date}），"
-                        "账户冻结待归还确认。"
-                    ),
+                    reason=(f"保管人离职（员工ID：{employee_id}，离职日期：{departure_date}），账户冻结待归还确认。"),
                     operator_id=employee_id,
                 )
                 summary["frozen_accounts"] += 1
@@ -306,6 +302,7 @@ async def handle_employee_departure(
         # 步骤4：查询该员工名下未核销的费用申请
         # 使用原生 SQL 避免循环依赖（expense_applications 在 expense_application_service）
         from sqlalchemy import text as sa_text
+
         pending_stmt = sa_text(
             "SELECT COUNT(*) FROM expense_applications "
             "WHERE tenant_id = :tenant_id "
@@ -354,6 +351,7 @@ async def handle_employee_departure(
 # =============================================================================
 # 4. 余额轮询检查（每5分钟）
 # =============================================================================
+
 
 async def run_balance_check(
     db: AsyncSession,
@@ -411,9 +409,7 @@ async def run_balance_check(
             # 推送余额不足预警
             try:
                 daily_avg = account.daily_avg_7d or 0
-                days_of_coverage = (
-                    round(account.balance / daily_avg, 1) if daily_avg > 0 else 999.0
-                )
+                days_of_coverage = round(account.balance / daily_avg, 1) if daily_avg > 0 else 999.0
                 await notification_service.send_notification(
                     db=db,
                     tenant_id=tenant_id,
@@ -494,6 +490,7 @@ async def run_balance_check(
 # 5. 月末核销批量处理（每月25日）
 # =============================================================================
 
+
 async def run_monthly_settlement(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -557,12 +554,14 @@ async def run_monthly_settlement(
 
                 if unreconciled_count > 0:
                     summary["accounts_with_unreconciled"] += 1
-                    account_unreconciled.append({
-                        "account_id": str(account.id),
-                        "store_id": str(account.store_id),
-                        "unreconciled_count": unreconciled_count,
-                        "balance": account.balance,
-                    })
+                    account_unreconciled.append(
+                        {
+                            "account_id": str(account.id),
+                            "store_id": str(account.store_id),
+                            "unreconciled_count": unreconciled_count,
+                            "balance": account.balance,
+                        }
+                    )
 
                     # 步骤5：推送催办通知给保管人
                     try:
@@ -645,6 +644,7 @@ async def run_monthly_settlement(
 # =============================================================================
 # 6. 单笔异常检测
 # =============================================================================
+
 
 async def detect_transaction_anomaly(
     db: AsyncSession,
@@ -731,6 +731,7 @@ async def detect_transaction_anomaly(
 # =============================================================================
 # 7. Agent 主入口（统一调度）
 # =============================================================================
+
 
 async def run(
     db: AsyncSession,

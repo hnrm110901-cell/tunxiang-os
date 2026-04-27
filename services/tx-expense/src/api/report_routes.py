@@ -14,6 +14,7 @@
 统一响应格式：{"ok": bool, "data": {}, "error": {}}
 所有接口通过 X-Tenant-ID / X-User-ID header 鉴权（与其他路由一致）。
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -37,14 +38,17 @@ log = structlog.get_logger(__name__)
 # Pydantic Schema
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ResolveRequest(BaseModel):
     """标记去重处理请求体"""
+
     note: str = Field(..., min_length=1, max_length=500, description="处理备注（确认合规原因或驳回理由）")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -53,6 +57,7 @@ def _ok(data: object) -> dict:
 def _current_year_month() -> tuple[int, int]:
     """返回当前年月（用于默认参数）。"""
     from datetime import date
+
     today = date.today()
     return today.year, today.month
 
@@ -60,6 +65,7 @@ def _current_year_month() -> tuple[int, int]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 月度汇总报表
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/monthly",
@@ -104,6 +110,7 @@ async def get_monthly_report(
 # 费用趋势
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/trend",
     summary="费用趋势分析",
@@ -138,6 +145,7 @@ async def get_expense_trend(
 # ─────────────────────────────────────────────────────────────────────────────
 # TOP 消费员工
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/top-spenders",
@@ -182,6 +190,7 @@ async def get_top_spenders(
 # 异常费用检测
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/abnormal",
     summary="异常费用检测",
@@ -221,17 +230,20 @@ async def get_abnormal_expenses(
             detail=f"异常费用检测失败：{exc}",
         )
 
-    return _ok({
-        "year": year,
-        "month": month,
-        "total": len(anomalies),
-        "items": anomalies,
-    })
+    return _ok(
+        {
+            "year": year,
+            "month": month,
+            "total": len(anomalies),
+            "items": anomalies,
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 导出报表
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/export",
@@ -283,6 +295,7 @@ async def export_report(
 # 集团去重 — 可疑发票列表
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/dedup/suspicious",
     summary="可疑跨品牌重复发票列表",
@@ -320,6 +333,7 @@ async def get_suspicious_invoices(
 # 集团去重 — 统计
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/dedup/stats",
     summary="发票集团去重统计",
@@ -352,6 +366,7 @@ async def get_dedup_stats(
 # ─────────────────────────────────────────────────────────────────────────────
 # 集团去重 — 标记处理
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/dedup/{group_id}/resolve",
@@ -407,8 +422,10 @@ async def resolve_dedup(
         resolved_by=str(current_user_id),
     )
 
-    return _ok({
-        "group_id": group_id,
-        "resolved_by": str(current_user_id),
-        "message": "去重记录已标记为已处理",
-    })
+    return _ok(
+        {
+            "group_id": group_id,
+            "resolved_by": str(current_user_id),
+            "message": "去重记录已标记为已处理",
+        }
+    )

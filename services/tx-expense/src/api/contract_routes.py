@@ -6,10 +6,11 @@
 
 金额约定：所有金额字段单位为分(fen)，1元=100分，展示层负责转换。
 """
+
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import structlog
@@ -24,6 +25,7 @@ logger = structlog.get_logger(__name__)
 
 try:
     from src.services.contract_ledger_service import ContractLedgerService
+
     _contract_svc = ContractLedgerService()
 except ImportError:
     _contract_svc = None  # type: ignore[assignment]
@@ -34,6 +36,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # 依赖注入
 # ---------------------------------------------------------------------------
+
 
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
@@ -59,12 +62,11 @@ def _get_svc() -> "ContractLedgerService":
 # Pydantic Schema
 # ---------------------------------------------------------------------------
 
+
 class ContractCreate(BaseModel):
     contract_no: Optional[str] = Field(None, max_length=64, description="合同编号（租户内唯一）")
     contract_name: str = Field(..., max_length=200, description="合同名称")
-    contract_type: Optional[str] = Field(
-        None, description="合同类型：rental/equipment/service/labor/other"
-    )
+    contract_type: Optional[str] = Field(None, description="合同类型：rental/equipment/service/labor/other")
     counterparty_name: Optional[str] = Field(None, max_length=200, description="乙方/甲方名称")
     counterparty_contact: Optional[str] = Field(None, max_length=100, description="对方联系人")
     total_amount: Optional[int] = Field(None, description="合同总金额（分），1元=100分")
@@ -116,6 +118,7 @@ class MarkPaymentPaidRequest(BaseModel):
 # 端点实现
 # ---------------------------------------------------------------------------
 
+
 @router.post("", status_code=status.HTTP_201_CREATED, summary="创建合同")
 async def create_contract(
     body: ContractCreate,
@@ -160,7 +163,9 @@ async def create_contract(
 
 @router.get("", summary="合同列表")
 async def list_contracts(
-    contract_status: Optional[str] = Query(None, alias="status", description="状态过滤：draft/active/expired/terminated"),
+    contract_status: Optional[str] = Query(
+        None, alias="status", description="状态过滤：draft/active/expired/terminated"
+    ),
     contract_type: Optional[str] = Query(None, description="类型过滤：rental/equipment/service/labor/other"),
     store_id: Optional[UUID] = Query(None, description="门店ID过滤"),
     expiring_within_days: Optional[int] = Query(None, ge=1, le=365, description="N天内到期的合同"),
@@ -231,9 +236,7 @@ async def get_payment_calendar(
     """
     svc = _get_svc()
     try:
-        result = await svc.get_payment_calendar(
-            db=db, tenant_id=tenant_id, year=year, month=month
-        )
+        result = await svc.get_payment_calendar(db=db, tenant_id=tenant_id, year=year, month=month)
         return {"ok": True, "data": result}
     except Exception as exc:
         logger.error("payment_calendar_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
@@ -295,9 +298,7 @@ async def update_contract(
     svc = _get_svc()
     try:
         data = {k: v for k, v in body.model_dump().items() if v is not None}
-        result = await svc.update_contract(
-            db=db, tenant_id=tenant_id, contract_id=contract_id, data=data
-        )
+        result = await svc.update_contract(db=db, tenant_id=tenant_id, contract_id=contract_id, data=data)
         await db.commit()
         logger.info(
             "contract_updated_via_api",
@@ -378,9 +379,7 @@ async def add_payment_plan(
     svc = _get_svc()
     try:
         data = body.model_dump()
-        result = await svc.add_payment_plan(
-            db=db, tenant_id=tenant_id, contract_id=contract_id, data=data
-        )
+        result = await svc.add_payment_plan(db=db, tenant_id=tenant_id, contract_id=contract_id, data=data)
         await db.commit()
         logger.info(
             "payment_plan_added_via_api",

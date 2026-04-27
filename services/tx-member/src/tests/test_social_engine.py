@@ -7,6 +7,7 @@
 5. 推荐追踪
 6. 社交统计
 """
+
 import os
 import sys
 
@@ -34,6 +35,7 @@ GROUP_ID = str(uuid.uuid4())
 
 
 # ── Mock helpers ─────────────────────────────────────────────
+
 
 class FakeMappingResult:
     def __init__(self, rows):
@@ -70,14 +72,17 @@ def make_db(side_effects=None):
 
 # ── 1. 创建拼单 ─────────────────────────────────────────────
 
+
 class TestCreateGroupOrder:
     @pytest.mark.asyncio
     async def test_create_group(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(),  # INSERT group_orders
-            FakeResult(),  # INSERT group_order_members
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(),  # INSERT group_orders
+                FakeResult(),  # INSERT group_order_members
+            ]
+        )
         result = await create_group_order(
             initiator_id=CUSTOMER_A,
             store_id=STORE_ID,
@@ -95,54 +100,67 @@ class TestCreateGroupOrder:
     async def test_create_group_no_table(self):
         db = make_db([FakeResult(), FakeResult(), FakeResult()])
         result = await create_group_order(
-            initiator_id=CUSTOMER_A, store_id=STORE_ID,
-            table_id=None, tenant_id=TENANT_ID, db=db,
+            initiator_id=CUSTOMER_A,
+            store_id=STORE_ID,
+            table_id=None,
+            tenant_id=TENANT_ID,
+            db=db,
         )
         assert result["table_id"] is None
 
 
 # ── 2. 加入拼单 ─────────────────────────────────────────────
 
+
 class TestJoinGroupOrder:
     @pytest.mark.asyncio
     async def test_join_success(self):
         future = datetime.now(timezone.utc) + timedelta(hours=1)
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"status": "open", "expires_at": future, "member_count": 1}]),
-            FakeResult(scalar_val=None),  # not already in group
-            FakeResult(),  # INSERT member
-            FakeResult(),  # UPDATE count
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"status": "open", "expires_at": future, "member_count": 1}]),
+                FakeResult(scalar_val=None),  # not already in group
+                FakeResult(),  # INSERT member
+                FakeResult(),  # UPDATE count
+            ]
+        )
         result = await join_group_order(
-            group_id=GROUP_ID, customer_id=CUSTOMER_B,
-            tenant_id=TENANT_ID, db=db,
+            group_id=GROUP_ID,
+            customer_id=CUSTOMER_B,
+            tenant_id=TENANT_ID,
+            db=db,
         )
         assert result["joined"] is True
         assert result["member_count"] == 2
 
     @pytest.mark.asyncio
     async def test_join_not_found(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[]),  # group not found
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[]),  # group not found
+            ]
+        )
         with pytest.raises(ValueError, match="group_order_not_found"):
             await join_group_order(GROUP_ID, CUSTOMER_B, TENANT_ID, db)
 
     @pytest.mark.asyncio
     async def test_join_already_member(self):
         future = datetime.now(timezone.utc) + timedelta(hours=1)
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[{"status": "open", "expires_at": future, "member_count": 1}]),
-            FakeResult(scalar_val="existing_id"),  # already in
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[{"status": "open", "expires_at": future, "member_count": 1}]),
+                FakeResult(scalar_val="existing_id"),  # already in
+            ]
+        )
         with pytest.raises(ValueError, match="already_in_group"):
             await join_group_order(GROUP_ID, CUSTOMER_B, TENANT_ID, db)
 
 
 # ── 3. 请客送礼 ─────────────────────────────────────────────
+
 
 class TestSendGift:
     @pytest.mark.asyncio
@@ -179,12 +197,17 @@ class TestSendGift:
         db = make_db([FakeResult()])
         with pytest.raises(ValueError, match="invalid_gift_type"):
             await send_gift(
-                CUSTOMER_A, "13800138000", "invalid", {},
-                TENANT_ID, db,
+                CUSTOMER_A,
+                "13800138000",
+                "invalid",
+                {},
+                TENANT_ID,
+                db,
             )
 
 
 # ── 4. 分享有礼 ─────────────────────────────────────────────
+
 
 class TestShareLink:
     @pytest.mark.asyncio
@@ -210,16 +233,19 @@ class TestShareLink:
 
 # ── 5. 推荐追踪 ─────────────────────────────────────────────
 
+
 class TestTrackReferral:
     @pytest.mark.asyncio
     async def test_track_success(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(scalar_val=None),  # no existing referral
-            FakeResult(),  # INSERT referral
-            FakeResult(),  # UPDATE referrer points
-            FakeResult(),  # UPDATE referee points
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(scalar_val=None),  # no existing referral
+                FakeResult(),  # INSERT referral
+                FakeResult(),  # UPDATE referrer points
+                FakeResult(),  # UPDATE referee points
+            ]
+        )
         result = await track_referral(
             referrer_id=CUSTOMER_A,
             new_customer_id=CUSTOMER_B,
@@ -233,25 +259,30 @@ class TestTrackReferral:
 
     @pytest.mark.asyncio
     async def test_duplicate_referral(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(scalar_val="existing"),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(scalar_val="existing"),
+            ]
+        )
         with pytest.raises(ValueError, match="referral_already_exists"):
             await track_referral(CUSTOMER_A, CUSTOMER_B, TENANT_ID, db)
 
 
 # ── 6. 社交统计 ─────────────────────────────────────────────
 
+
 class TestSocialStats:
     @pytest.mark.asyncio
     async def test_stats(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"cnt": 5, "reward": 50}]),  # referrals
-            FakeResult(scalar_val=3),  # group orders
-            FakeResult(scalar_val=2),  # gifts
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"cnt": 5, "reward": 50}]),  # referrals
+                FakeResult(scalar_val=3),  # group orders
+                FakeResult(scalar_val=2),  # gifts
+            ]
+        )
         result = await get_social_stats(CUSTOMER_A, TENANT_ID, db)
         assert result["customer_id"] == CUSTOMER_A
         assert result["referral_count"] == 5

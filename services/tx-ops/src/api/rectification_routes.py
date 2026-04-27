@@ -25,6 +25,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import json
@@ -241,10 +242,7 @@ async def get_rectification_summary(
     completed = status_counts.get("verified", 0)
     completion_rate = round(completed / total * 100, 1) if total > 0 else 0
 
-    top_stores = [
-        {"store_id": sid, "count": cnt}
-        for sid, cnt in sorted(store_counts.items(), key=lambda x: -x[1])[:5]
-    ]
+    top_stores = [{"store_id": sid, "count": cnt} for sid, cnt in sorted(store_counts.items(), key=lambda x: -x[1])[:5]]
 
     return {
         "ok": True,
@@ -279,8 +277,14 @@ async def list_rectification_tasks(
     if severity and severity not in _VALID_SEVERITIES:
         raise HTTPException(status_code=400, detail=f"severity 必须是 {_VALID_SEVERITIES} 之一")
 
-    log.info("rectification_tasks_listed", tenant_id=x_tenant_id,
-             status=status, severity=severity, region=region, store_id=store_id)
+    log.info(
+        "rectification_tasks_listed",
+        tenant_id=x_tenant_id,
+        status=status,
+        severity=severity,
+        region=region,
+        store_id=store_id,
+    )
 
     try:
         await _set_rls(db, x_tenant_id)
@@ -475,8 +479,13 @@ async def create_rectification_task(
         "remarks": [],
     }
 
-    log.info("rectification_task_created", task_id=task_id,
-             store_id=body.store_id, severity=body.severity, tenant_id=x_tenant_id)
+    log.info(
+        "rectification_task_created",
+        task_id=task_id,
+        store_id=body.store_id,
+        severity=body.severity,
+        tenant_id=x_tenant_id,
+    )
     return {"ok": True, "data": new_task}
 
 
@@ -491,8 +500,7 @@ async def update_rectification_status(
     if body.status not in _VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"status 必须是 {_VALID_STATUSES} 之一")
 
-    log.info("rectification_status_updated", task_id=task_id,
-             new_status=body.status, tenant_id=x_tenant_id)
+    log.info("rectification_status_updated", task_id=task_id, new_status=body.status, tenant_id=x_tenant_id)
 
     try:
         await _set_rls(db, x_tenant_id)
@@ -527,11 +535,13 @@ async def update_rectification_status(
 
         if body.remark:
             remarks = existing_detail.get("remarks", [])
-            remarks.append({
-                "time": now.isoformat(),
-                "operator": body.operator_name or "unknown",
-                "content": body.remark,
-            })
+            remarks.append(
+                {
+                    "time": now.isoformat(),
+                    "operator": body.operator_name or "unknown",
+                    "content": body.remark,
+                }
+            )
             existing_detail["remarks"] = remarks
 
         await db.execute(

@@ -8,6 +8,7 @@
 3. POST /scan-order/submit     — 攒一批提交到厨房（触发 KDS 分单 + 厨打）
 4. GET  /scan-order/status/{order_id} — 出餐进度查询
 """
+
 import uuid
 from typing import Optional
 
@@ -127,15 +128,17 @@ async def scan_order_init(
                 )
             )
             for item in items_result.scalars().all():
-                existing_items.append({
-                    "item_id": str(item.id),
-                    "dish_id": str(item.dish_id) if item.dish_id else "",
-                    "dish_name": item.item_name,
-                    "quantity": item.quantity,
-                    "unit_price_fen": item.unit_price_fen,
-                    "notes": item.notes or "",
-                    "sent_to_kds": item.sent_to_kds_flag,
-                })
+                existing_items.append(
+                    {
+                        "item_id": str(item.id),
+                        "dish_id": str(item.dish_id) if item.dish_id else "",
+                        "dish_name": item.item_name,
+                        "quantity": item.quantity,
+                        "unit_price_fen": item.unit_price_fen,
+                        "notes": item.notes or "",
+                        "sent_to_kds": item.sent_to_kds_flag,
+                    }
+                )
 
     # 如果桌台空闲，创建新订单
     order_id: str
@@ -166,9 +169,7 @@ async def scan_order_init(
 
         # 标记渠道为扫码点单
         await db.execute(
-            Order.__table__.update()
-            .where(Order.id == uuid.UUID(order_id))
-            .values(sales_channel_id=SCAN_ORDER_CHANNEL)
+            Order.__table__.update().where(Order.id == uuid.UUID(order_id)).values(sales_channel_id=SCAN_ORDER_CHANNEL)
         )
 
     # 获取菜单
@@ -195,15 +196,17 @@ async def scan_order_init(
         recommendation_count=len(recommendations),
     )
 
-    return _ok({
-        "order_id": order_id,
-        "order_no": order_no,
-        "table_no": req.table_no,
-        "is_new_order": is_new_order,
-        "existing_items": existing_items,
-        "menu_items": menu_items,
-        "recommendations": recommendations,
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "order_no": order_no,
+            "table_no": req.table_no,
+            "is_new_order": is_new_order,
+            "existing_items": existing_items,
+            "menu_items": menu_items,
+            "recommendations": recommendations,
+        }
+    )
 
 
 # ─── 2. 顾客自助加菜 ───
@@ -310,7 +313,7 @@ async def scan_order_submit(
             OrderItem.order_id == order_uuid,
             OrderItem.tenant_id == tid,
             OrderItem.sent_to_kds_flag == False,  # noqa: E712
-            OrderItem.return_flag == False,        # noqa: E712
+            OrderItem.return_flag == False,  # noqa: E712
         )
     )
     unsent_items = list(items_result.scalars().all())
@@ -322,13 +325,15 @@ async def scan_order_submit(
     # 构造 KDS 分单数据
     kds_items = []
     for item in unsent_items:
-        kds_items.append({
-            "dish_id": str(item.dish_id) if item.dish_id else "",
-            "item_name": item.item_name,
-            "quantity": item.quantity,
-            "order_item_id": str(item.id),
-            "notes": item.notes or "",
-        })
+        kds_items.append(
+            {
+                "dish_id": str(item.dish_id) if item.dish_id else "",
+                "item_name": item.item_name,
+                "quantity": item.quantity,
+                "order_item_id": str(item.id),
+                "notes": item.notes or "",
+            }
+        )
 
     # 触发 KDS 分单 + 厨打
     dispatch_result = await dispatch_order_to_kds(
@@ -354,11 +359,13 @@ async def scan_order_submit(
         channel=SCAN_ORDER_CHANNEL,
     )
 
-    return _ok({
-        "order_id": req.order_id,
-        "items_submitted": len(unsent_items),
-        "dispatch": dispatch_result,
-    })
+    return _ok(
+        {
+            "order_id": req.order_id,
+            "items_submitted": len(unsent_items),
+            "dispatch": dispatch_result,
+        }
+    )
 
 
 # ─── 4. 出餐进度查询 ───
@@ -414,13 +421,15 @@ async def scan_order_status(
             if isinstance(meta, dict):
                 kds_status = meta.get("kds_status", "pending")
 
-        item_statuses.append({
-            "item_id": str(item.id),
-            "dish_name": item.item_name,
-            "quantity": item.quantity,
-            "kds_status": kds_status,
-            "kds_station": item.kds_station or "",
-        })
+        item_statuses.append(
+            {
+                "item_id": str(item.id),
+                "dish_name": item.item_name,
+                "quantity": item.quantity,
+                "kds_status": kds_status,
+                "kds_station": item.kds_station or "",
+            }
+        )
 
     # 汇总统计
     total = len(item_statuses)
@@ -428,18 +437,20 @@ async def scan_order_status(
     cooking_count = sum(1 for i in item_statuses if i["kds_status"] == "cooking")
     pending_count = total - done_count - cooking_count
 
-    return _ok({
-        "order_id": order_id,
-        "order_no": order.order_no,
-        "order_status": order.status,
-        "items": item_statuses,
-        "summary": {
-            "total": total,
-            "done": done_count,
-            "cooking": cooking_count,
-            "pending": pending_count,
-        },
-    })
+    return _ok(
+        {
+            "order_id": order_id,
+            "order_no": order.order_no,
+            "order_status": order.status,
+            "items": item_statuses,
+            "summary": {
+                "total": total,
+                "done": done_count,
+                "cooking": cooking_count,
+                "pending": pending_count,
+            },
+        }
+    )
 
 
 # ─── 内部工具 ───
@@ -452,12 +463,14 @@ async def _get_menu_items(
 ) -> list[dict]:
     """获取门店在售菜单"""
     result = await db.execute(
-        select(Dish).where(
+        select(Dish)
+        .where(
             Dish.tenant_id == tenant_id,
             Dish.is_available == True,  # noqa: E712
-            Dish.is_deleted == False,   # noqa: E712
+            Dish.is_deleted == False,  # noqa: E712
             (Dish.store_id == store_id) | (Dish.store_id == None),  # noqa: E711
-        ).order_by(Dish.sort_order, Dish.dish_name)
+        )
+        .order_by(Dish.sort_order, Dish.dish_name)
     )
     dishes = result.scalars().all()
 

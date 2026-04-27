@@ -3,6 +3,7 @@
 支持问题全生命周期管理：创建→派发→处理中→已解决→已验证。
 红黄绿分级：overdue=红, deadline<3d=黄, on_track=绿。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -189,8 +190,7 @@ async def assign_issue(
         issue["status"] = "assigned"
         issue["updated_at"] = now.isoformat()
 
-    log.info("issue_assigned", issue_id=issue_id, tenant_id=tenant_id,
-             assignee_id=assignee_id, deadline=deadline)
+    log.info("issue_assigned", issue_id=issue_id, tenant_id=tenant_id, assignee_id=assignee_id, deadline=deadline)
 
     return {
         "issue_id": issue_id,
@@ -264,10 +264,12 @@ async def update_issue_status(
             raise ValueError(f"Cannot transition from '{current_status}' to '{status}'")
         issue["status"] = status
         issue["updated_at"] = now.isoformat()
-        issue.setdefault("notes", []).append({
-            "text": notes,
-            "timestamp": now.isoformat(),
-        })
+        issue.setdefault("notes", []).append(
+            {
+                "text": notes,
+                "timestamp": now.isoformat(),
+            }
+        )
 
     log.info("issue_status_updated", issue_id=issue_id, tenant_id=tenant_id, status=status)
 
@@ -337,8 +339,14 @@ async def get_store_issue_board(
         else:
             green.append(tagged)
 
-    log.info("issue_board_queried", store_id=store_id, tenant_id=tenant_id,
-             red=len(red), yellow=len(yellow), green=len(green))
+    log.info(
+        "issue_board_queried",
+        store_id=store_id,
+        tenant_id=tenant_id,
+        red=len(red),
+        yellow=len(yellow),
+        green=len(green),
+    )
 
     return {
         "store_id": store_id,
@@ -382,17 +390,24 @@ async def get_regional_issues(
         total_red += r
         total_yellow += y
         total_green += g
-        breakdown.append({
-            "store_id": board.get("store_id", ""),
-            "red": r,
-            "yellow": y,
-            "green": g,
-        })
+        breakdown.append(
+            {
+                "store_id": board.get("store_id", ""),
+                "red": r,
+                "yellow": y,
+                "green": g,
+            }
+        )
 
     breakdown.sort(key=lambda x: x["red"], reverse=True)
 
-    log.info("regional_issues_queried", region_id=region_id, tenant_id=tenant_id,
-             total_red=total_red, total_yellow=total_yellow)
+    log.info(
+        "regional_issues_queried",
+        region_id=region_id,
+        tenant_id=tenant_id,
+        total_red=total_red,
+        total_yellow=total_yellow,
+    )
 
     return {
         "region_id": region_id,
@@ -439,16 +454,13 @@ async def cross_store_benchmark(
         except SQLAlchemyError as exc:
             log.error("cross_store_benchmark_db_error", exc_info=True, error=str(exc), tenant_id=tenant_id)
 
-    stores: List[Dict[str, Any]] = [
-        {"store_id": sid, "count": count} for sid, count in counts.items()
-    ]
+    stores: List[Dict[str, Any]] = [{"store_id": sid, "count": count} for sid, count in counts.items()]
     stores.sort(key=lambda x: x["count"], reverse=True)
 
     total = sum(counts.values())
     avg = round(total / len(counts), 2) if counts else 0.0
 
-    log.info("cross_store_benchmark", tenant_id=tenant_id, issue_type=issue_type,
-             store_count=len(counts))
+    log.info("cross_store_benchmark", tenant_id=tenant_id, issue_type=issue_type, store_count=len(counts))
 
     return {
         "issue_type": issue_type,

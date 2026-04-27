@@ -1,4 +1,5 @@
 """tx-org 电子签约模块服务。"""
+
 from __future__ import annotations
 
 import hashlib

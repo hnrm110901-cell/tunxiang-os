@@ -9,6 +9,7 @@
   2. 调用 Claude Haiku API 生成 AI 洞察
   3. 降级策略：DB失败 → rule-based；Claude失败 → rule-based
 """
+
 import json
 from datetime import datetime, timezone
 from typing import Optional
@@ -48,21 +49,22 @@ INSIGHT_SYSTEM_PROMPT = """你是屯象OS的会员洞察引擎。根据会员消
 
 # ─── Pydantic 模型 ──────────────────────────────────────────
 
+
 class InsightGenerateRequest(BaseModel):
     order_id: str
     store_id: str
 
 
 class AlertItem(BaseModel):
-    type: str                # "allergy" | "preference" | "vip"
-    severity: str            # "danger" | "warning" | "info"
+    type: str  # "allergy" | "preference" | "vip"
+    severity: str  # "danger" | "warning" | "info"
     icon: str
     title: str
     body: str
 
 
 class SuggestionItem(BaseModel):
-    type: str                # "upsell" | "celebration" | "retention"
+    type: str  # "upsell" | "celebration" | "retention"
     icon: str
     title: str
     body: str
@@ -87,6 +89,7 @@ class InsightResponse(BaseModel):
 
 
 # ─── RLS 辅助 ──────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -125,6 +128,7 @@ _ORDERS_SQL = text("""
 
 # ─── Claude context 构建 ────────────────────────────────────
 
+
 def _build_context(member_row: dict, orders_rows: list[dict]) -> str:
     total_visits = member_row.get("total_order_count", 0) or 0
     total_spend = (member_row.get("total_order_amount_fen", 0) or 0) / 100
@@ -135,7 +139,7 @@ def _build_context(member_row: dict, orders_rows: list[dict]) -> str:
 
     dish_counts: dict[str, int] = {}
     for o in orders_rows:
-        for item in (o.get("items") or []):
+        for item in o.get("items") or []:
             name = item.get("dish_name", "")
             if name:
                 dish_counts[name] = dish_counts.get(name, 0) + item.get("quantity", 1)
@@ -150,6 +154,7 @@ def _build_context(member_row: dict, orders_rows: list[dict]) -> str:
 
 
 # ─── AI结果映射 ─────────────────────────────────────────────
+
 
 def _map_ai_result(ai_result: dict, member_row: dict, order_id: str, store_id: str) -> dict:
     visit_count = member_row.get("total_order_count", 0) or 0
@@ -182,6 +187,7 @@ def _map_ai_result(ai_result: dict, member_row: dict, order_id: str, store_id: s
 
 # ─── 降级：rule-based 洞察（原 mock 改良，使用真实数据或哈希兜底） ──
 
+
 def _build_rule_based_insight(
     member_id: str,
     member_data: dict | None,
@@ -206,8 +212,8 @@ def _build_rule_based_insight(
         # 用真实数据派生 seed 差异标志
         is_vip = rfm in ("S1", "S2") or visit_count > 40
         has_allergy = bool(dietary)
-        has_birthday = (seed % 5 == 0)
-        has_upsell = (seed % 3 != 2)
+        has_birthday = seed % 5 == 0
+        has_upsell = seed % 3 != 2
         favorite_dishes: list[str] = []
         avoided_items: list[str] = list(dietary) if isinstance(dietary, list) else []
         preferences: list[str] = list(tags) if isinstance(tags, list) else []
@@ -226,52 +232,64 @@ def _build_rule_based_insight(
 
     alerts: list[dict] = []
     if has_allergy and avoided_items:
-        alerts.append({
-            "type": "allergy",
-            "severity": "danger",
-            "icon": "⚠️",
-            "title": f"忌口：{avoided_items[0]}",
-            "body": f"该会员忌口 {', '.join(str(d) for d in avoided_items[:3])}，请通知后厨避免相关成分",
-        })
+        alerts.append(
+            {
+                "type": "allergy",
+                "severity": "danger",
+                "icon": "⚠️",
+                "title": f"忌口：{avoided_items[0]}",
+                "body": f"该会员忌口 {', '.join(str(d) for d in avoided_items[:3])}，请通知后厨避免相关成分",
+            }
+        )
     elif has_allergy:
-        alerts.append({
-            "type": "allergy",
-            "severity": "danger",
-            "icon": "⚠️",
-            "title": "有忌口记录",
-            "body": "该会员有忌口信息，请开台前确认并同步后厨",
-        })
+        alerts.append(
+            {
+                "type": "allergy",
+                "severity": "danger",
+                "icon": "⚠️",
+                "title": "有忌口记录",
+                "body": "该会员有忌口信息，请开台前确认并同步后厨",
+            }
+        )
     if visit_count > 30:
-        alerts.append({
-            "type": "preference",
-            "severity": "info",
-            "icon": "💡",
-            "title": "高频常客",
-            "body": f"已到店 {visit_count} 次，建议主动问好并记录本次偏好反馈",
-        })
+        alerts.append(
+            {
+                "type": "preference",
+                "severity": "info",
+                "icon": "💡",
+                "title": "高频常客",
+                "body": f"已到店 {visit_count} 次，建议主动问好并记录本次偏好反馈",
+            }
+        )
 
     suggestions: list[dict] = []
     if has_birthday:
-        suggestions.append({
-            "type": "celebration",
-            "icon": "🎂",
-            "title": "本月生日",
-            "body": "会员本月生日，可赠送甜品并拍照留存，有助于提升复访率",
-        })
+        suggestions.append(
+            {
+                "type": "celebration",
+                "icon": "🎂",
+                "title": "本月生日",
+                "body": "会员本月生日，可赠送甜品并拍照留存，有助于提升复访率",
+            }
+        )
     if has_upsell and visit_count > 5:
-        suggestions.append({
-            "type": "upsell",
-            "icon": "🍷",
-            "title": "推荐特色菜品",
-            "body": "根据历史偏好，今日可主动推荐招牌菜或当季新品",
-        })
+        suggestions.append(
+            {
+                "type": "upsell",
+                "icon": "🍷",
+                "title": "推荐特色菜品",
+                "body": "根据历史偏好，今日可主动推荐招牌菜或当季新品",
+            }
+        )
     if is_vip:
-        suggestions.append({
-            "type": "retention",
-            "icon": "👑",
-            "title": "VIP贵宾服务",
-            "body": "高价值会员，建议主动告知积分权益或会员专属优惠",
-        })
+        suggestions.append(
+            {
+                "type": "retention",
+                "icon": "👑",
+                "title": "VIP贵宾服务",
+                "body": "高价值会员，建议主动告知积分权益或会员专属优惠",
+            }
+        )
 
     level_label = "贵宾级" if visit_count > 40 else ("常客" if visit_count > 10 else "新客")
     service_tips = (
@@ -303,6 +321,7 @@ def _build_rule_based_insight(
 
 
 # ─── 路由 ────────────────────────────────────────────────────
+
 
 @router.post("/{member_id}/insights/generate", response_model=InsightResponse)
 async def generate_member_insight(
@@ -385,10 +404,7 @@ async def generate_member_insight(
             if clean_text.startswith("```"):
                 lines = clean_text.split("\n")
                 # 去除首尾的 ``` 行
-                clean_text = "\n".join(
-                    line for line in lines
-                    if not line.strip().startswith("```")
-                ).strip()
+                clean_text = "\n".join(line for line in lines if not line.strip().startswith("```")).strip()
 
             ai_result = json.loads(clean_text)
             insight = _map_ai_result(ai_result, member_data, req.order_id, req.store_id)
@@ -430,6 +446,7 @@ async def generate_member_insight(
     # 决策留痕 — 写入 agent_decision_logs（异步旁路，不阻塞响应）
     if x_tenant_id:
         import asyncio as _asyncio
+
         from sqlalchemy import text as _text
 
         async def _log_decision() -> None:
@@ -446,17 +463,21 @@ async def generate_member_insight(
                     """),
                     {
                         "tid": x_tenant_id,
-                        "input_ctx": json.dumps({
-                            "member_id": member_id,
-                            "order_id": req.order_id,
-                            "store_id": req.store_id,
-                            "source": source,
-                        }),
+                        "input_ctx": json.dumps(
+                            {
+                                "member_id": member_id,
+                                "order_id": req.order_id,
+                                "store_id": req.store_id,
+                                "source": source,
+                            }
+                        ),
                         "reasoning": f"member insight via {source}",
-                        "output_action": json.dumps({
-                            "alerts_count": len(insight.get("alerts", [])),
-                            "tags": insight.get("tags", []),
-                        }),
+                        "output_action": json.dumps(
+                            {
+                                "alerts_count": len(insight.get("alerts", [])),
+                                "tags": insight.get("tags", []),
+                            }
+                        ),
                         "confidence": 0.9 if source == "claude_api" else 0.6,
                     },
                 )

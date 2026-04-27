@@ -18,9 +18,9 @@
 
 from __future__ import annotations
 
-import sys
 import os
-from typing import Any, Optional
+import sys
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -58,9 +58,7 @@ _VALID_SYSTEMS = {"pinzhi", "aoqiwei_crm", "aoqiwei_supply", "yiding"}
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -97,9 +95,7 @@ def _mask_config(config: dict) -> dict:
 async def _load_systems_config(db: AsyncSession, tenant_id: str) -> dict:
     """从 DB 加载租户的 systems_config JSONB，返回原始 dict。"""
     row = await db.execute(
-        text(
-            "SELECT systems_config FROM tenants WHERE id = :tid::uuid LIMIT 1"
-        ).bindparams(tid=tenant_id)
+        text("SELECT systems_config FROM tenants WHERE id = :tid::uuid LIMIT 1").bindparams(tid=tenant_id)
     )
     record = row.fetchone()
     if record is None:
@@ -227,19 +223,23 @@ async def _test_pinzhi(tenant_id: str, cfg: dict) -> dict:
     if not cfg_parsed.base_url or not cfg_parsed.app_secret:
         return _err("品智 base_url 或 app_secret 未配置", code=422)
 
-    adapter = PinzhiAdapter({
-        "base_url": cfg_parsed.base_url,
-        "token": cfg_parsed.app_secret,
-        "timeout": 10,
-        "retry_times": 1,
-    })
+    adapter = PinzhiAdapter(
+        {
+            "base_url": cfg_parsed.base_url,
+            "token": cfg_parsed.app_secret,
+            "timeout": 10,
+            "retry_times": 1,
+        }
+    )
     try:
         stores = await adapter.get_store_info()
-        return _ok({
-            "system": "pinzhi",
-            "ok": True,
-            "message": f"连通成功，返回 {len(stores)} 个门店",
-        })
+        return _ok(
+            {
+                "system": "pinzhi",
+                "ok": True,
+                "message": f"连通成功，返回 {len(stores)} 个门店",
+            }
+        )
     except (ValueError, RuntimeError) as exc:
         return _ok({"system": "pinzhi", "ok": False, "message": str(exc)})
     finally:
@@ -254,13 +254,15 @@ async def _test_aoqiwei_crm(tenant_id: str, cfg: dict) -> dict:
     if not cfg_parsed.appid or not cfg_parsed.appkey:
         return _err("奥琦玮CRM appid 或 appkey 未配置", code=422)
 
-    adapter = AoqiweiCrmAdapter({
-        "base_url": cfg_parsed.api_url,
-        "appid": cfg_parsed.appid,
-        "appkey": cfg_parsed.appkey,
-        "timeout": 10,
-        "retry_times": 1,
-    })
+    adapter = AoqiweiCrmAdapter(
+        {
+            "base_url": cfg_parsed.api_url,
+            "appid": cfg_parsed.appid,
+            "appkey": cfg_parsed.appkey,
+            "timeout": 10,
+            "retry_times": 1,
+        }
+    )
     try:
         # get_member_info 需要参数，使用一个必定不存在的号码触发业务 400，
         # 只要不是网络/签名错误即视为连通成功。
@@ -273,11 +275,13 @@ async def _test_aoqiwei_crm(tenant_id: str, cfg: dict) -> dict:
         # 业务层错误（errcode != 0）说明已成功通信
         msg = str(exc)
         if "errcode" in msg or "errmsg" in msg or "会员" in msg:
-            return _ok({
-                "system": "aoqiwei_crm",
-                "ok": True,
-                "message": "连通成功（业务响应正常）",
-            })
+            return _ok(
+                {
+                    "system": "aoqiwei_crm",
+                    "ok": True,
+                    "message": "连通成功（业务响应正常）",
+                }
+            )
         return _ok({"system": "aoqiwei_crm", "ok": False, "message": msg})
     finally:
         await adapter.aclose()
@@ -291,20 +295,24 @@ async def _test_aoqiwei_supply(tenant_id: str, cfg: dict) -> dict:
     if not cfg_parsed.app_id or not cfg_parsed.app_secret:
         return _err("奥琦玮供应链 app_id 或 app_secret 未配置", code=422)
 
-    adapter = AoqiweiAdapter({
-        "base_url": cfg_parsed.api_url,
-        "app_key": cfg_parsed.app_id,
-        "app_secret": cfg_parsed.app_secret,
-        "timeout": 10,
-        "retry_times": 1,
-    })
+    adapter = AoqiweiAdapter(
+        {
+            "base_url": cfg_parsed.api_url,
+            "app_key": cfg_parsed.app_id,
+            "app_secret": cfg_parsed.app_secret,
+            "timeout": 10,
+            "retry_times": 1,
+        }
+    )
     try:
         shops = await adapter.query_shops()
-        return _ok({
-            "system": "aoqiwei_supply",
-            "ok": True,
-            "message": f"连通成功，返回 {len(shops)} 个门店",
-        })
+        return _ok(
+            {
+                "system": "aoqiwei_supply",
+                "ok": True,
+                "message": f"连通成功，返回 {len(shops)} 个门店",
+            }
+        )
     except RuntimeError as exc:
         return _ok({"system": "aoqiwei_supply", "ok": False, "message": str(exc)})
     finally:
@@ -323,7 +331,7 @@ async def _test_yiding(tenant_id: str, cfg: dict) -> dict:
     # 注意：api_key 字段对应适配器内部的 secret 参数
     yiding_cfg: dict = {
         "base_url": cfg_parsed.base_url,
-        "appid": "",        # appid 存于 yiding.app_id（未来可扩展）
+        "appid": "",  # appid 存于 yiding.app_id（未来可扩展）
         "secret": cfg_parsed.api_key,
         "hotel_id": cfg_parsed.hotel_id,
         "cache_ttl": 300,
@@ -331,10 +339,12 @@ async def _test_yiding(tenant_id: str, cfg: dict) -> dict:
     adapter = YiDingAdapter(yiding_cfg)
     try:
         ok = await adapter.health_check()
-        return _ok({
-            "system": "yiding",
-            "ok": ok,
-            "message": "连通成功" if ok else "连通失败，请检查 api_key",
-        })
+        return _ok(
+            {
+                "system": "yiding",
+                "ok": ok,
+                "message": "连通成功" if ok else "连通失败，请检查 api_key",
+            }
+        )
     finally:
         await adapter.close()

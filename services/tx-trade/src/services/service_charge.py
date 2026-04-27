@@ -4,6 +4,7 @@
 支持总部模板下发到门店。
 全部走真实DB（service_charge_configs / service_charge_templates 表）。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -191,8 +192,12 @@ async def calculate_service_charge(
 
     logger.info(
         "service_charge_calculated",
-        order_id=order_id, store_id=store_id, tenant_id=tenant_id,
-        mode=mode, amount_fen=amount_fen, waived=waived,
+        order_id=order_id,
+        store_id=store_id,
+        tenant_id=tenant_id,
+        mode=mode,
+        amount_fen=amount_fen,
+        waived=waived,
     )
     return result
 
@@ -265,7 +270,9 @@ async def publish_template(
 
     logger.info(
         "charge_template_published",
-        template_id=template_id, tenant_id=tenant_id, store_count=len(published),
+        template_id=template_id,
+        tenant_id=tenant_id,
+        store_count=len(published),
     )
     return {
         "template_id": template_id,

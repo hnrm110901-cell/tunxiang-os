@@ -20,6 +20,7 @@
   - food_safety 写入路由：patch asyncio.create_task 屏蔽后台 emit_event
   - food_safety summary：patch asyncpg.connect 模拟 DB 错误
 """
+
 from __future__ import annotations
 
 import sys
@@ -52,8 +53,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 # shared.events.*
@@ -64,17 +67,21 @@ _ev_types = _ensure_stub("shared.events.src.event_types")
 
 # SafetyEventType 存根
 if not hasattr(_ev_types, "SafetyEventType"):
+
     class _FakeSafetyEventType:
         SAMPLE_LOGGED = "safety.sample_logged"
         TEMPERATURE_RECORDED = "safety.temperature_recorded"
         INSPECTION_DONE = "safety.inspection_done"
         VIOLATION_FOUND = "safety.violation_found"
+
     _ev_types.SafetyEventType = _FakeSafetyEventType
 
 # SettlementEventType 存根
 if not hasattr(_ev_types, "SettlementEventType"):
+
     class _FakeSettlementEventType:
         DAILY_CLOSED = "settlement.daily_closed"
+
     _ev_types.SettlementEventType = _FakeSettlementEventType
 
 # structlog 存根
@@ -93,8 +100,11 @@ if "asyncpg" not in sys.modules:
 # shared.ontology.src.entities — OpsRepository 从此处导入 ORM 模型
 _entities_mod = _ensure_stub("shared.ontology.src.entities")
 for _entity_name in [
-    "DailySummary", "EmployeeDailyPerformance", "InspectionReport",
-    "OpsIssue", "ShiftHandover",
+    "DailySummary",
+    "EmployeeDailyPerformance",
+    "InspectionReport",
+    "OpsIssue",
+    "ShiftHandover",
 ]:
     if not hasattr(_entities_mod, _entity_name):
         setattr(_entities_mod, _entity_name, MagicMock())
@@ -106,41 +116,53 @@ from ..api.food_safety_routes import router as food_safety_router  # noqa: E402
 # 策略：先逐一导入各兄弟模块并注入兼容占位变量，再导入 settlement_routes。
 try:
     from ..api import daily_summary_routes as _dsm  # noqa: E402
+
     if not hasattr(_dsm, "_summaries"):
         _dsm._summaries = {}
     if not hasattr(_dsm, "_aggregate_orders"):
+
         async def _noop_aggregate(*a, **kw):  # pragma: no cover
             return {}
+
         _dsm._aggregate_orders = _noop_aggregate
 
     from ..api import inspection_routes as _ir  # noqa: E402
+
     if not hasattr(_ir, "_reports"):
         _ir._reports = {}
 
     from ..api import issues_routes as _isr  # noqa: E402
+
     if not hasattr(_isr, "_issues"):
         _isr._issues = {}
     for _fn_name in ["_scan_discount_abuse", "_scan_kds_timeout", "_scan_low_inventory"]:
         if not hasattr(_isr, _fn_name):
+
             async def _noop_scan(*a, **kw):  # pragma: no cover
                 return []
+
             setattr(_isr, _fn_name, _noop_scan)
 
     from ..api import performance_routes as _pr  # noqa: E402
+
     if not hasattr(_pr, "_performance"):
         _pr._performance = {}
     for _fn_name in [
-        "_aggregate_cashier_performance", "_aggregate_chef_performance",
+        "_aggregate_cashier_performance",
+        "_aggregate_chef_performance",
         "_aggregate_waiter_performance",
     ]:
         if not hasattr(_pr, _fn_name):
+
             async def _noop_perf(*a, **kw):  # pragma: no cover
                 return []
+
             setattr(_pr, _fn_name, _noop_perf)
     if not hasattr(_pr, "_calc_commission_fen"):
         _pr._calc_commission_fen = lambda *a, **kw: 0
 
     from ..api.daily_settlement_routes import router as settlement_router  # noqa: E402
+
     _settlement_available = True
 except Exception:  # pragma: no cover — 导入仍失败时跳过 settlement 测试
     _settlement_available = False
@@ -202,6 +224,7 @@ def _make_db(side_effects: list) -> AsyncMock:
 def _override(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
@@ -247,7 +270,7 @@ class TestFoodSafetySamples:
         payload = {
             "store_id": STORE_ID,
             "dish_name": "麻婆豆腐",
-            "sample_weight_g": 100.0,   # 不足
+            "sample_weight_g": 100.0,  # 不足
             "meal_period": "dinner",
             "sampler_id": "EMP-002",
         }
@@ -322,7 +345,7 @@ class TestFoodSafetyTemperatures:
         payload = {
             "store_id": STORE_ID,
             "location": "freezer",
-            "temp_celsius": -10.0,   # 合规范围 -25 ~ -15，此值超标
+            "temp_celsius": -10.0,  # 合规范围 -25 ~ -15，此值超标
             "recorder_id": "EMP-011",
         }
 
@@ -415,9 +438,7 @@ class TestSettlementStatus:
         _mock_repo._set_rls = AsyncMock()
         _mock_repo.list_shifts = AsyncMock(return_value=[])
         _mock_repo.get_daily_summary = AsyncMock(return_value=None)
-        _mock_repo.count_open_critical_issues = AsyncMock(
-            return_value={"open_critical_high": 0, "open_all": 0}
-        )
+        _mock_repo.count_open_critical_issues = AsyncMock(return_value={"open_critical_high": 0, "open_all": 0})
         _mock_repo.list_performance = AsyncMock(return_value=([], 0))
         _mock_repo.list_inspections = AsyncMock(return_value=([], 0))
 
@@ -427,6 +448,7 @@ class TestSettlementStatus:
 
         # patch OpsRepository 在 daily_settlement_routes 模块的命名空间内
         import src.api.daily_settlement_routes as _sr  # noqa: E402
+
         with patch.object(_sr, "OpsRepository", return_value=_mock_repo):
             with TestClient(app) as client:
                 resp = client.get(

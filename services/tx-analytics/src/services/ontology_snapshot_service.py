@@ -11,6 +11,7 @@
 所有 DB 操作：async/await + AsyncSession。
 AI 调用：通过 ModelRouter，不直接调用 API。
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -26,10 +27,10 @@ logger = structlog.get_logger(__name__)
 
 # ─── AI洞察触发阈值 ────────────────────────────────────────────────────────────
 
-_AI_ORDER_ABNORMAL_THRESHOLD = 5        # abnormal_count > 5
-_AI_ORDER_MARGIN_ALERT_THRESHOLD = 10   # margin_alert_count > 10
+_AI_ORDER_ABNORMAL_THRESHOLD = 5  # abnormal_count > 5
+_AI_ORDER_MARGIN_ALERT_THRESHOLD = 10  # margin_alert_count > 10
 _AI_INGREDIENT_OUT_OF_STOCK_THRESHOLD = 0  # out_of_stock_count > 0
-_AI_CUSTOMER_CHURN_RISK_THRESHOLD = 100    # churn_risk_count > 100
+_AI_CUSTOMER_CHURN_RISK_THRESHOLD = 100  # churn_risk_count > 100
 
 # ─── 支持的实体类型 ────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ def _get_model_router():
     """获取 ModelRouter 实例，不可用时返回 None（优雅降级）。"""
     try:
         from tx_agent.model_router import ModelRouter  # type: ignore[import]
+
         return ModelRouter()
     except ImportError:
         logger.warning("ontology_snapshot.model_router_not_available")
@@ -79,7 +81,8 @@ async def _compute_customer_metrics(
     # 品牌/集团级：无法从 customers 直接关联，聚合全租户数据
     # （实际项目中 customers 表无 brand_id/store_id 直接字段，集团级聚合全部顾客）
 
-    row = await db.execute(text(f"""
+    row = await db.execute(
+        text(f"""
         SELECT
             COUNT(*)                                                                    AS total_count,
             COUNT(*) FILTER (WHERE last_order_at >= :active_threshold)                  AS active_count,
@@ -96,7 +99,9 @@ async def _compute_customer_metrics(
           AND is_deleted = FALSE
           AND is_merged = FALSE
         {store_filter}
-    """), params)
+    """),
+        params,
+    )
     r = row.mappings().one()
 
     return {
@@ -131,7 +136,8 @@ async def _compute_dish_metrics(
     if store_id:
         params["store_id"] = str(store_id)
 
-    row = await db.execute(text(f"""
+    row = await db.execute(
+        text(f"""
         SELECT
             COUNT(*) FILTER (WHERE status = 'active')                   AS active_count,
             AVG(profit_margin) FILTER (WHERE status = 'active')         AS avg_profit_margin,
@@ -147,7 +153,9 @@ async def _compute_dish_metrics(
           AND is_deleted = FALSE
           {brand_filter}
           {store_filter}
-    """), params)
+    """),
+        params,
+    )
     r = row.mappings().one()
 
     return {
@@ -183,7 +191,8 @@ async def _compute_order_metrics(
     if store_id:
         params["store_id"] = str(store_id)
 
-    row = await db.execute(text(f"""
+    row = await db.execute(
+        text(f"""
         SELECT
             COUNT(*)                                                        AS total_count,
             SUM(final_amount_fen)                                           AS total_revenue_fen,
@@ -202,7 +211,9 @@ async def _compute_order_metrics(
           AND o.created_at < :next_day
           {brand_filter}
           {store_filter}
-    """), params)
+    """),
+        params,
+    )
     r = row.mappings().one()
 
     return {
@@ -232,7 +243,8 @@ async def _compute_ingredient_metrics(
     if store_id:
         params["store_id"] = str(store_id)
 
-    row = await db.execute(text(f"""
+    row = await db.execute(
+        text(f"""
         SELECT
             COUNT(*)                                                            AS total_sku_count,
             COUNT(*) FILTER (WHERE current_quantity < min_quantity
@@ -244,7 +256,9 @@ async def _compute_ingredient_metrics(
         WHERE tenant_id = :tenant_id
           AND is_deleted = FALSE
           {store_filter}
-    """), params)
+    """),
+        params,
+    )
     r = row.mappings().one()
 
     return {
@@ -278,7 +292,8 @@ async def _compute_employee_metrics(
     if store_id:
         params["store_id"] = str(store_id)
 
-    row = await db.execute(text(f"""
+    row = await db.execute(
+        text(f"""
         SELECT
             COUNT(*)                                                            AS total_count,
             COUNT(*) FILTER (WHERE employment_status = 'active')                AS active_count,
@@ -296,7 +311,9 @@ async def _compute_employee_metrics(
           AND is_deleted = FALSE
           {brand_filter}
           {store_filter}
-    """), params)
+    """),
+        params,
+    )
     r = row.mappings().one()
 
     return {
@@ -335,7 +352,8 @@ async def _compute_store_metrics(
     if store_id:
         params["store_id"] = str(store_id)
 
-    store_row = await db.execute(text(f"""
+    store_row = await db.execute(
+        text(f"""
         SELECT
             COUNT(*)                                                        AS total_store_count,
             COUNT(*) FILTER (WHERE operation_mode = '直营')                  AS direct_count,
@@ -348,10 +366,13 @@ async def _compute_store_metrics(
           AND is_deleted = FALSE
           {brand_filter_store}
           {store_filter_store}
-    """), params)
+    """),
+        params,
+    )
     sr = store_row.mappings().one()
 
-    order_row = await db.execute(text(f"""
+    order_row = await db.execute(
+        text(f"""
         SELECT
             AVG(daily_rev.rev)      AS avg_daily_revenue_fen,
             MAX(daily_rev.rev)      AS top_store_revenue_fen
@@ -366,7 +387,9 @@ async def _compute_store_metrics(
               {store_filter_order}
             GROUP BY o.store_id
         ) daily_rev
-    """), params)
+    """),
+        params,
+    )
     orr = order_row.mappings().one()
 
     return {
@@ -420,7 +443,8 @@ class OntologySnapshotService:
     ) -> None:
         """插入或覆盖更新一条快照记录（ON CONFLICT DO UPDATE）。"""
         now = datetime.now(tz=timezone.utc)
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO ontology_snapshots
                 (tenant_id, brand_id, store_id, snapshot_date, snapshot_type,
                  entity_type, metrics, computed_at, is_deleted, created_at, updated_at)
@@ -433,17 +457,19 @@ class OntologySnapshotService:
                 computed_at = EXCLUDED.computed_at,
                 updated_at  = EXCLUDED.updated_at,
                 is_deleted  = FALSE
-        """), {
-            "tenant_id": str(tenant_id),
-            "brand_id": str(brand_id) if brand_id else None,
-            "store_id": str(store_id) if store_id else None,
-            "snapshot_date": snapshot_date.isoformat(),
-            "snapshot_type": snapshot_type,
-            "entity_type": entity_type,
-            "metrics": __import__("json").dumps(metrics),
-            "computed_at": now,
-            "now": now,
-        })
+        """),
+            {
+                "tenant_id": str(tenant_id),
+                "brand_id": str(brand_id) if brand_id else None,
+                "store_id": str(store_id) if store_id else None,
+                "snapshot_date": snapshot_date.isoformat(),
+                "snapshot_type": snapshot_type,
+                "entity_type": entity_type,
+                "metrics": __import__("json").dumps(metrics),
+                "computed_at": now,
+                "now": now,
+            },
+        )
 
     async def compute_daily_snapshots(
         self,
@@ -583,14 +609,8 @@ class OntologySnapshotService:
         if snapshot_type not in SNAPSHOT_TYPES:
             raise ValueError(f"不支持的快照类型: {snapshot_type}，合法值: {SNAPSHOT_TYPES}")
 
-        brand_clause = (
-            "AND brand_id = :brand_id" if brand_id
-            else "AND brand_id IS NULL"
-        )
-        store_clause = (
-            "AND store_id = :store_id" if store_id
-            else "AND store_id IS NULL"
-        )
+        brand_clause = "AND brand_id = :brand_id" if brand_id else "AND brand_id IS NULL"
+        store_clause = "AND store_id = :store_id" if store_id else "AND store_id IS NULL"
 
         params: dict[str, Any] = {
             "tenant_id": str(tenant_id),
@@ -604,7 +624,8 @@ class OntologySnapshotService:
         if store_id:
             params["store_id"] = str(store_id)
 
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(f"""
             SELECT snapshot_date, metrics
             FROM ontology_snapshots
             WHERE tenant_id = :tenant_id
@@ -615,7 +636,9 @@ class OntologySnapshotService:
               {brand_clause}
               {store_clause}
             ORDER BY snapshot_date ASC
-        """), params)
+        """),
+            params,
+        )
 
         rows = result.mappings().all()
         return [
@@ -642,7 +665,8 @@ class OntologySnapshotService:
         if entity_type not in ENTITY_TYPES:
             raise ValueError(f"不支持的实体类型: {entity_type}，合法值: {ENTITY_TYPES}")
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 brand_id,
                 (metrics->>:metric_key)::NUMERIC   AS metric_value
@@ -656,12 +680,14 @@ class OntologySnapshotService:
               AND is_deleted = FALSE
               AND metrics ? :metric_key
             ORDER BY metric_value DESC NULLS LAST
-        """), {
-            "tenant_id": str(tenant_id),
-            "entity_type": entity_type,
-            "snapshot_date": snapshot_date.isoformat(),
-            "metric_key": metric_key,
-        })
+        """),
+            {
+                "tenant_id": str(tenant_id),
+                "entity_type": entity_type,
+                "snapshot_date": snapshot_date.isoformat(),
+                "metric_key": metric_key,
+            },
+        )
 
         rows = result.mappings().all()
         return [
@@ -687,7 +713,8 @@ class OntologySnapshotService:
         if entity_type not in ENTITY_TYPES:
             raise ValueError(f"不支持的实体类型: {entity_type}，合法值: {ENTITY_TYPES}")
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT snapshot_date, snapshot_type, metrics
             FROM ontology_snapshots
             WHERE tenant_id = :tenant_id
@@ -697,10 +724,12 @@ class OntologySnapshotService:
               AND is_deleted = FALSE
             ORDER BY snapshot_date DESC, computed_at DESC
             LIMIT 1
-        """), {
-            "tenant_id": str(tenant_id),
-            "entity_type": entity_type,
-        })
+        """),
+            {
+                "tenant_id": str(tenant_id),
+                "entity_type": entity_type,
+            },
+        )
 
         row = result.mappings().first()
         if row is None:

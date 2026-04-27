@@ -25,6 +25,7 @@ Agent铁律：
 量化目标：
   核验时间 8分钟/张→<30秒，重复发票集团级漏网率→0
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -54,6 +55,7 @@ _INVOICE_MIME_PREFIXES = ("image/", "application/pdf")
 # 内部工具
 # =============================================================================
 
+
 async def _log_agent_job(
     tenant_id: UUID,
     job_type: str,
@@ -78,6 +80,7 @@ async def _log_agent_job(
 # =============================================================================
 # 1. 文件下载（支持 Supabase Storage URL）
 # =============================================================================
+
 
 async def _download_file(file_url: str) -> Optional[bytes]:
     """
@@ -112,6 +115,7 @@ async def _download_file(file_url: str) -> Optional[bytes]:
 # =============================================================================
 # 2. 金额比对
 # =============================================================================
+
 
 def check_amount_consistency(
     invoice_total_fen: int,
@@ -175,6 +179,7 @@ def check_amount_consistency(
 # =============================================================================
 # 3. 生成核验报告摘要
 # =============================================================================
+
 
 def build_verification_summary(invoice_results: list[dict]) -> dict:
     """
@@ -241,9 +246,7 @@ def build_verification_summary(invoice_results: list[dict]) -> dict:
 
     if total > 0 and ocr_failed > total / 2:
         needs_manual_review = True
-        review_reasons.append(
-            f"{ocr_failed}/{total}张发票OCR识别失败（超过50%），请人工核对原件"
-        )
+        review_reasons.append(f"{ocr_failed}/{total}张发票OCR识别失败（超过50%），请人工核对原件")
 
     if compliance_issues > 0:
         needs_manual_review = True
@@ -266,6 +269,7 @@ def build_verification_summary(invoice_results: list[dict]) -> dict:
 # =============================================================================
 # 4. 单张发票处理
 # =============================================================================
+
 
 async def process_single_invoice(
     db: AsyncSession,
@@ -422,9 +426,7 @@ async def process_single_invoice(
         if ocr_result["success"]:
             seller_name = ocr_result.get("seller_name") or ""
             items = ocr_result.get("items") or []
-            items_desc = "、".join(
-                item.get("name", "") for item in items if item.get("name")
-            ) or ""
+            items_desc = "、".join(item.get("name", "") for item in items if item.get("name")) or ""
 
             # 从数据库获取该租户的费用科目列表
             try:
@@ -499,6 +501,7 @@ async def process_single_invoice(
 # =============================================================================
 # 5. 申请级批量处理（核心入口）
 # =============================================================================
+
 
 async def verify_application_invoices(
     db: AsyncSession,
@@ -586,10 +589,9 @@ async def verify_application_invoices(
 
     # ── 步骤2：过滤可能是发票的附件（图片或 PDF）────────────────────────────
     invoice_attachments = [
-        att for att in all_attachments
-        if att.get("file_type") and any(
-            att["file_type"].startswith(prefix) for prefix in _INVOICE_MIME_PREFIXES
-        )
+        att
+        for att in all_attachments
+        if att.get("file_type") and any(att["file_type"].startswith(prefix) for prefix in _INVOICE_MIME_PREFIXES)
     ]
 
     if not invoice_attachments:
@@ -690,6 +692,7 @@ async def verify_application_invoices(
 
     # ── 步骤6：将核验结果写入 expense_applications.metadata ──────────────────
     import json as _json
+
     verification_meta = {
         "verified_at": str(asyncio.get_event_loop().time()),  # 单调时钟，仅供参考
         "total_invoices": report["total_invoices"],
@@ -744,6 +747,7 @@ async def verify_application_invoices(
 # =============================================================================
 # 6. 批量重核验（手动触发）
 # =============================================================================
+
 
 async def reverify_invoices(
     db: AsyncSession,
@@ -835,6 +839,7 @@ async def reverify_invoices(
 # =============================================================================
 # 7. Agent 主入口（统一调度）
 # =============================================================================
+
 
 async def run(
     db: AsyncSession,

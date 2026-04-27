@@ -16,13 +16,13 @@
     GET  /api/v1/knowledge/practices
     GET  /api/v1/knowledge/suggestions
 """
+
 import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 # ─── 预置假模块，阻断真实服务层导入 ───
+
 
 def _make_async_service_mock(return_val):
     m = AsyncMock(return_value=return_val)
@@ -99,7 +99,6 @@ _setup_sys_modules()
 
 # ─── 导入路由，构建 TestClient ───
 
-import importlib
 import os
 
 # Add service root to sys.path so relative imports resolve
@@ -111,12 +110,15 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # Patch service functions at import time
-with patch.dict(sys.modules, {
-    "services.today_overview": _fake_today_overview_mod,
-    "services.store_ranking": _fake_store_ranking_mod,
-    "services.alert_summary": _fake_alert_summary_mod,
-    "services.knowledge_graph": _fake_knowledge_graph_mod,
-}):
+with patch.dict(
+    sys.modules,
+    {
+        "services.today_overview": _fake_today_overview_mod,
+        "services.store_ranking": _fake_store_ranking_mod,
+        "services.alert_summary": _fake_alert_summary_mod,
+        "services.knowledge_graph": _fake_knowledge_graph_mod,
+    },
+):
     import api.dashboard_routes as _dashboard_mod
     import api.knowledge_query as _knowledge_mod
 
@@ -135,6 +137,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 # ═══════════════════════════════════════════════
 # dashboard_routes 测试
 # ═══════════════════════════════════════════════
+
 
 class TestDashboardTodayOverview:
     def test_today_overview_success(self):
@@ -169,9 +172,7 @@ class TestDashboardTodayOverview:
 class TestDashboardRanking:
     def test_ranking_default_params(self):
         """默认参数门店排行正常返回"""
-        _fake_store_ranking_mod.get_store_ranking.return_value = [
-            {"store_id": "s1", "rank": 1, "metric_value": 100000}
-        ]
+        _fake_store_ranking_mod.get_store_ranking.return_value = [{"store_id": "s1", "rank": 1, "metric_value": 100000}]
         resp = _client_dash.get("/api/v1/dashboard/ranking", headers=HEADERS)
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
@@ -192,9 +193,7 @@ class TestDashboardRanking:
     def test_ranking_value_error_returns_422(self):
         """服务层抛 ValueError → HTTP 422"""
         _fake_store_ranking_mod.get_store_ranking.side_effect = ValueError("invalid metric")
-        resp = _client_dash.get(
-            "/api/v1/dashboard/ranking?metric=invalid", headers=HEADERS
-        )
+        resp = _client_dash.get("/api/v1/dashboard/ranking?metric=invalid", headers=HEADERS)
         assert resp.status_code == 422
         # restore
         _fake_store_ranking_mod.get_store_ranking.side_effect = None
@@ -204,9 +203,7 @@ class TestDashboardRanking:
 class TestDashboardComparison:
     def test_comparison_success(self):
         """多店对比正常返回"""
-        _fake_store_ranking_mod.get_store_comparison.return_value = {
-            "stores": [{"store_id": "s1"}, {"store_id": "s2"}]
-        }
+        _fake_store_ranking_mod.get_store_comparison.return_value = {"stores": [{"store_id": "s1"}, {"store_id": "s2"}]}
         resp = _client_dash.get(
             "/api/v1/dashboard/comparison?store_ids=s1,s2&metrics=revenue",
             headers=HEADERS,
@@ -240,9 +237,7 @@ class TestDashboardAlerts:
 
     def test_store_alerts_success(self):
         """单店今日告警正常"""
-        _fake_alert_summary_mod.get_today_alerts.return_value = [
-            {"level": "warning", "message": "营收下降"}
-        ]
+        _fake_alert_summary_mod.get_today_alerts.return_value = [{"level": "warning", "message": "营收下降"}]
         resp = _client_dash.get("/api/v1/dashboard/alerts/store-001", headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
@@ -257,6 +252,7 @@ class TestDashboardAlerts:
 # ═══════════════════════════════════════════════
 # knowledge_query 测试
 # ═══════════════════════════════════════════════
+
 
 class TestKnowledgeQuery:
     def test_query_success(self):
@@ -299,9 +295,7 @@ class TestKnowledgeQuery:
 
     def test_benchmarks_metric(self):
         """行业基准查询"""
-        resp = _client_kg.get(
-            "/api/v1/knowledge/benchmarks/turnover_rate?business_type=海鲜酒楼&city=长沙"
-        )
+        resp = _client_kg.get("/api/v1/knowledge/benchmarks/turnover_rate?business_type=海鲜酒楼&city=长沙")
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True

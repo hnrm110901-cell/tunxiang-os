@@ -11,6 +11,7 @@
 
 所有端点需要 X-Tenant-ID header（由 TenantMiddleware 注入）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,19 +35,19 @@ router = APIRouter(prefix="/api/v1/demo", tags=["demo-healthcheck"])
 # ────────────────────────────────────────────────────────────────────
 
 _SERVICES: list[dict] = [
-    {"name": "gateway",      "port": 8000, "health_path": "/health"},
-    {"name": "tx-trade",     "port": 8001, "health_path": "/health"},
-    {"name": "tx-menu",      "port": 8002, "health_path": "/health"},
-    {"name": "tx-member",    "port": 8003, "health_path": "/health"},
-    {"name": "tx-growth",    "port": 8004, "health_path": "/health"},
-    {"name": "tx-ops",       "port": 8005, "health_path": "/health"},
-    {"name": "tx-supply",    "port": 8006, "health_path": "/health"},
-    {"name": "tx-finance",   "port": 8007, "health_path": "/health"},
-    {"name": "tx-agent",     "port": 8008, "health_path": "/health"},
+    {"name": "gateway", "port": 8000, "health_path": "/health"},
+    {"name": "tx-trade", "port": 8001, "health_path": "/health"},
+    {"name": "tx-menu", "port": 8002, "health_path": "/health"},
+    {"name": "tx-member", "port": 8003, "health_path": "/health"},
+    {"name": "tx-growth", "port": 8004, "health_path": "/health"},
+    {"name": "tx-ops", "port": 8005, "health_path": "/health"},
+    {"name": "tx-supply", "port": 8006, "health_path": "/health"},
+    {"name": "tx-finance", "port": 8007, "health_path": "/health"},
+    {"name": "tx-agent", "port": 8008, "health_path": "/health"},
     {"name": "tx-analytics", "port": 8009, "health_path": "/health"},
-    {"name": "tx-brain",     "port": 8010, "health_path": "/health"},
-    {"name": "tx-intel",     "port": 8011, "health_path": "/health"},
-    {"name": "tx-org",       "port": 8012, "health_path": "/health"},
+    {"name": "tx-brain", "port": 8010, "health_path": "/health"},
+    {"name": "tx-intel", "port": 8011, "health_path": "/health"},
+    {"name": "tx-org", "port": 8012, "health_path": "/health"},
 ]
 
 # HTTP 探测超时（秒）
@@ -245,8 +246,9 @@ async def _probe_db() -> DBCheckResult:
     """探测本地 PostgreSQL 连通性（通过 ORM session 执行 SELECT 1）。"""
     start = time.monotonic()
     try:
-        from shared.ontology.src.database import async_session_factory
         from sqlalchemy import text
+
+        from shared.ontology.src.database import async_session_factory
 
         async with async_session_factory() as db:
             await db.execute(text("SELECT 1"))
@@ -293,8 +295,7 @@ def _build_recommendations(
     for cp in critical_paths:
         if cp.status != "ok":
             recs.append(
-                f"[CRITICAL] 关键链路 [{cp.description}] 不可用（{cp.service}），"
-                f"演示前必须恢复。错误: {cp.error}"
+                f"[CRITICAL] 关键链路 [{cp.description}] 不可用（{cp.service}），演示前必须恢复。错误: {cp.error}"
             )
 
     # 服务
@@ -309,8 +310,7 @@ def _build_recommendations(
     slow_services = [s for s in services if s.status == "up" and s.response_time_ms > 1000]
     for svc in slow_services:
         recs.append(
-            f"[INFO] 服务 {svc.name} 响应较慢（{svc.response_time_ms:.0f}ms），"
-            "演示时可能影响体验，建议重启服务预热。"
+            f"[INFO] 服务 {svc.name} 响应较慢（{svc.response_time_ms:.0f}ms），演示时可能影响体验，建议重启服务预热。"
         )
 
     return recs
@@ -347,10 +347,7 @@ async def demo_health_check(request: Request) -> dict:
 
     async with httpx.AsyncClient() as client:
         # 并发探测所有服务 + 关键路径 + DB
-        service_tasks = [
-            _probe_service(client, svc["name"], svc["port"], svc["health_path"])
-            for svc in _SERVICES
-        ]
+        service_tasks = [_probe_service(client, svc["name"], svc["port"], svc["health_path"]) for svc in _SERVICES]
         critical_tasks = [
             _probe_critical_path(
                 client,
@@ -384,11 +381,7 @@ async def demo_health_check(request: Request) -> dict:
 
     # go = 数据库正常 + 所有关键路径正常 + 至少 P0 服务（trade/menu/member/ops/agent）在线
     p0_service_names = {"tx-trade", "tx-menu", "tx-member", "tx-ops", "tx-agent"}
-    p0_up = all(
-        s.status == "up"
-        for s in service_results
-        if s.name in p0_service_names
-    )
+    p0_up = all(s.status == "up" for s in service_results if s.name in p0_service_names)
     critical_all_ok = all(cp.status == "ok" for cp in critical_results)
     db_ok = db_result.status == "ok"
 

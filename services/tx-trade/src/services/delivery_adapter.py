@@ -5,6 +5,7 @@
 
 v2: 订单持久化到 PostgreSQL delivery_orders 表（RLS 隔离）。
 """
+
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -148,9 +149,7 @@ class DeliveryPlatformAdapter:
         try:
             # 幂等性检查：平台订单已存在则返回已有记录（避免重复创建）
             existing = await session.execute(
-                select(DeliveryOrder).where(
-                    DeliveryOrder.platform_order_id == platform_order_id
-                )
+                select(DeliveryOrder).where(DeliveryOrder.platform_order_id == platform_order_id)
             )
             existing_order = existing.scalar_one_or_none()
             if existing_order is not None:
@@ -160,17 +159,17 @@ class DeliveryPlatformAdapter:
                     existing_order_id=str(existing_order.id),
                 )
                 return {
-                    'order_id': str(existing_order.id),
-                    'order_no': existing_order.order_no,
-                    'platform_order_id': platform_order_id,
-                    'platform': existing_order.platform,
-                    'status': existing_order.status,
-                    'items_mapped': existing_order.items_json or [],
-                    'total_fen': existing_order.total_fen,
-                    'commission_fen': existing_order.commission_fen,
-                    'merchant_receive_fen': existing_order.merchant_receive_fen,
-                    'unmapped_items': existing_order.unmapped_items or [],
-                    'duplicate': True,
+                    "order_id": str(existing_order.id),
+                    "order_no": existing_order.order_no,
+                    "platform_order_id": platform_order_id,
+                    "platform": existing_order.platform,
+                    "status": existing_order.status,
+                    "items_mapped": existing_order.items_json or [],
+                    "total_fen": existing_order.total_fen,
+                    "commission_fen": existing_order.commission_fen,
+                    "merchant_receive_fen": existing_order.merchant_receive_fen,
+                    "unmapped_items": existing_order.unmapped_items or [],
+                    "duplicate": True,
                 }
 
             platform_config = self.PLATFORMS[platform]
@@ -179,37 +178,37 @@ class DeliveryPlatformAdapter:
 
             # 映射菜品：平台SKU → 内部菜品
             items_mapped = []
-            menu_by_name: dict[str, dict] = {m['name']: m for m in self.menu_items}
+            menu_by_name: dict[str, dict] = {m["name"]: m for m in self.menu_items}
             menu_by_sku: dict[str, dict] = {}
             for m in self.menu_items:
-                if m.get('sku_id'):
-                    menu_by_sku[m['sku_id']] = m
+                if m.get("sku_id"):
+                    menu_by_sku[m["sku_id"]] = m
 
             unmapped_items: list[str] = []
             for item in items:
                 mapped = None
-                if item.get('sku_id') and item['sku_id'] in menu_by_sku:
-                    mapped = menu_by_sku[item['sku_id']]
-                elif item.get('name') and item['name'] in menu_by_name:
-                    mapped = menu_by_name[item['name']]
+                if item.get("sku_id") and item["sku_id"] in menu_by_sku:
+                    mapped = menu_by_sku[item["sku_id"]]
+                elif item.get("name") and item["name"] in menu_by_name:
+                    mapped = menu_by_name[item["name"]]
 
                 mapped_item = {
-                    'name': item.get('name', ''),
-                    'quantity': item.get('quantity', 1),
-                    'price_fen': item.get('price_fen', 0),
-                    'subtotal_fen': item.get('price_fen', 0) * item.get('quantity', 1),
-                    'notes': item.get('notes', ''),
-                    'platform_sku_id': item.get('sku_id', ''),
-                    'internal_dish_id': mapped.get('dish_id', '') if mapped else '',
-                    'mapped': mapped is not None,
+                    "name": item.get("name", ""),
+                    "quantity": item.get("quantity", 1),
+                    "price_fen": item.get("price_fen", 0),
+                    "subtotal_fen": item.get("price_fen", 0) * item.get("quantity", 1),
+                    "notes": item.get("notes", ""),
+                    "platform_sku_id": item.get("sku_id", ""),
+                    "internal_dish_id": mapped.get("dish_id", "") if mapped else "",
+                    "mapped": mapped is not None,
                 }
                 items_mapped.append(mapped_item)
                 if not mapped:
-                    unmapped_items.append(item.get('name', ''))
+                    unmapped_items.append(item.get("name", ""))
 
             # 计算佣金（int 运算避免 float 精度问题）
             # commission_rate 为近似值，佣金用 int(total * rate) 截断取整
-            commission_rate = platform_config['commission_rate']
+            commission_rate = platform_config["commission_rate"]
             commission_fen = int(total_fen * commission_rate)
             merchant_receive_fen = total_fen - commission_fen
 
@@ -223,10 +222,10 @@ class DeliveryPlatformAdapter:
                 store_id=uuid.UUID(self.store_id) if len(self.store_id) > 8 else uuid.uuid4(),
                 brand_id=self.brand_id,
                 platform=platform,
-                platform_name=platform_config['name'],
+                platform_name=platform_config["name"],
                 platform_order_id=platform_order_id,
                 sales_channel=f"delivery_{platform}",
-                status='confirmed',
+                status="confirmed",
                 items_json=items_mapped,
                 total_fen=total_fen,
                 commission_rate=commission_rate,
@@ -256,16 +255,16 @@ class DeliveryPlatformAdapter:
             )
 
             return {
-                'order_id': order_id,
-                'order_no': order_no,
-                'platform_order_id': platform_order_id,
-                'platform': platform,
-                'status': 'confirmed',
-                'items_mapped': items_mapped,
-                'total_fen': total_fen,
-                'commission_fen': commission_fen,
-                'merchant_receive_fen': merchant_receive_fen,
-                'unmapped_items': unmapped_items,
+                "order_id": order_id,
+                "order_no": order_no,
+                "platform_order_id": platform_order_id,
+                "platform": platform,
+                "status": "confirmed",
+                "items_mapped": items_mapped,
+                "total_fen": total_fen,
+                "commission_fen": commission_fen,
+                "merchant_receive_fen": merchant_receive_fen,
+                "unmapped_items": unmapped_items,
             }
         finally:
             await self._close_session(session)
@@ -284,25 +283,23 @@ class DeliveryPlatformAdapter:
         try:
             order = await self._get_order(session, order_id)
 
-            if order.status not in ('confirmed', 'pending'):
+            if order.status not in ("confirmed", "pending"):
                 raise ValueError(f"订单状态 {order.status}，无法确认")
 
-            order.status = 'preparing'
+            order.status = "preparing"
             order.estimated_ready_min = estimated_ready_min
 
-            estimated_ready_at = (
-                datetime.now(timezone.utc) + timedelta(minutes=estimated_ready_min)
-            ).isoformat()
+            estimated_ready_at = (datetime.now(timezone.utc) + timedelta(minutes=estimated_ready_min)).isoformat()
 
             await session.commit()
 
             # 通知平台
             await self._notify_platform(
                 order.platform,
-                'order_confirmed',
+                "order_confirmed",
                 {
-                    'platform_order_id': order.platform_order_id,
-                    'estimated_ready_min': estimated_ready_min,
+                    "platform_order_id": order.platform_order_id,
+                    "estimated_ready_min": estimated_ready_min,
                 },
             )
 
@@ -313,10 +310,10 @@ class DeliveryPlatformAdapter:
             )
 
             return {
-                'order_id': order_id,
-                'status': 'preparing',
-                'estimated_ready_min': estimated_ready_min,
-                'estimated_ready_at': estimated_ready_at,
+                "order_id": order_id,
+                "status": "preparing",
+                "estimated_ready_min": estimated_ready_min,
+                "estimated_ready_at": estimated_ready_at,
             }
         finally:
             await self._close_session(session)
@@ -331,21 +328,21 @@ class DeliveryPlatformAdapter:
         try:
             order = await self._get_order(session, order_id)
 
-            if order.status not in ('preparing', 'confirmed'):
+            if order.status not in ("preparing", "confirmed"):
                 raise ValueError(f"订单状态 {order.status}，无法标记出餐")
 
             ready_at = datetime.now(timezone.utc)
-            order.status = 'ready'
+            order.status = "ready"
             order.ready_at = ready_at
 
             await session.commit()
 
             await self._notify_platform(
                 order.platform,
-                'order_ready',
+                "order_ready",
                 {
-                    'platform_order_id': order.platform_order_id,
-                    'ready_at': ready_at.isoformat(),
+                    "platform_order_id": order.platform_order_id,
+                    "ready_at": ready_at.isoformat(),
                 },
             )
 
@@ -357,10 +354,10 @@ class DeliveryPlatformAdapter:
             )
 
             return {
-                'order_id': order_id,
-                'status': 'ready',
-                'ready_at': ready_at.isoformat(),
-                'platform_order_id': order.platform_order_id,
+                "order_id": order_id,
+                "status": "ready",
+                "ready_at": ready_at.isoformat(),
+                "platform_order_id": order.platform_order_id,
             }
         finally:
             await self._close_session(session)
@@ -380,7 +377,7 @@ class DeliveryPlatformAdapter:
         Returns:
             {order_id, status, reason, responsible_party, refund_fen}
         """
-        valid_parties = ['merchant', 'customer', 'platform', 'rider']
+        valid_parties = ["merchant", "customer", "platform", "rider"]
         if responsible_party not in valid_parties:
             raise ValueError(f"无效的责任方: {responsible_party}，可选: {valid_parties}")
 
@@ -388,20 +385,20 @@ class DeliveryPlatformAdapter:
         try:
             order = await self._get_order(session, order_id)
 
-            if order.status in ('completed', 'cancelled', 'refunded'):
+            if order.status in ("completed", "cancelled", "refunded"):
                 raise ValueError(f"订单状态 {order.status}，无法取消")
 
             # 退款计算：商家责任全额退，顾客责任看阶段
             refund_fen = 0
-            if responsible_party in ('merchant', 'platform', 'rider'):
+            if responsible_party in ("merchant", "platform", "rider"):
                 refund_fen = order.total_fen
-            elif responsible_party == 'customer':
-                if order.status in ('confirmed', 'pending'):
+            elif responsible_party == "customer":
+                if order.status in ("confirmed", "pending"):
                     refund_fen = order.total_fen
                 else:
                     refund_fen = 0
 
-            order.status = 'cancelled'
+            order.status = "cancelled"
             order.cancelled_at = datetime.now(timezone.utc)
             order.cancel_reason = reason
             order.cancel_responsible = responsible_party
@@ -410,11 +407,11 @@ class DeliveryPlatformAdapter:
 
             await self._notify_platform(
                 order.platform,
-                'order_cancelled',
+                "order_cancelled",
                 {
-                    'platform_order_id': order.platform_order_id,
-                    'reason': reason,
-                    'responsible_party': responsible_party,
+                    "platform_order_id": order.platform_order_id,
+                    "reason": reason,
+                    "responsible_party": responsible_party,
                 },
             )
 
@@ -427,11 +424,11 @@ class DeliveryPlatformAdapter:
             )
 
             return {
-                'order_id': order_id,
-                'status': 'cancelled',
-                'reason': reason,
-                'responsible_party': responsible_party,
-                'refund_fen': refund_fen,
+                "order_id": order_id,
+                "status": "cancelled",
+                "reason": reason,
+                "responsible_party": responsible_party,
+                "refund_fen": refund_fen,
             }
         finally:
             await self._close_session(session)
@@ -446,17 +443,17 @@ class DeliveryPlatformAdapter:
         try:
             order = await self._get_order(session, order_id)
 
-            if order.status not in ('ready', 'delivering', 'preparing', 'confirmed'):
+            if order.status not in ("ready", "delivering", "preparing", "confirmed"):
                 raise ValueError(f"订单状态 {order.status}，无法完成")
 
             completed_at = datetime.now(timezone.utc)
-            order.status = 'completed'
+            order.status = "completed"
             order.completed_at = completed_at
 
             await session.commit()
 
             platform_config = self.PLATFORMS[order.platform]
-            settle_delay = platform_config['settle_delay_days']
+            settle_delay = platform_config["settle_delay_days"]
             settle_date = (datetime.now(timezone.utc) + timedelta(days=settle_delay)).date()
 
             logger.info(
@@ -468,15 +465,15 @@ class DeliveryPlatformAdapter:
             )
 
             return {
-                'order_id': order_id,
-                'status': 'completed',
-                'completed_at': completed_at.isoformat(),
-                'settlement_info': {
-                    'total_fen': order.total_fen,
-                    'commission_fen': order.commission_fen,
-                    'merchant_receive_fen': order.merchant_receive_fen,
-                    'settle_date': settle_date.isoformat(),
-                    'settle_days': platform_config['settle_days'],
+                "order_id": order_id,
+                "status": "completed",
+                "completed_at": completed_at.isoformat(),
+                "settlement_info": {
+                    "total_fen": order.total_fen,
+                    "commission_fen": order.commission_fen,
+                    "merchant_receive_fen": order.merchant_receive_fen,
+                    "settle_date": settle_date.isoformat(),
+                    "settle_days": platform_config["settle_days"],
                 },
             }
         finally:
@@ -509,12 +506,11 @@ class DeliveryPlatformAdapter:
             if date_str:
                 target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 conditions.append(
-                    DeliveryOrder.created_at >= datetime.combine(
-                        target_date, datetime.min.time(), tzinfo=timezone.utc
-                    )
+                    DeliveryOrder.created_at >= datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
                 )
                 conditions.append(
-                    DeliveryOrder.created_at < datetime.combine(
+                    DeliveryOrder.created_at
+                    < datetime.combine(
                         target_date + timedelta(days=1),
                         datetime.min.time(),
                         tzinfo=timezone.utc,
@@ -522,27 +518,25 @@ class DeliveryPlatformAdapter:
                 )
 
             result = await session.execute(
-                select(DeliveryOrder)
-                .where(and_(*conditions))
-                .order_by(DeliveryOrder.created_at.desc())
+                select(DeliveryOrder).where(and_(*conditions)).order_by(DeliveryOrder.created_at.desc())
             )
             orders = result.scalars().all()
 
             return [
                 {
-                    'order_id': str(o.id),
-                    'order_no': o.order_no,
-                    'platform': o.platform,
-                    'platform_name': o.platform_name,
-                    'platform_order_id': o.platform_order_id,
-                    'status': o.status,
-                    'total_fen': o.total_fen,
-                    'commission_fen': o.commission_fen,
-                    'merchant_receive_fen': o.merchant_receive_fen,
-                    'items_count': len(o.items_json) if o.items_json else 0,
-                    'delivery_address': o.delivery_address or '',
-                    'created_at': o.created_at.isoformat() if o.created_at else '',
-                    'completed_at': o.completed_at.isoformat() if o.completed_at else '',
+                    "order_id": str(o.id),
+                    "order_no": o.order_no,
+                    "platform": o.platform,
+                    "platform_name": o.platform_name,
+                    "platform_order_id": o.platform_order_id,
+                    "status": o.status,
+                    "total_fen": o.total_fen,
+                    "commission_fen": o.commission_fen,
+                    "merchant_receive_fen": o.merchant_receive_fen,
+                    "items_count": len(o.items_json) if o.items_json else 0,
+                    "delivery_address": o.delivery_address or "",
+                    "created_at": o.created_at.isoformat() if o.created_at else "",
+                    "completed_at": o.completed_at.isoformat() if o.completed_at else "",
                 }
                 for o in orders
             ]
@@ -582,10 +576,10 @@ class DeliveryPlatformAdapter:
                         else DeliveryOrder.store_id.isnot(None),
                         DeliveryOrder.platform == platform,
                         DeliveryOrder.is_deleted == False,  # noqa: E712
-                        DeliveryOrder.created_at >= datetime.combine(
-                            start_date, datetime.min.time(), tzinfo=timezone.utc
-                        ),
-                        DeliveryOrder.created_at < datetime.combine(
+                        DeliveryOrder.created_at
+                        >= datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc),
+                        DeliveryOrder.created_at
+                        < datetime.combine(
                             end_date + timedelta(days=1),
                             datetime.min.time(),
                             tzinfo=timezone.utc,
@@ -603,14 +597,16 @@ class DeliveryPlatformAdapter:
             cancelled_count = 0
 
             for order in orders:
-                if order.status == 'completed':
+                if order.status == "completed":
                     completed_count += 1
                     total_revenue_fen += order.total_fen
                     total_commission_fen += order.commission_fen
 
                     if order.completed_at:
-                        completed_date = order.completed_at.date() if hasattr(order.completed_at, 'date') else order.completed_at
-                        settle_date = completed_date + timedelta(days=platform_config['settle_delay_days'])
+                        completed_date = (
+                            order.completed_at.date() if hasattr(order.completed_at, "date") else order.completed_at
+                        )
+                        settle_date = completed_date + timedelta(days=platform_config["settle_delay_days"])
                         today = datetime.now(timezone.utc).date()
                         if today >= settle_date:
                             settled_fen += order.merchant_receive_fen
@@ -619,27 +615,27 @@ class DeliveryPlatformAdapter:
                     else:
                         pending_fen += order.merchant_receive_fen
 
-                elif order.status == 'cancelled':
+                elif order.status == "cancelled":
                     cancelled_count += 1
 
             net_fen = total_revenue_fen - total_commission_fen
 
             return {
-                'store_id': self.store_id,
-                'platform': platform,
-                'platform_name': platform_config['name'],
-                'date_range': {'start': start_str, 'end': end_str},
-                'order_count': len(orders),
-                'completed_count': completed_count,
-                'cancelled_count': cancelled_count,
-                'revenue_fen': total_revenue_fen,
-                'commission_rate': platform_config['commission_rate'],
-                'commission_fen': total_commission_fen,
-                'subsidies_fen': 0,
-                'net_fen': net_fen,
-                'settled_fen': settled_fen,
-                'pending_settlement_fen': pending_fen,
-                'settle_days': platform_config['settle_days'],
+                "store_id": self.store_id,
+                "platform": platform,
+                "platform_name": platform_config["name"],
+                "date_range": {"start": start_str, "end": end_str},
+                "order_count": len(orders),
+                "completed_count": completed_count,
+                "cancelled_count": cancelled_count,
+                "revenue_fen": total_revenue_fen,
+                "commission_rate": platform_config["commission_rate"],
+                "commission_fen": total_commission_fen,
+                "subsidies_fen": 0,
+                "net_fen": net_fen,
+                "settled_fen": settled_fen,
+                "pending_settlement_fen": pending_fen,
+                "settle_days": platform_config["settle_days"],
             }
         finally:
             await self._close_session(session)
@@ -650,12 +646,8 @@ class DeliveryPlatformAdapter:
         """从数据库获取订单（显式 tenant_id 过滤，配合 RLS 双重保障）"""
         conditions = [DeliveryOrder.id == uuid.UUID(order_id)]
         if self.tenant_id:
-            conditions.append(
-                DeliveryOrder.tenant_id == uuid.UUID(self.tenant_id)
-            )
-        result = await session.execute(
-            select(DeliveryOrder).where(and_(*conditions))
-        )
+            conditions.append(DeliveryOrder.tenant_id == uuid.UUID(self.tenant_id))
+        result = await session.execute(select(DeliveryOrder).where(and_(*conditions)))
         order = result.scalar_one_or_none()
         if order is None:
             raise ValueError(f"外卖订单不存在: {order_id}")
@@ -689,12 +681,12 @@ class DeliveryPlatformAdapter:
 
         if not menu_items:
             return {
-                'platform': platform,
-                'platform_name': DeliveryPlatformAdapter.PLATFORMS[platform]['name'],
-                'synced_count': 0,
-                'failed_count': 0,
-                'details': [],
-                'message': '菜单为空，无需同步',
+                "platform": platform,
+                "platform_name": DeliveryPlatformAdapter.PLATFORMS[platform]["name"],
+                "synced_count": 0,
+                "failed_count": 0,
+                "details": [],
+                "message": "菜单为空，无需同步",
             }
 
         synced: list[dict] = []
@@ -703,21 +695,25 @@ class DeliveryPlatformAdapter:
         for item in menu_items:
             try:
                 platform_sku = f"{platform.upper()}_{item.get('dish_id', uuid.uuid4().hex[:8])}"
-                synced.append({
-                    'dish_id': item.get('dish_id', ''),
-                    'name': item.get('name', ''),
-                    'price_fen': item.get('price_fen', 0),
-                    'stock': item.get('stock', 999),
-                    'platform_sku_id': platform_sku,
-                    'status': 'synced',
-                })
+                synced.append(
+                    {
+                        "dish_id": item.get("dish_id", ""),
+                        "name": item.get("name", ""),
+                        "price_fen": item.get("price_fen", 0),
+                        "stock": item.get("stock", 999),
+                        "platform_sku_id": platform_sku,
+                        "status": "synced",
+                    }
+                )
             except (ValueError, RuntimeError) as e:
-                failed.append({
-                    'dish_id': item.get('dish_id', ''),
-                    'name': item.get('name', ''),
-                    'error': str(e),
-                    'status': 'failed',
-                })
+                failed.append(
+                    {
+                        "dish_id": item.get("dish_id", ""),
+                        "name": item.get("name", ""),
+                        "error": str(e),
+                        "status": "failed",
+                    }
+                )
 
         logger.info(
             "menu_synced_to_platform",
@@ -728,11 +724,11 @@ class DeliveryPlatformAdapter:
         )
 
         return {
-            'platform': platform,
-            'platform_name': DeliveryPlatformAdapter.PLATFORMS[platform]['name'],
-            'store_id': store_id,
-            'synced_count': len(synced),
-            'failed_count': len(failed),
-            'details': synced + failed,
-            'synced_at': datetime.now(timezone.utc).isoformat(),
+            "platform": platform,
+            "platform_name": DeliveryPlatformAdapter.PLATFORMS[platform]["name"],
+            "store_id": store_id,
+            "synced_count": len(synced),
+            "failed_count": len(failed),
+            "details": synced + failed,
+            "synced_at": datetime.now(timezone.utc).isoformat(),
         }

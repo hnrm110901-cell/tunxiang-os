@@ -20,6 +20,7 @@ orders.py:
   9. POST /api/v1/trade/orders/{id}/payments — DB 错误（execute 抛异常）→ 500
  10. POST /api/v1/trade/orders/{id}/discount  — 422 缺必填字段
 """
+
 import os
 import sys
 import types
@@ -27,8 +28,8 @@ import uuid
 
 # ─── 路径 ─────────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_SRC_DIR, "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_SRC_DIR, "..", "..", ".."))
 
 for _p in (_SRC_DIR, _ROOT_DIR):
     if _p not in sys.path:
@@ -36,6 +37,7 @@ for _p in (_SRC_DIR, _ROOT_DIR):
 
 
 # ─── 建立 src 包 & api 包 ─────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -45,7 +47,7 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",     _SRC_DIR)
+_ensure_pkg("src", _SRC_DIR)
 _ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 
 
@@ -73,14 +75,14 @@ _services_path = os.path.join(_SRC_DIR, "services")
 _ensure_pkg("src.services", _services_path)
 
 _SVC_CLASS_MAP = {
-    "cashier_engine":      ["CashierEngine"],
-    "daily_settlement":    ["DailySettlementService"],
-    "payment_gateway":     ["PaymentGateway"],
+    "cashier_engine": ["CashierEngine"],
+    "daily_settlement": ["DailySettlementService"],
+    "payment_gateway": ["PaymentGateway"],
     "payment_saga_service": ["PaymentSagaService"],
-    "permission_client":   ["CashierPermissionClient"],
-    "order_service":       ["OrderService"],
-    "payment_service":     ["PaymentService"],
-    "receipt_service":     ["ReceiptService"],
+    "permission_client": ["CashierPermissionClient"],
+    "order_service": ["OrderService"],
+    "payment_service": ["PaymentService"],
+    "receipt_service": ["ReceiptService"],
 }
 
 for _svc, _classes in _SVC_CLASS_MAP.items():
@@ -94,35 +96,37 @@ for _svc, _classes in _SVC_CLASS_MAP.items():
 
 # ── 存根 discount_engine_routes（cashier_api 从同包导入） ──
 _discount_stub = types.ModuleType("src.api.discount_engine_routes")
-_discount_stub.DiscountInput = object   # 仅类型占位
-_discount_stub._build_steps      = lambda *a, **kw: []
+_discount_stub.DiscountInput = object  # 仅类型占位
+_discount_stub._build_steps = lambda *a, **kw: []
 _discount_stub._fetch_active_rules = _mock.AsyncMock(return_value=[])
 _discount_stub._insert_discount_log = _mock.AsyncMock(return_value=None)
-_discount_stub._resolve_conflicts   = lambda *a, **kw: ([], [])
+_discount_stub._resolve_conflicts = lambda *a, **kw: ([], [])
 sys.modules["src.api.discount_engine_routes"] = _discount_stub
 
 
 # ─── 导入 ─────────────────────────────────────────────────────────────────────
-import pytest                                                       # noqa: E402
-from unittest.mock import AsyncMock, MagicMock, patch              # noqa: E402
-from fastapi import FastAPI                                         # noqa: E402
-from fastapi.testclient import TestClient                           # noqa: E402
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
 
-from shared.ontology.src.database import get_db                    # noqa: E402
+import pytest  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from shared.ontology.src.database import get_db  # noqa: E402
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 TENANT_ID = "22222222-2222-2222-2222-222222222222"
-ORDER_ID  = str(uuid.uuid4())
-ITEM_ID   = str(uuid.uuid4())
-HEADERS   = {"X-Tenant-ID": TENANT_ID}
+ORDER_ID = str(uuid.uuid4())
+ITEM_ID = str(uuid.uuid4())
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 共用工具 ─────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
     return db
 
@@ -142,14 +146,17 @@ def _make_app_with_db(router, db: AsyncMock) -> FastAPI:
 # Part 1 — cashier_api.py 测试（5 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.fixture(scope="module")
 def cashier_router():
     """导入 cashier_api router，CashierEngine 等通过 patch 替换。"""
     from src.api.cashier_api import router  # type: ignore[import]
+
     return router
 
 
 # ─── 场景 1: 开台成功 ──────────────────────────────────────────────────────────
+
 
 def test_cashier_open_table_success(cashier_router):
     """POST /api/v1/orders — CashierEngine.open_table 返回正常 → ok=True，含 order_id。"""
@@ -183,6 +190,7 @@ def test_cashier_open_table_success(cashier_router):
 
 # ─── 场景 2: 加菜成功 ──────────────────────────────────────────────────────────
 
+
 def test_cashier_add_item_success(cashier_router):
     """POST /api/v1/orders/{id}/items — 加菜成功，返回 ok=True + item 信息。"""
     fake_item = {"item_id": ITEM_ID, "dish_name": "宫保鸡丁", "qty": 2, "subtotal_fen": 7600}
@@ -215,6 +223,7 @@ def test_cashier_add_item_success(cashier_router):
 
 # ─── 场景 3: 结算成功 ──────────────────────────────────────────────────────────
 
+
 def test_cashier_settle_order_success(cashier_router):
     """POST /api/v1/orders/{id}/settle — settle_order 返回正常 → ok=True。"""
     fake_result = {"order_id": ORDER_ID, "status": "completed", "total_fen": 8800}
@@ -229,9 +238,7 @@ def test_cashier_settle_order_success(cashier_router):
         client = TestClient(app)
         resp = client.post(
             f"/api/v1/orders/{ORDER_ID}/settle",
-            json={
-                "payments": [{"method": "wechat", "amount_fen": 8800}]
-            },
+            json={"payments": [{"method": "wechat", "amount_fen": 8800}]},
             headers=HEADERS,
         )
 
@@ -242,6 +249,7 @@ def test_cashier_settle_order_success(cashier_router):
 
 
 # ─── 场景 4: 取消订单 — ValueError → 400 ──────────────────────────────────────
+
 
 def test_cashier_cancel_order_value_error(cashier_router):
     """POST /api/v1/orders/{id}/cancel — engine 抛 ValueError（如订单已完成）→ 400。"""
@@ -266,6 +274,7 @@ def test_cashier_cancel_order_value_error(cashier_router):
 
 # ─── 场景 5: 查询订单 — 不存在 → 404 ──────────────────────────────────────────
 
+
 def test_cashier_get_order_not_found(cashier_router):
     """GET /api/v1/orders/{id} — engine 抛 ValueError（订单不存在）→ 404。"""
     mock_engine = MagicMock()
@@ -289,14 +298,17 @@ def test_cashier_get_order_not_found(cashier_router):
 # Part 2 — orders.py 测试（5 个）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.fixture(scope="module")
 def trade_router():
     """导入 orders.py router，OrderService / PaymentService / ReceiptService patch 替换。"""
     from src.api.orders import router  # type: ignore[import]
+
     return router
 
 
 # ─── 场景 6: 创建订单成功 ──────────────────────────────────────────────────────
+
 
 def test_trade_create_order_success(trade_router):
     """POST /api/v1/trade/orders — OrderService.create_order 返回正常 → ok=True + order_id。"""
@@ -329,6 +341,7 @@ def test_trade_create_order_success(trade_router):
 
 # ─── 场景 7: 加菜成功 ──────────────────────────────────────────────────────────
 
+
 def test_trade_add_item_success(trade_router):
     """POST /api/v1/trade/orders/{id}/items — add_item 成功 → ok=True。"""
     fake_item = {"item_id": ITEM_ID, "dish_name": "清蒸鲈鱼", "quantity": 1}
@@ -360,6 +373,7 @@ def test_trade_add_item_success(trade_router):
 
 # ─── 场景 8: 查询订单 — 不存在 → 404 ──────────────────────────────────────────
 
+
 def test_trade_get_order_not_found(trade_router):
     """GET /api/v1/trade/orders/{id} — OrderService.get_order 返回 None → 404。"""
     mock_svc = MagicMock()
@@ -381,12 +395,11 @@ def test_trade_get_order_not_found(trade_router):
 
 # ─── 场景 9: 创建支付 — DB 错误 → 500 ────────────────────────────────────────
 
+
 def test_trade_create_payment_db_error(trade_router):
     """POST /api/v1/trade/orders/{id}/payments — PaymentService.create_payment 抛 Exception → 500。"""
     mock_svc = MagicMock()
-    mock_svc.create_payment = AsyncMock(
-        side_effect=Exception("DB connection pool exhausted")
-    )
+    mock_svc.create_payment = AsyncMock(side_effect=Exception("DB connection pool exhausted"))
 
     db = _make_mock_db()
     app = _make_app_with_db(trade_router, db)
@@ -404,6 +417,7 @@ def test_trade_create_payment_db_error(trade_router):
 
 # ─── 场景 10: 应用折扣 — 缺必填字段 → 422 ──────────────────────────────────────
 
+
 def test_trade_apply_discount_missing_field(trade_router):
     """POST /api/v1/trade/orders/{id}/discount — 缺少必填 discount_fen → 422 Unprocessable Entity。"""
     db = _make_mock_db()
@@ -412,14 +426,11 @@ def test_trade_apply_discount_missing_field(trade_router):
     client = TestClient(app)
     resp = client.post(
         f"/api/v1/trade/orders/{ORDER_ID}/discount",
-        json={"reason": "VIP优惠"},   # 缺少 discount_fen
+        json={"reason": "VIP优惠"},  # 缺少 discount_fen
         headers=HEADERS,
     )
 
     assert resp.status_code == 422
     errors = resp.json()["detail"]
-    field_names = [
-        e["loc"][-1] if isinstance(e.get("loc"), list) else str(e)
-        for e in errors
-    ]
+    field_names = [e["loc"][-1] if isinstance(e.get("loc"), list) else str(e) for e in errors]
     assert any("discount_fen" in str(f) for f in field_names)

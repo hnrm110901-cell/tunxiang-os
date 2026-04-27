@@ -59,10 +59,7 @@ class InvalidStatusTransitionError(ValueError):
 
     def __init__(self, current: str, target: str) -> None:
         allowed = SettlementStatus.ALLOWED_TRANSITIONS.get(current)
-        msg = (
-            f"结算单状态 {current!r} 不能转换为 {target!r}。"
-            f"当前状态允许的下一状态：{allowed!r}"
-        )
+        msg = f"结算单状态 {current!r} 不能转换为 {target!r}。当前状态允许的下一状态：{allowed!r}"
         super().__init__(msg)
 
 
@@ -70,9 +67,7 @@ class SettlementAlreadyFinalizedError(ValueError):
     """结算单已锁定，不可修改金额"""
 
     def __init__(self, settlement_id: str, status: str) -> None:
-        super().__init__(
-            f"结算单 {settlement_id} 状态为 {status!r}（已锁定），金额不可修改"
-        )
+        super().__init__(f"结算单 {settlement_id} 状态为 {status!r}（已锁定），金额不可修改")
 
 
 class SettlementNotFoundError(LookupError):
@@ -152,9 +147,7 @@ class FranchiseeStatementItem(BaseModel):
     due_date: Optional[date] = None
     paid_at: Optional[datetime] = None
 
-    model_config = {
-        "json_encoders": {datetime: lambda v: v.isoformat(), date: str}
-    }
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat(), date: str}}
 
 
 class FranchiseeStatement(BaseModel):
@@ -166,9 +159,7 @@ class FranchiseeStatement(BaseModel):
     total_revenue_fen: int
     total_royalty_fen: int
     total_mgmt_fee_fen: int
-    outstanding_amount_fen: int = Field(
-        ..., description="累计欠款（未付结算单合计）"
-    )
+    outstanding_amount_fen: int = Field(..., description="累计欠款（未付结算单合计）")
     monthly_items: List[FranchiseeStatementItem]
 
     model_config = {"json_encoders": {UUID: str}}
@@ -382,9 +373,7 @@ class FranchiseSettlementService:
         settlement._assert_transition(SettlementStatus.CONFIRMED)
 
         if str(settlement.franchisee_id) != franchisee_id:
-            raise PermissionError(
-                f"加盟商 {franchisee_id!r} 无权确认结算单 {settlement_id!r}"
-            )
+            raise PermissionError(f"加盟商 {franchisee_id!r} 无权确认结算单 {settlement_id!r}")
 
         await db.execute(
             """

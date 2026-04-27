@@ -10,6 +10,7 @@
 - 禁止 broad except，异常分类处理
 - structlog 记录 platform/customer_id/action
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone
@@ -29,8 +30,8 @@ Platform = Literal["meituan", "douyin", "eleme"]
 # 平台字段映射：platform → (user_id 列名, openid 列名)
 _PLATFORM_FIELDS: dict[str, tuple[str, str | None]] = {
     "meituan": ("meituan_user_id", "meituan_openid"),
-    "douyin": (None, "douyin_openid"),       # type: ignore[assignment]
-    "eleme": ("eleme_user_id", None),        # type: ignore[assignment]
+    "douyin": (None, "douyin_openid"),  # type: ignore[assignment]
+    "eleme": ("eleme_user_id", None),  # type: ignore[assignment]
 }
 
 
@@ -78,9 +79,7 @@ class PlatformBindingService:
         )
 
         if result["is_new_customer"]:
-            asyncio.create_task(
-                self._trigger_new_customer_journey(result["customer_id"], tenant_id, "meituan")
-            )
+            asyncio.create_task(self._trigger_new_customer_journey(result["customer_id"], tenant_id, "meituan"))
 
         log.info(
             "bind_meituan_order_done",
@@ -125,9 +124,7 @@ class PlatformBindingService:
         )
 
         if result["is_new_customer"]:
-            asyncio.create_task(
-                self._trigger_new_customer_journey(result["customer_id"], tenant_id, "douyin")
-            )
+            asyncio.create_task(self._trigger_new_customer_journey(result["customer_id"], tenant_id, "douyin"))
 
         log.info(
             "bind_douyin_order_done",
@@ -247,9 +244,7 @@ class PlatformBindingService:
         """
         await self._set_tenant(db, str(tenant_id))
 
-        today_start = datetime.now(tz=timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        today_start = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         # 各平台总绑定数
         async def _count_bound(col_name: str) -> int:
@@ -386,13 +381,13 @@ class PlatformBindingService:
             for dup in duplicates:
                 # 合并消费统计
                 primary.total_order_count = (primary.total_order_count or 0) + (dup.total_order_count or 0)
-                primary.total_order_amount_fen = (primary.total_order_amount_fen or 0) + (dup.total_order_amount_fen or 0)
+                primary.total_order_amount_fen = (primary.total_order_amount_fen or 0) + (
+                    dup.total_order_amount_fen or 0
+                )
                 primary.rfm_monetary_fen = (primary.rfm_monetary_fen or 0) + (dup.rfm_monetary_fen or 0)
 
                 # 取更近的 last_order_at
-                if dup.last_order_at and (
-                    primary.last_order_at is None or dup.last_order_at > primary.last_order_at
-                ):
+                if dup.last_order_at and (primary.last_order_at is None or dup.last_order_at > primary.last_order_at):
                     primary.last_order_at = dup.last_order_at
 
                 # 取更早的 first_order_at
@@ -449,9 +444,7 @@ class PlatformBindingService:
             {"tid": tenant_id},
         )
 
-    async def _find_by_phone(
-        self, db: AsyncSession, tenant_id: uuid.UUID, phone: str
-    ) -> Customer | None:
+    async def _find_by_phone(self, db: AsyncSession, tenant_id: uuid.UUID, phone: str) -> Customer | None:
         result = await db.execute(
             select(Customer)
             .where(Customer.tenant_id == tenant_id)
@@ -614,6 +607,7 @@ class PlatformBindingService:
 # ─────────────────────────────────────────────────────────────────
 # 工具函数
 # ─────────────────────────────────────────────────────────────────
+
 
 def _higher_rfm_level(level_a: str | None, level_b: str | None) -> str:
     """比较两个 RFM 等级，返回数字更小（等级更高）的。

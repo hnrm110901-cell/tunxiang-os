@@ -68,3 +68,6 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["services/*/src/tests", "edge/*/src/tests", "shared/*/tests"]
+markers = [
+    "integration: 集成测试，需要真实 PG/Redis；本地默认跳过，CI 通过 TX_INTEGRATION_DB_URL 启用",
+]

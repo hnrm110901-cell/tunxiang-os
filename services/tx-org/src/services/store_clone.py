@@ -43,25 +43,25 @@ logger = structlog.get_logger(__name__)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CLONE_ITEMS: List[str] = [
-    "tables",            # 桌台布局
+    "tables",  # 桌台布局
     "production_depts",  # 出品部门
-    "receipt_templates", # 小票模板
+    "receipt_templates",  # 小票模板
     "attendance_rules",  # 考勤规则
-    "shift_configs",     # 班次配置
-    "dispatch_rules",    # 档口路由规则
-    "store_push_configs",# 出单模式配置
+    "shift_configs",  # 班次配置
+    "dispatch_rules",  # 档口路由规则
+    "store_push_configs",  # 出单模式配置
 ]
 
 # 不可克隆的数据（前端提示用）
 NON_CLONE_ITEMS: List[str] = [
-    "orders",         # 订单
-    "payments",       # 支付流水
-    "members",        # 会员数据
+    "orders",  # 订单
+    "payments",  # 支付流水
+    "members",  # 会员数据
     "clock_records",  # 打卡记录
-    "daily_attendance", # 考勤汇总
-    "settlements",    # 日结单
-    "reports",        # 经营报表
-    "inventory",      # 库存数量
+    "daily_attendance",  # 考勤汇总
+    "settlements",  # 日结单
+    "reports",  # 经营报表
+    "inventory",  # 库存数量
 ]
 
 # 批量克隆上限
@@ -72,10 +72,12 @@ BATCH_LIMIT = 100
 #  数据模型
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @dataclass
 class CloneItemResult:
     """单个配置项的克隆结果"""
-    status: str          # "ok" | "error" | "skipped"
+
+    status: str  # "ok" | "error" | "skipped"
     cloned: int = 0
     error: Optional[str] = None
 
@@ -83,13 +85,14 @@ class CloneItemResult:
 @dataclass
 class StoreCloneTask:
     """克隆任务（对应 store_clone_tasks 表中的一行）"""
+
     id: str
     tenant_id: str
     source_store_id: str
     target_store_id: str
     selected_items: List[str]
-    status: str                                   # pending/running/completed/failed
-    progress: int                                 # 0-100
+    status: str  # pending/running/completed/failed
+    progress: int  # 0-100
     result_summary: Dict[str, Any] = field(default_factory=dict)
     error_message: Optional[str] = None
     created_by: Optional[str] = None
@@ -100,6 +103,7 @@ class StoreCloneTask:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  内部工具
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def _new_id() -> str:
     return str(uuid.uuid4())
@@ -128,9 +132,8 @@ def _assert_same_tenant(
 #  门店数据读取（纯函数，无 DB 依赖，便于单元测试替换）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-async def _get_source_store_data(
-    source_store_id: str, tenant_id: str, db: AsyncSession
-) -> Dict[str, Any]:
+
+async def _get_source_store_data(source_store_id: str, tenant_id: str, db: AsyncSession) -> Dict[str, Any]:
     """读取源门店可克隆的配置数据（真实 DB 查询）。"""
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
@@ -142,34 +145,60 @@ async def _get_source_store_data(
         keys = result.keys()
         return [dict(zip(keys, row)) for row in result.fetchall()]
 
-    tables = _rows(await db.execute(
-        text("SELECT id, table_no, area, floor, seats, min_consume_fen, sort_order, is_active, config FROM tables WHERE store_id = :sid::uuid AND is_deleted = false ORDER BY sort_order"),
-        {"sid": sid},
-    ))
-    production_depts = _rows(await db.execute(
-        text("SELECT id, dept_name, dept_code, brand_id, fixed_fee_type, sort_order FROM production_depts WHERE tenant_id = :tid::uuid AND is_deleted = false"),
-        {"tid": tenant_id},
-    ))
-    receipt_templates = _rows(await db.execute(
-        text("SELECT id, template_name, print_type, template_content, paper_width, is_default, is_active, config FROM receipt_templates WHERE store_id = :sid::uuid AND is_deleted = false"),
-        {"sid": sid},
-    ))
-    attendance_rules = _rows(await db.execute(
-        text("SELECT id, rule_name, grace_period_minutes, early_leave_grace_minutes, overtime_min_minutes, max_hours_week, max_overtime_month_hours, late_deduction_fen, early_leave_deduction_fen, full_attendance_bonus_fen, clock_methods, effective_from, effective_to, is_active FROM attendance_rules WHERE store_id = :sid AND is_deleted = false"),
-        {"sid": sid},
-    ))
-    shift_configs = _rows(await db.execute(
-        text("SELECT id, shift_name, start_time, end_time, color, is_active FROM shift_configs WHERE store_id = :sid::uuid AND is_deleted = false"),
-        {"sid": sid},
-    ))
-    dispatch_rules = _rows(await db.execute(
-        text("SELECT id, name, priority, match_dish_id, match_dish_category, match_brand_id, match_channel, match_time_start, match_time_end, match_day_type, target_dept_id FROM dispatch_rules WHERE tenant_id = :tid::uuid"),
-        {"tid": tenant_id},
-    ))
-    store_push_configs = _rows(await db.execute(
-        text("SELECT id, push_mode FROM store_push_configs WHERE store_id = :sid::uuid AND tenant_id = :tid::uuid"),
-        {"sid": sid, "tid": tenant_id},
-    ))
+    tables = _rows(
+        await db.execute(
+            text(
+                "SELECT id, table_no, area, floor, seats, min_consume_fen, sort_order, is_active, config FROM tables WHERE store_id = :sid::uuid AND is_deleted = false ORDER BY sort_order"
+            ),
+            {"sid": sid},
+        )
+    )
+    production_depts = _rows(
+        await db.execute(
+            text(
+                "SELECT id, dept_name, dept_code, brand_id, fixed_fee_type, sort_order FROM production_depts WHERE tenant_id = :tid::uuid AND is_deleted = false"
+            ),
+            {"tid": tenant_id},
+        )
+    )
+    receipt_templates = _rows(
+        await db.execute(
+            text(
+                "SELECT id, template_name, print_type, template_content, paper_width, is_default, is_active, config FROM receipt_templates WHERE store_id = :sid::uuid AND is_deleted = false"
+            ),
+            {"sid": sid},
+        )
+    )
+    attendance_rules = _rows(
+        await db.execute(
+            text(
+                "SELECT id, rule_name, grace_period_minutes, early_leave_grace_minutes, overtime_min_minutes, max_hours_week, max_overtime_month_hours, late_deduction_fen, early_leave_deduction_fen, full_attendance_bonus_fen, clock_methods, effective_from, effective_to, is_active FROM attendance_rules WHERE store_id = :sid AND is_deleted = false"
+            ),
+            {"sid": sid},
+        )
+    )
+    shift_configs = _rows(
+        await db.execute(
+            text(
+                "SELECT id, shift_name, start_time, end_time, color, is_active FROM shift_configs WHERE store_id = :sid::uuid AND is_deleted = false"
+            ),
+            {"sid": sid},
+        )
+    )
+    dispatch_rules = _rows(
+        await db.execute(
+            text(
+                "SELECT id, name, priority, match_dish_id, match_dish_category, match_brand_id, match_channel, match_time_start, match_time_end, match_day_type, target_dept_id FROM dispatch_rules WHERE tenant_id = :tid::uuid"
+            ),
+            {"tid": tenant_id},
+        )
+    )
+    store_push_configs = _rows(
+        await db.execute(
+            text("SELECT id, push_mode FROM store_push_configs WHERE store_id = :sid::uuid AND tenant_id = :tid::uuid"),
+            {"sid": sid, "tid": tenant_id},
+        )
+    )
 
     return {
         "tables": tables,
@@ -185,6 +214,7 @@ async def _get_source_store_data(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  克隆预览（无副作用，只读）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def get_clone_preview(
     source_store_id: str,
@@ -232,6 +262,7 @@ def get_clone_preview(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  单个配置项克隆器
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 async def _clone_tables(
     source_items: List[Dict[str, Any]],
@@ -497,6 +528,7 @@ _CLONE_DISPATCH: Dict[
 #  主克隆函数（同步版，供 API 路由调用）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 async def clone_store_config(
     source_store_id: str,
     target_store_id: str,
@@ -571,9 +603,7 @@ async def clone_store_config(
         clone_fn = _CLONE_DISPATCH[item_type]
         source_items = source_data.get(item_type, [])
 
-        item_result: CloneItemResult = await clone_fn(
-            source_items, target_store_id, tenant_id, db
-        )
+        item_result: CloneItemResult = await clone_fn(source_items, target_store_id, tenant_id, db)
         result_summary[item_type] = {
             "status": item_result.status,
             "cloned": item_result.cloned,
@@ -619,6 +649,7 @@ async def clone_store_config(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  门店创建 + 克隆一体化流程
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def setup_new_store(
     store_name: str,
@@ -678,7 +709,7 @@ def setup_new_store(
         "store_code": store_code,
         "address": address.strip() if address else "",
         "brand_id": brand_id.strip(),
-        "status": "inactive",     # 新门店默认未激活，等配置完成后激活
+        "status": "inactive",  # 新门店默认未激活，等配置完成后激活
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
@@ -713,6 +744,7 @@ def setup_new_store(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  旧接口兼容层（保持 admin_routes.py 不需修改）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def get_clone_preview(
     source_store_id: str,
@@ -763,7 +795,7 @@ def clone_store(
 
     result = setup_new_store(
         store_name=new_store_name,
-        brand_id="default",   # 旧签名无 brand_id，使用默认值
+        brand_id="default",  # 旧签名无 brand_id，使用默认值
         address=new_address,
         tenant_id=tenant_id,
         clone_from_store_id=source_store_id,
@@ -810,9 +842,7 @@ def batch_clone(
     if not new_stores:
         raise ValueError("new_stores 不能为空")
     if len(new_stores) > BATCH_LIMIT:
-        raise ValueError(
-            f"批量克隆上限为 {BATCH_LIMIT} 家，当前请求 {len(new_stores)} 家"
-        )
+        raise ValueError(f"批量克隆上限为 {BATCH_LIMIT} 家，当前请求 {len(new_stores)} 家")
 
     results: List[Dict[str, Any]] = []
     failed: List[Dict[str, Any]] = []
@@ -844,9 +874,7 @@ def batch_clone(
                 name=name,
                 error=str(e),
             )
-            failed.append(
-                {"index": idx, "name": name, "status": "failed", "error": str(e)}
-            )
+            failed.append({"index": idx, "name": name, "status": "failed", "error": str(e)})
 
     log.info(
         "store_clone.batch_completed",

@@ -13,15 +13,18 @@ Covered routes:
 
 Total: 12 test cases
 """
+
 import os
 import sys
 import types
+
 
 # ── stub heavy transitive dependencies before importing route modules ────────
 def _stub(name: str) -> types.ModuleType:
     mod = types.ModuleType(name)
     sys.modules.setdefault(name, mod)
     return mod
+
 
 # shared.skill_registry
 _sr = _stub("shared")
@@ -32,23 +35,26 @@ _so = _stub("shared.ontology")
 _so_src = _stub("shared.ontology.src")
 _so_db = _stub("shared.ontology.src.database")
 
+
 async def _fake_get_db_with_tenant(tenant_id):
     yield None
+
 
 _so_db.get_db_with_tenant = _fake_get_db_with_tenant
 sys.modules["shared.ontology.src.database"] = _so_db
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers — build mock SkillRegistry / OntologyRegistry
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _make_skill(name: str, display_name: str = "", version: str = "1.0"):
     meta = MagicMock()
@@ -84,14 +90,12 @@ def _make_mock_registry(skills=None):
         skills = [_make_skill("skill-a"), _make_skill("skill-b")]
     registry = MagicMock()
     registry.list_skills.return_value = skills
-    registry.get.side_effect = lambda name: next(
-        (s for s in skills if s.meta.name == name), None
-    )
+    registry.get.side_effect = lambda name: next((s for s in skills if s.meta.name == name), None)
     registry.get_all_owned_entities.return_value = {"Order": "skill-a"}
     registry.get_emitted_events.return_value = {"order.paid": "skill-a"}
-    registry.find_by_event_type.return_value = [
-        (skills[0], MagicMock(priority=10, condition=None, description="desc"))
-    ] if skills else []
+    registry.find_by_event_type.return_value = (
+        [(skills[0], MagicMock(priority=10, condition=None, description="desc"))] if skills else []
+    )
     return registry
 
 
@@ -106,9 +110,11 @@ def _make_mock_ontology(registry):
 # App fixture: skill_registry_routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def skill_app():
     from api.skill_registry_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -123,6 +129,7 @@ def skill_client(skill_app):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/skills/
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_list_skills_returns_all(skill_client):
@@ -155,6 +162,7 @@ async def test_list_skills_empty_registry(skill_client):
 # GET /api/v1/skills/health
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_skill_health_all_healthy(skill_client):
     """GET /health lists every skill as healthy."""
@@ -176,14 +184,17 @@ async def test_skill_health_all_healthy(skill_client):
 # GET /api/v1/skills/ontology/report
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_ontology_report_structure(skill_client):
     """GET /ontology/report returns entity_ownership and conflicts."""
     mock_registry = _make_mock_registry()
     mock_onto = _make_mock_ontology(mock_registry)
 
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry), \
-         patch("api.skill_registry_routes.OntologyRegistry", return_value=mock_onto):
+    with (
+        patch("api.skill_registry_routes._get_registry", return_value=mock_registry),
+        patch("api.skill_registry_routes.OntologyRegistry", return_value=mock_onto),
+    ):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/ontology/report")
 
@@ -202,6 +213,7 @@ async def test_ontology_report_structure(skill_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/skills/route/{event_type}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_route_event_returns_matched_skills(skill_client):
@@ -224,6 +236,7 @@ async def test_route_event_returns_matched_skills(skill_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/skills/{skill_name}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_skill_found(skill_client):
@@ -256,12 +269,13 @@ async def test_get_skill_not_found(skill_client):
 # App fixture: orchestrator_routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def orchestrator_app():
-    from api.orchestrator_routes import router, _get_db_with_tenant
+    from api.orchestrator_routes import _get_db_with_tenant, router
+
     app = FastAPI()
     # Override the DB dependency so no real DB is needed
-    from fastapi import Depends
 
     async def _override():
         yield None
@@ -280,6 +294,7 @@ def orchestrator_client(orchestrator_app):
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/v1/orchestrate
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_orchestrate_missing_intent_and_event_returns_422(orchestrator_client):
@@ -316,9 +331,11 @@ async def test_orchestrate_with_intent_returns_plan(orchestrator_client):
     mock_log_service = MagicMock()
     mock_log_service.log_orchestrator_result = AsyncMock()
 
-    with patch("api.orchestrator_routes.MasterAgent", return_value=mock_master), \
-         patch("api.orchestrator_routes.DecisionLogService", mock_log_service), \
-         patch("api.orchestrator_routes.AgentEvent", MagicMock()):
+    with (
+        patch("api.orchestrator_routes.MasterAgent", return_value=mock_master),
+        patch("api.orchestrator_routes.DecisionLogService", mock_log_service),
+        patch("api.orchestrator_routes.AgentEvent", MagicMock()),
+    ):
         payload = {
             "intent": "分析门店整体运营状态",
             "tenant_id": "t1",
@@ -360,9 +377,11 @@ async def test_orchestrate_with_trigger_event(orchestrator_client):
     mock_log_service = MagicMock()
     mock_log_service.log_orchestrator_result = AsyncMock()
 
-    with patch("api.orchestrator_routes.MasterAgent", return_value=mock_master), \
-         patch("api.orchestrator_routes.DecisionLogService", mock_log_service), \
-         patch("api.orchestrator_routes.AgentEvent", MagicMock()) as MockEvent:
+    with (
+        patch("api.orchestrator_routes.MasterAgent", return_value=mock_master),
+        patch("api.orchestrator_routes.DecisionLogService", mock_log_service),
+        patch("api.orchestrator_routes.AgentEvent", MagicMock()) as MockEvent,
+    ):
         payload = {
             "trigger_event": {
                 "event_type": "inventory.low_stock",
@@ -390,13 +409,12 @@ async def test_orchestrate_with_trigger_event(orchestrator_client):
 # GET /api/v1/orchestrate/skill-summary
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_skill_summary_returns_total(orchestrator_client):
     """GET /skill-summary returns ok=True with total_skills."""
     mock_summary = {"total_skills": 5, "skills": []}
-    with patch(
-        "api.orchestrator_routes.SkillAwareOrchestrator"
-    ) as MockOrch:
+    with patch("api.orchestrator_routes.SkillAwareOrchestrator") as MockOrch:
         MockOrch.get_ontology_summary.return_value = mock_summary
         async with orchestrator_client as c:
             resp = await c.get("/api/v1/orchestrate/skill-summary")
@@ -410,6 +428,7 @@ async def test_skill_summary_returns_total(orchestrator_client):
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/v1/orchestrate/{plan_id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_plan_history_always_404(orchestrator_client):

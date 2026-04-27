@@ -7,6 +7,7 @@
   GET  /list                 — 门店列表（支持 region/level 筛选）
   GET  /{store_id}           — 门店六维雷达详情
 """
+
 from __future__ import annotations
 
 import uuid
@@ -43,6 +44,7 @@ _DIMENSION_LABELS = {
 
 # ─── 依赖注入 ────────────────────────────────────────────────
 
+
 def _require_tenant(x_tenant_id: Optional[str]) -> str:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header is required")
@@ -59,6 +61,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ─── DB 查询函数 ─────────────────────────────────────────────
+
 
 def _compute_level(score: float) -> str:
     if score >= 85:
@@ -85,12 +88,14 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
     """从 DB 计算每个门店的健康度数据。"""
     try:
         # 1. 获取所有活跃门店
-        stores_result = await db.execute(text("""
+        stores_result = await db.execute(
+            text("""
             SELECT id, store_name, region, city
             FROM stores
             WHERE status = 'active'
             ORDER BY store_name
-        """))
+        """)
+        )
         stores = stores_result.mappings().all()
 
         if not stores:
@@ -100,20 +105,22 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
         store_ids_sql = ", ".join(f"'{sid}'" for sid in store_ids)
 
         # 2. 合规预警统计（open 状态告警数，按 store_id 分组）
-        alerts_result = await db.execute(text(f"""
+        alerts_result = await db.execute(
+            text(f"""
             SELECT store_id::text, COUNT(*) AS open_count
             FROM compliance_alerts
             WHERE store_id::text IN ({store_ids_sql})
               AND status = 'open'
             GROUP BY store_id
-        """))
+        """)
+        )
         alerts_by_store: dict[str, int] = {
-            row["store_id"]: int(row["open_count"])
-            for row in alerts_result.mappings().all()
+            row["store_id"]: int(row["open_count"]) for row in alerts_result.mappings().all()
         }
 
         # 3. 近7天 vs 前7天 销售额（分）
-        sales_result = await db.execute(text(f"""
+        sales_result = await db.execute(
+            text(f"""
             SELECT
                 store_id::text,
                 SUM(CASE WHEN created_at >= NOW() - INTERVAL '7 days'
@@ -126,7 +133,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
               AND status = 'paid'
               AND created_at >= NOW() - INTERVAL '14 days'
             GROUP BY store_id
-        """))
+        """)
+        )
         sales_by_store: dict[str, dict] = {
             row["store_id"]: {
                 "recent": int(row["recent_revenue"] or 0),
@@ -136,7 +144,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
         }
 
         # 4. 培训完成率（join employees 获取 store_id）
-        training_result = await db.execute(text(f"""
+        training_result = await db.execute(
+            text(f"""
             SELECT
                 e.store_id::text,
                 COUNT(*) AS total_trainings,
@@ -145,7 +154,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
             JOIN employees e ON et.employee_id = e.id
             WHERE e.store_id::text IN ({store_ids_sql})
             GROUP BY e.store_id
-        """))
+        """)
+        )
         training_by_store: dict[str, dict] = {
             row["store_id"]: {
                 "total": int(row["total_trainings"] or 0),
@@ -191,11 +201,7 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
                 "growth": min(100, int(sales_score * 0.8 + training_score * 0.2)),
             }
 
-            health_score = int(
-                compliance_score * 0.35
-                + sales_score * 0.40
-                + training_score * 0.25
-            )
+            health_score = int(compliance_score * 0.35 + sales_score * 0.40 + training_score * 0.25)
             level = _compute_level(health_score)
             trend = _compute_trend(sales["recent"], sales["prior"])
 
@@ -209,17 +215,19 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
             if training["total"] > 0 and training_score < 60:
                 risk_tags.append("培训完成率低")
 
-            result.append({
-                "store_id": sid,
-                "store_name": store["store_name"],
-                "region": store["region"] or "",
-                "city": store["city"] or "",
-                "level": level,
-                "health_score": health_score,
-                "radar": radar,
-                "trend": trend,
-                "risk_tags": risk_tags,
-            })
+            result.append(
+                {
+                    "store_id": sid,
+                    "store_name": store["store_name"],
+                    "region": store["region"] or "",
+                    "city": store["city"] or "",
+                    "level": level,
+                    "health_score": health_score,
+                    "radar": radar,
+                    "trend": trend,
+                    "risk_tags": risk_tags,
+                }
+            )
 
         return result
 
@@ -229,6 +237,7 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
 
 
 # ─── 端点 ────────────────────────────────────────────────────
+
 
 @router.get("/summary")
 async def store_health_summary(
@@ -301,7 +310,7 @@ async def store_health_list(
 
     total = len(filtered)
     offset = (page - 1) * size
-    items = filtered[offset: offset + size]
+    items = filtered[offset : offset + size]
 
     return {
         "ok": True,
@@ -365,13 +374,15 @@ async def store_health_detail(
 
     dimensions = []
     for dim_key, score in store["radar"].items():
-        dimensions.append({
-            "key": dim_key,
-            "label": _DIMENSION_LABELS[dim_key],
-            "score": score,
-            "max_score": 100,
-            "sub_metrics": sub_metrics_map.get(dim_key, []),
-        })
+        dimensions.append(
+            {
+                "key": dim_key,
+                "label": _DIMENSION_LABELS[dim_key],
+                "score": score,
+                "max_score": 100,
+                "sub_metrics": sub_metrics_map.get(dim_key, []),
+            }
+        )
 
     return {
         "ok": True,

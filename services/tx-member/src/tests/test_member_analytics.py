@@ -1,4 +1,5 @@
 """会员分析服务 (D4) 测试 — API 冒烟 + 服务逻辑单元测试"""
+
 import os
 import sys
 
@@ -16,6 +17,7 @@ client = TestClient(app)
 
 
 # ── API 冒烟测试 ──────────────────────────────────────────────
+
 
 class TestMemberGrowthAPI:
     def test_growth_ok(self):
@@ -95,28 +97,33 @@ class TestPreferenceInsightAPI:
 
 # ── 服务层单元测试（纯函数逻辑） ───────────────────────────────
 
+
 class TestChurnRiskCalculation:
     """验证流失风险分计算逻辑"""
 
     def test_high_risk_threshold(self):
         """>60天未消费应为高风险"""
         from services.member_analytics import CHURN_HIGH_RISK_DAYS, CHURN_MEDIUM_RISK_DAYS
+
         assert CHURN_HIGH_RISK_DAYS == 60
         assert CHURN_MEDIUM_RISK_DAYS == 30
 
     def test_safe_ratio_zero_denominator(self):
         from services.member_analytics import _safe_ratio
+
         assert _safe_ratio(100, 0) == 0.0
         assert _safe_ratio(0, 0) == 0.0
 
     def test_safe_ratio_normal(self):
         from services.member_analytics import _safe_ratio
+
         assert _safe_ratio(1, 4) == 0.25
         assert _safe_ratio(3, 10) == 0.3
 
     def test_frequency_bands_cover_all(self):
         """频次带必须无缝覆盖 1 到 999999"""
         from services.member_analytics import FREQUENCY_BANDS
+
         assert len(FREQUENCY_BANDS) >= 4
         assert FREQUENCY_BANDS[0][1] == 1  # 从 1 开始
         assert FREQUENCY_BANDS[-1][2] >= 999  # 覆盖到高频

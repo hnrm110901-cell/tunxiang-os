@@ -8,6 +8,7 @@
   - DB 连接失败时降级到 Mock 数据，保证 POS 不白屏
   - 所有降级均记录 structlog 警告
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,10 +17,9 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import Date, and_, cast, func, select, text, update
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.ontology.src.entities import Order, OrderItem
+from shared.ontology.src.entities import Order
 from shared.ontology.src.enums import OrderStatus
 
 from ..models.enums import TableStatus
@@ -226,9 +226,7 @@ class CashierService:
 
         # 金额校验
         if amount_fen < (order.final_amount_fen or 0):
-            raise ValueError(
-                f"支付金额 {amount_fen} 不足，应付 {order.final_amount_fen}"
-            )
+            raise ValueError(f"支付金额 {amount_fen} 不足，应付 {order.final_amount_fen}")
 
         # 更新订单状态
         now = datetime.now(timezone.utc)
@@ -293,9 +291,9 @@ class CashierService:
         ]
 
         # 总订单数
-        total_count = (await self.session.execute(
-            select(func.count(Order.id)).where(and_(*base_conditions))
-        )).scalar() or 0
+        total_count = (
+            await self.session.execute(select(func.count(Order.id)).where(and_(*base_conditions)))
+        ).scalar() or 0
 
         # 已完成订单数 + 营收
         completed_conditions = [*base_conditions, Order.status == OrderStatus.completed.value]
@@ -312,11 +310,11 @@ class CashierService:
         discount_fen = row[2] or 0
 
         # 已取消订单数
-        cancelled_count = (await self.session.execute(
-            select(func.count(Order.id)).where(
-                and_(*base_conditions, Order.status == OrderStatus.cancelled.value)
+        cancelled_count = (
+            await self.session.execute(
+                select(func.count(Order.id)).where(and_(*base_conditions, Order.status == OrderStatus.cancelled.value))
             )
-        )).scalar() or 0
+        ).scalar() or 0
 
         logger.info(
             "shift_summary_fetched",

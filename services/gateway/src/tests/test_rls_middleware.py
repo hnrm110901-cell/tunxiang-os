@@ -6,6 +6,7 @@
 - 合法 UUID 的 X-Tenant-ID 通过
 - 白名单路径（/health, /docs, /api/v1/auth/）免检
 """
+
 import os
 import sys
 
@@ -72,17 +73,13 @@ class TestTenantMiddlewareSecurity:
         assert body["error"]["code"] == "INVALID_TENANT"
 
     def test_valid_tenant_id_passes(self, client):
-        resp = client.get(
-            "/api/v1/trade/orders", headers={"X-Tenant-ID": VALID_TENANT}
-        )
+        resp = client.get("/api/v1/trade/orders", headers={"X-Tenant-ID": VALID_TENANT})
         assert resp.status_code == 200
         body = resp.json()
         assert body["tenant_id"] == VALID_TENANT
 
     def test_valid_tenant_on_another_route(self, client):
-        resp = client.get(
-            "/api/v1/menu/dishes", headers={"X-Tenant-ID": VALID_TENANT}
-        )
+        resp = client.get("/api/v1/menu/dishes", headers={"X-Tenant-ID": VALID_TENANT})
         assert resp.status_code == 200
 
 
@@ -107,25 +104,30 @@ class TestDatabaseTenantValidation:
 
     def test_none_raises(self):
         from shared.ontology.src.database import _validate_tenant_id
+
         with pytest.raises(ValueError, match="must not be empty"):
             _validate_tenant_id(None)
 
     def test_empty_string_raises(self):
         from shared.ontology.src.database import _validate_tenant_id
+
         with pytest.raises(ValueError, match="must not be empty"):
             _validate_tenant_id("")
 
     def test_whitespace_only_raises(self):
         from shared.ontology.src.database import _validate_tenant_id
+
         with pytest.raises(ValueError, match="must not be empty"):
             _validate_tenant_id("   ")
 
     def test_invalid_uuid_raises(self):
         from shared.ontology.src.database import _validate_tenant_id
+
         with pytest.raises(ValueError, match="valid UUID"):
             _validate_tenant_id("not-a-uuid-at-all")
 
     def test_valid_uuid_passes(self):
         from shared.ontology.src.database import _validate_tenant_id
+
         result = _validate_tenant_id(VALID_TENANT)
         assert result == VALID_TENANT

@@ -7,9 +7,10 @@
 
 前缀：/api/v1/org/compliance
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
@@ -43,6 +44,7 @@ class ScanRequest(BaseModel):
 
 # ─── RLS 辅助 ─────────────────────────────────────────────────────────────────
 
+
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
@@ -51,6 +53,7 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 
 # ─── DB 查询函数 ───────────────────────────────────────────────────────────────
+
 
 async def _query_expiring_certs(
     db: AsyncSession,
@@ -89,15 +92,17 @@ async def _query_expiring_certs(
                 severity = "medium"
             else:
                 severity = "low"
-            rows.append({
-                "document_id": d["document_id"],
-                "document_type": d["document_type"],
-                "employee_id": d["employee_id"],
-                "expiry_date": str(d["expiry_date"]) if d["expiry_date"] else None,
-                "days_remaining": days,
-                "severity": severity,
-                "category": "document",
-            })
+            rows.append(
+                {
+                    "document_id": d["document_id"],
+                    "document_type": d["document_type"],
+                    "employee_id": d["employee_id"],
+                    "expiry_date": str(d["expiry_date"]) if d["expiry_date"] else None,
+                    "days_remaining": days,
+                    "severity": severity,
+                    "category": "document",
+                }
+            )
         return rows
     except SQLAlchemyError:
         return []
@@ -144,13 +149,15 @@ async def _query_low_performers(
         rows = []
         for r in result.fetchall():
             d = dict(r._mapping)
-            rows.append({
-                "employee_id": d["employee_id"],
-                "category": "performance",
-                "severity": "high",
-                "avg_score": float(d["avg_score"]),
-                "consecutive_low_months": int(d["month_count"]),
-            })
+            rows.append(
+                {
+                    "employee_id": d["employee_id"],
+                    "category": "performance",
+                    "severity": "high",
+                    "avg_score": float(d["avg_score"]),
+                    "consecutive_low_months": int(d["month_count"]),
+                }
+            )
         return rows
     except SQLAlchemyError:
         return []
@@ -182,20 +189,23 @@ async def _query_attendance_anomalies(db: AsyncSession) -> list[dict[str, Any]]:
             absent = int(d.get("absent_days") or 0)
             late = int(d.get("late_days") or 0)
             severity = "high" if absent >= 5 else ("medium" if absent >= 3 else "low")
-            rows.append({
-                "employee_id": d["employee_id"],
-                "category": "attendance",
-                "severity": severity,
-                "absent_days": absent,
-                "late_days": late,
-                "total_days": int(d.get("total_days") or 0),
-            })
+            rows.append(
+                {
+                    "employee_id": d["employee_id"],
+                    "category": "attendance",
+                    "severity": severity,
+                    "absent_days": absent,
+                    "late_days": late,
+                    "total_days": int(d.get("total_days") or 0),
+                }
+            )
         return rows
     except SQLAlchemyError:
         return []
 
 
 # ─── 合规汇总构建 ──────────────────────────────────────────────────────────────
+
 
 async def _build_compliance_resp(
     db: AsyncSession,
@@ -238,6 +248,7 @@ async def _build_compliance_resp(
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
+
 @router.get("/alerts")
 async def get_compliance_alerts(
     severity: Optional[str] = Query(None, description="严重级别筛选"),
@@ -277,11 +288,13 @@ async def get_expiring_compliance_documents(
     """返回即将到期的证件列表（来自 employee_certificates）。"""
     await _set_rls(db, x_tenant_id)
     items = await _query_expiring_certs(db, threshold_days=threshold_days)
-    return _ok({
-        "items": items,
-        "threshold_days": threshold_days,
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
-    })
+    return _ok(
+        {
+            "items": items,
+            "threshold_days": threshold_days,
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 @router.get("/performance/low")
@@ -293,8 +306,10 @@ async def get_low_performance_employees(
     """返回低绩效员工列表（来自 payroll_records）。"""
     await _set_rls(db, x_tenant_id)
     items = await _query_low_performers(db, consecutive_months=consecutive_months)
-    return _ok({
-        "items": items,
-        "consecutive_months": consecutive_months,
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
-    })
+    return _ok(
+        {
+            "items": items,
+            "consecutive_months": consecutive_months,
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )

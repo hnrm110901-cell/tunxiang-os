@@ -1,4 +1,5 @@
 """桌台/订单状态机测试"""
+
 import os
 import sys
 
@@ -83,6 +84,7 @@ class TestOrderStateMachine:
 
     def test_9_states_defined(self):
         from services.state_machine import ORDER_STATES
+
         assert len(ORDER_STATES) == 9
 
 
@@ -92,7 +94,9 @@ class TestLifecycleValidation:
         assert result["valid"]
 
     def test_with_partial_serve(self):
-        result = validate_order_lifecycle(["draft", "placed", "preparing", "partial_served", "all_served", "pending_payment", "paid"])
+        result = validate_order_lifecycle(
+            ["draft", "placed", "preparing", "partial_served", "all_served", "pending_payment", "paid"]
+        )
         assert result["valid"]
 
     def test_invalid_skip(self):
@@ -105,7 +109,9 @@ class TestLifecycleValidation:
         assert result["valid"]
 
     def test_abnormal_recovery(self):
-        result = validate_order_lifecycle(["draft", "placed", "preparing", "abnormal", "preparing", "all_served", "pending_payment", "paid"])
+        result = validate_order_lifecycle(
+            ["draft", "placed", "preparing", "abnormal", "preparing", "all_served", "pending_payment", "paid"]
+        )
         assert result["valid"]
 
 

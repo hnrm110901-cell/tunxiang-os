@@ -11,6 +11,7 @@ POST /api/v1/members/{member_id}/stored-value/refund
   ≥ 1000分 → 赠 150分
   ≥ 500分  → 赠 50分
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,7 +32,7 @@ _BONUS_TIERS: list[tuple[int, int]] = [
     (300_000, 50_000),
     (200_000, 30_000),
     (100_000, 15_000),
-    (50_000,   5_000),
+    (50_000, 5_000),
 ]
 
 
@@ -59,6 +60,7 @@ def _err(msg: str, status: int = 400) -> HTTPException:
 
 
 # ── Pydantic 模型 ──────────────────────────────────────────────────────
+
 
 class RechargeReq(BaseModel):
     amount_fen: int
@@ -110,6 +112,7 @@ class RefundReq(BaseModel):
 
 
 # ── 工具函数 ───────────────────────────────────────────────────────────
+
 
 async def _get_or_create_account(
     db: AsyncSession,
@@ -199,6 +202,7 @@ async def _write_transaction(
 
 # ── GET 余额 + 最近20条流水 ────────────────────────────────────────────
 
+
 @router.get("/members/{member_id}/stored-value")
 async def get_stored_value(
     member_id: str,
@@ -206,9 +210,7 @@ async def get_stored_value(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(
-        text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id}
-    )
+    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
 
     account = await _get_or_create_account(db, tenant_id, member_id)
     await db.commit()
@@ -230,18 +232,21 @@ async def get_stored_value(
         if isinstance(t.get("created_at"), datetime):
             t["created_at"] = t["created_at"].isoformat()
 
-    return _ok({
-        "account_id": str(account["id"]),
-        "member_id": member_id,
-        "balance_fen": account["balance_fen"],
-        "frozen_fen": account["frozen_fen"],
-        "total_recharged_fen": account["total_recharged_fen"],
-        "total_consumed_fen": account["total_consumed_fen"],
-        "transactions": transactions,
-    })
+    return _ok(
+        {
+            "account_id": str(account["id"]),
+            "member_id": member_id,
+            "balance_fen": account["balance_fen"],
+            "frozen_fen": account["frozen_fen"],
+            "total_recharged_fen": account["total_recharged_fen"],
+            "total_consumed_fen": account["total_consumed_fen"],
+            "transactions": transactions,
+        }
+    )
 
 
 # ── POST 充值 ──────────────────────────────────────────────────────────
+
 
 @router.post("/members/{member_id}/stored-value/recharge")
 async def recharge(
@@ -251,9 +256,7 @@ async def recharge(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(
-        text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id}
-    )
+    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
 
     account = await _get_or_create_account(db, tenant_id, member_id)
     account_id = str(account["id"])
@@ -297,16 +300,19 @@ async def recharge(
 
     await db.commit()
 
-    return _ok({
-        "transaction_id": txn_id,
-        "amount_fen": body.amount_fen,
-        "bonus_fen": bonus_fen,
-        "total_credited_fen": total_credit,
-        "balance_after_fen": balance_after,
-    })
+    return _ok(
+        {
+            "transaction_id": txn_id,
+            "amount_fen": body.amount_fen,
+            "bonus_fen": bonus_fen,
+            "total_credited_fen": total_credit,
+            "balance_after_fen": balance_after,
+        }
+    )
 
 
 # ── POST 消费扣款 ──────────────────────────────────────────────────────
+
 
 @router.post("/members/{member_id}/stored-value/consume")
 async def consume(
@@ -316,9 +322,7 @@ async def consume(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(
-        text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id}
-    )
+    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
 
     # 先确保账户存在（只创建，不用于扣款判断）
     account = await _get_or_create_account(db, tenant_id, member_id)
@@ -352,11 +356,13 @@ async def consume(
         balance_now = cur_row["balance_fen"] if cur_row else account["balance_fen"]
         frozen_now = cur_row["frozen_fen"] if cur_row else account["frozen_fen"]
         available = balance_now - frozen_now
-        return _ok({
-            "success": False,
-            "balance_after_fen": balance_now,
-            "insufficient_fen": max(0, body.amount_fen - available),
-        })
+        return _ok(
+            {
+                "success": False,
+                "balance_after_fen": balance_now,
+                "insufficient_fen": max(0, body.amount_fen - available),
+            }
+        )
 
     balance_before = row["balance_before_fen"]
     balance_after = row["balance_after_fen"]
@@ -377,15 +383,18 @@ async def consume(
 
     await db.commit()
 
-    return _ok({
-        "success": True,
-        "transaction_id": txn_id,
-        "balance_after_fen": balance_after,
-        "insufficient_fen": 0,
-    })
+    return _ok(
+        {
+            "success": True,
+            "transaction_id": txn_id,
+            "balance_after_fen": balance_after,
+            "insufficient_fen": 0,
+        }
+    )
 
 
 # ── POST 退款回储值 ────────────────────────────────────────────────────
+
 
 @router.post("/members/{member_id}/stored-value/refund")
 async def refund(
@@ -395,9 +404,7 @@ async def refund(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(
-        text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id}
-    )
+    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
 
     # 校验原始消费流水
     orig_row = await db.execute(
@@ -455,8 +462,10 @@ async def refund(
 
     await db.commit()
 
-    return _ok({
-        "transaction_id": txn_id,
-        "refunded_fen": body.amount_fen,
-        "balance_after_fen": balance_after,
-    })
+    return _ok(
+        {
+            "transaction_id": txn_id,
+            "refunded_fen": body.amount_fen,
+            "balance_after_fen": balance_after,
+        }
+    )

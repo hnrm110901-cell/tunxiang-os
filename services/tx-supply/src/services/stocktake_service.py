@@ -12,6 +12,7 @@
 - stocktake_items 表 — 盘点明细（每原料一行）
 - 若 v064 迁移未运行（表不存在），自动降级到内存模式并记录 WARNING
 """
+
 from __future__ import annotations
 
 import uuid
@@ -470,16 +471,18 @@ async def finalize_stocktake(
                     )
                     db.add(txn)
 
-            details.append({
-                "ingredient_id": str(item["ingredient_id"]),
-                "ingredient_name": item["ingredient_name"],
-                "unit": item["unit"],
-                "system_qty": system_qty,
-                "actual_qty": actual_qty,
-                "variance": variance,
-                "variance_cost_fen": int(abs(variance) * unit_price),  # unit_price 已是分
-                "status": status,
-            })
+            details.append(
+                {
+                    "ingredient_id": str(item["ingredient_id"]),
+                    "ingredient_name": item["ingredient_name"],
+                    "unit": item["unit"],
+                    "system_qty": system_qty,
+                    "actual_qty": actual_qty,
+                    "variance": variance,
+                    "variance_cost_fen": int(abs(variance) * unit_price),  # unit_price 已是分
+                    "status": status,
+                }
+            )
 
     now_finalized = datetime.now(timezone.utc)
 
@@ -578,8 +581,12 @@ async def get_stocktake_history(
                 "stocktake_id": str(r["stocktake_id"]),
                 "store_id": str(r["store_id"]),
                 "status": r["status"],
-                "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
-                "finalized_at": r["completed_at"].isoformat() if r["completed_at"] and hasattr(r["completed_at"], "isoformat") else r["completed_at"],
+                "created_at": r["created_at"].isoformat()
+                if hasattr(r["created_at"], "isoformat")
+                else str(r["created_at"]),
+                "finalized_at": r["completed_at"].isoformat()
+                if r["completed_at"] and hasattr(r["completed_at"], "isoformat")
+                else r["completed_at"],
                 "item_count": r["item_count"],
             }
             for r in rows

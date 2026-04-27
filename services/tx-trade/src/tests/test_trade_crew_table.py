@@ -18,6 +18,7 @@ table_layout_routes.py（8个）：
 11. POST /api/v1/tables/{table_id}/transfer                 — 正常换台，返回 success=True
 12. POST /api/v1/tables/{table_id}/transfer                 — 服务层抛 ValueError → 400
 """
+
 import os
 import sys
 import types
@@ -25,8 +26,8 @@ import uuid
 
 # ─── 路径准备 ─────────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -34,6 +35,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 包层级建立 ───────────────────────────────────────────────────────────────
+
 
 def _ensure_pkg(name: str, path: str) -> None:
     if name not in sys.modules:
@@ -43,9 +45,9 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
-_ensure_pkg("src.routers",  os.path.join(_SRC_DIR, "routers"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src.routers", os.path.join(_SRC_DIR, "routers"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 
@@ -64,6 +66,7 @@ def _stub_module(full_name: str, **attrs):
 # TableLayoutService 方法在路由测试中通过 patch 覆盖，
 # 但需要先让 import 能成功，因此注入存根。
 
+
 class _FakeTableLayoutService:
     def __init__(self, db):
         pass
@@ -78,31 +81,30 @@ _tls_mod = _stub_module(
 # ─── 正式导入 ──────────────────────────────────────────────────────────────────
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db  # type: ignore
 from src.api.crew_handover_router import router as crew_handover_router  # type: ignore
-from src.api.table_layout_routes import router as table_layout_router    # type: ignore
-from shared.ontology.src.database import get_db                          # type: ignore
+from src.api.table_layout_routes import router as table_layout_router  # type: ignore
 
 # ─── 常量 ─────────────────────────────────────────────────────────────────────
 
-TENANT_ID  = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-STORE_ID   = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-TABLE_ID   = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+STORE_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+TABLE_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 OPERATOR_ID = "op-001"
-HEADERS    = {"X-Tenant-ID": TENANT_ID}
+HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
 
+
 def _make_mock_db() -> AsyncMock:
     db = AsyncMock()
-    db.commit   = AsyncMock()
+    db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute  = AsyncMock(return_value=MagicMock())
+    db.execute = AsyncMock(return_value=MagicMock())
     return db
 
 
@@ -132,6 +134,7 @@ def _make_app_table(db: AsyncMock) -> FastAPI:
 # 场景 1: GET /api/v1/crew/shift-summary — 正常获取班次摘要
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_shift_summary_success():
     """GET /crew/shift-summary：返回当前服务员本班摘要，含 crew_id、revenue 等字段。"""
     db = _make_mock_db()
@@ -154,6 +157,7 @@ def test_get_shift_summary_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 2: POST /api/v1/crew/handover — 正常提交交班记录
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_submit_handover_success():
     """POST /crew/handover：正常提交，返回 handover_id + message='交班完成'。"""
@@ -191,6 +195,7 @@ def test_submit_handover_success():
 # 场景 3: POST /api/v1/crew/handover — crew_id 为空 → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_submit_handover_empty_crew_id():
     """crew_id 为空字符串时，路由层应返回 400 Bad Request。"""
     db = _make_mock_db()
@@ -219,6 +224,7 @@ def test_submit_handover_empty_crew_id():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 4: POST /api/v1/crew/handover — DB commit 异常 → 500
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_submit_handover_db_error():
     """DB commit 时抛出异常，路由应返回 500。"""
@@ -249,6 +255,7 @@ def test_submit_handover_db_error():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 桌台布局 mock 辅助
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def _make_fake_floor_summary():
     """构造一个 TableLayoutSummary mock 对象。"""
@@ -310,14 +317,13 @@ def _make_fake_transfer_result():
 # 场景 5: GET /api/v1/tables/layout/{store_id}/floors — 正常返回楼层列表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_floors_success():
     """GET /tables/layout/{store_id}/floors：返回门店楼层摘要列表。"""
     db = _make_mock_db()
     fake_floor = _make_fake_floor_summary()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
         instance.get_all_floors = AsyncMock(return_value=[fake_floor])
 
@@ -340,14 +346,13 @@ def test_get_floors_success():
 # 场景 6: GET /api/v1/tables/layout/{store_id}/floor/{floor_no} — 正常返回布局
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_floor_layout_success():
     """GET /tables/layout/{store_id}/floor/1：返回指定楼层完整布局。"""
     db = _make_mock_db()
     fake_layout = _make_fake_layout()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
         instance.get_layout = AsyncMock(return_value=fake_layout)
 
@@ -369,13 +374,12 @@ def test_get_floor_layout_success():
 # 场景 7: GET /floor/{floor_no} — 布局不存在 → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_floor_layout_not_found():
     """服务层返回 None 时，路由应返回 404（布局不存在）。"""
     db = _make_mock_db()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
         instance.get_layout = AsyncMock(return_value=None)
 
@@ -392,14 +396,13 @@ def test_get_floor_layout_not_found():
 # 场景 8: PUT /api/v1/tables/layout/{store_id}/floor/{floor_no} — 保存成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_upsert_floor_layout_success():
     """PUT /tables/layout/{store_id}/floor/1：保存布局，版本号自动递增。"""
     db = _make_mock_db()
     fake_layout = _make_fake_layout()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
         instance.upsert_layout = AsyncMock(return_value=fake_layout)
 
@@ -424,6 +427,7 @@ def test_upsert_floor_layout_success():
 # 场景 9: PUT /tables/layout — 缺少 X-Tenant-ID → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_upsert_floor_layout_missing_tenant_id():
     """缺少 X-Tenant-ID header 时应返回 400。"""
     db = _make_mock_db()
@@ -444,14 +448,13 @@ def test_upsert_floor_layout_missing_tenant_id():
 # 场景 10: GET /api/v1/tables/status/{store_id} — 返回桌台实时状态
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_realtime_status_success():
     """GET /tables/status/{store_id}：返回全店桌台实时状态列表。"""
     db = _make_mock_db()
     fake_status = _make_fake_table_status()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
         instance.get_realtime_status = AsyncMock(return_value=[fake_status])
 
@@ -474,14 +477,13 @@ def test_get_realtime_status_success():
 # 场景 11: POST /api/v1/tables/{table_id}/transfer — 正常换台
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_transfer_table_success():
     """POST /tables/{table_id}/transfer：将订单换到另一桌，返回 success=True。"""
     db = _make_mock_db()
     fake_result = _make_fake_transfer_result()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
         instance.transfer_table = AsyncMock(return_value=fake_result)
 
@@ -506,17 +508,14 @@ def test_transfer_table_success():
 # 场景 12: POST /tables/{table_id}/transfer — 服务层抛 ValueError → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_transfer_table_value_error():
     """服务层抛 ValueError 时（如目标桌已有订单），路由应返回 400。"""
     db = _make_mock_db()
 
-    with patch(
-        "src.api.table_layout_routes.TableLayoutService"
-    ) as MockSvc:
+    with patch("src.api.table_layout_routes.TableLayoutService") as MockSvc:
         instance = MockSvc.return_value
-        instance.transfer_table = AsyncMock(
-            side_effect=ValueError("目标桌台已有进行中的订单")
-        )
+        instance.transfer_table = AsyncMock(side_effect=ValueError("目标桌台已有进行中的订单"))
 
         client = TestClient(_make_app_table(db))
         resp = client.post(

@@ -8,6 +8,7 @@ DB金额单位：分(int)  — 无需转换
   1 → completed（已结账）
   2 → cancelled（已退单）
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -150,18 +151,20 @@ def pinzhi_order_items_to_db(
         qty = _safe_int(dish.get("dishNum", dish.get("quantity", 1)), 1)
         dish_id_raw = dish.get("dishId", f"{raw_order.get('billId', '')}_{idx}")
 
-        items.append({
-            "id": str(uuid4()),
-            "tenant_id": str(tenant_id),
-            "order_id": order_id,
-            "item_name": str(dish.get("dishName", "")),
-            "quantity": qty,
-            "unit_price_fen": unit_price_fen,
-            "subtotal_fen": unit_price_fen * qty,
-            "notes": dish.get("remark"),
-            "customizations": {
-                "pinzhi_dish_id": str(dish_id_raw),
-                "category": dish.get("categoryName", ""),
-            },
-        })
+        items.append(
+            {
+                "id": str(uuid4()),
+                "tenant_id": str(tenant_id),
+                "order_id": order_id,
+                "item_name": str(dish.get("dishName", "")),
+                "quantity": qty,
+                "unit_price_fen": unit_price_fen,
+                "subtotal_fen": unit_price_fen * qty,
+                "notes": dish.get("remark"),
+                "customizations": {
+                    "pinzhi_dish_id": str(dish_id_raw),
+                    "category": dish.get("categoryName", ""),
+                },
+            }
+        )
     return items

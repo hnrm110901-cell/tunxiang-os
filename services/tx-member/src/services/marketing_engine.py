@@ -11,6 +11,7 @@
 
 金额单位：分(fen)
 """
+
 from typing import Any
 
 SCHEME_TYPES = [
@@ -28,6 +29,7 @@ SCHEME_TYPES = [
 # 工具函数
 # ---------------------------------------------------------------------------
 
+
 def _items_total_fen(items: list[dict]) -> int:
     """计算 items 列表的总金额（分）"""
     return sum(it["price_fen"] * it.get("quantity", 1) for it in items)
@@ -40,6 +42,7 @@ def _empty_result() -> dict:
 # ---------------------------------------------------------------------------
 # 1. 特价优惠
 # ---------------------------------------------------------------------------
+
 
 def calculate_special_price(items: list[dict], rules: dict) -> dict:
     """特价优惠：指定菜品以特价出售。
@@ -64,14 +67,16 @@ def calculate_special_price(items: list[dict], rules: dict) -> dict:
             saved = (item["price_fen"] - special) * qty
             if saved > 0:
                 discount_fen += saved
-                details.append({
-                    "dish_id": did,
-                    "name": item.get("name", ""),
-                    "original_fen": item["price_fen"],
-                    "special_fen": special,
-                    "quantity": qty,
-                    "saved_fen": saved,
-                })
+                details.append(
+                    {
+                        "dish_id": did,
+                        "name": item.get("name", ""),
+                        "original_fen": item["price_fen"],
+                        "special_fen": special,
+                        "quantity": qty,
+                        "saved_fen": saved,
+                    }
+                )
 
     return {
         "discount_fen": discount_fen,
@@ -83,6 +88,7 @@ def calculate_special_price(items: list[dict], rules: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 2. 买赠优惠（买N赠M）
 # ---------------------------------------------------------------------------
+
 
 def calculate_buy_gift(items: list[dict], rules: dict) -> dict:
     """买赠优惠。
@@ -101,9 +107,7 @@ def calculate_buy_gift(items: list[dict], rules: dict) -> dict:
     gift_count: int = rules.get("gift_count", 1)
     gift_price_fen: int = rules.get("gift_price_fen", 0)
 
-    total_buy_qty = sum(
-        it.get("quantity", 1) for it in items if it["dish_id"] == buy_dish_id
-    )
+    total_buy_qty = sum(it.get("quantity", 1) for it in items if it["dish_id"] == buy_dish_id)
 
     times = total_buy_qty // buy_count  # 满足几次
     if times <= 0:
@@ -114,15 +118,17 @@ def calculate_buy_gift(items: list[dict], rules: dict) -> dict:
 
     return {
         "discount_fen": discount_fen,
-        "details": [{
-            "type": "buy_gift",
-            "buy_dish_id": buy_dish_id,
-            "buy_count": buy_count,
-            "times": times,
-            "gifted_count": gifted,
-            "gift_dish_id": rules.get("gift_dish_id", ""),
-            "saved_fen": discount_fen,
-        }],
+        "details": [
+            {
+                "type": "buy_gift",
+                "buy_dish_id": buy_dish_id,
+                "buy_count": buy_count,
+                "times": times,
+                "gifted_count": gifted,
+                "gift_dish_id": rules.get("gift_dish_id", ""),
+                "saved_fen": discount_fen,
+            }
+        ],
         "applied_schemes": ["buy_gift"] if discount_fen > 0 else [],
     }
 
@@ -130,6 +136,7 @@ def calculate_buy_gift(items: list[dict], rules: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 3. 加价换购
 # ---------------------------------------------------------------------------
+
 
 def calculate_add_on(items: list[dict], rules: dict) -> dict:
     """加价换购：订单满足条件后，可低价换购指定商品。
@@ -158,14 +165,16 @@ def calculate_add_on(items: list[dict], rules: dict) -> dict:
     discount_fen = saved_per * max_count
     return {
         "discount_fen": discount_fen,
-        "details": [{
-            "type": "add_on",
-            "add_on_dish_id": rules.get("add_on_dish_id", ""),
-            "add_on_price_fen": add_on_price,
-            "original_price_fen": original,
-            "count": max_count,
-            "saved_fen": discount_fen,
-        }],
+        "details": [
+            {
+                "type": "add_on",
+                "add_on_dish_id": rules.get("add_on_dish_id", ""),
+                "add_on_price_fen": add_on_price,
+                "original_price_fen": original,
+                "count": max_count,
+                "saved_fen": discount_fen,
+            }
+        ],
         "applied_schemes": ["add_on"],
     }
 
@@ -173,6 +182,7 @@ def calculate_add_on(items: list[dict], rules: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 4. 再买优惠（第二份半价等）
 # ---------------------------------------------------------------------------
+
 
 def calculate_rebuy(items: list[dict], rules: dict) -> dict:
     """再买优惠：同一菜品第 N 份享折扣。
@@ -204,14 +214,16 @@ def calculate_rebuy(items: list[dict], rules: dict) -> dict:
 
     return {
         "discount_fen": discount_fen,
-        "details": [{
-            "type": "rebuy",
-            "dish_id": dish_id,
-            "nth": nth,
-            "discount_rate": discount_rate,
-            "discounted_count": discounted_count,
-            "saved_fen": discount_fen,
-        }],
+        "details": [
+            {
+                "type": "rebuy",
+                "dish_id": dish_id,
+                "nth": nth,
+                "discount_rate": discount_rate,
+                "discounted_count": discounted_count,
+                "saved_fen": discount_fen,
+            }
+        ],
         "applied_schemes": ["rebuy"] if discount_fen > 0 else [],
     }
 
@@ -219,6 +231,7 @@ def calculate_rebuy(items: list[dict], rules: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 5. 会员优惠
 # ---------------------------------------------------------------------------
+
 
 def calculate_member_discount(
     items: list[dict],
@@ -250,14 +263,16 @@ def calculate_member_discount(
 
     return {
         "discount_fen": discount_fen,
-        "details": [{
-            "type": "member",
-            "member_level": member_level,
-            "rate": rate,
-            "original_total_fen": order_total,
-            "discounted_total_fen": discounted_total,
-            "saved_fen": discount_fen,
-        }],
+        "details": [
+            {
+                "type": "member",
+                "member_level": member_level,
+                "rate": rate,
+                "original_total_fen": order_total,
+                "discounted_total_fen": discounted_total,
+                "saved_fen": discount_fen,
+            }
+        ],
         "applied_schemes": ["member"] if discount_fen > 0 else [],
     }
 
@@ -265,6 +280,7 @@ def calculate_member_discount(
 # ---------------------------------------------------------------------------
 # 6. 订单折扣（整单打折）
 # ---------------------------------------------------------------------------
+
 
 def calculate_order_discount(order_total_fen: int, rules: dict) -> dict:
     """整单打折。
@@ -283,13 +299,15 @@ def calculate_order_discount(order_total_fen: int, rules: dict) -> dict:
 
     return {
         "discount_fen": discount_fen,
-        "details": [{
-            "type": "order_discount",
-            "rate": rate,
-            "original_fen": order_total_fen,
-            "discounted_fen": discounted,
-            "saved_fen": discount_fen,
-        }],
+        "details": [
+            {
+                "type": "order_discount",
+                "rate": rate,
+                "original_fen": order_total_fen,
+                "discounted_fen": discounted,
+                "saved_fen": discount_fen,
+            }
+        ],
         "applied_schemes": ["order_discount"] if discount_fen > 0 else [],
     }
 
@@ -297,6 +315,7 @@ def calculate_order_discount(order_total_fen: int, rules: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 7. 满减优惠
 # ---------------------------------------------------------------------------
+
 
 def calculate_threshold(order_total_fen: int, rules: dict) -> dict:
     """满减优惠：达到门槛后减免固定金额。
@@ -322,12 +341,14 @@ def calculate_threshold(order_total_fen: int, rules: dict) -> dict:
             reduce = tier["reduce_fen"]
             return {
                 "discount_fen": reduce,
-                "details": [{
-                    "type": "threshold",
-                    "threshold_fen": tier["threshold_fen"],
-                    "reduce_fen": reduce,
-                    "order_total_fen": order_total_fen,
-                }],
+                "details": [
+                    {
+                        "type": "threshold",
+                        "threshold_fen": tier["threshold_fen"],
+                        "reduce_fen": reduce,
+                        "order_total_fen": order_total_fen,
+                    }
+                ],
                 "applied_schemes": ["threshold"],
             }
 
@@ -337,6 +358,7 @@ def calculate_threshold(order_total_fen: int, rules: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 互斥规则检查
 # ---------------------------------------------------------------------------
+
 
 def check_exclusion(
     scheme_a: str,
@@ -373,6 +395,7 @@ _CALCULATORS: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 # 执行顺序引擎
 # ---------------------------------------------------------------------------
+
 
 def apply_schemes_in_order(
     items: list[dict],
@@ -421,10 +444,12 @@ def apply_schemes_in_order(
         for applied_type in applied:
             if check_exclusion(stype, applied_type, excl):
                 excluded = True
-                skipped.append({
-                    "scheme_type": stype,
-                    "reason": f"与已应用的 {applied_type} 互斥",
-                })
+                skipped.append(
+                    {
+                        "scheme_type": stype,
+                        "reason": f"与已应用的 {applied_type} 互斥",
+                    }
+                )
                 break
 
         if excluded:

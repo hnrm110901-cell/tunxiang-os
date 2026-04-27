@@ -7,6 +7,7 @@
 4. 记录决策日志（AgentDecisionLog）
 5. 返回：允许/警告/拒绝 + 理由
 """
+
 from __future__ import annotations
 
 import json
@@ -105,16 +106,16 @@ class DiscountGuardianAgent:
         discounted_price = original_price_fen * discount_rate / 100
 
         return f"""折扣事件：
-- 操作员：{event.get('operator_id')} ({event.get('operator_role')})
-- 菜品：{event.get('dish_name')} 原价 {original_price_fen / 100:.2f}元
-- 折扣类型：{event.get('discount_type')} 折扣率：{discount_rate}
+- 操作员：{event.get("operator_id")} ({event.get("operator_role")})
+- 菜品：{event.get("dish_name")} 原价 {original_price_fen / 100:.2f}元
+- 折扣类型：{event.get("discount_type")} 折扣率：{discount_rate}
 - 折后价：{discounted_price:.2f}元
-- 桌号：{event.get('table_no')} 订单：{event.get('order_id')}
+- 桌号：{event.get("table_no")} 订单：{event.get("order_id")}
 
 近期折扣历史（最近{len(history)}条）：
 {self._format_history(history)}
 
-菜品毛利率（从dish BOM）：{event.get('margin_rate', '未知')}
+菜品毛利率（从dish BOM）：{event.get("margin_rate", "未知")}
 """
 
     def _format_history(self, history: list[dict]) -> str:
@@ -156,7 +157,6 @@ class DiscountGuardianAgent:
             },
         }
 
-
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """从 mv_discount_health 快速读取最近折扣健康数据，<5ms，无 Claude 调用。
 
@@ -165,6 +165,7 @@ class DiscountGuardianAgent:
         """
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
+
         from shared.ontology.src.database import get_db
 
         try:
@@ -216,7 +217,9 @@ class DiscountGuardianAgent:
                     "inference_layer": "mv_fast_path",
                     "data": data,
                     "agent": self.__class__.__name__,
-                    "risk_signal": "high" if data.get("unauthorized_count", 0) > 0 or data.get("threshold_breaches", 0) > 0 else "normal",
+                    "risk_signal": "high"
+                    if data.get("unauthorized_count", 0) > 0 or data.get("threshold_breaches", 0) > 0
+                    else "normal",
                 }
         except SQLAlchemyError as exc:
             logger.warning(

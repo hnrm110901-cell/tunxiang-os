@@ -67,10 +67,15 @@ class TestKPIAnalysis:
         老项目: calculate_performance 返回 total_score
         新项目: snapshot_kpi 返回 overall_completion_pct
         """
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 100000, "orders": 200, "satisfaction": 4.8},
-            "targets": {"revenue": 100000, "orders": 200, "satisfaction": 4.5},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 100000, "orders": 200, "satisfaction": 4.8},
+                    "targets": {"revenue": 100000, "orders": 200, "satisfaction": 4.5},
+                },
+            )
+        )
         assert result.success is True
         assert result.data["overall_completion_pct"] >= 95
 
@@ -79,14 +84,24 @@ class TestKPIAnalysis:
 
         迁移自: test_underperforming_score_lower
         """
-        result_good = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 100000, "orders": 200},
-            "targets": {"revenue": 100000, "orders": 200},
-        }))
-        result_bad = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 50000, "orders": 80},
-            "targets": {"revenue": 100000, "orders": 200},
-        }))
+        result_good = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 100000, "orders": 200},
+                    "targets": {"revenue": 100000, "orders": 200},
+                },
+            )
+        )
+        result_bad = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 50000, "orders": 80},
+                    "targets": {"revenue": 100000, "orders": 200},
+                },
+            )
+        )
         assert result_good.data["overall_completion_pct"] > result_bad.data["overall_completion_pct"]
 
     def test_serve_time_lower_is_better(self, serve_agent):
@@ -97,23 +112,42 @@ class TestKPIAnalysis:
         新项目: estimated_serve_minutes 越小越好，通过出餐时限约束验证
         """
         # 简单订单应该快速出餐
-        result = asyncio.run(serve_agent.execute("predict_serve_time", {
-            "dish_count": 2,
-            "has_complex_dish": False,
-            "kitchen_queue_size": 0,
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "predict_serve_time",
+                {
+                    "dish_count": 2,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 0,
+                },
+            )
+        )
         assert result.success is True
         # 2道简单菜，无排队: 5 + 2*2.5 = 10 分钟
         assert result.data["estimated_serve_minutes"] <= 15
 
     def test_complex_order_longer_serve_time(self, serve_agent):
         """复杂订单出餐时间应更长"""
-        result_simple = asyncio.run(serve_agent.execute("predict_serve_time", {
-            "dish_count": 3, "has_complex_dish": False, "kitchen_queue_size": 0,
-        }))
-        result_complex = asyncio.run(serve_agent.execute("predict_serve_time", {
-            "dish_count": 3, "has_complex_dish": True, "kitchen_queue_size": 0,
-        }))
+        result_simple = asyncio.run(
+            serve_agent.execute(
+                "predict_serve_time",
+                {
+                    "dish_count": 3,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 0,
+                },
+            )
+        )
+        result_complex = asyncio.run(
+            serve_agent.execute(
+                "predict_serve_time",
+                {
+                    "dish_count": 3,
+                    "has_complex_dish": True,
+                    "kitchen_queue_size": 0,
+                },
+            )
+        )
         assert result_complex.data["estimated_serve_minutes"] > result_simple.data["estimated_serve_minutes"]
 
 
@@ -132,20 +166,30 @@ class TestOrderTrendAnalysis:
 
         迁移自: test_multi_role_report_ranking (报表汇总能力)
         """
-        result = asyncio.run(finance_agent.execute("analyze_order_trend", {
-            "daily_orders": [100, 110, 120, 130, 140],
-            "daily_revenue_fen": [500000, 550000, 600000, 650000, 700000],
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "analyze_order_trend",
+                {
+                    "daily_orders": [100, 110, 120, 130, 140],
+                    "daily_revenue_fen": [500000, 550000, 600000, 650000, 700000],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["order_trend"] == "up"
         assert result.data["avg_ticket_yuan"] > 0
 
     def test_downward_trend_detected(self, finance_agent):
         """下降趋势检测"""
-        result = asyncio.run(finance_agent.execute("analyze_order_trend", {
-            "daily_orders": [200, 180, 160, 140, 120],
-            "daily_revenue_fen": [1000000, 900000, 800000, 700000, 600000],
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "analyze_order_trend",
+                {
+                    "daily_orders": [200, 180, 160, 140, 120],
+                    "daily_revenue_fen": [1000000, 900000, 800000, 700000, 600000],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["order_trend"] == "down"
 
@@ -154,11 +198,15 @@ class TestOrderTrendAnalysis:
 
         迁移自: test_single_role_report (单岗位报表 -> 单维度预测)
         """
-        result = asyncio.run(finance_agent.execute("forecast_orders", {
-            "daily_orders": [150, 140, 160, 180, 200, 190, 170,
-                             155, 145, 165, 175, 195, 185, 175],
-            "days_ahead": 7,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "forecast_orders",
+                {
+                    "daily_orders": [150, 140, 160, 180, 200, 190, 170, 155, 145, 165, 175, 195, 185, 175],
+                    "days_ahead": 7,
+                },
+            )
+        )
         assert result.success is True
         assert len(result.data["daily_forecast"]) == 7
         assert result.data["total_forecast"] > 0
@@ -178,12 +226,24 @@ class TestMultiStoreComparison:
         agent_a = FinanceAuditAgent(tenant_id=TID, store_id="STORE_A")
         agent_b = FinanceAuditAgent(tenant_id=TID, store_id="STORE_B")
 
-        result_a = asyncio.run(agent_a.execute("snapshot_kpi", {
-            "kpis": {"revenue": 100000}, "targets": {"revenue": 100000},
-        }))
-        result_b = asyncio.run(agent_b.execute("snapshot_kpi", {
-            "kpis": {"revenue": 50000}, "targets": {"revenue": 100000},
-        }))
+        result_a = asyncio.run(
+            agent_a.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 100000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
+        result_b = asyncio.run(
+            agent_b.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 50000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
 
         assert result_a.success is True
         assert result_b.success is True
@@ -207,14 +267,30 @@ class TestMultiStoreComparison:
         master.register(FinanceAuditAgent(tenant_id=TID, store_id="STORE001"))
         master.register(SmartMenuAgent(tenant_id=TID, store_id="STORE001"))
 
-        results = asyncio.run(master.multi_agent_execute([
-            {"agent_id": "finance_audit", "action": "snapshot_kpi", "params": {
-                "kpis": {"revenue": 95000}, "targets": {"revenue": 100000},
-            }},
-            {"agent_id": "smart_menu", "action": "classify_quadrant", "params": {
-                "total_sales": 200, "margin_rate": 0.5, "avg_sales": 100, "avg_margin": 0.3,
-            }},
-        ]))
+        results = asyncio.run(
+            master.multi_agent_execute(
+                [
+                    {
+                        "agent_id": "finance_audit",
+                        "action": "snapshot_kpi",
+                        "params": {
+                            "kpis": {"revenue": 95000},
+                            "targets": {"revenue": 100000},
+                        },
+                    },
+                    {
+                        "agent_id": "smart_menu",
+                        "action": "classify_quadrant",
+                        "params": {
+                            "total_sales": 200,
+                            "margin_rate": 0.5,
+                            "avg_sales": 100,
+                            "avg_margin": 0.3,
+                        },
+                    },
+                ]
+            )
+        )
         assert len(results) == 2
         assert all(r.success for r in results)
 
@@ -230,10 +306,15 @@ class TestEdgeCases:
 
         迁移自: test_extreme_high_value
         """
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 999999},
-            "targets": {"revenue": 100},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 999999},
+                    "targets": {"revenue": 100},
+                },
+            )
+        )
         assert 0 <= result.confidence <= 1.0
 
     def test_all_agent_actions_no_crash(self, serve_agent):
@@ -251,20 +332,30 @@ class TestEdgeCases:
 
     def test_empty_traffic_data_fails_gracefully(self, serve_agent):
         """空客流数据应优雅失败"""
-        result = asyncio.run(serve_agent.execute("analyze_traffic", {
-            "hourly_customers": [1, 2, 3],  # 少于12小时
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "analyze_traffic",
+                {
+                    "hourly_customers": [1, 2, 3],  # 少于12小时
+                },
+            )
+        )
         assert result.success is False
 
     def test_workload_balance(self, serve_agent):
         """工作量平衡检测"""
-        result = asyncio.run(serve_agent.execute("balance_workload", {
-            "staff_loads": [
-                {"name": "张三", "current_orders": 15},
-                {"name": "李四", "current_orders": 3},
-                {"name": "王五", "current_orders": 8},
-            ],
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "balance_workload",
+                {
+                    "staff_loads": [
+                        {"name": "张三", "current_orders": 15},
+                        {"name": "李四", "current_orders": 3},
+                        {"name": "王五", "current_orders": 8},
+                    ],
+                },
+            )
+        )
         assert result.success is True
         assert result.data["balance_score"] >= 0
         assert len(result.data["overloaded"]) > 0  # 张三超载
@@ -276,17 +367,33 @@ class TestEdgeCases:
         迁移自: 绩效评估的评级逻辑
         """
         # keep: 高毛利+高销量+低退菜+低差评
-        result = asyncio.run(menu_agent.execute("run_dish_review", {
-            "total_sales": 200, "return_count": 2, "bad_review_count": 5,
-            "margin_rate": 0.35, "category_avg_sales": 100,
-        }))
+        result = asyncio.run(
+            menu_agent.execute(
+                "run_dish_review",
+                {
+                    "total_sales": 200,
+                    "return_count": 2,
+                    "bad_review_count": 5,
+                    "margin_rate": 0.35,
+                    "category_avg_sales": 100,
+                },
+            )
+        )
         assert result.data["verdict"] == "keep"
 
         # retire: 低销量
-        result = asyncio.run(menu_agent.execute("run_dish_review", {
-            "total_sales": 30, "return_count": 5, "bad_review_count": 3,
-            "margin_rate": 0.15, "category_avg_sales": 100,
-        }))
+        result = asyncio.run(
+            menu_agent.execute(
+                "run_dish_review",
+                {
+                    "total_sales": 30,
+                    "return_count": 5,
+                    "bad_review_count": 3,
+                    "margin_rate": 0.15,
+                    "category_avg_sales": 100,
+                },
+            )
+        )
         assert result.data["verdict"] == "retire"
 
 
@@ -323,10 +430,15 @@ class TestPerformanceHappyPath:
 
     def test_kpi_multiple_dimensions(self, finance_agent):
         """多维度KPI快照应独立评分"""
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 95000, "orders": 180, "satisfaction": 4.8},
-            "targets": {"revenue": 100000, "orders": 200, "satisfaction": 4.5},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 95000, "orders": 180, "satisfaction": 4.8},
+                    "targets": {"revenue": 100000, "orders": 200, "satisfaction": 4.5},
+                },
+            )
+        )
         assert result.success is True
         assert len(result.data["kpi_scores"]) == 3
         # satisfaction超标，应100%
@@ -334,36 +446,58 @@ class TestPerformanceHappyPath:
 
     def test_flat_trend_detection(self, finance_agent):
         """持平趋势应正确识别"""
-        result = asyncio.run(finance_agent.execute("analyze_order_trend", {
-            "daily_orders": [150, 150, 150, 150, 150],
-            "daily_revenue_fen": [750000, 750000, 750000, 750000, 750000],
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "analyze_order_trend",
+                {
+                    "daily_orders": [150, 150, 150, 150, 150],
+                    "daily_revenue_fen": [750000, 750000, 750000, 750000, 750000],
+                },
+            )
+        )
         assert result.data["order_trend"] == "flat"
 
     def test_avg_ticket_calculation(self, finance_agent):
         """客单价计算应正确"""
-        result = asyncio.run(finance_agent.execute("analyze_order_trend", {
-            "daily_orders": [100, 100],
-            "daily_revenue_fen": [500000, 500000],  # 总营收 1000000分 / 200单 = 5000分 = 50元
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "analyze_order_trend",
+                {
+                    "daily_orders": [100, 100],
+                    "daily_revenue_fen": [500000, 500000],  # 总营收 1000000分 / 200单 = 5000分 = 50元
+                },
+            )
+        )
         assert result.data["avg_ticket_yuan"] == 50.0
 
     def test_serve_time_edge_inference_layer(self, serve_agent):
         """出餐时间预测应使用边缘推理"""
-        result = asyncio.run(serve_agent.execute("predict_serve_time", {
-            "dish_count": 3, "has_complex_dish": False, "kitchen_queue_size": 0,
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "predict_serve_time",
+                {
+                    "dish_count": 3,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 0,
+                },
+            )
+        )
         assert result.inference_layer == "edge"
 
     def test_workload_perfect_balance(self, serve_agent):
         """完全均衡的工作量应得高分"""
-        result = asyncio.run(serve_agent.execute("balance_workload", {
-            "staff_loads": [
-                {"name": "张三", "current_orders": 8},
-                {"name": "李四", "current_orders": 8},
-                {"name": "王五", "current_orders": 8},
-            ],
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "balance_workload",
+                {
+                    "staff_loads": [
+                        {"name": "张三", "current_orders": 8},
+                        {"name": "李四", "current_orders": 8},
+                        {"name": "王五", "current_orders": 8},
+                    ],
+                },
+            )
+        )
         assert result.data["balance_score"] >= 90
         assert len(result.data["overloaded"]) == 0
         assert len(result.data["underloaded"]) == 0
@@ -374,11 +508,16 @@ class TestPerformanceHardConstraints:
 
     def test_serve_time_constraint_violation_via_run(self, serve_agent):
         """出餐时限约束：复杂大单应触发超时违规"""
-        result = asyncio.run(serve_agent.run("predict_serve_time", {
-            "dish_count": 10,
-            "has_complex_dish": True,
-            "kitchen_queue_size": 8,
-        }))
+        result = asyncio.run(
+            serve_agent.run(
+                "predict_serve_time",
+                {
+                    "dish_count": 10,
+                    "has_complex_dish": True,
+                    "kitchen_queue_size": 8,
+                },
+            )
+        )
         # 5 + 10*2.5 + 8 + 8*1.5 = 5+25+8+12 = 50分钟 > 30分钟
         assert result.data["estimated_serve_minutes"] > 30
         exp_check = result.constraints_detail.get("experience_check")
@@ -387,9 +526,16 @@ class TestPerformanceHardConstraints:
 
     def test_serve_time_constraint_pass_for_simple_order(self, serve_agent):
         """出餐时限约束：简单订单应通过"""
-        result = asyncio.run(serve_agent.run("predict_serve_time", {
-            "dish_count": 2, "has_complex_dish": False, "kitchen_queue_size": 1,
-        }))
+        result = asyncio.run(
+            serve_agent.run(
+                "predict_serve_time",
+                {
+                    "dish_count": 2,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 1,
+                },
+            )
+        )
         # 5 + 2*2.5 + 1*1.5 = 11.5分钟 < 30分钟
         assert result.data["estimated_serve_minutes"] <= 30
         exp_check = result.constraints_detail.get("experience_check")
@@ -398,21 +544,33 @@ class TestPerformanceHardConstraints:
 
     def test_margin_constraint_in_cost_simulation(self, menu_agent):
         """毛利底线：成本仿真中毛利过低应触发违规"""
-        result = asyncio.run(menu_agent.run("simulate_cost", {
-            "bom_items": [
-                {"cost_fen": 850, "quantity": 1},
-            ],
-            "target_price_fen": 1000,  # 毛利率 15%，刚好通过
-        }))
+        result = asyncio.run(
+            menu_agent.run(
+                "simulate_cost",
+                {
+                    "bom_items": [
+                        {"cost_fen": 850, "quantity": 1},
+                    ],
+                    "target_price_fen": 1000,  # 毛利率 15%，刚好通过
+                },
+            )
+        )
         margin_check = result.constraints_detail.get("margin_check")
         if margin_check:
             assert margin_check["passed"] is True
 
     def test_food_safety_constraint_not_relevant_to_perf(self, serve_agent):
         """出餐调度不涉及食材，食安约束应跳过"""
-        result = asyncio.run(serve_agent.run("predict_serve_time", {
-            "dish_count": 3, "has_complex_dish": False, "kitchen_queue_size": 0,
-        }))
+        result = asyncio.run(
+            serve_agent.run(
+                "predict_serve_time",
+                {
+                    "dish_count": 3,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 0,
+                },
+            )
+        )
         assert result.constraints_detail.get("food_safety_check") is None
 
 
@@ -421,9 +579,15 @@ class TestPerformanceDecisionLog:
 
     def test_kpi_snapshot_audit_trail(self, finance_agent):
         """KPI快照必须有完整决策留痕"""
-        result = asyncio.run(finance_agent.run("snapshot_kpi", {
-            "kpis": {"revenue": 80000}, "targets": {"revenue": 100000},
-        }))
+        result = asyncio.run(
+            finance_agent.run(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 80000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
         assert result.action == "snapshot_kpi"
         assert len(result.reasoning) > 0
         assert result.confidence > 0
@@ -432,9 +596,16 @@ class TestPerformanceDecisionLog:
 
     def test_serve_prediction_audit_trail(self, serve_agent):
         """出餐预测必须有完整决策留痕"""
-        result = asyncio.run(serve_agent.run("predict_serve_time", {
-            "dish_count": 5, "has_complex_dish": True, "kitchen_queue_size": 3,
-        }))
+        result = asyncio.run(
+            serve_agent.run(
+                "predict_serve_time",
+                {
+                    "dish_count": 5,
+                    "has_complex_dish": True,
+                    "kitchen_queue_size": 3,
+                },
+            )
+        )
         assert result.action == "predict_serve_time"
         assert "分钟" in result.reasoning or "预计" in result.reasoning
         assert result.confidence > 0
@@ -442,12 +613,17 @@ class TestPerformanceDecisionLog:
 
     def test_workload_balance_audit_trail(self, serve_agent):
         """工作量均衡分析必须有决策留痕"""
-        result = asyncio.run(serve_agent.run("balance_workload", {
-            "staff_loads": [
-                {"name": "张三", "current_orders": 15},
-                {"name": "李四", "current_orders": 3},
-            ],
-        }))
+        result = asyncio.run(
+            serve_agent.run(
+                "balance_workload",
+                {
+                    "staff_loads": [
+                        {"name": "张三", "current_orders": 15},
+                        {"name": "李四", "current_orders": 3},
+                    ],
+                },
+            )
+        )
         assert result.action == "balance_workload"
         assert len(result.reasoning) > 0
         assert result.agent_level in (1, 2, 3)
@@ -458,40 +634,69 @@ class TestPerformanceInputDegradation:
 
     def test_empty_staff_loads_fails(self, serve_agent):
         """空员工负载数据应返回失败"""
-        result = asyncio.run(serve_agent.execute("balance_workload", {
-            "staff_loads": [],
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "balance_workload",
+                {
+                    "staff_loads": [],
+                },
+            )
+        )
         assert result.success is False
 
     def test_single_staff_member_balance(self, serve_agent):
         """单人团队不应崩溃"""
-        result = asyncio.run(serve_agent.execute("balance_workload", {
-            "staff_loads": [{"name": "张三", "current_orders": 10}],
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "balance_workload",
+                {
+                    "staff_loads": [{"name": "张三", "current_orders": 10}],
+                },
+            )
+        )
         assert result.success is True
 
     def test_zero_dish_serve_time(self, serve_agent):
         """0道菜的出餐预测应返回基础时间"""
-        result = asyncio.run(serve_agent.execute("predict_serve_time", {
-            "dish_count": 0, "has_complex_dish": False, "kitchen_queue_size": 0,
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "predict_serve_time",
+                {
+                    "dish_count": 0,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 0,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["estimated_serve_minutes"] > 0  # base time
 
     def test_very_large_queue_no_crash(self, serve_agent):
         """极大队列不应崩溃"""
-        result = asyncio.run(serve_agent.execute("predict_serve_time", {
-            "dish_count": 1, "has_complex_dish": False, "kitchen_queue_size": 100,
-        }))
+        result = asyncio.run(
+            serve_agent.execute(
+                "predict_serve_time",
+                {
+                    "dish_count": 1,
+                    "has_complex_dish": False,
+                    "kitchen_queue_size": 100,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["estimated_serve_minutes"] > 100  # 100*1.5 = 150分钟queue delay
 
     def test_extreme_kpi_values_capped(self, finance_agent):
         """极端KPI值(超出目标10倍)应被cap到100%"""
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 1000000},
-            "targets": {"revenue": 100},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 1000000},
+                    "targets": {"revenue": 100},
+                },
+            )
+        )
         assert result.data["kpi_scores"]["revenue"]["completion_pct"] == 100
 
 

@@ -2,11 +2,12 @@
 岗位认证与通关路由 — DB持久化版
 OR-xx: position_certifications 表
 """
+
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta
-from typing import Any, Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 from uuid import uuid4
 
 import structlog
@@ -42,37 +43,198 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 EXAM_TEMPLATES: dict[str, list[dict]] = {
     "chef": [
-        {"item": "食品安全知识", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "菜品出品标准", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "成本控制意识", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "实操出品考核（3道招牌菜）", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "卫生与设备操作", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
+        {
+            "item": "食品安全知识",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "菜品出品标准",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "成本控制意识",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "实操出品考核（3道招牌菜）",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "卫生与设备操作",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
     ],
     "waiter": [
-        {"item": "服务礼仪与话术", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "菜品知识考核", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "点单系统操作", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "客诉处理模拟", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "酒水饮品知识", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
+        {
+            "item": "服务礼仪与话术",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "菜品知识考核",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "点单系统操作",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "客诉处理模拟",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "酒水饮品知识",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
     ],
     "manager": [
-        {"item": "门店经营指标分析", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "团队管理与排班", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "成本与毛利管控", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "食品安全与合规", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "客户服务与危机处理", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "营销活动策划", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
+        {
+            "item": "门店经营指标分析",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "团队管理与排班",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "成本与毛利管控",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "食品安全与合规",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "客户服务与危机处理",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "营销活动策划",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
     ],
     "cashier": [
-        {"item": "收银系统操作", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "支付方式与对账流程", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "发票开具与税务基础", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "假币识别与现金管理", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
+        {
+            "item": "收银系统操作",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "支付方式与对账流程",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "发票开具与税务基础",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "假币识别与现金管理",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
     ],
     "cleaner": [
-        {"item": "清洁标准与流程", "type": "theory", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "消毒剂使用规范", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
-        {"item": "垃圾分类与处理", "type": "practice", "score": None, "passed": False, "examiner_id": None, "exam_date": None},
+        {
+            "item": "清洁标准与流程",
+            "type": "theory",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "消毒剂使用规范",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
+        {
+            "item": "垃圾分类与处理",
+            "type": "practice",
+            "score": None,
+            "passed": False,
+            "examiner_id": None,
+            "exam_date": None,
+        },
     ],
 }
 
@@ -195,17 +357,20 @@ async def create_certification(
                   exam_items, total_score, passed, certified_at, expires_at,
                   certifier_id, retake_count, notes, created_at, updated_at
     """)
-    row = await db.execute(sql, {
-        "id": cert_id,
-        "tid": tenant_id,
-        "employee_id": body.employee_id,
-        "store_id": body.store_id,
-        "position": body.position,
-        "exam_items": exam_items,
-        "certifier_id": body.certifier_id,
-        "notes": body.notes,
-        "now": now,
-    })
+    row = await db.execute(
+        sql,
+        {
+            "id": cert_id,
+            "tid": tenant_id,
+            "employee_id": body.employee_id,
+            "store_id": body.store_id,
+            "position": body.position,
+            "exam_items": exam_items,
+            "certifier_id": body.certifier_id,
+            "notes": body.notes,
+            "now": now,
+        },
+    )
     await db.commit()
     result = dict(row.fetchone()._mapping)
     if isinstance(result.get("exam_items"), str):
@@ -273,11 +438,13 @@ async def certification_dashboard(
     row3 = await db.execute(sql3, params)
     retake_stats = dict(row3.fetchone()._mapping)
 
-    return _ok({
-        "summary": summary,
-        "by_position": by_position,
-        "retake_stats": retake_stats,
-    })
+    return _ok(
+        {
+            "summary": summary,
+            "by_position": by_position,
+            "retake_stats": retake_stats,
+        }
+    )
 
 
 @router.get("/expiring")
@@ -372,7 +539,7 @@ async def update_certification(
 
     sql = text(f"""
         UPDATE position_certifications
-        SET {', '.join(sets)}
+        SET {", ".join(sets)}
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id, notes, expires_at, updated_at
     """)
@@ -409,7 +576,7 @@ async def submit_exam_item(
 
     exam_items = record.exam_items if isinstance(record.exam_items, list) else json.loads(record.exam_items)
     if item_idx < 0 or item_idx >= len(exam_items):
-        raise HTTPException(status_code=400, detail=f"Invalid item_idx {item_idx}, must be 0-{len(exam_items)-1}")
+        raise HTTPException(status_code=400, detail=f"Invalid item_idx {item_idx}, must be 0-{len(exam_items) - 1}")
 
     exam_date = body.exam_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -434,19 +601,22 @@ async def submit_exam_item(
         RETURNING exam_items
     """)
     idx_str = str(item_idx)
-    result = await db.execute(sql, {
-        "id": cert_id,
-        "tid": tenant_id,
-        "now": datetime.now(timezone.utc),
-        "path_score": f"{{{idx_str},score}}",
-        "path_passed": f"{{{idx_str},passed}}",
-        "path_examiner": f"{{{idx_str},examiner_id}}",
-        "path_date": f"{{{idx_str},exam_date}}",
-        "score": json.dumps(body.score),
-        "passed": json.dumps(body.passed),
-        "examiner": json.dumps(body.examiner_id),
-        "exam_date": json.dumps(exam_date),
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": cert_id,
+            "tid": tenant_id,
+            "now": datetime.now(timezone.utc),
+            "path_score": f"{{{idx_str},score}}",
+            "path_passed": f"{{{idx_str},passed}}",
+            "path_examiner": f"{{{idx_str},examiner_id}}",
+            "path_date": f"{{{idx_str},exam_date}}",
+            "score": json.dumps(body.score),
+            "passed": json.dumps(body.passed),
+            "examiner": json.dumps(body.examiner_id),
+            "exam_date": json.dumps(exam_date),
+        },
+    )
     updated = result.fetchone()
     if not updated:
         raise HTTPException(status_code=404, detail="Certification not found")
@@ -519,7 +689,7 @@ async def finalize_certification(
 
     sql = text(f"""
         UPDATE position_certifications
-        SET {', '.join(sets)}
+        SET {", ".join(sets)}
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id, total_score, passed, certified_at, expires_at, certifier_id, updated_at
     """)
@@ -574,12 +744,15 @@ async def retake_certification(
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id, retake_count, exam_items, updated_at
     """)
-    result = await db.execute(sql, {
-        "id": cert_id,
-        "tid": tenant_id,
-        "exam_items": json.dumps(exam_items, ensure_ascii=False),
-        "now": datetime.now(timezone.utc),
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": cert_id,
+            "tid": tenant_id,
+            "exam_items": json.dumps(exam_items, ensure_ascii=False),
+            "now": datetime.now(timezone.utc),
+        },
+    )
     updated = result.fetchone()
     if not updated:
         raise HTTPException(status_code=404, detail="Certification not found")

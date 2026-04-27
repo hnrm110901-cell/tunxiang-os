@@ -7,6 +7,7 @@
 4. 校验补偿金额约束（不超过订单金额50%，自动处理<5000分）
 5. 返回：意图/情绪/建议回复/处置动作/升级标志
 """
+
 from __future__ import annotations
 
 import json
@@ -199,9 +200,7 @@ class CustomerServiceAgent:
                         tenant_id=tenant_id,
                         store_id=store_id,
                     )
-                    return await self.handle(
-                        {"tenant_id": tenant_id, "store_id": store_id, "message": ""}
-                    )
+                    return await self.handle({"tenant_id": tenant_id, "store_id": store_id, "message": ""})
 
                 return {
                     "inference_layer": "mv_fast_path",
@@ -216,9 +215,7 @@ class CustomerServiceAgent:
                 store_id=store_id,
                 error=str(exc),
             )
-            return await self.handle(
-                {"tenant_id": tenant_id, "store_id": store_id, "message": ""}
-            )
+            return await self.handle({"tenant_id": tenant_id, "store_id": store_id, "message": ""})
 
     def _pre_check(self, payload: dict) -> dict:
         """Python预处理：业务规则前置判断，不依赖Claude。"""

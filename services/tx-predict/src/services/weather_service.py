@@ -7,6 +7,7 @@
 
 和风天气 API 文档：https://dev.qweather.com/docs/api/weather/weather-daily-forecast/
 """
+
 from __future__ import annotations
 
 import os
@@ -45,7 +46,7 @@ WEATHER_IMPACT_FACTORS: dict[str, float] = {
 
 # 温度极端值影响
 HIGH_TEMP_THRESHOLD = 38  # 高温预警
-LOW_TEMP_THRESHOLD = -5   # 低温预警
+LOW_TEMP_THRESHOLD = -5  # 低温预警
 EXTREME_TEMP_PENALTY = 0.85  # 极端温度惩罚系数
 
 
@@ -161,14 +162,16 @@ class WeatherService:
             elif factor < 0.85:
                 risk_level = "medium"
 
-            daily_impacts.append({
-                "date": day["date"],
-                "weather": day.get("text_day", ""),
-                "temp_max": day.get("temp_max"),
-                "temp_min": day.get("temp_min"),
-                "impact_factor": factor,
-                "risk_level": risk_level,
-            })
+            daily_impacts.append(
+                {
+                    "date": day["date"],
+                    "weather": day.get("text_day", ""),
+                    "temp_max": day.get("temp_max"),
+                    "temp_min": day.get("temp_min"),
+                    "impact_factor": factor,
+                    "risk_level": risk_level,
+                }
+            )
 
             if factor < worst_factor:
                 worst_factor = factor
@@ -215,17 +218,19 @@ class WeatherService:
                 temp_min = int(day.get("tempMin", 15))
                 text_day = day.get("textDay", "晴")
 
-                result.append({
-                    "date": day.get("fxDate", ""),
-                    "text_day": text_day,
-                    "text_night": day.get("textNight", ""),
-                    "temp_max": temp_max,
-                    "temp_min": temp_min,
-                    "humidity": int(day.get("humidity", 50)),
-                    "wind_dir": day.get("windDirDay", ""),
-                    "wind_scale": day.get("windScaleDay", ""),
-                    "impact_factor": self.calc_impact_factor(text_day, temp_max, temp_min),
-                })
+                result.append(
+                    {
+                        "date": day.get("fxDate", ""),
+                        "text_day": text_day,
+                        "text_night": day.get("textNight", ""),
+                        "temp_max": temp_max,
+                        "temp_min": temp_min,
+                        "humidity": int(day.get("humidity", 50)),
+                        "wind_dir": day.get("windDirDay", ""),
+                        "wind_scale": day.get("windScaleDay", ""),
+                        "impact_factor": self.calc_impact_factor(text_day, temp_max, temp_min),
+                    }
+                )
 
             log.info("weather.api_success", city=city, days=len(result))
             return result
@@ -269,21 +274,26 @@ class WeatherService:
         result = []
         for i in range(7):
             day_date = today + timedelta(days=i)
-            result.append({
-                "date": day_date.isoformat(),
-                "text_day": "晴",
-                "text_night": "晴",
-                "temp_max": 25,
-                "temp_min": 15,
-                "humidity": 50,
-                "wind_dir": "北风",
-                "wind_scale": "1-2",
-                "impact_factor": 1.0,
-            })
+            result.append(
+                {
+                    "date": day_date.isoformat(),
+                    "text_day": "晴",
+                    "text_night": "晴",
+                    "temp_max": 25,
+                    "temp_min": 15,
+                    "humidity": 50,
+                    "wind_dir": "北风",
+                    "wind_scale": "1-2",
+                    "impact_factor": 1.0,
+                }
+            )
         return result
 
     async def _read_cache(
-        self, city: str, tenant_id: str, db: AsyncSession,
+        self,
+        city: str,
+        tenant_id: str,
+        db: AsyncSession,
     ) -> Optional[list[dict[str, Any]]]:
         """从 weather_cache 读取缓存"""
         try:
@@ -315,6 +325,7 @@ class WeatherService:
     ) -> None:
         """写入 weather_cache"""
         import json
+
         try:
             await db.execute(
                 text("""

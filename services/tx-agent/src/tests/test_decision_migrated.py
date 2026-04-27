@@ -79,10 +79,15 @@ class TestDecisionCorePaths:
         老项目验证建议包含 action_items/expected_impact/priority
         新项目使用 AgentResult 统一结构
         """
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 95000, "orders": 180},
-            "targets": {"revenue": 100000, "orders": 200},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 95000, "orders": 180},
+                    "targets": {"revenue": 100000, "orders": 200},
+                },
+            )
+        )
         assert result.success is True
         assert result.action == "snapshot_kpi"
         assert len(result.reasoning) > 0, "决策必须包含推理过程"
@@ -96,13 +101,18 @@ class TestDecisionCorePaths:
         新项目通过 ConstraintChecker 在 SkillAgent.run() 中强制校验
         """
         # 用 run() 而非 execute()，触发约束校验
-        result = asyncio.run(discount_agent.run("detect_discount_anomaly", {
-            "order": {
-                "total_amount_fen": 10000,
-                "discount_amount_fen": 1000,
-                "cost_fen": 9000,  # 毛利率仅 10%, 低于 15% 阈值
-            },
-        }))
+        result = asyncio.run(
+            discount_agent.run(
+                "detect_discount_anomaly",
+                {
+                    "order": {
+                        "total_amount_fen": 10000,
+                        "discount_amount_fen": 1000,
+                        "cost_fen": 9000,  # 毛利率仅 10%, 低于 15% 阈值
+                    },
+                },
+            )
+        )
         # SkillAgent.run() 自动进行约束校验
         assert result.constraints_detail is not None
         assert "passed" in result.constraints_detail
@@ -118,14 +128,20 @@ class TestDecisionCorePaths:
         新项目直接校验食材剩余保质期
         """
         from agents.skills.inventory_alert import InventoryAlertAgent
+
         agent = InventoryAlertAgent(tenant_id=TID, store_id="STORE001")
         # check_expiration 返回的 data 包含 ingredients 字段
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [
-                {"name": "牛奶", "remaining_hours": 12},
-                {"name": "米", "remaining_hours": 720},
-            ],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "牛奶", "remaining_hours": 12},
+                        {"name": "米", "remaining_hours": 720},
+                    ],
+                },
+            )
+        )
         assert result.success is True
         # data 中有 ingredients 字段，会触发食安约束校验
         if result.constraints_detail.get("food_safety_check"):
@@ -139,10 +155,15 @@ class TestDecisionCorePaths:
         老项目: 决策报告包含 kpi_summary/insights_summary/recommendations_summary
         新项目: AgentResult 自动填充 constraints_detail + reasoning + execution_ms
         """
-        result = asyncio.run(finance_agent.run("snapshot_kpi", {
-            "kpis": {"revenue": 95000},
-            "targets": {"revenue": 100000},
-        }))
+        result = asyncio.run(
+            finance_agent.run(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 95000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
         # 决策留痕的关键字段
         assert result.action == "snapshot_kpi"
         assert len(result.reasoning) > 0, "必须有推理过程"
@@ -156,10 +177,15 @@ class TestDecisionCorePaths:
         老项目: action_required 字段表示需人工介入的建议数量
         新项目: agent_level (1=建议, 2=自动+回滚, 3=完全自主)
         """
-        result = asyncio.run(finance_agent.run("snapshot_kpi", {
-            "kpis": {"revenue": 50000},
-            "targets": {"revenue": 100000},
-        }))
+        result = asyncio.run(
+            finance_agent.run(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 50000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
         assert result.agent_level in (1, 2, 3)
         # FinanceAuditAgent 默认 level=1 (仅建议)
         assert result.agent_level == 1, "财务稽核Agent应为建议级别"
@@ -179,10 +205,16 @@ class TestDecisionCorePaths:
 
         迁移自: test_execute_analyze_kpis_via_dispatch 等 execute 分发测试
         """
-        result = asyncio.run(master.dispatch("finance_audit", "snapshot_kpi", {
-            "kpis": {"revenue": 95000, "orders": 180},
-            "targets": {"revenue": 100000, "orders": 200},
-        }))
+        result = asyncio.run(
+            master.dispatch(
+                "finance_audit",
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 95000, "orders": 180},
+                    "targets": {"revenue": 100000, "orders": 200},
+                },
+            )
+        )
         assert result.success is True
         assert result.data["overall_completion_pct"] > 0
 
@@ -200,11 +232,15 @@ class TestTrendConstraints:
         老项目: forecast_trends 返回 confidence_level
         新项目: forecast_orders 返回 AgentResult.confidence
         """
-        result = asyncio.run(finance_agent.execute("forecast_orders", {
-            "daily_orders": [150, 140, 160, 180, 200, 190, 170,
-                             155, 145, 165, 175, 195, 185, 175],
-            "days_ahead": 7,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "forecast_orders",
+                {
+                    "daily_orders": [150, 140, 160, 180, 200, 190, 170, 155, 145, 165, 175, 195, 185, 175],
+                    "days_ahead": 7,
+                },
+            )
+        )
         assert result.success is True
         assert 0 <= result.confidence <= 1, "预测置信度必须在[0,1]范围内"
 
@@ -213,11 +249,15 @@ class TestTrendConstraints:
 
         迁移自: test_forecast_values_non_negative
         """
-        result = asyncio.run(finance_agent.execute("forecast_orders", {
-            "daily_orders": [150, 140, 160, 180, 200, 190, 170,
-                             155, 145, 165, 175, 195, 185, 175],
-            "days_ahead": 7,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "forecast_orders",
+                {
+                    "daily_orders": [150, 140, 160, 180, 200, 190, 170, 155, 145, 165, 175, 195, 185, 175],
+                    "days_ahead": 7,
+                },
+            )
+        )
         assert result.success is True
         for val in result.data["daily_forecast"]:
             assert val >= 0, "预测订单数不能为负数"
@@ -229,17 +269,27 @@ class TestTrendConstraints:
         新项目: detect_revenue_anomaly 自动判断正常/异常
         """
         # 正常营收
-        result_normal = asyncio.run(finance_agent.execute("detect_revenue_anomaly", {
-            "actual_revenue_fen": 830000,
-            "history_daily_fen": [800000, 820000, 810000, 830000, 850000, 820000, 810000],
-        }))
+        result_normal = asyncio.run(
+            finance_agent.execute(
+                "detect_revenue_anomaly",
+                {
+                    "actual_revenue_fen": 830000,
+                    "history_daily_fen": [800000, 820000, 810000, 830000, 850000, 820000, 810000],
+                },
+            )
+        )
         assert result_normal.data["is_anomaly"] is False
 
         # 异常低营收
-        result_low = asyncio.run(finance_agent.execute("detect_revenue_anomaly", {
-            "actual_revenue_fen": 200000,
-            "history_daily_fen": [800000, 820000, 810000, 830000, 850000, 820000, 810000],
-        }))
+        result_low = asyncio.run(
+            finance_agent.execute(
+                "detect_revenue_anomaly",
+                {
+                    "actual_revenue_fen": 200000,
+                    "history_daily_fen": [800000, 820000, 810000, 830000, 850000, 820000, 810000],
+                },
+            )
+        )
         assert result_low.data["is_anomaly"] is True
         assert result_low.data["direction"] == "below"
 
@@ -250,9 +300,14 @@ class TestTrendConstraints:
         新项目: match_scenario 根据经营数据匹配场景
         """
         # 高成本场景
-        result = asyncio.run(finance_agent.execute("match_scenario", {
-            "cost_rate_pct": 45,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "match_scenario",
+                {
+                    "cost_rate_pct": 45,
+                },
+            )
+        )
         assert result.data["scenario"] == "high_cost"
 
         # 正常工作日
@@ -273,12 +328,17 @@ class TestRecommendationConstraints:
         老项目: 建议包含 expected_impact 和 action_items
         新项目: generate_biz_insight 返回带 insights 的洞察
         """
-        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
-            "metrics": {
-                "cost_rate_pct": 40,
-                "revenue_change_pct": -15,
-            },
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "generate_biz_insight",
+                {
+                    "metrics": {
+                        "cost_rate_pct": 40,
+                        "revenue_change_pct": -15,
+                    },
+                },
+            )
+        )
         assert result.success is True
         assert len(result.data["insights"]) >= 2, "高成本+营收下滑应产生至少2条洞察"
 
@@ -288,10 +348,15 @@ class TestRecommendationConstraints:
         迁移自: test_recommendation_from_kpi_critical_priority 等优先级测试
         新项目: snapshot_kpi 返回各指标达成率和总体达成率
         """
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 70000, "orders": 100},
-            "targets": {"revenue": 100000, "orders": 200},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 70000, "orders": 100},
+                    "targets": {"revenue": 100000, "orders": 200},
+                },
+            )
+        )
         assert result.success is True
         # 总体达成率应反映低达标情况
         assert result.data["overall_completion_pct"] < 80
@@ -307,13 +372,18 @@ class TestRecommendationConstraints:
         新项目: simulate_cost 返回的 data 包含 price_fen 和 cost_fen，
                 通过 SkillAgent.run() 自动触发 ConstraintChecker
         """
-        result = asyncio.run(menu_agent.run("simulate_cost", {
-            "bom_items": [
-                {"cost_fen": 800, "quantity": 1},
-                {"cost_fen": 500, "quantity": 2},
-            ],
-            "target_price_fen": 2000,  # 成本 1800，毛利率 10%
-        }))
+        result = asyncio.run(
+            menu_agent.run(
+                "simulate_cost",
+                {
+                    "bom_items": [
+                        {"cost_fen": 800, "quantity": 1},
+                        {"cost_fen": 500, "quantity": 2},
+                    ],
+                    "target_price_fen": 2000,  # 成本 1800，毛利率 10%
+                },
+            )
+        )
         # 毛利率 10% < 15% 阈值，约束应不通过
         assert result.constraints_passed is False
         assert result.constraints_detail["margin_check"]["passed"] is False
@@ -335,14 +405,27 @@ class TestResourceOptimization:
         迁移自: test_all_resource_types_have_savings
         新项目通过 multi_agent_execute 实现多域协同
         """
-        results = asyncio.run(master.multi_agent_execute([
-            {"agent_id": "finance_audit", "action": "snapshot_kpi", "params": {
-                "kpis": {"revenue": 95000}, "targets": {"revenue": 100000},
-            }},
-            {"agent_id": "discount_guard", "action": "detect_discount_anomaly", "params": {
-                "order": {"total_amount_fen": 10000, "discount_amount_fen": 1000},
-            }},
-        ]))
+        results = asyncio.run(
+            master.multi_agent_execute(
+                [
+                    {
+                        "agent_id": "finance_audit",
+                        "action": "snapshot_kpi",
+                        "params": {
+                            "kpis": {"revenue": 95000},
+                            "targets": {"revenue": 100000},
+                        },
+                    },
+                    {
+                        "agent_id": "discount_guard",
+                        "action": "detect_discount_anomaly",
+                        "params": {
+                            "order": {"total_amount_fen": 10000, "discount_amount_fen": 1000},
+                        },
+                    },
+                ]
+            )
+        )
         assert len(results) == 2
         assert all(r.success for r in results)
 
@@ -357,9 +440,14 @@ class TestResourceOptimization:
 
     def test_intent_routing(self, master):
         """意图路由 — finance 前缀路由到 finance_audit"""
-        result = asyncio.run(master.route_intent("finance_report", {
-            "report_type": "period_summary",
-        }))
+        result = asyncio.run(
+            master.route_intent(
+                "finance_report",
+                {
+                    "report_type": "period_summary",
+                },
+            )
+        )
         # intent "finance_report" -> prefix "finance" -> finance_audit agent
         assert result.action == "finance_report"
 
@@ -394,9 +482,15 @@ class TestDecisionAgentInit:
     def test_agent_without_db_runs_fine(self):
         """无DB连接时Agent应正常运行(降级模式)"""
         agent = FinanceAuditAgent(tenant_id=TID, store_id="S1", db=None)
-        result = asyncio.run(agent.execute("snapshot_kpi", {
-            "kpis": {"revenue": 80000}, "targets": {"revenue": 100000},
-        }))
+        result = asyncio.run(
+            agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 80000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
         assert result.success is True
 
 
@@ -405,41 +499,66 @@ class TestDecisionHappyPath:
 
     def test_revenue_decline_three_days_triggers_insight(self, finance_agent):
         """连续3天营收下降，Agent应生成营收下滑洞察"""
-        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
-            "metrics": {"revenue_change_pct": -20},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "generate_biz_insight",
+                {
+                    "metrics": {"revenue_change_pct": -20},
+                },
+            )
+        )
         assert result.success is True
         assert any(i["type"] == "revenue_drop" for i in result.data["insights"])
 
     def test_high_cost_rate_triggers_cost_alert(self, finance_agent):
         """食材成本率过高应触发成本预警洞察"""
-        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
-            "metrics": {"cost_rate_pct": 42},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "generate_biz_insight",
+                {
+                    "metrics": {"cost_rate_pct": 42},
+                },
+            )
+        )
         assert any(i["type"] == "cost_alert" for i in result.data["insights"])
 
     def test_stable_metrics_no_alarm(self, finance_agent):
         """经营指标正常时不应发虚假警报"""
-        result = asyncio.run(finance_agent.execute("generate_biz_insight", {
-            "metrics": {"cost_rate_pct": 28, "revenue_change_pct": 5},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "generate_biz_insight",
+                {
+                    "metrics": {"cost_rate_pct": 28, "revenue_change_pct": 5},
+                },
+            )
+        )
         assert result.success is True
         assert all(i["type"] == "stable" for i in result.data["insights"])
 
     def test_cost_analysis_fallback_without_db(self, finance_agent):
         """无DB时成本分析应使用params降级"""
-        result = asyncio.run(finance_agent.execute("cost_analysis", {
-            "revenue_fen": 500000,
-            "total_cost_fen": 175000,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "cost_analysis",
+                {
+                    "revenue_fen": 500000,
+                    "total_cost_fen": 175000,
+                },
+            )
+        )
         assert result.success is True
         assert result.data["gross_margin"] == 0.65
 
     def test_daily_reconciliation_fallback_without_db(self, finance_agent):
         """无DB时日结对账应返回空数据而非崩溃"""
-        result = asyncio.run(finance_agent.execute("daily_reconciliation", {
-            "date": "2026-04-18",
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "daily_reconciliation",
+                {
+                    "date": "2026-04-18",
+                },
+            )
+        )
         assert result.success is True
         assert result.confidence < 0.5, "无DB时置信度应较低"
 
@@ -449,33 +568,49 @@ class TestDecisionHardConstraints:
 
     def test_margin_floor_blocks_discount_below_threshold(self, discount_agent):
         """毛利底线：折扣导致毛利低于15%时，约束应不通过"""
-        result = asyncio.run(discount_agent.run("detect_discount_anomaly", {
-            "order": {
-                "total_amount_fen": 10000,
-                "discount_amount_fen": 2000,
-                "cost_fen": 8500,  # 毛利率 = (10000-8500)/10000 = 15%，但cost_fen在data中
-            },
-        }))
+        result = asyncio.run(
+            discount_agent.run(
+                "detect_discount_anomaly",
+                {
+                    "order": {
+                        "total_amount_fen": 10000,
+                        "discount_amount_fen": 2000,
+                        "cost_fen": 8500,  # 毛利率 = (10000-8500)/10000 = 15%，但cost_fen在data中
+                    },
+                },
+            )
+        )
         assert result.constraints_detail is not None
 
     def test_food_safety_constraint_triggers_via_finance(self):
         """食安约束：财务Agent返回含食材数据时应自动校验"""
         from agents.skills.inventory_alert import InventoryAlertAgent
+
         agent = InventoryAlertAgent(tenant_id=TID, store_id="STORE001")
-        result = asyncio.run(agent.run("check_expiration", {
-            "items": [
-                {"name": "三文鱼", "remaining_hours": 3},
-            ],
-        }))
+        result = asyncio.run(
+            agent.run(
+                "check_expiration",
+                {
+                    "items": [
+                        {"name": "三文鱼", "remaining_hours": 3},
+                    ],
+                },
+            )
+        )
         if result.constraints_detail.get("food_safety_check"):
             assert result.constraints_detail["food_safety_check"]["passed"] is False
 
     def test_service_time_constraint_in_cost_simulation(self, menu_agent):
         """出餐时限约束：成本仿真不涉及出餐时间，约束应跳过"""
-        result = asyncio.run(menu_agent.run("simulate_cost", {
-            "bom_items": [{"cost_fen": 300, "quantity": 1}],
-            "target_price_fen": 2000,
-        }))
+        result = asyncio.run(
+            menu_agent.run(
+                "simulate_cost",
+                {
+                    "bom_items": [{"cost_fen": 300, "quantity": 1}],
+                    "target_price_fen": 2000,
+                },
+            )
+        )
         # 无 estimated_serve_minutes 数据时应跳过出餐时限校验
         assert result.constraints_detail.get("experience_check") is None
 
@@ -485,10 +620,15 @@ class TestDecisionLogAuditTrail:
 
     def test_decision_log_contains_all_required_fields(self, finance_agent):
         """决策留痕必须包含: action/reasoning/confidence/constraints/execution_ms/inference_layer"""
-        result = asyncio.run(finance_agent.run("snapshot_kpi", {
-            "kpis": {"revenue": 90000, "orders": 180},
-            "targets": {"revenue": 100000, "orders": 200},
-        }))
+        result = asyncio.run(
+            finance_agent.run(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 90000, "orders": 180},
+                    "targets": {"revenue": 100000, "orders": 200},
+                },
+            )
+        )
         assert result.action == "snapshot_kpi"
         assert len(result.reasoning) > 0
         assert 0 <= result.confidence <= 1
@@ -506,17 +646,28 @@ class TestDecisionLogAuditTrail:
 
     def test_autonomy_level_always_marked(self, finance_agent):
         """每个决策结果都必须标注自治等级"""
-        result = asyncio.run(finance_agent.run("detect_revenue_anomaly", {
-            "actual_revenue_fen": 500000,
-            "history_daily_fen": [800000, 820000, 810000, 830000, 850000],
-        }))
+        result = asyncio.run(
+            finance_agent.run(
+                "detect_revenue_anomaly",
+                {
+                    "actual_revenue_fen": 500000,
+                    "history_daily_fen": [800000, 820000, 810000, 830000, 850000],
+                },
+            )
+        )
         assert result.agent_level in (1, 2, 3)
 
     def test_level1_agent_has_empty_rollback_id(self, finance_agent):
         """Level 1 Agent不应生成rollback_id(仅建议,无需回滚)"""
-        result = asyncio.run(finance_agent.run("snapshot_kpi", {
-            "kpis": {"revenue": 80000}, "targets": {"revenue": 100000},
-        }))
+        result = asyncio.run(
+            finance_agent.run(
+                "snapshot_kpi",
+                {
+                    "kpis": {"revenue": 80000},
+                    "targets": {"revenue": 100000},
+                },
+            )
+        )
         assert result.agent_level == 1
         assert result.rollback_id == ""
 
@@ -526,43 +677,69 @@ class TestDecisionInputDegradation:
 
     def test_empty_kpis_returns_zero_completion(self, finance_agent):
         """空KPI数据应返回0达成率而非崩溃"""
-        result = asyncio.run(finance_agent.execute("snapshot_kpi", {
-            "kpis": {}, "targets": {},
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "snapshot_kpi",
+                {
+                    "kpis": {},
+                    "targets": {},
+                },
+            )
+        )
         assert result.success is True
         assert result.data["overall_completion_pct"] == 0
 
     def test_missing_history_for_anomaly_detection(self, finance_agent):
         """营收异常检测无历史数据应返回失败"""
-        result = asyncio.run(finance_agent.execute("detect_revenue_anomaly", {
-            "actual_revenue_fen": 500000,
-            "history_daily_fen": [],
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "detect_revenue_anomaly",
+                {
+                    "actual_revenue_fen": 500000,
+                    "history_daily_fen": [],
+                },
+            )
+        )
         assert result.success is False
 
     def test_insufficient_forecast_history(self, finance_agent):
         """预测历史数据不足7天应返回失败"""
-        result = asyncio.run(finance_agent.execute("forecast_orders", {
-            "daily_orders": [100, 110, 120],
-            "days_ahead": 7,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "forecast_orders",
+                {
+                    "daily_orders": [100, 110, 120],
+                    "days_ahead": 7,
+                },
+            )
+        )
         assert result.success is False
         assert "7天" in result.error
 
     def test_order_trend_single_day_fails(self, finance_agent):
         """订单趋势分析只有1天数据应失败"""
-        result = asyncio.run(finance_agent.execute("analyze_order_trend", {
-            "daily_orders": [100],
-            "daily_revenue_fen": [500000],
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "analyze_order_trend",
+                {
+                    "daily_orders": [100],
+                    "daily_revenue_fen": [500000],
+                },
+            )
+        )
         assert result.success is False
 
     def test_scenario_match_defaults_to_weekday_normal(self, finance_agent):
         """无特殊标记时场景应默认为工作日常态"""
-        result = asyncio.run(finance_agent.execute("match_scenario", {
-            "cost_rate_pct": 25,
-            "waste_rate_pct": 1,
-        }))
+        result = asyncio.run(
+            finance_agent.execute(
+                "match_scenario",
+                {
+                    "cost_rate_pct": 25,
+                    "waste_rate_pct": 1,
+                },
+            )
+        )
         assert result.data["scenario"] == "weekday_normal"
 
 

@@ -6,6 +6,7 @@
   - [PAGINATION] list_by_store_date 增加 LIMIT 保护（看板场景仍需当日全量，但加上限）
   - [STATS] 新增 get_stats_by_store_date 用 SQL 聚合替代内存统计
 """
+
 import uuid
 from typing import Optional
 
@@ -95,21 +96,28 @@ class QueueRepository:
     async def count_waiting(self, store_id: str, date: str, prefix: str) -> int:
         """统计某桌型等待人数"""
         store_uuid = uuid.UUID(store_id)
-        stmt = select(func.count()).select_from(QueueEntry).where(
-            and_(
-                QueueEntry.tenant_id == self.tenant_id,
-                QueueEntry.store_id == store_uuid,
-                QueueEntry.date == date,
-                QueueEntry.prefix == prefix,
-                QueueEntry.status == "waiting",
-                QueueEntry.is_deleted.is_(False),
+        stmt = (
+            select(func.count())
+            .select_from(QueueEntry)
+            .where(
+                and_(
+                    QueueEntry.tenant_id == self.tenant_id,
+                    QueueEntry.store_id == store_uuid,
+                    QueueEntry.date == date,
+                    QueueEntry.prefix == prefix,
+                    QueueEntry.status == "waiting",
+                    QueueEntry.is_deleted.is_(False),
+                )
             )
         )
         result = await self.db.execute(stmt)
         return result.scalar_one()
 
     async def get_earliest_waiting_ts(
-        self, store_id: str, date: str, prefix: str,
+        self,
+        store_id: str,
+        date: str,
+        prefix: str,
     ) -> Optional[str]:
         """获取某桌型最早等待者的priority_ts"""
         store_uuid = uuid.UUID(store_id)
@@ -132,20 +140,27 @@ class QueueRepository:
         return result.scalar_one_or_none()
 
     async def find_existing_meituan(
-        self, store_id: str, phone: str, date: str,
+        self,
+        store_id: str,
+        phone: str,
+        date: str,
     ) -> Optional[QueueEntry]:
         """查找已同步的美团排队记录"""
         store_uuid = uuid.UUID(store_id)
-        stmt = select(QueueEntry).where(
-            and_(
-                QueueEntry.tenant_id == self.tenant_id,
-                QueueEntry.store_id == store_uuid,
-                QueueEntry.phone == phone,
-                QueueEntry.date == date,
-                QueueEntry.source == "meituan",
-                QueueEntry.is_deleted.is_(False),
+        stmt = (
+            select(QueueEntry)
+            .where(
+                and_(
+                    QueueEntry.tenant_id == self.tenant_id,
+                    QueueEntry.store_id == store_uuid,
+                    QueueEntry.phone == phone,
+                    QueueEntry.date == date,
+                    QueueEntry.source == "meituan",
+                    QueueEntry.is_deleted.is_(False),
+                )
             )
-        ).limit(1)
+            .limit(1)
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -170,11 +185,7 @@ class QueueRepository:
 
         # 分页数据
         stmt = (
-            select(QueueEntry)
-            .where(and_(*base_conditions))
-            .order_by(QueueEntry.taken_at)
-            .offset(offset)
-            .limit(limit)
+            select(QueueEntry).where(and_(*base_conditions)).order_by(QueueEntry.taken_at).offset(offset).limit(limit)
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all()), total
@@ -202,9 +213,7 @@ class QueueRepository:
 
         # 按状态分组计数
         status_stmt = (
-            select(QueueEntry.status, func.count().label("cnt"))
-            .where(base_conditions)
-            .group_by(QueueEntry.status)
+            select(QueueEntry.status, func.count().label("cnt")).where(base_conditions).group_by(QueueEntry.status)
         )
         status_result = await self.db.execute(status_stmt)
         status_counts: dict[str, int] = {}
@@ -225,7 +234,10 @@ class QueueRepository:
     # ─── 计数器 ───
 
     async def get_or_create_counter(
-        self, store_id: str, date: str, prefix: str,
+        self,
+        store_id: str,
+        date: str,
+        prefix: str,
     ) -> QueueCounter:
         """获取或创建当日计数器"""
         store_uuid = uuid.UUID(store_id)

@@ -12,11 +12,11 @@ Tests:
 Run:
     pytest services/tx-agent/src/tests/test_edge_inference_client.py -v
 """
+
 from __future__ import annotations
 
 import os
 import sys
-import time
 
 _here = os.path.dirname(__file__)
 _src = os.path.abspath(os.path.join(_here, ".."))
@@ -26,7 +26,6 @@ if _src not in sys.path:
 import httpx
 import pytest
 import respx
-
 from services.edge_inference_client import EdgeInferenceClient
 
 BRIDGE_URL = "http://localhost:8100"
@@ -41,14 +40,11 @@ def client() -> EdgeInferenceClient:
 
 
 class TestHealthCaching:
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_health_cached_on_success(self, client: EdgeInferenceClient) -> None:
         """Health check result is cached for 60s."""
-        route = respx.get(f"{BRIDGE_URL}/health").mock(
-            return_value=httpx.Response(200, json={"ok": True})
-        )
+        route = respx.get(f"{BRIDGE_URL}/health").mock(return_value=httpx.Response(200, json={"ok": True}))
 
         result1 = await client.is_available()
         result2 = await client.is_available()
@@ -61,9 +57,7 @@ class TestHealthCaching:
     @respx.mock
     async def test_health_cached_on_failure(self, client: EdgeInferenceClient) -> None:
         """Failure is also cached."""
-        route = respx.get(f"{BRIDGE_URL}/health").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        route = respx.get(f"{BRIDGE_URL}/health").mock(side_effect=httpx.ConnectError("refused"))
 
         result1 = await client.is_available()
         result2 = await client.is_available()
@@ -76,9 +70,7 @@ class TestHealthCaching:
     @respx.mock
     async def test_invalidate_cache(self, client: EdgeInferenceClient) -> None:
         """invalidate_health_cache forces re-check."""
-        route = respx.get(f"{BRIDGE_URL}/health").mock(
-            return_value=httpx.Response(200, json={"ok": True})
-        )
+        route = respx.get(f"{BRIDGE_URL}/health").mock(return_value=httpx.Response(200, json={"ok": True}))
 
         await client.is_available()
         client.invalidate_health_cache()
@@ -91,21 +83,23 @@ class TestHealthCaching:
 
 
 class TestPredictDishTime:
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_success(self, client: EdgeInferenceClient) -> None:
         respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(
-            return_value=httpx.Response(200, json={
-                "ok": True,
-                "data": {
-                    "estimated_minutes": 8.5,
-                    "confidence": 0.88,
-                    "method": "coreml",
-                    "p95_minutes": 12.0,
-                    "inference_ms": 3.2,
+            return_value=httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "data": {
+                        "estimated_minutes": 8.5,
+                        "confidence": 0.88,
+                        "method": "coreml",
+                        "p95_minutes": 12.0,
+                        "inference_ms": 3.2,
+                    },
                 },
-            })
+            )
         )
 
         result = await client.predict_dish_time(
@@ -127,9 +121,7 @@ class TestPredictDishTime:
     @pytest.mark.asyncio
     @respx.mock
     async def test_failure_returns_none(self, client: EdgeInferenceClient) -> None:
-        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(side_effect=httpx.ConnectError("refused"))
 
         result = await client.predict_dish_time(
             dish_id="dish_001",
@@ -144,21 +136,23 @@ class TestPredictDishTime:
 
 
 class TestPredictDiscountRisk:
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_success(self, client: EdgeInferenceClient) -> None:
         respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            return_value=httpx.Response(200, json={
-                "ok": True,
-                "data": {
-                    "risk_level": "high",
-                    "risk_score": 80,
-                    "method": "rule_fallback",
-                    "reasons": ["折扣率超过50%阈值"],
-                    "should_alert": True,
+            return_value=httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "data": {
+                        "risk_level": "high",
+                        "risk_score": 80,
+                        "method": "rule_fallback",
+                        "reasons": ["折扣率超过50%阈值"],
+                        "should_alert": True,
+                    },
                 },
-            })
+            )
         )
 
         result = await client.predict_discount_risk(
@@ -176,9 +170,7 @@ class TestPredictDiscountRisk:
     @pytest.mark.asyncio
     @respx.mock
     async def test_timeout_returns_none(self, client: EdgeInferenceClient) -> None:
-        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            side_effect=httpx.TimeoutException("timeout")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(side_effect=httpx.TimeoutException("timeout"))
 
         result = await client.predict_discount_risk(
             order_data={"discount_rate": 0.3},
@@ -191,21 +183,23 @@ class TestPredictDiscountRisk:
 
 
 class TestPredictTraffic:
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_success(self, client: EdgeInferenceClient) -> None:
         respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            return_value=httpx.Response(200, json={
-                "ok": True,
-                "data": {
-                    "expected_covers": 72,
-                    "turnover_rate": 2.25,
-                    "confidence": 0.80,
-                    "method": "rule_fallback",
-                    "peak_label": "lunch_peak",
+            return_value=httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "data": {
+                        "expected_covers": 72,
+                        "turnover_rate": 2.25,
+                        "confidence": 0.80,
+                        "method": "rule_fallback",
+                        "peak_label": "lunch_peak",
+                    },
                 },
-            })
+            )
         )
 
         result = await client.predict_traffic(
@@ -222,9 +216,7 @@ class TestPredictTraffic:
     @pytest.mark.asyncio
     @respx.mock
     async def test_failure_returns_none(self, client: EdgeInferenceClient) -> None:
-        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(side_effect=httpx.ConnectError("refused"))
 
         result = await client.predict_traffic(
             store_id="store_001",
@@ -239,15 +231,23 @@ class TestPredictTraffic:
 
 
 class TestStats:
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_stats_count_success(self, client: EdgeInferenceClient) -> None:
         respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            return_value=httpx.Response(200, json={
-                "ok": True,
-                "data": {"risk_level": "low", "risk_score": 10, "method": "rule_fallback", "reasons": [], "should_alert": False},
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "data": {
+                        "risk_level": "low",
+                        "risk_score": 10,
+                        "method": "rule_fallback",
+                        "reasons": [],
+                        "should_alert": False,
+                    },
+                },
+            )
         )
 
         await client.predict_discount_risk(order_data={"discount_rate": 0.1})
@@ -259,9 +259,7 @@ class TestStats:
     @pytest.mark.asyncio
     @respx.mock
     async def test_stats_count_failure(self, client: EdgeInferenceClient) -> None:
-        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(side_effect=httpx.ConnectError("refused"))
 
         await client.predict_traffic(store_id="s1", date="2026-04-12", hour=12)
 
@@ -274,19 +272,21 @@ class TestStats:
 
 
 class TestModelStatus:
-
     @pytest.mark.asyncio
     @respx.mock
     async def test_model_status_success(self, client: EdgeInferenceClient) -> None:
         respx.get(f"{BRIDGE_URL}/model-status").mock(
-            return_value=httpx.Response(200, json={
-                "ok": True,
-                "data": {
-                    "models": {
-                        "dish_time_predictor": {"method": "coreml", "coreml_available": True},
-                    }
+            return_value=httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "data": {
+                        "models": {
+                            "dish_time_predictor": {"method": "coreml", "coreml_available": True},
+                        }
+                    },
                 },
-            })
+            )
         )
 
         result = await client.get_model_status()
@@ -296,9 +296,7 @@ class TestModelStatus:
     @pytest.mark.asyncio
     @respx.mock
     async def test_model_status_failure(self, client: EdgeInferenceClient) -> None:
-        respx.get(f"{BRIDGE_URL}/model-status").mock(
-            side_effect=httpx.ConnectError("refused")
-        )
+        respx.get(f"{BRIDGE_URL}/model-status").mock(side_effect=httpx.ConnectError("refused"))
 
         result = await client.get_model_status()
         assert result is None

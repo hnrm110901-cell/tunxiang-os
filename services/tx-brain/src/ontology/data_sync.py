@@ -151,9 +151,7 @@ class PGToNeo4jSync:
             logger.error("change_sync_failed", table=table, error=str(e))
             return {"ok": False, "error": str(e), "status": "failed"}
 
-    def _apply_change(
-        self, config: TableSyncConfig, event: SyncEvent
-    ) -> dict[str, Any]:
+    def _apply_change(self, config: TableSyncConfig, event: SyncEvent) -> dict[str, Any]:
         """Apply a change event to the graph repository."""
         if event.operation == "INSERT":
             return self._apply_insert(config, event)
@@ -164,9 +162,7 @@ class PGToNeo4jSync:
         else:
             raise ValueError(f"Unknown operation: {event.operation}")
 
-    def _apply_insert(
-        self, config: TableSyncConfig, event: SyncEvent
-    ) -> dict[str, Any]:
+    def _apply_insert(self, config: TableSyncConfig, event: SyncEvent) -> dict[str, Any]:
         """Apply INSERT: create a new node."""
         if event.new_data is None:
             raise ValueError("INSERT event requires new_data")
@@ -182,9 +178,7 @@ class PGToNeo4jSync:
 
         return result
 
-    def _apply_update(
-        self, config: TableSyncConfig, event: SyncEvent
-    ) -> dict[str, Any]:
+    def _apply_update(self, config: TableSyncConfig, event: SyncEvent) -> dict[str, Any]:
         """Apply UPDATE: update node properties."""
         if event.new_data is None:
             raise ValueError("UPDATE event requires new_data")
@@ -204,9 +198,7 @@ class PGToNeo4jSync:
 
         return result
 
-    def _apply_delete(
-        self, config: TableSyncConfig, event: SyncEvent
-    ) -> dict[str, Any]:
+    def _apply_delete(self, config: TableSyncConfig, event: SyncEvent) -> dict[str, Any]:
         """Apply DELETE: remove node and its relationships."""
         data = event.old_data or event.new_data
         if data is None:
@@ -218,9 +210,7 @@ class PGToNeo4jSync:
 
         return self.repo.delete_node(config.node_label, node_id)
 
-    def _map_fields(
-        self, config: TableSyncConfig, data: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _map_fields(self, config: TableSyncConfig, data: dict[str, Any]) -> dict[str, Any]:
         """Map PG column names to Neo4j property names."""
         properties: dict[str, Any] = {}
         for pg_col, neo4j_prop in config.field_mapping.items():
@@ -262,13 +252,21 @@ class PGToNeo4jSync:
             try:
                 if direction == "out":
                     self.repo.create_relationship(
-                        config.node_label, node_id, rel_type,
-                        target_label, target_id, rel_props,
+                        config.node_label,
+                        node_id,
+                        rel_type,
+                        target_label,
+                        target_id,
+                        rel_props,
                     )
                 else:
                     self.repo.create_relationship(
-                        target_label, target_id, rel_type,
-                        config.node_label, node_id, rel_props,
+                        target_label,
+                        target_id,
+                        rel_type,
+                        config.node_label,
+                        node_id,
+                        rel_props,
                     )
             except ValueError as e:
                 logger.warning("relationship_mapping_failed", error=str(e))

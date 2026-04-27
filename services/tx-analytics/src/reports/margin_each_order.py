@@ -47,11 +47,21 @@ ORDER BY margin_rate ASC
 """
 
 DIMENSIONS = [
-    "order_no", "store_name", "biz_date", "order_type",
-    "table_number", "waiter_name", "discount_type",
+    "order_no",
+    "store_name",
+    "biz_date",
+    "order_type",
+    "table_number",
+    "waiter_name",
+    "discount_type",
 ]
 METRICS = [
-    "revenue_fen", "cost_fen", "margin_fen", "margin_rate",
-    "item_count", "guest_count", "discount_fen",
+    "revenue_fen",
+    "cost_fen",
+    "margin_fen",
+    "margin_rate",
+    "item_count",
+    "guest_count",
+    "discount_fen",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

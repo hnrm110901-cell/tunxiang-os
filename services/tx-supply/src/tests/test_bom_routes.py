@@ -11,6 +11,7 @@
 
 测试数量: 23 个测试用例
 """
+
 from __future__ import annotations
 
 import sys
@@ -23,8 +24,10 @@ _shared_ont = types.ModuleType("shared.ontology")
 _shared_ont_src = types.ModuleType("shared.ontology.src")
 _shared_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def _placeholder_get_db():
     yield None  # will be overridden via dependency_overrides
+
 
 _shared_db.get_db = _placeholder_get_db
 sys.modules.setdefault("shared", _shared)
@@ -42,14 +45,15 @@ _structlog.get_logger = lambda *a, **kw: types.SimpleNamespace(
 sys.modules.setdefault("structlog", _structlog)
 
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import AsyncMock, MagicMock
+
+from api.bom_routes import get_db, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.exc import SQLAlchemyError
-
-from api.bom_routes import router, get_db
 
 TENANT_ID = str(uuid.uuid4())
 BOM_ID = str(uuid.uuid4())
@@ -58,6 +62,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── App factory with injectable DB mock ──────────────────────────────────────
+
 
 def _make_app(db_mock):
     """Create FastAPI app with get_db overridden to yield db_mock."""
@@ -76,6 +81,7 @@ def _client(db_mock):
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _mock_db():
     db = AsyncMock()
@@ -132,14 +138,13 @@ def _fetchall_result(rows: list):
 
 
 class TestListBoms:
-
     def test_list_boms_empty(self):
         """空列表：total=0, items=[]。"""
         db = _mock_db()
         db.execute.side_effect = [
-            MagicMock(),           # set_config
-            _scalar_result(0),    # COUNT
-            _fetchall_result([]), # ids
+            MagicMock(),  # set_config
+            _scalar_result(0),  # COUNT
+            _fetchall_result([]),  # ids
         ]
         resp = _client(db).get("/api/v1/supply/boms", headers=HEADERS)
         assert resp.status_code == 200
@@ -200,7 +205,6 @@ class TestListBoms:
 
 
 class TestCreateBom:
-
     def _valid_body(self):
         return {
             "dish_id": DISH_ID,
@@ -231,19 +235,27 @@ class TestCreateBom:
         insert_bom.scalar.return_value = new_bom_id
 
         bom_data = {
-            "id": new_bom_id, "tenant_id": TENANT_ID, "dish_id": DISH_ID,
-            "version": 1, "total_cost_fen": 2100, "yield_qty": "1",
-            "yield_unit": "份", "is_active": False, "notes": None,
-            "created_at": None, "updated_at": None, "is_deleted": False,
+            "id": new_bom_id,
+            "tenant_id": TENANT_ID,
+            "dish_id": DISH_ID,
+            "version": 1,
+            "total_cost_fen": 2100,
+            "yield_qty": "1",
+            "yield_unit": "份",
+            "is_active": False,
+            "notes": None,
+            "created_at": None,
+            "updated_at": None,
+            "is_deleted": False,
         }
 
         db.execute.side_effect = [
-            MagicMock(),   # set_config
-            dup_check,     # dup check → None
-            insert_bom,    # INSERT dish_boms RETURNING id
-            MagicMock(),   # INSERT dish_bom_items
-            _mapping_first(bom_data),   # _fetch_bom_with_items: bom
-            _mapping_all([]),           # _fetch_bom_with_items: items
+            MagicMock(),  # set_config
+            dup_check,  # dup check → None
+            insert_bom,  # INSERT dish_boms RETURNING id
+            MagicMock(),  # INSERT dish_bom_items
+            _mapping_first(bom_data),  # _fetch_bom_with_items: bom
+            _mapping_all([]),  # _fetch_bom_with_items: items
         ]
 
         resp = _client(db).post(
@@ -301,7 +313,6 @@ class TestCreateBom:
 
 
 class TestUpdateBom:
-
     def test_update_bom_not_found_404(self):
         """BOM 不存在 → 404。"""
         db = _mock_db()
@@ -322,18 +333,26 @@ class TestUpdateBom:
         row_data = {"id": BOM_ID, "dish_id": DISH_ID, "is_active": False}
 
         bom_data = {
-            "id": BOM_ID, "tenant_id": TENANT_ID, "dish_id": DISH_ID,
-            "version": 1, "total_cost_fen": 0, "yield_qty": "1",
-            "yield_unit": "份", "is_active": False, "notes": "updated note",
-            "created_at": None, "updated_at": None, "is_deleted": False,
+            "id": BOM_ID,
+            "tenant_id": TENANT_ID,
+            "dish_id": DISH_ID,
+            "version": 1,
+            "total_cost_fen": 0,
+            "yield_qty": "1",
+            "yield_unit": "份",
+            "is_active": False,
+            "notes": "updated note",
+            "created_at": None,
+            "updated_at": None,
+            "is_deleted": False,
         }
 
         db.execute.side_effect = [
-            MagicMock(),                  # set_config
-            _mapping_first(row_data),     # SELECT existing
-            MagicMock(),                  # UPDATE dish_boms
-            _mapping_first(bom_data),     # _fetch_bom: bom
-            _mapping_all([]),             # _fetch_bom: items
+            MagicMock(),  # set_config
+            _mapping_first(row_data),  # SELECT existing
+            MagicMock(),  # UPDATE dish_boms
+            _mapping_first(bom_data),  # _fetch_bom: bom
+            _mapping_all([]),  # _fetch_bom: items
         ]
 
         resp = _client(db).put(
@@ -362,7 +381,6 @@ class TestUpdateBom:
 
 
 class TestDeleteBom:
-
     def test_delete_bom_not_found_404(self):
         """BOM 不存在 → 404。"""
         db = _mock_db()
@@ -389,7 +407,7 @@ class TestDeleteBom:
         db.execute.side_effect = [
             MagicMock(),
             _mapping_first({"id": BOM_ID, "is_active": False}),
-            MagicMock(),   # UPDATE is_deleted=true
+            MagicMock(),  # UPDATE is_deleted=true
         ]
         resp = _client(db).delete(f"/api/v1/supply/boms/{BOM_ID}", headers=HEADERS)
         assert resp.status_code == 200
@@ -405,7 +423,6 @@ class TestDeleteBom:
 
 
 class TestCalculateBomCost:
-
     def test_calculate_cost_not_found_404(self):
         """BOM 不存在 → 404。"""
         db = _mock_db()
@@ -426,7 +443,7 @@ class TestCalculateBomCost:
         db.execute.side_effect = [
             MagicMock(),
             existing,
-            _mapping_all([]),   # items → empty
+            _mapping_all([]),  # items → empty
         ]
         resp = _client(db).post(
             f"/api/v1/supply/boms/{BOM_ID}/calculate-cost",
@@ -442,16 +459,20 @@ class TestCalculateBomCost:
         existing.first.return_value = MagicMock()
 
         db.execute.side_effect = [
-            MagicMock(),   # set_config
-            existing,      # SELECT bom exists
-            _mapping_all([{
-                "id": item_id,
-                "quantity": "0.5",
-                "unit_cost_fen": 4000,
-                "loss_rate": "0.05",
-            }]),
-            MagicMock(),   # UPDATE item cost
-            MagicMock(),   # UPDATE bom total
+            MagicMock(),  # set_config
+            existing,  # SELECT bom exists
+            _mapping_all(
+                [
+                    {
+                        "id": item_id,
+                        "quantity": "0.5",
+                        "unit_cost_fen": 4000,
+                        "loss_rate": "0.05",
+                    }
+                ]
+            ),
+            MagicMock(),  # UPDATE item cost
+            MagicMock(),  # UPDATE bom total
         ]
 
         resp = _client(db).post(
@@ -472,7 +493,6 @@ class TestCalculateBomCost:
 
 
 class TestBomCostBreakdown:
-
     def test_breakdown_not_found_404(self):
         """BOM 不存在 → 404。"""
         db = _mock_db()
@@ -487,8 +507,11 @@ class TestBomCostBreakdown:
         """BOM 存在但无明细行 → 200 + breakdown=[]。"""
         db = _mock_db()
         bom_data = {
-            "id": BOM_ID, "total_cost_fen": 0,
-            "yield_qty": "1", "yield_unit": "份", "dish_id": DISH_ID,
+            "id": BOM_ID,
+            "total_cost_fen": 0,
+            "yield_qty": "1",
+            "yield_unit": "份",
+            "dish_id": DISH_ID,
         }
         db.execute.side_effect = [
             MagicMock(),
@@ -508,22 +531,29 @@ class TestBomCostBreakdown:
         """有明细行 → breakdown 含 cost_pct 字段。"""
         db = _mock_db()
         bom_data = {
-            "id": BOM_ID, "total_cost_fen": 2100,
-            "yield_qty": "1", "yield_unit": "份", "dish_id": DISH_ID,
+            "id": BOM_ID,
+            "total_cost_fen": 2100,
+            "yield_qty": "1",
+            "yield_unit": "份",
+            "dish_id": DISH_ID,
         }
         db.execute.side_effect = [
             MagicMock(),
             _mapping_first(bom_data),
-            _mapping_all([{
-                "ingredient_name": "猪肉",
-                "ingredient_code": "PK001",
-                "quantity": "0.5",
-                "unit": "kg",
-                "unit_cost_fen": 4000,
-                "total_cost_fen": 2100,
-                "loss_rate": "0.05",
-                "is_semi_product": False,
-            }]),
+            _mapping_all(
+                [
+                    {
+                        "ingredient_name": "猪肉",
+                        "ingredient_code": "PK001",
+                        "quantity": "0.5",
+                        "unit": "kg",
+                        "unit_cost_fen": 4000,
+                        "total_cost_fen": 2100,
+                        "loss_rate": "0.05",
+                        "is_semi_product": False,
+                    }
+                ]
+            ),
         ]
         resp = _client(db).get(
             f"/api/v1/supply/boms/{BOM_ID}/cost-breakdown",
@@ -545,7 +575,6 @@ class TestBomCostBreakdown:
 
 
 class TestConsumeStockByBom:
-
     def _valid_body(self):
         return {
             "quantity": "2",
@@ -573,14 +602,18 @@ class TestConsumeStockByBom:
         db.execute.side_effect = [
             MagicMock(),
             _mapping_first(bom_data),
-            _mapping_all([{
-                "ingredient_code": "PK001",
-                "ingredient_name": "猪肉",
-                "quantity": "0.5",
-                "unit": "kg",
-                "loss_rate": "0.05",
-            }]),
-            MagicMock(),   # UPDATE ingredients
+            _mapping_all(
+                [
+                    {
+                        "ingredient_code": "PK001",
+                        "ingredient_name": "猪肉",
+                        "quantity": "0.5",
+                        "unit": "kg",
+                        "loss_rate": "0.05",
+                    }
+                ]
+            ),
+            MagicMock(),  # UPDATE ingredients
         ]
         resp = _client(db).post(
             f"/api/v1/supply/dishes/{DISH_ID}/consume-stock",

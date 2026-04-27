@@ -5,6 +5,7 @@
   GET  /api/v1/member/rfm/distribution      查询当前 RFM 等级分布（各等级人数）
   GET  /api/v1/member/rfm/changes           查询今日 RFM 等级变化（升级/降级列表）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,6 +41,7 @@ def _parse_tenant(x_tenant_id: str) -> uuid.UUID:
 
 
 # ── 1. 手动触发 RFM 更新 ──────────────────────────────────────
+
 
 @router.post("/trigger-update")
 async def trigger_rfm_update(
@@ -80,6 +82,7 @@ async def trigger_rfm_update(
 
 # ── 2. 查询 RFM 等级分布 ──────────────────────────────────────
 
+
 @router.get("/distribution")
 async def get_rfm_distribution(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -105,8 +108,8 @@ async def get_rfm_distribution(
             func.count(Customer.id).label("count"),
         )
         .where(Customer.tenant_id == tenant_id)
-        .where(Customer.is_deleted == False)   # noqa: E712
-        .where(Customer.is_merged == False)    # noqa: E712
+        .where(Customer.is_deleted == False)  # noqa: E712
+        .where(Customer.is_merged == False)  # noqa: E712
         .group_by(Customer.rfm_level)
         .order_by(func.coalesce(Customer.rfm_level, "S3"))
     )
@@ -149,6 +152,7 @@ async def get_rfm_distribution(
 
 # ── 3. 查询今日 RFM 等级变化 ──────────────────────────────────
 
+
 @router.get("/changes")
 async def get_rfm_changes(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -173,13 +177,10 @@ async def get_rfm_changes(
         {"tid": str(tenant_id)},
     )
 
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # 尝试从 rfm_change_logs 表查询（如不存在则降级为简易查询）
     try:
-
         change_sql = text("""
             SELECT
                 cl.customer_id,
@@ -253,20 +254,16 @@ async def get_rfm_changes(
                 Customer.r_score,
             )
             .where(Customer.tenant_id == tenant_id)
-            .where(Customer.is_deleted == False)   # noqa: E712
-            .where(Customer.is_merged == False)    # noqa: E712
+            .where(Customer.is_deleted == False)  # noqa: E712
+            .where(Customer.is_merged == False)  # noqa: E712
             .where(Customer.rfm_updated_at >= today_start)
         )
 
-        count_result = await db.execute(
-            select(func.count()).select_from(base_query.subquery())
-        )
+        count_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
         total = count_result.scalar() or 0
 
         page_result = await db.execute(
-            base_query.order_by(Customer.rfm_updated_at.desc())
-            .offset((page - 1) * size)
-            .limit(size)
+            base_query.order_by(Customer.rfm_updated_at.desc()).offset((page - 1) * size).limit(size)
         )
         items = [
             {

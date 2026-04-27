@@ -18,6 +18,7 @@
   - 水温超出品种适宜范围 → water_temp_alert
   - 库存 < 安全库存 → low_stock_alert
 """
+
 from __future__ import annotations
 
 import uuid
@@ -67,6 +68,7 @@ _water_readings: List[Dict[str, Any]] = []
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -89,6 +91,7 @@ def _stock_key(tenant_id: str, store_id: str, ingredient_id: str) -> str:
 
 # ─── 鱼缸 / 水族箱 ────────────────────────────────────────────────────────────
 
+
 async def list_tanks(
     store_id: str,
     tenant_id: str,
@@ -110,6 +113,7 @@ async def list_tanks(
 
 
 # ─── 活鲜库存 ─────────────────────────────────────────────────────────────────
+
 
 async def list_stock(
     store_id: str,
@@ -151,7 +155,7 @@ async def intake_stock(
     quantity_kg: float,
     unit_price_fen: int,
     supplier_name: str,
-    origin_certificate_no: str,      # 产地证明（食安硬约束）
+    origin_certificate_no: str,  # 产地证明（食安硬约束）
     quarantine_certificate_no: str,  # 检疫证（食安硬约束）
     operator_id: str,
     tank_id: Optional[str] = None,
@@ -215,6 +219,7 @@ async def intake_stock(
 
 
 # ─── 死亡损耗 ─────────────────────────────────────────────────────────────────
+
 
 async def record_mortality(
     store_id: str,
@@ -290,6 +295,7 @@ async def record_mortality(
 
 # ─── 死亡率统计 ────────────────────────────────────────────────────────────────
 
+
 async def get_mortality_rate(
     store_id: str,
     tenant_id: str,
@@ -304,7 +310,8 @@ async def get_mortality_rate(
 
     # 过滤本租户本门店的记录
     filtered = [
-        r for r in _mortality_records
+        r
+        for r in _mortality_records
         if r["tenant_id"] == tenant_id
         and r["store_id"] == store_id
         and date.fromisoformat(r["date"]) >= cutoff
@@ -335,13 +342,15 @@ async def get_mortality_rate(
         total = dead_kg + alive_kg
         rate_pct = round(dead_kg / total * 100, 2) if total > 0 else 0.0
         is_alert = rate_pct > MORTALITY_ALERT_THRESHOLD_PCT
-        species_stats.append({
-            "species": sp,
-            "dead_kg": round(dead_kg, 4),
-            "alive_kg": round(alive_kg, 4),
-            "mortality_rate_pct": rate_pct,
-            "is_alert": is_alert,
-        })
+        species_stats.append(
+            {
+                "species": sp,
+                "dead_kg": round(dead_kg, 4),
+                "alive_kg": round(alive_kg, 4),
+                "mortality_rate_pct": rate_pct,
+                "is_alert": is_alert,
+            }
+        )
 
     # 按死亡率降序
     species_stats.sort(key=lambda x: x["mortality_rate_pct"], reverse=True)
@@ -365,6 +374,7 @@ async def get_mortality_rate(
 
 
 # ─── 水质检测 ─────────────────────────────────────────────────────────────────
+
 
 async def record_tank_reading(
     store_id: str,
@@ -447,42 +457,49 @@ def _check_water_quality_alerts(
     if temperature is not None and species:
         temp_range = SPECIES_TEMP_RANGE.get(species, SPECIES_TEMP_RANGE["DEFAULT"])
         if temperature < temp_range[0]:
-            alerts.append({
-                "type": "water_temp_low",
-                "tank_id": tank_id,
-                "species": species,
-                "current": temperature,
-                "min_safe": temp_range[0],
-                "severity": "warning",
-                "message": f"水温 {temperature}℃ 低于 {species} 适宜下限 {temp_range[0]}℃",
-            })
+            alerts.append(
+                {
+                    "type": "water_temp_low",
+                    "tank_id": tank_id,
+                    "species": species,
+                    "current": temperature,
+                    "min_safe": temp_range[0],
+                    "severity": "warning",
+                    "message": f"水温 {temperature}℃ 低于 {species} 适宜下限 {temp_range[0]}℃",
+                }
+            )
         elif temperature > temp_range[1]:
-            alerts.append({
-                "type": "water_temp_high",
-                "tank_id": tank_id,
-                "species": species,
-                "current": temperature,
-                "max_safe": temp_range[1],
-                "severity": "warning",
-                "message": f"水温 {temperature}℃ 高于 {species} 适宜上限 {temp_range[1]}℃",
-            })
+            alerts.append(
+                {
+                    "type": "water_temp_high",
+                    "tank_id": tank_id,
+                    "species": species,
+                    "current": temperature,
+                    "max_safe": temp_range[1],
+                    "severity": "warning",
+                    "message": f"水温 {temperature}℃ 高于 {species} 适宜上限 {temp_range[1]}℃",
+                }
+            )
 
     if ph is not None:
         if ph < 6.5 or ph > 8.5:
             severity = "critical" if ph < 6.0 or ph > 9.0 else "warning"
-            alerts.append({
-                "type": "ph_abnormal",
-                "tank_id": tank_id,
-                "current_ph": ph,
-                "safe_range": "6.5-8.5",
-                "severity": severity,
-                "message": f"pH {ph} 超出正常范围（6.5-8.5）",
-            })
+            alerts.append(
+                {
+                    "type": "ph_abnormal",
+                    "tank_id": tank_id,
+                    "current_ph": ph,
+                    "safe_range": "6.5-8.5",
+                    "severity": severity,
+                    "message": f"pH {ph} 超出正常范围（6.5-8.5）",
+                }
+            )
 
     return alerts
 
 
 # ─── 综合预警 ─────────────────────────────────────────────────────────────────
+
 
 async def get_alerts(
     store_id: str,
@@ -496,17 +513,19 @@ async def get_alerts(
     mortality_data = await get_mortality_rate(store_id, tenant_id, days=7)
     for sp_stat in mortality_data["by_species"]:
         if sp_stat["is_alert"]:
-            alerts.append({
-                "type": "mortality_alert",
-                "severity": "critical",
-                "species": sp_stat["species"],
-                "mortality_rate_pct": sp_stat["mortality_rate_pct"],
-                "threshold_pct": MORTALITY_ALERT_THRESHOLD_PCT,
-                "message": (
-                    f"{sp_stat['species']} 近7天死亡率 {sp_stat['mortality_rate_pct']}%，"
-                    f"超过阈值 {MORTALITY_ALERT_THRESHOLD_PCT}%"
-                ),
-            })
+            alerts.append(
+                {
+                    "type": "mortality_alert",
+                    "severity": "critical",
+                    "species": sp_stat["species"],
+                    "mortality_rate_pct": sp_stat["mortality_rate_pct"],
+                    "threshold_pct": MORTALITY_ALERT_THRESHOLD_PCT,
+                    "message": (
+                        f"{sp_stat['species']} 近7天死亡率 {sp_stat['mortality_rate_pct']}%，"
+                        f"超过阈值 {MORTALITY_ALERT_THRESHOLD_PCT}%"
+                    ),
+                }
+            )
 
     # 2. 水质预警（最新水质读数）
     prefix = f"{tenant_id}:{store_id}:"
@@ -527,21 +546,21 @@ async def get_alerts(
         species_remaining: Dict[str, float] = {}
         for item in stock_list:
             sp = item.get("species", "unknown")
-            species_remaining[sp] = (
-                species_remaining.get(sp, 0.0) + item.get("remaining_kg", 0.0)
-            )
+            species_remaining[sp] = species_remaining.get(sp, 0.0) + item.get("remaining_kg", 0.0)
 
         # 找安全库存阈值（此处用传入阈值；生产环境从 ingredients.min_quantity 读取）
         for sp, remaining in species_remaining.items():
             if remaining < min_stock_kg_threshold:
-                alerts.append({
-                    "type": "low_stock",
-                    "severity": "warning" if remaining > 0 else "critical",
-                    "species": sp,
-                    "remaining_kg": round(remaining, 4),
-                    "threshold_kg": min_stock_kg_threshold,
-                    "message": f"{sp} 库存 {round(remaining, 2)}kg 低于安全库存 {min_stock_kg_threshold}kg",
-                })
+                alerts.append(
+                    {
+                        "type": "low_stock",
+                        "severity": "warning" if remaining > 0 else "critical",
+                        "species": sp,
+                        "remaining_kg": round(remaining, 4),
+                        "threshold_kg": min_stock_kg_threshold,
+                        "message": f"{sp} 库存 {round(remaining, 2)}kg 低于安全库存 {min_stock_kg_threshold}kg",
+                    }
+                )
 
     log.info(
         "seafood.alerts",

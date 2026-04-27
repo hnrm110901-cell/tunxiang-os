@@ -3,6 +3,7 @@
 M4a: Gateway 路由 100% 切换到 tunxiang-os 域微服务。
 旧 tunxiang 单体作为 fallback 保留，可通过 LEGACY_API_URL 配置。
 """
+
 import os
 
 import httpx
@@ -63,6 +64,9 @@ DOMAIN_ROUTES = {
     "insights": os.getenv("TX_ANALYTICS_URL", "http://localhost:8009"),
     # 支付中枢（tx-pay:8016）
     "pay": os.getenv("TX_PAY_URL", "http://localhost:8016"),
+    # DevForge 内部研发运维平台（tx-devforge:8017）
+    # 与 tx-forge（外部 ISV 市场）严格区分
+    "devforge": os.getenv("TX_DEVFORGE_URL", "http://localhost:8017"),
 }
 
 # 旧单体回退（M4a 后可移除）
@@ -74,7 +78,11 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
     if not target_url:
         return JSONResponse(
             status_code=503,
-            content={"ok": False, "data": None, "error": {"code": "SERVICE_UNAVAILABLE", "message": "Target service not configured"}},
+            content={
+                "ok": False,
+                "data": None,
+                "error": {"code": "SERVICE_UNAVAILABLE", "message": "Target service not configured"},
+            },
         )
 
     try:
@@ -103,7 +111,11 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
         logger.warning("proxy_timeout", target=target_url, path=request.url.path, error=str(e))
         return JSONResponse(
             status_code=504,
-            content={"ok": False, "data": None, "error": {"code": "PROXY_TIMEOUT", "message": "Upstream service timeout"}},
+            content={
+                "ok": False,
+                "data": None,
+                "error": {"code": "PROXY_TIMEOUT", "message": "Upstream service timeout"},
+            },
         )
     except httpx.HTTPError as e:
         logger.error("proxy_http_error", target=target_url, error=str(e))

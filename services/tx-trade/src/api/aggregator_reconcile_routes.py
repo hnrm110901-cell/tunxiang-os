@@ -9,6 +9,7 @@ Y-A5 对账模块
   GET    /discrepancies                  差异单列表（本地有/平台无，或金额不符）
   POST   /discrepancies/{id}/resolve     人工标记差异已处理
 """
+
 from __future__ import annotations
 
 import uuid
@@ -380,9 +381,7 @@ async def list_reconcile_results(
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header("demo-tenant", alias="X-Tenant-ID"),
 ) -> dict:
-    results = [
-        r for r in _RECONCILE_RESULTS.values() if r["tenant_id"] == x_tenant_id
-    ]
+    results = [r for r in _RECONCILE_RESULTS.values() if r["tenant_id"] == x_tenant_id]
 
     if platform:
         results = [r for r in results if r["platform"] == platform]
@@ -437,11 +436,7 @@ async def get_reconcile_result(
         )
 
     # 附带差异单摘要
-    discrepancies = [
-        _DISCREPANCIES[d_id]
-        for d_id in result.get("discrepancy_ids", [])
-        if d_id in _DISCREPANCIES
-    ]
+    discrepancies = [_DISCREPANCIES[d_id] for d_id in result.get("discrepancy_ids", []) if d_id in _DISCREPANCIES]
 
     return {
         "ok": True,
@@ -461,9 +456,7 @@ async def get_reconcile_result(
 @router.get("/discrepancies", summary="差异单列表（本地有/平台无，或金额不符）")
 async def list_discrepancies(
     platform: Optional[str] = Query(None, description="平台过滤"),
-    discrepancy_type: Optional[str] = Query(
-        None, description="差异类型：local_only/platform_only/amount_mismatch"
-    ),
+    discrepancy_type: Optional[str] = Query(None, description="差异类型：local_only/platform_only/amount_mismatch"),
     resolved: Optional[bool] = Query(None, description="是否已处理"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -484,9 +477,7 @@ async def list_discrepancies(
 
     # 汇总差异金额
     total_discrepancy_fen: int = sum(int(d["discrepancy_amount_fen"]) for d in items)
-    unresolved_fen: int = sum(
-        int(d["discrepancy_amount_fen"]) for d in items if not d["resolved"]
-    )
+    unresolved_fen: int = sum(int(d["discrepancy_amount_fen"]) for d in items if not d["resolved"])
 
     return {
         "ok": True,

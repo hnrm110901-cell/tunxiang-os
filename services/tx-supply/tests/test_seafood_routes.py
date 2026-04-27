@@ -21,14 +21,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from services.tx_supply.src.api.seafood_routes import router as seafood_router
+
 from shared.ontology.src.database import get_db
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────

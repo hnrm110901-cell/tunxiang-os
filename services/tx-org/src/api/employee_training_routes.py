@@ -2,6 +2,7 @@
 员工培训管理路由 — DB持久化版
 OR-02: employee_trainings / training_plans 表（v104迁移）
 """
+
 from __future__ import annotations
 
 import uuid
@@ -302,7 +303,7 @@ async def update_training_record(
         result = await db.execute(
             text(f"""
                 UPDATE employee_trainings
-                SET {', '.join(set_parts)}
+                SET {", ".join(set_parts)}
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
                 RETURNING id
             """),
@@ -372,18 +373,20 @@ async def get_expiring_certificates(
             _, risk_level = CERT_RISK.get(r.category or "", DEFAULT_CERT_RISK)
             if r.category == "food_safety":
                 risk_level = "high"
-            items.append({
-                "record_id": str(r.id),
-                "employee_id": str(r.employee_id),
-                "training_type": r.category,
-                "training_name": r.course_name,
-                "certificate_no": r.certificate_id,
-                "certificate_expires_at": exp_str,
-                "days_remaining": days_remaining,
-                "cert_status": _cert_status(days_remaining),
-                "risk_level": risk_level,
-                "action": "安排复训",
-            })
+            items.append(
+                {
+                    "record_id": str(r.id),
+                    "employee_id": str(r.employee_id),
+                    "training_type": r.category,
+                    "training_name": r.course_name,
+                    "certificate_no": r.certificate_id,
+                    "certificate_expires_at": exp_str,
+                    "days_remaining": days_remaining,
+                    "cert_status": _cert_status(days_remaining),
+                    "risk_level": risk_level,
+                    "action": "安排复训",
+                }
+            )
 
     except SQLAlchemyError as exc:
         logger.warning("expiring_certs_db_fallback", error=str(exc))
@@ -457,6 +460,7 @@ async def create_training_plan(
     await _set_rls(db, tid)
 
     import json
+
     plan_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
 
@@ -673,14 +677,16 @@ async def get_employee_training_profile(
                 item["cert_days_remaining"] = days
                 item["cert_status"] = _cert_status(days)
                 if days >= 0:
-                    active_certs.append({
-                        "training_type": r.category,
-                        "training_name": r.course_name,
-                        "certificate_no": r.certificate_id,
-                        "certificate_expires_at": exp_str,
-                        "days_remaining": days,
-                        "cert_status": _cert_status(days),
-                    })
+                    active_certs.append(
+                        {
+                            "training_type": r.category,
+                            "training_name": r.course_name,
+                            "certificate_no": r.certificate_id,
+                            "certificate_expires_at": exp_str,
+                            "days_remaining": days,
+                            "cert_status": _cert_status(days),
+                        }
+                    )
             records.append(item)
 
         completed = sum(1 for r in records if r["status"] == "completed")

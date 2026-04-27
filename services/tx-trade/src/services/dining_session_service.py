@@ -17,11 +17,13 @@ dining_sessions 是门店业务聚合根，一次完整就餐旅程的主记录�
 
 三条硬约束在调用层（cashier_engine）校验，此服务只管桌台生命周期。
 """
+
 from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, date as date_type, timezone
+from datetime import date as date_type
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -33,18 +35,35 @@ from shared.events.src.event_types import TableEventType
 
 logger = structlog.get_logger()
 
-# ─── 状态机：合法迁移矩阵 ────────────────────────────────────────────────────
+# ─── 状态机：按服务模式分支的合法迁移矩阵 ────────────────────────────────
 VALID_TRANSITIONS: dict[str, list[str]] = {
-    "reserved":     ["seated"],
-    "seated":       ["ordering"],
-    "ordering":     ["dining", "billing"],
-    "dining":       ["add_ordering", "billing"],
+    "reserved": ["seated"],
+    "seated": ["ordering"],
+    "ordering": ["dining", "billing"],
+    "dining": ["add_ordering", "billing"],
     "add_ordering": ["dining"],
-    "billing":      ["paid"],
-    "paid":         ["clearing"],
-    "clearing":     [],           # 终态
-    "disabled":     [],           # 管理员手动禁用，不参与正常流转
+    "billing": ["paid"],
+    "paid": ["clearing"],
+    "clearing": [],  # 终态
+    "disabled": [],  # 管理员手动禁用，不参与正常流转
 }
+
+# scan_and_pay 模式：跳过 seated，下单后直接进入 billing
+VALID_TRANSITIONS_SCAN_AND_PAY: dict[str, list[str]] = {
+    "ordering": ["billing"],
+    "billing": ["paid"],
+    "paid": ["clearing"],
+    "clearing": [],
+}
+
+
+def get_valid_transitions(service_mode: str) -> dict[str, list[str]]:
+    """根据服务模式返回对应的状态迁移矩阵"""
+    if service_mode == "scan_and_pay":
+        return VALID_TRANSITIONS_SCAN_AND_PAY
+    # dine_first 和其他模式使用默认状态机
+    return VALID_TRANSITIONS
+
 
 # 终态集合：这些状态下桌台可以释放给下一批客人
 TERMINAL_STATUSES = {"paid", "clearing", "disabled"}
@@ -140,8 +159,7 @@ class DiningSessionService:
         existing = await self.get_active_session_by_table(store_id, table_id)
         if existing:
             raise ValueError(
-                f"桌台 {table_id} 已有活跃会话 {existing['session_no']}（状态：{existing['status']}），"
-                f"请先清台再开台"
+                f"桌台 {table_id} 已有活跃会话 {existing['session_no']}（状态：{existing['status']}），请先清台再开台"
             )
 
         # 获取桌台信息（桌号快照、低消配置）
@@ -167,16 +185,25 @@ class DiningSessionService:
         if isinstance(extra_config, dict):
             room_config.update({k: v for k, v in extra_config.items() if k not in room_config})
 
-        # 获取区域支付模式（先付/后付），默认后付
+        # 获取区域支付模式和服务模式
         zone_pay_mode: str = "postpay"
+        zone_service_mode: str = "dine_first"
+        zone_pricing_snapshot: dict = {}
+        zone_coupon_config: dict = {}
         if zone_id:
             zone_row = await self._db.execute(
-                text("SELECT pay_mode FROM table_zones WHERE id = :zid AND tenant_id = :tid"),
+                text("""
+                    SELECT pay_mode, service_mode, pricing_policy, coupon_config
+                    FROM table_zones WHERE id = :zid AND tenant_id = :tid
+                """),
                 {"zid": zone_id, "tid": self._tenant_id},
             )
             zone_info = zone_row.mappings().one_or_none()
             if zone_info:
                 zone_pay_mode = zone_info["pay_mode"] or "postpay"
+                zone_service_mode = zone_info["service_mode"] or "dine_first"
+                zone_pricing_snapshot = zone_info["pricing_policy"] or {}
+                zone_coupon_config = zone_info["coupon_config"] or {}
 
         # 获取门店 store_code（用于生成 session_no）
         store_row = await self._db.execute(
@@ -193,9 +220,13 @@ class DiningSessionService:
         session_id = uuid.uuid4()
         now = _now_utc()
 
-        # 先付（prepay）模式：直接进入 ordering 状态（已付款，直接点单）
-        # 后付（postpay）模式：从 seated 开始（传统堂食流程）
-        initial_status = "ordering" if zone_pay_mode == "prepay" else "seated"
+        # 根据服务模式决定初始状态
+        # scan_and_pay: 直接进入 ordering（扫码即点即付）
+        # dine_first:   从 seated 开始（传统堂食流程）
+        # retail:       不应走到这里（retail模式不创建dining_session）
+        if zone_service_mode == "retail":
+            raise ValueError("retail 模式不创建堂食会话，请使用 /cashier/retail-sale 端点")
+        initial_status = "ordering" if zone_service_mode == "scan_and_pay" else "seated"
 
         # 插入 dining_sessions
         await self._db.execute(
@@ -207,14 +238,16 @@ class DiningSessionService:
                     opened_at, table_no_snapshot,
                     total_orders, total_items, total_amount_fen,
                     discount_amount_fen, final_amount_fen, per_capita_fen,
-                    service_call_count, room_config, pay_mode, order_type,
+                    service_call_count, room_config, pay_mode, service_mode,
+                    zone_pricing_snapshot, order_type,
                     created_at, updated_at, is_deleted
                 ) VALUES (
                     :id, :tenant_id, :store_id, :table_id, :session_no,
                     :guest_count, :vip_customer_id, :booking_id,
                     :initial_status, :lead_waiter_id, :zone_id, :session_type,
                     :now, :table_no_snapshot,
-                    0, 0, 0, 0, 0, 0, 0, :room_config, :pay_mode, :order_type,
+                    0, 0, 0, 0, 0, 0, 0, :room_config, :pay_mode, :service_mode,
+                    :zone_pricing_snapshot, :order_type,
                     :now, :now, FALSE
                 )
             """),
@@ -234,7 +267,9 @@ class DiningSessionService:
                 "table_no_snapshot": table_no_snapshot,
                 "room_config": room_config,
                 "pay_mode": zone_pay_mode,
-                "order_type": session_type,   # 从 session_type 推导渠道类型
+                "service_mode": zone_service_mode,
+                "zone_pricing_snapshot": zone_pricing_snapshot,
+                "order_type": session_type,  # 从 session_type 推导渠道类型
                 "initial_status": initial_status,
             },
         )
@@ -267,23 +302,25 @@ class DiningSessionService:
         )
 
         # 旁路发送跨域事件
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.OPENED,
-            tenant_id=self._tenant_id,
-            stream_id=str(session_id),
-            payload={
-                "session_no": session_no,
-                "table_id": str(table_id),
-                "table_no": table_no_snapshot,
-                "guest_count": guest_count,
-                "session_type": session_type,
-                "lead_waiter_id": str(lead_waiter_id),
-                "booking_id": str(booking_id) if booking_id else None,
-                "vip_customer_id": str(vip_customer_id) if vip_customer_id else None,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.OPENED,
+                tenant_id=self._tenant_id,
+                stream_id=str(session_id),
+                payload={
+                    "session_no": session_no,
+                    "table_id": str(table_id),
+                    "table_no": table_no_snapshot,
+                    "guest_count": guest_count,
+                    "session_type": session_type,
+                    "lead_waiter_id": str(lead_waiter_id),
+                    "booking_id": str(booking_id) if booking_id else None,
+                    "vip_customer_id": str(vip_customer_id) if vip_customer_id else None,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         logger.info(
             "dining_session_opened",
@@ -320,9 +357,7 @@ class DiningSessionService:
         row = result.mappings().one_or_none()
         return dict(row) if row else None
 
-    async def get_active_session_by_table(
-        self, store_id: uuid.UUID, table_id: uuid.UUID
-    ) -> Optional[dict]:
+    async def get_active_session_by_table(self, store_id: uuid.UUID, table_id: uuid.UUID) -> Optional[dict]:
         """获取桌台的当前活跃会话（非终态）"""
         await self._set_tenant()
         result = await self._db.execute(
@@ -410,15 +445,14 @@ class DiningSessionService:
         allowed = VALID_TRANSITIONS.get(current, [])
         if new_status not in allowed:
             raise ValueError(
-                f"状态迁移不合法：{current} → {new_status}。"
-                f"当前允许迁移到：{allowed or '（终态，无法迁移）'}"
+                f"状态迁移不合法：{current} → {new_status}。当前允许迁移到：{allowed or '（终态，无法迁移）'}"
             )
 
         now = _now_utc()
         # 根据新状态更新对应时间戳字段
         ts_field_map = {
-            "billing":  "bill_requested_at",
-            "paid":     "paid_at",
+            "billing": "bill_requested_at",
+            "paid": "paid_at",
             "clearing": "cleared_at",
         }
         ts_field = ts_field_map.get(new_status)
@@ -456,8 +490,8 @@ class DiningSessionService:
 
         # 状态→事件类型映射
         status_event_map = {
-            "billing":  TableEventType.BILL_REQUESTED,
-            "paid":     TableEventType.PAID,
+            "billing": TableEventType.BILL_REQUESTED,
+            "paid": TableEventType.PAID,
             "clearing": TableEventType.CLEARED,
         }
         event_type = status_event_map.get(new_status)
@@ -470,14 +504,16 @@ class DiningSessionService:
                 payload={"from_status": current, "reason": reason},
                 operator_id=operator_id,
             )
-            asyncio.create_task(emit_event(
-                event_type=event_type,
-                tenant_id=self._tenant_id,
-                stream_id=str(session_id),
-                payload={"from_status": current, "to_status": new_status, "reason": reason},
-                store_id=store_id,
-                source_service="tx-trade",
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=event_type,
+                    tenant_id=self._tenant_id,
+                    stream_id=str(session_id),
+                    payload={"from_status": current, "to_status": new_status, "reason": reason},
+                    store_id=store_id,
+                    source_service="tx-trade",
+                )
+            )
 
         logger.info(
             "dining_session_status_changed",
@@ -509,7 +545,7 @@ class DiningSessionService:
             raise ValueError(f"堂食会话 {session_id} 不存在")
 
         now = _now_utc()
-        is_first_order = (session["total_orders"] == 0)
+        is_first_order = session["total_orders"] == 0
 
         # 更新汇总字段
         await self._db.execute(
@@ -551,18 +587,20 @@ class DiningSessionService:
                 "is_add_order": is_add_order,
             },
         )
-        asyncio.create_task(emit_event(
-            event_type=event_type,
-            tenant_id=self._tenant_id,
-            stream_id=str(session_id),
-            payload={
-                "order_id": str(order_id),
-                "order_amount_fen": order_amount_fen,
-                "item_count": item_count,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=event_type,
+                tenant_id=self._tenant_id,
+                stream_id=str(session_id),
+                payload={
+                    "order_id": str(order_id),
+                    "order_amount_fen": order_amount_fen,
+                    "item_count": item_count,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
     async def record_dish_served(
         self,
@@ -626,9 +664,7 @@ class DiningSessionService:
         # 检查目标桌台是否可用
         target_existing = await self.get_active_session_by_table(store_id, target_table_id)
         if target_existing:
-            raise ValueError(
-                f"目标桌台 {target_table_id} 已有活跃会话 {target_existing['session_no']}，无法转台"
-            )
+            raise ValueError(f"目标桌台 {target_table_id} 已有活跃会话 {target_existing['session_no']}，无法转台")
 
         # 获取目标桌台信息（桌号 + 低消配置）
         target_row = await self._db.execute(
@@ -654,9 +690,7 @@ class DiningSessionService:
         # 合并新桌台额外配置
         extra_config = target_info["config"] or {}
         if isinstance(extra_config, dict):
-            existing_room_config.update(
-                {k: v for k, v in extra_config.items() if k not in ("min_spend_fen",)}
-            )
+            existing_room_config.update({k: v for k, v in extra_config.items() if k not in ("min_spend_fen",)})
 
         now = _now_utc()
 
@@ -729,18 +763,20 @@ class DiningSessionService:
             },
             operator_id=operator_id,
         )
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.TRANSFERRED,
-            tenant_id=self._tenant_id,
-            stream_id=str(session_id),
-            payload={
-                "from_table_no": old_table_no,
-                "to_table_no": new_table_no,
-                "reason": reason,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.TRANSFERRED,
+                tenant_id=self._tenant_id,
+                stream_id=str(session_id),
+                payload={
+                    "from_table_no": old_table_no,
+                    "to_table_no": new_table_no,
+                    "reason": reason,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         logger.info(
             "dining_session_transferred",
@@ -857,17 +893,19 @@ class DiningSessionService:
             },
             operator_id=operator_id,
         )
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.MERGED,
-            tenant_id=self._tenant_id,
-            stream_id=str(primary_session_id),
-            payload={
-                "merged_count": len(secondary_session_ids),
-                "merged_table_nos": merged_table_nos,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.MERGED,
+                tenant_id=self._tenant_id,
+                stream_id=str(primary_session_id),
+                payload={
+                    "merged_count": len(secondary_session_ids),
+                    "merged_table_nos": merged_table_nos,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         logger.info(
             "dining_sessions_merged",
@@ -923,9 +961,7 @@ class DiningSessionService:
                     f"如需豁免请联系管理员审批"
                 )
 
-        return await self.transition_status(
-            session_id, "billing", operator_id=operator_id
-        )
+        return await self.transition_status(session_id, "billing", operator_id=operator_id)
 
     async def override_min_spend(
         self,
@@ -1037,18 +1073,20 @@ class DiningSessionService:
                 "guest_count": guest_count,
             },
         )
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.PAID,
-            tenant_id=self._tenant_id,
-            stream_id=str(session_id),
-            payload={
-                "final_amount_fen": final_amount_fen,
-                "discount_amount_fen": discount_amount_fen,
-                "per_capita_fen": per_capita,
-            },
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.PAID,
+                tenant_id=self._tenant_id,
+                stream_id=str(session_id),
+                payload={
+                    "final_amount_fen": final_amount_fen,
+                    "discount_amount_fen": discount_amount_fen,
+                    "per_capita_fen": per_capita,
+                },
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         logger.info(
             "dining_session_paid",
@@ -1074,9 +1112,7 @@ class DiningSessionService:
             raise ValueError(f"堂食会话 {session_id} 不存在")
 
         if session["status"] != "paid":
-            raise ValueError(
-                f"只有已结账（paid）的会话才能清台，当前状态：{session['status']}"
-            )
+            raise ValueError(f"只有已结账（paid）的会话才能清台，当前状态：{session['status']}")
 
         now = _now_utc()
         table_id = uuid.UUID(str(session["table_id"]))
@@ -1109,20 +1145,22 @@ class DiningSessionService:
             event_type=TableEventType.CLEARED,
             payload={
                 "cleared_by": str(cleaner_id),
-                "dining_minutes": int(
-                    (now - session["opened_at"]).total_seconds() / 60
-                ) if session.get("opened_at") else None,
+                "dining_minutes": int((now - session["opened_at"]).total_seconds() / 60)
+                if session.get("opened_at")
+                else None,
             },
             operator_id=cleaner_id,
         )
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.CLEARED,
-            tenant_id=self._tenant_id,
-            stream_id=str(session_id),
-            payload={"session_no": session["session_no"]},
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.CLEARED,
+                tenant_id=self._tenant_id,
+                stream_id=str(session_id),
+                payload={"session_no": session["session_no"]},
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         logger.info(
             "dining_session_cleared",
@@ -1175,14 +1213,16 @@ class DiningSessionService:
                 "identified_by": identified_by,
             },
         )
-        asyncio.create_task(emit_event(
-            event_type=TableEventType.VIP_IDENTIFIED,
-            tenant_id=self._tenant_id,
-            stream_id=str(session_id),
-            payload={"customer_id": str(customer_id), "identified_by": identified_by},
-            store_id=store_id,
-            source_service="tx-trade",
-        ))
+        asyncio.create_task(
+            emit_event(
+                event_type=TableEventType.VIP_IDENTIFIED,
+                tenant_id=self._tenant_id,
+                stream_id=str(session_id),
+                payload={"customer_id": str(customer_id), "identified_by": identified_by},
+                store_id=store_id,
+                source_service="tx-trade",
+            )
+        )
 
         return await self.get_session(session_id)  # type: ignore[return-value]
 

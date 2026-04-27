@@ -74,18 +74,22 @@ async def get_week_schedule(
                 "position": row.get("employee_position"),
                 "shifts": [],
             }
-        emp_map[eid]["shifts"].append({
-            "schedule_id": str(row["id"]),
-            "date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
-            "shift_start": str(row["shift_start"]),
-            "shift_end": str(row["shift_end"]),
-            "status": row.get("status", "scheduled"),
-            "role": row.get("role"),
-            "template_id": str(row["template_id"]) if row.get("template_id") else None,
-            "template_name": row.get("template_name"),
-            "template_color": row.get("template_color"),
-            "notes": row.get("notes"),
-        })
+        emp_map[eid]["shifts"].append(
+            {
+                "schedule_id": str(row["id"]),
+                "date": row["schedule_date"].isoformat()
+                if hasattr(row["schedule_date"], "isoformat")
+                else str(row["schedule_date"]),
+                "shift_start": str(row["shift_start"]),
+                "shift_end": str(row["shift_end"]),
+                "status": row.get("status", "scheduled"),
+                "role": row.get("role"),
+                "template_id": str(row["template_id"]) if row.get("template_id") else None,
+                "template_name": row.get("template_name"),
+                "template_color": row.get("template_color"),
+                "notes": row.get("notes"),
+            }
+        )
 
     return {
         "store_id": store_id,
@@ -135,8 +139,11 @@ async def create_schedule(
             "AND shift_start < :new_end::time AND shift_end > :new_start::time"
         ),
         {
-            "tid": tenant_id, "eid": employee_id,
-            "d": schedule_date, "new_start": shift_start, "new_end": shift_end,
+            "tid": tenant_id,
+            "eid": employee_id,
+            "d": schedule_date,
+            "new_start": shift_start,
+            "new_end": shift_end,
         },
     )
     conflict_row = conflict_check.mappings().first()
@@ -184,7 +191,9 @@ async def create_schedule(
         "schedule_id": str(row_data["id"]),
         "employee_id": employee_id,
         "store_id": data["store_id"],
-        "schedule_date": row_data["schedule_date"].isoformat() if hasattr(row_data["schedule_date"], "isoformat") else str(row_data["schedule_date"]),
+        "schedule_date": row_data["schedule_date"].isoformat()
+        if hasattr(row_data["schedule_date"], "isoformat")
+        else str(row_data["schedule_date"]),
         "shift_start": str(row_data["shift_start"]),
         "shift_end": str(row_data["shift_end"]),
         "status": row_data["status"],
@@ -248,9 +257,12 @@ async def batch_create_schedules(
                     "RETURNING id"
                 ),
                 {
-                    "tid": tenant_id, "store_id": store_id,
-                    "eid": eid, "d": target_date,
-                    "start": shift_start, "end": shift_end,
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "eid": eid,
+                    "d": target_date,
+                    "start": shift_start,
+                    "end": shift_end,
                     "tmpl_id": template_id,
                 },
             )
@@ -331,7 +343,9 @@ async def detect_conflicts(
         {
             "employee_id": str(row["employee_id"]),
             "employee_name": row.get("employee_name"),
-            "date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
+            "date": row["schedule_date"].isoformat()
+            if hasattr(row["schedule_date"], "isoformat")
+            else str(row["schedule_date"]),
             "conflict_a": {
                 "schedule_id": str(row["schedule_id_a"]),
                 "shift_start": str(row["start_a"]),
@@ -403,7 +417,8 @@ async def swap_schedules(
             "AND shift_start < :end::time AND shift_end > :start::time"
         ),
         {
-            "tid": tenant_id, "eid": to_employee_id,
+            "tid": tenant_id,
+            "eid": to_employee_id,
             "d": orig["schedule_date"],
             "start": str(orig["shift_start"]),
             "end": str(orig["shift_end"]),
@@ -424,8 +439,11 @@ async def swap_schedules(
             "WHERE id = :sid::uuid AND tenant_id = :tid::uuid"
         ),
         {
-            "new_eid": to_employee_id, "from_eid": from_employee_id,
-            "to_eid": to_employee_id, "sid": from_schedule_id, "tid": tenant_id,
+            "new_eid": to_employee_id,
+            "from_eid": from_employee_id,
+            "to_eid": to_employee_id,
+            "sid": from_schedule_id,
+            "tid": tenant_id,
         },
     )
 
@@ -439,7 +457,9 @@ async def swap_schedules(
         "schedule_id": from_schedule_id,
         "from_employee_id": from_employee_id,
         "to_employee_id": to_employee_id,
-        "schedule_date": orig["schedule_date"].isoformat() if hasattr(orig["schedule_date"], "isoformat") else str(orig["schedule_date"]),
+        "schedule_date": orig["schedule_date"].isoformat()
+        if hasattr(orig["schedule_date"], "isoformat")
+        else str(orig["schedule_date"]),
         "shift_start": str(orig["shift_start"]),
         "shift_end": str(orig["shift_end"]),
     }
@@ -515,21 +535,26 @@ async def auto_detect_gaps(
                     "AND shift_start = :start::time AND shift_end = :end::time"
                 ),
                 {
-                    "tid": tenant_id, "store_id": store_id,
-                    "d": target_date, "start": tmpl["shift_start"], "end": tmpl["shift_end"],
+                    "tid": tenant_id,
+                    "store_id": store_id,
+                    "d": target_date,
+                    "start": tmpl["shift_start"],
+                    "end": tmpl["shift_end"],
                 },
             )
             cnt = actual_result.scalar() or 0
             if cnt == 0:
-                gaps.append({
-                    "shift_start": tmpl["shift_start"],
-                    "shift_end": tmpl["shift_end"],
-                    "role": "general",
-                    "required": 1,
-                    "actual": 0,
-                    "shortage": 1,
-                    "detection_method": "template_fallback",
-                })
+                gaps.append(
+                    {
+                        "shift_start": tmpl["shift_start"],
+                        "shift_end": tmpl["shift_end"],
+                        "role": "general",
+                        "required": 1,
+                        "actual": 0,
+                        "shortage": 1,
+                        "detection_method": "template_fallback",
+                    }
+                )
 
         log.info("gaps_detected_fallback", store_id=store_id, date=str(target_date), gap_count=len(gaps))
         return gaps
@@ -547,24 +572,29 @@ async def auto_detect_gaps(
                 "AND shift_start < :req_end::time AND shift_end > :req_start::time"
             ),
             {
-                "tid": tenant_id, "store_id": store_id, "d": target_date,
+                "tid": tenant_id,
+                "store_id": store_id,
+                "d": target_date,
                 "role": req["role"],
-                "req_start": req["shift_start"], "req_end": req["shift_end"],
+                "req_start": req["shift_start"],
+                "req_end": req["shift_end"],
             },
         )
         actual_count = actual_result.scalar() or 0
         min_headcount = req["min_headcount"]
 
         if actual_count < min_headcount:
-            gaps.append({
-                "shift_start": req["shift_start"],
-                "shift_end": req["shift_end"],
-                "role": req["role"],
-                "required": min_headcount,
-                "actual": actual_count,
-                "shortage": min_headcount - actual_count,
-                "detection_method": "staffing_requirement",
-            })
+            gaps.append(
+                {
+                    "shift_start": req["shift_start"],
+                    "shift_end": req["shift_end"],
+                    "role": req["role"],
+                    "required": min_headcount,
+                    "actual": actual_count,
+                    "shortage": min_headcount - actual_count,
+                    "detection_method": "staffing_requirement",
+                }
+            )
 
     log.info("gaps_detected_svc", store_id=store_id, date=str(target_date), gap_count=len(gaps))
     return gaps
@@ -632,14 +662,16 @@ async def get_fill_suggestions(
         {"tid": tenant_id, "store_id": store_id, "d": gap_date, "role": role},
     )
     for row in free_result.mappings().fetchall():
-        suggestions.append({
-            "employee_id": str(row["employee_id"]),
-            "name": row["name"],
-            "position": row.get("position"),
-            "priority": 1,
-            "reason": "本店当天无排班",
-            "source_store_id": store_id,
-        })
+        suggestions.append(
+            {
+                "employee_id": str(row["employee_id"]),
+                "name": row["name"],
+                "position": row.get("position"),
+                "priority": 1,
+                "reason": "本店当天无排班",
+                "source_store_id": store_id,
+            }
+        )
 
     # 优先级2：本店当天有排班但时段不冲突的员工
     no_conflict_result = await db.execute(
@@ -663,22 +695,28 @@ async def get_fill_suggestions(
             "LIMIT 10"
         ),
         {
-            "tid": tenant_id, "store_id": store_id, "d": gap_date,
-            "gap_start": shift_start, "gap_end": shift_end, "role": role,
+            "tid": tenant_id,
+            "store_id": store_id,
+            "d": gap_date,
+            "gap_start": shift_start,
+            "gap_end": shift_end,
+            "role": role,
         },
     )
     existing_ids = {s["employee_id"] for s in suggestions}
     for row in no_conflict_result.mappings().fetchall():
         eid = str(row["employee_id"])
         if eid not in existing_ids:
-            suggestions.append({
-                "employee_id": eid,
-                "name": row["name"],
-                "position": row.get("position"),
-                "priority": 2,
-                "reason": "本店当天有排班但时段不冲突",
-                "source_store_id": store_id,
-            })
+            suggestions.append(
+                {
+                    "employee_id": eid,
+                    "name": row["name"],
+                    "position": row.get("position"),
+                    "priority": 2,
+                    "reason": "本店当天有排班但时段不冲突",
+                    "source_store_id": store_id,
+                }
+            )
             existing_ids.add(eid)
 
     # 优先级3：同品牌临近门店空闲员工
@@ -703,14 +741,16 @@ async def get_fill_suggestions(
         for row in nearby_result.mappings().fetchall():
             eid = str(row["employee_id"])
             if eid not in existing_ids:
-                suggestions.append({
-                    "employee_id": eid,
-                    "name": row["name"],
-                    "position": row.get("position"),
-                    "priority": 3,
-                    "reason": "临近门店当天无排班",
-                    "source_store_id": str(row["source_store_id"]),
-                })
+                suggestions.append(
+                    {
+                        "employee_id": eid,
+                        "name": row["name"],
+                        "position": row.get("position"),
+                        "priority": 3,
+                        "reason": "临近门店当天无排班",
+                        "source_store_id": str(row["source_store_id"]),
+                    }
+                )
                 existing_ids.add(eid)
     except SQLAlchemyError as exc:
         log.warning("nearby_store_query_failed", error=str(exc))

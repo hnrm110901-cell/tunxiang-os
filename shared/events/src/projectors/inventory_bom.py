@@ -8,6 +8,7 @@
 
 维护视图：mv_inventory_bom
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -18,7 +19,6 @@ from ..projector import ProjectorBase
 
 
 class InventoryBomProjector(ProjectorBase):
-
     name = "inventory_bom"
     event_types = {
         "inventory.consumed",
@@ -53,8 +53,11 @@ class InventoryBomProjector(ProjectorBase):
             VALUES ($1, $2, $3, $4, $5, NOW())
             ON CONFLICT (tenant_id, store_id, stat_date, ingredient_id) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_date,
-            UUID(str(ingredient_id)), ingredient_name,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_date,
+            UUID(str(ingredient_id)),
+            ingredient_name,
         )
 
         quantity_g = float(payload.get("quantity_g", payload.get("quantity", 0)))
@@ -73,8 +76,12 @@ class InventoryBomProjector(ProjectorBase):
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                   AND ingredient_id = $7
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                theoretical_g, actual_g, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                theoretical_g,
+                actual_g,
+                UUID(str(event["event_id"])),
                 UUID(str(ingredient_id)),
             )
 
@@ -88,8 +95,11 @@ class InventoryBomProjector(ProjectorBase):
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3
                   AND ingredient_id = $6
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                quantity_g, UUID(str(event["event_id"])),
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                quantity_g,
+                UUID(str(event["event_id"])),
                 UUID(str(ingredient_id)),
             )
 
@@ -111,5 +121,8 @@ async def _recalc_loss(conn: object, tenant_id: UUID, store_id: UUID, stat_date,
             END
         WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3 AND ingredient_id = $4
         """,
-        tenant_id, store_id, stat_date, ingredient_id,
+        tenant_id,
+        store_id,
+        stat_date,
+        ingredient_id,
     )

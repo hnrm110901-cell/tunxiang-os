@@ -7,6 +7,7 @@ c. 时段匹配：午市推快餐、晚市推大菜
 d. 顾客历史：如果有 customer_id，推荐常点菜品
 e. 热度排行：最近 7 天销量 Top 10
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -22,10 +23,10 @@ logger = structlog.get_logger()
 # ─── 时段定义 ───
 
 MEAL_PERIODS = {
-    "breakfast": (6, 10),   # 早餐 06:00-10:00
-    "lunch": (10, 14),      # 午市 10:00-14:00
+    "breakfast": (6, 10),  # 早餐 06:00-10:00
+    "lunch": (10, 14),  # 午市 10:00-14:00
     "afternoon": (14, 17),  # 下午茶 14:00-17:00
-    "dinner": (17, 21),     # 晚市 17:00-21:00
+    "dinner": (17, 21),  # 晚市 17:00-21:00
     "late_night": (21, 6),  # 夜宵 21:00-06:00
 }
 
@@ -34,7 +35,7 @@ PERIOD_PREP_TIME_MAX = {
     "breakfast": 10,
     "lunch": 15,
     "afternoon": 10,
-    "dinner": None,      # 晚市不限
+    "dinner": None,  # 晚市不限
     "late_night": 15,
 }
 
@@ -96,7 +97,7 @@ async def get_recommendations(
         select(Dish).where(
             Dish.tenant_id == tid,
             Dish.is_available == True,  # noqa: E712
-            Dish.is_deleted == False,   # noqa: E712
+            Dish.is_deleted == False,  # noqa: E712
             # 门店专属或集团通用
             (Dish.store_id == sid) | (Dish.store_id == None),  # noqa: E711
         )
@@ -163,15 +164,17 @@ async def get_recommendations(
         # 选择最佳理由（取第一个）
         primary_reason = reasons[0] if reasons else REASON_HIGH_VALUE
 
-        scored_dishes.append({
-            "dish_id": dish_id_str,
-            "dish_name": dish.dish_name,
-            "price_fen": dish.price_fen,
-            "image_url": dish.image_url or "",
-            "reason": primary_reason,
-            "score": round(score, 1),
-            "category_id": str(dish.category_id) if dish.category_id else "",
-        })
+        scored_dishes.append(
+            {
+                "dish_id": dish_id_str,
+                "dish_name": dish.dish_name,
+                "price_fen": dish.price_fen,
+                "image_url": dish.image_url or "",
+                "reason": primary_reason,
+                "score": round(score, 1),
+                "category_id": str(dish.category_id) if dish.category_id else "",
+            }
+        )
 
     # 5. 按分数排序，取 Top N
     scored_dishes.sort(key=lambda x: x["score"], reverse=True)

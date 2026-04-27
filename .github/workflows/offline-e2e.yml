@@ -26,7 +26,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   offline-e2e:
@@ -37,9 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
-          version: 8
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -83,7 +83,7 @@ jobs:
       # ── 失败时收集日志 ────────────────────────────────────────────────
       - name: Upload web-pos log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-pos-log
           path: /tmp/web-pos.log
@@ -91,11 +91,31 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}
           path: e2e/playwright-report/
           retention-days: 7
+
+      - name: Collect nightly results
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          OFFLINE_HOURS: ${{ github.event_name == 'schedule' && '4' || inputs.offline_hours || '0.01' }}
+        run: |
+          chmod +x scripts/collect-offline-results.sh
+          ./scripts/collect-offline-results.sh e2e/playwright-report/
+
+      - name: Commit nightly results to nightly-results branch
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git stash -- infra/nightly/offline-e2e-results.json
+          git fetch origin nightly-results 2>/dev/null && git checkout nightly-results || git checkout -b nightly-results
+          git checkout stash -- infra/nightly/offline-e2e-results.json 2>/dev/null || git stash pop
+          git add infra/nightly/offline-e2e-results.json
+          git diff --cached --quiet || git commit -m "ci(nightly): update offline E2E results [skip ci]"
+          git push origin nightly-results || echo "Push failed — results will be committed next run"
 
       - name: Stop dev server
         if: always()

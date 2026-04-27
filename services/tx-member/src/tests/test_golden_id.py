@@ -10,6 +10,7 @@
 7. test_stats                      - 统计
 8. test_batch_import               - 批量导入
 """
+
 import os
 import sys
 
@@ -20,10 +21,7 @@ from fastapi.testclient import TestClient
 from main import app
 
 # 注册路由（避免重复注册）
-if not any(
-    getattr(r, "prefix", None) == "/api/v1/member/golden-id"
-    for r in app.routes
-):
+if not any(getattr(r, "prefix", None) == "/api/v1/member/golden-id" for r in app.routes):
     app.include_router(golden_id_router)
 
 client = TestClient(app)
@@ -36,6 +34,7 @@ CUSTOMER_B = "b0000000-0000-0000-0000-000000000002"
 
 
 # ── 1. 新顾客绑定 ─────────────────────────────────────────────────────────────
+
 
 class TestBindNewCustomer:
     """test_bind_new_customer: 绑定一个全新的 customer + channel openid"""
@@ -98,6 +97,7 @@ class TestBindNewCustomer:
 
 # ── 2. 手机号匹配自动合并 ──────────────────────────────────────────────────────
 
+
 class TestBindPhoneMatchMerges:
     """test_bind_phone_match_merges: 提供手机号时若已有同 phone_hash 的 customer，自动合并"""
 
@@ -154,6 +154,7 @@ class TestBindPhoneMatchMerges:
 
 # ── 3. 重复绑定幂等 ───────────────────────────────────────────────────────────
 
+
 class TestBindDuplicateIdempotent:
     """test_bind_duplicate_idempotent: 重复绑定同一 openid 返回相同 binding_id，不报错"""
 
@@ -202,6 +203,7 @@ class TestBindDuplicateIdempotent:
 
 
 # ── 4. 解绑 ───────────────────────────────────────────────────────────────────
+
 
 class TestUnbind:
     """test_unbind: 解绑已有渠道绑定"""
@@ -252,6 +254,7 @@ class TestUnbind:
 
 # ── 5. 列出冲突 ───────────────────────────────────────────────────────────────
 
+
 class TestListConflicts:
     """test_list_conflicts: 列出未解决冲突，分页"""
 
@@ -290,6 +293,7 @@ class TestListConflicts:
 
 
 # ── 6. 解决冲突 ───────────────────────────────────────────────────────────────
+
 
 class TestResolveConflict:
     """test_resolve_conflict: 解决单个冲突，保留指定 customer_id"""
@@ -341,6 +345,7 @@ class TestResolveConflict:
 
 # ── 7. 统计 ───────────────────────────────────────────────────────────────────
 
+
 class TestStats:
     """test_stats: 各渠道绑定数量统计"""
 
@@ -382,6 +387,7 @@ class TestStats:
 
 
 # ── 8. 批量导入 ───────────────────────────────────────────────────────────────
+
 
 class TestBatchImport:
     """test_batch_import: 批量导入渠道绑定"""
@@ -444,12 +450,7 @@ class TestBatchImport:
         """超过 500 条应返回 422（Pydantic max_length 校验）"""
         r = client.post(
             "/api/v1/member/golden-id/batch-import",
-            json={
-                "items": [
-                    {"channel_type": "meituan", "channel_openid": f"mt_over_{i}"}
-                    for i in range(501)
-                ]
-            },
+            json={"items": [{"channel_type": "meituan", "channel_openid": f"mt_over_{i}"} for i in range(501)]},
             headers=TENANT_HEADER,
         )
         assert r.status_code == 422

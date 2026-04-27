@@ -3,6 +3,7 @@
 典型场景: 累计消费满1000元送50元券
 按周期(月/季/年)累计, 达标自动发券。
 """
+
 from typing import Any
 
 import structlog

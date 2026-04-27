@@ -38,7 +38,10 @@ ORDER BY sales_amount_fen DESC
 
 DIMENSIONS = ["department"]
 METRICS = [
-    "dish_count", "sales_qty", "sales_amount_fen",
-    "avg_unit_price_fen", "dept_pct",
+    "dish_count",
+    "sales_qty",
+    "sales_amount_fen",
+    "avg_unit_price_fen",
+    "dept_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

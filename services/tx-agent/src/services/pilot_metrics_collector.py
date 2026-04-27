@@ -11,6 +11,7 @@
   - 基线计算取试点前 N 天的历史均值（仅首次运行时用于对比参考）
   - 试验组 vs 对照组差值计算供 PilotService 复盘报告使用
 """
+
 from __future__ import annotations
 
 import json
@@ -69,7 +70,9 @@ class PilotMetricsCollector:
                     error=str(exc),
                     exc_info=True,
                 )
-                results.append({"pilot_id": str(pilot_id), "name": program["name"], "status": "error", "error": str(exc)})
+                results.append(
+                    {"pilot_id": str(pilot_id), "name": program["name"], "status": "error", "error": str(exc)}
+                )
 
         logger.info(
             "pilot_metrics_batch_complete",
@@ -115,7 +118,8 @@ class PilotMetricsCollector:
             store_id = store_ref.get("store_id", "")
             sales_data = await self.get_dish_sales_by_store(store_id, dish_ids, target_date)
             await self._upsert_metric(
-                tenant_id, pilot_id,
+                tenant_id,
+                pilot_id,
                 store_id=uuid.UUID(store_id),
                 is_control=False,
                 metric_date=target_date,
@@ -128,7 +132,8 @@ class PilotMetricsCollector:
             store_id = store_ref.get("store_id", "")
             sales_data = await self.get_dish_sales_by_store(store_id, dish_ids, target_date)
             await self._upsert_metric(
-                tenant_id, pilot_id,
+                tenant_id,
+                pilot_id,
                 store_id=uuid.UUID(store_id),
                 is_control=True,
                 metric_date=target_date,
@@ -164,6 +169,7 @@ class PilotMetricsCollector:
         """
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
                     f"{self._analytics_url}/api/v1/internal/dish-sales",
@@ -407,9 +413,7 @@ class PilotMetricsCollector:
             if criterion.get("operator") == "gt":
                 threshold = float(criterion.get("threshold", 0))
                 metric = criterion.get("metric", "")
-                if metric == "total_sales" and all(
-                    (dict(r).get("pilot_sales") or 0) > threshold for r in rows
-                ):
+                if metric == "total_sales" and all((dict(r).get("pilot_sales") or 0) > threshold for r in rows):
                     logger.info("pilot_early_success_detected", pilot_id=str(pilot_id))
                     await self._db.execute(
                         "UPDATE pilot_programs SET status = 'completed', updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id",

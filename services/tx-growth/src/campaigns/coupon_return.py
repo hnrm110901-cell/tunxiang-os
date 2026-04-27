@@ -3,6 +3,7 @@
 典型场景: 每次消费后返一张下次使用的优惠券, 形成消费闭环
 支持不同消费金额返不同面额券。
 """
+
 from typing import Any
 
 import structlog

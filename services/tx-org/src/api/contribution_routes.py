@@ -36,9 +36,7 @@ _service = ContributionScoreService()
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -139,11 +137,13 @@ async def get_store_comparison(
     comparisons: list[dict[str, Any]] = []
     for sid in sid_list:
         result = await _service.calculate_store_rankings(db, tid, sid, p_start, p_end)
-        comparisons.append({
-            "store_id": sid,
-            "stats": result["stats"],
-            "top3": result["rankings"][:3],
-        })
+        comparisons.append(
+            {
+                "store_id": sid,
+                "stats": result["stats"],
+                "top3": result["rankings"][:3],
+            }
+        )
 
     comparisons.sort(key=lambda x: x["stats"].get("avg", 0), reverse=True)
     return _ok({"stores": comparisons})

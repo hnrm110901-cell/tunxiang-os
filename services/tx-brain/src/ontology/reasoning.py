@@ -169,9 +169,7 @@ class CausalReasoningEngine:
         entity_props = entity_result["node"]["properties"]
 
         # Also check graph CAUSES relationships
-        graph_causes = self.repo.get_relationships(
-            entity_type, entity_id, rel_type="CAUSES", direction="in"
-        )
+        graph_causes = self.repo.get_relationships(entity_type, entity_id, rel_type="CAUSES", direction="in")
 
         # Build causal chain from templates + graph evidence
         chain: list[dict[str, Any]] = []
@@ -181,14 +179,16 @@ class CausalReasoningEngine:
             evidence = self._check_evidence(template, entity_props, entity_type, entity_id)
             if evidence["has_evidence"]:
                 depth += 1
-                chain.append({
-                    "cause": template["description"],
-                    "pattern": template["pattern"],
-                    "evidence": evidence["detail"],
-                    "confidence": template["confidence_base"] * evidence["strength"],
-                    "depth": depth,
-                    "data": evidence.get("data", {}),
-                })
+                chain.append(
+                    {
+                        "cause": template["description"],
+                        "pattern": template["pattern"],
+                        "evidence": evidence["detail"],
+                        "confidence": template["confidence_base"] * evidence["strength"],
+                        "depth": depth,
+                        "data": evidence.get("data", {}),
+                    }
+                )
 
         # Add graph-based causes
         for rel_data in graph_causes:
@@ -196,14 +196,16 @@ class CausalReasoningEngine:
             from_node = self.repo.get_node_model(from_id)
             if from_node is not None:
                 depth += 1
-                chain.append({
-                    "cause": from_node.properties.get("description", f"Event {from_id}"),
-                    "pattern": "graph_cause",
-                    "evidence": rel_data.get("properties", {}).get("evidence", "Graph relationship"),
-                    "confidence": float(rel_data.get("properties", {}).get("confidence", 0.5)),
-                    "depth": depth,
-                    "data": from_node.properties,
-                })
+                chain.append(
+                    {
+                        "cause": from_node.properties.get("description", f"Event {from_id}"),
+                        "pattern": "graph_cause",
+                        "evidence": rel_data.get("properties", {}).get("evidence", "Graph relationship"),
+                        "confidence": float(rel_data.get("properties", {}).get("confidence", 0.5)),
+                        "depth": depth,
+                        "data": from_node.properties,
+                    }
+                )
 
         # Sort by confidence descending
         chain.sort(key=lambda x: x["confidence"], reverse=True)
@@ -235,9 +237,7 @@ class CausalReasoningEngine:
         direction = self._infer_direction(store_props, metric, period)
 
         # Get all dishes served by this store
-        dish_rels = self.repo.get_relationships(
-            "Store", store_id, rel_type="SERVES", direction="out"
-        )
+        dish_rels = self.repo.get_relationships("Store", store_id, rel_type="SERVES", direction="out")
 
         # Trace causes for the store-level metric
         store_causes = self.trace_cause("Store", store_id, metric, direction)
@@ -307,9 +307,7 @@ class CausalReasoningEngine:
 
             if event_type == "ingredient_price_change":
                 # Find BOM link from dish to ingredient
-                rels = self.repo.get_relationships(
-                    entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out"
-                )
+                rels = self.repo.get_relationships(entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out")
                 for rel in rels:
                     if rel.get("to_node_id") == source_id:
                         quantity_g = rel.get("properties", {}).get("quantity_g", 0)
@@ -325,25 +323,29 @@ class CausalReasoningEngine:
                                 new_cost = old_cost + cost_change_fen
                                 new_margin = (current_price_fen - new_cost) / current_price_fen
 
-                            impacts.append({
-                                "entity_type": entity_type,
-                                "entity_id": entity_id,
-                                "entity_name": props.get("name", ""),
-                                "cost_change_fen": cost_change_fen,
-                                "old_margin": props.get("margin_rate", 0.0),
-                                "new_margin": round(new_margin, 4),
-                                "severity": "high" if abs(cost_change_fen) > 500 else "medium",
-                            })
+                            impacts.append(
+                                {
+                                    "entity_type": entity_type,
+                                    "entity_id": entity_id,
+                                    "entity_name": props.get("name", ""),
+                                    "cost_change_fen": cost_change_fen,
+                                    "old_margin": props.get("margin_rate", 0.0),
+                                    "new_margin": round(new_margin, 4),
+                                    "severity": "high" if abs(cost_change_fen) > 500 else "medium",
+                                }
+                            )
                         break
             else:
                 # Generic impact estimation
-                impacts.append({
-                    "entity_type": entity_type,
-                    "entity_id": entity_id,
-                    "entity_name": props.get("name", ""),
-                    "estimated_impact_pct": change_pct * 0.5,
-                    "severity": "medium",
-                })
+                impacts.append(
+                    {
+                        "entity_type": entity_type,
+                        "entity_id": entity_id,
+                        "entity_name": props.get("name", ""),
+                        "estimated_impact_pct": change_pct * 0.5,
+                        "severity": "medium",
+                    }
+                )
 
         return {
             "ok": True,
@@ -379,16 +381,16 @@ class CausalReasoningEngine:
         # Augment with confidence from root cause
         result = []
         for action in actions:
-            result.append({
-                **action,
-                "based_on": root_cause.get("cause", ""),
-                "cause_confidence": root_cause.get("confidence", 0.0),
-            })
+            result.append(
+                {
+                    **action,
+                    "based_on": root_cause.get("cause", ""),
+                    "cause_confidence": root_cause.get("confidence", 0.0),
+                }
+            )
         return result
 
-    def get_causal_graph(
-        self, entity_type: str, entity_id: str, depth: int = 3
-    ) -> dict[str, Any]:
+    def get_causal_graph(self, entity_type: str, entity_id: str, depth: int = 3) -> dict[str, Any]:
         """Get the full causal neighborhood for visualization.
 
         Returns a subgraph centered on the entity, including all
@@ -420,10 +422,7 @@ class CausalReasoningEngine:
                 causal_edges.append(rel)
                 causal_node_ids.add(rel.get("to_node_id", ""))
 
-        causal_nodes = [
-            n for n in neighbors.get("neighbors", [])
-            if n.get("id", "") in causal_node_ids
-        ]
+        causal_nodes = [n for n in neighbors.get("neighbors", []) if n.get("id", "") in causal_node_ids]
 
         # Include center node
         center = neighbors.get("center_node", {})
@@ -454,9 +453,7 @@ class CausalReasoningEngine:
             return "margin_decline"  # Same analysis, opposite direction
         return "margin_decline"  # Default
 
-    def _infer_direction(
-        self, store_props: dict[str, Any], metric: str, period: str
-    ) -> str:
+    def _infer_direction(self, store_props: dict[str, Any], metric: str, period: str) -> str:
         """Infer whether metric is declining or increasing."""
         current = store_props.get(f"{metric}_current", 0)
         previous = store_props.get(f"{metric}_previous", 0)
@@ -479,9 +476,7 @@ class CausalReasoningEngine:
 
         if check_type == "ingredient_cost_change":
             # Check BOM ingredients for price changes
-            rels = self.repo.get_relationships(
-                entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out"
-            )
+            rels = self.repo.get_relationships(entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out")
             for rel in rels:
                 ing_id = rel.get("to_node_id", "")
                 ing_node = self.repo.get_node_model(ing_id)
@@ -534,9 +529,7 @@ class CausalReasoningEngine:
 
         if check_type == "seasonal_price_pattern":
             # Check if any ingredient has seasonal flag
-            rels = self.repo.get_relationships(
-                entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out"
-            )
+            rels = self.repo.get_relationships(entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out")
             for rel in rels:
                 ing_id = rel.get("to_node_id", "")
                 ing_node = self.repo.get_node_model(ing_id)
@@ -551,9 +544,7 @@ class CausalReasoningEngine:
 
         if check_type == "supplier_price_change":
             # Check suppliers via ingredient→supplier chain
-            rels = self.repo.get_relationships(
-                entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out"
-            )
+            rels = self.repo.get_relationships(entity_type, entity_id, rel_type="USES_INGREDIENT", direction="out")
             for rel in rels:
                 ing_id = rel.get("to_node_id", "")
                 supplier_rels = self.repo.get_relationships(

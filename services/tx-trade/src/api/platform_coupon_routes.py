@@ -1,11 +1,12 @@
 """平台团购核销 API — 聚合核销(美团/抖音/口碑/广发银行)"""
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services import coupon_platform_service as cps
 from ..services.trade_audit_log import write_audit
 
@@ -16,10 +17,7 @@ router = APIRouter(
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -59,7 +57,7 @@ async def verify_platform_coupon(
     body: VerifyReq,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("platform_coupon.verify", "cashier", "store_manager", "admin")),
 ):
     """聚合验证 — 扫码自动识别平台并验证"""
     tenant_id = _get_tenant_id(request)
@@ -89,7 +87,7 @@ async def redeem_platform_coupon(
     body: RedeemReq,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("platform_coupon.redeem", "cashier", "store_manager", "admin")),
 ):
     """核销 — 关联 order_id"""
     tenant_id = _get_tenant_id(request)
@@ -125,7 +123,9 @@ async def get_redemption_report(
     end_date: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin", "auditor", "audit_admin")),
+    user: UserContext = Depends(
+        require_role_audited("platform_coupon.report.read", "store_manager", "admin", "auditor", "audit_admin")
+    ),
 ):
     """核销报告 — 按平台/日期汇总（只读）"""
     tenant_id = _get_tenant_id(request)
@@ -143,7 +143,7 @@ async def reconcile_platform(
     body: ReconcileReq,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("platform_coupon.reconcile", "store_manager", "admin")),
 ):
     """平台对账 — 平台金额 vs 系统金额"""
     tenant_id = _get_tenant_id(request)

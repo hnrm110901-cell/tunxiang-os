@@ -318,9 +318,11 @@ async def get_device_stats(
         log.error("org_devices_stats_db_error", error=str(exc))
         raise _err("DB_ERROR", "数据库查询失败", 500) from exc
 
-    return _ok({
-        "overall": dict(overall_row),
-        "by_store": by_store,
-        "by_hardware_model": by_model,
-        "by_app_version": by_version,
-    })
+    return _ok(
+        {
+            "overall": dict(overall_row),
+            "by_store": by_store,
+            "by_hardware_model": by_model,
+            "by_app_version": by_version,
+        }
+    )

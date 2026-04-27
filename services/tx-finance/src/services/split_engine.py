@@ -6,6 +6,7 @@
   3. settle_records：批量将 pending 记录标记为 settled（对接实际付款后回调）
   4. get_settlement_summary：按 recipient + 时段聚合应付/已付金额
 """
+
 from __future__ import annotations
 
 import json
@@ -220,11 +221,19 @@ class SplitEngine:
 
         for rule in all_rules:
             # 检查门店范围
-            stores = rule.applicable_stores if isinstance(rule.applicable_stores, list) else json.loads(rule.applicable_stores or "[]")
+            stores = (
+                rule.applicable_stores
+                if isinstance(rule.applicable_stores, list)
+                else json.loads(rule.applicable_stores or "[]")
+            )
             if stores and store_id not in stores:
                 continue
             # 检查渠道范围
-            channels = rule.applicable_channels if isinstance(rule.applicable_channels, list) else json.loads(rule.applicable_channels or "[]")
+            channels = (
+                rule.applicable_channels
+                if isinstance(rule.applicable_channels, list)
+                else json.loads(rule.applicable_channels or "[]")
+            )
             if channels and channel not in channels:
                 continue
 
@@ -262,19 +271,27 @@ class SplitEngine:
                     "split": split_amount,
                 },
             )
-            created.append({
-                "record_id": str(rec_id),
-                "rule_id": str(rule.id),
-                "rule_name": rule.name,
-                "recipient_type": rule.recipient_type,
-                "recipient_id": str(rule.recipient_id) if rule.recipient_id else None,
-                "split_amount_fen": split_amount,
-                "split_amount_yuan": round(split_amount / 100, 2),
-            })
+            created.append(
+                {
+                    "record_id": str(rec_id),
+                    "rule_id": str(rule.id),
+                    "rule_name": rule.name,
+                    "recipient_type": rule.recipient_type,
+                    "recipient_id": str(rule.recipient_id) if rule.recipient_id else None,
+                    "split_amount_fen": split_amount,
+                    "split_amount_yuan": round(split_amount / 100, 2),
+                }
+            )
 
         await self.db.flush()
-        log.info("split_executed", order_id=order_id, store_id=store_id,
-                 gross_fen=gross_amount_fen, records=len(created), tenant_id=self.tenant_id)
+        log.info(
+            "split_executed",
+            order_id=order_id,
+            store_id=store_id,
+            gross_fen=gross_amount_fen,
+            records=len(created),
+            tenant_id=self.tenant_id,
+        )
         return created
 
     async def settle_records(self, record_ids: List[str]) -> int:
@@ -385,9 +402,7 @@ class SplitEngine:
             where += " AND created_at < (:ed::date + INTERVAL '1 day')::timestamptz"
             params["ed"] = end_date
 
-        count_result = await self.db.execute(
-            text(f"SELECT COUNT(*) FROM profit_split_records {where}"), params
-        )
+        count_result = await self.db.execute(text(f"SELECT COUNT(*) FROM profit_split_records {where}"), params)
         total = count_result.scalar() or 0
 
         params["limit"] = size
@@ -454,16 +469,18 @@ class SplitEngine:
         summary = []
         for r in rows:
             total_fen = int(r.total_amount_fen or 0)
-            summary.append({
-                "recipient_type": r.recipient_type,
-                "recipient_id": str(r.recipient_id) if r.recipient_id else None,
-                "total_records": int(r.total_records),
-                "total_amount_fen": total_fen,
-                "total_amount_yuan": round(total_fen / 100, 2),
-                "pending_fen": int(r.pending_fen or 0),
-                "settled_fen": int(r.settled_fen or 0),
-                "cancelled_fen": int(r.cancelled_fen or 0),
-            })
+            summary.append(
+                {
+                    "recipient_type": r.recipient_type,
+                    "recipient_id": str(r.recipient_id) if r.recipient_id else None,
+                    "total_records": int(r.total_records),
+                    "total_amount_fen": total_fen,
+                    "total_amount_yuan": round(total_fen / 100, 2),
+                    "pending_fen": int(r.pending_fen or 0),
+                    "settled_fen": int(r.settled_fen or 0),
+                    "cancelled_fen": int(r.cancelled_fen or 0),
+                }
+            )
         return {
             "summary": summary,
             "grand_total_fen": sum(s["total_amount_fen"] for s in summary),

@@ -8,11 +8,13 @@
   POST /api/v1/agent-hub/actions/{id}/dismiss
   GET  /api/v1/agent-hub/log
 """
+
 import sys
 import types
 from unittest.mock import AsyncMock, MagicMock
 
 # ─── 预置假模块，阻断真实数据库导入 ───
+
 
 def _make_db_module():
     """伪造 shared.ontology.src.database，返回 mock AsyncSession"""
@@ -44,10 +46,12 @@ def _setup_sys_modules():
     # structlog stub
     if "structlog" not in sys.modules:
         sl = types.ModuleType("structlog")
-        sl.get_logger = MagicMock(return_value=MagicMock(
-            warning=MagicMock(),
-            info=MagicMock(),
-        ))
+        sl.get_logger = MagicMock(
+            return_value=MagicMock(
+                warning=MagicMock(),
+                info=MagicMock(),
+            )
+        )
         sys.modules["structlog"] = sl
 
 
@@ -60,10 +64,9 @@ _svc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _svc_root not in sys.path:
     sys.path.insert(0, _svc_root)
 
+import api.agent_hub_routes as _hub_mod
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-import api.agent_hub_routes as _hub_mod
 
 _app = FastAPI()
 _app.include_router(_hub_mod.router)
@@ -76,6 +79,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 # ═══════════════════════════════════════
 # GET /api/v1/agent-hub/status
 # ═══════════════════════════════════════
+
 
 class TestGetHubStatus:
     def test_returns_ok_true(self):
@@ -129,6 +133,7 @@ class TestGetHubStatus:
 # GET /api/v1/agent-hub/actions
 # ═══════════════════════════════════════
 
+
 class TestGetPendingActions:
     def test_default_returns_ok(self):
         """默认（pending_confirm 状态）返回 ok:True"""
@@ -181,6 +186,7 @@ class TestGetPendingActions:
 # POST /api/v1/agent-hub/actions/{id}/confirm
 # ═══════════════════════════════════════
 
+
 class TestConfirmAction:
     def test_confirm_returns_ok_true(self):
         """确认行动返回 ok:True"""
@@ -213,6 +219,7 @@ class TestConfirmAction:
 # POST /api/v1/agent-hub/actions/{id}/dismiss
 # ═══════════════════════════════════════
 
+
 class TestDismissAction:
     def test_dismiss_returns_ok_true(self):
         """驳回行动返回 ok:True"""
@@ -244,6 +251,7 @@ class TestDismissAction:
 # ═══════════════════════════════════════
 # GET /api/v1/agent-hub/log
 # ═══════════════════════════════════════
+
 
 class TestGetActionLog:
     def test_returns_ok_true(self):

@@ -7,6 +7,7 @@
 
 使用方：cashier_api.py（折扣/退单端点）
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -26,6 +27,7 @@ except ImportError:
     # 回退：通过 sys.path 查找（本地开发时路径可能不同）
     import os
     import sys
+
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../tx-org/src"))
     from services.permission_service import (  # type: ignore[import]
         PermissionCheckResult,

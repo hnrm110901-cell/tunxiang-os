@@ -7,6 +7,7 @@
 
 菜品状态: sold_out ↔ active
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ from shared.events import MenuEventType, UniversalPublisher
 log = structlog.get_logger()
 
 # ─── 沽清原因 ───
-REASON_MANUAL = "manual"              # 手动沽清（厨房/前台操作）
+REASON_MANUAL = "manual"  # 手动沽清（厨房/前台操作）
 REASON_STOCK_DEPLETED = "stock_depleted"  # 库存耗尽
 REASON_INGREDIENT_SHORT = "ingredient_short"  # BOM 原料不足
 REASON_QUALITY_ISSUE = "quality_issue"  # 品质问题
@@ -89,14 +90,16 @@ def mark_sold_out(
         reason=reason,
     )
 
-    asyncio.create_task(UniversalPublisher.publish(
-        event_type=MenuEventType.DISH_SOLDOUT,
-        tenant_id=uuid.UUID(tenant_id),
-        store_id=uuid.UUID(store_id),
-        entity_id=uuid.UUID(dish_id),
-        event_data={"dish_id": dish_id, "store_id": store_id},
-        source_service="tx-menu",
-    ))
+    asyncio.create_task(
+        UniversalPublisher.publish(
+            event_type=MenuEventType.DISH_SOLDOUT,
+            tenant_id=uuid.UUID(tenant_id),
+            store_id=uuid.UUID(store_id),
+            entity_id=uuid.UUID(dish_id),
+            event_data={"dish_id": dish_id, "store_id": store_id},
+            source_service="tx-menu",
+        )
+    )
 
     return record
 
@@ -191,10 +194,9 @@ def get_sold_out_list(store_id: str, tenant_id: str) -> list[dict]:
         raise ValueError("store_id 不能为空")
 
     return [
-        r for r in _sold_out_records.values()
-        if r["store_id"] == store_id
-        and r["tenant_id"] == tenant_id
-        and r["status"] == "sold_out"
+        r
+        for r in _sold_out_records.values()
+        if r["store_id"] == store_id and r["tenant_id"] == tenant_id and r["status"] == "sold_out"
     ]
 
 

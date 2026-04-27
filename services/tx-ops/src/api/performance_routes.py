@@ -7,6 +7,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -52,9 +53,7 @@ class CalculatePerformanceRequest(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-async def _aggregate_cashier_performance(
-    store_id: str, perf_date: date, tenant_id: str
-) -> List[Dict[str, Any]]:
+async def _aggregate_cashier_performance(store_id: str, perf_date: date, tenant_id: str) -> List[Dict[str, Any]]:
     """
     收银员绩效聚合。
     生产替换为 asyncpg:
@@ -73,9 +72,7 @@ async def _aggregate_cashier_performance(
     return []
 
 
-async def _aggregate_chef_performance(
-    store_id: str, perf_date: date, tenant_id: str
-) -> List[Dict[str, Any]]:
+async def _aggregate_chef_performance(store_id: str, perf_date: date, tenant_id: str) -> List[Dict[str, Any]]:
     """
     厨师绩效聚合。
     生产替换为 asyncpg:
@@ -94,9 +91,7 @@ async def _aggregate_chef_performance(
     return []
 
 
-async def _aggregate_waiter_performance(
-    store_id: str, perf_date: date, tenant_id: str
-) -> List[Dict[str, Any]]:
+async def _aggregate_waiter_performance(store_id: str, perf_date: date, tenant_id: str) -> List[Dict[str, Any]]:
     """
     服务员绩效聚合。
     生产替换为 asyncpg:
@@ -164,9 +159,7 @@ async def get_performance_ranking(
         where_clause = " AND ".join(filters)
 
         # 先查总数
-        count_sql = text(
-            f"SELECT COUNT(*) FROM staff_performance_records WHERE {where_clause}"
-        )
+        count_sql = text(f"SELECT COUNT(*) FROM staff_performance_records WHERE {where_clause}")
         total_result = await db.execute(count_sql, params)
         total_employees: int = total_result.scalar_one()
 
@@ -226,15 +219,9 @@ async def calculate_performance(
     result_ids: List[str] = []
 
     # 各角色聚合
-    cashier_data = await _aggregate_cashier_performance(
-        body.store_id, body.perf_date, x_tenant_id
-    )
-    chef_data = await _aggregate_chef_performance(
-        body.store_id, body.perf_date, x_tenant_id
-    )
-    waiter_data = await _aggregate_waiter_performance(
-        body.store_id, body.perf_date, x_tenant_id
-    )
+    cashier_data = await _aggregate_cashier_performance(body.store_id, body.perf_date, x_tenant_id)
+    chef_data = await _aggregate_chef_performance(body.store_id, body.perf_date, x_tenant_id)
+    waiter_data = await _aggregate_waiter_performance(body.store_id, body.perf_date, x_tenant_id)
 
     all_employees: List[tuple[str, List[Dict[str, Any]]]] = [
         ("cashier", cashier_data),
@@ -331,13 +318,23 @@ async def calculate_performance(
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        log.error("calculate_performance_db_error", error=str(exc),
-                  store_id=body.store_id, perf_date=date_str, tenant_id=x_tenant_id)
+        log.error(
+            "calculate_performance_db_error",
+            error=str(exc),
+            store_id=body.store_id,
+            perf_date=date_str,
+            tenant_id=x_tenant_id,
+        )
         raise HTTPException(status_code=500, detail="绩效写入失败")
 
-    log.info("performance_calculated", store_id=body.store_id,
-             perf_date=date_str, created=created_count, updated=updated_count,
-             tenant_id=x_tenant_id)
+    log.info(
+        "performance_calculated",
+        store_id=body.store_id,
+        perf_date=date_str,
+        created=created_count,
+        updated=updated_count,
+        tenant_id=x_tenant_id,
+    )
 
     return {
         "ok": True,
@@ -385,9 +382,7 @@ async def list_performance(
 
         where_clause = " AND ".join(filters)
 
-        count_sql = text(
-            f"SELECT COUNT(*) FROM staff_performance_records WHERE {where_clause}"
-        )
+        count_sql = text(f"SELECT COUNT(*) FROM staff_performance_records WHERE {where_clause}")
         total_result = await db.execute(count_sql, params)
         total: int = total_result.scalar_one()
 
@@ -412,8 +407,7 @@ async def list_performance(
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        log.error("list_performance_db_error", error=str(exc),
-                  store_id=store_id, tenant_id=x_tenant_id)
+        log.error("list_performance_db_error", error=str(exc), store_id=store_id, tenant_id=x_tenant_id)
         raise HTTPException(status_code=500, detail="数据库查询失败")
 
     return {

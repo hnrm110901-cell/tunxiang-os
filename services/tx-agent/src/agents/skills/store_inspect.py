@@ -5,6 +5,7 @@
 
 迁移自 tunxiang V2.x ops_agent.py
 """
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,11 +17,36 @@ logger = structlog.get_logger(__name__)
 
 
 RUNBOOK_DB = {
-    "printer_jam": {"title": "打印机卡纸", "steps": ["1.关闭打印机电源", "2.打开上盖取出卡纸", "3.重新装纸合盖", "4.重启打印机"], "rollback": "联系商米售后"},
-    "network_down": {"title": "网络断开", "steps": ["1.检查路由器电源灯", "2.重启路由器(等30秒)", "3.检查网线连接", "4.确认Mac mini可ping"], "rollback": "切换备用4G热点"},
-    "pos_crash": {"title": "POS应用崩溃", "steps": ["1.强制关闭App", "2.清除WebView缓存", "3.重启App", "4.如仍崩溃重启设备"], "rollback": "使用备用设备"},
-    "db_connection": {"title": "数据库连接失败", "steps": ["1.检查Mac mini运行状态", "2.检查PG服务: systemctl status postgresql", "3.重启PG服务", "4.检查磁盘空间"], "rollback": "切换到离线模式"},
-    "scale_error": {"title": "电子秤异常", "steps": ["1.检查USB连接", "2.重启秤设备", "3.在商米设置中重新校准", "4.测试称重准确性"], "rollback": "手动输入重量"},
+    "printer_jam": {
+        "title": "打印机卡纸",
+        "steps": ["1.关闭打印机电源", "2.打开上盖取出卡纸", "3.重新装纸合盖", "4.重启打印机"],
+        "rollback": "联系商米售后",
+    },
+    "network_down": {
+        "title": "网络断开",
+        "steps": ["1.检查路由器电源灯", "2.重启路由器(等30秒)", "3.检查网线连接", "4.确认Mac mini可ping"],
+        "rollback": "切换备用4G热点",
+    },
+    "pos_crash": {
+        "title": "POS应用崩溃",
+        "steps": ["1.强制关闭App", "2.清除WebView缓存", "3.重启App", "4.如仍崩溃重启设备"],
+        "rollback": "使用备用设备",
+    },
+    "db_connection": {
+        "title": "数据库连接失败",
+        "steps": [
+            "1.检查Mac mini运行状态",
+            "2.检查PG服务: systemctl status postgresql",
+            "3.重启PG服务",
+            "4.检查磁盘空间",
+        ],
+        "rollback": "切换到离线模式",
+    },
+    "scale_error": {
+        "title": "电子秤异常",
+        "steps": ["1.检查USB连接", "2.重启秤设备", "3.在商米设置中重新校准", "4.测试称重准确性"],
+        "rollback": "手动输入重量",
+    },
 }
 
 MAINTENANCE_SCHEDULE = {
@@ -39,11 +65,21 @@ class StoreInspectAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 5：食安巡检是 safety 核心动作
+    constraint_scope = {"safety"}
+
     def get_supported_actions(self) -> list[str]:
         return [
-            "health_check", "diagnose_fault", "suggest_runbook",
-            "predict_maintenance", "security_advice", "food_safety_status", "store_dashboard",
-            "trigger_shift_checklist", "log_attendance_issue", "create_followup_task",
+            "health_check",
+            "diagnose_fault",
+            "suggest_runbook",
+            "predict_maintenance",
+            "security_advice",
+            "food_safety_status",
+            "store_dashboard",
+            "trigger_shift_checklist",
+            "log_attendance_issue",
+            "create_followup_task",
         ]
 
     def get_action_config(self, action: str) -> ActionConfig:
@@ -117,7 +153,11 @@ class StoreInspectAgent(SkillAgent):
                 return 0
             return round(sum(1 for v in d.values() if v) / len(d) * 100)
 
-        scores = {"software": domain_score(software), "hardware": domain_score(hardware), "network": domain_score(network)}
+        scores = {
+            "software": domain_score(software),
+            "hardware": domain_score(hardware),
+            "network": domain_score(network),
+        }
         overall = round(sum(scores.values()) / 3)
         issues = []
         for domain, items in [("software", software), ("hardware", hardware), ("network", network)]:
@@ -126,8 +166,14 @@ class StoreInspectAgent(SkillAgent):
                     issues.append({"domain": domain, "component": k, "status": "down"})
 
         return AgentResult(
-            success=True, action="health_check",
-            data={"overall_score": overall, "domain_scores": scores, "issues": issues, "details": {"software": software, "hardware": hardware, "network": network}},
+            success=True,
+            action="health_check",
+            data={
+                "overall_score": overall,
+                "domain_scores": scores,
+                "issues": issues,
+                "details": {"software": software, "hardware": hardware, "network": network},
+            },
             reasoning=f"门店健康度 {overall}%，{len(issues)} 个问题",
             confidence=0.9,
         )
@@ -154,7 +200,8 @@ class StoreInspectAgent(SkillAgent):
 
         if not matched:
             return AgentResult(
-                success=True, action="diagnose_fault",
+                success=True,
+                action="diagnose_fault",
                 data={"diagnosis": "unknown", "suggestion": "建议检查设备日志或联系技术支持"},
                 reasoning="未能自动诊断，建议人工排查",
                 confidence=0.4,
@@ -164,7 +211,8 @@ class StoreInspectAgent(SkillAgent):
         runbook = RUNBOOK_DB.get(fault_id, {})
 
         return AgentResult(
-            success=True, action="diagnose_fault",
+            success=True,
+            action="diagnose_fault",
             data={
                 "fault_id": fault_id,
                 "diagnosis": label,
@@ -180,11 +228,15 @@ class StoreInspectAgent(SkillAgent):
         fault_id = params.get("fault_id", "")
         runbook = RUNBOOK_DB.get(fault_id)
         if not runbook:
-            return AgentResult(success=False, action="suggest_runbook",
-                             error=f"未知故障类型: {fault_id}，可选: {list(RUNBOOK_DB.keys())}")
+            return AgentResult(
+                success=False,
+                action="suggest_runbook",
+                error=f"未知故障类型: {fault_id}，可选: {list(RUNBOOK_DB.keys())}",
+            )
 
         return AgentResult(
-            success=True, action="suggest_runbook",
+            success=True,
+            action="suggest_runbook",
             data=runbook,
             reasoning=f"Runbook: {runbook['title']}，{len(runbook['steps'])} 步",
             confidence=0.95,
@@ -205,20 +257,23 @@ class StoreInspectAgent(SkillAgent):
             days_overdue = last_maintained - schedule["interval_days"]
             urgency = "overdue" if days_overdue > 0 else "due_soon" if days_overdue > -30 else "ok"
 
-            predictions.append({
-                "device_type": device_type,
-                "task": schedule["task"],
-                "interval_days": schedule["interval_days"],
-                "days_since_last": last_maintained,
-                "days_overdue": max(0, days_overdue),
-                "urgency": urgency,
-                "spare_parts": schedule["parts"],
-            })
+            predictions.append(
+                {
+                    "device_type": device_type,
+                    "task": schedule["task"],
+                    "interval_days": schedule["interval_days"],
+                    "days_since_last": last_maintained,
+                    "days_overdue": max(0, days_overdue),
+                    "urgency": urgency,
+                    "spare_parts": schedule["parts"],
+                }
+            )
 
         predictions.sort(key=lambda p: -p.get("days_overdue", 0))
 
         return AgentResult(
-            success=True, action="predict_maintenance",
+            success=True,
+            action="predict_maintenance",
             data={"predictions": predictions, "total": len(predictions)},
             reasoning=f"{len([p for p in predictions if p['urgency'] != 'ok'])} 个设备需要维护",
             confidence=0.85,
@@ -230,7 +285,9 @@ class StoreInspectAgent(SkillAgent):
         total_inspections = params.get("total_inspections", 0)
 
         violation_count = len(violations)
-        compliance_rate = (total_inspections - violation_count) / total_inspections * 100 if total_inspections > 0 else 100
+        compliance_rate = (
+            (total_inspections - violation_count) / total_inspections * 100 if total_inspections > 0 else 100
+        )
 
         by_type = {}
         for v in violations:
@@ -238,7 +295,8 @@ class StoreInspectAgent(SkillAgent):
             by_type[t] = by_type.get(t, 0) + 1
 
         return AgentResult(
-            success=True, action="food_safety_status",
+            success=True,
+            action="food_safety_status",
             data={
                 "compliance_rate_pct": round(compliance_rate, 1),
                 "violation_count": violation_count,
@@ -253,21 +311,39 @@ class StoreInspectAgent(SkillAgent):
 
     async def _security(self, params: dict) -> AgentResult:
         issues = []
-        if params.get("weak_passwords"): issues.append("弱密码需更换")
-        if params.get("unauthorized_devices"): issues.append("发现未授权设备")
-        if params.get("firmware_outdated"): issues.append("固件需更新")
-        if not params.get("vpn_enabled", True): issues.append("VPN未启用")
-        return AgentResult(success=True, action="security_advice",
-                         data={"issues": issues, "total": len(issues),
-                               "risk_level": "high" if len(issues) >= 3 else "medium" if issues else "low"},
-                         reasoning=f"{len(issues)} 个安全风险", confidence=0.85)
+        if params.get("weak_passwords"):
+            issues.append("弱密码需更换")
+        if params.get("unauthorized_devices"):
+            issues.append("发现未授权设备")
+        if params.get("firmware_outdated"):
+            issues.append("固件需更新")
+        if not params.get("vpn_enabled", True):
+            issues.append("VPN未启用")
+        return AgentResult(
+            success=True,
+            action="security_advice",
+            data={
+                "issues": issues,
+                "total": len(issues),
+                "risk_level": "high" if len(issues) >= 3 else "medium" if issues else "low",
+            },
+            reasoning=f"{len(issues)} 个安全风险",
+            confidence=0.85,
+        )
 
     async def _dashboard(self, params: dict) -> AgentResult:
-        return AgentResult(success=True, action="store_dashboard",
-                         data={"software_score": params.get("sw", 100), "hardware_score": params.get("hw", 100),
-                               "network_score": params.get("net", 100),
-                               "overall": round((params.get("sw", 100) + params.get("hw", 100) + params.get("net", 100)) / 3)},
-                         reasoning="门店健康总览", confidence=0.9)
+        return AgentResult(
+            success=True,
+            action="store_dashboard",
+            data={
+                "software_score": params.get("sw", 100),
+                "hardware_score": params.get("hw", 100),
+                "network_score": params.get("net", 100),
+                "overall": round((params.get("sw", 100) + params.get("hw", 100) + params.get("net", 100)) / 3),
+            },
+            reasoning="门店健康总览",
+            confidence=0.9,
+        )
 
     # ─── 事件驱动：班次交接质检清单 ───
 
@@ -310,7 +386,9 @@ class StoreInspectAgent(SkillAgent):
 
         required_count = sum(1 for item in checklist if item["required"])
 
-        checklist_id = f"CHK-{store_id[:8] if store_id else 'STORE'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        checklist_id = (
+            f"CHK-{store_id[:8] if store_id else 'STORE'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        )
 
         logger.info(
             "shift_checklist_triggered",
@@ -336,9 +414,7 @@ class StoreInspectAgent(SkillAgent):
                 "status": "pending",
                 "triggered_at": datetime.now(timezone.utc).isoformat(),
             },
-            reasoning=(
-                f"{shift_date} {shift_type}班质检清单已触发：{len(checklist)}项（必填{required_count}项）"
-            ),
+            reasoning=(f"{shift_date} {shift_type}班质检清单已触发：{len(checklist)}项（必填{required_count}项）"),
             confidence=0.95,
         )
 
@@ -362,10 +438,13 @@ class StoreInspectAgent(SkillAgent):
 
         # 严重程度评估
         severity = (
-            "critical" if late_minutes > 60 or late_count_this_month >= 5 else
-            "high" if late_minutes > 30 or late_count_this_month >= 3 else
-            "medium" if late_minutes > 15 or late_count_this_month >= 2 else
-            "low"
+            "critical"
+            if late_minutes > 60 or late_count_this_month >= 5
+            else "high"
+            if late_minutes > 30 or late_count_this_month >= 3
+            else "medium"
+            if late_minutes > 15 or late_count_this_month >= 2
+            else "low"
         )
 
         # 影响评估（关键岗位迟到影响更大）
@@ -466,9 +545,8 @@ class StoreInspectAgent(SkillAgent):
         task_id = f"TASK-{store_id[:8] if store_id else 'STORE'}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
 
         from datetime import timedelta
-        due_at = (
-            datetime.now(timezone.utc) + timedelta(hours=template["due_hours"])
-        ).isoformat()
+
+        due_at = (datetime.now(timezone.utc) + timedelta(hours=template["due_hours"])).isoformat()
 
         logger.info(
             "followup_task_created",
@@ -496,9 +574,6 @@ class StoreInspectAgent(SkillAgent):
                 "status": "open",
                 "created_at": datetime.now(timezone.utc).isoformat(),
             },
-            reasoning=(
-                f"跟进任务已创建：{template['title']}，"
-                f"分配给{assigned_to}，{template['due_hours']}小时内处理"
-            ),
+            reasoning=(f"跟进任务已创建：{template['title']}，分配给{assigned_to}，{template['due_hours']}小时内处理"),
             confidence=0.9,
         )

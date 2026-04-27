@@ -6,6 +6,7 @@
 维度权重：
   营收完成率 30% + 翻台率 20% + 成本率 25% + 客诉率 15% + 人效 10%
 """
+
 from typing import Optional
 
 # ─── 权重配置 ───
@@ -18,11 +19,12 @@ WEIGHTS = {
     "staff_efficiency": 0.10,
 }
 
-TURNOVER_TARGET = 2.0          # 翻台率目标：2次/天
+TURNOVER_TARGET = 2.0  # 翻台率目标：2次/天
 STAFF_EFFICIENCY_TARGET = 500  # 人效目标：500元/人/天
 
 
 # ─── 纯函数：综合评分 ───
+
 
 def compute_health_score(dimension_scores: dict[str, Optional[float]]) -> float:
     """加权综合评分（缺失维度自动归一化，不拉低分数）
@@ -61,6 +63,7 @@ def classify_health(score: float) -> str:
 
 
 # ─── 纯函数：维度得分计算 ───
+
 
 def score_revenue_completion(
     actual_fen: int,

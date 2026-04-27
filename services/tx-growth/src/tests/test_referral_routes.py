@@ -21,6 +21,7 @@
 15. GET  /api/v1/growth/referrals/my-invites             — 正常返回邀请记录
 16. GET  /api/v1/growth/referrals/my-invites             — 活动不存在 → 404
 """
+
 import os
 import sys
 import types
@@ -32,9 +33,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ---------------------------------------------------------------------------
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
@@ -86,17 +86,20 @@ sys.modules.setdefault("sqlalchemy.ext", _sqla_ext_parent)
 sys.modules.setdefault("sqlalchemy.ext.asyncio", _sqla_ext)
 
 # Stub sqlalchemy.select
-_sqla_parent.select = MagicMock(return_value=MagicMock(
-    where=MagicMock(return_value=MagicMock(
-        where=MagicMock(return_value=MagicMock(
-            order_by=MagicMock(return_value=MagicMock())
-        ))
-    ))
-))
+_sqla_parent.select = MagicMock(
+    return_value=MagicMock(
+        where=MagicMock(
+            return_value=MagicMock(
+                where=MagicMock(return_value=MagicMock(order_by=MagicMock(return_value=MagicMock())))
+            )
+        )
+    )
+)
 
 from api.referral_routes import router  # noqa: E402
 
 # ─── Build app with middleware that injects mock DB ────────────────────────
+
 
 def _build_app(mock_db):
     _app = FastAPI()
@@ -140,6 +143,7 @@ def _make_mock_db():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 1-4: POST /campaigns
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_create_campaign_ok():
     """正常创建裂变活动，返回 campaign_id 和 status=draft"""
@@ -210,6 +214,7 @@ def test_create_campaign_negative_reward_value():
 # 场景 5: GET /campaigns
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_list_campaigns_ok():
     """正常返回活动列表"""
     campaign = _FakeReferralCampaign(
@@ -222,9 +227,7 @@ def test_list_campaigns_ok():
         invitee_reward_type="coupon",
     )
     mock_result = MagicMock()
-    mock_result.scalars = MagicMock(return_value=MagicMock(
-        all=MagicMock(return_value=[campaign])
-    ))
+    mock_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[campaign])))
 
     mock_db = _make_mock_db()
     mock_db.execute = AsyncMock(return_value=mock_result)
@@ -244,13 +247,16 @@ def test_list_campaigns_ok():
 # 场景 6-7: GET /campaigns/{id}/stats
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_campaign_stats_ok():
     """正常返回活动统计数据"""
-    _fake_ref_svc.get_referral_stats = AsyncMock(return_value={
-        "total_invitees": 50,
-        "total_conversions": 30,
-        "referrer_rewards_issued": 25,
-    })
+    _fake_ref_svc.get_referral_stats = AsyncMock(
+        return_value={
+            "total_invitees": 50,
+            "total_conversions": 30,
+            "referrer_rewards_issued": 25,
+        }
+    )
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -268,9 +274,7 @@ def test_get_campaign_stats_ok():
 
 def test_get_campaign_stats_not_found():
     """活动不存在 → 404"""
-    _fake_ref_svc.get_referral_stats = AsyncMock(
-        side_effect=_ReferralError("CAMPAIGN_NOT_FOUND", "活动不存在")
-    )
+    _fake_ref_svc.get_referral_stats = AsyncMock(side_effect=_ReferralError("CAMPAIGN_NOT_FOUND", "活动不存在"))
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -287,13 +291,16 @@ def test_get_campaign_stats_not_found():
 # 场景 8-9: POST /invite/generate
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_generate_invite_link_ok():
     """正常生成专属邀请链接"""
-    _fake_ref_svc.generate_invite_link = AsyncMock(return_value={
-        "invite_code": "INV_ABC123",
-        "invite_url": "https://miniapp.tunxiang.com/invite?code=INV_ABC123",
-        "expires_at": "2026-05-01T00:00:00",
-    })
+    _fake_ref_svc.generate_invite_link = AsyncMock(
+        return_value={
+            "invite_code": "INV_ABC123",
+            "invite_url": "https://miniapp.tunxiang.com/invite?code=INV_ABC123",
+            "expires_at": "2026-05-01T00:00:00",
+        }
+    )
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -315,9 +322,7 @@ def test_generate_invite_link_ok():
 
 def test_generate_invite_link_campaign_not_found():
     """活动不存在 → 404"""
-    _fake_ref_svc.generate_invite_link = AsyncMock(
-        side_effect=_ReferralError("CAMPAIGN_NOT_FOUND", "活动不存在")
-    )
+    _fake_ref_svc.generate_invite_link = AsyncMock(side_effect=_ReferralError("CAMPAIGN_NOT_FOUND", "活动不存在"))
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -338,13 +343,16 @@ def test_generate_invite_link_campaign_not_found():
 # 场景 10-12: POST /invite/register
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_register_via_invite_ok():
     """正常通过邀请码注册绑定"""
-    _fake_ref_svc.register_via_invite = AsyncMock(return_value={
-        "registered": True,
-        "invite_code": "INV_ABC123",
-        "invitee_reward_issued": True,
-    })
+    _fake_ref_svc.register_via_invite = AsyncMock(
+        return_value={
+            "registered": True,
+            "invite_code": "INV_ABC123",
+            "invitee_reward_issued": True,
+        }
+    )
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -366,9 +374,7 @@ def test_register_via_invite_ok():
 
 def test_register_via_invite_fraud_blocked():
     """欺诈检测拦截（同设备）→ 403"""
-    _fake_ref_svc.register_via_invite = AsyncMock(
-        side_effect=_ReferralError("FRAUD_SAME_DEVICE", "设备已被使用")
-    )
+    _fake_ref_svc.register_via_invite = AsyncMock(side_effect=_ReferralError("FRAUD_SAME_DEVICE", "设备已被使用"))
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -388,9 +394,7 @@ def test_register_via_invite_fraud_blocked():
 
 def test_register_via_invite_code_not_found():
     """邀请码不存在 → 404"""
-    _fake_ref_svc.register_via_invite = AsyncMock(
-        side_effect=_ReferralError("INVITE_CODE_NOT_FOUND", "邀请码不存在")
-    )
+    _fake_ref_svc.register_via_invite = AsyncMock(side_effect=_ReferralError("INVITE_CODE_NOT_FOUND", "邀请码不存在"))
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -411,12 +415,15 @@ def test_register_via_invite_code_not_found():
 # 场景 13-14: POST /invite/first-order
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_first_order_trigger_ok():
     """正常触发首单奖励"""
-    _fake_ref_svc.process_first_order = AsyncMock(return_value={
-        "reward_issued": True,
-        "referrer_rewarded": True,
-    })
+    _fake_ref_svc.process_first_order = AsyncMock(
+        return_value={
+            "reward_issued": True,
+            "referrer_rewarded": True,
+        }
+    )
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -459,14 +466,17 @@ def test_first_order_trigger_zero_amount():
 # 场景 15-16: GET /my-invites
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_get_my_invites_ok():
     """正常返回我的邀请记录列表"""
-    _fake_ref_svc.get_my_referrals = AsyncMock(return_value={
-        "items": [
-            {"invitee_name": "张三", "status": "rewarded", "created_at": _NOW.isoformat()},
-        ],
-        "total": 1,
-    })
+    _fake_ref_svc.get_my_referrals = AsyncMock(
+        return_value={
+            "items": [
+                {"invitee_name": "张三", "status": "rewarded", "created_at": _NOW.isoformat()},
+            ],
+            "total": 1,
+        }
+    )
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
@@ -485,9 +495,7 @@ def test_get_my_invites_ok():
 
 def test_get_my_invites_campaign_not_found():
     """活动不存在 → 404"""
-    _fake_ref_svc.get_my_referrals = AsyncMock(
-        side_effect=_ReferralError("CAMPAIGN_NOT_FOUND", "活动不存在")
-    )
+    _fake_ref_svc.get_my_referrals = AsyncMock(side_effect=_ReferralError("CAMPAIGN_NOT_FOUND", "活动不存在"))
 
     mock_db = _make_mock_db()
     app = _build_app(mock_db)
