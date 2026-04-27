@@ -494,6 +494,10 @@ class FinancialVoucherService:
             )
 
         red.red_flush_of_voucher_id = original.id
+        # [W2.F] 审计字段入 DB (不再只 log)
+        red.red_flush_operator_id = operator_id
+        red.red_flush_reason = reason.strip()
+        red.red_flushed_at = datetime.now(timezone.utc)
         session.add(red)
         try:
             await session.flush()  # 先 flush 拿到 red.id

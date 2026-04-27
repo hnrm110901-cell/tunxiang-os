@@ -206,6 +206,20 @@ class FinancialVoucher(Base):
         comment="本凭证被哪个红冲凭证冲正 (最多一次)."
     )
 
+    # v280 红冲审计字段 (W2.F). CHECK: 红字凭证 (red_flush_of 非空) 必须有 operator + at.
+    red_flush_operator_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        comment="红冲操作员 UUID. 红字凭证 CHECK 非空."
+    )
+    red_flush_reason: Mapped[str | None] = mapped_column(
+        String(200),
+        comment="红冲原因 (审计). 应用层强制非空, DB 允许 NULL 兼容历史."
+    )
+    red_flushed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="红冲操作时间. 红字凭证 CHECK 非空."
+    )
+
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -241,6 +255,12 @@ class FinancialVoucher(Base):
         CheckConstraint(
             "red_flush_of_voucher_id IS NULL OR red_flushed_by_voucher_id IS NULL",
             name="chk_voucher_red_flush_exclusive",
+        ),
+        # v280 CHECK: 红字凭证 (red_flush_of 非空) 必须有 red_flush_operator + at
+        CheckConstraint(
+            "red_flush_of_voucher_id IS NULL "
+            "OR (red_flush_operator_id IS NOT NULL AND red_flushed_at IS NOT NULL)",
+            name="chk_voucher_red_flush_audit",
         ),
         # v278 CHECK: source_period 两列同时 NULL 或同时非空 (跨期调账元数据一致性)
         # 显式 IS NOT NULL 防 SQL 三值逻辑 NULL 穿透 (NULL BETWEEN ... = NULL, CHECK pass)
@@ -397,6 +417,12 @@ class FinancialVoucher(Base):
             ),
             "is_red_flush_voucher": self.is_red_flush_voucher,
             "has_been_red_flushed": self.has_been_red_flushed,
+            # v280: 红冲审计字段
+            "red_flush_operator_id": (
+                str(self.red_flush_operator_id) if self.red_flush_operator_id else None
+            ),
+            "red_flush_reason": self.red_flush_reason,
+            "red_flushed_at": self.red_flushed_at.isoformat() if self.red_flushed_at else None,
             # v278: 以前年度损益调整
             "source_period_year": self.source_period_year,
             "source_period_month": self.source_period_month,

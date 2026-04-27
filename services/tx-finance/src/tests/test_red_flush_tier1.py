@@ -424,6 +424,137 @@ class TestRedFlushBypassesPeriodCheck:
 # ─── v272 迁移文件结构 ────────────────────────────────────────────
 
 
+class TestW2FRedFlushAuditFields:
+    """[W2.F §19 安全 P1-4 + CFO P1-7] red_flush 审计字段入 DB, 不只 log."""
+
+    @pytest.mark.asyncio
+    async def test_red_flush_writes_operator_id_to_db(self):
+        """红字凭证 red_flush_operator_id 字段持久化."""
+        svc = FinancialVoucherService()
+        original = _exported_voucher()
+
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=original)
+        session.flush = AsyncMock()
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
+
+        operator = uuid.uuid4()
+        reason = "2026-04 科目误记"
+
+        red = await svc.red_flush(
+            original.id, operator_id=operator, reason=reason,
+            session=session,
+        )
+
+        assert red.red_flush_operator_id == operator
+        assert red.red_flush_reason == reason
+        assert red.red_flushed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_red_flush_reason_stripped(self):
+        """reason 首尾空白被 strip (存储规范)."""
+        svc = FinancialVoucherService()
+        original = _exported_voucher()
+
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=original)
+        session.flush = AsyncMock()
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
+
+        red = await svc.red_flush(
+            original.id, operator_id=uuid.uuid4(),
+            reason="  带空白的原因  ", session=session,
+        )
+        assert red.red_flush_reason == "带空白的原因"
+
+    @pytest.mark.asyncio
+    async def test_red_flush_audit_timestamp_recent(self):
+        """red_flushed_at 应为当前 UTC 时间."""
+        from datetime import datetime as _datetime, timezone as _tz
+
+        svc = FinancialVoucherService()
+        original = _exported_voucher()
+
+        session = AsyncMock()
+        session.get = AsyncMock(return_value=original)
+        session.flush = AsyncMock()
+        _pre = MagicMock()
+        _pre.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(return_value=_pre)
+
+        before = _datetime.now(_tz.utc)
+        red = await svc.red_flush(
+            original.id, operator_id=uuid.uuid4(),
+            reason="test", session=session,
+        )
+        after = _datetime.now(_tz.utc)
+
+        assert before <= red.red_flushed_at <= after
+
+    def test_to_dict_exposes_red_flush_audit_fields(self):
+        v = _exported_voucher()
+        v.red_flush_of_voucher_id = uuid.uuid4()
+        v.red_flush_operator_id = uuid.uuid4()
+        v.red_flush_reason = "科目调整"
+        from datetime import datetime as _dt, timezone as _tz
+        v.red_flushed_at = _dt(2027, 3, 10, 12, 0, tzinfo=_tz.utc)
+
+        d = v.to_dict()
+        assert d["red_flush_operator_id"] == str(v.red_flush_operator_id)
+        assert d["red_flush_reason"] == "科目调整"
+        assert d["red_flushed_at"] == "2027-03-10T12:00:00+00:00"
+
+
+class TestV280RedFlushAuditMigration:
+    """v280 migration 结构断言."""
+
+    migration_src: str = ""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        path = (
+            Path(__file__).resolve().parents[4]
+            / "shared" / "db-migrations" / "versions"
+            / "v280_red_flush_audit_fields.py"
+        )
+        self.migration_src = path.read_text(encoding="utf-8")
+
+    def test_revision_is_v280(self):
+        assert re.search(r'^revision\s*=\s*"v280"', self.migration_src, re.M)
+
+    def test_down_revision_is_v278(self):
+        assert re.search(r'^down_revision\s*=\s*"v278"', self.migration_src, re.M)
+
+    def test_adds_three_audit_columns(self):
+        for col in ("red_flush_operator_id", "red_flush_reason", "red_flushed_at"):
+            assert re.search(
+                rf"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+{col}",
+                self.migration_src, re.I,
+            )
+
+    def test_check_audit_with_not_valid(self):
+        """CHECK 红字必须有审计 + NOT VALID (跳过历史行)."""
+        assert "chk_voucher_red_flush_audit" in self.migration_src
+        # 表达式: red_flush_of IS NULL OR (operator + at IS NOT NULL)
+        assert re.search(
+            r"red_flush_of_voucher_id\s+IS\s+NULL\s+OR\s+\(\s*"
+            r"red_flush_operator_id\s+IS\s+NOT\s+NULL\s+AND\s+"
+            r"red_flushed_at\s+IS\s+NOT\s+NULL",
+            self.migration_src, re.I,
+        )
+        # NOT VALID (历史行豁免)
+        assert re.search(r"\)\s*NOT\s+VALID", self.migration_src, re.I)
+
+    def test_orm_has_check_mirror(self):
+        orm_path = Path(__file__).resolve().parents[1] / "models" / "voucher.py"
+        orm_src = orm_path.read_text(encoding="utf-8")
+        assert "chk_voucher_red_flush_audit" in orm_src
+
+
 class TestW2DRedFlushOrphanProtection:
     """[W2.D §19 DBA P1-5] 孤儿红字凭证防护 (应用层 pre-check + DB UNIQUE 兜底)."""
 
