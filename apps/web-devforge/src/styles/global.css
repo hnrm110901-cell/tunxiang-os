@@ -1,5 +1,13 @@
 /* DevForge 全局样式 */
 
+/*
+ * Tailwind 与 AntD v5 共存：
+ * preflight 已在 tailwind.config.ts 中关闭，避免与 AntD reset 冲突。
+ * 仅启用 components + utilities 层，让我们能用 className="flex gap-2" 等工具类。
+ */
+@tailwind components;
+@tailwind utilities;
+
 * {
   box-sizing: border-box;
 }

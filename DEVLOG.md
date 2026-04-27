@@ -1,4 +1,26 @@
-## 2026-04-27 DevForge — PR #120 CodeRabbit + Codex 评审修复（7 fix + 3 defer + 1 false-positive）
+## 2026-04-27 DevForge — PR #120 评审修复 Round 2（4 余项全部归零 + merge main）
+
+### Round 2：把 Round 1 延期的 3 项 + false-positive 1 项全部完成
+- **Tailwind 合规** — `apps/web-devforge` 加 `tailwindcss/postcss/autoprefixer` devDeps、`tailwind.config.ts`（preflight 关闭以避免与 AntD reset 冲突）、`postcss.config.js`、`global.css` 加 `@tailwind components/utilities` 指令；与 AntD v5 共存。Round 1 标为 false-positive 是误判——CLAUDE.md 第十条对 `apps/web-*/` 是硬要求，CodeRabbit 引用准确。
+- **Dockerfile USER 非 root** — 加 `useradd --system --no-create-home --shell /usr/sbin/nologin --uid 1001 txuser` + `chown -R` + `USER txuser`，规避 Trivy DS-0002
+- **structlog stdlib bridge** — `utils/logging.py` 重写：用 `ProcessorFormatter` 把 uvicorn / SQLAlchemy / asyncpg 的 stdlib 日志桥接到 JSON 渲染管线，业务日志和框架日志统一格式
+- **CQRS 事件发射** — `shared/events/src/event_types.py` 注册 `DevForgeApplicationEventType`（CREATED/UPDATED/DELETED） + 域名映射 `devforge_application → tx_devforge_application_events` + 加入 `ALL_EVENT_ENUMS`；`api/app_routes.py` 在 POST/PATCH/DELETE 成功路径用 `asyncio.create_task(emit_event(...))` 旁路写入
+
+### 同步合并 origin/main（解锁 PR）
+- main 已并入 web-hub v2.0 三浪 + tx-supply P0 五任务 v366-v370，本分支与 main 双向偏离
+- 冲突点：DEVLOG.md（保留双方条目）+ v366 命名（rename `v366_devforge_application` → `v371_devforge_application`，避开 v366_price_ledger / v367-v370 占用）
+- 计划文档迁移规划表 v366-v381 顺延为 **v371-v386**
+
+### 验证
+- py_compile 全过（app_routes / event_types / logging / db）
+- `npm install` 添加 3 个 Tailwind devDeps 成功
+- `npx tsc --noEmit` 零错误
+- `npx vite build` 通过
+- 所有 12 条 CodeRabbit + Codex 评审项已落实（11 fix + 1 改判为 fix，零延期）
+
+---
+
+## 2026-04-27 DevForge — PR #120 CodeRabbit + Codex 评审修复 Round 1（7 fix + 3 defer + 1 false-positive）
 
 ### CodeRabbit + Codex 12 条评审修复
 PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 全部分类处理：

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated, AsyncGenerator
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import DevForgeApplicationEventType
 
 from ..db import get_db_with_tenant, validate_tenant_id
 from ..repositories.application import ApplicationAlreadyExists, ApplicationRepository
@@ -17,6 +21,8 @@ from ..schemas.application import (
     ApplicationResponse,
     ApplicationUpdate,
 )
+
+SOURCE_SERVICE = "tx-devforge"
 
 router = APIRouter(prefix="/api/v1/devforge/applications", tags=["applications"])
 logger = structlog.get_logger(__name__)
@@ -69,6 +75,22 @@ async def create_application(
         ) from exc
 
     payload = ApplicationResponse.model_validate(created).model_dump(mode="json")
+    # 旁路写入事件总线（CLAUDE.md §15，v147 规范）— 失败不阻塞业务响应
+    asyncio.create_task(
+        emit_event(
+            event_type=DevForgeApplicationEventType.CREATED,
+            tenant_id=tenant_uuid,
+            stream_id=str(created.id),
+            payload={
+                "code": created.code,
+                "name": created.name,
+                "resource_type": created.resource_type,
+                "owner": created.owner,
+                "tech_stack": created.tech_stack,
+            },
+            source_service=SOURCE_SERVICE,
+        )
+    )
     return _ok(payload)
 
 
@@ -142,6 +164,18 @@ async def update_application(
         )
 
     payload = ApplicationResponse.model_validate(updated).model_dump(mode="json")
+    asyncio.create_task(
+        emit_event(
+            event_type=DevForgeApplicationEventType.UPDATED,
+            tenant_id=tenant_uuid,
+            stream_id=str(updated.id),
+            payload={
+                "code": updated.code,
+                "patched_fields": list(patch.keys()),
+            },
+            source_service=SOURCE_SERVICE,
+        )
+    )
     return _ok(payload)
 
 
@@ -159,4 +193,13 @@ async def delete_application(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "not_found", "message": "application not found"},
         )
+    asyncio.create_task(
+        emit_event(
+            event_type=DevForgeApplicationEventType.DELETED,
+            tenant_id=tenant_uuid,
+            stream_id=str(application_id),
+            payload={"soft_delete": True},
+            source_service=SOURCE_SERVICE,
+        )
+    )
     return _ok({"id": str(application_id), "is_deleted": True})

@@ -300,6 +300,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "adapter": "tx_adapter_events",
     # 供应链价格台账域（v366 新增）
     "price": "tx_price_events",
+    # DevForge 内部研运平台域（v371 新增）
+    "devforge_application": "tx_devforge_application_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -345,6 +347,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "adapter": "adapter",
     # 供应链价格台账域（v366 新增）
     "price": "price",
+    # DevForge 内部研运平台域（v371 新增）
+    "devforge_application": "devforge_application",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -520,6 +524,18 @@ class GrowthEventType(str, Enum):
     STORE_READINESS_EVALUATED = "growth.store_readiness_evaluated"
 
 
+class DevForgeApplicationEventType(str, Enum):
+    """DevForge 应用目录生命周期事件 — 内部研运平台 CMDB 写路径。
+
+    每次 application 表的 create/update/soft_delete 都旁路写入事件总线
+    （CLAUDE.md 第十五条 v147 规范），供后续审计/拓扑/灰度联动消费。
+    """
+
+    CREATED = "devforge_application.created"
+    UPDATED = "devforge_application.updated"
+    DELETED = "devforge_application.deleted"
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -579,4 +595,6 @@ ALL_EVENT_ENUMS = (
     AdapterEventType,
     # 供应链价格台账域（v366 新增）
     PriceEventType,
+    # DevForge 内部研运平台域（v371 新增）
+    DevForgeApplicationEventType,
 )
