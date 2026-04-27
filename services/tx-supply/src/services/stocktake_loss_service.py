@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Any, Optional
 
 import structlog
@@ -282,12 +283,14 @@ async def auto_create_loss_case_from_stocktake(
     total_gain_fen = 0
     items_payload: list[dict[str, Any]] = []
     for r in diff_rows:
-        expected = float(r["expected_qty"])
-        actual = float(r["actual_qty"])
+        # 金额必须用 Decimal 才能避免分位浮点误差（宪法第十节硬约束）
+        # cost_price 是 NUMERIC(10,4) 元，转回分用 Decimal * 100 再 int 截断
+        # expected_qty / actual_qty 是 NUMERIC(14,3) — 也用 Decimal 算 diff
+        expected = Decimal(str(r["expected_qty"]))
+        actual = Decimal(str(r["actual_qty"]))
         diff = actual - expected
-        # cost_price 在 stocktake_items 中是元（NUMERIC(10,4)），转回分
-        unit_cost_fen = int(round(float(r["cost_price"]) * 100))
-        diff_amount_abs_fen = int(round(abs(diff) * unit_cost_fen))
+        unit_cost_fen = int(Decimal(str(r["cost_price"])) * 100)
+        diff_amount_abs_fen = int(abs(diff) * unit_cost_fen)
         if diff < 0:  # 盘亏
             total_loss_fen += diff_amount_abs_fen
             sign = -1
@@ -298,8 +301,9 @@ async def auto_create_loss_case_from_stocktake(
         items_payload.append(
             {
                 "ingredient_id": str(r["ingredient_id"]),
-                "expected_qty": expected,
-                "actual_qty": actual,
+                # API 层向后兼容：返回 float 便于 JSON 序列化（数量字段非金额）
+                "expected_qty": float(expected),
+                "actual_qty": float(actual),
                 "unit_cost_fen": unit_cost_fen,
                 "diff_amount_fen": sign * diff_amount_abs_fen,
             }
