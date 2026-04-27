@@ -90,9 +90,7 @@ async def list_practices(
         conditions.append(DishPractice.is_temporary == False)  # noqa: E712
 
     result = await db.execute(
-        select(DishPractice)
-        .where(*conditions)
-        .order_by(DishPractice.practice_group, DishPractice.sort_order)
+        select(DishPractice).where(*conditions).order_by(DishPractice.practice_group, DishPractice.sort_order)
     )
     practices = result.scalars().all()
 
@@ -210,16 +208,18 @@ async def create_temp_practice(
 
     logger.info("temp_practice_created", dish_id=dish_id, name=req.practice_name, price_fen=req.additional_price_fen)
 
-    return _ok({
-        "id": str(practice.id),
-        "dish_id": dish_id,
-        "practice_name": req.practice_name,
-        "practice_group": req.practice_group,
-        "additional_price_fen": req.additional_price_fen,
-        "is_temporary": True,
-        "practice_type": "temporary",
-        "max_quantity": req.max_quantity,
-    })
+    return _ok(
+        {
+            "id": str(practice.id),
+            "dish_id": dish_id,
+            "practice_name": req.practice_name,
+            "practice_group": req.practice_group,
+            "additional_price_fen": req.additional_price_fen,
+            "is_temporary": True,
+            "practice_type": "temporary",
+            "max_quantity": req.max_quantity,
+        }
+    )
 
 
 @router.delete("/practices/{practice_id}")
@@ -276,32 +276,112 @@ async def list_practice_templates(
     if rows:
         groups: dict[str, list] = {}
         for r in rows:
-            groups.setdefault(r.practice_group, []).append({
-                "id": str(r.id),
-                "practice_name": r.practice_name,
-                "practice_group": r.practice_group,
-                "additional_price_fen": r.additional_price_fen,
-                "is_default": r.is_default,
-                "practice_type": r.practice_type,
-                "max_quantity": r.max_quantity,
-            })
+            groups.setdefault(r.practice_group, []).append(
+                {
+                    "id": str(r.id),
+                    "practice_name": r.practice_name,
+                    "practice_group": r.practice_group,
+                    "additional_price_fen": r.additional_price_fen,
+                    "is_default": r.is_default,
+                    "practice_type": r.practice_type,
+                    "max_quantity": r.max_quantity,
+                }
+            )
         return _ok({"groups": groups, "total": len(rows)})
 
     # 未 seed，返回内存默认模板
     _DEFAULT_TEMPLATES = [
-        {"practice_name": "不辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "微辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "中辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "特辣", "practice_group": "辣度", "additional_price_fen": 200, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "不加糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "半糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "全糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "不要香菜", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "不要葱", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "不要蒜", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "不加味精", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "max_quantity": 1},
-        {"practice_name": "加蛋", "practice_group": "加料", "additional_price_fen": 200, "practice_type": "addon", "max_quantity": 3},
-        {"practice_name": "加芝士", "practice_group": "加料", "additional_price_fen": 300, "practice_type": "addon", "max_quantity": 2},
+        {
+            "practice_name": "不辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "微辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "中辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "特辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 200,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不加糖",
+            "practice_group": "甜度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "半糖",
+            "practice_group": "甜度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "全糖",
+            "practice_group": "甜度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不要香菜",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不要葱",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不要蒜",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不加味精",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "加蛋",
+            "practice_group": "加料",
+            "additional_price_fen": 200,
+            "practice_type": "addon",
+            "max_quantity": 3,
+        },
+        {
+            "practice_name": "加芝士",
+            "practice_group": "加料",
+            "additional_price_fen": 300,
+            "practice_type": "addon",
+            "max_quantity": 2,
+        },
     ]
 
     groups = {}
@@ -333,19 +413,123 @@ async def seed_templates(
         return _ok({"seeded": 0, "message": "模板已存在，跳过初始化"})
 
     _SEED_TEMPLATES = [
-        {"practice_name": "不辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "is_default": True, "sort_order": 0, "max_quantity": 1},
-        {"practice_name": "微辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 1, "max_quantity": 1},
-        {"practice_name": "中辣", "practice_group": "辣度", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 2, "max_quantity": 1},
-        {"practice_name": "特辣", "practice_group": "辣度", "additional_price_fen": 200, "practice_type": "standard", "is_default": False, "sort_order": 3, "max_quantity": 1},
-        {"practice_name": "不加糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "is_default": True, "sort_order": 0, "max_quantity": 1},
-        {"practice_name": "半糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 1, "max_quantity": 1},
-        {"practice_name": "全糖", "practice_group": "甜度", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 2, "max_quantity": 1},
-        {"practice_name": "不要香菜", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 0, "max_quantity": 1},
-        {"practice_name": "不要葱", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 1, "max_quantity": 1},
-        {"practice_name": "不要蒜", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 2, "max_quantity": 1},
-        {"practice_name": "不加味精", "practice_group": "忌口", "additional_price_fen": 0, "practice_type": "standard", "is_default": False, "sort_order": 3, "max_quantity": 1},
-        {"practice_name": "加蛋", "practice_group": "加料", "additional_price_fen": 200, "practice_type": "addon", "is_default": False, "sort_order": 0, "max_quantity": 3},
-        {"practice_name": "加芝士", "practice_group": "加料", "additional_price_fen": 300, "practice_type": "addon", "is_default": False, "sort_order": 1, "max_quantity": 2},
+        {
+            "practice_name": "不辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": True,
+            "sort_order": 0,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "微辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 1,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "中辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 2,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "特辣",
+            "practice_group": "辣度",
+            "additional_price_fen": 200,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 3,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不加糖",
+            "practice_group": "甜度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": True,
+            "sort_order": 0,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "半糖",
+            "practice_group": "甜度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 1,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "全糖",
+            "practice_group": "甜度",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 2,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不要香菜",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 0,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不要葱",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 1,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不要蒜",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 2,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "不加味精",
+            "practice_group": "忌口",
+            "additional_price_fen": 0,
+            "practice_type": "standard",
+            "is_default": False,
+            "sort_order": 3,
+            "max_quantity": 1,
+        },
+        {
+            "practice_name": "加蛋",
+            "practice_group": "加料",
+            "additional_price_fen": 200,
+            "practice_type": "addon",
+            "is_default": False,
+            "sort_order": 0,
+            "max_quantity": 3,
+        },
+        {
+            "practice_name": "加芝士",
+            "practice_group": "加料",
+            "additional_price_fen": 300,
+            "practice_type": "addon",
+            "is_default": False,
+            "sort_order": 1,
+            "max_quantity": 2,
+        },
     ]
 
     inserted = 0

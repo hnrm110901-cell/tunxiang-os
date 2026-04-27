@@ -594,11 +594,13 @@ class ApprovalService:
                 else:
                     failed += 1
             except ValueError as exc:
-                results.append({
-                    "request_id": str(request_id),
-                    "ok": False,
-                    "reason": str(exc),
-                })
+                results.append(
+                    {
+                        "request_id": str(request_id),
+                        "ok": False,
+                        "reason": str(exc),
+                    }
+                )
                 failed += 1
 
         log.info(

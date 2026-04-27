@@ -26,7 +26,6 @@ from shared.ontology.src.database import get_db_with_tenant
 
 from ..services.settlement_notify_service import SettlementNotifyService
 from ..services.stored_value_split_service import (
-    NoApplicableRuleError,
     StoredValueSplitService,
 )
 from ..tasks.settlement_scheduler import SettlementScheduler
@@ -71,22 +70,14 @@ def _notify_svc(
 
 class CreateSplitRuleReq(BaseModel):
     rule_name: str = Field(..., min_length=1, max_length=100, description="规则名称")
-    recharge_store_ratio: float = Field(
-        default=0.1500, ge=0, le=1, description="充值店比例（小数，如 0.15 = 15%）"
-    )
-    consume_store_ratio: float = Field(
-        default=0.7000, ge=0, le=1, description="消费店比例"
-    )
-    hq_ratio: float = Field(
-        default=0.1500, ge=0, le=1, description="总部比例"
-    )
+    recharge_store_ratio: float = Field(default=0.1500, ge=0, le=1, description="充值店比例（小数，如 0.15 = 15%）")
+    consume_store_ratio: float = Field(default=0.7000, ge=0, le=1, description="消费店比例")
+    hq_ratio: float = Field(default=0.1500, ge=0, le=1, description="总部比例")
     scope_type: str = Field(
         default="brand",
         description="适用范围: brand | region | custom",
     )
-    applicable_store_ids: Optional[List[str]] = Field(
-        None, description="适用门店 ID 列表（scope_type=custom 时必填）"
-    )
+    applicable_store_ids: Optional[List[str]] = Field(None, description="适用门店 ID 列表（scope_type=custom 时必填）")
     is_default: bool = Field(False, description="是否为默认兜底规则")
     effective_from: Optional[str] = Field(None, description="生效日期 YYYY-MM-DD")
     effective_to: Optional[str] = Field(None, description="失效日期 YYYY-MM-DD")

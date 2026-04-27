@@ -13,9 +13,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -87,10 +86,12 @@ def make_db(side_effects=None):
 class TestCategories:
     @pytest.mark.asyncio
     async def test_list_categories_empty(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[]),  # SELECT
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[]),  # SELECT
+            ]
+        )
         result = await list_categories(tenant_id=TENANT_ID, db=db)
         assert result["total"] == 0
         assert result["items"] == []
@@ -107,10 +108,12 @@ class TestCategories:
                 "is_active": True,
             },
         ]
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=categories),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=categories),
+            ]
+        )
         result = await list_categories(tenant_id=TENANT_ID, db=db)
         assert result["total"] == 1
         assert result["items"][0]["category_name"] == "热销爆品"
@@ -118,10 +121,12 @@ class TestCategories:
 
     @pytest.mark.asyncio
     async def test_create_category_success(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(),  # INSERT
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(),  # INSERT
+            ]
+        )
         result = await create_category(
             category_name="限时特惠",
             category_code="flash_sale",
@@ -147,11 +152,13 @@ class TestCategories:
 
     @pytest.mark.asyncio
     async def test_update_category_success(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": CATEGORY_ID}]),  # check exists
-            FakeResult(),  # UPDATE
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": CATEGORY_ID}]),  # check exists
+                FakeResult(),  # UPDATE
+            ]
+        )
         result = await update_category(
             category_id=CATEGORY_ID,
             tenant_id=TENANT_ID,
@@ -163,10 +170,12 @@ class TestCategories:
 
     @pytest.mark.asyncio
     async def test_update_category_not_found(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[]),  # not found
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[]),  # not found
+            ]
+        )
         with pytest.raises(ValueError, match="category_not_found"):
             await update_category(
                 category_id=CATEGORY_ID,
@@ -177,10 +186,12 @@ class TestCategories:
 
     @pytest.mark.asyncio
     async def test_delete_category_success(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": CATEGORY_ID}], rowcount=1),  # UPDATE RETURNING
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": CATEGORY_ID}], rowcount=1),  # UPDATE RETURNING
+            ]
+        )
         result = await delete_category(
             category_id=CATEGORY_ID,
             tenant_id=TENANT_ID,
@@ -190,10 +201,12 @@ class TestCategories:
 
     @pytest.mark.asyncio
     async def test_delete_category_not_found(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[], rowcount=0),  # nothing to delete
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[], rowcount=0),  # nothing to delete
+            ]
+        )
         with pytest.raises(ValueError, match="category_not_found"):
             await delete_category(
                 category_id=str(uuid.uuid4()),
@@ -249,12 +262,14 @@ class TestAchievementConfigurable:
             "share_count": 3,
             "review_count": 0,
         }
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=configs),  # config query
-            FakeResult(rows=[metrics]),  # metrics query
-            FakeResult(rows=[("first_order",), ("orders_10",)]),  # earned
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=configs),  # config query
+                FakeResult(rows=[metrics]),  # metrics query
+                FakeResult(rows=[("first_order",), ("orders_10",)]),  # earned
+            ]
+        )
         result = await get_achievement_list(CUSTOMER_ID, TENANT_ID, db)
         assert result["total_count"] == 2
         assert result["earned_count"] == 2
@@ -264,10 +279,12 @@ class TestAchievementConfigurable:
 
     @pytest.mark.asyncio
     async def test_get_achievement_list_empty_configs(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[]),  # no configs
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[]),  # no configs
+            ]
+        )
         result = await get_achievement_list(CUSTOMER_ID, TENANT_ID, db)
         assert result["total_count"] == 0
         assert result["achievements"] == []
@@ -282,20 +299,24 @@ class TestExpirationCleanup:
     @pytest.mark.asyncio
     async def test_cleanup_expired_products(self):
         expired_product_id = str(uuid.uuid4())
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[(expired_product_id,)]),  # UPDATE RETURNING
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[(expired_product_id,)]),  # UPDATE RETURNING
+            ]
+        )
         result = await cleanup_expired_products(tenant_id=TENANT_ID, db=db)
         assert result["deactivated_count"] == 1
         assert expired_product_id in result["deactivated_product_ids"]
 
     @pytest.mark.asyncio
     async def test_cleanup_expired_products_none(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[]),  # nothing expired
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[]),  # nothing expired
+            ]
+        )
         result = await cleanup_expired_products(tenant_id=TENANT_ID, db=db)
         assert result["deactivated_count"] == 0
 
@@ -310,16 +331,18 @@ class TestExpirationCleanup:
             "points_deducted": 500,
             "quantity": 1,
         }
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[expired_order]),  # SELECT expired orders
-            FakeResult(),  # UPDATE order status
-            FakeResult(rows=[{"id": CARD_ID}]),  # SELECT member card
-            FakeResult(),  # UPDATE member_cards (refund)
-            FakeResult(),  # INSERT points_log
-            FakeResult(rows=[{"stock": 10}]),  # SELECT product stock
-            FakeResult(),  # UPDATE product stock
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[expired_order]),  # SELECT expired orders
+                FakeResult(),  # UPDATE order status
+                FakeResult(rows=[{"id": CARD_ID}]),  # SELECT member card
+                FakeResult(),  # UPDATE member_cards (refund)
+                FakeResult(),  # INSERT points_log
+                FakeResult(rows=[{"stock": 10}]),  # SELECT product stock
+                FakeResult(),  # UPDATE product stock
+            ]
+        )
         result = await cleanup_expired_orders(
             tenant_id=TENANT_ID,
             db=db,
@@ -330,10 +353,12 @@ class TestExpirationCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_expired_orders_none(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[]),  # no expired orders
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[]),  # no expired orders
+            ]
+        )
         result = await cleanup_expired_orders(tenant_id=TENANT_ID, db=db)
         assert result["expired_count"] == 0
         assert result["total_points_refunded"] == 0
@@ -367,11 +392,13 @@ class TestScopeFilter:
                 "valid_until": None,
             },
         ]
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(scalar_val=1),  # COUNT
-            FakeResult(rows=products),  # SELECT products
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(scalar_val=1),  # COUNT
+                FakeResult(rows=products),  # SELECT products
+            ]
+        )
         result = await list_products(
             tenant_id=TENANT_ID,
             db=db,
@@ -390,11 +417,13 @@ class TestScopeFilter:
     @pytest.mark.asyncio
     async def test_list_products_without_store_scope(self):
         """不传 store_id 时，不添加 scope 过滤"""
-        db = make_db([
-            FakeResult(),
-            FakeResult(scalar_val=0),
-            FakeResult(rows=[]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(scalar_val=0),
+                FakeResult(rows=[]),
+            ]
+        )
         result = await list_products(
             tenant_id=TENANT_ID,
             db=db,
@@ -409,11 +438,13 @@ class TestScopeFilter:
     @pytest.mark.asyncio
     async def test_list_products_with_category_filter(self):
         """传入 category_id 时，查询应包含 category 过滤"""
-        db = make_db([
-            FakeResult(),
-            FakeResult(scalar_val=0),
-            FakeResult(rows=[]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(scalar_val=0),
+                FakeResult(rows=[]),
+            ]
+        )
         result = await list_products(
             tenant_id=TENANT_ID,
             db=db,
@@ -443,11 +474,13 @@ class TestShipmentFlow:
             "fulfillment_status": "pending",
             "product_type": "physical",
         }
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[order_data]),  # SELECT order FOR UPDATE
-            FakeResult(),  # UPDATE shipping
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[order_data]),  # SELECT order FOR UPDATE
+                FakeResult(),  # UPDATE shipping
+            ]
+        )
         result = await ship_order(
             order_id=ORDER_ID,
             carrier="顺丰速运",
@@ -471,10 +504,12 @@ class TestShipmentFlow:
             "fulfillment_status": "pending",
             "product_type": "coupon",
         }
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[order_data]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[order_data]),
+            ]
+        )
         with pytest.raises(ValueError, match="only_physical_orders_can_ship"):
             await ship_order(
                 order_id=ORDER_ID,
@@ -495,10 +530,12 @@ class TestShipmentFlow:
             "fulfillment_status": "shipped",
             "product_type": "physical",
         }
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[order_data]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[order_data]),
+            ]
+        )
         with pytest.raises(ValueError, match="cannot_ship_status:shipped"):
             await ship_order(
                 order_id=ORDER_ID,
@@ -510,10 +547,12 @@ class TestShipmentFlow:
 
     @pytest.mark.asyncio
     async def test_ship_order_not_found(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[]),
+            ]
+        )
         with pytest.raises(ValueError, match="order_not_found"):
             await ship_order(
                 order_id=str(uuid.uuid4()),
@@ -537,13 +576,15 @@ class TestShipmentFlow:
 
     @pytest.mark.asyncio
     async def test_confirm_delivery_success(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(
-                rows=[{"id": ORDER_ID, "order_no": "PM-20260101-XYZ789", "customer_id": CUSTOMER_ID}],
-                rowcount=1,
-            ),  # UPDATE RETURNING
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[{"id": ORDER_ID, "order_no": "PM-20260101-XYZ789", "customer_id": CUSTOMER_ID}],
+                    rowcount=1,
+                ),  # UPDATE RETURNING
+            ]
+        )
         result = await confirm_delivery(
             order_id=ORDER_ID,
             tenant_id=TENANT_ID,
@@ -555,10 +596,12 @@ class TestShipmentFlow:
 
     @pytest.mark.asyncio
     async def test_confirm_delivery_not_shipped(self):
-        db = make_db([
-            FakeResult(),
-            FakeResult(rows=[], rowcount=0),  # nothing matched
-        ])
+        db = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[], rowcount=0),  # nothing matched
+            ]
+        )
         with pytest.raises(ValueError, match="order_not_found_or_not_shipped"):
             await confirm_delivery(
                 order_id=ORDER_ID,
@@ -586,11 +629,13 @@ class TestShipmentIntegration:
             "fulfillment_status": "pending",
             "product_type": "physical",
         }
-        db_ship = make_db([
-            FakeResult(),
-            FakeResult(rows=[order_data]),
-            FakeResult(),
-        ])
+        db_ship = make_db(
+            [
+                FakeResult(),
+                FakeResult(rows=[order_data]),
+                FakeResult(),
+            ]
+        )
         ship_result = await ship_order(
             order_id=ORDER_ID,
             carrier="中通快递",
@@ -601,13 +646,15 @@ class TestShipmentIntegration:
         assert ship_result["fulfillment_status"] == "shipped"
 
         # Step 2: confirm delivery
-        db_deliver = make_db([
-            FakeResult(),
-            FakeResult(
-                rows=[{"id": ORDER_ID, "order_no": "PM-20260101-LIFE01", "customer_id": CUSTOMER_ID}],
-                rowcount=1,
-            ),
-        ])
+        db_deliver = make_db(
+            [
+                FakeResult(),
+                FakeResult(
+                    rows=[{"id": ORDER_ID, "order_no": "PM-20260101-LIFE01", "customer_id": CUSTOMER_ID}],
+                    rowcount=1,
+                ),
+            ]
+        )
         deliver_result = await confirm_delivery(
             order_id=ORDER_ID,
             tenant_id=TENANT_ID,

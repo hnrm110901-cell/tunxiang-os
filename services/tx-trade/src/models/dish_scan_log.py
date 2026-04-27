@@ -23,35 +23,17 @@ class DishScanLog(TenantBase):
 
     __tablename__ = "dish_scan_logs"
 
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, comment="门店ID"
-    )
-    order_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, comment="订单ID"
-    )
-    order_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, comment="订单明细ID"
-    )
-    barcode: Mapped[str] = mapped_column(
-        String(30), nullable=False, comment="菜品条码"
-    )
-    dish_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), comment="菜品ID"
-    )
-    dish_name: Mapped[Optional[str]] = mapped_column(
-        String(100), comment="菜品名称（冗余）"
-    )
-    dept_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), comment="出品档口ID"
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, comment="门店ID")
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, comment="订单ID")
+    order_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, comment="订单明细ID")
+    barcode: Mapped[str] = mapped_column(String(30), nullable=False, comment="菜品条码")
+    dish_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), comment="菜品ID")
+    dish_name: Mapped[Optional[str]] = mapped_column(String(100), comment="菜品名称（冗余）")
+    dept_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), comment="出品档口ID")
     ordered_at: Mapped[Optional[datetime]] = mapped_column(comment="下单时间")
     scanned_at: Mapped[datetime] = mapped_column(nullable=False, comment="扫码确认时间")
-    duration_seconds: Mapped[Optional[int]] = mapped_column(
-        Integer, comment="出品耗时(秒)=scanned_at-ordered_at"
-    )
-    scanned_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), comment="扫码操作人ID"
-    )
+    duration_seconds: Mapped[Optional[int]] = mapped_column(Integer, comment="出品耗时(秒)=scanned_at-ordered_at")
+    scanned_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), comment="扫码操作人ID")
 
     __table_args__ = (
         Index("idx_scan_logs_store_date", "tenant_id", "store_id", "scanned_at"),

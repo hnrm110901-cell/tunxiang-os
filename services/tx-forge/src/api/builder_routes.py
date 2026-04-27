@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.builder_schemas import ProjectCreate, ProjectUpdate
 
 router = APIRouter(prefix="/api/v1/forge/builder", tags=["Forge Builder"])
@@ -69,9 +70,7 @@ async def list_projects(
         params["status"] = status
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.builder_projects WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.builder_projects WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(

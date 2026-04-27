@@ -47,6 +47,7 @@ def _get_http_client() -> httpx.AsyncClient:
         )
     return _http_client
 
+
 # 时段名称映射
 SLOT_NAMES: dict[str, str] = {
     "morning_prep": "早间准备",
@@ -1205,7 +1206,7 @@ class AICoachService:
             )
             memories = data.get("data", data)
             episodes: list[dict] = []
-            for mem in (memories if isinstance(memories, list) else memories.get("items", [])):
+            for mem in memories if isinstance(memories, list) else memories.get("items", []):
                 episodes.append(
                     {
                         "date": mem.get("created_at", "")[:10],

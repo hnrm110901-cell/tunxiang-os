@@ -31,7 +31,7 @@ import types
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -76,15 +76,37 @@ def _stub_module(full_name: str, **attrs: Any) -> types.ModuleType:
     return mod
 
 
-# Stub heavy dependencies
-_stub_module("structlog", get_logger=lambda: MagicMock())
+# 关键：先 import 真 sqlalchemy 让 _stub_module 在 sys.modules 已存在时跳过。
+# 否则 stub 的 sqlalchemy.dialects.postgresql 只含 UUID 等占位 MagicMock，
+# 通过 sys.modules 污染整个 pytest session，后续 test_booking_*/test_cashier_*/...
+# 试图把 stub 的 MagicMock 当作真实 ORM Column 类型 → 集体 collection 失败：
+#   "cannot import name 'ARRAY'" 或
+#   "type object 'MagicMock' has no attribute '_set_parent_with_dispatch'"
+# 让真 sqlalchemy 占位后，本测试文件依赖的 stub 仍按需可用（structlog / httpx），
+# 而 postgresql 等 ORM 子模块走真实导入，互不影响。
+import sqlalchemy  # noqa: E402, F401
+import sqlalchemy.dialects.postgresql  # noqa: E402, F401
+import sqlalchemy.ext.asyncio  # noqa: E402, F401
+import sqlalchemy.orm  # noqa: E402, F401
+
+# httpx 同样必须真模块（fastapi.testclient 等依赖 httpx.Response 等真实属性）
+try:
+    import httpx  # noqa: E402, F401
+except ImportError:
+    pass
+
+# Stub heavy dependencies（这些在真模块缺席的轻量场景才用；
+# _stub_module 检查 sys.modules 已有则跳过，所以上面 import 后 sqlalchemy 不会被替换）
+_stub_module("structlog", get_logger=lambda *a, **kw: MagicMock())
 _stub_module("httpx")
-_stub_module("sqlalchemy")
-_stub_module("sqlalchemy.ext", asyncio=MagicMock())
-_stub_module("sqlalchemy.ext.asyncio", AsyncSession=MagicMock)
-_stub_module("sqlalchemy.dialects", postgresql=MagicMock())
-_stub_module("sqlalchemy.dialects.postgresql", UUID=MagicMock)
-_stub_module("sqlalchemy.orm", Mapped=Any, mapped_column=MagicMock, relationship=MagicMock, DeclarativeBase=type)
+_stub_module("sqlalchemy")  # no-op：真 sqlalchemy 已在 sys.modules
+_stub_module("sqlalchemy.ext", asyncio=MagicMock())  # no-op
+_stub_module("sqlalchemy.ext.asyncio", AsyncSession=MagicMock)  # no-op
+_stub_module("sqlalchemy.dialects", postgresql=MagicMock())  # no-op
+_stub_module("sqlalchemy.dialects.postgresql", UUID=MagicMock)  # no-op
+_stub_module(
+    "sqlalchemy.orm", Mapped=Any, mapped_column=MagicMock, relationship=MagicMock, DeclarativeBase=type
+)  # no-op
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 测试1: 条码生成器

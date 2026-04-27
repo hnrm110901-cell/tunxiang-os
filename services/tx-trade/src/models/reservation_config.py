@@ -6,7 +6,7 @@
 import uuid
 from datetime import time
 
-from sqlalchemy import Boolean, Index, Integer, BigInteger, String, Time
+from sqlalchemy import BigInteger, Boolean, Index, Integer, String, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -100,9 +100,7 @@ class ReservationTimeSlot(TenantBase):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    __table_args__ = (
-        {"comment": "预订时段配置"},
-    )
+    __table_args__ = ({"comment": "预订时段配置"},)
 
     def to_dict(self) -> dict:
         return {

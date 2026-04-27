@@ -7,7 +7,6 @@
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import structlog
 from sqlalchemy import text
@@ -81,8 +80,18 @@ class BanquetContractService:
         event_date = banquet["event_date"]
         deposit_due = event_date - timedelta(days=30) if event_date else None
         payment_schedule = [
-            {"due_date": deposit_due.isoformat() if deposit_due else None, "amount_fen": deposit_fen, "description": "定金", "status": "pending"},
-            {"due_date": event_date.isoformat() if event_date else None, "amount_fen": balance_fen, "description": "尾款", "status": "pending"},
+            {
+                "due_date": deposit_due.isoformat() if deposit_due else None,
+                "amount_fen": deposit_fen,
+                "description": "定金",
+                "status": "pending",
+            },
+            {
+                "due_date": event_date.isoformat() if event_date else None,
+                "amount_fen": balance_fen,
+                "description": "尾款",
+                "status": "pending",
+            },
         ]
 
         terms = terms_override or DEFAULT_CANCEL_TERMS
@@ -102,14 +111,22 @@ class BanquetContractService:
                     :deposit, :schedule::jsonb, 'draft')
             """),
             {
-                "id": cid, "tid": self.tenant_id, "no": contract_no, "bid": banquet_id,
-                "pa_name": banquet["host_name"], "pa_phone": banquet["host_phone"],
-                "pb_name": party_b_name, "pb_license": party_b_license,
-                "edate": event_date, "ename": banquet["event_name"],
-                "tables": banquet["table_count"], "guests": banquet["guest_count"],
+                "id": cid,
+                "tid": self.tenant_id,
+                "no": contract_no,
+                "bid": banquet_id,
+                "pa_name": banquet["host_name"],
+                "pa_phone": banquet["host_phone"],
+                "pb_name": party_b_name,
+                "pb_license": party_b_license,
+                "edate": event_date,
+                "ename": banquet["event_name"],
+                "tables": banquet["table_count"],
+                "guests": banquet["guest_count"],
                 "menu": json.dumps(quote["menu_json"], ensure_ascii=False) if quote["menu_json"] else "[]",
                 "terms": json.dumps(terms, ensure_ascii=False),
-                "total": total_fen, "ratio": deposit_ratio,
+                "total": total_fen,
+                "ratio": deposit_ratio,
                 "deposit": deposit_fen,
                 "schedule": json.dumps(payment_schedule, ensure_ascii=False, default=str),
             },
@@ -117,7 +134,13 @@ class BanquetContractService:
         await self.db.flush()
 
         logger.info("banquet_contract_generated", contract_no=contract_no, banquet_id=banquet_id, total_fen=total_fen)
-        return {"id": cid, "contract_no": contract_no, "total_fen": total_fen, "deposit_fen": deposit_fen, "status": "draft"}
+        return {
+            "id": cid,
+            "contract_no": contract_no,
+            "total_fen": total_fen,
+            "deposit_fen": deposit_fen,
+            "status": "draft",
+        }
 
     async def sign_contract(self, contract_id: str, signed_by_customer: str) -> dict:
         """签署合同"""
@@ -139,8 +162,13 @@ class BanquetContractService:
         return {"id": str(row["id"]), "contract_no": row["contract_no"], "status": "signed"}
 
     async def create_amendment(
-        self, contract_id: str, change_type: str, old_value: dict, new_value: dict,
-        reason: str, price_diff_fen: int = 0,
+        self,
+        contract_id: str,
+        change_type: str,
+        old_value: dict,
+        new_value: dict,
+        reason: str,
+        price_diff_fen: int = 0,
     ) -> dict:
         """创建合同变更"""
         # 获取当前最大amendment_no
@@ -164,11 +192,15 @@ class BanquetContractService:
                     :old::jsonb, :new::jsonb, :reason, :diff, 'pending')
             """),
             {
-                "id": aid, "tid": self.tenant_id, "cid": contract_id, "no": next_no,
+                "id": aid,
+                "tid": self.tenant_id,
+                "cid": contract_id,
+                "no": next_no,
                 "ctype": change_type,
                 "old": json.dumps(old_value, ensure_ascii=False, default=str),
                 "new": json.dumps(new_value, ensure_ascii=False, default=str),
-                "reason": reason, "diff": price_diff_fen,
+                "reason": reason,
+                "diff": price_diff_fen,
             },
         )
         await self.db.flush()
@@ -257,7 +289,9 @@ class BanquetContractService:
     async def get_contract_by_banquet(self, banquet_id: str) -> dict | None:
         """按宴会ID获取合同"""
         row = await self.db.execute(
-            text("SELECT * FROM banquet_contracts WHERE banquet_id = :bid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY created_at DESC LIMIT 1"),
+            text(
+                "SELECT * FROM banquet_contracts WHERE banquet_id = :bid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY created_at DESC LIMIT 1"
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         contract = row.mappings().first()
@@ -266,7 +300,9 @@ class BanquetContractService:
     async def list_amendments(self, contract_id: str) -> list:
         """列出合同变更"""
         rows = await self.db.execute(
-            text("SELECT * FROM banquet_contract_amendments WHERE contract_id = :cid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY amendment_no"),
+            text(
+                "SELECT * FROM banquet_contract_amendments WHERE contract_id = :cid AND tenant_id = :tid AND is_deleted = FALSE ORDER BY amendment_no"
+            ),
             {"cid": contract_id, "tid": self.tenant_id},
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -274,7 +310,9 @@ class BanquetContractService:
     async def get_payment_schedule(self, contract_id: str) -> list:
         """获取付款计划"""
         row = await self.db.execute(
-            text("SELECT payment_schedule_json FROM banquet_contracts WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE"),
+            text(
+                "SELECT payment_schedule_json FROM banquet_contracts WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
             {"cid": contract_id, "tid": self.tenant_id},
         )
         result = row.scalar_one_or_none()
@@ -292,8 +330,11 @@ class BanquetContractService:
         schedule[schedule_index]["paid_at"] = datetime.now(timezone.utc).isoformat()
 
         import json
+
         await self.db.execute(
-            text("UPDATE banquet_contracts SET payment_schedule_json = :schedule::jsonb, updated_at = NOW() WHERE id = :cid AND tenant_id = :tid"),
+            text(
+                "UPDATE banquet_contracts SET payment_schedule_json = :schedule::jsonb, updated_at = NOW() WHERE id = :cid AND tenant_id = :tid"
+            ),
             {"schedule": json.dumps(schedule, ensure_ascii=False), "cid": contract_id, "tid": self.tenant_id},
         )
         await self.db.flush()

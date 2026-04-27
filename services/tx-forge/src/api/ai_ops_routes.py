@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
 from uuid import UUID
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/ai-ops", tags=["ai-ops"])
@@ -25,7 +28,8 @@ async def agent_observatory(
     where = "tenant_id = :tid"
     params: Dict[str, Any] = {"tid": x_tenant_id}
     if store_id:
-        where += " AND store_id = :store_id"; params["store_id"] = store_id
+        where += " AND store_id = :store_id"
+        params["store_id"] = store_id
     rows = await db.execute(text(f"SELECT * FROM forge.ai_agents WHERE {where} ORDER BY last_active_at DESC"), params)
     return {"items": [dict(r) for r in rows.mappings().all()]}
 
@@ -65,11 +69,16 @@ async def list_traces(
     await _set_tenant(db, x_tenant_id)
     clauses, params = ["tenant_id = :tid"], {"tid": x_tenant_id, "limit": size, "offset": (page - 1) * size}
     if agent_id:
-        clauses.append("agent_id = :agent_id"); params["agent_id"] = agent_id
+        clauses.append("agent_id = :agent_id")
+        params["agent_id"] = agent_id
     if status:
-        clauses.append("status = :status"); params["status"] = status
+        clauses.append("status = :status")
+        params["status"] = status
     where = " AND ".join(clauses)
-    rows = await db.execute(text(f"SELECT * FROM forge.ai_traces WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"), params)
+    rows = await db.execute(
+        text(f"SELECT * FROM forge.ai_traces WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"),
+        params,
+    )
     return {"items": [dict(r) for r in rows.mappings().all()], "page": page, "size": size}
 
 
@@ -101,8 +110,11 @@ async def decision_feed(
     where = "tenant_id = :tid"
     params: Dict[str, Any] = {"tid": x_tenant_id, "limit": limit}
     if agent_id:
-        where += " AND agent_id = :agent_id"; params["agent_id"] = agent_id
-    rows = await db.execute(text(f"SELECT * FROM forge.ai_decisions WHERE {where} ORDER BY created_at DESC LIMIT :limit"), params)
+        where += " AND agent_id = :agent_id"
+        params["agent_id"] = agent_id
+    rows = await db.execute(
+        text(f"SELECT * FROM forge.ai_decisions WHERE {where} ORDER BY created_at DESC LIMIT :limit"), params
+    )
     return {"items": [dict(r) for r in rows.mappings().all()]}
 
 
@@ -132,7 +144,7 @@ async def cost_dashboard(
     await _set_tenant(db, x_tenant_id)
     trunc = "day" if group_by == "day" else "week" if group_by == "week" else "month"
     rows = await db.execute(
-        text(f"""SELECT date_trunc(:trunc, created_at) AS period, model_name, SUM(cost) AS total_cost, COUNT(*) AS call_count
+        text("""SELECT date_trunc(:trunc, created_at) AS period, model_name, SUM(cost) AS total_cost, COUNT(*) AS call_count
                  FROM forge.ai_llm_calls WHERE tenant_id = :tid AND created_at >= now() - make_interval(days => :days)
                  GROUP BY period, model_name ORDER BY period DESC"""),
         {"tid": x_tenant_id, "days": days, "trunc": trunc},
@@ -151,7 +163,8 @@ async def latency_stats(
     where = "tenant_id = :tid AND created_at >= now() - make_interval(days => :days)"
     params: Dict[str, Any] = {"tid": x_tenant_id, "days": days}
     if model:
-        where += " AND model_name = :model"; params["model"] = model
+        where += " AND model_name = :model"
+        params["model"] = model
     row = await db.execute(
         text(f"""SELECT AVG(latency_ms) AS avg_latency, percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS p50,
                         percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95,
@@ -174,9 +187,14 @@ async def memory_browser(
     await _set_tenant(db, x_tenant_id)
     clauses, params = ["tenant_id = :tid"], {"tid": x_tenant_id, "limit": size, "offset": (page - 1) * size}
     if agent_id:
-        clauses.append("agent_id = :agent_id"); params["agent_id"] = agent_id
+        clauses.append("agent_id = :agent_id")
+        params["agent_id"] = agent_id
     if memory_type:
-        clauses.append("memory_type = :mtype"); params["mtype"] = memory_type
+        clauses.append("memory_type = :mtype")
+        params["mtype"] = memory_type
     where = " AND ".join(clauses)
-    rows = await db.execute(text(f"SELECT * FROM forge.ai_memories WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"), params)
+    rows = await db.execute(
+        text(f"SELECT * FROM forge.ai_memories WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"),
+        params,
+    )
     return {"items": [dict(r) for r in rows.mappings().all()], "page": page, "size": size}

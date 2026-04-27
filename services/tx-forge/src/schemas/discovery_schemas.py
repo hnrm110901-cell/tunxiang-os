@@ -1,6 +1,6 @@
 """智能发现 Pydantic schemas"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import UUID
 
 from pydantic import BaseModel, Field

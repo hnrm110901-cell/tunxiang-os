@@ -98,9 +98,15 @@ async def get_flywheel(
 
     # 计算趋势
     trend_fields = [
-        "isv_active_rate", "product_quality_score", "install_density",
-        "outcome_conversion_rate", "token_efficiency", "developer_nps",
-        "tthw_minutes", "ecosystem_gmv_fen", "composite_score",
+        "isv_active_rate",
+        "product_quality_score",
+        "install_density",
+        "outcome_conversion_rate",
+        "token_efficiency",
+        "developer_nps",
+        "tthw_minutes",
+        "ecosystem_gmv_fen",
+        "composite_score",
     ]
     trends: Dict[str, float] = {}
     for field in trend_fields:

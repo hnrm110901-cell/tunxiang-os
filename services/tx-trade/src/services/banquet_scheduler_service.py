@@ -6,7 +6,6 @@
 import json
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional
 
 import structlog
 from sqlalchemy import text
@@ -60,8 +59,14 @@ class BanquetSchedulerService:
         # 时间轴
         timeline = []
         for b in banquets:
-            timeline.append({"time": b["time_slot"], "event": "banquet_start", "banquet_id": str(b["id"]),
-                             "description": f"{b['event_name'] or b['banquet_no']} - {b['guest_count']}人{b['table_count']}桌"})
+            timeline.append(
+                {
+                    "time": b["time_slot"],
+                    "event": "banquet_start",
+                    "banquet_id": str(b["id"]),
+                    "description": f"{b['event_name'] or b['banquet_no']} - {b['guest_count']}人{b['table_count']}桌",
+                }
+            )
 
         # 厨房负载(从产能表获取)
         cap_rows = await self.db.execute(
@@ -104,22 +109,36 @@ class BanquetSchedulerService:
                 RETURNING id
             """),
             {
-                "id": schedule_id, "tid": self.tenant_id, "sid": store_id, "d": schedule_date,
-                "bids": json.dumps(banquet_ids), "cnt": len(banquets),
-                "guests": total_guests, "tables": total_tables,
+                "id": schedule_id,
+                "tid": self.tenant_id,
+                "sid": store_id,
+                "d": schedule_date,
+                "bids": json.dumps(banquet_ids),
+                "cnt": len(banquets),
+                "guests": total_guests,
+                "tables": total_tables,
                 "venue": json.dumps(venue_allocation, ensure_ascii=False),
                 "timeline": json.dumps(timeline, ensure_ascii=False),
                 "kitchen": json.dumps(kitchen_load),
             },
         )
-        row = (await self.db.execute(
-            text("SELECT id FROM banquet_day_schedules WHERE store_id = :sid AND schedule_date = :d AND tenant_id = :tid AND is_deleted = FALSE"),
-            {"sid": store_id, "d": schedule_date, "tid": self.tenant_id},
-        )).scalar_one()
+        row = (
+            await self.db.execute(
+                text(
+                    "SELECT id FROM banquet_day_schedules WHERE store_id = :sid AND schedule_date = :d AND tenant_id = :tid AND is_deleted = FALSE"
+                ),
+                {"sid": store_id, "d": schedule_date, "tid": self.tenant_id},
+            )
+        ).scalar_one()
 
         await self.db.flush()
-        logger.info("banquet_daily_schedule_generated", store_id=store_id, date=schedule_date.isoformat(),
-                     banquets=len(banquets), guests=total_guests)
+        logger.info(
+            "banquet_daily_schedule_generated",
+            store_id=store_id,
+            date=schedule_date.isoformat(),
+            banquets=len(banquets),
+            guests=total_guests,
+        )
 
         return {
             "id": str(row),
@@ -137,7 +156,9 @@ class BanquetSchedulerService:
     async def get_schedule(self, store_id: str, schedule_date: date) -> dict | None:
         """获取调度"""
         row = await self.db.execute(
-            text("SELECT * FROM banquet_day_schedules WHERE store_id = :sid AND schedule_date = :d AND tenant_id = :tid AND is_deleted = FALSE"),
+            text(
+                "SELECT * FROM banquet_day_schedules WHERE store_id = :sid AND schedule_date = :d AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
             {"sid": store_id, "d": schedule_date, "tid": self.tenant_id},
         )
         result = row.mappings().first()
@@ -161,7 +182,9 @@ class BanquetSchedulerService:
     async def start_execution(self, schedule_id: str) -> dict:
         """开始执行"""
         result = await self.db.execute(
-            text("UPDATE banquet_day_schedules SET status = 'executing', updated_at = NOW() WHERE id = :id AND tenant_id = :tid AND status = 'confirmed' AND is_deleted = FALSE RETURNING id"),
+            text(
+                "UPDATE banquet_day_schedules SET status = 'executing', updated_at = NOW() WHERE id = :id AND tenant_id = :tid AND status = 'confirmed' AND is_deleted = FALSE RETURNING id"
+            ),
             {"id": schedule_id, "tid": self.tenant_id},
         )
         if not result.mappings().first():
@@ -172,7 +195,9 @@ class BanquetSchedulerService:
     async def complete_schedule(self, schedule_id: str) -> dict:
         """完成调度"""
         result = await self.db.execute(
-            text("UPDATE banquet_day_schedules SET status = 'completed', updated_at = NOW() WHERE id = :id AND tenant_id = :tid AND status = 'executing' AND is_deleted = FALSE RETURNING id"),
+            text(
+                "UPDATE banquet_day_schedules SET status = 'completed', updated_at = NOW() WHERE id = :id AND tenant_id = :tid AND status = 'executing' AND is_deleted = FALSE RETURNING id"
+            ),
             {"id": schedule_id, "tid": self.tenant_id},
         )
         if not result.mappings().first():
@@ -183,9 +208,12 @@ class BanquetSchedulerService:
     async def allocate_staff(self, schedule_id: str, staff_assignments: list[dict]) -> dict:
         """分配人员到各宴会"""
         import json as json_mod
+
         staff_json = json_mod.dumps(staff_assignments, ensure_ascii=False)
         await self.db.execute(
-            text("UPDATE banquet_day_schedules SET staff_allocation_json = :staff::jsonb, updated_at = NOW() WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"),
+            text(
+                "UPDATE banquet_day_schedules SET staff_allocation_json = :staff::jsonb, updated_at = NOW() WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE"
+            ),
             {"id": schedule_id, "tid": self.tenant_id, "staff": staff_json},
         )
         await self.db.flush()

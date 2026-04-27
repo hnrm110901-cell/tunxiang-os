@@ -3,11 +3,10 @@
 import json
 from uuid import uuid4
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -186,9 +185,7 @@ class ForgeInstallationService:
         return {"items": items, "total": total}
 
     # ── 安装状态 ─────────────────────────────────────────────
-    async def get_installation_status(
-        self, db: AsyncSession, tenant_id: str, app_id: str
-    ) -> dict:
+    async def get_installation_status(self, db: AsyncSession, tenant_id: str, app_id: str) -> dict:
         result = await db.execute(
             text("""
                 SELECT install_id, app_id, store_ids, status,

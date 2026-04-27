@@ -1,6 +1,6 @@
 """应用组合 ORM"""
 
-from sqlalchemy import String, Text, Integer, Numeric
+from sqlalchemy import Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 

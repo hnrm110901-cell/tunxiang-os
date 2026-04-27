@@ -5,8 +5,7 @@
 
 import json
 import uuid
-from datetime import date, datetime, time, timezone
-from typing import Optional
+from datetime import date, datetime, timezone
 
 import structlog
 from sqlalchemy import text
@@ -15,13 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = structlog.get_logger()
 
 DEFAULT_SLOTS = [
-    {"time_slot": "morning",        "start": "06:00", "end": "09:00"},
-    {"time_slot": "lunch_prep",     "start": "09:00", "end": "11:00"},
-    {"time_slot": "lunch_service",  "start": "11:00", "end": "14:00"},
-    {"time_slot": "afternoon",      "start": "14:00", "end": "16:00"},
-    {"time_slot": "dinner_prep",    "start": "16:00", "end": "17:30"},
+    {"time_slot": "morning", "start": "06:00", "end": "09:00"},
+    {"time_slot": "lunch_prep", "start": "09:00", "end": "11:00"},
+    {"time_slot": "lunch_service", "start": "11:00", "end": "14:00"},
+    {"time_slot": "afternoon", "start": "14:00", "end": "16:00"},
+    {"time_slot": "dinner_prep", "start": "16:00", "end": "17:30"},
     {"time_slot": "dinner_service", "start": "17:30", "end": "21:00"},
-    {"time_slot": "late_night",     "start": "21:00", "end": "23:00"},
+    {"time_slot": "late_night", "start": "21:00", "end": "23:00"},
 ]
 
 
@@ -44,8 +43,15 @@ class BanquetCapacityService:
                     VALUES (:id, :tid, :sid, :d, :slot, :st, :et)
                     ON CONFLICT DO NOTHING
                 """),
-                {"id": sid, "tid": self.tenant_id, "sid": store_id, "d": slot_date,
-                 "slot": s["time_slot"], "st": s["start"], "et": s["end"]},
+                {
+                    "id": sid,
+                    "tid": self.tenant_id,
+                    "sid": store_id,
+                    "d": slot_date,
+                    "slot": s["time_slot"],
+                    "st": s["start"],
+                    "et": s["end"],
+                },
             )
             created.append(s["time_slot"])
         await self.db.flush()
@@ -77,7 +83,9 @@ class BanquetCapacityService:
             "is_blocked": slot["is_blocked"],
         }
 
-    async def allocate_capacity(self, store_id: str, slot_date: date, time_slot: str, banquet_id: str, dish_count: int) -> dict:
+    async def allocate_capacity(
+        self, store_id: str, slot_date: date, time_slot: str, banquet_id: str, dish_count: int
+    ) -> dict:
         """分配产能"""
         result = await self.db.execute(
             text("""
@@ -113,8 +121,12 @@ class BanquetCapacityService:
                         'critical', :desc, :bids::jsonb, 'open')
                 """),
                 {
-                    "id": cid, "tid": self.tenant_id, "sid": store_id,
-                    "d": slot_date, "slot": time_slot, "ctype": ct,
+                    "id": cid,
+                    "tid": self.tenant_id,
+                    "sid": store_id,
+                    "d": slot_date,
+                    "slot": time_slot,
+                    "ctype": ct,
                     "desc": f"{ct}: 当前负载超出产能",
                     "bids": json.dumps([banquet_id]),
                 },
@@ -152,11 +164,25 @@ class BanquetCapacityService:
         conflicts = []
         for s in rows.mappings().all():
             if s["current_load_dishes"] > s["available_capacity_dishes"]:
-                conflicts.append({"time_slot": s["time_slot"], "type": "dish_overload",
-                                   "severity": "critical", "load": s["current_load_dishes"], "capacity": s["available_capacity_dishes"]})
+                conflicts.append(
+                    {
+                        "time_slot": s["time_slot"],
+                        "type": "dish_overload",
+                        "severity": "critical",
+                        "load": s["current_load_dishes"],
+                        "capacity": s["available_capacity_dishes"],
+                    }
+                )
             if s["current_banquet_count"] > s["max_concurrent_banquets"]:
-                conflicts.append({"time_slot": s["time_slot"], "type": "banquet_overload",
-                                   "severity": "warning", "count": s["current_banquet_count"], "max": s["max_concurrent_banquets"]})
+                conflicts.append(
+                    {
+                        "time_slot": s["time_slot"],
+                        "type": "banquet_overload",
+                        "severity": "warning",
+                        "count": s["current_banquet_count"],
+                        "max": s["max_concurrent_banquets"],
+                    }
+                )
         return conflicts
 
     async def get_daily_overview(self, store_id: str, slot_date: date) -> dict:

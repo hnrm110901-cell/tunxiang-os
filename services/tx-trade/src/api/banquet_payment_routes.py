@@ -29,7 +29,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_no_rls, get_db_with_tenant
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import (
+    UserContext,
+    assert_mfa_for_high_value,
+    require_role_audited,
+)
 from ..services.banquet_payment_service import BanquetPaymentService
 from ..services.trade_audit_log import write_audit
 
@@ -118,9 +122,21 @@ async def create_deposit(
     body: CreateDepositReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.deposit.create", "store_manager", "admin")),
 ):
-    """创建定金记录（初始状态 pending；仅店长/管理员）"""
+    """创建定金记录（初始状态 pending；仅店长/管理员）。
+
+    PR-7 / R-A4-4 后续：≥ ¥5000 的定金强制 MFA 验证。
+    阈值可通过环境变量 TX_MFA_THRESHOLD_FEN__BANQUET_DEPOSIT_CREATE 覆盖。
+    """
+    # 高额定金强制 MFA — 防 store_manager token 泄漏被批量盗刷大额定金
+    await assert_mfa_for_high_value(
+        user,
+        db,
+        action="banquet.deposit.create",
+        amount_fen=body.total_deposit_fen,
+        request_id=request.headers.get("X-Request-Id") if hasattr(request, "headers") else None,
+    )
     try:
         tenant_id = UUID(_get_tenant_id(request))
         svc = BanquetPaymentService(tenant_id=str(tenant_id), db=db)
@@ -170,7 +186,7 @@ async def initiate_wechat_pay(
     body: WechatPayReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.deposit.wechat_pay", "store_manager", "admin")),
 ):
     """发起微信小程序支付（JSAPI模式；仅店长/管理员）
 
@@ -287,7 +303,7 @@ async def create_confirmation(
     body: CreateConfirmationReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.confirmation.create", "store_manager", "admin")),
 ):
     """创建电子确认单（仅店长/管理员）
 
@@ -347,7 +363,7 @@ async def sign_confirmation(
     body: SignConfirmationReq,
     request: Request,
     db: AsyncSession = Depends(_get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("banquet.confirmation.sign", "store_manager", "admin")),
 ):
     """顾客确认签字，将确认单状态更新为 confirmed（仅店长/管理员代签）"""
     try:

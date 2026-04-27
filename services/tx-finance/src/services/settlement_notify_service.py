@@ -16,8 +16,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import structlog
 from sqlalchemy import text
@@ -103,10 +102,7 @@ class SettlementNotifyService:
         """
         amount_yuan = round(total_amount_fen / 100, 2)
         message = (
-            f"[储值分账结算] 批次已确认\n"
-            f"批次号: {batch_no}\n"
-            f"已结算笔数: {settled_count}\n"
-            f"总金额: {amount_yuan} 元"
+            f"[储值分账结算] 批次已确认\n批次号: {batch_no}\n已结算笔数: {settled_count}\n总金额: {amount_yuan} 元"
         )
 
         log.info(
@@ -137,11 +133,7 @@ class SettlementNotifyService:
         batch_no: str,
     ) -> Dict[str, Any]:
         """结算批次打款完成通知"""
-        message = (
-            f"[储值分账结算] 打款已完成\n"
-            f"批次号: {batch_no}\n"
-            f"状态: 已结算"
-        )
+        message = f"[储值分账结算] 打款已完成\n批次号: {batch_no}\n状态: 已结算"
 
         log.info(
             "sv_settlement.notify_settled",
@@ -172,12 +164,7 @@ class SettlementNotifyService:
         detail: str,
     ) -> Dict[str, Any]:
         """结算异常通知 — 金额不一致/超时未确认等"""
-        message = (
-            f"[储值分账结算] 异常告警\n"
-            f"批次号: {batch_no}\n"
-            f"异常类型: {anomaly_type}\n"
-            f"详情: {detail}"
-        )
+        message = f"[储值分账结算] 异常告警\n批次号: {batch_no}\n异常类型: {anomaly_type}\n详情: {detail}"
 
         log.warning(
             "sv_settlement.notify_anomaly",

@@ -1,10 +1,13 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict
 from uuid import UUID
+
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/reviews", tags=["reviews"])
@@ -25,8 +28,13 @@ async def submit_review(
     result = await db.execute(
         text("""INSERT INTO forge.reviews (tenant_id, app_id, reviewer_id, decision, comment)
                 VALUES (:tid, :app_id, :reviewer_id, :decision, :comment) RETURNING *"""),
-        {"tid": x_tenant_id, "app_id": body["app_id"], "reviewer_id": body["reviewer_id"],
-         "decision": body["decision"], "comment": body.get("comment")},
+        {
+            "tid": x_tenant_id,
+            "app_id": body["app_id"],
+            "reviewer_id": body["reviewer_id"],
+            "decision": body["decision"],
+            "comment": body.get("comment"),
+        },
     )
     if body["decision"] in ("approved", "rejected"):
         await db.execute(

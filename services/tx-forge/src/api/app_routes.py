@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
 from uuid import UUID
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/forge/apps", tags=["apps"])
@@ -46,13 +49,18 @@ async def list_apps(
     await _set_tenant(db, x_tenant_id)
     clauses, params = ["tenant_id = :tid"], {"tid": x_tenant_id, "limit": size, "offset": (page - 1) * size}
     if category:
-        clauses.append("category = :category"); params["category"] = category
+        clauses.append("category = :category")
+        params["category"] = category
     if status:
-        clauses.append("status = :status"); params["status"] = status
+        clauses.append("status = :status")
+        params["status"] = status
     if q:
-        clauses.append("name ILIKE :q"); params["q"] = f"%{q}%"
+        clauses.append("name ILIKE :q")
+        params["q"] = f"%{q}%"
     where = " AND ".join(clauses)
-    rows = await db.execute(text(f"SELECT * FROM forge.apps WHERE {where} ORDER BY {sort_by} DESC LIMIT :limit OFFSET :offset"), params)
+    rows = await db.execute(
+        text(f"SELECT * FROM forge.apps WHERE {where} ORDER BY {sort_by} DESC LIMIT :limit OFFSET :offset"), params
+    )
     return {"items": [dict(r) for r in rows.mappings().all()], "page": page, "size": size}
 
 
@@ -63,7 +71,9 @@ async def get_app(
     x_tenant_id: str = Header(...),
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
-    row = await db.execute(text("SELECT * FROM forge.apps WHERE id = :id AND tenant_id = :tid"), {"id": str(app_id), "tid": x_tenant_id})
+    row = await db.execute(
+        text("SELECT * FROM forge.apps WHERE id = :id AND tenant_id = :tid"), {"id": str(app_id), "tid": x_tenant_id}
+    )
     result = row.mappings().first()
     if not result:
         raise HTTPException(404, "App not found")
@@ -80,7 +90,10 @@ async def update_app(
     await _set_tenant(db, x_tenant_id)
     sets = ", ".join(f"{k} = :{k}" for k in body)
     params = {**body, "id": str(app_id), "tid": x_tenant_id}
-    result = await db.execute(text(f"UPDATE forge.apps SET {sets}, updated_at = now() WHERE id = :id AND tenant_id = :tid RETURNING *"), params)
+    result = await db.execute(
+        text(f"UPDATE forge.apps SET {sets}, updated_at = now() WHERE id = :id AND tenant_id = :tid RETURNING *"),
+        params,
+    )
     await db.commit()
     row = result.mappings().first()
     if not row:
@@ -96,7 +109,9 @@ async def get_app_revenue(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     row = await db.execute(
-        text("SELECT app_id, SUM(amount) AS total_revenue, COUNT(*) AS tx_count FROM forge.app_revenue WHERE app_id = :id AND tenant_id = :tid GROUP BY app_id"),
+        text(
+            "SELECT app_id, SUM(amount) AS total_revenue, COUNT(*) AS tx_count FROM forge.app_revenue WHERE app_id = :id AND tenant_id = :tid GROUP BY app_id"
+        ),
         {"id": str(app_id), "tid": x_tenant_id},
     )
     result = row.mappings().first()

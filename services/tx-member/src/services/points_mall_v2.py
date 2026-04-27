@@ -1459,10 +1459,7 @@ async def update_category(
     await _set_tenant(db, tenant_id)
 
     check_row = await db.execute(
-        text(
-            "SELECT id FROM points_mall_categories "
-            "WHERE id = :cid AND tenant_id = :tid AND is_deleted = false"
-        ),
+        text("SELECT id FROM points_mall_categories WHERE id = :cid AND tenant_id = :tid AND is_deleted = false"),
         {"cid": category_id, "tid": tenant_id},
     )
     if not check_row.first():
@@ -1887,10 +1884,7 @@ async def cleanup_expired_orders(
 
         # 退还库存
         prod_row = await db.execute(
-            text(
-                "SELECT stock FROM points_mall_products "
-                "WHERE id = :pid AND tenant_id = :tid"
-            ),
+            text("SELECT stock FROM points_mall_products WHERE id = :pid AND tenant_id = :tid"),
             {"pid": product_id, "tid": tenant_id},
         )
         prod = prod_row.mappings().first()

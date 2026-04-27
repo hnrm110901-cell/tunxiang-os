@@ -1,12 +1,16 @@
 """宴会AI决策 + KPI ORM模型"""
+
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
+
 from sqlalchemy import Boolean, Date, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from shared.ontology.src.base import TenantBase
+
 
 class BanquetAIDecision(TenantBase):
     __tablename__ = "banquet_ai_decisions"
@@ -24,8 +28,19 @@ class BanquetAIDecision(TenantBase):
     operator_feedback: Mapped[Optional[str]] = mapped_column(Text)
     execution_ms: Mapped[int] = mapped_column(Integer, default=0)
     __table_args__ = (Index("idx_bad_tenant", "tenant_id", "agent_type"), {"comment": "AI决策日志"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "agent_type": self.agent_type, "decision_type": self.decision_type, "recommendation_json": self.recommendation_json, "reasoning": self.reasoning, "confidence": float(self.confidence), "accepted": self.accepted, "created_at": self.created_at.isoformat() if self.created_at else None}
+        return {
+            "id": str(self.id),
+            "agent_type": self.agent_type,
+            "decision_type": self.decision_type,
+            "recommendation_json": self.recommendation_json,
+            "reasoning": self.reasoning,
+            "confidence": float(self.confidence),
+            "accepted": self.accepted,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
 
 class BanquetDemandForecast(TenantBase):
     __tablename__ = "banquet_demand_forecasts"
@@ -40,8 +55,19 @@ class BanquetDemandForecast(TenantBase):
     factors_json: Mapped[dict] = mapped_column(JSON, default=dict)
     model_version: Mapped[str] = mapped_column(String(20), default="v1")
     __table_args__ = (Index("idx_bdf_store", "tenant_id", "store_id", "forecast_month"), {"comment": "需求预测"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "store_id": str(self.store_id), "forecast_month": self.forecast_month, "event_type": self.event_type, "predicted_count": self.predicted_count, "predicted_revenue_fen": self.predicted_revenue_fen, "actual_count": self.actual_count, "accuracy_pct": float(self.accuracy_pct) if self.accuracy_pct else None}
+        return {
+            "id": str(self.id),
+            "store_id": str(self.store_id),
+            "forecast_month": self.forecast_month,
+            "event_type": self.event_type,
+            "predicted_count": self.predicted_count,
+            "predicted_revenue_fen": self.predicted_revenue_fen,
+            "actual_count": self.actual_count,
+            "accuracy_pct": float(self.accuracy_pct) if self.accuracy_pct else None,
+        }
+
 
 class BanquetKPISnapshot(TenantBase):
     __tablename__ = "banquet_kpi_snapshots"
@@ -63,8 +89,22 @@ class BanquetKPISnapshot(TenantBase):
     cancellation_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))
     food_cost_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))
     __table_args__ = (Index("idx_bks_store", "tenant_id", "store_id", "period_date"), {"comment": "宴会KPI"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "store_id": str(self.store_id), "period": self.period, "period_date": self.period_date.isoformat(), "leads_count": self.leads_count, "conversion_rate": float(self.conversion_rate), "bookings_count": self.bookings_count, "revenue_fen": self.revenue_fen, "avg_per_table_fen": self.avg_per_table_fen, "customer_satisfaction": float(self.customer_satisfaction), "repeat_rate": float(self.repeat_rate)}
+        return {
+            "id": str(self.id),
+            "store_id": str(self.store_id),
+            "period": self.period,
+            "period_date": self.period_date.isoformat(),
+            "leads_count": self.leads_count,
+            "conversion_rate": float(self.conversion_rate),
+            "bookings_count": self.bookings_count,
+            "revenue_fen": self.revenue_fen,
+            "avg_per_table_fen": self.avg_per_table_fen,
+            "customer_satisfaction": float(self.customer_satisfaction),
+            "repeat_rate": float(self.repeat_rate),
+        }
+
 
 class BanquetCompetitiveBenchmark(TenantBase):
     __tablename__ = "banquet_competitive_benchmarks"
@@ -79,5 +119,16 @@ class BanquetCompetitiveBenchmark(TenantBase):
     percentile: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))
     trend: Mapped[str] = mapped_column(String(10), default="flat")
     __table_args__ = (Index("idx_bcb_store", "tenant_id", "store_id", "period_date"), {"comment": "跨店对标"})
+
     def to_dict(self) -> dict:
-        return {"id": str(self.id), "store_id": str(self.store_id), "metric_name": self.metric_name, "store_value": float(self.store_value), "brand_avg": float(self.brand_avg), "brand_best": float(self.brand_best), "rank": self.rank, "percentile": float(self.percentile), "trend": self.trend}
+        return {
+            "id": str(self.id),
+            "store_id": str(self.store_id),
+            "metric_name": self.metric_name,
+            "store_value": float(self.store_value),
+            "brand_avg": float(self.brand_avg),
+            "brand_best": float(self.brand_best),
+            "rank": self.rank,
+            "percentile": float(self.percentile),
+            "trend": self.trend,
+        }

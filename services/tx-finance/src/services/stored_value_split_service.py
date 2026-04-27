@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -30,6 +30,7 @@ log = structlog.get_logger(__name__)
 
 class NoApplicableRuleError(ValueError):
     """没有匹配的分账规则"""
+
     pass
 
 
@@ -108,9 +109,7 @@ class StoredValueSplitService:
         )
         return await self.get_rule(str(rule_id))  # type: ignore[return-value]
 
-    async def update_rule(
-        self, rule_id: str, rule_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def update_rule(self, rule_id: str, rule_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """更新分账规则"""
         await self._set_tenant()
 
@@ -118,10 +117,7 @@ class StoredValueSplitService:
         consume_ratio = Decimal(str(rule_data.get("consume_store_ratio", "0.7000")))
         hq_ratio = Decimal(str(rule_data.get("hq_ratio", "0.1500")))
         if recharge_ratio + consume_ratio + hq_ratio != Decimal("1.0000"):
-            raise ValueError(
-                f"三方比例之和必须为 1.0000，当前: "
-                f"{recharge_ratio + consume_ratio + hq_ratio}"
-            )
+            raise ValueError(f"三方比例之和必须为 1.0000，当前: {recharge_ratio + consume_ratio + hq_ratio}")
 
         store_ids = rule_data.get("applicable_store_ids")
         safe_store_ids = None
@@ -275,8 +271,7 @@ class StoredValueSplitService:
             return self._rule_to_dict(row)
 
         raise NoApplicableRuleError(
-            f"未找到适用的分账规则 (recharge_store={recharge_store_id}, "
-            f"consume_store={consume_store_id})"
+            f"未找到适用的分账规则 (recharge_store={recharge_store_id}, consume_store={consume_store_id})"
         )
 
     async def create_split_record(

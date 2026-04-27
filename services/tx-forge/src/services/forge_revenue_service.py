@@ -128,11 +128,7 @@ class ForgeRevenueService:
         total_revenue_fen = sum(a["app_revenue_fen"] for a in app_breakdown)
         platform_fee_fen = sum(a["app_fee_fen"] for a in app_breakdown)
         developer_payout_fen = sum(a["app_payout_fen"] for a in app_breakdown)
-        platform_fee_rate = (
-            round(platform_fee_fen / total_revenue_fen, 4)
-            if total_revenue_fen > 0
-            else 0.0
-        )
+        platform_fee_rate = round(platform_fee_fen / total_revenue_fen, 4) if total_revenue_fen > 0 else 0.0
 
         return {
             "developer_id": developer_id,
@@ -246,9 +242,7 @@ class ForgeRevenueService:
         )
         return row
 
-    async def get_payout_history(
-        self, db: AsyncSession, developer_id: str
-    ) -> list[dict]:
+    async def get_payout_history(self, db: AsyncSession, developer_id: str) -> list[dict]:
         """查询开发者提现历史。"""
         result = await db.execute(
             text("""

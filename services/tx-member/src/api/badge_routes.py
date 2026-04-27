@@ -9,14 +9,14 @@
 import json
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+from services.tx_member.src.services import badge_engine
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from services.tx_member.src.services import badge_engine
 
 router = APIRouter(prefix="/api/v1/member/badges", tags=["badge-engine"])
 
@@ -119,9 +119,7 @@ async def list_badges_api(
     db: AsyncSession = Depends(get_db),
 ):
     """2. 列出徽章 → SELECT FROM badges"""
-    result = await badge_engine.list_badges(
-        db, x_tenant_id, category=category, page=page, size=size
-    )
+    result = await badge_engine.list_badges(db, x_tenant_id, category=category, page=page, size=size)
     return _ok(result)
 
 
@@ -172,8 +170,17 @@ async def update_badge(
         return _err("NO_CHANGES", "no fields to update")
 
     # 动态构建 SET 子句（allowlist防止SQL注入）
-    ALLOWED_COLUMNS = {"name", "description", "category", "unlock_rule", "rarity",
-                       "points_reward", "icon_url", "display_order", "is_active"}
+    ALLOWED_COLUMNS = {
+        "name",
+        "description",
+        "category",
+        "unlock_rule",
+        "rarity",
+        "points_reward",
+        "icon_url",
+        "display_order",
+        "is_active",
+    }
     set_parts: list[str] = ["updated_at = NOW()"]
     params: dict[str, Any] = {"tid": x_tenant_id, "bid": badge_id}
     for key, val in updates.items():
@@ -241,9 +248,7 @@ async def evaluate_badges_api(
     db: AsyncSession = Depends(get_db),
 ):
     """6. 评估顾客可解锁的徽章 → badge_engine.evaluate_badges"""
-    newly_unlocked = await badge_engine.evaluate_badges(
-        db, x_tenant_id, req.customer_id
-    )
+    newly_unlocked = await badge_engine.evaluate_badges(db, x_tenant_id, req.customer_id)
     return _ok({"customer_id": req.customer_id, "newly_unlocked": newly_unlocked})
 
 
@@ -256,7 +261,5 @@ async def badge_holders(
     db: AsyncSession = Depends(get_db),
 ):
     """8. 获取徽章持有者列表 → badge_engine.get_badge_holders"""
-    result = await badge_engine.get_badge_holders(
-        db, x_tenant_id, badge_id, page=page, size=size
-    )
+    result = await badge_engine.get_badge_holders(db, x_tenant_id, badge_id, page=page, size=size)
     return _ok(result)

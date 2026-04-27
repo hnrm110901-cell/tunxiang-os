@@ -18,7 +18,7 @@ from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import PaymentEventType
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services.trade_audit_log import write_audit
 
 router = APIRouter(prefix="/api/v1/payments", tags=["scan-pay"])
@@ -59,7 +59,7 @@ async def scan_pay(
     body: ScanPayRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.scan_pay.create", "cashier", "store_manager", "admin")),
 ):
     """扫码收款 — 写入 scan_pay_transactions，模拟调用第三方支付（异步）。"""
     tenant_id = _get_tenant_id(request)
@@ -174,7 +174,7 @@ async def get_payment_status(
     payment_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.scan_pay.status", "cashier", "store_manager", "admin")),
 ):
     """查询支付状态。"""
     tenant_id = _get_tenant_id(request)
@@ -212,7 +212,7 @@ async def cancel_payment(
     payment_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
+    user: UserContext = Depends(require_role_audited("payment.scan_pay.cancel", "cashier", "store_manager", "admin")),
 ):
     """取消支付（仅限 pending 状态）。"""
     tenant_id = _get_tenant_id(request)

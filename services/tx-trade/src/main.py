@@ -135,12 +135,24 @@ async def lifespan(app: FastAPI):
 
     from shared.ontology.src.database import async_session_factory
 
+    from .security.rbac import assert_no_dev_bypass_in_production
+    from .services.audit_outbox import start_audit_outbox_flusher
     from .services.cook_time_stats import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
+
+    # 启动门禁（PR-2 / §19 R-A4-7）：拒绝生产环境 TX_AUTH_ENABLED=false 配置漂移。
+    # 必须在 init_db / scheduler 之前 — fail-loud，让 k8s readiness probe 失败。
+    assert_no_dev_bypass_in_production()
 
     await init_db()
     asyncio.create_task(start_daily_scheduler(async_session_factory))
     asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+
+    # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
+    # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
+    audit_outbox_flusher_task, audit_outbox_flusher_stop = start_audit_outbox_flusher(
+        async_session_factory,
+    )
 
     # Feature Flag 检查：TradeFlags.DELIVERY_AUTO_ACCEPT（外卖自动接单）
     # 关闭时跳过自动接单初始化，外卖订单须人工在接单面板手动接单
@@ -168,6 +180,15 @@ async def lifespan(app: FastAPI):
         pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
 
     yield
+
+    # ── Graceful shutdown ─────────────────────────────────────────────
+    # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
+    # 防止 SIGTERM 时 outbox 文件残留几秒未消费的 audit 行。
+    audit_outbox_flusher_stop.set()
+    try:
+        await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
+    except asyncio.TimeoutError:
+        audit_outbox_flusher_task.cancel()
 
 
 app = FastAPI(
@@ -247,16 +268,18 @@ app.include_router(banquet_material_router)
 app.include_router(banquet_capacity_router)
 app.include_router(banquet_schedule_router)
 # Phase 3 宴会执行+结算+售后
+from .api.banquet_aftercare_routes import router as banquet_aftercare_router
 from .api.banquet_execution_routes import router as banquet_execution_router
 from .api.banquet_live_order_routes import router as banquet_live_order_router
 from .api.banquet_settlement_routes import router as banquet_settlement_routes_router
-from .api.banquet_aftercare_routes import router as banquet_aftercare_router
+
 app.include_router(banquet_execution_router)
 app.include_router(banquet_live_order_router)
 app.include_router(banquet_settlement_routes_router)
 app.include_router(banquet_aftercare_router)
 # Phase 4 AI宴会大脑+经营看板
 from .api.banquet_ai_routes import router as banquet_ai_router
+
 app.include_router(banquet_ai_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)

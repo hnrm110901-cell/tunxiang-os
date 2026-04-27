@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..schemas.workflow_schemas import WorkflowCreate, WorkflowRunStart
 
 router = APIRouter(prefix="/api/v1/forge/workflows", tags=["Agent编排"])
@@ -74,9 +75,7 @@ async def list_workflows(
         params["creator_id"] = creator_id
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.workflows WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.workflows WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(
@@ -181,9 +180,7 @@ async def list_workflow_runs(
         params["status"] = status
     where = " AND ".join(clauses)
 
-    total_row = await db.execute(
-        text(f"SELECT COUNT(*) FROM forge.workflow_runs WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM forge.workflow_runs WHERE {where}"), params)
     total = total_row.scalar() or 0
 
     rows = await db.execute(
