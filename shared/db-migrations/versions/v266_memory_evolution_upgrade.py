@@ -18,10 +18,9 @@ ALTER agent_memories 新增列：
   idx_agent_memories_valid      — (valid_from, valid_until) 部分索引
 
 Revision ID: v266_mem_evo
-Revises: v263_kiosk_voice_count (v265_mv_roi was never merged to main)
+Revises: v263 (reanchored from missing v265_mv_roi)
 Create Date: 2026-04-23
 """
-
 from alembic import op
 
 revision = "v266_mem_evo"

@@ -57,6 +57,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE discount_audit_log ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE discount_audit_log FORCE ROW LEVEL SECURITY;")
     op.execute("""
+        DROP POLICY IF EXISTS dal_tenant_isolation ON discount_audit_log;
         CREATE POLICY dal_tenant_isolation ON discount_audit_log
             AS PERMISSIVE FOR ALL
             USING (

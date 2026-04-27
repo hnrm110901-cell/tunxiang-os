@@ -6,16 +6,15 @@
 背景：B-03差距关闭，merchant_targets_routes.py PUT端点需要持久化目标覆盖，
 支持商户差异化KPI目标配置。
 
-Revision ID: v236
+Revision ID: v236b
 Revises: v235
 """
-
-import sqlalchemy as sa
 from alembic import op
+import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "v289"
-down_revision = "v288"
+revision = "v236b"
+down_revision = "v235"
 branch_labels = None
 depends_on = None
 

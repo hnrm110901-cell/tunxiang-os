@@ -12,14 +12,14 @@
   - kds_display_rules：健康度检查 + KDS 前端渲染规则
   - member_migration_pending：天财切换客户的会员储值安全迁移暂存
 
-Revision ID: v206
+Revision ID: v206d
 Revises: v205
 Create Date: 2026-04-11
 """
 
 from alembic import op
 
-revision = "v285"
+revision = "v206d"
 down_revision = "v205"
 branch_labels = None
 depends_on = None

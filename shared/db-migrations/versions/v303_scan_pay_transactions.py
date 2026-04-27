@@ -17,14 +17,13 @@
 RLS：标准 NULLIF(current_setting('app.tenant_id', true), '')::UUID 模式
 索引：tenant_id/payment_id(UNIQUE)/store_id+created_at
 
-Revision ID: v168
+Revision ID: v168b
 Revises: v167
 """
-
 from alembic import op
 
-revision = "v303"
-down_revision = "v302"
+revision = "v168b"
+down_revision = "v167"
 
 branch_labels = None
 depends_on = None

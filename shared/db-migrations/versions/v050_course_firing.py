@@ -52,6 +52,8 @@ def upgrade() -> None:
         ALTER TABLE order_courses ENABLE ROW LEVEL SECURITY;
         ALTER TABLE order_courses FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS order_courses_tenant_isolation ON order_courses;
+
         CREATE POLICY order_courses_tenant_isolation ON order_courses
             AS PERMISSIVE FOR ALL
             USING (

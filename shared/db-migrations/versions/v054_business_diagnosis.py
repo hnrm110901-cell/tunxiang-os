@@ -64,7 +64,12 @@ def upgrade() -> None:
         ALTER TABLE business_diagnosis_reports ENABLE ROW LEVEL SECURITY;
         ALTER TABLE business_diagnosis_reports FORCE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS business_diagnosis_reports_tenant_isolation ON business_diagnosis_reports;
+
+
         CREATE POLICY business_diagnosis_reports_tenant_isolation
+
+
             ON business_diagnosis_reports
             AS PERMISSIVE FOR ALL
             USING (

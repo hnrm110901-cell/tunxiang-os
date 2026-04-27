@@ -16,15 +16,14 @@
     （action, created_at DESC）三条典型查询
   - amount_fen 可空（查询/取消等操作无金额）
 
-Revision ID: v261
+Revision ID: v261b
 Revises: v260
 Create Date: 2026-04-18
 """
-
 import sqlalchemy as sa
 from alembic import op
 
-revision = "v299"
+revision = "v261b"
 down_revision = "v260"
 branch_labels = None
 depends_on = None

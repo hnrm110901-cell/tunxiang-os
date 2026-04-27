@@ -19,10 +19,9 @@
 多店/多月分析共享 cache。
 
 Revision ID: v280_salary_anomaly
-Revises: v277_memory_feedback_signals (v279_cost_root_cause was never merged to main)
+Revises: v277_memory_feedback_signals (reanchored from missing v279_cost_root_cause)
 Create Date: 2026-04-23
 """
-
 from alembic import op
 
 revision = "v280_salary_anomaly"

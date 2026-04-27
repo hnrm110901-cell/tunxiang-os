@@ -9,7 +9,7 @@
   retail       — 纯零售（便利店窗口，扫商品码→付款→走人，无桌台无会话）
 
 Revision ID: v281
-Revises: v280
+Revises: v280_salary_anomaly
 Create Date: 2026-04-24
 """
 from typing import Sequence, Union
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "v281"
-down_revision: Union[str, None] = "v280"
+down_revision: Union[str, None] = "v280_salary_anomaly"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

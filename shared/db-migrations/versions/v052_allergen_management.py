@@ -81,6 +81,8 @@ def upgrade() -> None:
         DROP POLICY IF EXISTS dish_allergens_update ON dish_allergens;
         DROP POLICY IF EXISTS dish_allergens_delete ON dish_allergens;
 
+        DROP POLICY IF EXISTS dish_allergens_select ON dish_allergens;
+
         CREATE POLICY dish_allergens_select ON dish_allergens
             FOR SELECT
             USING (
@@ -88,6 +90,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
+
+        DROP POLICY IF EXISTS dish_allergens_insert ON dish_allergens;
 
         CREATE POLICY dish_allergens_insert ON dish_allergens
             FOR INSERT
@@ -97,6 +101,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
 
+        DROP POLICY IF EXISTS dish_allergens_update ON dish_allergens;
+
         CREATE POLICY dish_allergens_update ON dish_allergens
             FOR UPDATE
             USING (
@@ -104,6 +110,8 @@ def upgrade() -> None:
                 AND current_setting('app.tenant_id', TRUE) IS NOT NULL
                 AND current_setting('app.tenant_id', TRUE) <> ''
             );
+
+        DROP POLICY IF EXISTS dish_allergens_delete ON dish_allergens;
 
         CREATE POLICY dish_allergens_delete ON dish_allergens
             FOR DELETE

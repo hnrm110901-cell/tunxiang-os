@@ -2,14 +2,14 @@
 
 薪税申报对接模块持久化存储。
 
-Revision ID: v256
+Revision ID: v256b
 Revises: v255
 Create Date: 2026-04-13
 """
 
 from alembic import op
 
-revision = "v256"
+revision = "v256b"
 down_revision = "v255"
 branch_labels = None
 depends_on = None

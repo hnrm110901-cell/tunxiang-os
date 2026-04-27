@@ -10,14 +10,14 @@
   - 金额单位：分（BIGINT）
   - 配合 tx-pay (:8013) 服务使用
 
-Revision ID: v206
+Revision ID: v206c
 Revises: v205
 Create Date: 2026-04-11
 """
 
 from alembic import op
 
-revision = "v284"
+revision = "v206c"
 down_revision = "v205"
 branch_labels = None
 depends_on = None

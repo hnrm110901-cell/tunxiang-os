@@ -19,13 +19,13 @@
 
 RLS：使用标准 NULLIF(current_setting('app.tenant_id', true), '')::UUID 模式
 
-Revision ID: v167
+Revision ID: v167b
 Revises: v166
 """
 
 from alembic import op
 
-revision = "v302"
+revision = "v167b"
 down_revision = "v166"
 branch_labels = None
 depends_on = None

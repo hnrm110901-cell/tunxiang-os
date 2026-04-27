@@ -14,27 +14,28 @@
   后付区域（postpay）：开台 → 就餐 → 买单 → 结账（传统堂食）
   混合门店：大厅快餐区=prepay，包间区=postpay，互不干扰
 
-Revision ID: v169
+Revision ID: v169b
 Revises: v168
 Create Date: 2026-04-06
 """
+from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision = "v169"
-down_revision = "v168"
-branch_labels = None
-depends_on = None
+revision: str = "v169b"
+down_revision: Union[str, None] = "v168"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def _col_exists(table: str, column: str) -> bool:
     bind = op.get_bind()
-    result = bind.execute(
-        sa.text("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = :t AND column_name = :c"),
-        {"t": table, "c": column},
-    )
+    result = bind.execute(sa.text(
+        "SELECT COUNT(*) FROM information_schema.columns "
+        "WHERE table_name = :t AND column_name = :c"
+    ), {"t": table, "c": column})
     return result.scalar() > 0
 
 
@@ -44,10 +45,7 @@ def upgrade() -> None:
         op.add_column(
             "table_zones",
             sa.Column(
-                "pay_mode",
-                sa.String(20),
-                nullable=False,
-                server_default="postpay",
+                "pay_mode", sa.String(20), nullable=False, server_default="postpay",
                 comment="区域支付时序：prepay=先付后餐(快餐/外带) / postpay=先餐后付(堂食默认)",
             ),
         )
@@ -62,10 +60,7 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "pay_mode",
-                sa.String(20),
-                nullable=False,
-                server_default="postpay",
+                "pay_mode", sa.String(20), nullable=False, server_default="postpay",
                 comment="会话支付时序（继承table_zones.pay_mode，开台时写入，可管理员覆盖）",
             ),
         )
@@ -76,10 +71,7 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "order_type",
-                sa.String(30),
-                nullable=False,
-                server_default="dine_in",
+                "order_type", sa.String(30), nullable=False, server_default="dine_in",
                 comment="会话渠道：dine_in/takeout/self_pickup/banquet",
             ),
         )
@@ -90,9 +82,7 @@ def upgrade() -> None:
         op.add_column(
             "dining_sessions",
             sa.Column(
-                "prepay_order_id",
-                UUID(as_uuid=True),
-                nullable=True,
+                "prepay_order_id", UUID(as_uuid=True), nullable=True,
                 comment="先付场景的预支付订单ID（扫码点餐→支付→出品流程中写入）",
             ),
         )
@@ -102,9 +92,7 @@ def upgrade() -> None:
         op.add_column(
             "orders",
             sa.Column(
-                "pickup_code",
-                sa.String(10),
-                nullable=True,
+                "pickup_code", sa.String(10), nullable=True,
                 comment="自提取餐码（4-6位字母数字，当日门店唯一，用于叫号/扫码提货）",
             ),
         )
@@ -119,9 +107,7 @@ def upgrade() -> None:
         op.add_column(
             "orders",
             sa.Column(
-                "pickup_ready_at",
-                sa.TIMESTAMP(timezone=True),
-                nullable=True,
+                "pickup_ready_at", sa.TIMESTAMP(timezone=True), nullable=True,
                 comment="备餐完成时间（KDS所有任务done后回填，触发叫号/推送）",
             ),
         )
@@ -131,9 +117,7 @@ def upgrade() -> None:
         op.add_column(
             "orders",
             sa.Column(
-                "pickup_confirmed_at",
-                sa.TIMESTAMP(timezone=True),
-                nullable=True,
+                "pickup_confirmed_at", sa.TIMESTAMP(timezone=True), nullable=True,
                 comment="顾客取餐确认时间（员工扫码确认 or 自助取餐后写入）",
             ),
         )
@@ -143,9 +127,7 @@ def upgrade() -> None:
         op.add_column(
             "orders",
             sa.Column(
-                "pickup_channel",
-                sa.String(20),
-                nullable=True,
+                "pickup_channel", sa.String(20), nullable=True,
                 comment="自提渠道来源：miniapp/h5/wechat/store(收银台代下单)",
             ),
         )
@@ -167,5 +149,7 @@ def downgrade() -> None:
     for col in ("prepay_order_id", "order_type", "pay_mode"):
         op.execute(sa.text(f"ALTER TABLE dining_sessions DROP COLUMN IF EXISTS {col};"))
 
-    op.execute(sa.text("ALTER TABLE table_zones DROP CONSTRAINT IF EXISTS ck_table_zones_pay_mode;"))
+    op.execute(sa.text(
+        "ALTER TABLE table_zones DROP CONSTRAINT IF EXISTS ck_table_zones_pay_mode;"
+    ))
     op.execute(sa.text("ALTER TABLE table_zones DROP COLUMN IF EXISTS pay_mode;"))
