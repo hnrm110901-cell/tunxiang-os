@@ -60,7 +60,7 @@ _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 # ─── 导入 ─────────────────────────────────────────────────────────────────────
 
-from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+from unittest.mock import AsyncMock, patch  # noqa: E402
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

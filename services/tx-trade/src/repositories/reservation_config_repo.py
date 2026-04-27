@@ -3,7 +3,7 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.reservation_config import ReservationConfig, ReservationTimeSlot

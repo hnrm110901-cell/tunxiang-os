@@ -6,7 +6,7 @@
 import uuid
 from datetime import time
 
-from sqlalchemy import Boolean, Index, Integer, BigInteger, String, Time
+from sqlalchemy import BigInteger, Boolean, Index, Integer, String, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

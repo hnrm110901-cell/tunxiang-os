@@ -3,10 +3,13 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
+
 from sqlalchemy import Boolean, Date, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from shared.ontology.src.base import TenantBase
+
 
 class BanquetAIDecision(TenantBase):
     __tablename__ = "banquet_ai_decisions"

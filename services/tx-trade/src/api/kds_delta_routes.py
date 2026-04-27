@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.ontology.src.database import get_db
-from shared.ontology.src.entities import Order, OrderItem
+from shared.ontology.src.entities import Order
 
 logger = structlog.get_logger(__name__)
 

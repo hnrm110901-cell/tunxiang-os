@@ -1,10 +1,11 @@
 """宴会结算服务 — 生成结算单/定金抵扣/加菜汇总/发票/B2B月结"""
-import json, uuid
+import uuid
 from datetime import datetime, timezone
-from typing import Optional
+
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = structlog.get_logger()
 
 class BanquetSettlementService:

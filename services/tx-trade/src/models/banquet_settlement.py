@@ -2,10 +2,13 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Boolean, Integer, String, Text, Index
-from sqlalchemy.dialects.postgresql import JSON, UUID
+
+from sqlalchemy import Boolean, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from shared.ontology.src.base import TenantBase
+
 
 class BanquetSettlement(TenantBase):
     __tablename__ = "banquet_settlements"

@@ -9,14 +9,14 @@
 import json
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+from services.tx_member.src.services import badge_engine
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from services.tx_member.src.services import badge_engine
 
 router = APIRouter(prefix="/api/v1/member/badges", tags=["badge-engine"])
 

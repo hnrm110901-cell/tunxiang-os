@@ -1263,8 +1263,9 @@ class CustomerJourneyService:
             tenant_id=tenant_id,
             content_keys=list(content.keys()),
         )
-        import httpx
         import os
+
+        import httpx
 
         gateway_url = os.getenv("GATEWAY_URL", "http://gateway:8000") + "/api/v1/bff/im/push"
         payload = {

@@ -247,16 +247,18 @@ app.include_router(banquet_material_router)
 app.include_router(banquet_capacity_router)
 app.include_router(banquet_schedule_router)
 # Phase 3 宴会执行+结算+售后
+from .api.banquet_aftercare_routes import router as banquet_aftercare_router
 from .api.banquet_execution_routes import router as banquet_execution_router
 from .api.banquet_live_order_routes import router as banquet_live_order_router
 from .api.banquet_settlement_routes import router as banquet_settlement_routes_router
-from .api.banquet_aftercare_routes import router as banquet_aftercare_router
+
 app.include_router(banquet_execution_router)
 app.include_router(banquet_live_order_router)
 app.include_router(banquet_settlement_routes_router)
 app.include_router(banquet_aftercare_router)
 # Phase 4 AI宴会大脑+经营看板
 from .api.banquet_ai_routes import router as banquet_ai_router
+
 app.include_router(banquet_ai_router)
 app.include_router(collab_order_router)
 app.include_router(table_layout_router)

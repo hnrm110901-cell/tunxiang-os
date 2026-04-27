@@ -20,7 +20,7 @@
 """
 
 import uuid
-from datetime import datetime, time as dt_time, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
@@ -29,9 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events import UniversalPublisher
 
 from ..models.reservation import Reservation
-from ..models.reservation_config import ReservationConfig, ReservationTimeSlot
-from ..repositories.reservation_repo import ReservationRepository
 from ..repositories.reservation_config_repo import ReservationConfigRepository
+from ..repositories.reservation_repo import ReservationRepository
 from .attribution_hook import fire_reservation_attribution
 from .queue_service import QueueService
 from .reservation_flow import (
