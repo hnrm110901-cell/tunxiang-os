@@ -62,12 +62,12 @@ PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 
 
 ### 关键偏差与修复
 - **端口**：原计划 8015，实际分配 **8017**（8015 被 tx-expense 占、8016 被 tx-pay 占）。已同步：Dockerfile / config.py / main.py / vite proxy / api client / pages/apps / 发现脚本 / compose / 计划文档
-- **迁移 head**：CLAUDE.md 写 229，实测 **v365_forge_ecosystem_metrics**（仓内总迁移文件 409 个，含旧 0001_ 与新 vNNN_ 双格式）。新 v230 已正确链入 v365
-- **微服务数**：CLAUDE.md 写 14 业务+2 支撑，实测 **21**（多出 tx-pay/tx-expense/tx-predict/mcp-server/tunxiang-api 等）
-- **适配器数**：CLAUDE.md 写 10，实测 **13**
+- **迁移 head 与命名**：CLAUDE.md 写 229，实测 414 个版本文件（仓内仅 `vNNN_*.py` 单一格式，head=`v365_forge_ecosystem_metrics`）。本服务首迁 经过两次重命名：原起草 `v230_*`（被占）→ 改 `v366_*`（merge main 后被 supplier_price 占）→ 最终 `v371_devforge_application`，down_revision=`v365_forge_ecosystem_metrics`
+- **微服务数**：CLAUDE.md 写 14 业务+2 支撑，实测 21（多出 tx-pay/tx-expense/tx-predict/mcp-server/tunxiang-api 等）
+- **适配器数**：CLAUDE.md 写 10，实测 13
 
 ### 数据变化
-- 迁移版本：v365 → v371_devforge_application（已添加，待执行；原起草为 v230_*，独立验证发现 v230 已被 agent_registry 与 rls_nullif 双占，避免 alembic 多 head 已重命名）
+- 迁移版本：down_revision=`v365_forge_ecosystem_metrics` → 新 `v371_devforge_application`（已添加，待执行；命名经历 `v230_*` → `v366_*` → `v371_*`，详见上一节）
 - 新增 API 端点：5 个（GET/POST/PATCH/DELETE applications + health）
 - 新增代码：~4500 行（后端 ~1200 + 前端 ~2200 + 脚本 ~830 + 配置 ~270）
 - 新前端应用：1 个（apps/web-devforge，端口 5182）
@@ -75,7 +75,7 @@ PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 
 
 ### 遗留 TODO（Day-2+）
 - 后端 Service 层（当前 API 直调 Repository，待引入；CI/CD 编排逻辑接入时一起加）
-- pytest 测试目录（v230 表 + RLS 跨租户隔离用例必须 Tier 2 起步）
+- pytest 测试目录（v371 表 + RLS 跨租户隔离用例必须 Tier 2 起步）
 - helm chart 缺失（tx-pay/tx-civic/tx-expense 同样未补，统一治理）
 - gateway / web-devforge 之间的端到端 token 鉴权（目前仅 X-Tenant-ID 透传）
 - 13 个前端占位页待实装；新建应用 Modal 表单待接 createApplication
@@ -86,7 +86,7 @@ PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 
 - 把 v371 迁移 apply 到 dev 环境，跑 `--push` 把 57 条资源真实入库
 - 后端补 Application 列表的过滤/排序/分页参数 + Repository 单元测试
 - 前端"应用中心"页对接真实数据，添加资源详情 8 Tab 中的"概览"和"依赖拓扑"（拓扑数据先用 metadata_json 占位）
-- 起 06 流水线模块的数据库 schema 设计（v232 迁移草稿）
+- 起 06 流水线模块的数据库 schema 设计（v372 迁移草稿）
 
 ---
 ## 2026-04-27 屯象Hub v2.0 — 三浪全量交付（Wave 1+2+3）

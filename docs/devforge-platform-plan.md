@@ -15,14 +15,14 @@
 
 两个产品**不合并**：受众不同（外部 ISV vs 内部研发）、节奏不同（市场化 vs 工程化）、数据模型不同。
 
-**定位**：把 14 微服务 + 16 客户端 + N 个门店边缘 + 10 类适配器 + 229 迁移 全部可治理、可追溯、可回滚。
+**定位**：把 14 微服务 + 16 客户端 + N 个门店边缘 + 10 类适配器 + 414 迁移 全部可治理、可追溯、可回滚。
 
 **数据校正**（与设计文档差异）：
 | 项 | 设计文档 | 实际 |
 |---|---|---|
 | 微服务数 | 18 | 21（含 gateway / 14 tx-* 主域 / tx-pay / tx-expense / tx-predict / tx-forge / tx-devforge / mcp-server / tunxiang-api）|
 | 客户端数 | 18 | 18（13 web/h5 + 2 miniapp + 2 android + 1 ios + 1 windows-pos） |
-| 迁移数 | 256 | 实测 409 个版本文件（含旧 `0001_*.py` + 新 `vNNN_*.py` 双格式；merge main 后 v366-v370 被 supplier_price/warehouse/delivery_temp/delivery_proof/stocktake_loss 占用，本计划新表从 **v371** 起接续） |
+| 迁移数 | 256 | 实测 414 个 `vNNN_*.py` 版本文件（无旧 `0001_*` 遗留），head=`v365_forge_ecosystem_metrics`；merge main 后 v366-v370 被 supplier_price/warehouse/delivery_temp/delivery_proof/stocktake_loss 占用，本计划新表从 **v371** 起接续 |
 | 适配器数 | 15 | 13 类（pinzhi/aoqiwei/keruyun/yiding/weishenghuo/meituan-saas/douyin/eleme/xiaohongshu/tiancai-shanglong/nuonuo/erp/logistics） |
 
 ---
@@ -57,7 +57,7 @@
 | 09 | 配置中心 Config | shared/feature_flags + 各服务 .env | 配置服务 + KMS 引用 | T2 | V1 |
 | 10 | 可观测 Observe | infra/monitoring (Prometheus+Grafana+Loki) + 2 dashboards + alerts.yml | SLO 看板 + 业务指标 | T2 | V1 |
 | 11 | 边缘门店 Edge ⭐ | edge/{mac-station, coreml-bridge, sync-engine, mac-mini} | 上报 Agent + OTA + 地图 | **T1** | V1 |
-| 12 | 数据治理 Data | shared/db-migrations (229 版) + Alembic | 迁移拓扑 + 慢 SQL | **T1** | V2 |
+| 12 | 数据治理 Data | shared/db-migrations (414 版) + Alembic | 迁移拓扑 + 慢 SQL | **T1** | V2 |
 | 13 | 集成中心 Integration | shared/adapters (10 类) | 适配器实例监控 + 凭证保险箱 | T2 | V2 |
 | 14 | 安全审计 Security | services/tx-civic 已有合规评分 | 审计中台 + Kill Switch | **T1** | V2 |
 | 15 | 系统 System | gateway 有 auth + brand_switcher | RBAC + SSO | T2 | MVP |
@@ -104,7 +104,7 @@ services/tx-devforge/                            # FastAPI :8017（8015/8016 被
       audit_projector.py                         #   * → mv_audit_trail (WORM)
     main.py
   Dockerfile
-  alembic/                                       # 新增迁移 v230-v245
+  alembic/                                       # 新增迁移 v371-v386（详见下表）
 ```
 
 ### 新增数据库迁移（v371-v386，共 ~16 版）
@@ -194,13 +194,13 @@ apps/web-devforge/                               # Vite + React 18 + AntD v5
 
 **M1（第 1-3 周）— 骨架与应用中心 + 系统**
 - W1 项目脚手架：`apps/web-devforge` + `services/tx-devforge` 初始化，Docker Compose 接入，`/health` 通跑
-- W1 数据库 v230-v231 + v245 迁移，AppLayout + EnvSwitcher + GlobalSearch
+- W1 数据库 v371-v372 + v386 迁移，AppLayout + EnvSwitcher + GlobalSearch
 - W2 **02 应用中心**：5 类资源统一目录页，从 services/、apps/、edge/、shared/adapters/ 自动扫描注册（一次性脚本 + 后续 webhook）
   - 应用详情页 8 个 Tab 中先实现：概览 / 依赖拓扑 / 版本历史 / 文档（README 自动同步）
 - W3 **15 系统**：RBAC + Token + 企业微信 SSO（gateway 已有 auth 基础，扩展即可）
 
 **M2（第 4-5 周）— 流水线 + 制品库**
-- W4 数据库 v232-v233，**04 流水线**：
+- W4 数据库 v373-v374，**04 流水线**：
   - GitHub Actions API 拉取（8 个 workflow 全收编）
   - Webhook 反向通知 Run 结果
   - 列表 + 实时日志（xterm 流式）+ 阶段图
@@ -211,11 +211,11 @@ apps/web-devforge/                               # Vite + React 18 + AntD v5
   - 晋升通道 test → gray → prod（手动按钮 + 审批流）
 
 **M3（第 6-8 周）— 部署 + 灰度（基础）**
-- W6 数据库 v234，**07 部署中心**：
+- W6 数据库 v375，**07 部署中心**：
   - 解析现有 `infra/docker/docker-compose.{prod,staging,gray}.yml` → 环境矩阵可视化
   - 部署工单四态：申请 → 审批 → 执行 → 回滚
   - 实时部署日志，回滚一键到任意历史版本
-- W7-W8 数据库 v235，**08 灰度发布（基础）**：
+- W7-W8 数据库 v376，**08 灰度发布（基础）**：
   - 发布单 = N 服务 + M 客户端协同
   - 灰度维度先做 4 个：按门店 / 按城市 / 按比例 / 按时段（餐饮高峰禁推校验）
   - 蓝绿 + 金丝雀两种策略
@@ -234,7 +234,7 @@ apps/web-devforge/                               # Vite + React 18 + AntD v5
 ### **V1（第 3-4 月）— 上线后必要治理**
 
 **M4（第 9-11 周）— 配置中心 + 可观测**
-- 数据库 v236-v239
+- 数据库 v377-v380
 - **09 配置中心**：配置项三维（命名空间×环境×集群）、KMS 密钥引用、Feature Flag 与 shared/feature_flags 双向同步、变更审计
 - **10 可观测**：
   - 嵌入现有 Grafana iframe（`infra/monitoring/`），但导航在 DevForge 内
@@ -244,7 +244,7 @@ apps/web-devforge/                               # Vite + React 18 + AntD v5
   - 拓扑视图（G6 力导向，从依赖关系反推）
 
 **M5（第 12-14 周）— 测试中心 + 边缘门店（基础）**
-- 数据库 v240
+- 数据库 v381
 - **06 测试中心**：用例库（对齐现有 7K+ 测试）、Playwright 任务调度、PR 环境（每 MR 自动拉一套 docker-compose 子环境）、k6 压测调度
 - **11 边缘门店（基础）**：
   - 门店地图（高德 SDK）+ 健康度色块
@@ -260,8 +260,8 @@ apps/web-devforge/                               # Vite + React 18 + AntD v5
 - **11 边缘 OTA**：批量推送边缘镜像、断网续传、失败回滚、开业向导（新门店 0→1 自动化交付清单）
 
 **M7（第 18-20 周）— 数据治理 + 集成中心**
-- 数据库 v241-v242
-- **12 数据治理**：229 个 Alembic 迁移可视化为 DAG，标注风险等级与回滚 SQL；DDL 走工单审批；接 pg_stat_statements 做慢 SQL Top N
+- 数据库 v382-v383
+- **12 数据治理**：414 个 Alembic 迁移可视化为 DAG，标注风险等级与回滚 SQL；DDL 走工单审批；接 pg_stat_statements 做慢 SQL Top N
 - **13 集成中心**：10 个 adapter 实例运行状态监控；凭证保险箱（appKey/token 加密 + 自动轮换）；回调日志失败重放（接 v147 事件总线 `CHANNEL.ORDER_SYNCED`）；三方对账报表
 
 ---
@@ -269,7 +269,7 @@ apps/web-devforge/                               # Vite + React 18 + AntD v5
 ### **V3（持续）— 安全与 AI**
 
 **M8（第 21-24 周）— 安全审计**
-- 数据库 v243-v244
+- 数据库 v384-v385
 - **14 安全审计**：审计日志（WORM）、依赖 CVE 看板、合规检查项（GDPR/等保）、Kill Switch（秒级关停某服务/某门店/某第三方接入）
 
 **M9（持续）— AI 辅助（与屯象 Agent OS 对接）**
@@ -360,7 +360,7 @@ class TestReleaseGateTier1:
 1. ✅ 本计划落档为 `docs/devforge-platform-plan.md`
 2. 创建 `services/tx-devforge` 骨架（FastAPI + 端口 8017 + 接入 gateway 路由代理）
 3. 创建 `apps/web-devforge` 骨架（Vite + AntD + AppLayout + EnvSwitcher + 15 模块路由占位）
-4. 起草 v371 迁移：`devforge_application` 表 + RLS 策略（v230 已被占用，新表从 v366 起接续）
+4. 起草 v371 迁移：`devforge_application` 表 + RLS 策略（命名经历 v230 → v366 → v371 三次顺延，详见迁移规划表注释）
 5. 写 `scripts/forge_register_resources.py`：一次性扫描全仓 5 类资源入库
 6. 在 gateway 注册 tx-devforge `:8017` 反向代理
 7. 在 `progress.md` 加一条 Tier 标注：本计划属 Tier 2 起步，08/07/11/14 模块为 Tier 1

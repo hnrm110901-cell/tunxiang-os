@@ -9,3 +9,8 @@ dist-ssr
 .env.*.local
 coverage
 *.tsbuildinfo
+# 本应用未纳入 pnpm-workspace.yaml；不提交 lock 文件，
+# 避免与仓库根 pnpm-lock.yaml 混淆。CI 不依赖此应用。
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

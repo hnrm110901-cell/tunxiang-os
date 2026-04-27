@@ -9,7 +9,7 @@
 - [x] 现有 `apps/web-forge` / `apps/web-forge-admin` / `services/tx-forge`（AI Agent Exchange v3.0）— 不修改
 - [x] 现有 14 微服务 + 16 客户端 — 零侵入（仅 gateway 加一行路由 + compose 加一段服务定义）
 - [x] `shared/ontology/` — 未触碰
-- [x] 已应用迁移 v001-v365 — 未修改，新 v230 链入 v365 之后
+- [x] 已应用迁移 v001-v365 — 未修改，新 `v371_devforge_application` 链入 `v365_forge_ecosystem_metrics` 之后
 
 ### 完成状态
 - [x] [docs/devforge-platform-plan.md](docs/devforge-platform-plan.md) — 15 模块全量计划（MVP 8 周 → V3 持续，估 24 周）
@@ -32,14 +32,14 @@
 - v371 迁移**未实际执行**，需先在 dev 环境跑 `alembic upgrade head` 验证 RLS 策略生效（Tier 2，无业务影响）
 - TenantMiddleware 仅校验 X-Tenant-ID 存在，**未对接 JWT 鉴权**（与现有 gateway 鉴权链路一致，待统一改造）
 - helm chart 缺失（与 tx-pay/tx-civic/tx-expense 同样缺，需 Day-3+ 统一治理）
-- `forge_register_resources.py` 报告仓内迁移文件 **409 个**，与 CLAUDE.md "229" 严重对不上（旧 0001_ 与新 vNNN_ 双格式并存），需后续核查并更新 CLAUDE.md
+- `forge_register_resources.py` 报告仓内迁移文件 414 个（实际为 `vNNN_*.py` 单一格式，无 `0001_*` 旧格式遗留），与 CLAUDE.md "229" 严重对不上，需后续核查并更新 CLAUDE.md
 - 前端 13 个占位页未实装；新建应用 Modal 表单未接 createApplication；全局搜索仅搜菜单未接后端
 
 ### 下一步
 1. dev 环境 apply v371 迁移，跑 `forge_register_resources.py --push --tenant-id <demo>` 把 57 条资源真实入库
 2. 后端 Application Repository 补单元测试（Tier 2：CRUD + 跨租户隔离 + 软删 + 唯一约束冲突）
 3. 前端"应用中心"对接真实数据，详情页"概览"+"依赖拓扑"两 Tab 实装
-4. 起 04 流水线模块的 schema 设计草稿（v232 迁移）
+4. 起 04 流水线模块的 schema 设计草稿（v372 迁移）
 5. 由独立验证视角（CLAUDE.md 第十九条）开新会话审计本次改动的 RLS 与跨租户隔离
 
 ---
