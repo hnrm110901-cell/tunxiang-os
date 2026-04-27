@@ -28,6 +28,7 @@ from .api.ck_production_routes import router as ck_production_router
 from .api.ck_recipe_routes import router as ck_recipe_router
 from .api.craft_routes import router as craft_router
 from .api.deduction_routes import router as deduction_router
+from .api.delivery_proof_routes import router as delivery_proof_router
 from .api.delivery_route_routes import router as delivery_route_router
 from .api.dept_issue_routes import router as dept_issue_router
 from .api.distribution_routes import router as distribution_router
@@ -138,6 +139,9 @@ app.include_router(voice_count_router)  # 语音盘点：会话管理/语音录�
 from .api.mrp_routes import router as mrp_router
 
 app.include_router(mrp_router, prefix="/api/v1/supply/mrp")  # MRP预估：需求计算/生产建议/采购建议/领料（v282表）
+
+# ── 配送电子签收 + 损坏拍照取证（TASK-4，v369表）──
+app.include_router(delivery_proof_router)  # 8 端点：签收/损坏/附件/凭证/统计
 
 
 @app.get("/health")
