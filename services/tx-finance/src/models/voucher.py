@@ -33,9 +33,10 @@
     C. 回归测试: 所有写入路径的端到端校验两字段同步.
 """
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
@@ -137,6 +138,18 @@ class FinancialVoucher(Base):
         comment="来源单据ID（订单ID/日结ID等）"
     )
 
+    # v268 幂等字段. (tenant_id, event_type, event_id) partial UNIQUE.
+    # order.paid / daily_settlement.closed / refund.processed 事件重试不生成重复凭证.
+    # 手工凭证 / 历史凭证 event_id=NULL, 不参与去重 (partial 索引允许 NULL).
+    event_type: Mapped[str | None] = mapped_column(
+        String(50),
+        comment="事件类型 (e.g. order.paid / daily_settlement.closed). 幂等键之一."
+    )
+    event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        comment="事件去重 UUID. 同 (tenant, event_type, event_id) 唯一."
+    )
+
     # 状态
     status: Mapped[str] = mapped_column(
         String(20), default="draft", index=True,
@@ -145,6 +158,25 @@ class FinancialVoucher(Base):
     exported_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         comment="导出到ERP的时间"
+    )
+
+    # v268 作废状态机. CHECK 强制 voided=TRUE 时 voided_at + voided_by 必填.
+    # 区别于红冲 (W1.5 PR): void 用于 draft/confirmed 误生成; exported 必须 red_flush.
+    voided: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.text("FALSE"),
+        comment="作废标志. TRUE 时 DB CHECK 强制 voided_at + voided_by 非空."
+    )
+    voided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        comment="作废时间. voided=TRUE 时 CHECK 非空."
+    )
+    voided_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        comment="作废操作员 UUID. voided=TRUE 时 CHECK 非空."
+    )
+    voided_reason: Mapped[str | None] = mapped_column(
+        String(200),
+        comment="作废原因 (审计). DB 允许 NULL, 应用层 (W1.3 PR) 强制非空."
     )
 
     # 时间戳
@@ -172,6 +204,12 @@ class FinancialVoucher(Base):
             "tenant_id", "store_id", "voucher_date"
         ),
         Index("idx_financial_vouchers_status", "tenant_id", "status"),
+        # v268 CHECK: voided=TRUE → voided_at + voided_by 必填 (审计留痕)
+        CheckConstraint(
+            "voided = FALSE "
+            "OR (voided = TRUE AND voided_at IS NOT NULL AND voided_by IS NOT NULL)",
+            name="chk_voucher_void_consistency",
+        ),
     )
 
     def is_balanced(self) -> bool:
@@ -205,6 +243,65 @@ class FinancialVoucher(Base):
         """基于 lines 子表判定借贷平衡 (W1.3 切换后成为主判定)."""
         return self.total_debit_fen_from_lines() == self.total_credit_fen_from_lines()
 
+    # ── W1.2: 作废状态机 ──────────────────────────────────────────────
+    # 区别于红冲 (W1.5 PR 引入 red_flush_* 字段 + red_flush() 方法):
+    #   void: 误生成, 仅 draft / confirmed 可, exported 禁止
+    #   red_flush: exported 到 ERP 后的反向冲正, 必须新建反向分录入账
+    # 这里只管 void; red_flush 在 W1.5 独立 PR 落.
+    @property
+    def is_voidable(self) -> bool:
+        """能否作废. 已 exported 必须走红冲, 已 voided 不能重复作废."""
+        return (not self.voided) and self.status in ("draft", "confirmed")
+
+    @property
+    def is_active(self) -> bool:
+        """凭证是否有效 (参与账簿汇总). 作废凭证不参与."""
+        return not self.voided
+
+    def void(
+        self,
+        operator_id: uuid.UUID,
+        reason: str,
+        voided_at: datetime | None = None,
+    ) -> None:
+        """作废凭证 — 审计留痕 (谁/何时/为何).
+
+        为什么不直接 DELETE:
+          - 金税四期要求作废凭证可回溯 (6 年保存期)
+          - 凭证号不复用 (voucher_no UNIQUE, 删了原号不可再分配)
+          - 下游 ERP 已同步的凭证硬删会导致对账失败
+
+        调用前置条件:
+          - status ∈ {draft, confirmed} (exported 必须走 red_flush())
+          - not self.voided (已作废不可重复作废)
+          - reason 非空 (审计必需)
+
+        Args:
+            operator_id: 作废操作员 UUID
+            reason: 作废原因 (审计, 必填)
+            voided_at: 作废时间, 默认当前 UTC
+
+        Raises:
+            ValueError: 前置条件不满足
+        """
+        if self.voided:
+            raise ValueError(f"凭证 {self.voucher_no} 已作废, 不可重复作废")
+        if self.status == "exported":
+            raise ValueError(
+                f"凭证 {self.voucher_no} 已导出 ERP, 作废禁止, 必须走红冲 (red_flush)"
+            )
+        if self.status not in ("draft", "confirmed"):
+            raise ValueError(
+                f"凭证 {self.voucher_no} 状态 {self.status} 不支持作废"
+            )
+        if not reason or not reason.strip():
+            raise ValueError("作废原因必填 (审计留痕)")
+
+        self.voided = True
+        self.voided_at = voided_at or datetime.now(timezone.utc)
+        self.voided_by = operator_id
+        self.voided_reason = reason.strip()
+
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
@@ -222,6 +319,14 @@ class FinancialVoucher(Base):
             "exported_at": self.exported_at.isoformat() if self.exported_at else None,
             "is_balanced": self.is_balanced(),
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            # v268: 幂等 + 作废
+            "event_type": self.event_type,
+            "event_id": str(self.event_id) if self.event_id else None,
+            "voided": self.voided,
+            "voided_at": self.voided_at.isoformat() if self.voided_at else None,
+            "voided_by": str(self.voided_by) if self.voided_by else None,
+            "voided_reason": self.voided_reason,
+            "is_active": self.is_active,
         }
 
 
