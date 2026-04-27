@@ -120,6 +120,23 @@ app.include_router(vat_router)  # /api/v1/finance/vat/*
 app.include_router(invoice_ocr_router, prefix="/api/v1/invoice-ocr")  # /api/v1/invoice-ocr/*
 
 
+# ── Sprint D4a/D4c 路由自动挂载（PR #85 #88 合入后自动生效）──
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
+
+_sprint_d4_mount = auto_mount_routes(
+    app,
+    pkg=__package__,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("cost_root_cause_routes", "router"),    # D4a #85
+        ("budget_forecast_routes", "router"),     # D4c #88
+    ],
+)
+validate_result(_sprint_d4_mount)
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-finance", "version": "4.0.0"}}

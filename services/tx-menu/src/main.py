@@ -81,6 +81,22 @@ from .api.multi_platform_publish_routes import router as multi_platform_publish_
 app.include_router(multi_platform_publish_router)
 
 
+# ── Sprint D3c 路由自动挂载（PR #84 合入后自动生效）──
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
+
+_sprint_d3c_mount = auto_mount_routes(
+    app,
+    pkg=__package__,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("dish_pricing_routes", "router"),  # D3c #84
+    ],
+)
+validate_result(_sprint_d3c_mount)
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-menu", "version": "3.0.0"}}

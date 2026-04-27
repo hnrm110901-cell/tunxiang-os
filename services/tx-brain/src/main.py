@@ -116,6 +116,22 @@ app.include_router(voice_stable_router)
 app.include_router(content_hub_router)  # /api/v1/brain/content/* — AIGC 营销内容生成（v207）
 
 
+# ── Sprint G 路由自动挂载（PR #97 A/B 实验框架 合入后自动生效）──
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
+
+_sprint_g_mount = auto_mount_routes(
+    app,
+    pkg=__package__,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("ab_experiment_routes", "router"),  # G #97
+    ],
+)
+validate_result(_sprint_g_mount)
+
+
 # ─── Health & Info ───────────────────────────────────────────────
 
 

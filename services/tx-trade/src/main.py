@@ -451,6 +451,26 @@ from .api.kiosk_routes import router as kiosk_router
 app.include_router(kiosk_router)
 
 
+# ── Sprint E 路由自动挂载（PR #91 #92 #93 #94 合入后自动生效）──
+# 容错：模块文件不存在时静默跳过；文件存在但 import 失败时 WARNING 不阻塞启动
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
+
+_sprint_e_mount = auto_mount_routes(
+    app,
+    pkg=__package__,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("canonical_delivery_routes", "router"),  # E1 #91
+        ("dish_publish_routes", "router"),         # E2 #92
+        ("xiaohongshu_routes", "router"),          # E3 #93
+        ("dispute_routes", "router"),              # E4 #94
+    ],
+)
+# 校验：失败 → stderr + WARNING；env AUTO_MOUNT_STRICT=1 时 sys.exit(1)
+validate_result(_sprint_e_mount)
+
 # ── v281-v283: 区域服务模式 + 时段拼桌预设 + 桌台时段配置 + 利用率分析 ──
 from .api.table_merge_preset_routes import router as table_merge_preset_router
 from .api.table_period_config_routes import router as table_period_config_router

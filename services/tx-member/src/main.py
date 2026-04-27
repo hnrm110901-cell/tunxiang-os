@@ -226,6 +226,23 @@ from .api.smart_recharge_routes import router as smart_recharge_router
 app.include_router(smart_recharge_router)
 
 
+# ── Sprint D3a/D3b 路由自动挂载（PR #82 #83 合入后自动生效）──
+from pathlib import Path as _Path  # noqa: E402
+
+from shared.service_utils import auto_mount_routes, validate_result  # noqa: E402
+
+_sprint_d3_mount = auto_mount_routes(
+    app,
+    pkg=__package__,
+    api_dir=_Path(__file__).parent / "api",
+    modules=[
+        ("rfm_outreach_routes", "router"),            # D3a #82
+        ("campaign_roi_forecast_routes", "router"),    # D3b #83
+    ],
+)
+validate_result(_sprint_d3_mount)
+
+
 @app.get("/health")
 async def health():
     return {"ok": True, "data": {"service": "tx-member", "version": "4.0.0"}}
