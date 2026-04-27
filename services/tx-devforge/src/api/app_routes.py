@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, AsyncGenerator
+from typing import Annotated, AsyncGenerator, Coroutine
 from uuid import UUID
 
 import structlog
@@ -26,6 +26,34 @@ SOURCE_SERVICE = "tx-devforge"
 
 router = APIRouter(prefix="/api/v1/devforge/applications", tags=["applications"])
 logger = structlog.get_logger(__name__)
+
+
+# 后台任务强引用集合 — 防止 asyncio.create_task() 返回的 Task 在执行完成前被 GC，
+# 导致事件 emit 被静默取消。Python 文档明确要求保存 Task 引用：
+# https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+_BACKGROUND_TASKS: set[asyncio.Task[object]] = set()
+
+
+def _fire_and_forget(coro: Coroutine[object, object, object]) -> asyncio.Task[object]:
+    """创建后台任务并保持强引用，完成后自动清理。失败仅记录日志，不传播。"""
+
+    task: asyncio.Task[object] = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(task)
+
+    def _on_done(t: asyncio.Task[object]) -> None:
+        _BACKGROUND_TASKS.discard(t)
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.warning(
+                "devforge_event_emit_failed",
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+
+    task.add_done_callback(_on_done)
+    return task
 
 TenantHeader = Annotated[
     str,
@@ -75,8 +103,9 @@ async def create_application(
         ) from exc
 
     payload = ApplicationResponse.model_validate(created).model_dump(mode="json")
-    # 旁路写入事件总线（CLAUDE.md §15，v147 规范）— 失败不阻塞业务响应
-    asyncio.create_task(
+    # 旁路写入事件总线（CLAUDE.md §15，v147 规范）— 失败不阻塞业务响应；
+    # 用 _fire_and_forget 保持 Task 强引用，避免 GC 导致事件被静默取消。
+    _fire_and_forget(
         emit_event(
             event_type=DevForgeApplicationEventType.CREATED,
             tenant_id=tenant_uuid,
@@ -164,7 +193,7 @@ async def update_application(
         )
 
     payload = ApplicationResponse.model_validate(updated).model_dump(mode="json")
-    asyncio.create_task(
+    _fire_and_forget(
         emit_event(
             event_type=DevForgeApplicationEventType.UPDATED,
             tenant_id=tenant_uuid,
@@ -193,7 +222,7 @@ async def delete_application(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "not_found", "message": "application not found"},
         )
-    asyncio.create_task(
+    _fire_and_forget(
         emit_event(
             event_type=DevForgeApplicationEventType.DELETED,
             tenant_id=tenant_uuid,
