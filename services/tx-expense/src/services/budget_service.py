@@ -5,15 +5,16 @@
 金额约定：所有金额存储为分(fen)，入参/出参统一用分，展示层负责转换。
 update_used_amount 使用原子 SQL 更新，避免并发竞态条件。
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
-from sqlalchemy import func, select, text, update
+from sqlalchemy import select, update
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -27,6 +28,7 @@ logger = structlog.get_logger(__name__)
 # 辅助
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
 
@@ -38,6 +40,7 @@ def _today() -> date:
 # ─────────────────────────────────────────────────────────────────────────────
 # BudgetService
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class BudgetService:
     """预算管理服务，所有方法显式传入 tenant_id 确保 RLS 安全隔离。"""
@@ -184,8 +187,7 @@ class BudgetService:
 
         if budget.status in ("locked", "expired"):
             raise ValueError(
-                f"Cannot update budget in status '{budget.status}'. "
-                "Only draft/active budgets can be edited."
+                f"Cannot update budget in status '{budget.status}'. Only draft/active budgets can be edited."
             )
 
         allowed_fields = {"budget_name", "department", "total_amount", "status", "notes"}
@@ -214,10 +216,7 @@ class BudgetService:
         budget = await self.get_budget(db, tenant_id, budget_id)
 
         if budget.status != "draft":
-            raise ValueError(
-                f"Cannot approve budget in status '{budget.status}'. "
-                "Only draft budgets can be approved."
-            )
+            raise ValueError(f"Cannot approve budget in status '{budget.status}'. Only draft budgets can be approved.")
 
         budget.status = "active"
         budget.approved_by = approved_by
@@ -365,12 +364,14 @@ class BudgetService:
         alloc_details = []
         for a in allocations:
             a_rate = round(a.used_amount / a.allocated_amount, 4) if a.allocated_amount > 0 else -1.0
-            alloc_details.append({
-                "category_code": a.category_code,
-                "allocated": a.allocated_amount,
-                "used": a.used_amount,
-                "rate": a_rate,
-            })
+            alloc_details.append(
+                {
+                    "category_code": a.category_code,
+                    "allocated": a.allocated_amount,
+                    "used": a.used_amount,
+                    "rate": a_rate,
+                }
+            )
 
         return {
             "budget_id": str(budget_id),
@@ -706,10 +707,10 @@ class BudgetService:
 
         search_candidates = [
             # (store_id, is_monthly)
-            (store_id, True),   # 1. 门店月度
-            (None, True),       # 2. 集团月度
+            (store_id, True),  # 1. 门店月度
+            (None, True),  # 2. 集团月度
             (store_id, False),  # 3. 门店年度
-            (None, False),      # 4. 集团年度
+            (None, False),  # 4. 集团年度
         ]
 
         for sid, is_monthly in search_candidates:

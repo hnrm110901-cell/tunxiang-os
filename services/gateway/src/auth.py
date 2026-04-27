@@ -44,6 +44,69 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 # ─────────────────────────────────────────────────────────────────
+# Redis — MFA临时secret存储（5分钟TTL）
+# ─────────────────────────────────────────────────────────────────
+_mfa_redis = None
+
+
+async def _get_mfa_redis():
+    """获取Redis连接（单例，延迟初始化）"""
+    global _mfa_redis
+    if _mfa_redis is None:
+        try:
+            import redis.asyncio as aioredis
+
+            _mfa_redis = await aioredis.from_url(
+                os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+        except (ImportError, OSError) as exc:
+            logger.warning("mfa_redis_unavailable", error=str(exc))
+            return None
+    return _mfa_redis
+
+
+async def _store_mfa_temp_secret(user_id: str, encrypted_secret: str) -> None:
+    """将MFA临时secret存入Redis，5分钟TTL"""
+    r = await _get_mfa_redis()
+    if r is not None:
+        try:
+            key = f"mfa:temp:{user_id}"
+            await r.setex(key, 300, encrypted_secret)
+            logger.debug("mfa_temp_secret_stored", user_id=user_id)
+            return
+        except OSError as exc:
+            logger.warning("mfa_temp_secret_store_failed", user_id=user_id, error=str(exc))
+    # Redis不可用 — 仅开发环境允许内存fallback，生产环境直接报错
+    if os.getenv("TX_ENV", "dev") in ("dev", "test"):
+        _mfa_temp_fallback[user_id] = encrypted_secret
+        logger.warning("mfa_temp_secret_stored_in_memory_fallback", user_id=user_id)
+    else:
+        logger.error("mfa_temp_secret_redis_required", user_id=user_id)
+        raise RuntimeError("MFA requires Redis in production")
+
+
+async def _get_mfa_temp_secret(user_id: str) -> Optional[str]:
+    """从Redis读取MFA临时secret"""
+    r = await _get_mfa_redis()
+    if r is not None:
+        try:
+            key = f"mfa:temp:{user_id}"
+            val = await r.get(key)
+            if val:
+                return val
+        except OSError as exc:
+            logger.warning("mfa_temp_secret_get_failed", user_id=user_id, error=str(exc))
+    # fallback: 尝试内存
+    return _mfa_temp_fallback.get(user_id)
+
+
+# 内存fallback（Redis不可用时的降级方案，仅限开发环境）
+_mfa_temp_fallback: dict[str, str] = {}
+
+# ─────────────────────────────────────────────────────────────────
 # 服务实例（进程级单例）
 # ─────────────────────────────────────────────────────────────────
 _jwt_service = JWTService()
@@ -309,6 +372,7 @@ _brute_force_guard = LoginBruteForceProtection()
 # 工具函数
 # ─────────────────────────────────────────────────────────────────
 
+
 def _extract_token(request: Request) -> Optional[str]:
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
@@ -489,6 +553,7 @@ async def _issue_tokens(
 # Request / Response 模型
 # ─────────────────────────────────────────────────────────────────
 
+
 class LoginBody(BaseModel):
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=1)
@@ -510,6 +575,7 @@ class MFASetupEnableBody(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 步骤1：登录（密码验证）
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/login")
 async def login(body: LoginBody, request: Request):
@@ -556,9 +622,7 @@ async def login(body: LoginBody, request: Request):
         ph: Optional[str] = db_user_row.get("password_hash")
         if ph:
             try:
-                password_ok = bcrypt.checkpw(
-                    body.password.encode(), ph.encode()
-                )
+                password_ok = bcrypt.checkpw(body.password.encode(), ph.encode())
             except (ValueError, TypeError):
                 password_ok = False
         if password_ok:
@@ -630,11 +694,13 @@ async def login(body: LoginBody, request: Request):
             "failed_count": 0,
         }
         logger.info("login_mfa_required", username=username, ip=ip)
-        return ok({
-            "step": "mfa_required",
-            "session_token": session_token,
-            "expires_in": _MFA_SESSION_TTL_SECONDS,
-        })
+        return ok(
+            {
+                "step": "mfa_required",
+                "session_token": session_token,
+                "expires_in": _MFA_SESSION_TTL_SECONDS,
+            }
+        )
 
     # 5. 未启用MFA，直接签发token
     tokens = await _issue_tokens(
@@ -676,17 +742,20 @@ async def login(body: LoginBody, request: Request):
     except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
-    return ok({
-        **tokens,
-        "user": user_info,
-        # 向后兼容字段
-        "token": legacy_token,
-    })
+    return ok(
+        {
+            **tokens,
+            "user": user_info,
+            # 向后兼容字段
+            "token": legacy_token,
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # 步骤2：MFA验证
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/mfa/verify")
 async def mfa_verify(body: MFAVerifyBody, request: Request):
@@ -819,16 +888,19 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
     except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
-    return ok({
-        **tokens,
-        "user": user_info,
-        "token": legacy_token,
-    })
+    return ok(
+        {
+            **tokens,
+            "user": user_info,
+            "token": legacy_token,
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # Refresh Token
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/refresh")
 async def refresh_token(body: RefreshBody, request: Request):
@@ -955,6 +1027,7 @@ async def refresh_token(body: RefreshBody, request: Request):
 # 登出
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/logout")
 async def logout(request: Request, body: Optional[RefreshBody] = None):
     """撤销 refresh_token，使会话失效。
@@ -1012,6 +1085,7 @@ async def logout(request: Request, body: Optional[RefreshBody] = None):
 # ─────────────────────────────────────────────────────────────────
 # 当前用户信息
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/me")
 async def me(request: Request):
@@ -1082,6 +1156,7 @@ async def me(request: Request):
 # MFA 设置端点
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/mfa/setup")
 async def mfa_setup(request: Request):
     """返回 TOTP setup URI（用于前端生成二维码）。
@@ -1115,19 +1190,20 @@ async def mfa_setup(request: Request):
     if user.get("mfa_enabled"):
         return err("MFA已启用，如需重置请联系管理员", code="MFA_ALREADY_ENABLED", status_code=409)
 
-    # 生成新 secret 并临时存储（等待验证后正式启用）
-    # 生产环境 TODO: 将临时 secret 存入 Redis（5分钟TTL），不要直接写 DB
+    # 生成新 secret 并临时存储到Redis（5分钟TTL）
     raw_secret = _mfa_service.generate_secret()
     encrypted_secret = _mfa_service.encrypt_secret(raw_secret)
-    user["_pending_mfa_secret_enc"] = encrypted_secret  # 临时存储
+    await _store_mfa_temp_secret(user_id, encrypted_secret)
 
     totp_uri = _mfa_service.get_totp_uri(encrypted_secret, username or "")
 
     logger.info("mfa_setup_initiated", user_id=user_id)
-    return ok({
-        "totp_uri": totp_uri,
-        "message": "请使用验证器App（Google Authenticator/Authy）扫描二维码，然后调用 /mfa/enable 提交验证码",
-    })
+    return ok(
+        {
+            "totp_uri": totp_uri,
+            "message": "请使用验证器App（Google Authenticator/Authy）扫描二维码，然后调用 /mfa/enable 提交验证码",
+        }
+    )
 
 
 @router.post("/mfa/enable")
@@ -1159,9 +1235,11 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
     if not user:
         return err("用户不存在", code="USER_NOT_FOUND", status_code=401)
 
-    pending_secret = user.get("_pending_mfa_secret_enc")
+    pending_secret = await _get_mfa_temp_secret(user_id)
     if not pending_secret:
-        return err("请先调用 /mfa/setup 获取二维码", code="MFA_SETUP_REQUIRED", status_code=400)
+        return err(
+            "请先调用 /mfa/setup 获取二维码（临时密钥已过期或未生成）", code="MFA_SETUP_REQUIRED", status_code=400
+        )
 
     # 验证用户提交的TOTP码
     if not _mfa_service.verify_totp(pending_secret, body.code):
@@ -1229,16 +1307,19 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
     except (OperationalError, SQLAlchemyError) as audit_exc:
         logger.warning("audit_log_write_failed", error=str(audit_exc))
 
-    return ok({
-        "message": "MFA已成功启用",
-        "backup_codes": backup_codes_plain,
-        "backup_codes_warning": "请将备用码保存在安全位置，每个备用码只能使用一次，丢失后无法找回",
-    })
+    return ok(
+        {
+            "message": "MFA已成功启用",
+            "backup_codes": backup_codes_plain,
+            "backup_codes_warning": "请将备用码保存在安全位置，每个备用码只能使用一次，丢失后无法找回",
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # 向后兼容端点（旧版 verify）
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/verify")
 async def verify_token(request: Request):
@@ -1258,19 +1339,23 @@ async def verify_token(request: Request):
         db_user = await _load_user_dict_by_id(user_id)
         if db_user:
             uname = db_user["username"]
-            return ok({
-                "valid": True,
-                "user": _user_info_from_demo(uname, db_user),
-                "mfa_verified": payload.get("mfa_verified", False),
-            })
+            return ok(
+                {
+                    "valid": True,
+                    "user": _user_info_from_demo(uname, db_user),
+                    "mfa_verified": payload.get("mfa_verified", False),
+                }
+            )
         if _demo_auth_enabled():
             for username, user in DEMO_USERS.items():
                 if user["user_id"] == user_id:
-                    return ok({
-                        "valid": True,
-                        "user": _user_info_from_demo(username, user),
-                        "mfa_verified": payload.get("mfa_verified", False),
-                    })
+                    return ok(
+                        {
+                            "valid": True,
+                            "user": _user_info_from_demo(username, user),
+                            "mfa_verified": payload.get("mfa_verified", False),
+                        }
+                    )
         return ok({"valid": False, "user": None})
 
     # 回退：旧版内存 token

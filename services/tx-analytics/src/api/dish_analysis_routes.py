@@ -8,6 +8,7 @@ GET  /api/v1/analysis/dish/structure               — 菜品四象限分析
 GET  /api/v1/analysis/dish/new-performance         — 新菜表现
 GET  /api/v1/analysis/dish/optimization            — AI菜单优化建议
 """
+
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
@@ -60,6 +61,7 @@ def _parse_date_range(start_date: Optional[str], end_date: Optional[str]) -> tup
 
 # ─── 1. 菜品销量排行 ───
 
+
 @router.get("/sales-ranking")
 async def api_sales_ranking(
     store_id: str = Query(..., description="门店ID"),
@@ -80,6 +82,7 @@ async def api_sales_ranking(
 
 # ─── 2. 退菜率排行+原因分布 ───
 
+
 @router.get("/return-rate")
 async def api_return_rate(
     store_id: str = Query(..., description="门店ID"),
@@ -98,6 +101,7 @@ async def api_return_rate(
 
 
 # ─── 3. 差评菜清单 ───
+
 
 @router.get("/negative-reviews")
 async def api_negative_reviews(
@@ -119,6 +123,7 @@ async def api_negative_reviews(
 
 # ─── 4. 沽清频率排行 ───
 
+
 @router.get("/stockout-frequency")
 async def api_stockout_frequency(
     store_id: str = Query(..., description="门店ID"),
@@ -137,6 +142,7 @@ async def api_stockout_frequency(
 
 
 # ─── 5. 菜品四象限分析 ───
+
 
 @router.get("/structure")
 async def api_dish_structure(
@@ -158,6 +164,7 @@ async def api_dish_structure(
 
 # ─── 6. 新菜表现 ───
 
+
 @router.get("/new-performance")
 async def api_new_dish_performance(
     store_id: str = Query(..., description="门店ID"),
@@ -174,6 +181,7 @@ async def api_new_dish_performance(
 
 
 # ─── 7. AI菜单优化建议 ───
+
 
 @router.get("/optimization")
 async def api_menu_optimization(

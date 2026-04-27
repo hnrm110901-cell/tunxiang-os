@@ -1,4 +1,5 @@
 """原料追溯服务测试 -- 正向追溯 / 反向追溯 / 时间线 / 报告 / 关系图"""
+
 import os
 import sys
 
@@ -33,45 +34,65 @@ STORE_ID = "store-changsha-001"
 
 def _setup_full_chain():
     """注入完整追溯链数据：供应商 -> 入库 -> 领用 -> BOM -> 菜品 -> 订单 -> 客户"""
-    inject_batch(BATCH_NO, TENANT, {
-        "supplier_id": "sup-001",
-        "supplier_name": "湖南优质猪肉供应商",
-        "ingredient_id": INGREDIENT_ID,
-        "ingredient_name": "五花肉",
-        "quantity": 50.0,
-        "unit": "kg",
-        "received_at": "2026-03-25T08:00:00+08:00",
-        "received_by": "验收员张三",
-        "store_id": STORE_ID,
-        "expiry_date": "2026-03-30",
-    })
-    inject_batch_transaction(BATCH_NO, TENANT, {
-        "node_type": TraceNodeType.storage.value,
-        "action": "入库冷藏 (2C)",
-        "operator": "仓管李四",
-        "location": "冷藏库A区",
-        "quantity": 50.0,
-        "timestamp": "2026-03-25T08:30:00+08:00",
-    })
-    inject_batch_transaction(BATCH_NO, TENANT, {
-        "node_type": TraceNodeType.requisition.value,
-        "action": "厨房领用 5kg",
-        "operator": "厨师王五",
-        "location": "热菜档口",
-        "quantity": 5.0,
-        "timestamp": "2026-03-26T10:00:00+08:00",
-    })
+    inject_batch(
+        BATCH_NO,
+        TENANT,
+        {
+            "supplier_id": "sup-001",
+            "supplier_name": "湖南优质猪肉供应商",
+            "ingredient_id": INGREDIENT_ID,
+            "ingredient_name": "五花肉",
+            "quantity": 50.0,
+            "unit": "kg",
+            "received_at": "2026-03-25T08:00:00+08:00",
+            "received_by": "验收员张三",
+            "store_id": STORE_ID,
+            "expiry_date": "2026-03-30",
+        },
+    )
+    inject_batch_transaction(
+        BATCH_NO,
+        TENANT,
+        {
+            "node_type": TraceNodeType.storage.value,
+            "action": "入库冷藏 (2C)",
+            "operator": "仓管李四",
+            "location": "冷藏库A区",
+            "quantity": 50.0,
+            "timestamp": "2026-03-25T08:30:00+08:00",
+        },
+    )
+    inject_batch_transaction(
+        BATCH_NO,
+        TENANT,
+        {
+            "node_type": TraceNodeType.requisition.value,
+            "action": "厨房领用 5kg",
+            "operator": "厨师王五",
+            "location": "热菜档口",
+            "quantity": 5.0,
+            "timestamp": "2026-03-26T10:00:00+08:00",
+        },
+    )
     inject_bom_link(INGREDIENT_ID, TENANT, DISH_ID)
-    inject_order_dish(ORDER_ID, TENANT, {
-        "dish_id": DISH_ID,
-        "dish_name": "红烧肉",
-        "batch_nos": [BATCH_NO],
-    })
-    inject_order_customer(ORDER_ID, TENANT, {
-        "customer_id": CUSTOMER_ID,
-        "customer_name": "张先生",
-        "phone": "138****1234",
-    })
+    inject_order_dish(
+        ORDER_ID,
+        TENANT,
+        {
+            "dish_id": DISH_ID,
+            "dish_name": "红烧肉",
+            "batch_nos": [BATCH_NO],
+        },
+    )
+    inject_order_customer(
+        ORDER_ID,
+        TENANT,
+        {
+            "customer_id": CUSTOMER_ID,
+            "customer_name": "张先生",
+            "phone": "138****1234",
+        },
+    )
 
 
 class TestFullTraceForward:
@@ -104,9 +125,7 @@ class TestFullTraceForward:
 
     def test_forward_trace_supplier_info(self):
         result = full_trace_forward(BATCH_NO, TENANT)
-        supplier_node = next(
-            n for n in result["chain"] if n["node_type"] == TraceNodeType.supplier.value
-        )
+        supplier_node = next(n for n in result["chain"] if n["node_type"] == TraceNodeType.supplier.value)
         assert supplier_node["supplier_name"] == "湖南优质猪肉供应商"
 
     def test_tenant_isolation(self):
@@ -134,20 +153,22 @@ class TestFullTraceBackward:
         assert TraceNodeType.supplier.value in node_types
 
     def test_backward_trace_no_batch(self):
-        inject_order_dish("order-empty", TENANT, {
-            "dish_id": "dish-x",
-            "dish_name": "测试菜",
-            "batch_nos": [],
-        })
+        inject_order_dish(
+            "order-empty",
+            TENANT,
+            {
+                "dish_id": "dish-x",
+                "dish_name": "测试菜",
+                "batch_nos": [],
+            },
+        )
         result = full_trace_backward("order-empty", "dish-x", TENANT)
         assert result["complete"] is False
         assert result["source_batches"] == []
 
     def test_backward_includes_customer(self):
         result = full_trace_backward(ORDER_ID, DISH_ID, TENANT)
-        customer_nodes = [
-            n for n in result["chain"] if n["node_type"] == TraceNodeType.customer.value
-        ]
+        customer_nodes = [n for n in result["chain"] if n["node_type"] == TraceNodeType.customer.value]
         assert len(customer_nodes) >= 1
         assert customer_nodes[0]["customer_id"] == CUSTOMER_ID
 
@@ -233,12 +254,16 @@ class TestBuildIngredientGraph:
         _clear_store()
         inject_bom_link(INGREDIENT_ID, TENANT, DISH_ID)
         inject_bom_link(INGREDIENT_ID, TENANT, "dish-meatball")
-        inject_ingredient_supplier(INGREDIENT_ID, TENANT, {
-            "supplier_id": "sup-001",
-            "supplier_name": "供应商A",
-            "contact": "138xxxx",
-            "lead_time_days": 2,
-        })
+        inject_ingredient_supplier(
+            INGREDIENT_ID,
+            TENANT,
+            {
+                "supplier_id": "sup-001",
+                "supplier_name": "供应商A",
+                "contact": "138xxxx",
+                "lead_time_days": 2,
+            },
+        )
         inject_ingredient_alternative(INGREDIENT_ID, TENANT, "ing-alt-001")
 
     def test_graph_dishes(self):

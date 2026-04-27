@@ -109,10 +109,18 @@ FROM rev, costs
 
 DIMENSIONS = ["store_name", "channel"]
 METRICS = [
-    "total_revenue_fen", "food_cost_fen", "labor_cost_fen", "rent_fen",
-    "utilities_fen", "other_cost_fen", "total_cost_fen",
-    "gross_profit_fen", "net_profit_fen",
-    "gross_margin_pct", "net_margin_pct",
-    "food_cost_ratio_pct", "labor_cost_ratio_pct",
+    "total_revenue_fen",
+    "food_cost_fen",
+    "labor_cost_fen",
+    "rent_fen",
+    "utilities_fen",
+    "other_cost_fen",
+    "total_cost_fen",
+    "gross_profit_fen",
+    "net_profit_fen",
+    "gross_margin_pct",
+    "net_margin_pct",
+    "food_cost_ratio_pct",
+    "labor_cost_ratio_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

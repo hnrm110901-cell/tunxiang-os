@@ -10,17 +10,18 @@
   - 失败隔离：外部服务调用失败返回 None 并记录错误日志，不向上抛出
   - 所有 DB 查询显式传入 tenant_id
 """
+
 from __future__ import annotations
 
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import httpx
 import structlog
-from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -74,9 +75,7 @@ class ProcurementPaymentService:
         raw_order_id = order_data.get("purchase_order_id")
         if raw_order_id is None:
             raise ValueError("order_data 必须包含 purchase_order_id")
-        purchase_order_id = (
-            raw_order_id if isinstance(raw_order_id, uuid.UUID) else uuid.UUID(str(raw_order_id))
-        )
+        purchase_order_id = raw_order_id if isinstance(raw_order_id, uuid.UUID) else uuid.UUID(str(raw_order_id))
 
         total_amount = order_data.get("total_amount")
         if total_amount is None:
@@ -86,24 +85,17 @@ class ProcurementPaymentService:
         supplier_id: Optional[uuid.UUID] = None
         raw_supplier_id = order_data.get("supplier_id")
         if raw_supplier_id:
-            supplier_id = (
-                raw_supplier_id
-                if isinstance(raw_supplier_id, uuid.UUID)
-                else uuid.UUID(str(raw_supplier_id))
-            )
+            supplier_id = raw_supplier_id if isinstance(raw_supplier_id, uuid.UUID) else uuid.UUID(str(raw_supplier_id))
 
         created_by: Optional[uuid.UUID] = None
         raw_created_by = order_data.get("created_by")
         if raw_created_by:
-            created_by = (
-                raw_created_by
-                if isinstance(raw_created_by, uuid.UUID)
-                else uuid.UUID(str(raw_created_by))
-            )
+            created_by = raw_created_by if isinstance(raw_created_by, uuid.UUID) else uuid.UUID(str(raw_created_by))
 
         due_date = order_data.get("due_date")
         if isinstance(due_date, str) and due_date:
             from datetime import date as _date
+
             due_date = _date.fromisoformat(due_date)
 
         payment = ProcurementPayment(
@@ -128,9 +120,7 @@ class ProcurementPaymentService:
         except IntegrityError:
             # 唯一键冲突：该采购订单的付款单已存在，查询并返回已有记录
             await db.rollback()
-            existing = await self._get_by_purchase_order_id(
-                db, tenant_id, purchase_order_id
-            )
+            existing = await self._get_by_purchase_order_id(db, tenant_id, purchase_order_id)
             if existing is None:
                 raise LookupError(
                     f"ProcurementPayment for purchase_order_id={purchase_order_id} "
@@ -149,11 +139,7 @@ class ProcurementPaymentService:
             payment_items = []
             for item in items_data:
                 raw_item_supplier_id = item.get("order_item_id")
-                order_item_id = (
-                    uuid.UUID(str(raw_item_supplier_id))
-                    if raw_item_supplier_id
-                    else None
-                )
+                order_item_id = uuid.UUID(str(raw_item_supplier_id)) if raw_item_supplier_id else None
                 pi = ProcurementPaymentItem(
                     id=uuid.uuid4(),
                     tenant_id=tenant_id,
@@ -203,9 +189,7 @@ class ProcurementPaymentService:
         result = await db.execute(stmt)
         payment = result.scalar_one_or_none()
         if payment is None:
-            raise LookupError(
-                f"ProcurementPayment {payment_id} not found for tenant {tenant_id}"
-            )
+            raise LookupError(f"ProcurementPayment {payment_id} not found for tenant {tenant_id}")
         return payment
 
     async def list_payments(
@@ -241,11 +225,7 @@ class ProcurementPaymentService:
         if filters.get("payment_type"):
             base_where.append(ProcurementPayment.payment_type == filters["payment_type"])
 
-        count_stmt = (
-            select(func.count())
-            .select_from(ProcurementPayment)
-            .where(*base_where)
-        )
+        count_stmt = select(func.count()).select_from(ProcurementPayment).where(*base_where)
         count_result = await db.execute(count_stmt)
         total_count = count_result.scalar_one()
 
@@ -283,9 +263,7 @@ class ProcurementPaymentService:
         payment = await self.get_payment(db, tenant_id, payment_id)
 
         if payment.status not in ("pending",):
-            raise ValueError(
-                f"付款单状态为 '{payment.status}'，只有 pending 状态允许编辑"
-            )
+            raise ValueError(f"付款单状态为 '{payment.status}'，只有 pending 状态允许编辑")
 
         updatable = {"purchase_order_no", "supplier_name", "payment_type", "due_date", "notes"}
         for field in updatable:
@@ -323,9 +301,7 @@ class ProcurementPaymentService:
         payment = await self.get_payment(db, tenant_id, payment_id)
 
         if payment.status != "pending":
-            raise ValueError(
-                f"付款单状态为 '{payment.status}'，只有 pending 状态可以审批通过"
-            )
+            raise ValueError(f"付款单状态为 '{payment.status}'，只有 pending 状态可以审批通过")
 
         payment.status = "approved"
         payment.updated_at = _now_utc()
@@ -361,9 +337,7 @@ class ProcurementPaymentService:
         payment = await self.get_payment(db, tenant_id, payment_id)
 
         if payment.status != "approved":
-            raise ValueError(
-                f"付款单状态为 '{payment.status}'，只有 approved 状态可以标记为已付"
-            )
+            raise ValueError(f"付款单状态为 '{payment.status}'，只有 approved 状态可以标记为已付")
 
         payment.paid_amount = paid_amount
         payment.status = "paid"
@@ -450,9 +424,7 @@ class ProcurementPaymentService:
 
         # 计算已匹配发票的条目总金额
         invoice_amount = sum(
-            item.amount
-            for item in payment.items
-            if not item.is_deleted and item.invoice_id is not None
+            item.amount for item in payment.items if not item.is_deleted and item.invoice_id is not None
         )
         payment_amount = payment.total_amount
         discrepancy = payment_amount - invoice_amount
@@ -527,15 +499,12 @@ class ProcurementPaymentService:
         pending_amount = total_amount - paid_amount_sum
 
         # 平均账期天数：仅对 paid 状态的付款单计算（updated_at - created_at）
-        paid_stmt = (
-            select(
-                ProcurementPayment.created_at,
-                ProcurementPayment.updated_at,
-            )
-            .where(
-                *base_where,
-                ProcurementPayment.status == "paid",
-            )
+        paid_stmt = select(
+            ProcurementPayment.created_at,
+            ProcurementPayment.updated_at,
+        ).where(
+            *base_where,
+            ProcurementPayment.status == "paid",
         )
         paid_result = await db.execute(paid_stmt)
         paid_rows = paid_result.all()

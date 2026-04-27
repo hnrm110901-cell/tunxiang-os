@@ -11,6 +11,7 @@
 8. 生成开票二维码数据
 9. 发票台账查询
 """
+
 import os
 import sys
 
@@ -31,6 +32,7 @@ TENANT_ID = _uid()
 @pytest.fixture(autouse=True)
 def _clear_stores():
     from services.invoice_service import _invoice_queue, _invoices
+
     _invoices.clear()
     _invoice_queue.clear()
 
@@ -95,9 +97,11 @@ async def test_submit_to_tax_platform():
     from services.invoice_service import create_invoice_request, submit_to_tax_platform
 
     inv = await create_invoice_request(
-        order_id=_uid(), invoice_type="electronic",
+        order_id=_uid(),
+        invoice_type="electronic",
         buyer_info={"name": "测试", "tax_no": "123"},
-        tenant_id=TENANT_ID, amount_fen=10000,
+        tenant_id=TENANT_ID,
+        amount_fen=10000,
     )
     result = await submit_to_tax_platform(inv["id"], TENANT_ID)
     assert result["status"] == "issued"
@@ -111,7 +115,8 @@ async def test_submit_already_issued():
     from services.invoice_service import create_invoice_request, submit_to_tax_platform
 
     inv = await create_invoice_request(
-        order_id=_uid(), invoice_type="electronic",
+        order_id=_uid(),
+        invoice_type="electronic",
         buyer_info={"name": "测试", "tax_no": "123"},
         tenant_id=TENANT_ID,
     )
@@ -127,9 +132,11 @@ async def test_get_invoice_status():
     from services.invoice_service import create_invoice_request, get_invoice_status
 
     inv = await create_invoice_request(
-        order_id=_uid(), invoice_type="paper",
+        order_id=_uid(),
+        invoice_type="paper",
         buyer_info={"name": "测试"},
-        tenant_id=TENANT_ID, amount_fen=8800,
+        tenant_id=TENANT_ID,
+        amount_fen=8800,
     )
     result = await get_invoice_status(inv["id"], TENANT_ID)
     assert result["status"] == "pending"
@@ -151,8 +158,10 @@ async def test_generate_qrcode():
     from services.invoice_service import generate_qrcode_data
 
     result = await generate_qrcode_data(
-        order_id=_uid(), tenant_id=TENANT_ID,
-        amount_fen=20000, store_name="测试门店",
+        order_id=_uid(),
+        tenant_id=TENANT_ID,
+        amount_fen=20000,
+        store_name="测试门店",
     )
     assert "url" in result
     assert "token" in result
@@ -167,9 +176,11 @@ async def test_invoice_ledger():
     # 创建几张发票
     for i in range(3):
         await create_invoice_request(
-            order_id=_uid(), invoice_type="electronic",
+            order_id=_uid(),
+            invoice_type="electronic",
             buyer_info={"name": f"公司{i}"},
-            tenant_id=TENANT_ID, amount_fen=10000 * (i + 1),
+            tenant_id=TENANT_ID,
+            amount_fen=10000 * (i + 1),
         )
 
     result = await get_invoice_ledger(

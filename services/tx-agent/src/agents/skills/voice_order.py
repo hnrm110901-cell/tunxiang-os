@@ -4,6 +4,7 @@
 语音转文字使用 mock 接口（真实环境接入 Whisper/讯飞）。
 菜品匹配支持拼音模糊搜索（duojiaoyutou→剁椒鱼头）。
 """
+
 from typing import Any, Optional
 
 import structlog
@@ -16,25 +17,81 @@ logger = structlog.get_logger()
 # ── 拼音工具（简易版，无外部依赖） ──────────────────────────
 # 常用餐饮汉字→拼音映射（生产环境应使用 pypinyin 库）
 _PINYIN_MAP: dict[str, str] = {
-    "剁": "duo", "椒": "jiao", "鱼": "yu", "头": "tou",
-    "啤": "pi", "酒": "jiu", "米": "mi", "饭": "fan",
-    "红": "hong", "烧": "shao", "肉": "rou", "宫": "gong",
-    "保": "bao", "鸡": "ji", "丁": "ding", "麻": "ma",
-    "婆": "po", "豆": "dou", "腐": "fu", "水": "shui",
-    "煮": "zhu", "片": "pian", "白": "bai", "切": "qie",
-    "回": "hui", "锅": "guo", "辣": "la", "子": "zi",
-    "蛋": "dan", "炒": "chao", "饭": "fan", "面": "mian",
-    "汤": "tang", "粉": "fen", "虾": "xia", "蟹": "xie",
-    "龙": "long", "清": "qing", "蒸": "zheng", "炸": "zha",
-    "烤": "kao", "煎": "jian", "焖": "men", "炖": "dun",
-    "凉": "liang", "拌": "ban", "青": "qing", "菜": "cai",
-    "猪": "zhu", "牛": "niu", "羊": "yang", "排": "pai",
-    "骨": "gu", "翅": "chi", "腿": "tui", "肚": "du",
-    "肝": "gan", "肠": "chang", "血": "xue", "花": "hua",
-    "藕": "ou", "笋": "sun", "菌": "jun", "蘑": "mo",
-    "菇": "gu", "茄": "qie", "椒": "jiao", "葱": "cong",
-    "姜": "jiang", "蒜": "suan", "醋": "cu", "糖": "tang",
-    "盐": "yan", "油": "you", "酱": "jiang",
+    "剁": "duo",
+    "椒": "jiao",
+    "鱼": "yu",
+    "头": "tou",
+    "啤": "pi",
+    "酒": "jiu",
+    "米": "mi",
+    "饭": "fan",
+    "红": "hong",
+    "烧": "shao",
+    "肉": "rou",
+    "宫": "gong",
+    "保": "bao",
+    "鸡": "ji",
+    "丁": "ding",
+    "麻": "ma",
+    "婆": "po",
+    "豆": "dou",
+    "腐": "fu",
+    "水": "shui",
+    "煮": "zhu",
+    "片": "pian",
+    "白": "bai",
+    "切": "qie",
+    "回": "hui",
+    "锅": "guo",
+    "辣": "la",
+    "子": "zi",
+    "蛋": "dan",
+    "炒": "chao",
+    "饭": "fan",
+    "面": "mian",
+    "汤": "tang",
+    "粉": "fen",
+    "虾": "xia",
+    "蟹": "xie",
+    "龙": "long",
+    "清": "qing",
+    "蒸": "zheng",
+    "炸": "zha",
+    "烤": "kao",
+    "煎": "jian",
+    "焖": "men",
+    "炖": "dun",
+    "凉": "liang",
+    "拌": "ban",
+    "青": "qing",
+    "菜": "cai",
+    "猪": "zhu",
+    "牛": "niu",
+    "羊": "yang",
+    "排": "pai",
+    "骨": "gu",
+    "翅": "chi",
+    "腿": "tui",
+    "肚": "du",
+    "肝": "gan",
+    "肠": "chang",
+    "血": "xue",
+    "花": "hua",
+    "藕": "ou",
+    "笋": "sun",
+    "菌": "jun",
+    "蘑": "mo",
+    "菇": "gu",
+    "茄": "qie",
+    "椒": "jiao",
+    "葱": "cong",
+    "姜": "jiang",
+    "蒜": "suan",
+    "醋": "cu",
+    "糖": "tang",
+    "盐": "yan",
+    "油": "you",
+    "酱": "jiang",
 }
 
 
@@ -62,9 +119,23 @@ def _pinyin_similarity(a: str, b: str) -> float:
 
 # ── 意图解析关键词 ─────────────────────────────────────
 _QUANTITY_WORDS = {
-    "一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5,
-    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
-    "半": 0.5, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+    "一": 1,
+    "两": 2,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+    "半": 0.5,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 4,
+    "5": 5,
 }
 
 _ACTION_KEYWORDS = {
@@ -125,8 +196,11 @@ class VoiceOrderAgent(SkillAgent):
 
     def get_supported_actions(self) -> list[str]:
         return [
-            "transcribe", "parse_order_intent", "match_dishes",
-            "confirm_and_order", "get_stats",
+            "transcribe",
+            "parse_order_intent",
+            "match_dishes",
+            "confirm_and_order",
+            "get_stats",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -148,15 +222,17 @@ class VoiceOrderAgent(SkillAgent):
         audio_data: bytes = params.get("audio_data", b"")
         if not audio_data:
             return AgentResult(
-                success=False, action="transcribe",
+                success=False,
+                action="transcribe",
                 error="缺少 audio_data 参数",
             )
         result = await transcribe(audio_data)
-        logger.info("voice_transcribe_done",
-                     tenant_id=self.tenant_id, text=result["text"],
-                     confidence=result["confidence"])
+        logger.info(
+            "voice_transcribe_done", tenant_id=self.tenant_id, text=result["text"], confidence=result["confidence"]
+        )
         return AgentResult(
-            success=True, action="transcribe",
+            success=True,
+            action="transcribe",
             data=result,
             reasoning=f"语音识别完成: '{result['text']}' (置信度 {result['confidence']})",
             confidence=result["confidence"],
@@ -176,16 +252,17 @@ class VoiceOrderAgent(SkillAgent):
         text: str = params.get("text", "").strip()
         if not text:
             return AgentResult(
-                success=False, action="parse_order_intent",
+                success=False,
+                action="parse_order_intent",
                 error="缺少 text 参数",
             )
 
         intent = self._extract_intent(text)
-        logger.info("voice_intent_parsed",
-                     tenant_id=self.tenant_id, text=text, intent=intent)
+        logger.info("voice_intent_parsed", tenant_id=self.tenant_id, text=text, intent=intent)
 
         return AgentResult(
-            success=True, action="parse_order_intent",
+            success=True,
+            action="parse_order_intent",
             data={"original_text": text, "intent": intent},
             reasoning=f"从 '{text}' 解析出 {len(intent)} 个意图项",
             confidence=0.85,
@@ -206,10 +283,12 @@ class VoiceOrderAgent(SkillAgent):
 
         if modifiers and not any(ch not in "的了啊呢吧嘛哦呀" and ch not in " " for ch in text):
             # 纯修饰语句（如 "不要辣"）
-            intents.append({
-                "action": "modify",
-                "modifier": modifiers[0],
-            })
+            intents.append(
+                {
+                    "action": "modify",
+                    "modifier": modifiers[0],
+                }
+            )
             return intents
 
         # 检测动作
@@ -287,18 +366,18 @@ class VoiceOrderAgent(SkillAgent):
 
         if not dish_query:
             return AgentResult(
-                success=False, action="match_dishes",
+                success=False,
+                action="match_dishes",
                 error="缺少 dish 参数",
             )
 
         matches = self._fuzzy_match(dish_query, menu_items, top_n)
 
-        logger.info("voice_dish_matched",
-                     tenant_id=self.tenant_id, query=dish_query,
-                     match_count=len(matches))
+        logger.info("voice_dish_matched", tenant_id=self.tenant_id, query=dish_query, match_count=len(matches))
 
         return AgentResult(
-            success=True, action="match_dishes",
+            success=True,
+            action="match_dishes",
             data={
                 "query": dish_query,
                 "matches": matches,
@@ -328,13 +407,13 @@ class VoiceOrderAgent(SkillAgent):
                 score = _pinyin_similarity(query, name)
 
             if score > 0.3:
-                scored.append({
-                    **item,
-                    "score": round(score, 3),
-                    "match_type": "exact" if score == 1.0
-                                 else "contains" if score >= 0.85
-                                 else "pinyin",
-                })
+                scored.append(
+                    {
+                        **item,
+                        "score": round(score, 3),
+                        "match_type": "exact" if score == 1.0 else "contains" if score >= 0.85 else "pinyin",
+                    }
+                )
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         return scored[:top_n]
@@ -347,12 +426,14 @@ class VoiceOrderAgent(SkillAgent):
 
         if not matched_items:
             return AgentResult(
-                success=False, action="confirm_and_order",
+                success=False,
+                action="confirm_and_order",
                 error="没有待确认的菜品",
             )
         if not table_id:
             return AgentResult(
-                success=False, action="confirm_and_order",
+                success=False,
+                action="confirm_and_order",
                 error="缺少 table_id 参数",
             )
 
@@ -364,26 +445,34 @@ class VoiceOrderAgent(SkillAgent):
             price = item.get("price_fen", 0)
             subtotal = int(price * qty)
             total_fen += subtotal
-            order_items.append({
-                "dish_id": item.get("dish_id", ""),
-                "dish_name": item.get("name", item.get("dish_name", "")),
-                "quantity": qty,
-                "unit": item.get("unit", "份"),
-                "price_fen": price,
-                "subtotal_fen": subtotal,
-                "modifiers": item.get("modifiers", []),
-            })
+            order_items.append(
+                {
+                    "dish_id": item.get("dish_id", ""),
+                    "dish_name": item.get("name", item.get("dish_name", "")),
+                    "quantity": qty,
+                    "unit": item.get("unit", "份"),
+                    "price_fen": price,
+                    "subtotal_fen": subtotal,
+                    "modifiers": item.get("modifiers", []),
+                }
+            )
 
         import uuid
+
         order_id = f"VO-{uuid.uuid4().hex[:8].upper()}"
 
-        logger.info("voice_order_confirmed",
-                     tenant_id=self.tenant_id, table_id=table_id,
-                     order_id=order_id, item_count=len(order_items),
-                     total_fen=total_fen)
+        logger.info(
+            "voice_order_confirmed",
+            tenant_id=self.tenant_id,
+            table_id=table_id,
+            order_id=order_id,
+            item_count=len(order_items),
+            total_fen=total_fen,
+        )
 
         return AgentResult(
-            success=True, action="confirm_and_order",
+            success=True,
+            action="confirm_and_order",
             data={
                 "order_id": order_id,
                 "table_id": table_id,
@@ -393,7 +482,7 @@ class VoiceOrderAgent(SkillAgent):
                 "status": "confirmed",
                 "order_type": "voice",
             },
-            reasoning=f"语音点餐已确认: {len(order_items)} 道菜，合计 ¥{total_fen/100:.2f}",
+            reasoning=f"语音点餐已确认: {len(order_items)} 道菜，合计 ¥{total_fen / 100:.2f}",
             confidence=0.95,
         )
 
@@ -421,7 +510,8 @@ class VoiceOrderAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="get_stats",
+            success=True,
+            action="get_stats",
             data=stats,
             reasoning=f"门店 {store_id} 语音点餐占比 {stats['voice_order_rate']:.1%}",
             confidence=0.9,

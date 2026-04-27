@@ -1,8 +1,9 @@
 """会员管理 API — Golden ID + RFM + 旅程 + 企微 SCRM 绑定"""
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException
@@ -208,8 +209,7 @@ async def get_customer_orders(
         async with get_db_with_tenant(x_tenant_id) as db:
             count_result = await db.execute(
                 text(
-                    "SELECT COUNT(*) FROM orders"
-                    " WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false"
+                    "SELECT COUNT(*) FROM orders WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false"
                 ),
                 {"cid": customer_id, "tid": x_tenant_id},
             )
@@ -248,38 +248,46 @@ async def get_customer_orders(
         logger.error("get_customer_orders_db_error", error=str(exc), customer_id=customer_id)
         return {"ok": True, "data": {"items": [], "total": 0}}
 
+
 # RFM 分析
 @router.get("/rfm/segments")
 async def get_rfm_segments(store_id: str):
     """RFM 分层分布：S1-S5"""
     return {"ok": True, "data": {"segments": {}}}
 
+
 @router.get("/rfm/at-risk")
 async def get_at_risk_customers(store_id: str, risk_threshold: float = 0.5):
     """流失风险客户列表"""
     return {"ok": True, "data": {"customers": []}}
+
 
 # 营销活动
 @router.get("/campaigns")
 async def list_campaigns(store_id: str):
     return {"ok": True, "data": {"campaigns": []}}
 
+
 @router.post("/campaigns")
 async def create_campaign(data: dict):
     return {"ok": True, "data": {"campaign_id": "new"}}
 
+
 @router.post("/campaigns/{campaign_id}/trigger")
 async def trigger_campaign(campaign_id: str):
     return {"ok": True, "data": {"triggered": True}}
+
 
 # 用户旅程
 @router.get("/journeys")
 async def list_journeys(store_id: str, status: Optional[str] = None):
     return {"ok": True, "data": {"journeys": []}}
 
+
 @router.post("/journeys/trigger")
 async def trigger_journey(customer_id: str, journey_type: str):
     return {"ok": True, "data": {"journey_id": "new"}}
+
 
 # 身份合并
 @router.post("/customers/merge")
@@ -292,6 +300,7 @@ async def merge_customers(primary_id: str, secondary_id: str):
 # 企微 SCRM 绑定
 # ─────────────────────────────────────────────────────────────────
 
+
 class WecomBindingUpdate(BaseModel):
     wecom_external_userid: Optional[str] = None
     wecom_follow_user: Optional[str] = None
@@ -301,14 +310,15 @@ class WecomBindingUpdate(BaseModel):
 
 class WecomBindByExternalIdReq(BaseModel):
     """通过企微事件回调传入的信息，找到或创建 Customer 并绑定"""
+
     wecom_external_userid: str
     wecom_follow_user: str
-    wecom_follow_at: str            # ISO 8601
+    wecom_follow_at: str  # ISO 8601
     wecom_remark: str = ""
-    mobile: str = ""                # 从企微客户联系 API 获取
-    unionid: str = ""               # 微信 unionid（如已授权）
-    name: str = ""                  # 企微客户姓名（备用）
-    state: str = ""                 # 扫码来源（store_id）
+    mobile: str = ""  # 从企微客户联系 API 获取
+    unionid: str = ""  # 微信 unionid（如已授权）
+    name: str = ""  # 企微客户姓名（备用）
+    state: str = ""  # 扫码来源（store_id）
 
 
 class WecomUnbindReq(BaseModel):

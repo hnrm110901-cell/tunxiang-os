@@ -3,6 +3,7 @@
 5 个端点: 高峰检测/档口负载/服务加派/等位拥堵/事件处理
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException

@@ -5,6 +5,7 @@
   POST /api/v1/projectors/rebuild/{name}    — 重建指定投影器视图
   GET  /api/v1/projectors/discount-health   — 折扣健康视图快照（Phase 3 验证接口）
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -59,6 +60,7 @@ async def get_discount_health_snapshot(
     用于验证 Phase 3 切换效果（vs 旧的跨服务查询模式）。
     """
     import os
+
     import asyncpg
 
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/tunxiang")

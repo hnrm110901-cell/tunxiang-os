@@ -9,6 +9,7 @@
 
 需求预测（forecast_demand）从已完成的 production_orders 计算近 30 天日均量。
 """
+
 from __future__ import annotations
 
 import json
@@ -141,8 +142,13 @@ class CentralKitchenRepository:
         )
         row = result.fetchone()
         await self.db.flush()
-        log.info("production_plan_created", plan_id=str(plan_id),
-                 kitchen_id=kitchen_id, plan_date=plan_date, tenant_id=self.tenant_id)
+        log.info(
+            "production_plan_created",
+            plan_id=str(plan_id),
+            kitchen_id=kitchen_id,
+            plan_date=plan_date,
+            tenant_id=self.tenant_id,
+        )
         return self._plan_row(row, str(plan_id))
 
     async def get_plan(self, plan_id: str) -> Optional[Dict[str, Any]]:
@@ -180,9 +186,7 @@ class CentralKitchenRepository:
             where += " AND status = :status"
             params["status"] = status
 
-        count_result = await self.db.execute(
-            text(f"SELECT COUNT(*) FROM production_plans {where}"), params
-        )
+        count_result = await self.db.execute(text(f"SELECT COUNT(*) FROM production_plans {where}"), params)
         total = count_result.scalar() or 0
 
         params["limit"] = size
@@ -244,8 +248,12 @@ class CentralKitchenRepository:
             )
 
         await self.db.flush()
-        log.info("production_plan_confirmed", plan_id=plan_id,
-                 order_count=len(plan.get("items", [])), tenant_id=self.tenant_id)
+        log.info(
+            "production_plan_confirmed",
+            plan_id=plan_id,
+            order_count=len(plan.get("items", [])),
+            tenant_id=self.tenant_id,
+        )
         return await self.get_plan(plan_id)  # type: ignore[return-value]
 
     async def start_production(self, plan_id: str) -> Dict[str, Any]:
@@ -271,8 +279,7 @@ class CentralKitchenRepository:
             {"now": now, "pid": uuid.UUID(plan_id), "tid": self._tid},
         )
         await self.db.flush()
-        log.info("production_started", plan_id=plan_id,
-                 orders_started=result.rowcount, tenant_id=self.tenant_id)
+        log.info("production_started", plan_id=plan_id, orders_started=result.rowcount, tenant_id=self.tenant_id)
         return await self.get_plan(plan_id)  # type: ignore[return-value]
 
     # ══════════════════════════════════════════════════════
@@ -314,13 +321,10 @@ class CentralKitchenRepository:
         )
         await self._auto_complete_plan(order["plan_id"])
         await self.db.flush()
-        log.info("production_order_completed", order_id=order_id,
-                 actual_qty=actual_qty, tenant_id=self.tenant_id)
+        log.info("production_order_completed", order_id=order_id, actual_qty=actual_qty, tenant_id=self.tenant_id)
         return await self.get_order(order_id)  # type: ignore[return-value]
 
-    async def update_order_progress(
-        self, order_id: str, status: str, quantity_done: Optional[float]
-    ) -> Dict[str, Any]:
+    async def update_order_progress(self, order_id: str, status: str, quantity_done: Optional[float]) -> Dict[str, Any]:
         await self._set_tenant()
         order = await self.get_order(order_id)
         if not order:
@@ -376,9 +380,7 @@ class CentralKitchenRepository:
             where += " AND status = :status"
             params["status"] = status
 
-        count_result = await self.db.execute(
-            text(f"SELECT COUNT(*) FROM production_orders {where}"), params
-        )
+        count_result = await self.db.execute(text(f"SELECT COUNT(*) FROM production_orders {where}"), params)
         total = count_result.scalar() or 0
 
         params["limit"] = size
@@ -453,8 +455,13 @@ class CentralKitchenRepository:
         )
         row = result.fetchone()
         await self.db.flush()
-        log.info("distribution_order_created", order_id=str(oid),
-                 kitchen_id=kitchen_id, store_id=store_id, tenant_id=self.tenant_id)
+        log.info(
+            "distribution_order_created",
+            order_id=str(oid),
+            kitchen_id=kitchen_id,
+            store_id=store_id,
+            tenant_id=self.tenant_id,
+        )
         return self._dist_row(row, str(oid))
 
     async def mark_dispatched(self, order_id: str) -> Dict[str, Any]:
@@ -497,9 +504,7 @@ class CentralKitchenRepository:
             where += " AND status = :status"
             params["status"] = status
 
-        count_result = await self.db.execute(
-            text(f"SELECT COUNT(*) FROM distribution_orders {where}"), params
-        )
+        count_result = await self.db.execute(text(f"SELECT COUNT(*) FROM distribution_orders {where}"), params)
         total = count_result.scalar() or 0
 
         params["limit"] = size
@@ -560,17 +565,19 @@ class CentralKitchenRepository:
             variance_notes = item.get("variance_notes")
             if variance_pct > 5.0 and not variance_notes:
                 variance_notes = (
-                    f"差异 {variance_pct:.1f}%：期望 {expected} {item.get('unit','份')}，"
-                    f"实收 {received} {item.get('unit','份')}"
+                    f"差异 {variance_pct:.1f}%：期望 {expected} {item.get('unit', '份')}，"
+                    f"实收 {received} {item.get('unit', '份')}"
                 )
-            confirmed_items.append({
-                "dish_id": dish_id,
-                "dish_name": item.get("dish_name", ""),
-                "expected_qty": expected,
-                "received_qty": received,
-                "unit": item.get("unit", "份"),
-                "variance_notes": variance_notes,
-            })
+            confirmed_items.append(
+                {
+                    "dish_id": dish_id,
+                    "dish_name": item.get("dish_name", ""),
+                    "expected_qty": expected,
+                    "received_qty": received,
+                    "unit": item.get("unit", "份"),
+                    "variance_notes": variance_notes,
+                }
+            )
 
         now = datetime.now(timezone.utc)
         conf_id = uuid.uuid4()
@@ -603,8 +610,12 @@ class CentralKitchenRepository:
             {"da": delivered_at, "id": uuid.UUID(distribution_order_id), "tid": self._tid},
         )
         await self.db.flush()
-        log.info("store_receiving_confirmed", confirmation_id=str(conf_id),
-                 distribution_order_id=distribution_order_id, tenant_id=self.tenant_id)
+        log.info(
+            "store_receiving_confirmed",
+            confirmation_id=str(conf_id),
+            distribution_order_id=distribution_order_id,
+            tenant_id=self.tenant_id,
+        )
         return {
             "id": str(conf_id),
             "tenant_id": self.tenant_id,
@@ -705,14 +716,16 @@ class CentralKitchenRepository:
         for r in rows:
             avg_qty = round(float(r.total_qty) / max(1, r.day_count), 2)
             suggested = round(avg_qty * _WEEKEND_WEIGHT, 2) if is_weekend else avg_qty
-            dishes.append({
-                "dish_id": str(r.dish_id),
-                "dish_name": "",   # 菜品名称从 dishes 表读取，此处省略
-                "avg_daily_qty": avg_qty,
-                "suggested_qty": suggested,
-                "unit": r.unit or "份",
-                "weekend_adjusted": is_weekend,
-            })
+            dishes.append(
+                {
+                    "dish_id": str(r.dish_id),
+                    "dish_name": "",  # 菜品名称从 dishes 表读取，此处省略
+                    "avg_daily_qty": avg_qty,
+                    "suggested_qty": suggested,
+                    "unit": r.unit or "份",
+                    "weekend_adjusted": is_weekend,
+                }
+            )
 
         return {
             "kitchen_id": kitchen_id,

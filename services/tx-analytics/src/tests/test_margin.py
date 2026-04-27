@@ -1,4 +1,5 @@
 """菜品毛利 + 门店报表 + 成本偏差 纯函数测试"""
+
 import os
 import sys
 from decimal import Decimal
@@ -25,6 +26,7 @@ from services.store_margin_report import (
 # ═══════════════════════════════════════════════
 # 菜品毛利计算测试
 # ═══════════════════════════════════════════════
+
 
 class TestComputeMargin:
     """测试单品毛利计算"""
@@ -96,6 +98,7 @@ class TestMarginRanking:
 # 门店毛利日报测试
 # ═══════════════════════════════════════════════
 
+
 class TestStoreMarginReport:
     """测试门店日报纯函数"""
 
@@ -126,9 +129,9 @@ class TestStoreMarginReport:
         report = build_daily_report(
             store_id="store-001",
             report_date="2026-03-27",
-            revenue_fen=100000,           # 1000元营收
-            theoretical_cost_fen=35000,   # 350元理论成本
-            actual_cost_fen=42000,        # 420元实际成本
+            revenue_fen=100000,  # 1000元营收
+            theoretical_cost_fen=35000,  # 350元理论成本
+            actual_cost_fen=42000,  # 420元实际成本
             top_cost_dishes=[{"dish_name": "龙虾", "total_cost_fen": 15000}],
         )
         assert report["revenue_fen"] == 100000
@@ -160,6 +163,7 @@ class TestStoreMarginReport:
 # ═══════════════════════════════════════════════
 # 成本偏差分析测试
 # ═══════════════════════════════════════════════
+
 
 class TestCostVariance:
     """测试成本偏差分析纯函数"""

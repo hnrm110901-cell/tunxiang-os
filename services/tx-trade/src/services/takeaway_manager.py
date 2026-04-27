@@ -5,6 +5,7 @@
 
 所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from datetime import time as dtime
@@ -42,9 +43,9 @@ _ELEME_STATUS_MAP = {
 }
 
 # 自动接单模式
-AUTO_ACCEPT_MODE_ALL = "all"            # 全自动
-AUTO_ACCEPT_MODE_DAYTIME = "daytime"    # 仅白天
-AUTO_ACCEPT_MODE_OFF = "off"            # 关闭
+AUTO_ACCEPT_MODE_ALL = "all"  # 全自动
+AUTO_ACCEPT_MODE_DAYTIME = "daytime"  # 仅白天
+AUTO_ACCEPT_MODE_OFF = "off"  # 关闭
 
 _DEFAULT_DAYTIME_START = dtime(9, 0)
 _DEFAULT_DAYTIME_END = dtime(22, 0)
@@ -61,6 +62,7 @@ def _now_utc() -> datetime:
 # ---------------------------------------------------------------------------
 # Mock 平台客户端 — 接口与真实 SDK 兼容，生产切换只需替换实现
 # ---------------------------------------------------------------------------
+
 
 class _MockMeituanClient:
     """Mock 美团外卖 API（接口与 MeituanSaasAdapter 兼容）"""
@@ -155,6 +157,7 @@ def _save_order(tenant_id: str, store_id: str, order: dict) -> None:
 # ---------------------------------------------------------------------------
 # 核心业务函数
 # ---------------------------------------------------------------------------
+
 
 async def sync_meituan_orders(
     store_id: str,
@@ -390,11 +393,13 @@ async def sync_stockout_to_platforms(
         # 同步到美团
         try:
             await _meituan_client.sold_out_food(poi_id=store_id, food_id=food_id)
-            results.append({
-                "platform": "meituan",
-                "food_id": food_id,
-                "status": "synced",
-            })
+            results.append(
+                {
+                    "platform": "meituan",
+                    "food_id": food_id,
+                    "status": "synced",
+                }
+            )
         except (ConnectionError, TimeoutError, ValueError) as e:
             logger.error(
                 "meituan_stockout_failed",
@@ -402,21 +407,25 @@ async def sync_stockout_to_platforms(
                 error=str(e),
                 tenant_id=tenant_id,
             )
-            results.append({
-                "platform": "meituan",
-                "food_id": food_id,
-                "status": "failed",
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "platform": "meituan",
+                    "food_id": food_id,
+                    "status": "failed",
+                    "error": str(e),
+                }
+            )
 
         # 同步到饿了么
         try:
             await _eleme_client.sold_out_food(shop_id=store_id, food_id=food_id)
-            results.append({
-                "platform": "eleme",
-                "food_id": food_id,
-                "status": "synced",
-            })
+            results.append(
+                {
+                    "platform": "eleme",
+                    "food_id": food_id,
+                    "status": "synced",
+                }
+            )
         except (ConnectionError, TimeoutError, ValueError) as e:
             logger.error(
                 "eleme_stockout_failed",
@@ -424,12 +433,14 @@ async def sync_stockout_to_platforms(
                 error=str(e),
                 tenant_id=tenant_id,
             )
-            results.append({
-                "platform": "eleme",
-                "food_id": food_id,
-                "status": "failed",
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "platform": "eleme",
+                    "food_id": food_id,
+                    "status": "failed",
+                    "error": str(e),
+                }
+            )
 
     synced_count = sum(1 for r in results if r["status"] == "synced")
 
@@ -589,11 +600,13 @@ async def get_platform_reconciliation(
             order_date = order.get("created_at", "")[:10]
             if order_date == date:
                 internal_total_fen += order.get("total_fen", 0)
-                matched_orders.append({
-                    "order_id": order["order_id"],
-                    "platform_order_id": order.get("platform_order_id", ""),
-                    "total_fen": order.get("total_fen", 0),
-                })
+                matched_orders.append(
+                    {
+                        "order_id": order["order_id"],
+                        "platform_order_id": order.get("platform_order_id", ""),
+                        "total_fen": order.get("total_fen", 0),
+                    }
+                )
 
     diff_fen = platform_total_fen - internal_total_fen
 
@@ -647,12 +660,14 @@ async def manage_online_menu(
         action = action_item.get("action", "")
 
         if action not in ("on_sale", "sold_out"):
-            results.append({
-                "food_id": food_id,
-                "action": action,
-                "status": "failed",
-                "error": f"无效操作: {action}",
-            })
+            results.append(
+                {
+                    "food_id": food_id,
+                    "action": action,
+                    "status": "failed",
+                    "error": f"无效操作: {action}",
+                }
+            )
             continue
 
         try:
@@ -667,11 +682,13 @@ async def manage_online_menu(
                 else:
                     await _eleme_client.sold_out_food(shop_id=store_id, food_id=food_id)
 
-            results.append({
-                "food_id": food_id,
-                "action": action,
-                "status": "success",
-            })
+            results.append(
+                {
+                    "food_id": food_id,
+                    "action": action,
+                    "status": "success",
+                }
+            )
         except (ConnectionError, TimeoutError, ValueError) as e:
             logger.error(
                 "menu_action_failed",
@@ -680,12 +697,14 @@ async def manage_online_menu(
                 error=str(e),
                 tenant_id=tenant_id,
             )
-            results.append({
-                "food_id": food_id,
-                "action": action,
-                "status": "failed",
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "food_id": food_id,
+                    "action": action,
+                    "status": "failed",
+                    "error": str(e),
+                }
+            )
 
     success_count = sum(1 for r in results if r["status"] == "success")
 
@@ -752,6 +771,7 @@ async def set_auto_accept_rules(
 # ---------------------------------------------------------------------------
 # 内部辅助函数
 # ---------------------------------------------------------------------------
+
 
 def _update_order_status_local(tenant_id: str, order_id: str, status: str) -> None:
     """更新内存中的订单状态"""

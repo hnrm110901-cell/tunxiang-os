@@ -9,6 +9,9 @@
 
 使用 FastAPI TestClient + dependency_overrides，mock MenuApprovalService，不连真实数据库。
 """
+
+import os
+import sys
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,14 +19,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import os
-import sys
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from shared.ontology.src.database import get_db
 from api.menu_approval_routes import router
+
+from shared.ontology.src.database import get_db
 
 # ─── 构建测试用 App ───────────────────────────────────────────────────────────
 
@@ -281,9 +282,7 @@ class TestApproveApproval:
         """POST approve 已处理的审批返回 400"""
         with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
-            instance.approve_request = AsyncMock(
-                side_effect=ValueError("审批申请已处理，无法重复操作")
-            )
+            instance.approve_request = AsyncMock(side_effect=ValueError("审批申请已处理，无法重复操作"))
 
             resp = client.post(
                 f"/api/v1/menu/approvals/{APPROVAL_ID}/approve",
@@ -330,9 +329,7 @@ class TestRejectApproval:
         """POST reject 已处理的审批返回 400"""
         with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
-            instance.reject_request = AsyncMock(
-                side_effect=ValueError("审批申请状态不是 pending，无法拒绝")
-            )
+            instance.reject_request = AsyncMock(side_effect=ValueError("审批申请状态不是 pending，无法拒绝"))
 
             resp = client.post(
                 f"/api/v1/menu/approvals/{APPROVAL_ID}/reject",

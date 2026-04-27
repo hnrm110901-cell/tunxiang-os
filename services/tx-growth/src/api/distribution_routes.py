@@ -15,6 +15,7 @@ CRM三级分销路由 — 私域裂变三级链路 + 奖励体系
   GET    /api/v1/growth/referral/rules                   获取分销规则配置
   POST   /api/v1/growth/referral/detect-abuse            异常检测
 """
+
 import random
 import string
 import uuid
@@ -39,6 +40,7 @@ router = APIRouter(prefix="/api/v1/growth/referral", tags=["distribution"])
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok(data: object) -> dict:
     return {"ok": True, "data": data}
 
@@ -50,6 +52,7 @@ def err(msg: str, code: str = "ERROR") -> dict:
 # ---------------------------------------------------------------------------
 # Pydantic 请求模型
 # ---------------------------------------------------------------------------
+
 
 class GenerateLinkRequest(BaseModel):
     member_id: str
@@ -66,13 +69,13 @@ class GenerateLinkRequest(BaseModel):
 
 
 class BindRequest(BaseModel):
-    referee_id: str       # 新会员 ID
-    referral_code: str    # 使用的推荐码
+    referee_id: str  # 新会员 ID
+    referral_code: str  # 使用的推荐码
 
 
 class CalculateRewardRequest(BaseModel):
     order_id: str
-    member_id: str        # 消费会员（触发奖励的人）
+    member_id: str  # 消费会员（触发奖励的人）
     order_amount_fen: int
 
     @field_validator("order_amount_fen")
@@ -84,11 +87,11 @@ class CalculateRewardRequest(BaseModel):
 
 
 class SaveRulesRequest(BaseModel):
-    level1_rate: float    # 一级佣金比例，如 0.03 = 3%
-    level2_rate: float    # 二级佣金比例
-    level3_rate: float    # 三级佣金比例
-    reward_type: str      # coupon/points/cash
-    trigger_type: str     # first_order/order/recharge
+    level1_rate: float  # 一级佣金比例，如 0.03 = 3%
+    level2_rate: float  # 二级佣金比例
+    level3_rate: float  # 三级佣金比例
+    reward_type: str  # coupon/points/cash
+    trigger_type: str  # first_order/order/recharge
 
     @field_validator("level1_rate", "level2_rate", "level3_rate")
     @classmethod
@@ -124,6 +127,7 @@ class DetectAbuseRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+
 
 def _generate_code() -> str:
     """生成6字符推荐码，TX前缀+4位大写字母数字"""
@@ -169,6 +173,7 @@ CREATE TABLE IF NOT EXISTS referral_rules (
 # ---------------------------------------------------------------------------
 # 1. 生成推荐码
 # ---------------------------------------------------------------------------
+
 
 @router.post("/links")
 async def generate_referral_link(
@@ -248,6 +253,7 @@ async def generate_referral_link(
 # 2. 获取会员的推荐码
 # ---------------------------------------------------------------------------
 
+
 @router.get("/links/{member_id}")
 async def get_member_links(
     member_id: str,
@@ -288,28 +294,33 @@ async def get_member_links(
             for r in rows
         ]
 
-        return ok({
-            "member_id": member_id,
-            "links": links,
-            "total": len(links),
-            "total_click": sum(lk["click_count"] for lk in links),
-            "total_convert": sum(lk["convert_count"] for lk in links),
-        })
+        return ok(
+            {
+                "member_id": member_id,
+                "links": links,
+                "total": len(links),
+                "total_click": sum(lk["click_count"] for lk in links),
+                "total_convert": sum(lk["convert_count"] for lk in links),
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("referral.get_member_links.db_error", error=str(exc))
-        return ok({
-            "member_id": member_id,
-            "links": [],
-            "total": 0,
-            "total_click": 0,
-            "total_convert": 0,
-        })
+        return ok(
+            {
+                "member_id": member_id,
+                "links": [],
+                "total": 0,
+                "total_click": 0,
+                "total_convert": 0,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
 # 3. 绑定推荐关系（自动推导三级）
 # ---------------------------------------------------------------------------
+
 
 @router.post("/bind")
 async def bind_referral_relationship(
@@ -472,6 +483,7 @@ async def bind_referral_relationship(
 # 4. 查看推荐关系树
 # ---------------------------------------------------------------------------
 
+
 @router.get("/tree/{member_id}")
 async def get_referral_tree(
     member_id: str,
@@ -545,26 +557,31 @@ async def get_referral_tree(
         direct_count = len(direct_rows)
         indirect_count = len(indirect_rows) + len(level3_rows)
 
-        return ok({
-            "tree": tree,
-            "summary": {
-                "direct_referrals": direct_count,
-                "indirect_referrals": indirect_count,
-                "total_fen": 0,  # 跨服务消费汇总，留给 analytics 域计算
-            },
-        })
+        return ok(
+            {
+                "tree": tree,
+                "summary": {
+                    "direct_referrals": direct_count,
+                    "indirect_referrals": indirect_count,
+                    "total_fen": 0,  # 跨服务消费汇总，留给 analytics 域计算
+                },
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("referral.get_tree.db_error", error=str(exc))
-        return ok({
-            "tree": {"member_id": member_id, "level": 0, "children": []},
-            "summary": {"direct_referrals": 0, "indirect_referrals": 0, "total_fen": 0},
-        })
+        return ok(
+            {
+                "tree": {"member_id": member_id, "level": 0, "children": []},
+                "summary": {"direct_referrals": 0, "indirect_referrals": 0, "total_fen": 0},
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
 # 5. 触发奖励计算
 # ---------------------------------------------------------------------------
+
 
 @router.post("/rewards/calculate")
 async def calculate_rewards(
@@ -622,13 +639,15 @@ async def calculate_rewards(
 
         if rel_row is None:
             # 无上级关系，无奖励可计算
-            return ok({
-                "order_id": req.order_id,
-                "consumer_id": req.member_id,
-                "order_amount_fen": req.order_amount_fen,
-                "rewards": [],
-                "total_reward_fen": 0,
-            })
+            return ok(
+                {
+                    "order_id": req.order_id,
+                    "consumer_id": req.member_id,
+                    "order_amount_fen": req.order_amount_fen,
+                    "rewards": [],
+                    "total_reward_fen": 0,
+                }
+            )
 
         rewards_created = []
         reward_map = [
@@ -669,21 +688,23 @@ async def calculate_rewards(
                     "created_at": now,
                 },
             )
-            rewards_created.append({
-                "id": reward_id,
-                "tenant_id": x_tenant_id,
-                "member_id": beneficiary_id,
-                "referee_id": req.member_id,
-                "reward_level": level,
-                "trigger_type": rules["trigger_type"],
-                "reward_type": rules["reward_type"],
-                "reward_value_fen": reward_value_fen,
-                "status": "pending",
-                "order_id": req.order_id,
-                "issued_at": None,
-                "expires_at": None,
-                "created_at": now,
-            })
+            rewards_created.append(
+                {
+                    "id": reward_id,
+                    "tenant_id": x_tenant_id,
+                    "member_id": beneficiary_id,
+                    "referee_id": req.member_id,
+                    "reward_level": level,
+                    "trigger_type": rules["trigger_type"],
+                    "reward_type": rules["reward_type"],
+                    "reward_value_fen": reward_value_fen,
+                    "status": "pending",
+                    "order_id": req.order_id,
+                    "issued_at": None,
+                    "expires_at": None,
+                    "created_at": now,
+                }
+            )
 
         await db.commit()
 
@@ -693,13 +714,15 @@ async def calculate_rewards(
             amount_fen=req.order_amount_fen,
             rewards_count=len(rewards_created),
         )
-        return ok({
-            "order_id": req.order_id,
-            "consumer_id": req.member_id,
-            "order_amount_fen": req.order_amount_fen,
-            "rewards": rewards_created,
-            "total_reward_fen": sum(r["reward_value_fen"] for r in rewards_created),
-        })
+        return ok(
+            {
+                "order_id": req.order_id,
+                "consumer_id": req.member_id,
+                "order_amount_fen": req.order_amount_fen,
+                "rewards": rewards_created,
+                "total_reward_fen": sum(r["reward_value_fen"] for r in rewards_created),
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("referral.calculate_rewards.db_error", error=str(exc))
@@ -710,6 +733,7 @@ async def calculate_rewards(
 # ---------------------------------------------------------------------------
 # 6. 发放奖励
 # ---------------------------------------------------------------------------
+
 
 @router.post("/rewards/issue/{reward_id}")
 async def issue_reward(
@@ -784,6 +808,7 @@ async def issue_reward(
 # 7. 会员分销收益明细
 # ---------------------------------------------------------------------------
 
+
 @router.get("/rewards/{member_id}")
 async def get_member_rewards(
     member_id: str,
@@ -857,30 +882,35 @@ async def get_member_rewards(
             for r in rows
         ]
 
-        return ok({
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-            "total_issued_fen": total_issued_fen,
-            "total_pending_fen": total_pending_fen,
-        })
+        return ok(
+            {
+                "items": items,
+                "total": total,
+                "page": page,
+                "size": size,
+                "total_issued_fen": total_issued_fen,
+                "total_pending_fen": total_pending_fen,
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("referral.get_member_rewards.db_error", error=str(exc))
-        return ok({
-            "items": [],
-            "total": 0,
-            "page": page,
-            "size": size,
-            "total_issued_fen": 0,
-            "total_pending_fen": 0,
-        })
+        return ok(
+            {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "total_issued_fen": 0,
+                "total_pending_fen": 0,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
 # 8. 分销总览
 # ---------------------------------------------------------------------------
+
 
 @router.get("/stats")
 async def get_distribution_stats(
@@ -931,34 +961,39 @@ async def get_distribution_stats(
         pending_fen = int(reward_row["pending_fen"]) if reward_row else 0
         convert_rate = round(total_convert / total_click, 4) if total_click > 0 else 0.0
 
-        return ok({
-            "participant_count": participant_count,
-            "participant_growth_this_month": 0,  # 需 analytics 域月同比计算
-            "three_level_chain_count": relationship_count,
-            "this_month_issued_fen": issued_fen,
-            "pending_reward_fen": pending_fen,
-            "total_click_count": total_click,
-            "total_convert_count": total_convert,
-            "convert_rate": convert_rate,
-        })
+        return ok(
+            {
+                "participant_count": participant_count,
+                "participant_growth_this_month": 0,  # 需 analytics 域月同比计算
+                "three_level_chain_count": relationship_count,
+                "this_month_issued_fen": issued_fen,
+                "pending_reward_fen": pending_fen,
+                "total_click_count": total_click,
+                "total_convert_count": total_convert,
+                "convert_rate": convert_rate,
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("referral.get_stats.db_error", error=str(exc))
-        return ok({
-            "participant_count": 0,
-            "participant_growth_this_month": 0,
-            "three_level_chain_count": 0,
-            "this_month_issued_fen": 0,
-            "pending_reward_fen": 0,
-            "total_click_count": 0,
-            "total_convert_count": 0,
-            "convert_rate": 0.0,
-        })
+        return ok(
+            {
+                "participant_count": 0,
+                "participant_growth_this_month": 0,
+                "three_level_chain_count": 0,
+                "this_month_issued_fen": 0,
+                "pending_reward_fen": 0,
+                "total_click_count": 0,
+                "total_convert_count": 0,
+                "convert_rate": 0.0,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
 # 9. 分销排行榜
 # ---------------------------------------------------------------------------
+
 
 @router.get("/leaderboard")
 async def get_leaderboard(
@@ -972,7 +1007,7 @@ async def get_leaderboard(
 
     period_filter = {
         "today": "AND rr.registered_at >= NOW() - INTERVAL '1 day'",
-        "week":  "AND rr.registered_at >= NOW() - INTERVAL '7 days'",
+        "week": "AND rr.registered_at >= NOW() - INTERVAL '7 days'",
         "month": "AND rr.registered_at >= NOW() - INTERVAL '30 days'",
     }[period]
 
@@ -1011,11 +1046,13 @@ async def get_leaderboard(
             for idx, r in enumerate(rows)
         ]
 
-        return ok({
-            "period": period,
-            "items": items,
-            "total": len(items),
-        })
+        return ok(
+            {
+                "period": period,
+                "items": items,
+                "total": len(items),
+            }
+        )
 
     except SQLAlchemyError as exc:
         logger.error("referral.get_leaderboard.db_error", error=str(exc))
@@ -1025,6 +1062,7 @@ async def get_leaderboard(
 # ---------------------------------------------------------------------------
 # 10. 保存分销规则配置
 # ---------------------------------------------------------------------------
+
 
 @router.post("/rules")
 async def save_distribution_rules(
@@ -1095,6 +1133,7 @@ async def save_distribution_rules(
 # 11. 获取分销规则配置
 # ---------------------------------------------------------------------------
 
+
 @router.get("/rules")
 async def get_distribution_rules(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -1139,6 +1178,7 @@ async def get_distribution_rules(
 # ---------------------------------------------------------------------------
 # 12. 异常检测（防刷）
 # ---------------------------------------------------------------------------
+
 
 @router.post("/detect-abuse")
 async def detect_abuse(
@@ -1213,12 +1253,12 @@ async def detect_abuse(
         risk_level=risk_level,
     )
 
-    return ok({
-        "referee_id": req.referee_id,
-        "is_abuse": is_abuse,
-        "risk_level": risk_level,
-        "flags": abuse_flags,
-        "recommendation": "block" if risk_level == "high" else (
-            "review" if risk_level == "medium" else "allow"
-        ),
-    })
+    return ok(
+        {
+            "referee_id": req.referee_id,
+            "is_abuse": is_abuse,
+            "risk_level": risk_level,
+            "flags": abuse_flags,
+            "recommendation": "block" if risk_level == "high" else ("review" if risk_level == "medium" else "allow"),
+        }
+    )

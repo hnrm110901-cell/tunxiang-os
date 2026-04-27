@@ -16,6 +16,7 @@
  9. [wechat]  query_order 正常 → 200 ok=True，返回订单状态
 10. [wechat]  apply_refund 退款金额超过订单金额 → 400
 """
+
 import hashlib
 import hmac as hmac_mod
 import os
@@ -34,16 +35,20 @@ _events_pkg = types.ModuleType("shared")
 _events_pkg.events = types.ModuleType("shared.events")
 _events_pkg.events.src = types.ModuleType("shared.events.src")
 
+
 async def _noop_emit(**_kwargs):
     pass
+
 
 _events_pkg.events.src.emitter = types.ModuleType("shared.events.src.emitter")
 _events_pkg.events.src.emitter.emit_event = _noop_emit
 
 _event_types_mod = types.ModuleType("shared.events.src.event_types")
 
+
 class _ChannelEventType:
     ORDER_SYNCED = "CHANNEL.ORDER_SYNCED"
+
 
 _event_types_mod.ChannelEventType = _ChannelEventType
 
@@ -58,8 +63,10 @@ _ontology_pkg = types.ModuleType("shared.ontology")
 _ontology_src = types.ModuleType("shared.ontology.src")
 _ontology_db = types.ModuleType("shared.ontology.src.database")
 
+
 async def get_db():
     yield None
+
 
 _ontology_db.get_db = get_db
 sys.modules.setdefault("shared.ontology", _ontology_pkg)
@@ -69,6 +76,7 @@ sys.modules.setdefault("shared.ontology.src.database", _ontology_db)
 # shared.integrations.wechat_pay 存根
 _integrations_pkg = types.ModuleType("shared.integrations")
 _wechat_pay_mod = types.ModuleType("shared.integrations.wechat_pay")
+
 
 class _FakeWechatPayService:
     async def create_prepay(self, **_kw):
@@ -83,6 +91,7 @@ class _FakeWechatPayService:
     async def refund(self, **_kw):
         return {"refund_id": "RF_TEST"}
 
+
 _wechat_pay_mod.get_wechat_pay_service = lambda: _FakeWechatPayService()
 sys.modules.setdefault("shared.integrations", _integrations_pkg)
 sys.modules.setdefault("shared.integrations.wechat_pay", _wechat_pay_mod)
@@ -91,7 +100,6 @@ sys.modules.setdefault("shared.integrations.wechat_pay", _wechat_pay_mod)
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -105,6 +113,7 @@ def _make_webhook_app():
     """构建包含 webhook_routes 的测试 FastAPI 应用"""
     # 延迟导入避免循环
     from api.webhook_routes import router
+
     app = FastAPI()
     app.include_router(router)
     return app
@@ -113,7 +122,9 @@ def _make_webhook_app():
 def _make_wechat_app():
     """构建包含 wechat_pay_routes 的测试 FastAPI 应用"""
     from api.wechat_pay_routes import router
+
     from shared.ontology.src.database import get_db as real_get_db
+
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[real_get_db] = lambda: None
@@ -149,6 +160,7 @@ def _douyin_sign(payload: str, timestamp: str, secret: str) -> str:
 # 场景 1: 美团推送 — 缺少 sign 字段 → 403
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_meituan_webhook_missing_sign():
     """美团 Webhook 缺少 sign 字段时应返回 403"""
     app = _make_webhook_app()
@@ -166,13 +178,16 @@ def test_meituan_webhook_missing_sign():
 # 场景 2: 美团推送 — 签名验证失败 → 403
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_meituan_webhook_invalid_sign():
     """美团 Webhook 签名错误时应返回 403"""
     # 设置一个 secret 让验签路径走到比较逻辑
     with patch.dict(os.environ, {"MEITUAN_APP_SECRET": "test_secret_key"}):
         # 重新导入模块使环境变量生效
         import importlib
+
         import api.webhook_routes as wh_mod
+
         importlib.reload(wh_mod)
 
         ts = str(int(time.time()))
@@ -198,6 +213,7 @@ def test_meituan_webhook_invalid_sign():
 # 场景 3: 美团推送 — 验签成功 → 200, adapter.receive_order 被调用
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_meituan_webhook_valid_push():
     """美团 Webhook 验签通过时应调用 adapter 并返回 ok=True"""
     secret = "meituan_test_secret"
@@ -218,14 +234,18 @@ def test_meituan_webhook_valid_push():
     params["sign"] = sign
 
     mock_adapter = MagicMock()
-    mock_adapter.receive_order = AsyncMock(return_value={
-        "order_id": str(uuid.uuid4()),
-        "order_no": "ORD20260404001",
-    })
+    mock_adapter.receive_order = AsyncMock(
+        return_value={
+            "order_id": str(uuid.uuid4()),
+            "order_no": "ORD20260404001",
+        }
+    )
 
     with patch.dict(os.environ, {"MEITUAN_APP_SECRET": secret}):
         import importlib
+
         import api.webhook_routes as wh_mod
+
         importlib.reload(wh_mod)
 
         with patch.object(wh_mod, "DeliveryPlatformAdapter", return_value=mock_adapter):
@@ -253,12 +273,16 @@ def test_meituan_webhook_valid_push():
 # 场景 4: 饿了么推送 — 签名验证失败 → 403
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_eleme_webhook_invalid_signature():
     """饿了么 Webhook 签名错误时应返回 403"""
     import json as _json
+
     with patch.dict(os.environ, {"ELEME_APP_SECRET": "eleme_test_secret"}):
         import importlib
+
         import api.webhook_routes as wh_mod
+
         importlib.reload(wh_mod)
 
         ts = str(int(time.time()))
@@ -287,9 +311,11 @@ def test_eleme_webhook_invalid_signature():
 # 场景 5: 抖音推送 — 验签成功 → 200, adapter.receive_order 被调用
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_douyin_webhook_valid_push():
     """抖音 Webhook 验签通过时应调用 adapter 并返回 ok=True"""
     import json as _json
+
     secret = "douyin_test_secret"
     ts = str(int(time.time()))
 
@@ -301,23 +327,25 @@ def test_douyin_webhook_valid_push():
         "address": "北京市朝阳区xxx",
         "delivery_time": "2026-04-04T18:00:00",
         "remark": "不要香菜",
-        "item_list": [
-            {"product_name": "烤鸭", "count": 1, "origin_amount": 3200, "product_id": "P001"}
-        ],
+        "item_list": [{"product_name": "烤鸭", "count": 1, "origin_amount": 3200, "product_id": "P001"}],
     }
     body_dict = {"event": "new_order", "data": order_data}
     payload = _json.dumps(body_dict)
     sign = _douyin_sign(payload, ts, secret)
 
     mock_adapter = MagicMock()
-    mock_adapter.receive_order = AsyncMock(return_value={
-        "order_id": str(uuid.uuid4()),
-        "order_no": "ORD20260404002",
-    })
+    mock_adapter.receive_order = AsyncMock(
+        return_value={
+            "order_id": str(uuid.uuid4()),
+            "order_no": "ORD20260404002",
+        }
+    )
 
     with patch.dict(os.environ, {"DOUYIN_APP_SECRET": secret}):
         import importlib
+
         import api.webhook_routes as wh_mod
+
         importlib.reload(wh_mod)
 
         with patch.object(wh_mod, "DeliveryPlatformAdapter", return_value=mock_adapter):
@@ -351,6 +379,7 @@ def test_douyin_webhook_valid_push():
 # 场景 6: 微信预支付 — 缺少 X-Tenant-ID → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_wechat_prepay_missing_tenant():
     """预支付接口缺少 X-Tenant-ID header 时应返回 400"""
     app = _make_wechat_app()
@@ -373,15 +402,18 @@ def test_wechat_prepay_missing_tenant():
 # 场景 7: 微信预支付 — 正常调用 → 200, ok=True, 返回支付参数
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_wechat_prepay_success():
     """预支付正常调用时应返回 ok=True 及 prepay_id"""
     mock_svc = MagicMock()
-    mock_svc.create_prepay = AsyncMock(return_value={
-        "prepay_id": "px_test456",
-        "sign": "ABCDEF123456",
-        "nonce_str": "RANDOMNONCE",
-        "timestamp": str(int(time.time())),
-    })
+    mock_svc.create_prepay = AsyncMock(
+        return_value={
+            "prepay_id": "px_test456",
+            "sign": "ABCDEF123456",
+            "nonce_str": "RANDOMNONCE",
+            "timestamp": str(int(time.time())),
+        }
+    )
 
     with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
@@ -413,6 +445,7 @@ def test_wechat_prepay_success():
 # 场景 8: 微信支付回调 — 验签失败 → 返回 code=FAIL
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_wechat_callback_verify_fail():
     """微信支付回调验签失败时应返回 code=FAIL，不抛 500"""
     mock_svc = MagicMock()
@@ -438,15 +471,18 @@ def test_wechat_callback_verify_fail():
 # 场景 9: 微信查询订单 — 正常 → 200, ok=True, 返回 trade_state
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_wechat_query_order_success():
     """主动查询订单状态正常时应返回 ok=True 及 trade_state"""
     mock_svc = MagicMock()
-    mock_svc.query_order = AsyncMock(return_value={
-        "trade_state": "SUCCESS",
-        "out_trade_no": "ORD_QUERY_001",
-        "transaction_id": "TXN20260404001",
-        "amount": {"total": 8800},
-    })
+    mock_svc.query_order = AsyncMock(
+        return_value={
+            "trade_state": "SUCCESS",
+            "out_trade_no": "ORD_QUERY_001",
+            "transaction_id": "TXN20260404001",
+            "amount": {"total": 8800},
+        }
+    )
 
     with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
@@ -469,6 +505,7 @@ def test_wechat_query_order_success():
 # 场景 10: 微信退款 — 退款金额超过订单金额 → 400
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_wechat_refund_amount_exceeds_total():
     """退款金额超过订单金额时应返回 400"""
     app = _make_wechat_app()
@@ -479,7 +516,7 @@ def test_wechat_refund_amount_exceeds_total():
         json={
             "order_id": "ORD_REFUND_001",
             "total_fen": 5000,
-            "refund_fen": 9999,   # 超出订单金额
+            "refund_fen": 9999,  # 超出订单金额
             "reason": "顾客取消",
         },
         headers=BASE_HEADERS,

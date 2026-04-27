@@ -5,6 +5,7 @@
 
 迁移自 tunxiang V2.x private_domain/agent.py + service/agent.py
 """
+
 from typing import Any
 
 import structlog
@@ -16,8 +17,8 @@ logger = structlog.get_logger(__name__)
 
 # RFM 分层阈值
 RFM_THRESHOLDS = {
-    "R": [7, 30, 90, 180],    # 天数：S1(≤7) S2(≤30) S3(≤90) S4(≤180) S5(>180)
-    "F": [12, 6, 3, 1],       # 次数：S1(≥12) S2(≥6) S3(≥3) S4(≥1) S5(0)
+    "R": [7, 30, 90, 180],  # 天数：S1(≤7) S2(≤30) S3(≤90) S4(≤180) S5(>180)
+    "F": [12, 6, 3, 1],  # 次数：S1(≥12) S2(≥6) S3(≥3) S4(≥1) S5(0)
     "M": [500000, 200000, 80000, 20000],  # 分：S1(≥5000元) S2(≥2000) S3(≥800) S4(≥200) S5(<200)
 }
 
@@ -43,20 +44,30 @@ class MemberInsightAgent(SkillAgent):
     priority = "P1"
     run_location = "cloud"
 
+    # Sprint D1 / PR Overflow：RFM 触达决策（发券/召回）直接冲击毛利
+    constraint_scope = {"margin"}
+
     def get_supported_actions(self) -> list[str]:
         return [
-            "analyze_rfm", "detect_signals", "detect_competitor",
-            "trigger_journey", "get_churn_risks", "process_bad_review",
-            "monitor_service_quality", "handle_complaint", "collect_feedback",
-            "rfm_analysis", "update_customer_rfm",
-            "get_clv_snapshot",         # Phase 3: 读 mv_member_clv
+            "analyze_rfm",
+            "detect_signals",
+            "detect_competitor",
+            "trigger_journey",
+            "get_churn_risks",
+            "process_bad_review",
+            "monitor_service_quality",
+            "handle_complaint",
+            "collect_feedback",
+            "rfm_analysis",
+            "update_customer_rfm",
+            "get_clv_snapshot",  # Phase 3: 读 mv_member_clv
             "generate_first_to_second_suggestion",  # 增长中枢V2: 首单转二访建议
-            "generate_repair_suggestion",           # 增长中枢V2: 服务修复建议
+            "generate_repair_suggestion",  # 增长中枢V2: 服务修复建议
             # P1 扩展
-            "generate_super_user_suggestion",       # P1: 超级用户关系经营建议
-            "generate_psych_bridge_suggestion",     # P1: 心理距离修复建议
-            "generate_milestone_suggestion",        # P1: 里程碑庆祝建议
-            "generate_referral_suggestion",         # P1: 裂变场景激活建议
+            "generate_super_user_suggestion",  # P1: 超级用户关系经营建议
+            "generate_psych_bridge_suggestion",  # P1: 心理距离修复建议
+            "generate_milestone_suggestion",  # P1: 里程碑庆祝建议
+            "generate_referral_suggestion",  # P1: 裂变场景激活建议
         ]
 
     def get_action_config(self, action: str) -> ActionConfig:
@@ -187,17 +198,22 @@ class MemberInsightAgent(SkillAgent):
             level = f"S{max(r_score, f_score, m_score)}"
             segments[level] += 1
 
-            analyzed.append({
-                "customer_id": m.get("customer_id"),
-                "r_score": r_score, "f_score": f_score, "m_score": m_score,
-                "level": level,
-            })
+            analyzed.append(
+                {
+                    "customer_id": m.get("customer_id"),
+                    "r_score": r_score,
+                    "f_score": f_score,
+                    "m_score": m_score,
+                    "level": level,
+                }
+            )
 
         total = len(members)
         distribution = {k: {"count": v, "pct": round(v / total * 100, 1)} for k, v in segments.items()}
 
         return AgentResult(
-            success=True, action="analyze_rfm",
+            success=True,
+            action="analyze_rfm",
             data={"total": total, "distribution": distribution, "members": analyzed[:20]},
             reasoning=f"分析 {total} 个会员，S1(高价值) {segments['S1']} 人，S5(流失) {segments['S5']} 人",
             confidence=0.9,
@@ -234,19 +250,22 @@ class MemberInsightAgent(SkillAgent):
                 risk *= max(0.3, 1 - frequency / 20)  # 高频降低风险
 
             if risk >= risk_threshold:
-                at_risk.append({
-                    "customer_id": m.get("customer_id"),
-                    "name": m.get("name", ""),
-                    "risk_score": round(risk, 2),
-                    "recency_days": recency,
-                    "total_spent_yuan": round(monetary / 100, 2),
-                    "recommended_action": "召回优惠券" if risk > 0.7 else "温馨提醒",
-                })
+                at_risk.append(
+                    {
+                        "customer_id": m.get("customer_id"),
+                        "name": m.get("name", ""),
+                        "risk_score": round(risk, 2),
+                        "recency_days": recency,
+                        "total_spent_yuan": round(monetary / 100, 2),
+                        "recommended_action": "召回优惠券" if risk > 0.7 else "温馨提醒",
+                    }
+                )
 
         at_risk.sort(key=lambda x: x["risk_score"], reverse=True)
 
         return AgentResult(
-            success=True, action="get_churn_risks",
+            success=True,
+            action="get_churn_risks",
             data={"at_risk": at_risk[:50], "total": len(at_risk)},
             reasoning=f"发现 {len(at_risk)} 个流失风险客户（阈值 {risk_threshold}）",
             confidence=0.8,
@@ -259,11 +278,15 @@ class MemberInsightAgent(SkillAgent):
 
         template = JOURNEY_TEMPLATES.get(journey_type)
         if not template:
-            return AgentResult(success=False, action="trigger_journey",
-                             error=f"未知旅程类型: {journey_type}，可选: {list(JOURNEY_TEMPLATES.keys())}")
+            return AgentResult(
+                success=False,
+                action="trigger_journey",
+                error=f"未知旅程类型: {journey_type}，可选: {list(JOURNEY_TEMPLATES.keys())}",
+            )
 
         return AgentResult(
-            success=True, action="trigger_journey",
+            success=True,
+            action="trigger_journey",
             data={
                 "journey_type": journey_type,
                 "journey_name": template["name"],
@@ -295,7 +318,8 @@ class MemberInsightAgent(SkillAgent):
         reply += "我们会立即改进，期待您再次光临。"
 
         return AgentResult(
-            success=True, action="process_bad_review",
+            success=True,
+            action="process_bad_review",
             data={
                 "severity": severity,
                 "detected_issues": issues,
@@ -318,17 +342,30 @@ class MemberInsightAgent(SkillAgent):
 
             # 流失预警
             if recency >= 60:
-                signals.append({"type": "churn_risk", "customer_id": m.get("customer_id"),
-                               "detail": f"{recency}天未消费", "priority": 1})
+                signals.append(
+                    {
+                        "type": "churn_risk",
+                        "customer_id": m.get("customer_id"),
+                        "detail": f"{recency}天未消费",
+                        "priority": 1,
+                    }
+                )
 
             # 生日提醒（简化：检查 birth_date 字段存在）
             if birthday:
-                signals.append({"type": "birthday", "customer_id": m.get("customer_id"),
-                               "detail": f"生日: {birthday}", "priority": 2})
+                signals.append(
+                    {
+                        "type": "birthday",
+                        "customer_id": m.get("customer_id"),
+                        "detail": f"生日: {birthday}",
+                        "priority": 2,
+                    }
+                )
 
         signals.sort(key=lambda s: s["priority"])
         return AgentResult(
-            success=True, action="detect_signals",
+            success=True,
+            action="detect_signals",
             data={"signals": signals[:30], "total": len(signals)},
             reasoning=f"检测到 {len(signals)} 个行为信号",
             confidence=0.8,
@@ -338,8 +375,9 @@ class MemberInsightAgent(SkillAgent):
         """服务质量监控"""
         feedbacks = params.get("feedbacks", [])
         if not feedbacks:
-            return AgentResult(success=True, action="monitor_service_quality",
-                             data={"avg_rating": 0, "total": 0}, confidence=0.5)
+            return AgentResult(
+                success=True, action="monitor_service_quality", data={"avg_rating": 0, "total": 0}, confidence=0.5
+            )
 
         ratings = [f.get("rating", 3) for f in feedbacks]
         avg = sum(ratings) / len(ratings)
@@ -347,7 +385,8 @@ class MemberInsightAgent(SkillAgent):
         bad_rate = bad_count / len(ratings) * 100
 
         return AgentResult(
-            success=True, action="monitor_service_quality",
+            success=True,
+            action="monitor_service_quality",
             data={
                 "avg_rating": round(avg, 2),
                 "total_feedbacks": len(feedbacks),
@@ -366,30 +405,46 @@ class MemberInsightAgent(SkillAgent):
         for c in competitors:
             name = c.get("name", "")
             if c.get("price_change_pct", 0) < -10:
-                signals.append({"competitor": name, "type": "price_drop", "detail": f"降价{abs(c['price_change_pct'])}%"})
+                signals.append(
+                    {"competitor": name, "type": "price_drop", "detail": f"降价{abs(c['price_change_pct'])}%"}
+                )
             if c.get("new_campaign"):
                 signals.append({"competitor": name, "type": "campaign", "detail": c["new_campaign"]})
-        return AgentResult(success=True, action="detect_competitor",
-                         data={"signals": signals, "total": len(signals)},
-                         reasoning=f"检测到 {len(signals)} 个竞对动态", confidence=0.7)
+        return AgentResult(
+            success=True,
+            action="detect_competitor",
+            data={"signals": signals, "total": len(signals)},
+            reasoning=f"检测到 {len(signals)} 个竞对动态",
+            confidence=0.7,
+        )
 
     async def _handle_complaint(self, params: dict) -> AgentResult:
         """投诉处理"""
         complaint_type = params.get("type", "other")
         priority = {"food_quality": 1, "service": 2, "hygiene": 1}.get(complaint_type, 3)
-        return AgentResult(success=True, action="handle_complaint",
-                         data={"type": complaint_type, "priority": priority,
-                               "assigned_to": "store_manager" if priority <= 2 else "duty_manager",
-                               "follow_up_hours": 24 if priority == 1 else 48},
-                         reasoning=f"投诉 {complaint_type}，优先级 {priority}", confidence=0.85)
+        return AgentResult(
+            success=True,
+            action="handle_complaint",
+            data={
+                "type": complaint_type,
+                "priority": priority,
+                "assigned_to": "store_manager" if priority <= 2 else "duty_manager",
+                "follow_up_hours": 24 if priority == 1 else 48,
+            },
+            reasoning=f"投诉 {complaint_type}，优先级 {priority}",
+            confidence=0.85,
+        )
 
     async def _collect_feedback(self, params: dict) -> AgentResult:
         """收集反馈"""
         feedback = params.get("feedback", {})
-        return AgentResult(success=True, action="collect_feedback",
-                         data={"stored": True, "rating": feedback.get("rating", 0),
-                               "category": feedback.get("category", "general")},
-                         reasoning="反馈已收集", confidence=0.95)
+        return AgentResult(
+            success=True,
+            action="collect_feedback",
+            data={"stored": True, "rating": feedback.get("rating", 0), "category": feedback.get("category", "general")},
+            reasoning="反馈已收集",
+            confidence=0.95,
+        )
 
     # ─── RFM分析（真实DB） ───
 
@@ -404,7 +459,8 @@ class MemberInsightAgent(SkillAgent):
 
             now = datetime.now(timezone.utc)
 
-            rows = await self._db.execute(text("""
+            rows = await self._db.execute(
+                text("""
                 SELECT
                     o.customer_id,
                     COUNT(DISTINCT o.id) as frequency,
@@ -420,7 +476,9 @@ class MemberInsightAgent(SkillAgent):
                 GROUP BY o.customer_id
                 ORDER BY monetary_fen DESC
                 LIMIT :top_n
-            """), {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n},
+            )
 
             members = []
             for row in rows.mappings():
@@ -430,22 +488,40 @@ class MemberInsightAgent(SkillAgent):
                 monetary = int(r.get("monetary_fen") or 0)
 
                 # RFM评分（各1-5分）
-                r_score = 5 if recency <= 7 else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1)))
-                f_score = 5 if frequency >= 10 else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1)))
-                m_score = 5 if monetary >= 50000 else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1)))
+                r_score = (
+                    5
+                    if recency <= 7
+                    else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1)))
+                )
+                f_score = (
+                    5
+                    if frequency >= 10
+                    else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1)))
+                )
+                m_score = (
+                    5
+                    if monetary >= 50000
+                    else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1)))
+                )
                 total = r_score + f_score + m_score
 
-                segment = "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
+                segment = (
+                    "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
+                )
 
-                members.append({
-                    "customer_id": str(r["customer_id"]),
-                    "recency_days": round(recency, 1),
-                    "frequency": frequency,
-                    "monetary_fen": monetary,
-                    "rfm_score": total,
-                    "segment": segment,
-                    "r_score": r_score, "f_score": f_score, "m_score": m_score,
-                })
+                members.append(
+                    {
+                        "customer_id": str(r["customer_id"]),
+                        "recency_days": round(recency, 1),
+                        "frequency": frequency,
+                        "monetary_fen": monetary,
+                        "rfm_score": total,
+                        "segment": segment,
+                        "r_score": r_score,
+                        "f_score": f_score,
+                        "m_score": m_score,
+                    }
+                )
 
             segments: dict[str, int] = {}
             for m in members:
@@ -461,10 +537,14 @@ class MemberInsightAgent(SkillAgent):
                         tenant_id=self.tenant_id,
                         task_type="standard_analysis",
                         system="你是餐饮会员运营专家，根据RFM数据给出精准的会员激活和留存建议，100字内，中文。",
-                        messages=[{"role": "user", "content":
-                            f"近90天会员分布：{seg_summary}，共{len(members)}名活跃会员。"
-                            f"高价值均消费{sum(m['monetary_fen'] for m in members if m['segment']=='高价值') // max(1, segments.get('高价值', 1)) / 100:.0f}元。"
-                            f"请给出运营建议。"}],
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": f"近90天会员分布：{seg_summary}，共{len(members)}名活跃会员。"
+                                f"高价值均消费{sum(m['monetary_fen'] for m in members if m['segment'] == '高价值') // max(1, segments.get('高价值', 1)) / 100:.0f}元。"
+                                f"请给出运营建议。",
+                            }
+                        ],
                         max_tokens=200,
                         db=self._db,
                     )
@@ -472,7 +552,8 @@ class MemberInsightAgent(SkillAgent):
                     logger.warning("member_insight_llm_fallback", error=str(exc))
 
             return AgentResult(
-                success=True, action="rfm_analysis",
+                success=True,
+                action="rfm_analysis",
                 data={
                     "members": members,
                     "total_analyzed": len(members),
@@ -487,7 +568,8 @@ class MemberInsightAgent(SkillAgent):
         # 降级
         members = params.get("members", [])
         return AgentResult(
-            success=True, action="rfm_analysis",
+            success=True,
+            action="rfm_analysis",
             data={"members": members, "total_analyzed": len(members), "segments": {}},
             reasoning="无DB连接，返回传入数据",
             confidence=0.5,
@@ -509,7 +591,8 @@ class MemberInsightAgent(SkillAgent):
 
         if not customer_id:
             return AgentResult(
-                success=False, action="update_customer_rfm",
+                success=False,
+                action="update_customer_rfm",
                 error="缺少 customer_id，无法更新 RFM",
             )
 
@@ -517,7 +600,9 @@ class MemberInsightAgent(SkillAgent):
         rfm_data: dict = {}
         if self._db and customer_id:
             from sqlalchemy import text
-            row = await self._db.execute(text("""
+
+            row = await self._db.execute(
+                text("""
                 SELECT
                     COUNT(DISTINCT id) as frequency,
                     EXTRACT(DAY FROM NOW() - MAX(completed_at)) as recency_days,
@@ -526,7 +611,9 @@ class MemberInsightAgent(SkillAgent):
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
                   AND status = 'completed'
-            """), {"tenant_id": self.tenant_id, "customer_id": customer_id})
+            """),
+                {"tenant_id": self.tenant_id, "customer_id": customer_id},
+            )
             r = dict(row.mappings().first() or {})
             rfm_data = {
                 "frequency": int(r.get("frequency") or 1),
@@ -548,10 +635,7 @@ class MemberInsightAgent(SkillAgent):
         rfm_total = r_score + f_score + m_score
 
         segment = (
-            "高价值" if rfm_total >= 13 else
-            "成长型" if rfm_total >= 10 else
-            "潜在" if rfm_total >= 7 else
-            "流失风险"
+            "高价值" if rfm_total >= 13 else "成长型" if rfm_total >= 10 else "潜在" if rfm_total >= 7 else "流失风险"
         )
 
         logger.info(
@@ -601,11 +685,13 @@ class MemberInsightAgent(SkillAgent):
 
         if not self._db:
             return AgentResult(
-                success=False, action="get_clv_snapshot",
+                success=False,
+                action="get_clv_snapshot",
                 error="无DB连接，无法读取物化视图",
             )
 
-        rows = await self._db.execute(text("""
+        rows = await self._db.execute(
+            text("""
             SELECT
                 customer_id, visit_count,
                 total_spend_fen, clv_fen,
@@ -617,12 +703,14 @@ class MemberInsightAgent(SkillAgent):
               AND churn_probability >= :churn_threshold
             ORDER BY clv_fen DESC
             LIMIT :top_n
-        """), {
-            "tenant_id": self.tenant_id,
-            "min_clv_fen": min_clv_fen,
-            "churn_threshold": churn_threshold,
-            "top_n": top_n,
-        })
+        """),
+            {
+                "tenant_id": self.tenant_id,
+                "min_clv_fen": min_clv_fen,
+                "churn_threshold": churn_threshold,
+                "top_n": top_n,
+            },
+        )
 
         members = []
         for r in rows.mappings():
@@ -640,7 +728,8 @@ class MemberInsightAgent(SkillAgent):
         total_clv_fen = sum(int(m.get("clv_fen") or 0) for m in members)
 
         return AgentResult(
-            success=True, action="get_clv_snapshot",
+            success=True,
+            action="get_clv_snapshot",
             data={
                 "members": members,
                 "total_returned": len(members),
@@ -649,8 +738,7 @@ class MemberInsightAgent(SkillAgent):
                 "source": "mv_member_clv",
             },
             reasoning=(
-                f"CLV快照：Top{len(members)}会员，总CLV¥{total_clv_fen/100:.0f}，"
-                f"{len(high_churn)}人流失风险>60%"
+                f"CLV快照：Top{len(members)}会员，总CLV¥{total_clv_fen / 100:.0f}，{len(high_churn)}人流失风险>60%"
             ),
             confidence=0.95,
             inference_layer="cloud",
@@ -672,8 +760,7 @@ class MemberInsightAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_first_to_second_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_first_to_second_suggestion", error="缺少 customer_id")
 
         first_order_amount_fen = params.get("first_order_amount_fen", 0)
         favorite_dish = params.get("favorite_dish", "")
@@ -704,8 +791,8 @@ class MemberInsightAgent(SkillAgent):
 
         # 三条硬约束校验
         constraints_check = {
-            "margin_safe": True,       # 首单转二访赠品成本已在旅程预算内
-            "food_safety_ok": True,    # 触达类操作不涉及食材出品
+            "margin_safe": True,  # 首单转二访赠品成本已在旅程预算内
+            "food_safety_ok": True,  # 触达类操作不涉及食材出品
             "customer_experience_ok": True,  # 触达间隔>=3天，不过度打扰
         }
 
@@ -742,7 +829,8 @@ class MemberInsightAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_first_to_second_suggestion",
+                success=False,
+                action="generate_first_to_second_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=True,
                 constraints_detail=constraints_check,
@@ -756,8 +844,8 @@ class MemberInsightAgent(SkillAgent):
                 "api_response": result,
             },
             reasoning=f"首单转二访建议: {primary_mechanism}+{secondary_mechanism}，"
-                      f"客单价¥{first_order_amount_fen / 100:.0f}，"
-                      f"预计14天二访率{suggestion['expected_outcome_json']['expected_second_visit_rate_14d']:.0%}",
+            f"客单价¥{first_order_amount_fen / 100:.0f}，"
+            f"预计14天二访率{suggestion['expected_outcome_json']['expected_second_visit_rate_14d']:.0%}",
             confidence=0.82,
             constraints_passed=True,
             constraints_detail=constraints_check,
@@ -785,8 +873,7 @@ class MemberInsightAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_repair_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_repair_suggestion", error="缺少 customer_id")
 
         complaint_type = params.get("complaint_type", "other")
         complaint_severity = params.get("complaint_severity", "medium")
@@ -830,7 +917,7 @@ class MemberInsightAgent(SkillAgent):
         # 三条硬约束校验
         constraints_check = {
             "margin_safe": compensation_budget_fen <= max(3000, customer_lifetime_value_fen // 10),
-            "food_safety_ok": True,    # 修复触达不涉及食材出品
+            "food_safety_ok": True,  # 修复触达不涉及食材出品
             "customer_experience_ok": True,  # 修复旅程优先级最高，不会与其他旅程冲突
         }
 
@@ -850,8 +937,16 @@ class MemberInsightAgent(SkillAgent):
             "risk_summary": risk,
             "constraints_check": constraints_check,
             "expected_outcome_json": {
-                "expected_repair_success_rate": 0.50 if complaint_severity == "high" else 0.65 if complaint_severity == "medium" else 0.85,
-                "expected_revisit_rate_7d": 0.30 if complaint_severity == "high" else 0.45 if complaint_severity == "medium" else 0.60,
+                "expected_repair_success_rate": 0.50
+                if complaint_severity == "high"
+                else 0.65
+                if complaint_severity == "medium"
+                else 0.85,
+                "expected_revisit_rate_7d": 0.30
+                if complaint_severity == "high"
+                else 0.45
+                if complaint_severity == "medium"
+                else 0.60,
             },
             "requires_human_review": True,  # 修复类建议必须人工审核
             "created_by_agent": "member_insight",
@@ -869,7 +964,8 @@ class MemberInsightAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_repair_suggestion",
+                success=False,
+                action="generate_repair_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=all(constraints_check.values()),
                 constraints_detail=constraints_check,
@@ -883,8 +979,8 @@ class MemberInsightAgent(SkillAgent):
                 "api_response": result,
             },
             reasoning=f"服务修复建议: {complaint_severity}严重度（{complaint_type}），"
-                      f"补偿预算¥{compensation_budget_fen / 100:.0f}，"
-                      f"紧急度={urgency}，须人工审核",
+            f"补偿预算¥{compensation_budget_fen / 100:.0f}，"
+            f"紧急度={urgency}，须人工审核",
             confidence=0.80,
             constraints_passed=all(constraints_check.values()),
             constraints_detail=constraints_check,
@@ -905,8 +1001,7 @@ class MemberInsightAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_super_user_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_super_user_suggestion", error="缺少 customer_id")
 
         super_level = params.get("super_user_level", "active")
         referral_scenario = params.get("referral_scenario", "none")
@@ -932,8 +1027,7 @@ class MemberInsightAgent(SkillAgent):
             mechanism = "super_user_exclusive"
             channel = "wecom"
             explanation = (
-                f"活跃超级用户，无明显裂变潜力，CLV¥{lifetime_value_fen / 100:.0f}。"
-                f"建议特权体验路径，维护高价值关系。"
+                f"活跃超级用户，无明显裂变潜力，CLV¥{lifetime_value_fen / 100:.0f}。建议特权体验路径，维护高价值关系。"
             )
 
         constraints_check = {
@@ -972,7 +1066,8 @@ class MemberInsightAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_super_user_suggestion",
+                success=False,
+                action="generate_super_user_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=True,
                 constraints_detail=constraints_check,
@@ -983,7 +1078,7 @@ class MemberInsightAgent(SkillAgent):
             action="generate_super_user_suggestion",
             data={"suggestion": suggestion, "api_response": result},
             reasoning=f"超级用户建议: {super_level}级，机制={mechanism}，"
-                      f"裂变潜力={'有' if has_referral_potential else '无'}",
+            f"裂变潜力={'有' if has_referral_potential else '无'}",
             confidence=0.85,
             constraints_passed=True,
             constraints_detail=constraints_check,
@@ -1002,8 +1097,7 @@ class MemberInsightAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_psych_bridge_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_psych_bridge_suggestion", error="缺少 customer_id")
 
         psych_level = params.get("psych_distance_level", "fading")
         lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
@@ -1064,7 +1158,8 @@ class MemberInsightAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_psych_bridge_suggestion",
+                success=False,
+                action="generate_psych_bridge_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=True,
                 constraints_detail=constraints_check,
@@ -1074,8 +1169,7 @@ class MemberInsightAgent(SkillAgent):
             success=True,
             action="generate_psych_bridge_suggestion",
             data={"suggestion": suggestion, "api_response": result},
-            reasoning=f"心理距离修复建议: {psych_level}级，{days_since_last}天未到，"
-                      f"渠道={channel}，模板={template}",
+            reasoning=f"心理距离修复建议: {psych_level}级，{days_since_last}天未到，渠道={channel}，模板={template}",
             confidence=0.78,
             constraints_passed=True,
             constraints_detail=constraints_check,
@@ -1093,8 +1187,7 @@ class MemberInsightAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_milestone_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_milestone_suggestion", error="缺少 customer_id")
 
         milestone_stage = params.get("growth_milestone_stage", "regular")
         order_count = params.get("order_count", 0)
@@ -1150,7 +1243,8 @@ class MemberInsightAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_milestone_suggestion",
+                success=False,
+                action="generate_milestone_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=True,
                 constraints_detail=constraints_check,
@@ -1178,8 +1272,7 @@ class MemberInsightAgent(SkillAgent):
 
         customer_id = params.get("customer_id")
         if not customer_id:
-            return AgentResult(success=False, action="generate_referral_suggestion",
-                               error="缺少 customer_id")
+            return AgentResult(success=False, action="generate_referral_suggestion", error="缺少 customer_id")
 
         referral_scenario = params.get("referral_scenario", "none")
         lifetime_value_fen = params.get("customer_lifetime_value_fen", 0)
@@ -1212,12 +1305,15 @@ class MemberInsightAgent(SkillAgent):
             },
         }
 
-        config = scenario_config.get(referral_scenario, {
-            "template": "tmpl_referral_generic",
-            "channel": "miniapp",
-            "desc": referral_scenario,
-            "expected_referral": 0.10,
-        })
+        config = scenario_config.get(
+            referral_scenario,
+            {
+                "template": "tmpl_referral_generic",
+                "channel": "miniapp",
+                "desc": referral_scenario,
+                "expected_referral": 0.10,
+            },
+        )
 
         explanation = (
             f"裂变场景: {config['desc']}，CLV¥{lifetime_value_fen / 100:.0f}，"
@@ -1262,7 +1358,8 @@ class MemberInsightAgent(SkillAgent):
                 result = resp.json()
         except (httpx.HTTPError, OSError) as exc:
             return AgentResult(
-                success=False, action="generate_referral_suggestion",
+                success=False,
+                action="generate_referral_suggestion",
                 error=f"写入建议池失败: {exc}",
                 constraints_passed=True,
                 constraints_detail=constraints_check,
@@ -1273,7 +1370,7 @@ class MemberInsightAgent(SkillAgent):
             action="generate_referral_suggestion",
             data={"suggestion": suggestion, "api_response": result},
             reasoning=f"裂变激活建议: {config['desc']}，历史推荐{past_referral_count}次，"
-                      f"预期分享率{config['expected_referral']:.0%}",
+            f"预期分享率{config['expected_referral']:.0%}",
             confidence=0.82,
             constraints_passed=True,
             constraints_detail=constraints_check,

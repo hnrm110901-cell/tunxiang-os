@@ -4,6 +4,7 @@
 所有金额单位：分（fen）。
 RLS 由 get_db_with_tenant 在连接级设置，这里额外显式传入 tenant_id 作双重过滤。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,9 +31,7 @@ def _day_window(biz_date: date) -> tuple[datetime, datetime]:
     return start, end
 
 
-def _range_window(
-    start_date: date, end_date: date
-) -> tuple[datetime, datetime]:
+def _range_window(start_date: date, end_date: date) -> tuple[datetime, datetime]:
     """返回日期区间的 UTC 时间窗口"""
     start = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     end = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
@@ -217,10 +216,7 @@ class CostEngineRepository:
                 "as_of_dt": as_of_dt,
             },
         )
-        return {
-            str(row.ingredient_id): int(row.unit_price_fen or 0)
-            for row in result.all()
-        }
+        return {str(row.ingredient_id): int(row.unit_price_fen or 0) for row in result.all()}
 
     # ── 日成本汇总 ─────────────────────────────────────────────
 
@@ -357,9 +353,7 @@ class CostEngineRepository:
                 "total_cost_fen": int(row.total_cost_fen),
                 "avg_cost_fen": int(row.avg_cost_fen),
                 "total_revenue_fen": int(row.total_revenue_fen),
-                "cost_ratio": round(
-                    int(row.total_cost_fen) / total_cost, 4
-                ) if total_cost > 0 else 0.0,
+                "cost_ratio": round(int(row.total_cost_fen) / total_cost, 4) if total_cost > 0 else 0.0,
             }
             for row in rows
         ]

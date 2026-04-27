@@ -91,6 +91,7 @@ _models_pkg = types.ModuleType("src.models")
 _models_pkg.__path__ = [os.path.join(_SRC, "models")]
 sys.modules.setdefault("src.models", _models_pkg)
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 服务存根异常类
 # ──────────────────────────────────────────────────────────────────────────────
@@ -163,7 +164,9 @@ sys.modules["src.services.royalty_calculator"] = _royalty_calc_stub
 
 # httpx — 确保使用真实版本（路由 service 依赖它）
 import httpx as _real_httpx  # noqa: E402
+
 sys.modules["httpx"] = _real_httpx
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # patrol_service 存根
@@ -206,6 +209,7 @@ _patrol_svc_stub = types.ModuleType("src.services.patrol_service")
 _patrol_svc_stub.PatrolService = _FakePatrolService
 sys.modules["src.services.patrol_service"] = _patrol_svc_stub
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # 用 importlib 加载路由模块（设置正确的 __package__ 使相对导入生效）
 # ──────────────────────────────────────────────────────────────────────────────
@@ -239,6 +243,7 @@ _patrol_mod = _load_route_module(
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 settlement_router = _settlement_mod.router
@@ -260,6 +265,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 def _override_db(mock_session):
     async def _inner():
         yield mock_session
+
     return _inner
 
 
@@ -274,9 +280,7 @@ async def test_generate_settlement_ok():
     mock_db = AsyncMock()
     app_settlement.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/franchise/settlements/generate",
                 headers=HEADERS,
@@ -294,9 +298,7 @@ async def test_generate_settlement_ok():
 @pytest.mark.anyio
 async def test_generate_settlement_missing_tenant():
     """[2] POST /settlements/generate — 缺少 X-Tenant-ID → 400。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_settlement), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
         resp = await ac.post(
             "/api/v1/franchise/settlements/generate",
             json={"franchisee_id": FRANCHISEE_ID, "year": 2026, "month": 3},
@@ -314,9 +316,7 @@ async def test_generate_settlement_lookup_error():
         "generate_monthly_settlement",
         new=AsyncMock(side_effect=LookupError("加盟商不存在")),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/franchise/settlements/generate",
                 headers=HEADERS,
@@ -335,9 +335,7 @@ async def test_send_settlement_ok():
         "send_settlement_to_franchisee",
         new=AsyncMock(return_value=None),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.post(
                 f"/api/v1/franchise/settlements/{SETTLEMENT_ID}/send",
                 headers=HEADERS,
@@ -357,9 +355,7 @@ async def test_send_settlement_invalid_status_transition():
         "send_settlement_to_franchisee",
         new=AsyncMock(side_effect=_InvalidStatusTransitionError("只有 draft 才能发送")),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.post(
                 f"/api/v1/franchise/settlements/{SETTLEMENT_ID}/send",
                 headers=HEADERS,
@@ -377,9 +373,7 @@ async def test_confirm_settlement_ok():
         "confirm_settlement",
         new=AsyncMock(return_value=None),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.put(
                 f"/api/v1/franchise/settlements/{SETTLEMENT_ID}/confirm",
                 headers=HEADERS,
@@ -400,9 +394,7 @@ async def test_mark_as_paid_ok():
         "mark_as_paid",
         new=AsyncMock(return_value=None),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.put(
                 f"/api/v1/franchise/settlements/{SETTLEMENT_ID}/pay",
                 headers=HEADERS,
@@ -424,9 +416,7 @@ async def test_get_overdue_settlements_ok():
         "get_overdue_settlements",
         new=AsyncMock(return_value=[fake_settlement]),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/franchise/settlements/overdue",
                 headers=HEADERS,
@@ -443,9 +433,7 @@ async def test_get_overdue_settlements_ok():
 @pytest.mark.anyio
 async def test_get_franchisee_statement_invalid_uuid():
     """[9] GET /{franchisee_id}/statement — franchisee_id 非 UUID → 400。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_settlement), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
         resp = await ac.get(
             "/api/v1/franchise/not-a-uuid/statement",
             headers=HEADERS,
@@ -464,9 +452,7 @@ async def test_get_franchisee_statement_ok():
         "get_franchisee_statement",
         new=AsyncMock(return_value=fake_stmt),
     ):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_settlement), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_settlement), base_url="http://test") as ac:
             resp = await ac.get(
                 f"/api/v1/franchise/{FRANCHISEE_ID}/statement",
                 headers=HEADERS,
@@ -495,18 +481,14 @@ async def test_patrol_create_template_ok():
             "create_template",
             new=AsyncMock(return_value={"template_id": "tmpl-001", "name": "食品安全检查"}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/patrol/templates",
                     headers=HEADERS,
                     json={
                         "name": "食品安全检查",
                         "category": "safety",
-                        "items": [
-                            {"item_name": "灶台清洁", "item_type": "score", "max_score": 10.0}
-                        ],
+                        "items": [{"item_name": "灶台清洁", "item_type": "score", "max_score": 10.0}],
                     },
                 )
     finally:
@@ -529,9 +511,7 @@ async def test_patrol_list_templates_ok():
             "list_templates",
             new=AsyncMock(return_value={"items": [{"template_id": "t1"}], "total": 1}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/patrol/templates",
                     headers=HEADERS,
@@ -557,9 +537,7 @@ async def test_patrol_start_patrol_ok():
             "start_patrol",
             new=AsyncMock(return_value={"record_id": "rec-999", "status": "in_progress"}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/patrol/records",
                     headers=HEADERS,
@@ -590,9 +568,7 @@ async def test_patrol_submit_patrol_ok():
             "submit_patrol",
             new=AsyncMock(return_value={"record_id": record_id, "status": "submitted", "total_score": 88.5}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.put(
                     f"/patrol/records/{record_id}/submit",
                     headers=HEADERS,
@@ -626,14 +602,14 @@ async def test_patrol_get_rankings_ok():
         with patch.object(
             _FakePatrolService,
             "get_store_patrol_ranking",
-            new=AsyncMock(return_value=[
-                {"store_id": "store-A", "avg_score": 98.0},
-                {"store_id": "store-B", "avg_score": 85.0},
-            ]),
+            new=AsyncMock(
+                return_value=[
+                    {"store_id": "store-A", "avg_score": 98.0},
+                    {"store_id": "store-B", "avg_score": 85.0},
+                ]
+            ),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/patrol/rankings",
                     headers=HEADERS,
@@ -660,9 +636,7 @@ async def test_patrol_list_issues_ok():
             "list_issues",
             new=AsyncMock(return_value={"items": [{"issue_id": "iss-1"}], "total": 1}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/patrol/issues",
                     headers=HEADERS,
@@ -688,9 +662,7 @@ async def test_patrol_create_issue_ok():
             "create_issue",
             new=AsyncMock(return_value={"issue_id": "iss-new", "status": "open"}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/patrol/issues",
                     headers=HEADERS,
@@ -722,9 +694,7 @@ async def test_patrol_update_issue_ok():
             "update_issue_status",
             new=AsyncMock(return_value={"issue_id": issue_id, "status": "resolved"}),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.put(
                     f"/patrol/issues/{issue_id}",
                     headers=HEADERS,
@@ -750,9 +720,7 @@ async def test_patrol_create_template_value_error():
             "create_template",
             new=AsyncMock(side_effect=ValueError("category 非法")),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app_patrol), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/patrol/templates",
                     headers=HEADERS,
@@ -771,9 +739,7 @@ async def test_patrol_list_templates_missing_tenant():
     mock_db = AsyncMock()
     app_patrol.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_patrol), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_patrol), base_url="http://test") as ac:
             resp = await ac.get("/patrol/templates")  # 故意不带 header
     finally:
         app_patrol.dependency_overrides.pop(get_db, None)

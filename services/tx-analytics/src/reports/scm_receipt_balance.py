@@ -51,6 +51,5 @@ ORDER BY closing_balance_fen DESC
 """
 
 DIMENSIONS = ["store_name", "ingredient_name", "ingredient_category", "unit"]
-METRICS = ["opening_qty", "in_qty", "in_cost_fen", "out_qty", "out_cost_fen",
-           "closing_qty", "closing_balance_fen"]
+METRICS = ["opening_qty", "in_qty", "in_cost_fen", "out_qty", "out_cost_fen", "closing_qty", "closing_balance_fen"]
 FILTERS = ["start_date", "end_date", "store_id"]

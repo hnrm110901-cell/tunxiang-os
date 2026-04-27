@@ -2,6 +2,7 @@
 FastAPI审计日志中间件 — 等保三级合规
 自动记录所有敏感路径API请求到 audit_logs 表
 """
+
 import asyncio
 import base64
 import json
@@ -44,15 +45,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         if should_audit:
             # 后台异步写，不阻塞响应
-            asyncio.create_task(
-                self._write_audit_log(request, response, duration_ms)
-            )
+            asyncio.create_task(self._write_audit_log(request, response, duration_ms))
 
         return response
 
-    async def _write_audit_log(
-        self, request: Request, response: Response, duration_ms: int
-    ) -> None:
+    async def _write_audit_log(self, request: Request, response: Response, duration_ms: int) -> None:
         try:
             # 从JWT提取用户信息（不验证，只解码payload部分）
             actor_id, tenant_id = self._extract_jwt_claims(request)

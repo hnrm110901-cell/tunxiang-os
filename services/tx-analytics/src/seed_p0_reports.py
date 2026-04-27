@@ -10,6 +10,7 @@
 SQL模板均基于已有数据库表结构（orders/order_items/payments/customers/employees/
 store_daily_settlements/refunds/daily_attendance/payroll_items 等）。
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -56,7 +57,13 @@ ORDER BY d.biz_date DESC, d.net_revenue_fen DESC
             {"name": "avg_per_guest_fen", "label": "客单价(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -98,7 +105,13 @@ ORDER BY o.order_time DESC
             {"name": "item_count", "label": "菜品数", "unit": "道", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -135,7 +148,13 @@ ORDER BY total_amount_fen DESC
             {"name": "actual_revenue_fen", "label": "实收(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -172,7 +191,13 @@ ORDER BY total_revenue_fen DESC
             {"name": "cancel_count", "label": "取消单数", "unit": "笔", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -209,7 +234,13 @@ ORDER BY total_fen DESC
             {"name": "total_fen", "label": "金额(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -246,7 +277,13 @@ ORDER BY total_fen DESC
             {"name": "total_fen", "label": "押金总额(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -288,11 +325,16 @@ ORDER BY d.biz_date DESC, d.status ASC
             {"name": "cash_diff_fen", "label": "现金差异(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
-
     # ════════════════════════ 经营(6) ════════════════════════
     {
         "id": "p0_ops_store_compare",
@@ -328,7 +370,13 @@ ORDER BY net_revenue_fen DESC
             {"name": "avg_margin_rate", "label": "平均毛利率", "unit": "%", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -364,7 +412,13 @@ ORDER BY hour_of_day
             {"name": "avg_order_fen", "label": "均单价(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -401,7 +455,13 @@ ORDER BY total_revenue_fen DESC
             {"name": "order_count", "label": "点单次数", "unit": "次", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -444,7 +504,13 @@ ORDER BY profit_fen DESC
             {"name": "margin_pct", "label": "毛利率(%)", "unit": "%", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -483,7 +549,13 @@ ORDER BY o.biz_date DESC
             {"name": "total_discount_fen", "label": "折扣总额(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -520,11 +592,16 @@ ORDER BY refund_fen DESC
             {"name": "refund_fen", "label": "退款金额(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
-
     # ════════════════════════ 会员(4) ════════════════════════
     {
         "id": "p0_mbr_new_members",
@@ -556,7 +633,13 @@ ORDER BY join_date DESC, new_count DESC
             {"name": "new_count", "label": "新增数", "unit": "人", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -623,7 +706,13 @@ ORDER BY o.biz_date DESC
             {"name": "balance_consumed_fen", "label": "储值消费(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -663,11 +752,16 @@ FROM member_orders
             {"name": "repurchase_rate_pct", "label": "复购率(%)", "unit": "%", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
-
     # ════════════════════════ 人力(3) ════════════════════════
     {
         "id": "p0_hr_attendance_summary",
@@ -706,7 +800,13 @@ ORDER BY late_count DESC, work_days DESC
             {"name": "total_overtime_min", "label": "加班(分钟)", "unit": "分钟", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -785,7 +885,13 @@ ORDER BY revenue_per_staff_fen DESC
             {"name": "revenue_per_staff_fen", "label": "人效(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-09"},
         ],
     },
@@ -819,7 +925,13 @@ ORDER BY d.biz_date ASC
             {"name": "avg_per_guest_fen", "label": "客单价(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-03-13"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-03-13",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-12"},
             {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
         ],
@@ -854,7 +966,13 @@ ORDER BY biz_month DESC, s.store_name
             {"name": "discount_amount_fen", "label": "折扣金额(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-01-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-01-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-30"},
             {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
         ],
@@ -899,7 +1017,13 @@ ORDER BY wb.registered_at DESC
             {"name": "quantity_remain", "label": "剩余数量", "unit": "瓶", "is_money_fen": False},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-30"},
             {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
         ],
@@ -942,7 +1066,13 @@ ORDER BY ab.created_at DESC
             {"name": "outstanding_fen", "label": "待还金额(分)", "unit": "fen", "is_money_fen": True},
         ],
         "filters": [
-            {"name": "start_date", "label": "开始日期", "field_type": "date", "required": True, "default": "2026-04-01"},
+            {
+                "name": "start_date",
+                "label": "开始日期",
+                "field_type": "date",
+                "required": True,
+                "default": "2026-04-01",
+            },
             {"name": "end_date", "label": "结束日期", "field_type": "date", "required": True, "default": "2026-04-30"},
             {"name": "store_id", "label": "门店", "field_type": "store_select", "required": False},
         ],

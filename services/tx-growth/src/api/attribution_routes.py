@@ -12,6 +12,7 @@
 认证：所有请求需携带 X-Tenant-ID header（RLS 租户隔离）。
 响应格式：{"ok": bool, "data": {}, "error": {}}
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Optional
@@ -60,10 +61,10 @@ class RecordTouchRequest(BaseModel):
     """记录营销触达请求体"""
 
     customer_id: str
-    touch_type: str               # campaign | journey | referral | manual
+    touch_type: str  # campaign | journey | referral | manual
     source_id: str
     source_name: str = ""
-    channel: str                  # wecom | sms | miniapp | pos_receipt
+    channel: str  # wecom | sms | miniapp | pos_receipt
     message_title: Optional[str] = None
     offer_id: Optional[str] = None
     touched_at: Optional[str] = None  # ISO 8601，为 None 则使用服务器时间
@@ -91,8 +92,8 @@ class AttributeOrderRequest(BaseModel):
     order_id: str
     customer_id: str
     order_amount_fen: int
-    order_time: Optional[str] = None   # ISO 8601，为 None 则使用服务器时间
-    model: str = "last_touch"          # last_touch | first_touch | linear
+    order_time: Optional[str] = None  # ISO 8601，为 None 则使用服务器时间
+    model: str = "last_touch"  # last_touch | first_touch | linear
 
     @field_validator("order_amount_fen")
     @classmethod
@@ -266,9 +267,7 @@ async def record_touch(
     touch_data: dict = req.model_dump()
     if req.touched_at:
         try:
-            touch_data["touched_at"] = datetime.fromisoformat(
-                req.touched_at.replace("Z", "+00:00")
-            )
+            touch_data["touched_at"] = datetime.fromisoformat(req.touched_at.replace("Z", "+00:00"))
         except ValueError as exc:
             raise HTTPException(
                 status_code=422,
@@ -283,13 +282,15 @@ async def record_touch(
                 db=db,
             )
             await db.commit()
-            return ok({
-                "touch_id": str(touch.id),
-                "customer_id": str(touch.customer_id),
-                "source_id": touch.source_id,
-                "channel": touch.channel,
-                "touched_at": touch.touched_at.isoformat(),
-            })
+            return ok(
+                {
+                    "touch_id": str(touch.id),
+                    "customer_id": str(touch.customer_id),
+                    "source_id": touch.source_id,
+                    "channel": touch.channel,
+                    "touched_at": touch.touched_at.isoformat(),
+                }
+            )
         except (ValueError, KeyError) as exc:
             await db.rollback()
             log.warning(

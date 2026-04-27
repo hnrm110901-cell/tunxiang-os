@@ -2,6 +2,7 @@
 
 典型场景: 会员等级从银卡升至金卡, 赠送升级礼包
 """
+
 from typing import Any
 
 import structlog

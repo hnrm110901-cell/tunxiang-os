@@ -12,6 +12,7 @@
 
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,7 +42,7 @@ def _ok(data: dict | list) -> dict:
 @router.get("/board", summary="KDS桌台出餐看板（按会话优先级排序）")
 async def get_kds_session_board(
     store_id: uuid.UUID = Query(..., description="门店ID"),
-    dept_id:  Optional[uuid.UUID] = Query(default=None, description="档口ID（为空则返回全档口汇总）"),
+    dept_id: Optional[uuid.UUID] = Query(default=None, description="档口ID（为空则返回全档口汇总）"),
     request: Request = ...,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -190,21 +191,23 @@ async def get_session_dish_progress(
 
     # 汇总
     total = len(dishes)
-    done  = sum(1 for d in dishes if d["kds_status"] == "done")
+    done = sum(1 for d in dishes if d["kds_status"] == "done")
     rushed = sum(1 for d in dishes if d["is_rushed"] and d["kds_status"] != "done")
 
-    return _ok({
-        "session_id": str(session_id),
-        "dishes": dishes,
-        "summary": {
-            "total": total,
-            "done": done,
-            "pending": total - done,
-            "completion_pct": round(done / total * 100) if total else 0,
-            "has_rush": rushed > 0,
-            "rush_count": rushed,
-        },
-    })
+    return _ok(
+        {
+            "session_id": str(session_id),
+            "dishes": dishes,
+            "summary": {
+                "total": total,
+                "done": done,
+                "pending": total - done,
+                "completion_pct": round(done / total * 100) if total else 0,
+                "has_rush": rushed > 0,
+                "rush_count": rushed,
+            },
+        }
+    )
 
 
 @router.post("/{session_id}/rush-all-pending", summary="催全桌未完成菜品")

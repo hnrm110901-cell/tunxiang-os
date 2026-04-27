@@ -108,20 +108,24 @@ class TestToolRegistryByAgent:
     def test_agent_tool_count(self, agent_id: str, expected_count: int) -> None:
         tools = get_tools_by_agent(agent_id)
         assert len(tools) == expected_count, (
-            f"{agent_id}: expected {expected_count} tools, got {len(tools)}: "
-            f"{list(tools.keys())}"
+            f"{agent_id}: expected {expected_count} tools, got {len(tools)}: {list(tools.keys())}"
         )
 
     def test_all_9_skill_agents_present(self) -> None:
         skill_agents = {
-            e["agent_id"] for e in TOOL_REGISTRY.values()
-            if e["agent_id"] not in ("master", "planner", "event_bus")
+            e["agent_id"] for e in TOOL_REGISTRY.values() if e["agent_id"] not in ("master", "planner", "event_bus")
         }
         assert len(skill_agents) == 9
         expected = {
-            "discount_guard", "smart_menu", "serve_dispatch",
-            "member_insight", "inventory_alert", "finance_audit",
-            "store_inspect", "smart_service", "private_ops",
+            "discount_guard",
+            "smart_menu",
+            "serve_dispatch",
+            "member_insight",
+            "inventory_alert",
+            "finance_audit",
+            "store_inspect",
+            "smart_service",
+            "private_ops",
         }
         assert skill_agents == expected
 
@@ -258,6 +262,7 @@ class TestSerialisation:
             def __init__(self) -> None:
                 self.x = 1
                 self.y = "hello"
+
         result = _serialise_result(Obj())
         parsed = json.loads(result)
         assert parsed["x"] == 1
@@ -326,9 +331,12 @@ class TestMCPServerCallTool:
 
     @pytest.mark.asyncio
     async def test_call_tool_returns_text_content(self) -> None:
-        contents = await call_tool("discount_guard__detect_discount_anomaly", {
-            "order": {"total_amount_fen": 10000, "discount_amount_fen": 3000},
-        })
+        contents = await call_tool(
+            "discount_guard__detect_discount_anomaly",
+            {
+                "order": {"total_amount_fen": 10000, "discount_amount_fen": 3000},
+            },
+        )
         assert len(contents) == 1
         assert contents[0].type == "text"
         # Should be valid JSON
@@ -337,12 +345,15 @@ class TestMCPServerCallTool:
 
     @pytest.mark.asyncio
     async def test_call_tool_with_full_params(self) -> None:
-        contents = await call_tool("smart_menu__classify_quadrant", {
-            "total_sales": 200,
-            "margin_rate": 0.4,
-            "avg_sales": 100,
-            "avg_margin": 0.3,
-        })
+        contents = await call_tool(
+            "smart_menu__classify_quadrant",
+            {
+                "total_sales": 200,
+                "margin_rate": 0.4,
+                "avg_sales": 100,
+                "avg_margin": 0.3,
+            },
+        )
         assert len(contents) == 1
         parsed = json.loads(contents[0].text)
         assert isinstance(parsed, dict)
@@ -350,11 +361,14 @@ class TestMCPServerCallTool:
     @pytest.mark.asyncio
     async def test_call_master_dispatch_stub(self) -> None:
         """Master dispatch should work (possibly stub mode)."""
-        contents = await call_tool("master__dispatch", {
-            "agent_id": "discount_guard",
-            "action": "detect_discount_anomaly",
-            "params": {"order": {"total_amount_fen": 10000, "discount_amount_fen": 5000}},
-        })
+        contents = await call_tool(
+            "master__dispatch",
+            {
+                "agent_id": "discount_guard",
+                "action": "detect_discount_anomaly",
+                "params": {"order": {"total_amount_fen": 10000, "discount_amount_fen": 5000}},
+            },
+        )
         assert len(contents) == 1
         parsed = json.loads(contents[0].text)
         assert isinstance(parsed, dict)
@@ -415,8 +429,12 @@ class TestFullActionList:
 
     def test_discount_guard_actions(self) -> None:
         expected = [
-            "detect_discount_anomaly", "scan_store_licenses", "scan_all_licenses",
-            "get_financial_report", "explain_voucher", "reconciliation_status",
+            "detect_discount_anomaly",
+            "scan_store_licenses",
+            "scan_all_licenses",
+            "get_financial_report",
+            "explain_voucher",
+            "reconciliation_status",
         ]
         tools = get_tools_by_agent("discount_guard")
         actual = sorted(e["action"] for e in tools.values())
@@ -424,9 +442,14 @@ class TestFullActionList:
 
     def test_smart_menu_actions(self) -> None:
         expected = [
-            "simulate_cost", "recommend_pilot_stores", "run_dish_review",
-            "check_launch_readiness", "scan_dish_risks", "inspect_dish_quality",
-            "classify_quadrant", "optimize_menu",
+            "simulate_cost",
+            "recommend_pilot_stores",
+            "run_dish_review",
+            "check_launch_readiness",
+            "scan_dish_risks",
+            "inspect_dish_quality",
+            "classify_quadrant",
+            "optimize_menu",
         ]
         tools = get_tools_by_agent("smart_menu")
         actual = sorted(e["action"] for e in tools.values())
@@ -434,9 +457,13 @@ class TestFullActionList:
 
     def test_serve_dispatch_actions(self) -> None:
         expected = [
-            "predict_serve_time", "optimize_schedule", "analyze_traffic",
-            "predict_staffing_needs", "detect_order_anomaly",
-            "trigger_chain_alert", "balance_workload",
+            "predict_serve_time",
+            "optimize_schedule",
+            "analyze_traffic",
+            "predict_staffing_needs",
+            "detect_order_anomaly",
+            "trigger_chain_alert",
+            "balance_workload",
         ]
         tools = get_tools_by_agent("serve_dispatch")
         actual = sorted(e["action"] for e in tools.values())
@@ -444,9 +471,15 @@ class TestFullActionList:
 
     def test_member_insight_actions(self) -> None:
         expected = [
-            "analyze_rfm", "detect_signals", "detect_competitor",
-            "trigger_journey", "get_churn_risks", "process_bad_review",
-            "monitor_service_quality", "handle_complaint", "collect_feedback",
+            "analyze_rfm",
+            "detect_signals",
+            "detect_competitor",
+            "trigger_journey",
+            "get_churn_risks",
+            "process_bad_review",
+            "monitor_service_quality",
+            "handle_complaint",
+            "collect_feedback",
         ]
         tools = get_tools_by_agent("member_insight")
         actual = sorted(e["action"] for e in tools.values())
@@ -454,9 +487,15 @@ class TestFullActionList:
 
     def test_inventory_alert_actions(self) -> None:
         expected = [
-            "monitor_inventory", "predict_consumption", "generate_restock_alerts",
-            "check_expiration", "optimize_stock_levels", "compare_supplier_prices",
-            "evaluate_supplier", "scan_contract_risks", "analyze_waste",
+            "monitor_inventory",
+            "predict_consumption",
+            "generate_restock_alerts",
+            "check_expiration",
+            "optimize_stock_levels",
+            "compare_supplier_prices",
+            "evaluate_supplier",
+            "scan_contract_risks",
+            "analyze_waste",
         ]
         tools = get_tools_by_agent("inventory_alert")
         actual = sorted(e["action"] for e in tools.values())
@@ -464,8 +503,12 @@ class TestFullActionList:
 
     def test_finance_audit_actions(self) -> None:
         expected = [
-            "get_financial_report", "detect_revenue_anomaly", "snapshot_kpi",
-            "forecast_orders", "generate_biz_insight", "match_scenario",
+            "get_financial_report",
+            "detect_revenue_anomaly",
+            "snapshot_kpi",
+            "forecast_orders",
+            "generate_biz_insight",
+            "match_scenario",
             "analyze_order_trend",
         ]
         tools = get_tools_by_agent("finance_audit")
@@ -474,8 +517,12 @@ class TestFullActionList:
 
     def test_store_inspect_actions(self) -> None:
         expected = [
-            "health_check", "diagnose_fault", "suggest_runbook",
-            "predict_maintenance", "security_advice", "food_safety_status",
+            "health_check",
+            "diagnose_fault",
+            "suggest_runbook",
+            "predict_maintenance",
+            "security_advice",
+            "food_safety_status",
             "store_dashboard",
         ]
         tools = get_tools_by_agent("store_inspect")
@@ -484,10 +531,15 @@ class TestFullActionList:
 
     def test_smart_service_actions(self) -> None:
         expected = [
-            "analyze_feedback", "handle_complaint", "generate_improvements",
-            "assess_training_needs", "generate_training_plan",
-            "track_training_progress", "evaluate_effectiveness",
-            "analyze_skill_gaps", "manage_certificates",
+            "analyze_feedback",
+            "handle_complaint",
+            "generate_improvements",
+            "assess_training_needs",
+            "generate_training_plan",
+            "track_training_progress",
+            "evaluate_effectiveness",
+            "analyze_skill_gaps",
+            "manage_certificates",
         ]
         tools = get_tools_by_agent("smart_service")
         actual = sorted(e["action"] for e in tools.values())
@@ -495,10 +547,17 @@ class TestFullActionList:
 
     def test_private_ops_actions(self) -> None:
         expected = [
-            "get_private_domain_dashboard", "trigger_campaign", "advance_journey",
-            "optimize_shift", "score_performance", "analyze_labor_cost",
-            "warn_attendance", "create_reservation", "manage_banquet",
-            "generate_beo", "allocate_seating",
+            "get_private_domain_dashboard",
+            "trigger_campaign",
+            "advance_journey",
+            "optimize_shift",
+            "score_performance",
+            "analyze_labor_cost",
+            "warn_attendance",
+            "create_reservation",
+            "manage_banquet",
+            "generate_beo",
+            "allocate_seating",
         ]
         tools = get_tools_by_agent("private_ops")
         actual = sorted(e["action"] for e in tools.values())
@@ -518,8 +577,11 @@ class TestFullActionList:
 
     def test_event_bus_actions(self) -> None:
         expected = [
-            "publish_event", "get_event_chain", "get_stream",
-            "register_handler", "get_all_event_types",
+            "publish_event",
+            "get_event_chain",
+            "get_stream",
+            "register_handler",
+            "get_all_event_types",
         ]
         tools = get_tools_by_agent("event_bus")
         actual = sorted(e["action"] for e in tools.values())

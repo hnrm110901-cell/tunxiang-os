@@ -68,8 +68,15 @@ ORDER BY ABS(SUM(cs.actual_amount_fen - cs.system_amount_fen)) DESC
 
 DIMENSIONS = ["store_name", "biz_date", "cashier_name", "cashier_no", "shift"]
 METRICS = [
-    "system_amount_fen", "actual_amount_fen", "variance_fen", "variance_pct",
-    "cash_amount_fen", "wechat_amount_fen", "alipay_amount_fen",
-    "unionpay_amount_fen", "other_amount_fen", "order_count",
+    "system_amount_fen",
+    "actual_amount_fen",
+    "variance_fen",
+    "variance_pct",
+    "cash_amount_fen",
+    "wechat_amount_fen",
+    "alipay_amount_fen",
+    "unionpay_amount_fen",
+    "other_amount_fen",
+    "order_count",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

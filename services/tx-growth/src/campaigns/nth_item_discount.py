@@ -7,6 +7,7 @@
 
 价值：提升客单价+推动爆品销量，比直接打折更有心理吸引力
 """
+
 from typing import Any
 
 import structlog
@@ -139,17 +140,19 @@ async def execute(
                 item_discount = discount_per_item * discount_count
                 total_discount_fen += item_discount
 
-                discount_details.append({
-                    "dish_id": dish_id,
-                    "dish_name": dish_name,
-                    "original_price_fen": unit_price,
-                    "quantity": quantity,
-                    "nth_item": nth,
-                    "discount_pct": pct,
-                    "discount_count": discount_count,
-                    "discount_fen": item_discount,
-                    "description": f"{dish_name}第{nth}份{pct}折 x{discount_count}",
-                })
+                discount_details.append(
+                    {
+                        "dish_id": dish_id,
+                        "dish_name": dish_name,
+                        "original_price_fen": unit_price,
+                        "quantity": quantity,
+                        "nth_item": nth,
+                        "discount_pct": pct,
+                        "discount_count": discount_count,
+                        "discount_fen": item_discount,
+                        "description": f"{dish_name}第{nth}份{pct}折 x{discount_count}",
+                    }
+                )
 
     if not discount_details:
         return {"success": False, "reason": "no_applicable_items"}

@@ -5,11 +5,11 @@
 
 menu_template 测试使用 AsyncMock 模拟 DB session。
 """
+
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -25,20 +25,10 @@ from services.dish_service import (
     update_dish,
 )
 from services.menu_template import (
-    _clear_all as _clear_templates,
-)
-from services.menu_template import (
     create_banquet_package,
     create_template,
-    get_room_menu,
-    get_seasonal_menu,
-    get_store_menu,
-    get_template,
-    publish_to_store,
     set_channel_price,
     set_room_menu,
-    get_room_menu,
-    create_banquet_package,
     set_seasonal_menu,
 )
 from services.stockout_sync import (
@@ -228,7 +218,11 @@ class TestChannelPrice:
         db.execute.return_value = mock_result
 
         record = await set_channel_price(
-            db=db, dish_id=str(uuid.uuid4()), channel="delivery", price_fen=4200, tenant_id=TENANT,
+            db=db,
+            dish_id=str(uuid.uuid4()),
+            channel="delivery",
+            price_fen=4200,
+            tenant_id=TENANT,
         )
         assert record["channel"] == "delivery"
         assert record["price_fen"] == 4200
@@ -239,7 +233,11 @@ class TestChannelPrice:
         db = _make_mock_db()
         with pytest.raises(ValueError, match="channel"):
             await set_channel_price(
-                db=db, dish_id="d1", channel="invalid", price_fen=1000, tenant_id=TENANT,
+                db=db,
+                dish_id="d1",
+                channel="invalid",
+                price_fen=1000,
+                tenant_id=TENANT,
             )
 
     @pytest.mark.asyncio
@@ -247,7 +245,11 @@ class TestChannelPrice:
         db = _make_mock_db()
         with pytest.raises(ValueError, match="price_fen"):
             await set_channel_price(
-                db=db, dish_id="d1", channel="dine_in", price_fen=-100, tenant_id=TENANT,
+                db=db,
+                dish_id="d1",
+                channel="dine_in",
+                price_fen=-100,
+                tenant_id=TENANT,
             )
 
 
@@ -280,7 +282,11 @@ class TestSeasonalMenu:
         db = _make_mock_db()
         with pytest.raises(ValueError, match="season"):
             await set_seasonal_menu(
-                db=db, store_id=STORE, season="rainy", dishes=[{"dish_id": "d1"}], tenant_id=TENANT,
+                db=db,
+                store_id=STORE,
+                season="rainy",
+                dishes=[{"dish_id": "d1"}],
+                tenant_id=TENANT,
             )
 
     @pytest.mark.asyncio
@@ -288,7 +294,11 @@ class TestSeasonalMenu:
         db = _make_mock_db()
         with pytest.raises(ValueError, match="dishes"):
             await set_seasonal_menu(
-                db=db, store_id=STORE, season="summer", dishes=[], tenant_id=TENANT,
+                db=db,
+                store_id=STORE,
+                season="summer",
+                dishes=[],
+                tenant_id=TENANT,
             )
 
 
@@ -321,7 +331,11 @@ class TestRoomMenu:
         db = _make_mock_db()
         with pytest.raises(ValueError, match="room_type"):
             await set_room_menu(
-                db=db, store_id=STORE, room_type="invalid", dishes=[{"dish_id": "d1"}], tenant_id=TENANT,
+                db=db,
+                store_id=STORE,
+                room_type="invalid",
+                dishes=[{"dish_id": "d1"}],
+                tenant_id=TENANT,
             )
 
 
@@ -355,7 +369,11 @@ class TestBanquetPackage:
         with pytest.raises(ValueError, match="guest_count"):
             await create_banquet_package(
                 db=db,
-                name="X", dishes=[{"dish_id": "d1"}], package_price_fen=1000, guest_count=0, tenant_id=TENANT,
+                name="X",
+                dishes=[{"dish_id": "d1"}],
+                package_price_fen=1000,
+                guest_count=0,
+                tenant_id=TENANT,
             )
 
 

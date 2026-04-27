@@ -7,6 +7,7 @@
 
 响应格式统一：{ "ok": bool, "data": {}, "error": {} }
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,6 +32,7 @@ _analytics_service = GroupAnalyticsService()
 # ─────────────────────────────────────────────────────────────────
 # 依赖项：集团管理员鉴权（临时 Header 方案）
 # ─────────────────────────────────────────────────────────────────
+
 
 def _require_group_admin(
     x_group_admin: str = Header(default="false", alias="X-Group-Admin"),
@@ -58,12 +60,11 @@ def _require_group_admin(
 # Request / Response Schemas
 # ─────────────────────────────────────────────────────────────────
 
+
 class CreateBrandGroupReq(BaseModel):
     group_name: str = Field(..., min_length=1, max_length=100, description="集团名称")
     group_code: str = Field(..., min_length=1, max_length=50, description="集团唯一标识码")
-    brand_tenant_ids: list[str] = Field(
-        default_factory=list, description="旗下品牌 tenant_id 列表（UUID 字符串）"
-    )
+    brand_tenant_ids: list[str] = Field(default_factory=list, description="旗下品牌 tenant_id 列表（UUID 字符串）")
     stored_value_interop: bool = Field(default=False, description="储值卡是否跨品牌互通")
     member_data_shared: bool = Field(default=False, description="会员数据是否集团共享")
     operator_id: Optional[str] = Field(default=None, description="操作人 UUID")
@@ -83,6 +84,7 @@ class StoredValueInteropReq(BaseModel):
 # A. 创建品牌组
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("", summary="创建品牌组（集团管理员）")
 async def create_brand_group(
     req: CreateBrandGroupReq,
@@ -100,18 +102,14 @@ async def create_brand_group(
     try:
         brand_uuids = [str(uuid.UUID(tid)) for tid in req.brand_tenant_ids]
     except ValueError as exc:
-        raise HTTPException(
-            status_code=422, detail=f"invalid brand_tenant_id format: {exc}"
-        ) from exc
+        raise HTTPException(status_code=422, detail=f"invalid brand_tenant_id format: {exc}") from exc
 
     operator_id: uuid.UUID | None = None
     if req.operator_id:
         try:
             operator_id = uuid.UUID(req.operator_id)
         except ValueError as exc:
-            raise HTTPException(
-                status_code=422, detail=f"invalid operator_id: {exc}"
-            ) from exc
+            raise HTTPException(status_code=422, detail=f"invalid operator_id: {exc}") from exc
 
     group = BrandGroup(
         tenant_id=uuid.UUID(group_tenant_id),
@@ -144,6 +142,7 @@ async def create_brand_group(
 # ─────────────────────────────────────────────────────────────────
 # B. 集团配置详情
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/{group_id}", summary="集团配置详情")
 async def get_brand_group(
@@ -189,6 +188,7 @@ async def get_brand_group(
 # C. 更新旗下品牌列表
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.put("/{group_id}/brands", summary="更新旗下品牌列表")
 async def update_brand_list(
     group_id: uuid.UUID,
@@ -202,18 +202,14 @@ async def update_brand_list(
     try:
         brand_uuids = [str(uuid.UUID(tid)) for tid in req.brand_tenant_ids]
     except ValueError as exc:
-        raise HTTPException(
-            status_code=422, detail=f"invalid brand_tenant_id format: {exc}"
-        ) from exc
+        raise HTTPException(status_code=422, detail=f"invalid brand_tenant_id format: {exc}") from exc
 
     operator_id: uuid.UUID | None = None
     if req.operator_id:
         try:
             operator_id = uuid.UUID(req.operator_id)
         except ValueError as exc:
-            raise HTTPException(
-                status_code=422, detail=f"invalid operator_id: {exc}"
-            ) from exc
+            raise HTTPException(status_code=422, detail=f"invalid operator_id: {exc}") from exc
 
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
@@ -256,6 +252,7 @@ async def update_brand_list(
 # D. 集团 RFM 总览
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/{group_id}/dashboard", summary="集团 RFM 总览")
 async def get_group_dashboard(
     group_id: uuid.UUID,
@@ -279,6 +276,7 @@ async def get_group_dashboard(
 # ─────────────────────────────────────────────────────────────────
 # E. 跨品牌会员全貌（by phone）
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/{group_id}/member-profile", summary="跨品牌会员全貌（by phone）")
 async def get_group_member_profile(
@@ -304,6 +302,7 @@ async def get_group_member_profile(
 # F. 集团流失风险
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/{group_id}/churn-risk", summary="集团流失风险汇总")
 async def get_group_churn_risk(
     group_id: uuid.UUID,
@@ -326,6 +325,7 @@ async def get_group_churn_risk(
 # ─────────────────────────────────────────────────────────────────
 # G. 跨品牌消费客户
 # ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/{group_id}/cross-brand", summary="跨品牌消费客户列表")
 async def get_cross_brand_customers(
@@ -351,6 +351,7 @@ async def get_cross_brand_customers(
 # H. 储值互通配置
 # ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/{group_id}/stored-value-interop", summary="储值卡跨品牌互通配置")
 async def configure_stored_value_interop(
     group_id: uuid.UUID,
@@ -367,9 +368,7 @@ async def configure_stored_value_interop(
     try:
         operator_uuid = uuid.UUID(req.operator_id)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=422, detail=f"invalid operator_id: {exc}"
-        ) from exc
+        raise HTTPException(status_code=422, detail=f"invalid operator_id: {exc}") from exc
 
     data = await _analytics_service.configure_stored_value_interop(
         group_id=group_id,

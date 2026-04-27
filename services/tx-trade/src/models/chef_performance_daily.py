@@ -1,4 +1,5 @@
 """厨师绩效日汇总模型"""
+
 import uuid
 from datetime import date
 from decimal import Decimal

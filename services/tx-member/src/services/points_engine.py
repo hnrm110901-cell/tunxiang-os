@@ -4,6 +4,7 @@
 成长值为累计制，只增不减。
 所有金额单位：分(fen)。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,6 +27,7 @@ DEFAULT_SPEND_RATIO = 100  # 100积分抵1元（100分）
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -314,6 +316,7 @@ async def set_earn_rules(
         raise ValueError("invalid_earn_rules")
 
     import json
+
     now = _now_utc()
 
     await db.execute(
@@ -363,6 +366,7 @@ async def set_spend_rules(
         raise ValueError("invalid_spend_rules")
 
     import json
+
     now = _now_utc()
 
     await db.execute(
@@ -416,6 +420,7 @@ async def set_multiplier(
         raise ValueError("invalid_multiplier_conditions")
 
     import json
+
     now = _now_utc()
     config = {"multiplier": multiplier, "conditions": conditions}
 
@@ -578,7 +583,9 @@ async def get_points_history(
             "direction": r["direction"],
             "source": r["source"],
             "points": r["points"],
-            "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"]),
+            "created_at": r["created_at"].isoformat()
+            if hasattr(r["created_at"], "isoformat")
+            else str(r["created_at"]),
         }
         for r in rows.mappings().all()
     ]

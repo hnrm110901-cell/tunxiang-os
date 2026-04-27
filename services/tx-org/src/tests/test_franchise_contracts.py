@@ -30,16 +30,15 @@
   5. test_contract_list_and_update         — 合同列表 + 更新
   6. test_fee_create_and_pay               — 旧端点：创建收费 + 付款
 """
+
 import os
 import sys
 import uuid
 from datetime import date, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 
 import pytest
 from fastapi import FastAPI
@@ -64,6 +63,7 @@ def _reset_stores():
 
 class DictRow(dict):
     """dict that also supports attribute access, mimicking SQLAlchemy RowMapping."""
+
     def __getattr__(self, key):
         try:
             return self[key]
@@ -100,7 +100,7 @@ class FakeAsyncSession:
         self._committed = False
 
     async def execute(self, stmt, params=None):
-        sql = str(stmt.text if hasattr(stmt, 'text') else stmt).strip().lower()
+        sql = str(stmt.text if hasattr(stmt, "text") else stmt).strip().lower()
         params = params or {}
 
         # set_config — ignore
@@ -210,24 +210,30 @@ class FakeAsyncSession:
             if "sum(amount_fen)" in sql and "group by" not in sql:
                 total_a = sum(r["amount_fen"] for r in rows)
                 total_p = sum(r["paid_fen"] for r in rows)
-                total_o = sum(
-                    r["amount_fen"] - r["paid_fen"]
-                    for r in rows if r["status"] == "overdue"
+                total_o = sum(r["amount_fen"] - r["paid_fen"] for r in rows if r["status"] == "overdue")
+                return FakeResult(
+                    [
+                        {
+                            "total_amount_fen": total_a,
+                            "total_paid_fen": total_p,
+                            "total_overdue_fen": total_o,
+                            "total_records": len(rows),
+                        }
+                    ]
                 )
-                return FakeResult([{
-                    "total_amount_fen": total_a,
-                    "total_paid_fen": total_p,
-                    "total_overdue_fen": total_o,
-                    "total_records": len(rows),
-                }])
 
             if "group by fee_type" in sql:
                 by_type: dict[str, dict] = {}
                 for r in rows:
                     ft = r["fee_type"]
                     if ft not in by_type:
-                        by_type[ft] = {"fee_type": ft, "amount_fen": 0, "paid_fen": 0,
-                                       "overdue_fen": 0, "record_count": 0}
+                        by_type[ft] = {
+                            "fee_type": ft,
+                            "amount_fen": 0,
+                            "paid_fen": 0,
+                            "overdue_fen": 0,
+                            "record_count": 0,
+                        }
                     by_type[ft]["amount_fen"] += r["amount_fen"]
                     by_type[ft]["paid_fen"] += r["paid_fen"]
                     by_type[ft]["record_count"] += 1
@@ -240,10 +246,14 @@ class FakeAsyncSession:
                 for r in rows:
                     fid = r["franchisee_id"]
                     if fid not in by_f:
-                        by_f[fid] = {"franchisee_id": fid,
-                                     "franchisee_name": r["franchisee_name"],
-                                     "amount_fen": 0, "paid_fen": 0,
-                                     "overdue_fen": 0, "record_count": 0}
+                        by_f[fid] = {
+                            "franchisee_id": fid,
+                            "franchisee_name": r["franchisee_name"],
+                            "amount_fen": 0,
+                            "paid_fen": 0,
+                            "overdue_fen": 0,
+                            "record_count": 0,
+                        }
                     by_f[fid]["amount_fen"] += r["amount_fen"]
                     by_f[fid]["paid_fen"] += r["paid_fen"]
                     by_f[fid]["record_count"] += 1
@@ -307,18 +317,18 @@ app.dependency_overrides = {}
 
 # Override the dependency
 from shared.ontology.src.database import get_db_with_tenant
+
 app.dependency_overrides[get_db_with_tenant] = _fake_get_db_with_tenant
 
 
 # ─── 测试用例 1: 创建合同 + 查看详情 ─────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_contract_create_and_detail():
     """创建合同并查看详情，验证字段正确。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 创建合同
         end_date = (date.today() + timedelta(days=365)).isoformat()
         resp = await client.post(
@@ -357,13 +367,12 @@ async def test_contract_create_and_detail():
 
 # ─── 测试用例 2: 设置收费计划 + 收款 ─────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_fee_schedule_and_collect():
     """为合同设置收费计划，然后通过 collect 端点收款。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 创建合同
         end_date = (date.today() + timedelta(days=365)).isoformat()
         create_resp = await client.post(
@@ -440,18 +449,19 @@ async def test_fee_schedule_and_collect():
 
 # ─── 测试用例 3: 收缴汇总报表 ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_fee_summary_report():
     """创建多笔收费记录后，验证汇总报表数据正确。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 创建两笔收费记录
-        for i, (ftype, amount) in enumerate([
-            ("joining_fee", 10000000),
-            ("management_fee", 500000),
-        ]):
+        for i, (ftype, amount) in enumerate(
+            [
+                ("joining_fee", 10000000),
+                ("management_fee", 500000),
+            ]
+        ):
             await client.post(
                 "/api/v1/org/franchise/fees",
                 json={
@@ -482,13 +492,12 @@ async def test_fee_summary_report():
 
 # ─── 测试用例 4: 超额收款拒绝 ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_collect_overpayment_rejected():
     """收款金额超出应收时应被拒绝。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 创建合同
         end_date = (date.today() + timedelta(days=365)).isoformat()
         create_resp = await client.post(
@@ -534,13 +543,12 @@ async def test_collect_overpayment_rejected():
 
 # ─── 测试用例 5: 合同列表 + 更新 ─────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_contract_list_and_update():
     """创建多个合同后验证列表和更新功能。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 创建两个合同
         for name in ["测试店X", "测试店Y"]:
             await client.post(
@@ -579,13 +587,12 @@ async def test_contract_list_and_update():
 
 # ─── 测试用例 6: 旧端点：创建收费 + 付款 ────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_fee_create_and_pay():
     """通过旧端点创建收费记录并标记付款。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 创建收费记录
         create_resp = await client.post(
             "/api/v1/org/franchise/fees",

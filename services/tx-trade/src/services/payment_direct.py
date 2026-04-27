@@ -2,6 +2,7 @@
 
 所有支付 API 为 mock 实现，接口与微信/支付宝 SDK 兼容。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional

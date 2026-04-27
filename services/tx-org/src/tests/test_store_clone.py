@@ -61,6 +61,7 @@ TENANT_B = "tenant-bbb-222"
 #  1. 克隆预览
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_preview_returns_all_items():
     preview = get_clone_preview(SOURCE_STORE, TENANT_A)
     assert preview["source_store_id"] == SOURCE_STORE
@@ -70,9 +71,7 @@ def test_preview_returns_all_items():
 def test_preview_cloneable_counts_positive():
     preview = get_clone_preview(SOURCE_STORE, TENANT_A)
     for item_type in CLONE_ITEMS:
-        assert preview["cloneable"][item_type]["count"] > 0, (
-            f"{item_type} 应有示例数据，count 应 > 0"
-        )
+        assert preview["cloneable"][item_type]["count"] > 0, f"{item_type} 应有示例数据，count 应 > 0"
 
 
 def test_preview_non_cloneable_included():
@@ -90,6 +89,7 @@ def test_preview_sample_max_2():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  2. 全量克隆
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_full_clone_all_items_completed():
     task = clone_store_config(
@@ -110,9 +110,7 @@ def test_full_clone_summary_covers_all_items():
         tenant_id=TENANT_A,
     )
     for item_type in CLONE_ITEMS:
-        assert item_type in task.result_summary, (
-            f"{item_type} 应出现在 result_summary 中"
-        )
+        assert item_type in task.result_summary, f"{item_type} 应出现在 result_summary 中"
         assert task.result_summary[item_type]["status"] == "ok"
         assert task.result_summary[item_type]["cloned"] > 0
 
@@ -120,6 +118,7 @@ def test_full_clone_summary_covers_all_items():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  3. 选择性克隆
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_selective_clone_only_selected_items_in_summary():
     selected = ["tables", "shift_configs"]
@@ -148,6 +147,7 @@ def test_selective_clone_unselected_items_not_in_summary():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  4. 桌台克隆：数量相同但 ID 不同
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_clone_tables_count_matches_source():
     source_data = _get_source_store_data(SOURCE_STORE, TENANT_A)
@@ -188,6 +188,7 @@ def test_clone_tables_store_id_set_to_target():
 #  5. 克隆不影响源门店数据
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_clone_does_not_mutate_source_data():
     source_before = _get_source_store_data(SOURCE_STORE, TENANT_A)
     tables_before = [dict(t) for t in source_before["tables"]]
@@ -201,14 +202,13 @@ def test_clone_does_not_mutate_source_data():
 
     # 再次读取源数据，结构应不变
     source_after = _get_source_store_data(SOURCE_STORE, TENANT_A)
-    assert len(source_after["tables"]) == len(tables_before), (
-        "克隆操作不应修改源门店桌台数量"
-    )
+    assert len(source_after["tables"]) == len(tables_before), "克隆操作不应修改源门店桌台数量"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  6-8. 参数校验错误
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_clone_same_source_and_target_raises():
     with pytest.raises(ValueError, match="不能相同"):
@@ -244,12 +244,14 @@ def test_clone_invalid_item_type_raises():
 #  9. 跨 tenant 克隆被拒绝（安全校验）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_cross_tenant_clone_raises_permission_error():
     """
     模拟跨 tenant 场景：通过 _assert_same_tenant 函数直接测试。
     生产环境中，路由层从 DB 查出两个门店的 tenant_id，再调用此校验。
     """
     from services.store_clone import _assert_same_tenant
+
     with pytest.raises(PermissionError, match="跨租户克隆被拒绝"):
         _assert_same_tenant(
             source_tenant=TENANT_A,
@@ -261,6 +263,7 @@ def test_cross_tenant_clone_raises_permission_error():
 
 def test_same_tenant_assert_passes():
     from services.store_clone import _assert_same_tenant
+
     # 不应抛出异常
     _assert_same_tenant(TENANT_A, TENANT_A, SOURCE_STORE, TARGET_STORE)
 
@@ -268,6 +271,7 @@ def test_same_tenant_assert_passes():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  10-12. setup_new_store
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_setup_without_clone_returns_no_clone_task():
     result = setup_new_store(
@@ -325,11 +329,9 @@ def test_setup_store_id_is_unique():
 #  13-15. batch_clone
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_batch_clone_all_success():
-    new_stores = [
-        {"name": f"门店{i}号", "address": f"长沙市测试路{i}号"}
-        for i in range(1, 4)
-    ]
+    new_stores = [{"name": f"门店{i}号", "address": f"长沙市测试路{i}号"} for i in range(1, 4)]
     result = batch_clone(SOURCE_STORE, new_stores, TENANT_A)
     assert result["success_count"] == 3
     assert result["failed_count"] == 0
@@ -340,7 +342,7 @@ def test_batch_clone_partial_failure():
     """名称为空的条目应失败，其余应成功。"""
     new_stores = [
         {"name": "合法门店", "address": "地址A"},
-        {"name": "", "address": "地址B"},   # 空名称 → 失败
+        {"name": "", "address": "地址B"},  # 空名称 → 失败
     ]
     result = batch_clone(SOURCE_STORE, new_stores, TENANT_A)
     assert result["failed_count"] == 1
@@ -363,6 +365,7 @@ def test_batch_clone_empty_list_raises():
 #  16. result_summary 格式
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_result_summary_schema():
     task = clone_store_config(
         source_store_id=SOURCE_STORE,
@@ -381,6 +384,7 @@ def test_result_summary_schema():
 #  17. tables 状态重置
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_clone_tables_status_reset_to_free():
     """
     _clone_tables 内部每条桌台的 status 应设为 'free'，
@@ -389,9 +393,15 @@ def test_clone_tables_status_reset_to_free():
     """
     source_items = [
         {
-            "id": "old-id-1", "table_no": "A01", "area": "大厅",
-            "floor": 1, "seats": 4, "min_consume_fen": 0,
-            "sort_order": 1, "is_active": True, "config": None,
+            "id": "old-id-1",
+            "table_no": "A01",
+            "area": "大厅",
+            "floor": 1,
+            "seats": 4,
+            "min_consume_fen": 0,
+            "sort_order": 1,
+            "is_active": True,
+            "config": None,
             "store_id": SOURCE_STORE,
             # 模拟源门店有在桌订单
             "status": "occupied",
@@ -418,6 +428,7 @@ def test_clone_tables_status_reset_to_free():
 #  18. attendance_rules effective_from 重置为今日
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_clone_attendance_rules_effective_from_today():
     from datetime import datetime
 
@@ -434,8 +445,8 @@ def test_clone_attendance_rules_effective_from_today():
             "early_leave_deduction_fen": 5000,
             "full_attendance_bonus_fen": 30000,
             "clock_methods": ["device", "face"],
-            "effective_from": "2020-01-01",   # 旧日期
-            "effective_to": "2025-12-31",      # 旧截止日
+            "effective_from": "2020-01-01",  # 旧日期
+            "effective_to": "2025-12-31",  # 旧截止日
             "is_active": True,
         }
     ]
@@ -453,6 +464,7 @@ def test_clone_attendance_rules_effective_from_today():
 #  19. 完成后 progress == 100
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_completed_task_progress_is_100():
     task = clone_store_config(
         source_store_id=SOURCE_STORE,
@@ -468,17 +480,17 @@ def test_completed_task_progress_is_100():
 #  20. available_items 完整性
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_available_items_includes_all_clone_items():
     preview = get_clone_preview(SOURCE_STORE, TENANT_A)
     for item in CLONE_ITEMS:
-        assert item in preview["available_items"], (
-            f"{item} 应在 available_items 中"
-        )
+        assert item in preview["available_items"], f"{item} 应在 available_items 中"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  额外：旧接口兼容层
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_legacy_clone_store_returns_dict_with_id():
     result = clone_store(

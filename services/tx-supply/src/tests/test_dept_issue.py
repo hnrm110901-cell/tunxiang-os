@@ -1,4 +1,5 @@
 """部门领用测试"""
+
 import os
 import sys
 
@@ -104,8 +105,12 @@ class TestCheckYieldRate:
     @pytest.mark.asyncio
     async def test_normal_yield(self):
         result = await check_yield_rate(
-            "dish_1", "store_1", "t1", db=None,
-            actual_output=95, theoretical_output=100,
+            "dish_1",
+            "store_1",
+            "t1",
+            db=None,
+            actual_output=95,
+            theoretical_output=100,
         )
         assert result["yield_rate"] == 0.95
         assert result["yield_percent"] == 95.0
@@ -115,8 +120,12 @@ class TestCheckYieldRate:
     @pytest.mark.asyncio
     async def test_abnormal_yield(self):
         result = await check_yield_rate(
-            "dish_1", "store_1", "t1", db=None,
-            actual_output=80, theoretical_output=100,
+            "dish_1",
+            "store_1",
+            "t1",
+            db=None,
+            actual_output=80,
+            theoretical_output=100,
         )
         assert result["yield_rate"] == 0.80
         assert result["is_normal"] is False
@@ -125,14 +134,12 @@ class TestCheckYieldRate:
     @pytest.mark.asyncio
     async def test_zero_theoretical_raises(self):
         with pytest.raises(ValueError, match="大于0"):
-            await check_yield_rate("dish_1", "store_1", "t1", db=None,
-                                   actual_output=10, theoretical_output=0)
+            await check_yield_rate("dish_1", "store_1", "t1", db=None, actual_output=10, theoretical_output=0)
 
     @pytest.mark.asyncio
     async def test_negative_actual_raises(self):
         with pytest.raises(ValueError, match="不能为负"):
-            await check_yield_rate("dish_1", "store_1", "t1", db=None,
-                                   actual_output=-1, theoretical_output=100)
+            await check_yield_rate("dish_1", "store_1", "t1", db=None, actual_output=-1, theoretical_output=100)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -145,14 +152,18 @@ class TestSalesToInventory:
     async def test_sales_deduction(self):
         sales = [
             {
-                "dish_id": "d1", "dish_name": "红烧鲈鱼", "quantity": 2,
+                "dish_id": "d1",
+                "dish_name": "红烧鲈鱼",
+                "quantity": 2,
                 "ingredients": [
                     {"ingredient_id": "i1", "name": "鲈鱼", "qty_per_dish": 0.5, "unit": "kg"},
                     {"ingredient_id": "i2", "name": "酱油", "qty_per_dish": 0.05, "unit": "L"},
                 ],
             },
             {
-                "dish_id": "d2", "dish_name": "清蒸鲈鱼", "quantity": 1,
+                "dish_id": "d2",
+                "dish_name": "清蒸鲈鱼",
+                "quantity": 1,
                 "ingredients": [
                     {"ingredient_id": "i1", "name": "鲈鱼", "qty_per_dish": 0.6, "unit": "kg"},
                 ],
@@ -183,7 +194,9 @@ class TestFlowAndSummary:
             {"total_cost_fen": 10000, "total_qty": 5},
             {"total_cost_fen": 20000, "total_qty": 8},
         ]
-        result = await get_issue_flow("store_1", "kitchen", ("2026-03-01", "2026-03-31"), "t1", db=None, issue_orders=orders)
+        result = await get_issue_flow(
+            "store_1", "kitchen", ("2026-03-01", "2026-03-31"), "t1", db=None, issue_orders=orders
+        )
         assert result["total_count"] == 2
         assert result["total_cost_fen"] == 30000
         assert result["total_qty"] == 13

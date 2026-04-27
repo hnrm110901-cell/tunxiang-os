@@ -6,11 +6,9 @@
 - 涉及资金的事件必须携带 tenant_id + application_id 以便审计
 - Agent触发的事件必须携带 agent_type 字段便于可解释审计
 """
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional
-from uuid import UUID
 
+from dataclasses import dataclass
+from typing import Optional
 
 # ─────────────────────────────────────────────
 # 对外发出的事件（tx-expense → 其他服务）
@@ -30,23 +28,25 @@ EXPENSE_INVOICE_VERIFIED = "expense.invoice.verified"
 @dataclass
 class ExpenseApplicationSubmittedPayload:
     """费用申请提交事件 payload"""
+
     application_id: str
     tenant_id: str
     store_id: str
     applicant_id: str
     scenario_code: str
-    total_amount: int      # 分(fen)
-    submitted_at: str      # ISO8601
+    total_amount: int  # 分(fen)
+    submitted_at: str  # ISO8601
 
 
 @dataclass
 class ExpensePettyCashBalanceLowPayload:
     """备用金余额不足预警 payload（A1 Agent 触发）"""
+
     account_id: str
     store_id: str
     tenant_id: str
-    current_balance: int   # 分(fen)
-    threshold: int         # 分(fen)，触发预警的阈值
+    current_balance: int  # 分(fen)
+    threshold: int  # 分(fen)，触发预警的阈值
     days_of_coverage: float  # 按历史日均消耗，当前余额可用天数
     agent_type: str = "a1_petty_cash_guardian"
 
@@ -54,27 +54,29 @@ class ExpensePettyCashBalanceLowPayload:
 @dataclass
 class ExpenseBudgetWarningPayload:
     """预算预警 payload（A4 Agent 触发）"""
+
     budget_plan_id: str
     tenant_id: str
     brand_id: str
     store_id: Optional[str]
-    consumed_rate: float       # 消耗比例，如 0.82 表示82%
-    consumed_amount: int       # 已消耗金额（分）
-    budget_amount: int         # 预算总额（分）
+    consumed_rate: float  # 消耗比例，如 0.82 表示82%
+    consumed_amount: int  # 已消耗金额（分）
+    budget_amount: int  # 预算总额（分）
     forecasted_overrun: Optional[int]  # 预测超支金额（分），None表示不会超支
-    warning_level: str         # "yellow"(80%) 或 "red"(95%)
+    warning_level: str  # "yellow"(80%) 或 "red"(95%)
     agent_type: str = "a4_budget_monitor"
 
 
 @dataclass
 class ExpenseCostAttributionCompletePayload:
     """成本归因完成 payload（A6 Agent 触发，通知 tx-finance 更新 P&L）"""
+
     attribution_batch_id: str
     tenant_id: str
     store_id: str
-    period: str            # 如 "2026-04"
+    period: str  # 如 "2026-04"
     total_attributed: int  # 本次归集总金额（分）
-    item_count: int        # 归集条目数
+    item_count: int  # 归集条目数
     agent_type: str = "a6_cost_attribution"
 
 

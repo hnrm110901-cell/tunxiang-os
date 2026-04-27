@@ -19,16 +19,15 @@
   - transfer_service 函数通过 AsyncMock DB 直接测试，无真实 DB 依赖
   - InsufficientStockError 是 ValueError 子类，路由层映射为 422
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import uuid
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -36,10 +35,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ─── 从 service 模块导入（经由 src/ 路径） ──────────────────────────────────
 from services.transfer_service import (
     InsufficientStockError,
-    _set_tenant,
-    _uuid,
-    create_transfer_order,
     cancel_transfer_order,
+    create_transfer_order,
     list_transfer_orders,
 )
 
@@ -104,8 +101,14 @@ class TestCreateTransferOrder:
                 tenant_id=TENANT_ID,
                 from_store_id=STORE_FROM,
                 to_store_id=STORE_FROM,  # 同一门店
-                items=[{"ingredient_id": INGREDIENT_ID, "ingredient_name": "大米",
-                        "requested_quantity": 10.0, "unit": "kg"}],
+                items=[
+                    {
+                        "ingredient_id": INGREDIENT_ID,
+                        "ingredient_name": "大米",
+                        "requested_quantity": 10.0,
+                        "unit": "kg",
+                    }
+                ],
                 db=db,
             )
 
@@ -127,24 +130,26 @@ class TestCreateTransferOrder:
         """正常创建：调用 db.add 和 db.flush，返回 order_id + status=draft。"""
         db = _make_db()
 
-        from shared.ontology.src.entities import TransferOrder, TransferOrderItem
-
         with patch("services.transfer_service._set_tenant", new_callable=AsyncMock):
             # TransferOrder.__init__ 不能 mock，改 patch db.flush 使流程通过
             mock_order = _make_mock_order("draft")
 
-            with patch("services.transfer_service.TransferOrder", return_value=mock_order), \
-                 patch("services.transfer_service.TransferOrderItem", return_value=MagicMock()):
+            with (
+                patch("services.transfer_service.TransferOrder", return_value=mock_order),
+                patch("services.transfer_service.TransferOrderItem", return_value=MagicMock()),
+            ):
                 result = await create_transfer_order(
                     tenant_id=TENANT_ID,
                     from_store_id=STORE_FROM,
                     to_store_id=STORE_TO,
-                    items=[{
-                        "ingredient_id": INGREDIENT_ID,
-                        "ingredient_name": "大米",
-                        "requested_quantity": 10.0,
-                        "unit": "kg",
-                    }],
+                    items=[
+                        {
+                            "ingredient_id": INGREDIENT_ID,
+                            "ingredient_name": "大米",
+                            "requested_quantity": 10.0,
+                            "unit": "kg",
+                        }
+                    ],
                     db=db,
                 )
 
@@ -176,6 +181,7 @@ class TestListTransferOrders:
 
         # db.execute(...) 是 coroutine，await 后得到 mock
         call_count = [0]
+
         async def _execute(query):
             call_count[0] += 1
             if call_count[0] == 1:

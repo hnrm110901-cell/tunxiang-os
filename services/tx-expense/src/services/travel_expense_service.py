@@ -7,6 +7,7 @@
 
 金额约定：所有金额存储为分(fen)，BigInteger，展示层除以100转元。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -20,8 +21,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..models.travel import TravelAllocation, TravelItinerary, TravelRequest
 from ..models.expense_enums import TravelStatus
+from ..models.travel import TravelAllocation, TravelItinerary, TravelRequest
 
 logger = structlog.get_logger(__name__)
 
@@ -29,6 +30,7 @@ logger = structlog.get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # 内部辅助
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _now_utc() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -49,6 +51,7 @@ def _calc_planned_days(start: date, end: date) -> int:
 # ─────────────────────────────────────────────────────────────────────────────
 # 差旅申请 CRUD
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def create_travel_request(
     db: AsyncSession,
@@ -211,13 +214,17 @@ async def update_travel_request(
 
     if request.status != TravelStatus.DRAFT.value:
         raise ValueError(
-            f"Cannot update travel request in status '{request.status}'. "
-            "Only DRAFT requests can be edited."
+            f"Cannot update travel request in status '{request.status}'. Only DRAFT requests can be edited."
         )
 
     allowed_fields = {
-        "departure_city", "destination_cities", "planned_stores",
-        "transport_mode", "estimated_cost_fen", "notes", "task_type",
+        "departure_city",
+        "destination_cities",
+        "planned_stores",
+        "transport_mode",
+        "estimated_cost_fen",
+        "notes",
+        "task_type",
     }
     for field in allowed_fields:
         if field in data:
@@ -258,15 +265,12 @@ async def submit_travel_request(
 
     if request.status != TravelStatus.DRAFT.value:
         raise ValueError(
-            f"Cannot submit travel request in status '{request.status}'. "
-            "Only DRAFT requests can be submitted."
+            f"Cannot submit travel request in status '{request.status}'. Only DRAFT requests can be submitted."
         )
 
     # 校验申请人匹配
     if request.applicant_id != applicant_id:
-        raise ValueError(
-            f"Only the applicant ({request.applicant_id}) can submit this travel request."
-        )
+        raise ValueError(f"Only the applicant ({request.applicant_id}) can submit this travel request.")
 
     # 快照提交时的申请状态
     request.status = TravelStatus.PENDING_APPROVAL.value
@@ -292,6 +296,7 @@ async def submit_travel_request(
 # 行程明细 CRUD
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def add_itinerary(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -307,11 +312,8 @@ async def add_itinerary(
     request = await get_travel_request(db, tenant_id, request_id)
 
     # 允许 DRAFT / APPROVED 状态添加行程（审批通过后才能实际出行签到）
-    if request.status not in (TravelStatus.DRAFT.value, TravelStatus.APPROVED.value,
-                               TravelStatus.IN_PROGRESS.value):
-        raise ValueError(
-            f"Cannot add itinerary to travel request in status '{request.status}'."
-        )
+    if request.status not in (TravelStatus.DRAFT.value, TravelStatus.APPROVED.value, TravelStatus.IN_PROGRESS.value):
+        raise ValueError(f"Cannot add itinerary to travel request in status '{request.status}'.")
 
     # 自动推算下一个 sequence_order
     max_order_stmt = select(func.coalesce(func.max(TravelItinerary.sequence_order), -1)).where(
@@ -377,16 +379,23 @@ async def update_itinerary(
     itinerary = result.scalar_one_or_none()
 
     if itinerary is None:
-        raise LookupError(
-            f"TravelItinerary {itinerary_id} not found for request {request_id} "
-            f"and tenant {tenant_id}"
-        )
+        raise LookupError(f"TravelItinerary {itinerary_id} not found for request {request_id} and tenant {tenant_id}")
 
     allowed_fields = {
-        "store_name", "checkin_time", "checkout_time", "duration_minutes",
-        "checkin_location", "checkout_location", "gps_track",
-        "leg_mileage_km", "itinerary_status", "skip_reason", "sequence_order",
-        "distance_from_store_m", "is_mileage_anomaly", "anomaly_reason",
+        "store_name",
+        "checkin_time",
+        "checkout_time",
+        "duration_minutes",
+        "checkin_location",
+        "checkout_location",
+        "gps_track",
+        "leg_mileage_km",
+        "itinerary_status",
+        "skip_reason",
+        "sequence_order",
+        "distance_from_store_m",
+        "is_mileage_anomaly",
+        "anomaly_reason",
     }
     for field in allowed_fields:
         if field in data:
@@ -433,9 +442,7 @@ async def delete_itinerary(
     itinerary = result.scalar_one_or_none()
 
     if itinerary is None:
-        raise LookupError(
-            f"TravelItinerary {itinerary_id} not found for request {request_id}"
-        )
+        raise LookupError(f"TravelItinerary {itinerary_id} not found for request {request_id}")
 
     await db.delete(itinerary)
     await db.flush()
@@ -453,8 +460,8 @@ async def delete_itinerary(
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 默认补贴标准（分/天），没有差标配置时使用
-_DEFAULT_MEAL_ALLOWANCE_PER_DAY_FEN = 8000        # 餐补 80元/天
-_DEFAULT_ACCOMMODATION_PER_DAY_FEN = 30000         # 住宿 300元/天（无差标时的兜底）
+_DEFAULT_MEAL_ALLOWANCE_PER_DAY_FEN = 8000  # 餐补 80元/天
+_DEFAULT_ACCOMMODATION_PER_DAY_FEN = 30000  # 住宿 300元/天（无差标时的兜底）
 
 
 async def calculate_allowances(
@@ -573,6 +580,7 @@ async def calculate_allowances(
 # 完成差旅（填写实际费用）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def complete_travel(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -592,8 +600,7 @@ async def complete_travel(
 
     if request.status not in (TravelStatus.IN_PROGRESS.value, TravelStatus.APPROVED.value):
         raise ValueError(
-            f"Cannot complete travel request in status '{request.status}'. "
-            "Request must be IN_PROGRESS or APPROVED."
+            f"Cannot complete travel request in status '{request.status}'. Request must be IN_PROGRESS or APPROVED."
         )
 
     actual_start: Optional[date] = actual_amounts.get("actual_start_date")
@@ -739,6 +746,7 @@ async def _auto_allocate(
 # A5 专用：从巡店任务自动创建差旅申请草稿
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def create_from_inspection_task(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -811,9 +819,7 @@ async def create_from_inspection_task(
 
     # 提取目的地城市列表
     target_stores: list[dict] = task_data.get("target_stores", [])
-    destination_cities = list({
-        s["city"] for s in target_stores if s.get("city")
-    })
+    destination_cities = list({s["city"] for s in target_stores if s.get("city")})
     planned_store_ids = [str(s["store_id"]) for s in target_stores if s.get("store_id")]
 
     # 创建差旅申请
@@ -823,7 +829,7 @@ async def create_from_inspection_task(
         brand_id=brand_id,
         store_id=store_id,
         traveler_id=supervisor_id,
-        applicant_id=supervisor_id,          # 督导本人申请
+        applicant_id=supervisor_id,  # 督导本人申请
         inspection_task_id=task_id,
         task_type="inspection",
         departure_city=task_data.get("departure_city"),
@@ -879,6 +885,7 @@ async def create_from_inspection_task(
 # 统计看板
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_stats(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -927,9 +934,7 @@ async def get_stats(
 
     # 按状态分组
     by_status_stmt = (
-        select(TravelRequest.status, func.count().label("count"))
-        .where(*base_where)
-        .group_by(TravelRequest.status)
+        select(TravelRequest.status, func.count().label("count")).where(*base_where).group_by(TravelRequest.status)
     )
     by_status_result = await db.execute(by_status_stmt)
     by_status = {row["status"]: int(row["count"]) for row in by_status_result.mappings().all()}
@@ -941,10 +946,7 @@ async def get_stats(
         .group_by(TravelRequest.transport_mode)
     )
     by_transport_result = await db.execute(by_transport_stmt)
-    by_transport = {
-        row["transport_mode"]: int(row["count"])
-        for row in by_transport_result.mappings().all()
-    }
+    by_transport = {row["transport_mode"]: int(row["count"]) for row in by_transport_result.mappings().all()}
 
     pending_count = by_status.get(TravelStatus.PENDING_APPROVAL.value, 0)
     in_progress_count = by_status.get(TravelStatus.IN_PROGRESS.value, 0)

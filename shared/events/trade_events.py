@@ -3,6 +3,7 @@
 交易域所有跨服务事件均通过 TradeEvent 传递，事件类型由 TradeEventType 枚举定义。
 Redis Stream key: trade_events
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,20 +20,20 @@ class TradeEventType(str, Enum):
     """
 
     # ── 订单类 ─────────────────────────────────────────────────────
-    ORDER_CREATED = "trade.order.created"           # 订单创建
-    ORDER_PAID = "trade.order.paid"                 # 支付成功
-    ORDER_REFUNDED = "trade.order.refunded"         # 退款
-    ORDER_CANCELLED = "trade.order.cancelled"       # 取消
+    ORDER_CREATED = "trade.order.created"  # 订单创建
+    ORDER_PAID = "trade.order.paid"  # 支付成功
+    ORDER_REFUNDED = "trade.order.refunded"  # 退款
+    ORDER_CANCELLED = "trade.order.cancelled"  # 取消
 
     # ── 折扣类 ─────────────────────────────────────────────────────
-    DISCOUNT_BLOCKED = "trade.discount.blocked"     # 折扣被折扣守护拦截
+    DISCOUNT_BLOCKED = "trade.discount.blocked"  # 折扣被折扣守护拦截
 
     # ── 桌台类 ─────────────────────────────────────────────────────
-    TABLE_OPENED = "trade.table.opened"             # 桌台开台
-    TABLE_CLOSED = "trade.table.closed"             # 桌台结台
+    TABLE_OPENED = "trade.table.opened"  # 桌台开台
+    TABLE_CLOSED = "trade.table.closed"  # 桌台结台
 
     # ── 班次类 ─────────────────────────────────────────────────────
-    SHIFT_HANDOVER = "trade.shift.handover"         # 班次交接
+    SHIFT_HANDOVER = "trade.shift.handover"  # 班次交接
 
     # ── 日结类 ─────────────────────────────────────────────────────
     DAILY_SETTLEMENT_COMPLETED = "trade.daily_settlement.completed"  # 日结完成
@@ -59,7 +60,5 @@ class TradeEvent:
     entity_id: UUID
     event_data: dict
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source_service: str = "tx-trade"

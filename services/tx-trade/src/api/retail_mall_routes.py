@@ -13,6 +13,7 @@
 7. POST   /api/v1/retail/orders/{id}/refund       退款
 8. GET    /api/v1/retail/stats                    零售统计
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -20,12 +21,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services import retail_mall as retail_mall_svc
 
 router = APIRouter(prefix="/api/v1/retail", tags=["retail-mall"])
 
 
 # ── 请求模型 ──────────────────────────────────────────────────
+
 
 class CreateProductReq(BaseModel):
     name: str = Field(..., max_length=200)

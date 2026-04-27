@@ -1,10 +1,10 @@
-"""积分商城 API — 10 个端点
+"""积分商城 API — 18 个端点
 
 路由前缀：/api/v1/member/points-mall
 所有路由需要 X-Tenant-ID header。
 
 端点列表：
-  GET  /products               商品列表（会员端）
+  GET  /products               商品列表（会员端，支持scope过滤）
   GET  /products/{id}          商品详情
   POST /products               新增商品（管理端）
   PUT  /products/{id}          更新商品（管理端）
@@ -14,7 +14,17 @@
   POST /orders/{id}/fulfill    核销（门店）
   POST /orders/{id}/cancel     取消订单
   GET  /stats                  商城统计（管理端）
+  # v345 新增
+  GET  /categories             分类列表
+  POST /categories             新增分类
+  PUT  /categories/{id}        更新分类
+  DELETE /categories/{id}      删除分类
+  GET  /achievements           成就列表（从DB读取）
+  POST /achievements/seed      初始化默认成就配置
+  POST /orders/{id}/ship       实物发货
+  POST /orders/{id}/deliver    确认收货
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -29,14 +39,22 @@ from shared.ontology.src.database import get_db
 
 from ..services.points_mall_v2 import (
     cancel_order,
+    confirm_delivery,
+    create_category,
     create_product,
+    delete_category,
     fulfill_order,
+    get_achievement_list,
     get_customer_orders,
     get_order_detail,
     get_order_stats,
     get_product,
+    list_categories,
     list_products,
     redeem,
+    seed_default_achievements,
+    ship_order,
+    update_category,
     update_product,
 )
 
@@ -45,6 +63,7 @@ router = APIRouter(prefix="/api/v1/member/points-mall", tags=["points-mall"])
 
 
 # ── 工具函数 ──────────────────────────────────────────────────
+
 
 def _require_tenant(x_tenant_id: str) -> str:
     if not x_tenant_id:
@@ -113,18 +132,41 @@ class CancelOrderReq(BaseModel):
     cancel_reason: str = Field(..., min_length=1, max_length=200, description="取消原因")
 
 
+class CreateCategoryReq(BaseModel):
+    category_name: str = Field(..., min_length=1, max_length=50, description="分类名称")
+    category_code: str = Field(..., min_length=1, max_length=30, description="分类编码")
+    icon_url: Optional[str] = Field(None, max_length=500)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class UpdateCategoryReq(BaseModel):
+    category_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    icon_url: Optional[str] = Field(None, max_length=500)
+    sort_order: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+class ShipOrderReq(BaseModel):
+    carrier: str = Field(..., min_length=1, max_length=50, description="快递公司")
+    tracking_no: str = Field(..., min_length=1, max_length=100, description="快递单号")
+    operator_id: Optional[str] = Field(None, description="操作员 UUID")
+
+
 # ── 1. 商品列表（会员端）────────────────────────────────────
+
 
 @router.get("/products")
 async def api_list_products(
     customer_id: Optional[str] = Query(None, description="顾客 UUID，用于查询已兑次数"),
     product_type: Optional[str] = Query(None, description="physical | coupon | dish | stored_value"),
+    category_id: Optional[str] = Query(None, description="分类 UUID"),
+    store_id: Optional[str] = Query(None, description="当前门店 UUID（用于scope过滤）"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    """积分商城商品列表（有效商品，按排序权重 ASC）"""
+    """积分商城商品列表（有效商品，按排序权重 ASC，支持scope过滤）"""
     tenant_id = _require_tenant(x_tenant_id)
     try:
         result = await list_products(
@@ -132,6 +174,8 @@ async def api_list_products(
             db=db,
             customer_id=customer_id,
             product_type=product_type,
+            category_id=category_id,
+            store_id=store_id,
             page=page,
             size=size,
         )
@@ -141,6 +185,7 @@ async def api_list_products(
 
 
 # ── 2. 商品详情 ──────────────────────────────────────────────
+
 
 @router.get("/products/{product_id}")
 async def api_get_product(
@@ -166,6 +211,7 @@ async def api_get_product(
 
 
 # ── 3. 新增商品（管理端）────────────────────────────────────
+
 
 @router.post("/products")
 async def api_create_product(
@@ -199,6 +245,7 @@ async def api_create_product(
 
 
 # ── 4. 更新商品（管理端）────────────────────────────────────
+
 
 @router.put("/products/{product_id}")
 async def api_update_product(
@@ -236,6 +283,7 @@ async def api_update_product(
 
 
 # ── 5. 积分兑换 ──────────────────────────────────────────────
+
 
 @router.post("/redeem")
 async def api_redeem(
@@ -280,6 +328,7 @@ async def api_redeem(
 
 # ── 6. 我的兑换记录 ──────────────────────────────────────────
 
+
 @router.get("/orders")
 async def api_get_customer_orders(
     customer_id: str = Query(..., description="顾客 UUID"),
@@ -305,6 +354,7 @@ async def api_get_customer_orders(
 
 # ── 7. 订单详情 ──────────────────────────────────────────────
 
+
 @router.get("/orders/{order_id}")
 async def api_get_order_detail(
     order_id: str,
@@ -327,6 +377,7 @@ async def api_get_order_detail(
 
 
 # ── 8. 核销订单（门店）──────────────────────────────────────
+
 
 @router.post("/orders/{order_id}/fulfill")
 async def api_fulfill_order(
@@ -353,6 +404,7 @@ async def api_fulfill_order(
 
 # ── 9. 取消订单 ──────────────────────────────────────────────
 
+
 @router.post("/orders/{order_id}/cancel")
 async def api_cancel_order(
     order_id: str,
@@ -378,6 +430,7 @@ async def api_cancel_order(
 
 # ── 10. 商城统计（管理端）───────────────────────────────────
 
+
 @router.get("/stats")
 async def api_get_order_stats(
     x_tenant_id: str = Header("", alias="X-Tenant-ID"),
@@ -392,4 +445,200 @@ async def api_get_order_stats(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    return _ok(result)
+
+
+# ══════════════════════════════════════════════════════════════════
+#  v345 新增端点
+# ══════════════════════════════════════════════════════════════════
+
+
+# ── 11. 分类列表 ─────────────────────────────────────────────
+
+
+@router.get("/categories")
+async def api_list_categories(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """积分商城分类列表"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await list_categories(tenant_id=tenant_id, db=db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return _ok(result)
+
+
+# ── 12. 新增分类 ─────────────────────────────────────────────
+
+
+@router.post("/categories")
+async def api_create_category(
+    body: CreateCategoryReq,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """新增积分商城分类（管理端）"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await create_category(
+            category_name=body.category_name,
+            category_code=body.category_code,
+            tenant_id=tenant_id,
+            db=db,
+            icon_url=body.icon_url,
+            sort_order=body.sort_order,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 409 if "duplicate" in code else 400
+        raise HTTPException(status_code=status, detail=code)
+    return _ok(result)
+
+
+# ── 13. 更新分类 ─────────────────────────────────────────────
+
+
+@router.put("/categories/{category_id}")
+async def api_update_category(
+    category_id: str,
+    body: UpdateCategoryReq,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新分类（管理端）"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await update_category(
+            category_id=category_id,
+            tenant_id=tenant_id,
+            db=db,
+            category_name=body.category_name,
+            icon_url=body.icon_url,
+            sort_order=body.sort_order,
+            is_active=body.is_active,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 404 if "not_found" in code else 400
+        raise HTTPException(status_code=status, detail=code)
+    return _ok(result)
+
+
+# ── 14. 删除分类 ─────────────────────────────────────────────
+
+
+@router.delete("/categories/{category_id}")
+async def api_delete_category(
+    category_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除分类（软删除，管理端）"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await delete_category(
+            category_id=category_id,
+            tenant_id=tenant_id,
+            db=db,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 404 if "not_found" in code else 400
+        raise HTTPException(status_code=status, detail=code)
+    return _ok(result)
+
+
+# ── 15. 成就列表 ─────────────────────────────────────────────
+
+
+@router.get("/achievements")
+async def api_get_achievements(
+    customer_id: str = Query(..., description="顾客 UUID"),
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """成就列表（从DB配置读取，含进度和已获得状态）"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await get_achievement_list(
+            customer_id=customer_id,
+            tenant_id=tenant_id,
+            db=db,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return _ok(result)
+
+
+# ── 16. 初始化默认成就 ───────────────────────────────────────
+
+
+@router.post("/achievements/seed")
+async def api_seed_achievements(
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """初始化默认6个成就配置（幂等，管理端）"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await seed_default_achievements(
+            tenant_id=tenant_id,
+            db=db,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return _ok(result)
+
+
+# ── 17. 实物发货 ─────────────────────────────────────────────
+
+
+@router.post("/orders/{order_id}/ship")
+async def api_ship_order(
+    order_id: str,
+    body: ShipOrderReq,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """实物发货 — 填写快递信息，fulfillment_status: pending -> shipped"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await ship_order(
+            order_id=order_id,
+            carrier=body.carrier,
+            tracking_no=body.tracking_no,
+            tenant_id=tenant_id,
+            db=db,
+            operator_id=body.operator_id,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 404 if "not_found" in code else 422
+        raise HTTPException(status_code=status, detail=code)
+    return _ok(result)
+
+
+# ── 18. 确认收货 ─────────────────────────────────────────────
+
+
+@router.post("/orders/{order_id}/deliver")
+async def api_confirm_delivery(
+    order_id: str,
+    x_tenant_id: str = Header("", alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """确认收货 — fulfillment_status: shipped -> delivered, status -> fulfilled"""
+    tenant_id = _require_tenant(x_tenant_id)
+    try:
+        result = await confirm_delivery(
+            order_id=order_id,
+            tenant_id=tenant_id,
+            db=db,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 404 if "not_found" in code else 422
+        raise HTTPException(status_code=status, detail=code)
     return _ok(result)

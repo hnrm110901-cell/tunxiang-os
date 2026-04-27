@@ -53,9 +53,7 @@ class CityAdapterRegistry:
         return decorator
 
     @classmethod
-    def get_adapter(
-        cls, city_code: str, config: dict[str, Any]
-    ) -> BaseCityAdapter:
+    def get_adapter(cls, city_code: str, config: dict[str, Any]) -> BaseCityAdapter:
         """获取城市适配器实例（三级查找）。
 
         1. 精确匹配 city_code
@@ -90,10 +88,7 @@ class CityAdapterRegistry:
                 )
 
         if adapter_cls is None:
-            raise ValueError(
-                f"未找到城市适配器: city_code={city_code}，"
-                f"且无通用兜底适配器(000000)"
-            )
+            raise ValueError(f"未找到城市适配器: city_code={city_code}，且无通用兜底适配器(000000)")
 
         return adapter_cls(city_code=city_code, config=config)
 

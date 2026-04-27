@@ -6,6 +6,7 @@
 3. 记录决策日志（留痕）
 4. 返回：活动名称/微信群文案/朋友圈文案/小程序推送/优惠券建议/发送时间建议
 """
+
 from __future__ import annotations
 
 import json
@@ -192,16 +193,16 @@ class CRMOperator:
 
 品牌信息：
 - 品牌名称：{brand_name}
-- 门店ID：{payload.get('store_id')}
+- 门店ID：{payload.get("store_id")}
 
 活动参数：
 - 活动类型：{campaign_type_map.get(campaign_type, campaign_type)}（{campaign_type}）
 - 目标用户：{segment_map.get(target_segment, target_segment)}，共{target_count}人
-- 活动预算：{budget_fen / 100:.2f}元（每人均摊{pre_check.get('per_user_budget_fen', 0) / 100:.2f}元）
+- 活动预算：{budget_fen / 100:.2f}元（每人均摊{pre_check.get("per_user_budget_fen", 0) / 100:.2f}元）
 - {discount_text}
 - {occasion_text}
 
-重点推广菜品：{', '.join(key_dishes) if key_dishes else '未指定'}
+重点推广菜品：{", ".join(key_dishes) if key_dishes else "未指定"}
 
 请为{brand_name}生成一套完整的私域运营活动方案，文案要体现品牌特色和温度。"""
 
@@ -238,17 +239,14 @@ class CRMOperator:
             f"期待您的光临 🎉"
         )
 
-        moments_copy = (
-            f"{brand_name}会员专享！{main_dish}等特色好味，满100减10，"
-            f"今日限定，快来打卡！"
-        )
+        moments_copy = f"{brand_name}会员专享！{main_dish}等特色好味，满100减10，今日限定，快来打卡！"
 
         return {
             "campaign_name": f"{brand_name}会员专属活动",
             "wechat_group_message": wechat_msg[:WECHAT_GROUP_MAX_LEN],
             "moments_copy": moments_copy[:MOMENTS_MAX_LEN],
             "miniapp_push_title": f"{brand_name}会员福利",
-            "miniapp_push_content": f"满100减10，今日有效，快来领取",
+            "miniapp_push_content": "满100减10，今日有效，快来领取",
             "coupon_suggestion": {
                 "type": "满减",
                 "value": "满100减10",
@@ -261,7 +259,6 @@ class CRMOperator:
                 "experience_ok": True,
             },
         }
-
 
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """Phase 3 快速路径：从 mv_member_clv 物化视图读取，<5ms。
@@ -311,9 +308,7 @@ class CRMOperator:
                         tenant_id=tenant_id,
                         store_id=store_id,
                     )
-                    return await self.generate_campaign(
-                        {"tenant_id": tenant_id, "store_id": store_id}
-                    )
+                    return await self.generate_campaign({"tenant_id": tenant_id, "store_id": store_id})
 
                 return {
                     "inference_layer": "mv_fast_path",
@@ -328,9 +323,7 @@ class CRMOperator:
                 store_id=store_id,
                 error=str(exc),
             )
-            return await self.generate_campaign(
-                {"tenant_id": tenant_id, "store_id": store_id}
-            )
+            return await self.generate_campaign({"tenant_id": tenant_id, "store_id": store_id})
 
     async def get_clv_context(self, tenant_id: str, store_id: str, db) -> dict:
         """从 mv_member_clv 读取高流失风险会员数、平均CLV、总储值余额。

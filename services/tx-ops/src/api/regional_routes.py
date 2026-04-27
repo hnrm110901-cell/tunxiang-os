@@ -2,6 +2,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -57,8 +58,13 @@ async def dispatch_rectification(
 
     try:
         result = await svc(
-            region_id, body.store_id, body.issue_id,
-            body.assignee_id, body.deadline, x_tenant_id, db=db,
+            region_id,
+            body.store_id,
+            body.issue_id,
+            body.assignee_id,
+            body.deadline,
+            x_tenant_id,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -82,8 +88,11 @@ async def track_rectification(
 
     try:
         result = await svc(
-            rectification_id, x_tenant_id, db=db,
-            new_status=body.new_status, note=body.note,
+            rectification_id,
+            x_tenant_id,
+            db=db,
+            new_status=body.new_status,
+            note=body.note,
         )
         return {"ok": True, "data": result}
     except ValueError as e:
@@ -107,8 +116,12 @@ async def submit_review(
 
     try:
         result = await svc(
-            rectification_id, body.reviewer_id, body.result,
-            x_tenant_id, db=db, comment=body.comment,
+            rectification_id,
+            body.reviewer_id,
+            body.result,
+            x_tenant_id,
+            db=db,
+            comment=body.comment,
         )
         return {"ok": True, "data": result}
     except ValueError as e:

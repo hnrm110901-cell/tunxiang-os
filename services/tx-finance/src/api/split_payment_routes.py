@@ -14,6 +14,7 @@
 异步通知验签（mock）：检查 X-Wechat-Pay-Signature 或 X-Alipay-Sign，非空即通过。
 生产环境替换：使用微信/支付宝官方 SDK 验签逻辑。
 """
+
 import hashlib
 import uuid
 from typing import Any, Optional
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/api/v1/finance/split", tags=["split-payment"])
 
 
 # ── 依赖 ──────────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -59,9 +61,11 @@ def _make_idempotency_key(split_order_id: str, receiver_id: str) -> str:
 
 # ── Pydantic Schema ────────────────────────────────────────────────────────────
 
+
 class SplitReceiverItem(BaseModel):
     """单个收款方分账规则。"""
-    receiver_type: str = Field(..., pattern=r'^(brand|franchise|platform_fee)$')
+
+    receiver_type: str = Field(..., pattern=r"^(brand|franchise|platform_fee)$")
     receiver_id: str = Field(..., max_length=64, description="收款方标识")
     amount_fen: int = Field(..., gt=0, description="分账金额（分）")
     channel_sub_merchant_id: Optional[str] = Field(None, max_length=64)
@@ -69,23 +73,26 @@ class SplitReceiverItem(BaseModel):
 
 class CreateSplitOrderBody(BaseModel):
     """发起分账请求体。"""
+
     order_id: uuid.UUID
     total_fen: int = Field(..., gt=0, description="总金额（分）")
-    channel: str = Field(..., pattern=r'^(wechat|alipay)$')
+    channel: str = Field(..., pattern=r"^(wechat|alipay)$")
     merchant_order_id: str = Field(..., max_length=64, description="渠道侧商户订单号，全局唯一")
     receivers: list[SplitReceiverItem] = Field(..., min_length=1, description="分账明细列表")
 
 
 class AsyncNotifyBody(BaseModel):
     """异步分账通知请求体（微信/支付宝回调 payload）。"""
+
     notify_id: str = Field(..., max_length=64, description="渠道通知ID")
-    split_result: str = Field(..., pattern=r'^(success|failed)$')
+    split_result: str = Field(..., pattern=r"^(success|failed)$")
     receiver_id: Optional[str] = Field(None, max_length=64)
     extra: Optional[dict[str, Any]] = None
 
 
 class AdjustmentCreateBody(BaseModel):
     """差错账调账请求体。"""
+
     split_record_id: uuid.UUID
     reason: str = Field(..., max_length=500)
     adjusted_amount_fen: int = Field(..., gt=0, description="调整后金额（分）")
@@ -94,18 +101,21 @@ class AdjustmentCreateBody(BaseModel):
 
 class PreviewSplitRuleItem(BaseModel):
     """试算分润规则。"""
-    receiver_type: str = Field(..., pattern=r'^(brand|franchise|platform_fee)$')
+
+    receiver_type: str = Field(..., pattern=r"^(brand|franchise|platform_fee)$")
     receiver_id: str = Field(..., max_length=64)
     ratio: int = Field(..., ge=1, le=10000, description="分润比例（万分比，10000=100%）")
 
 
 class PreviewSplitBody(BaseModel):
     """试算分润请求体。"""
+
     total_fen: int = Field(..., gt=0)
     split_rules: list[PreviewSplitRuleItem] = Field(..., min_length=1)
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
 async def create_split_order(
@@ -114,8 +124,8 @@ async def create_split_order(
     db: AsyncSession = Depends(_get_tenant_db),
 ) -> dict[str, Any]:
     """发起分账订单，同时写入分账主表和明细表（幂等：merchant_order_id唯一）。"""
+
     from sqlalchemy import text
-    import json
 
     # 校验各方金额之和不超过总金额
     total_split = sum(r.amount_fen for r in body.receivers)
@@ -195,12 +205,14 @@ async def create_split_order(
         merchant_order_id=body.merchant_order_id,
         tenant_id=str(tenant_id),
     )
-    return _ok({
-        "split_order_id": str(split_order_id),
-        "merchant_order_id": body.merchant_order_id,
-        "split_status": "splitting",
-        "split_count": len(body.receivers),
-    })
+    return _ok(
+        {
+            "split_order_id": str(split_order_id),
+            "merchant_order_id": body.merchant_order_id,
+            "split_status": "splitting",
+            "split_count": len(body.receivers),
+        }
+    )
 
 
 @router.get("/orders")
@@ -472,12 +484,14 @@ async def create_adjustment(
         adjusted=body.adjusted_amount_fen,
         adjusted_by=body.adjusted_by,
     )
-    return _ok({
-        "adjustment_id": str(adjustment_id),
-        "split_record_id": str(body.split_record_id),
-        "original_amount_fen": original_amount_fen,
-        "adjusted_amount_fen": body.adjusted_amount_fen,
-    })
+    return _ok(
+        {
+            "adjustment_id": str(adjustment_id),
+            "split_record_id": str(body.split_record_id),
+            "original_amount_fen": original_amount_fen,
+            "adjusted_amount_fen": body.adjusted_amount_fen,
+        }
+    )
 
 
 @router.get("/adjustments")
@@ -552,12 +566,14 @@ async def preview_split_rules(
     allocated = 0
     for i, rule in enumerate(parsed_rules):
         amount = (total_fen * rule.ratio) // 10000  # 整数除法，无浮点
-        preview_items.append({
-            "receiver_type": rule.receiver_type,
-            "receiver_id": rule.receiver_id,
-            "ratio": rule.ratio,
-            "amount_fen": amount,
-        })
+        preview_items.append(
+            {
+                "receiver_type": rule.receiver_type,
+                "receiver_id": rule.receiver_id,
+                "ratio": rule.ratio,
+                "amount_fen": amount,
+            }
+        )
         allocated += amount
 
     # 余数归第一方（保证总和=total_fen）
@@ -566,12 +582,12 @@ async def preview_split_rules(
         preview_items[0]["amount_fen"] += remainder
 
     # 验证：各方之和 == total_fen
-    assert sum(item["amount_fen"] for item in preview_items) == total_fen, (
-        "分账金额计算错误，总和不等于输入金额"
-    )
+    assert sum(item["amount_fen"] for item in preview_items) == total_fen, "分账金额计算错误，总和不等于输入金额"
 
-    return _ok({
-        "total_fen": total_fen,
-        "preview_items": preview_items,
-        "amounts_are_integers": all(isinstance(item["amount_fen"], int) for item in preview_items),
-    })
+    return _ok(
+        {
+            "total_fen": total_fen,
+            "preview_items": preview_items,
+            "amounts_are_integers": all(isinstance(item["amount_fen"], int) for item in preview_items),
+        }
+    )

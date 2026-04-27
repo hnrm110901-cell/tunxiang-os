@@ -9,6 +9,7 @@
 6. 赠送年卡 (正常/无效手机号)
 7. 年卡常量校验
 """
+
 import os
 import sys
 
@@ -27,6 +28,7 @@ TENANT_HEADER = {"X-Tenant-ID": "test-tenant-001"}
 
 
 # ── 1. 年卡方案列表 ──────────────────────────────────────────
+
 
 class TestListPlans:
     def test_list_annual_plans(self):
@@ -50,6 +52,7 @@ class TestListPlans:
 
 
 # ── 2. 购买年卡 ──────────────────────────────────────────────
+
 
 class TestPurchaseCard:
     def test_purchase_ok(self):
@@ -82,6 +85,7 @@ class TestPurchaseCard:
 
 # ── 3. 权益清单 ──────────────────────────────────────────────
 
+
 class TestCardBenefits:
     def test_get_benefits(self):
         r = client.get(
@@ -96,6 +100,7 @@ class TestCardBenefits:
 
 
 # ── 4. 权益使用情况 ──────────────────────────────────────────
+
 
 class TestBenefitUsage:
     def test_check_usage(self):
@@ -122,6 +127,7 @@ class TestBenefitUsage:
 
 # ── 5. 续费 ──────────────────────────────────────────────────
 
+
 class TestRenewCard:
     def test_renew_ok(self):
         r = client.post(
@@ -135,6 +141,7 @@ class TestRenewCard:
 
 
 # ── 6. 赠送年卡 ──────────────────────────────────────────────
+
 
 class TestGiftCard:
     def test_gift_ok(self):
@@ -168,20 +175,24 @@ class TestGiftCard:
 
 # ── 7. 年卡常量校验 ──────────────────────────────────────────
 
+
 class TestAnnualPlanConstants:
     def test_all_plans_have_benefits(self):
         from services.premium_card import ANNUAL_PLANS
+
         for plan_id, plan in ANNUAL_PLANS.items():
             assert "benefits" in plan, f"{plan_id} missing benefits"
             assert len(plan["benefits"]) > 0, f"{plan_id} has empty benefits"
 
     def test_all_plans_have_correct_duration(self):
         from services.premium_card import ANNUAL_PLANS
+
         for plan_id, plan in ANNUAL_PLANS.items():
             assert plan["duration_days"] == 365, f"{plan_id} duration != 365"
 
     def test_diamond_has_most_benefits(self):
         from services.premium_card import ANNUAL_PLANS
+
         silver_count = len(ANNUAL_PLANS["silver"]["benefits"])
         gold_count = len(ANNUAL_PLANS["gold"]["benefits"])
         diamond_count = len(ANNUAL_PLANS["diamond"]["benefits"])

@@ -9,8 +9,9 @@
   POST /api/v1/manager/broadcast-message     — 广播消息（无 DB，记日志）
   GET  /api/v1/manager/discount-requests     — 折扣申请列表（manager_discount_requests）
 """
+
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
@@ -109,7 +110,7 @@ async def get_realtime_kpi(
 
         data = {
             "revenue_fen": revenue_fen,
-            "revenue": revenue_fen,   # 向前兼容
+            "revenue": revenue_fen,  # 向前兼容
             "order_count": order_count,
             "avg_check_fen": avg_check_fen,
             "avg_check": avg_check_fen,

@@ -3,10 +3,11 @@
 为 Agent 间工具调用提供动态注册、查询、LLM 格式化能力。
 支持从 SkillAgent 自动注册，也支持从 MCP agent_registry 静态数据导入。
 """
+
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -235,14 +236,16 @@ class ToolRegistry:
         result: list[dict[str, Any]] = []
 
         for tool in tools:
-            result.append({
-                "type": "function",
-                "function": {
-                    "name": tool.tool_id,
-                    "description": tool.description,
-                    "parameters": tool.input_schema,
-                },
-            })
+            result.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.tool_id,
+                        "description": tool.description,
+                        "parameters": tool.input_schema,
+                    },
+                }
+            )
 
         return result
 

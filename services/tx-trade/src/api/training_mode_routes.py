@@ -15,6 +15,7 @@
 
 编码规范：FastAPI + Pydantic V2 + async/await，统一响应 {ok, data, error}
 """
+
 import json
 import os
 from datetime import datetime, timezone
@@ -30,11 +31,12 @@ router = APIRouter(prefix="/api/v1/training-mode", tags=["training-mode"])
 
 # ─── Redis Key 常量 ──────────────────────────────────────────────────────────
 
-_KEY_MODE = "tx:training:{store_id}:mode"         # Hash：模式状态
-_KEY_ORDERS = "tx:training:{store_id}:orders"     # Set ：演示订单ID集合
+_KEY_MODE = "tx:training:{store_id}:mode"  # Hash：模式状态
+_KEY_ORDERS = "tx:training:{store_id}:orders"  # Set ：演示订单ID集合
 
 
 # ─── Pydantic 模型 ───────────────────────────────────────────────────────────
+
 
 class TrainingStatusResponse(BaseModel):
     is_demo_mode: bool
@@ -64,6 +66,7 @@ class DemoOrdersResponse(BaseModel):
 
 # ─── Redis 工具 ──────────────────────────────────────────────────────────────
 
+
 def _mode_key(store_id: str) -> str:
     return _KEY_MODE.format(store_id=store_id)
 
@@ -76,6 +79,7 @@ async def _get_redis():
     """获取 Redis 异步客户端（懒导入，不可用时抛 RuntimeError）"""
     try:
         import redis.asyncio as aioredis  # type: ignore
+
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         return aioredis.from_url(redis_url, decode_responses=True)
     except ImportError as exc:
@@ -97,6 +101,7 @@ async def _get_mode_state(store_id: str) -> dict | None:
 
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/status/{store_id}", response_model=dict)
 async def get_training_mode_status(
@@ -295,6 +300,7 @@ async def get_demo_orders(
 
 
 # ─── 内部调用端点（供 cashier_engine.py 使用）────────────────────────────────
+
 
 @router.post("/register-order/{store_id}", response_model=dict, include_in_schema=False)
 async def register_demo_order(

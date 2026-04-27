@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Optional
 
 import structlog
@@ -19,6 +19,7 @@ logger = structlog.get_logger(__name__)
 
 
 # ── Mock 数据生成 ────────────────────────────────────────────────────────────
+
 
 def _mock_daily_scan(check_date: str, store_id: Optional[str]) -> dict[str, Any]:
     """模拟每日合规扫描结果"""
@@ -108,8 +109,18 @@ def _mock_compliance_report(month: str, store_id: Optional[str]) -> dict[str, An
             "proxy_punch": {"count": 2, "trend": "down", "prev_month": 4},
         },
         "high_frequency_employees": [
-            {"employee_id": "e003", "employee_name": "王强", "violation_count": 4, "types": ["overtime_exceed", "gps_anomaly"]},
-            {"employee_id": "e004", "employee_name": "赵敏", "violation_count": 3, "types": ["proxy_punch", "same_device"]},
+            {
+                "employee_id": "e003",
+                "employee_name": "王强",
+                "violation_count": 4,
+                "types": ["overtime_exceed", "gps_anomaly"],
+            },
+            {
+                "employee_id": "e004",
+                "employee_name": "赵敏",
+                "violation_count": 3,
+                "types": ["proxy_punch", "same_device"],
+            },
         ],
         "recommendations": [
             "王强连续2个月加班超标，建议调整排班或增补人手",
@@ -135,6 +146,13 @@ class AttendanceComplianceAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
     agent_level = 1  # 建议级（需人工确认）
+
+    # Sprint D1 / PR 批次 5：考勤合规检测输出建议供 HR 决策，不触发资金/食材/出餐，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "考勤合规检测纯异常识别（GPS/代打卡/加班超时），输出 HR 建议供人工决策，"
+        "不直接操作毛利/食安/体验三条业务约束维度"
+    )
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -193,6 +211,7 @@ class AttendanceComplianceAgent(SkillAgent):
                 from services.tx_org.src.services.attendance_compliance_service import (
                     AttendanceComplianceLogService,
                 )
+
                 svc = AttendanceComplianceLogService(self._db, self.tenant_id)
                 result = await svc.run_full_scan(check_date, store_id)
                 total = result.get("inserted", 0)
@@ -247,6 +266,7 @@ class AttendanceComplianceAgent(SkillAgent):
                 from services.tx_org.src.services.attendance_compliance_service import (
                     AttendanceComplianceLogService,
                 )
+
                 svc = AttendanceComplianceLogService(self._db, self.tenant_id)
                 stats = await svc.get_compliance_stats(month)
                 report = {

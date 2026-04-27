@@ -6,19 +6,21 @@
   GET  /api/v1/org/compliance/documents/expiring - 即将到期证件
   GET  /api/v1/org/compliance/performance/low    - 低绩效员工
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 
-import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from api.compliance_routes import router as compliance_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 app = FastAPI()
@@ -42,6 +44,7 @@ def _make_mock_session():
 def _override_db(mock_session):
     async def _mock_get_db():
         yield mock_session
+
     return _mock_get_db
 
 
@@ -53,37 +56,50 @@ def _make_row(data: dict):
 
 # ─── GET /alerts ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_get_compliance_alerts_ok(headers):
     """正常路径：所有子查询有数据，返回汇总预警。"""
     mock_session = _make_mock_session()
 
     # days_remaining=6 → high 级别
-    cert_row = _make_row({
-        "document_id": "cert-001", "employee_id": "emp-001",
-        "document_type": "健康证", "expiry_date": "2026-04-10",
-        "status": "active", "days_remaining": 6,
-    })
+    cert_row = _make_row(
+        {
+            "document_id": "cert-001",
+            "employee_id": "emp-001",
+            "document_type": "健康证",
+            "expiry_date": "2026-04-10",
+            "status": "active",
+            "days_remaining": 6,
+        }
+    )
     cert_result = MagicMock()
     cert_result.fetchall.return_value = [cert_row]
 
-    perf_row = _make_row({
-        "employee_id": "emp-002", "month_count": 3,
-        "avg_score": "4500.00", "global_avg": "6000.00",
-    })
+    perf_row = _make_row(
+        {
+            "employee_id": "emp-002",
+            "month_count": 3,
+            "avg_score": "4500.00",
+            "global_avg": "6000.00",
+        }
+    )
     perf_result = MagicMock()
     perf_result.fetchall.return_value = [perf_row]
 
-    att_row = _make_row({
-        "employee_id": "emp-003", "absent_days": 5, "late_days": 2, "total_days": 25,
-    })
+    att_row = _make_row(
+        {
+            "employee_id": "emp-003",
+            "absent_days": 5,
+            "late_days": 2,
+            "total_days": 25,
+        }
+    )
     att_result = MagicMock()
     att_result.fetchall.return_value = [att_row]
 
     # 调用顺序：RLS、证件查询、绩效查询、考勤查询
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), cert_result, perf_result, att_result]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), cert_result, perf_result, att_result])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -113,8 +129,12 @@ async def test_get_compliance_alerts_db_error_returns_empty(headers):
     mock_session = _make_mock_session()
     # 第一次 execute 是 _set_rls 的 set_config，必须成功；之后的子查询全部抛异常
     mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), SQLAlchemyError("db unavailable"),
-                     SQLAlchemyError("db unavailable"), SQLAlchemyError("db unavailable")]
+        side_effect=[
+            MagicMock(),
+            SQLAlchemyError("db unavailable"),
+            SQLAlchemyError("db unavailable"),
+            SQLAlchemyError("db unavailable"),
+        ]
     )
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
@@ -136,20 +156,23 @@ async def test_get_compliance_alerts_severity_filter(headers):
     """severity=critical 过滤：days_remaining=-1 的证件保留，其余被过滤。"""
     mock_session = _make_mock_session()
 
-    cert_row = _make_row({
-        "document_id": "cert-001", "employee_id": "emp-001",
-        "document_type": "营业执照", "expiry_date": "2026-04-03",
-        "status": "active", "days_remaining": -1,  # → critical
-    })
+    cert_row = _make_row(
+        {
+            "document_id": "cert-001",
+            "employee_id": "emp-001",
+            "document_type": "营业执照",
+            "expiry_date": "2026-04-03",
+            "status": "active",
+            "days_remaining": -1,  # → critical
+        }
+    )
     cert_result = MagicMock()
     cert_result.fetchall.return_value = [cert_row]
 
     empty_result = MagicMock()
     empty_result.fetchall.return_value = []
 
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), cert_result, empty_result, empty_result]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), cert_result, empty_result, empty_result])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -171,6 +194,7 @@ async def test_get_compliance_alerts_severity_filter(headers):
 
 # ─── POST /scan ───────────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_post_compliance_scan_all_ok(headers):
     """scan_type=all 正常扫描，返回完整合规结果。"""
@@ -179,9 +203,7 @@ async def test_post_compliance_scan_all_ok(headers):
     empty_result = MagicMock()
     empty_result.fetchall.return_value = []
 
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), empty_result, empty_result, empty_result]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), empty_result, empty_result, empty_result])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -207,11 +229,16 @@ async def test_post_compliance_scan_documents_only(headers):
     """scan_type=documents 只扫描证件，不调绩效/考勤。"""
     mock_session = _make_mock_session()
 
-    cert_row = _make_row({
-        "document_id": "cert-001", "employee_id": "emp-001",
-        "document_type": "健康证", "expiry_date": "2026-04-20",
-        "status": "active", "days_remaining": 16,
-    })
+    cert_row = _make_row(
+        {
+            "document_id": "cert-001",
+            "employee_id": "emp-001",
+            "document_type": "健康证",
+            "expiry_date": "2026-04-20",
+            "status": "active",
+            "days_remaining": 16,
+        }
+    )
     cert_result = MagicMock()
     cert_result.fetchall.return_value = [cert_row]
 
@@ -260,16 +287,22 @@ async def test_post_compliance_scan_invalid_type(headers):
 
 # ─── GET /documents/expiring ──────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_get_expiring_documents_ok(headers):
     """正常路径：返回即将到期证件列表，带 threshold_days 和 scanned_at。"""
     mock_session = _make_mock_session()
 
-    cert_row = _make_row({
-        "document_id": "cert-001", "employee_id": "emp-001",
-        "document_type": "食品经营许可证", "expiry_date": "2026-04-25",
-        "status": "active", "days_remaining": 21,
-    })
+    cert_row = _make_row(
+        {
+            "document_id": "cert-001",
+            "employee_id": "emp-001",
+            "document_type": "食品经营许可证",
+            "expiry_date": "2026-04-25",
+            "status": "active",
+            "days_remaining": 21,
+        }
+    )
     cert_result = MagicMock()
     cert_result.fetchall.return_value = [cert_row]
 
@@ -302,16 +335,12 @@ async def test_get_expiring_documents_db_error_returns_empty(headers):
 
     mock_session = _make_mock_session()
     # 第一次成功（_set_rls），第二次抛异常（证件查询）
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), SQLAlchemyError("timeout")]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), SQLAlchemyError("timeout")])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.get(
-                "/api/v1/org/compliance/documents/expiring", headers=headers
-            )
+            r = await client.get("/api/v1/org/compliance/documents/expiring", headers=headers)
     finally:
         app.dependency_overrides.clear()
 
@@ -323,15 +352,20 @@ async def test_get_expiring_documents_db_error_returns_empty(headers):
 
 # ─── GET /performance/low ─────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_get_low_performance_ok(headers):
     """正常路径：返回低绩效员工列表，含 severity=high 和 avg_score。"""
     mock_session = _make_mock_session()
 
-    perf_row = _make_row({
-        "employee_id": "emp-007", "month_count": 4,
-        "avg_score": "3800.00", "global_avg": "6000.00",
-    })
+    perf_row = _make_row(
+        {
+            "employee_id": "emp-007",
+            "month_count": 4,
+            "avg_score": "3800.00",
+            "global_avg": "6000.00",
+        }
+    )
     perf_result = MagicMock()
     perf_result.fetchall.return_value = [perf_row]
 

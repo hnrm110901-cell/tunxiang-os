@@ -3,6 +3,7 @@
 能力：智能菜品推荐、回答菜品问题、加购建议
 根据顾客人数/预算/偏好/历史消费进行智能推荐。
 """
+
 from typing import Any
 
 import structlog
@@ -106,7 +107,8 @@ class AIWaiterAgent(SkillAgent):
 
         if not available_dishes:
             return AgentResult(
-                success=False, action="suggest_dishes",
+                success=False,
+                action="suggest_dishes",
                 error="缺少 available_dishes 参数",
             )
 
@@ -182,13 +184,11 @@ class AIWaiterAgent(SkillAgent):
         }
         suggestion["total_yuan"] = round(suggestion["total_fen"] / 100, 2)
 
-        logger.info("ai_waiter_suggest",
-                     tenant_id=self.tenant_id,
-                     guest_count=guest_count,
-                     dish_count=len(selected))
+        logger.info("ai_waiter_suggest", tenant_id=self.tenant_id, guest_count=guest_count, dish_count=len(selected))
 
         return AgentResult(
-            success=True, action="suggest_dishes",
+            success=True,
+            action="suggest_dishes",
             data=suggestion,
             reasoning=f"为 {guest_count} 人推荐 {len(selected)} 道菜，合计 ¥{suggestion['total_yuan']}",
             confidence=0.85,
@@ -243,7 +243,8 @@ class AIWaiterAgent(SkillAgent):
 
         if not question:
             return AgentResult(
-                success=False, action="answer_question",
+                success=False,
+                action="answer_question",
                 error="缺少 question 参数",
             )
 
@@ -264,11 +265,11 @@ class AIWaiterAgent(SkillAgent):
         if not answer:
             answer = "抱歉，我暂时无法回答这个问题，让我为您叫一下服务员。"
 
-        logger.info("ai_waiter_answer",
-                     tenant_id=self.tenant_id, question=question)
+        logger.info("ai_waiter_answer", tenant_id=self.tenant_id, question=question)
 
         return AgentResult(
-            success=True, action="answer_question",
+            success=True,
+            action="answer_question",
             data={
                 "question": question,
                 "answer": answer,
@@ -297,7 +298,8 @@ class AIWaiterAgent(SkillAgent):
 
         if not current_order:
             return AgentResult(
-                success=False, action="upsell_suggestion",
+                success=False,
+                action="upsell_suggestion",
                 error="当前订单为空，无法给出加购建议",
             )
 
@@ -311,43 +313,42 @@ class AIWaiterAgent(SkillAgent):
             trigger = rule["trigger"]
             if trigger in order_text and rule["suggest"] not in order_text:
                 if rule["suggest"] not in already_suggested:
-                    suggestions.append({
-                        "dish_name": rule["suggest"],
-                        "reason": rule["reason"],
-                        "type": "pairing",
-                    })
+                    suggestions.append(
+                        {
+                            "dish_name": rule["suggest"],
+                            "reason": rule["reason"],
+                            "type": "pairing",
+                        }
+                    )
                     already_suggested.add(rule["suggest"])
 
         # 检查是否缺少主食
-        has_staple = any(
-            item.get("category") == "主食"
-            for item in current_order
-        )
+        has_staple = any(item.get("category") == "主食" for item in current_order)
         if not has_staple and len(current_order) >= 2:
-            suggestions.append({
-                "dish_name": "米饭",
-                "reason": "您还没有点主食，建议搭配米饭",
-                "type": "category_fill",
-            })
+            suggestions.append(
+                {
+                    "dish_name": "米饭",
+                    "reason": "您还没有点主食，建议搭配米饭",
+                    "type": "category_fill",
+                }
+            )
 
         # 检查是否缺少饮品
-        has_drink = any(
-            item.get("category") == "酒水"
-            for item in current_order
-        )
+        has_drink = any(item.get("category") == "酒水" for item in current_order)
         if not has_drink and len(current_order) >= 3:
-            suggestions.append({
-                "dish_name": "饮品",
-                "reason": "点了这么多好菜，来点饮品搭配吧",
-                "type": "category_fill",
-            })
+            suggestions.append(
+                {
+                    "dish_name": "饮品",
+                    "reason": "点了这么多好菜，来点饮品搭配吧",
+                    "type": "category_fill",
+                }
+            )
 
-        logger.info("ai_waiter_upsell",
-                     tenant_id=self.tenant_id,
-                     suggestion_count=len(suggestions))
+        logger.info("ai_waiter_upsell", tenant_id=self.tenant_id, suggestion_count=len(suggestions))
 
         return AgentResult(
-            success=True, action="upsell_suggestion",
+            success=True,
+            action="upsell_suggestion",
             data={
                 "current_order_count": len(current_order),
                 "suggestions": suggestions,

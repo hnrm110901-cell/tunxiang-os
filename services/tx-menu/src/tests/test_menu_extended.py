@@ -12,13 +12,14 @@
 使用 FastAPI TestClient + dependency_overrides[get_db]，不连真实数据库。
 相对导入通过 sys.modules 存根解决。
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import types
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -33,6 +34,7 @@ for p in (_SRC, _ROOT):
         sys.path.insert(0, p)
 
 # ─── sys.modules 存根：阻断相对导入链 ─────────────────────────────────────────
+
 
 def _stub(name: str, **attrs):
     """向 sys.modules 注入最小存根模块，避免因相对导入链失败。"""
@@ -64,9 +66,11 @@ if "structlog" not in sys.modules:
 from shared.ontology.src.database import get_db  # noqa: E402 — 用存根模块
 
 # 为 get_db 提供默认实现（存根模块原来没有）
-if not hasattr(get_db, "__call__"):
+if not callable(get_db):
+
     async def get_db():  # type: ignore[misc]
         yield None
+
 
 from api.brand_publish_routes import router as bp_router  # noqa: E402
 from api.channel_mapping_routes import router as cm_router  # noqa: E402
@@ -89,6 +93,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 # ─── Mock DB 工厂 ──────────────────────────────────────────────────────────────
+
 
 def _make_db() -> AsyncMock:
     db = AsyncMock()
@@ -137,20 +142,27 @@ def client():
 
 
 class TestBrandPublishRoutes:
-
     # ── BP-1: GET /api/v1/menu/brand-dishes 正常查询 ─────────────────────────
 
     def test_list_brand_dishes_returns_200(self, client):
         """GET /brand-dishes 带合法 tenant_id 返回 200，分页结构正确。"""
         # 第一次 execute：set_config；第二次：COUNT；第三次：SELECT rows
         db = _make_db()
-        set_cfg_res = MagicMock(); set_cfg_res.fetchall.return_value = []
-        count_res = MagicMock(); count_res.scalar.return_value = 3
+        set_cfg_res = MagicMock()
+        set_cfg_res.fetchall.return_value = []
+        count_res = MagicMock()
+        count_res.scalar.return_value = 3
         row = (
-            uuid.UUID(DISH_ID), "红烧肉", "D001", 4800,
-            "经典湘菜", "http://img/1.jpg",
-            uuid.UUID(STORE_ID), True,
-            uuid.UUID(TENANT_ID), None,
+            uuid.UUID(DISH_ID),
+            "红烧肉",
+            "D001",
+            4800,
+            "经典湘菜",
+            "http://img/1.jpg",
+            uuid.UUID(STORE_ID),
+            True,
+            uuid.UUID(TENANT_ID),
+            None,
         )
         rows_res = MagicMock()
         rows_res.fetchall.return_value = [row]
@@ -207,9 +219,7 @@ class TestBrandPublishRoutes:
     def test_create_publish_plan_service_error_returns_400(self, client):
         """POST /publish-plans 当 service 抛 ValueError 时应返回 400。"""
         mock_svc_instance = AsyncMock()
-        mock_svc_instance.create_publish_plan = AsyncMock(
-            side_effect=ValueError("brand_id 不存在")
-        )
+        mock_svc_instance.create_publish_plan = AsyncMock(side_effect=ValueError("brand_id 不存在"))
         _bps_class.return_value = mock_svc_instance
 
         resp = client.post(
@@ -231,9 +241,7 @@ class TestBrandPublishRoutes:
         """GET /publish-plans/{plan_id} 方案不存在时 service 抛 ValueError → 404。"""
         fake_plan_id = str(uuid.uuid4())
         mock_svc_instance = AsyncMock()
-        mock_svc_instance.get_publish_plan = AsyncMock(
-            side_effect=ValueError(f"发布方案 {fake_plan_id} 不存在")
-        )
+        mock_svc_instance.get_publish_plan = AsyncMock(side_effect=ValueError(f"发布方案 {fake_plan_id} 不存在"))
         _bps_class.return_value = mock_svc_instance
 
         resp = client.get(
@@ -251,7 +259,6 @@ class TestBrandPublishRoutes:
 
 
 class TestChannelMappingRoutes:
-
     # ── CM-1: GET /api/v1/menu/channels 正常查询渠道列表 ─────────────────────
 
     def test_list_channels_returns_200(self, client):
@@ -263,7 +270,8 @@ class TestChannelMappingRoutes:
             ("meituan", 8),
         ]
         # 第一次 execute: set_config；第二次: count query
-        set_cfg_res = MagicMock(); set_cfg_res.fetchall.return_value = []
+        set_cfg_res = MagicMock()
+        set_cfg_res.fetchall.return_value = []
         db = _make_db()
         db.execute = AsyncMock(side_effect=[set_cfg_res, count_res])
         app.dependency_overrides[get_db] = lambda: db
@@ -301,19 +309,21 @@ class TestChannelMappingRoutes:
     def test_list_channel_dishes_returns_200(self, client):
         """GET /channels/dine_in/dishes 合法渠道和门店返回 200。"""
         dish_row = (
-            uuid.UUID(DISH_ID),       # cmi.id
-            uuid.UUID(DISH_ID),       # cmi.dish_id
-            "剁椒鱼头",               # d.dish_name
-            5800,                     # base_price_fen
-            None,                     # channel_price_fen
-            5800,                     # effective_price_fen
-            True,                     # is_available
-            0,                        # sort_order
-            "http://img/dish.jpg",    # image_url
-            uuid.UUID(STORE_ID),      # category_id
+            uuid.UUID(DISH_ID),  # cmi.id
+            uuid.UUID(DISH_ID),  # cmi.dish_id
+            "剁椒鱼头",  # d.dish_name
+            5800,  # base_price_fen
+            None,  # channel_price_fen
+            5800,  # effective_price_fen
+            True,  # is_available
+            0,  # sort_order
+            "http://img/dish.jpg",  # image_url
+            uuid.UUID(STORE_ID),  # category_id
         )
-        set_cfg_res = MagicMock(); set_cfg_res.fetchall.return_value = []
-        rows_res = MagicMock(); rows_res.fetchall.return_value = [dish_row]
+        set_cfg_res = MagicMock()
+        set_cfg_res.fetchall.return_value = []
+        rows_res = MagicMock()
+        rows_res.fetchall.return_value = [dish_row]
         db = _make_db()
         db.execute = AsyncMock(side_effect=[set_cfg_res, rows_res])
         app.dependency_overrides[get_db] = lambda: db
@@ -347,9 +357,11 @@ class TestChannelMappingRoutes:
 
     def test_publish_to_channel_no_dishes_returns_422(self, client):
         """POST /channels/meituan/publish 渠道无可用菜品时应返回 422。"""
-        set_cfg_res = MagicMock(); set_cfg_res.fetchall.return_value = []
+        set_cfg_res = MagicMock()
+        set_cfg_res.fetchall.return_value = []
         # channel_menu_items 查询返回空列表
-        empty_res = MagicMock(); empty_res.fetchall.return_value = []
+        empty_res = MagicMock()
+        empty_res.fetchall.return_value = []
         db = _make_db()
         db.execute = AsyncMock(side_effect=[set_cfg_res, empty_res])
         app.dependency_overrides[get_db] = lambda: db

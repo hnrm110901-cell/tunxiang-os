@@ -13,6 +13,7 @@
 10. PUT  /api/v1/member/gdpr/retention-policies/{category}      更新某类数据保留期
 11. GET  /api/v1/member/gdpr/export/{customer_id}               生成顾客数据导出（兼容旧路径）
 """
+
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
@@ -28,12 +29,14 @@ router = APIRouter(prefix="/api/v1/member/gdpr", tags=["gdpr_compliance"])
 
 # ─── DB 依赖 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class CreateRequestModel(BaseModel):
     customer_id: str = Field(..., description="客户 ID")
@@ -60,6 +63,7 @@ class ExecuteErasureModel(BaseModel):
 
 
 # ─── 1. 提交权利申请 ──────────────────────────────────────────────────────────
+
 
 @router.post("/requests", summary="提交 GDPR 权利申请", status_code=201)
 async def create_gdpr_request(
@@ -89,6 +93,7 @@ async def create_gdpr_request(
 
 # ─── 2. 查询请求列表 ──────────────────────────────────────────────────────────
 
+
 @router.get("/requests", summary="GDPR 请求列表")
 async def list_gdpr_requests(
     customer_id: Optional[str] = Query(None, description="按客户过滤"),
@@ -109,6 +114,7 @@ async def list_gdpr_requests(
 
 # ─── 3. 请求详情 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/requests/{request_id}", summary="GDPR 请求详情")
 async def get_gdpr_request(
     request_id: str = Path(..., description="请求 ID"),
@@ -124,6 +130,7 @@ async def get_gdpr_request(
 
 
 # ─── 4. 审核请求 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/requests/{request_id}/review", summary="审核 GDPR 请求")
 async def review_gdpr_request(
@@ -153,6 +160,7 @@ async def review_gdpr_request(
 
 # ─── 5. 执行匿名化 ────────────────────────────────────────────────────────────
 
+
 @router.post("/requests/{request_id}/execute", summary="执行被遗忘权匿名化")
 async def execute_erasure(
     request_id: str = Path(..., description="请求 ID"),
@@ -180,6 +188,7 @@ async def execute_erasure(
 
 # ─── 6. 数据导出 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/export/{customer_id}", summary="导出客户个人数据（数据可携权）")
 async def export_customer_data(
     customer_id: str = Path(..., description="客户 ID"),
@@ -201,6 +210,7 @@ async def export_customer_data(
 
 # ─── 7. 待处理数量 ────────────────────────────────────────────────────────────
 
+
 @router.get("/pending-count", summary="待处理 GDPR 请求数（运营看板）")
 async def get_pending_count(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
@@ -208,7 +218,6 @@ async def get_pending_count(
 ) -> Dict[str, Any]:
     """返回各状态的 GDPR 请求数量，供运营看板使用。"""
     from sqlalchemy import text as sa_text
-
 
     result = await db.execute(
         sa_text("""
@@ -234,9 +243,9 @@ async def get_pending_count(
 
 # ─── 8. 统一处理端点（approve/reject）— v202 新增 ─────────────────────────────
 
-import uuid as _uuid_mod
-import structlog as _structlog
 from datetime import datetime, timezone
+
+import structlog as _structlog
 from sqlalchemy import text as _sa_text
 
 _log = _structlog.get_logger(__name__)
@@ -289,6 +298,7 @@ async def process_gdpr_request(
 
 
 # ─── 9. 列出数据保留期策略 — v202 新增 ────────────────────────────────────────
+
 
 @router.get("/retention-policies", summary="列出数据保留期策略")
 async def list_retention_policies(

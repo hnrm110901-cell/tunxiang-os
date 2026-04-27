@@ -1,4 +1,5 @@
 """宴席定金 JSAPI 参数构建（无 DB / 无 ORM 导入链）。"""
+
 import os
 import sys
 

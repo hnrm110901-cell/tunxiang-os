@@ -3,6 +3,7 @@
 测试链路：开单 → 加菜 → 改菜 → 折扣 → 结算 → 支付 → 退款
 不依赖真实数据库，使用 mock AsyncSession。
 """
+
 import asyncio
 import os
 import sys
@@ -31,6 +32,7 @@ def _mock_db():
 
 # ─── OrderService 测试 ───
 
+
 class TestOrderService:
     def test_create_order(self):
         db = _mock_db()
@@ -45,26 +47,30 @@ class TestOrderService:
         db = _mock_db()
         svc = OrderService(db, TENANT_ID)
         order_id = str(uuid.uuid4())
-        result = asyncio.run(svc.add_item(
-            order_id=order_id,
-            dish_id=str(uuid.uuid4()),
-            dish_name="剁椒鱼头",
-            quantity=1,
-            unit_price_fen=8800,
-        ))
+        result = asyncio.run(
+            svc.add_item(
+                order_id=order_id,
+                dish_id=str(uuid.uuid4()),
+                dish_name="剁椒鱼头",
+                quantity=1,
+                unit_price_fen=8800,
+            )
+        )
         assert result["subtotal_fen"] == 8800
         assert "item_id" in result
 
     def test_add_item_multiple_quantity(self):
         db = _mock_db()
         svc = OrderService(db, TENANT_ID)
-        result = asyncio.run(svc.add_item(
-            order_id=str(uuid.uuid4()),
-            dish_id=str(uuid.uuid4()),
-            dish_name="米饭",
-            quantity=3,
-            unit_price_fen=300,
-        ))
+        result = asyncio.run(
+            svc.add_item(
+                order_id=str(uuid.uuid4()),
+                dish_id=str(uuid.uuid4()),
+                dish_name="米饭",
+                quantity=3,
+                unit_price_fen=300,
+            )
+        )
         assert result["subtotal_fen"] == 900
 
     def test_apply_discount_validates_amount(self):
@@ -152,13 +158,18 @@ class TestOrderService:
 
 # ─── PaymentService 测试 ───
 
+
 class TestPaymentService:
     def test_create_payment(self):
         db = _mock_db()
         svc = PaymentService(db, TENANT_ID)
-        result = asyncio.run(svc.create_payment(
-            order_id=str(uuid.uuid4()), method="wechat", amount_fen=15800,
-        ))
+        result = asyncio.run(
+            svc.create_payment(
+                order_id=str(uuid.uuid4()),
+                method="wechat",
+                amount_fen=15800,
+            )
+        )
         assert result["payment_no"].startswith("PAY")
         assert result["status"] == "paid"
 
@@ -173,9 +184,13 @@ class TestPaymentService:
 
         svc = PaymentService(db, TENANT_ID)
         try:
-            asyncio.run(svc.process_refund(
-                str(uuid.uuid4()), str(uuid.uuid4()), amount_fen=15000,
-            ))
+            asyncio.run(
+                svc.process_refund(
+                    str(uuid.uuid4()),
+                    str(uuid.uuid4()),
+                    amount_fen=15000,
+                )
+            )
             assert False, "Should raise ValueError"
         except ValueError as e:
             assert "exceeds" in str(e)
@@ -190,9 +205,13 @@ class TestPaymentService:
         db.execute.return_value = mock_result
 
         svc = PaymentService(db, TENANT_ID)
-        result = asyncio.run(svc.process_refund(
-            str(uuid.uuid4()), str(uuid.uuid4()), amount_fen=10000,
-        ))
+        result = asyncio.run(
+            svc.process_refund(
+                str(uuid.uuid4()),
+                str(uuid.uuid4()),
+                amount_fen=10000,
+            )
+        )
         assert result["refund_no"].startswith("REF")
         assert result["status"] == "refunded"
 
@@ -206,13 +225,19 @@ class TestPaymentService:
         db.execute.return_value = mock_result
 
         svc = PaymentService(db, TENANT_ID)
-        result = asyncio.run(svc.process_refund(
-            str(uuid.uuid4()), str(uuid.uuid4()), amount_fen=3000, refund_type="partial",
-        ))
+        result = asyncio.run(
+            svc.process_refund(
+                str(uuid.uuid4()),
+                str(uuid.uuid4()),
+                amount_fen=3000,
+                refund_type="partial",
+            )
+        )
         assert result["status"] == "partial_refund"
 
 
 # ─── 全流程集成测试 ───
+
 
 class TestCashierE2EFlow:
     """模拟完整收银流程"""
@@ -275,7 +300,12 @@ class TestCashierE2EFlow:
         mock_result.scalar_one_or_none.return_value = mock_payment
         db.execute.return_value = mock_result
 
-        refund = asyncio.run(pay_svc.process_refund(
-            str(uuid.uuid4()), str(uuid.uuid4()), amount_fen=9700, reason="菜品问题",
-        ))
+        refund = asyncio.run(
+            pay_svc.process_refund(
+                str(uuid.uuid4()),
+                str(uuid.uuid4()),
+                amount_fen=9700,
+                reason="菜品问题",
+            )
+        )
         assert refund["status"] == "refunded"

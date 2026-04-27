@@ -1,0 +1,43 @@
+name: Nightly Offline E2E
+on:
+  schedule:
+    - cron: '0 19 * * *'  # UTC 19:00 = CST 03:00
+  workflow_dispatch:
+
+jobs:
+  offline-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: tunxiang_test
+          POSTGRES_USER: tunxiang
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.14' }
+      - name: Install dependencies
+        run: |
+          cd apps/web-pos && npm ci
+          cd ../../apps/web-kds && npm ci
+          npx playwright install --with-deps chromium
+      - name: Start services
+        run: |
+          cd services/tx-trade && pip install -r requirements.txt && uvicorn src.main:app --port 8001 &
+          cd apps/web-pos && npm run build && npx serve -s dist -l 3000 &
+          sleep 10
+      - name: Run offline E2E tests
+        run: npx playwright test e2e/tests/offline-cashier.spec.ts --project=offline
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-e2e-results-${{ github.run_number }}
+          path: e2e/test-results/

@@ -9,19 +9,19 @@
 
 DB不可用时自动降级返回 Mock 数据。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
-from fastapi import Depends
 
 logger = structlog.get_logger(__name__)
 
@@ -32,12 +32,12 @@ router = APIRouter(prefix="/api/v1/growth/campaigns-v2", tags=["campaigns-engine
 # ---------------------------------------------------------------------------
 
 VALID_TRANSITIONS: dict[str, list[str]] = {
-    "draft":     ["scheduled", "active", "cancelled"],
+    "draft": ["scheduled", "active", "cancelled"],
     "scheduled": ["active", "cancelled"],
-    "active":    ["paused", "ended", "cancelled"],
-    "paused":    ["active", "ended", "cancelled"],
-    "ended":     [],   # 终态
-    "cancelled": [],   # 终态
+    "active": ["paused", "ended", "cancelled"],
+    "paused": ["active", "ended", "cancelled"],
+    "ended": [],  # 终态
+    "cancelled": [],  # 终态
 }
 
 # ---------------------------------------------------------------------------
@@ -66,9 +66,9 @@ def error_response(code: str, message: str) -> dict:
 
 class CreateCampaignRequest(BaseModel):
     name: str
-    campaign_type: str   # discount/gift/points/combo/flash_sale/buy_x_get_y
-    start_at: str        # ISO8601
-    end_at: str          # ISO8601
+    campaign_type: str  # discount/gift/points/combo/flash_sale/buy_x_get_y
+    start_at: str  # ISO8601
+    end_at: str  # ISO8601
     budget_fen: Optional[int] = None
     target_audience: dict = {}
     rules: dict = {}
@@ -181,7 +181,7 @@ async def list_campaigns(
             items = [c for c in items if c["status"] == status]
         if campaign_type:
             items = [c for c in items if c["campaign_type"] == campaign_type]
-        page_items = items[(page - 1) * size: page * size]
+        page_items = items[(page - 1) * size : page * size]
         return ok_response({"items": page_items, "total": len(items), "page": page, "size": size})
 
 
@@ -324,23 +324,25 @@ async def create_campaign(
         await db.commit()
 
         logger.info("campaign.created", campaign_id=str(campaign_id), tenant_id=x_tenant_id)
-        return ok_response({
-            "id": str(campaign_id),
-            "name": req.name,
-            "campaign_type": req.campaign_type,
-            "status": "draft",
-            "start_at": req.start_at,
-            "end_at": req.end_at,
-            "budget_fen": req.budget_fen,
-            "used_fen": 0,
-            "target_audience": req.target_audience,
-            "rules": req.rules,
-            "applicable_stores": req.applicable_stores,
-            "priority": req.priority,
-            "max_per_member": req.max_per_member,
-            "total_participants": 0,
-            "created_at": now.isoformat(),
-        })
+        return ok_response(
+            {
+                "id": str(campaign_id),
+                "name": req.name,
+                "campaign_type": req.campaign_type,
+                "status": "draft",
+                "start_at": req.start_at,
+                "end_at": req.end_at,
+                "budget_fen": req.budget_fen,
+                "used_fen": 0,
+                "target_audience": req.target_audience,
+                "rules": req.rules,
+                "applicable_stores": req.applicable_stores,
+                "priority": req.priority,
+                "max_per_member": req.max_per_member,
+                "total_participants": 0,
+                "created_at": now.isoformat(),
+            }
+        )
 
     except HTTPException:
         raise
@@ -606,34 +608,40 @@ async def apply_campaign(
         camp = _row_to_dict(row)
 
         if camp["status"] != "active":
-            return ok_response({
-                "applicable_campaigns": [],
-                "total_discount_fen": 0,
-                "applied_campaign_id": None,
-                "reason": f"活动未在进行中（当前: {camp['status']}）",
-            })
+            return ok_response(
+                {
+                    "applicable_campaigns": [],
+                    "total_discount_fen": 0,
+                    "applied_campaign_id": None,
+                    "reason": f"活动未在进行中（当前: {camp['status']}）",
+                }
+            )
 
         rules = camp["rules"] if isinstance(camp["rules"], dict) else _json.loads(camp["rules"] or "{}")
         threshold_fen: int = rules.get("threshold_fen", 0)
 
         if req.order_amount_fen < threshold_fen:
-            return ok_response({
-                "applicable_campaigns": [],
-                "total_discount_fen": 0,
-                "applied_campaign_id": None,
-                "reason": f"订单金额 {req.order_amount_fen} 分不满足最低门槛 {threshold_fen} 分",
-            })
+            return ok_response(
+                {
+                    "applicable_campaigns": [],
+                    "total_discount_fen": 0,
+                    "applied_campaign_id": None,
+                    "reason": f"订单金额 {req.order_amount_fen} 分不满足最低门槛 {threshold_fen} 分",
+                }
+            )
 
         # 检查预算
         budget_fen = camp["budget_fen"]
         used_fen: int = camp["used_fen"] or 0
         if budget_fen is not None and used_fen >= budget_fen:
-            return ok_response({
-                "applicable_campaigns": [],
-                "total_discount_fen": 0,
-                "applied_campaign_id": None,
-                "reason": "活动预算已用完",
-            })
+            return ok_response(
+                {
+                    "applicable_campaigns": [],
+                    "total_discount_fen": 0,
+                    "applied_campaign_id": None,
+                    "reason": "活动预算已用完",
+                }
+            )
 
         # 检查每会员参与上限
         max_per_member = camp["max_per_member"]
@@ -644,17 +652,18 @@ async def apply_campaign(
                     WHERE campaign_id = :cid
                       AND (member_id = :mid OR customer_id = :mid_uuid)
                 """),
-                {"cid": uuid.UUID(campaign_id), "mid": req.member_id,
-                 "mid_uuid": _try_uuid(req.member_id)},
+                {"cid": uuid.UUID(campaign_id), "mid": req.member_id, "mid_uuid": _try_uuid(req.member_id)},
             )
             participation_count = count_result.scalar() or 0
             if participation_count >= max_per_member:
-                return ok_response({
-                    "applicable_campaigns": [],
-                    "total_discount_fen": 0,
-                    "applied_campaign_id": None,
-                    "reason": "已达每会员参与上限",
-                })
+                return ok_response(
+                    {
+                        "applicable_campaigns": [],
+                        "total_discount_fen": 0,
+                        "applied_campaign_id": None,
+                        "reason": "已达每会员参与上限",
+                    }
+                )
 
         # 计算折扣
         discount_fen = _calc_discount(req.order_amount_fen, rules)
@@ -707,16 +716,22 @@ async def apply_campaign(
         )
 
         await db.commit()
-        logger.info("campaign.applied",
-                    campaign_id=campaign_id, member_id=req.member_id,
-                    discount_fen=discount_fen, tenant_id=x_tenant_id)
+        logger.info(
+            "campaign.applied",
+            campaign_id=campaign_id,
+            member_id=req.member_id,
+            discount_fen=discount_fen,
+            tenant_id=x_tenant_id,
+        )
 
-        return ok_response({
-            "applicable_campaigns": [campaign_id],
-            "total_discount_fen": discount_fen,
-            "applied_campaign_id": campaign_id,
-            "participant_record_id": str(participant_id),
-        })
+        return ok_response(
+            {
+                "applicable_campaigns": [campaign_id],
+                "total_discount_fen": discount_fen,
+                "applied_campaign_id": campaign_id,
+                "participant_record_id": str(participant_id),
+            }
+        )
 
     except HTTPException:
         raise
@@ -765,21 +780,22 @@ async def get_campaign_stats(
         )
         agg_row = _row_to_dict(agg.fetchone())
 
-        return ok_response({
-            "campaign_id": campaign_id,
-            "name": camp["name"],
-            "status": camp["status"],
-            "budget_fen": camp["budget_fen"],
-            "used_fen": camp["used_fen"],
-            "budget_utilization_pct": (
-                round(camp["used_fen"] / camp["budget_fen"] * 100, 2)
-                if camp["budget_fen"] else None
-            ),
-            "total_participants": camp["total_participants"],
-            "participant_count_from_records": agg_row["participant_count"],
-            "total_discount_fen": agg_row["total_discount_fen"],
-            "total_points_earned": agg_row["total_points_earned"],
-        })
+        return ok_response(
+            {
+                "campaign_id": campaign_id,
+                "name": camp["name"],
+                "status": camp["status"],
+                "budget_fen": camp["budget_fen"],
+                "used_fen": camp["used_fen"],
+                "budget_utilization_pct": (
+                    round(camp["used_fen"] / camp["budget_fen"] * 100, 2) if camp["budget_fen"] else None
+                ),
+                "total_participants": camp["total_participants"],
+                "participant_count_from_records": agg_row["participant_count"],
+                "total_discount_fen": agg_row["total_discount_fen"],
+                "total_points_earned": agg_row["total_points_earned"],
+            }
+        )
 
     except HTTPException:
         raise
@@ -787,16 +803,18 @@ async def get_campaign_stats(
         logger.warning("get_stats_db_error_fallback", campaign_id=campaign_id, tenant_id=x_tenant_id)
         for c in _FALLBACK_CAMPAIGNS:
             if c["id"] == campaign_id:
-                return ok_response({
-                    "campaign_id": campaign_id,
-                    "name": c["name"],
-                    "status": c["status"],
-                    "budget_fen": c.get("budget_fen"),
-                    "used_fen": c["used_fen"],
-                    "total_participants": c["total_participants"],
-                    "total_discount_fen": c["used_fen"],
-                    "total_points_earned": 0,
-                })
+                return ok_response(
+                    {
+                        "campaign_id": campaign_id,
+                        "name": c["name"],
+                        "status": c["status"],
+                        "budget_fen": c.get("budget_fen"),
+                        "used_fen": c["used_fen"],
+                        "total_participants": c["total_participants"],
+                        "total_discount_fen": c["used_fen"],
+                        "total_points_earned": 0,
+                    }
+                )
         raise HTTPException(status_code=404, detail=error_response("NOT_FOUND", f"活动不存在: {campaign_id}"))
 
 

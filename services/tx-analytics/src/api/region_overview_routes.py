@@ -6,6 +6,7 @@
   GET  /                       — 区域/品牌维度汇总数据
   GET  /{region_id}/stores     — 区域内门店列表
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,6 +38,7 @@ _METRIC_LABELS = {
 
 # ─── 辅助函数 ────────────────────────────────────────────────
 
+
 def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
     if not x_tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header is required")
@@ -55,6 +57,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> None:
 
 # ─── 端点 ────────────────────────────────────────────────────
 
+
 @router.get("/")
 async def region_overview(
     dimension: str = Query("region", description="维度: region / brand"),
@@ -70,7 +73,8 @@ async def region_overview(
 
         if dimension == "brand":
             # 按品牌聚合：group stores by brand_id, join orders for revenue
-            rows = await db.execute(text("""
+            rows = await db.execute(
+                text("""
                 SELECT
                     s.brand_id,
                     COUNT(DISTINCT s.id)                        AS store_count,
@@ -84,7 +88,8 @@ async def region_overview(
                 WHERE s.is_deleted = false
                   AND s.status     = 'active'
                 GROUP BY s.brand_id, s.region
-            """))
+            """)
+            )
             raw = rows.fetchall()
 
             brand_map: dict[str, dict] = {}
@@ -98,7 +103,7 @@ async def region_overview(
                         "regions": [],
                     }
                 brand_map[brand]["store_count"] += r.store_count
-                brand_map[brand]["revenue_fen"]  += r.revenue_fen
+                brand_map[brand]["revenue_fen"] += r.revenue_fen
                 if r.region and r.region not in brand_map[brand]["regions"]:
                     brand_map[brand]["regions"].append(r.region)
 
@@ -113,7 +118,8 @@ async def region_overview(
 
         # ── 按区域汇总 ───────────────────────────────────────────────
         # Group stores by the `region` varchar field; join orders for revenue/metrics
-        region_rows = await db.execute(text("""
+        region_rows = await db.execute(
+            text("""
             SELECT
                 COALESCE(s.region, '未分区')                    AS region_name,
                 COUNT(DISTINCT s.id)                            AS store_count,
@@ -132,11 +138,13 @@ async def region_overview(
               AND s.status     = 'active'
             GROUP BY COALESCE(s.region, '未分区')
             ORDER BY revenue_fen DESC
-        """))
+        """)
+        )
         region_raw = region_rows.fetchall()
 
         # Per-region brand breakdown
-        brand_rows = await db.execute(text("""
+        brand_rows = await db.execute(
+            text("""
             SELECT
                 COALESCE(s.region, '未分区')                    AS region_name,
                 COALESCE(s.brand_id, 'unknown')                 AS brand,
@@ -150,35 +158,40 @@ async def region_overview(
             WHERE s.is_deleted = false
               AND s.status     = 'active'
             GROUP BY COALESCE(s.region, '未分区'), COALESCE(s.brand_id, 'unknown')
-        """))
+        """)
+        )
         brand_raw = brand_rows.fetchall()
 
         # Build brand lookup keyed by region
         brand_by_region: dict[str, list] = {}
         for br in brand_raw:
-            brand_by_region.setdefault(br.region_name, []).append({
-                "brand":       br.brand,
-                "store_count": br.store_count,
-                "revenue_fen": br.revenue_fen,
-            })
+            brand_by_region.setdefault(br.region_name, []).append(
+                {
+                    "brand": br.brand,
+                    "store_count": br.store_count,
+                    "revenue_fen": br.revenue_fen,
+                }
+            )
 
         items = []
         for r in region_raw:
-            items.append({
-                "region_id":   r.region_name,   # use region name as stable key
-                "region_name": r.region_name,
-                "store_count": r.store_count,
-                "metrics": {
-                    "revenue_fen":   r.revenue_fen,
-                    "avg_ticket_fen": int(r.avg_ticket_fen),
-                    "order_count":   r.order_count,
-                    "total_guests":  r.total_guests,
-                },
-                "brands": brand_by_region.get(r.region_name, []),
-            })
+            items.append(
+                {
+                    "region_id": r.region_name,  # use region name as stable key
+                    "region_name": r.region_name,
+                    "store_count": r.store_count,
+                    "metrics": {
+                        "revenue_fen": r.revenue_fen,
+                        "avg_ticket_fen": int(r.avg_ticket_fen),
+                        "order_count": r.order_count,
+                        "total_guests": r.total_guests,
+                    },
+                    "brands": brand_by_region.get(r.region_name, []),
+                }
+            )
 
         total_revenue = sum(i["metrics"]["revenue_fen"] for i in items)
-        total_stores  = sum(i["store_count"] for i in items)
+        total_stores = sum(i["store_count"] for i in items)
 
         return {
             "ok": True,
@@ -187,9 +200,9 @@ async def region_overview(
                 "items": items,
                 "total": len(items),
                 "group_summary": {
-                    "total_stores":    total_stores,
+                    "total_stores": total_stores,
                     "total_revenue_fen": total_revenue,
-                    "metric_labels":   _METRIC_LABELS,
+                    "metric_labels": _METRIC_LABELS,
                 },
             },
         }
@@ -229,13 +242,16 @@ async def region_stores(
         await _set_tenant(db, tenant_id)
 
         # Verify the region exists (region_id is the region string value)
-        check = await db.execute(text("""
+        check = await db.execute(
+            text("""
             SELECT COUNT(*)
             FROM stores
             WHERE is_deleted = false
               AND status     = 'active'
               AND COALESCE(region, '未分区') = :region_id
-        """), {"region_id": region_id})
+        """),
+            {"region_id": region_id},
+        )
         total = check.scalar() or 0
         if total == 0:
             raise HTTPException(status_code=404, detail=f"区域不存在: {region_id}")
@@ -247,7 +263,8 @@ async def region_stores(
         direction = "DESC" if sort_order == "desc" else "ASC"
         offset = (page - 1) * size
 
-        rows = await db.execute(text(f"""
+        rows = await db.execute(
+            text(f"""
             SELECT
                 s.id::text                                      AS store_id,
                 s.store_name,
@@ -266,15 +283,17 @@ async def region_stores(
             GROUP BY s.id, s.store_name, s.city, s.brand_id
             ORDER BY {sort_by} {direction}
             LIMIT :size OFFSET :offset
-        """), {"region_id": region_id, "size": size, "offset": offset})
+        """),
+            {"region_id": region_id, "size": size, "offset": offset},
+        )
         store_rows = rows.fetchall()
 
         items = [
             {
-                "store_id":    r.store_id,
-                "store_name":  r.store_name,
-                "city":        r.city,
-                "brand_id":    r.brand_id,
+                "store_id": r.store_id,
+                "store_name": r.store_name,
+                "city": r.city,
+                "brand_id": r.brand_id,
                 "revenue_fen": r.revenue_fen,
                 "order_count": r.order_count,
             }
@@ -284,12 +303,12 @@ async def region_stores(
         return {
             "ok": True,
             "data": {
-                "region_id":   region_id,
+                "region_id": region_id,
                 "region_name": region_id,
-                "items":  items,
-                "total":  total,
-                "page":   page,
-                "size":   size,
+                "items": items,
+                "total": total,
+                "page": page,
+                "size": size,
             },
         }
 
@@ -300,11 +319,11 @@ async def region_stores(
         return {
             "ok": True,
             "data": {
-                "region_id":   region_id,
+                "region_id": region_id,
                 "region_name": region_id,
-                "items":  [],
-                "total":  0,
-                "page":   page,
-                "size":   size,
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
             },
         }

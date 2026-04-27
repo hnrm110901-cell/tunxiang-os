@@ -10,6 +10,7 @@
 7. GET    /api/v1/finance/splits/settlement         分账汇总（按收款方）
 8. POST   /api/v1/finance/splits/channel-notify     通道异步结果（Y-B2 骨架 + 可选 HMAC）
 """
+
 from __future__ import annotations
 
 import json
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/v1/finance/splits", tags=["split_engine"])
 
 # ─── DB 依赖 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -42,6 +44,7 @@ def _engine(
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class UpsertRuleRequest(BaseModel):
     id: Optional[str] = Field(None, description="规则 ID（更新时传入）")
@@ -114,6 +117,7 @@ class ChannelNotifyRequest(BaseModel):
 
 # ─── 1. 创建/更新规则 ─────────────────────────────────────────────────────────
 
+
 @router.post("/rules", summary="创建或更新分润规则", status_code=201)
 async def upsert_split_rule(
     body: UpsertRuleRequest,
@@ -142,6 +146,7 @@ async def upsert_split_rule(
 
 # ─── 2. 查询规则列表 ──────────────────────────────────────────────────────────
 
+
 @router.get("/rules", summary="查询分润规则列表")
 async def list_split_rules(
     is_active: Optional[bool] = Query(None, description="是否启用过滤"),
@@ -156,6 +161,7 @@ async def list_split_rules(
 
 
 # ─── 3. 停用规则 ──────────────────────────────────────────────────────────────
+
 
 @router.delete("/rules/{rule_id}", summary="停用分润规则")
 async def deactivate_split_rule(
@@ -174,6 +180,7 @@ async def deactivate_split_rule(
 
 # ─── 4. 执行分账 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/execute", summary="执行分账（对一笔交易）")
 async def execute_split(
     body: ExecuteSplitRequest,
@@ -186,6 +193,7 @@ async def execute_split(
     返回本次生成的所有分润记录。
     """
     from datetime import date as date_type
+
     t_date = date_type.fromisoformat(body.transaction_date) if body.transaction_date else None
 
     engine = SplitEngine(db, x_tenant_id)
@@ -217,6 +225,7 @@ async def execute_split(
 
 # ─── 5. 批量结算 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/settle", summary="批量结算分润流水")
 async def settle_split_records(
     body: SettleRequest,
@@ -240,6 +249,7 @@ async def settle_split_records(
 
 
 # ─── 5b. 通道异步通知（微信/支付宝分账结果回调形状）────────────────────────────
+
 
 @router.post("/channel-notify", summary="通道分账异步结果（幂等）")
 async def channel_split_notify(
@@ -291,6 +301,7 @@ async def channel_split_notify(
 
 # ─── 6. 分润流水 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/transactions", summary="分润流水列表")
 async def list_split_transactions(
     order_id: Optional[str] = Query(None, description="按订单 ID 过滤"),
@@ -320,6 +331,7 @@ async def list_split_transactions(
 
 
 # ─── 7. 分账汇总 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/settlement", summary="分账汇总（按收款方）")
 async def get_settlement_summary(

@@ -13,13 +13,12 @@
   - Agent 单笔限额 1000 元，日累计 5000 元
   - 所有调用留痕到 AgentDecisionLog
 """
+
 from __future__ import annotations
 
 # MCP 工具注册表 — 供 mcp-server/src/agent_registry.py 导入
 PAYMENT_MCP_TOOLS: dict[str, dict] = {
-
     # ─── 只读工具（Agent 可自由调用） ─────────────────────────
-
     "payment__query_status": {
         "agent_id": "payment_nexus",
         "description": "查询支付状态。输入 payment_id，返回支付方式、金额、状态、第三方流水号。",
@@ -30,7 +29,6 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "service_url": "http://localhost:8013",
         "human_auth_required": False,
     },
-
     "payment__daily_summary": {
         "agent_id": "payment_nexus",
         "description": "获取门店当日支付汇总，按支付方式分组（微信/支付宝/现金/储值/挂账），含手续费计算。",
@@ -42,7 +40,6 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "service_url": "http://localhost:8013",
         "human_auth_required": False,
     },
-
     "payment__list_channels": {
         "agent_id": "payment_nexus",
         "description": "列出当前已注册的所有支付渠道及其支持的支付方式。用于诊断渠道配置问题。",
@@ -51,7 +48,6 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "service_url": "http://localhost:8013",
         "human_auth_required": False,
     },
-
     "payment__list_pending_agent_payments": {
         "agent_id": "payment_nexus",
         "description": "列出所有等待人类确认的 Agent 发起的支付请求。用于 POS 端展示确认弹窗。",
@@ -62,14 +58,11 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "service_url": "http://localhost:8013",
         "human_auth_required": False,
     },
-
     # ─── 准备工具（预授权，不扣款） ──────────────────────────
-
     "payment__prepare": {
         "agent_id": "payment_nexus",
         "description": (
-            "Agent 准备一笔支付（不扣款）。生成 prepared_id 后推送到 POS 端，"
-            "等待收银员确认。单笔上限 1000 元。"
+            "Agent 准备一笔支付（不扣款）。生成 prepared_id 后推送到 POS 端，等待收银员确认。单笔上限 1000 元。"
         ),
         "params": {
             "order_id": {"type": "string", "description": "订单ID", "required": True},
@@ -85,15 +78,10 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "service_url": "http://localhost:8013",
         "human_auth_required": False,  # 准备阶段不需要人类确认
     },
-
     # ─── 执行工具（必须人类确认） ─────────────────────────────
-
     "payment__confirm_agent": {
         "agent_id": "payment_nexus",
-        "description": (
-            "确认 Agent 准备的支付并执行实际扣款。"
-            "必须由收银员通过生物识别/密码确认后才能调用。"
-        ),
+        "description": ("确认 Agent 准备的支付并执行实际扣款。必须由收银员通过生物识别/密码确认后才能调用。"),
         "params": {
             "prepared_id": {"type": "string", "description": "Agent 准备的支付ID", "required": True},
             "operator_id": {"type": "string", "description": "操作员ID", "required": True},
@@ -103,7 +91,6 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "service_url": "http://localhost:8013",
         "human_auth_required": True,
     },
-
     "payment__refund": {
         "agent_id": "payment_nexus",
         "description": "发起退款。需要管理员审批（非 Agent 自主决策）。",
@@ -124,7 +111,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
 PROTOCOL_ADAPTERS: dict[str, dict] = {
     "wechat_skill": {
         "name": "微信支付 AI Skill",
-        "status": "planned",       # planned / alpha / stable
+        "status": "planned",  # planned / alpha / stable
         "description": "对接微信面向AI的支付技能包，支持 Agent 通过微信 Skill 协议发起支付。",
         "spec_url": "",
     },

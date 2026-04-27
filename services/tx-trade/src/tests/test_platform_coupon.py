@@ -14,6 +14,7 @@
 11. 核销对账报告 — 按平台汇总
 12. 平台对账 — 金额比对
 """
+
 import os
 import sys
 
@@ -215,7 +216,10 @@ async def test_redemption_report():
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     report = await get_redemption_report(
-        STORE_ID, (today, today), TENANT_ID, db,
+        STORE_ID,
+        (today, today),
+        TENANT_ID,
+        db,
     )
 
     assert report["record_count"] == 2

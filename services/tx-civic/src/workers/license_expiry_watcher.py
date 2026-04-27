@@ -6,11 +6,12 @@
 - 发射 LICENSE_EXPIRING / LICENSE_EXPIRED 事件
 - 健康证同理（发射 HEALTH_CERT_EXPIRING 事件）
 """
+
 from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import date, timedelta, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
@@ -38,8 +39,10 @@ class LicenseExpiryWatcher:
     async def _fetch_tenant_ids(self, db: AsyncSession) -> list[str]:
         """获取所有租户 ID 列表。"""
         result = await db.execute(
-            text("SELECT DISTINCT tenant_id FROM civic_licenses WHERE is_deleted = FALSE "
-                 "UNION SELECT DISTINCT tenant_id FROM civic_health_certs WHERE is_deleted = FALSE")
+            text(
+                "SELECT DISTINCT tenant_id FROM civic_licenses WHERE is_deleted = FALSE "
+                "UNION SELECT DISTINCT tenant_id FROM civic_health_certs WHERE is_deleted = FALSE"
+            )
         )
         return [str(row[0]) for row in result.all()]
 
@@ -143,14 +146,10 @@ class LicenseExpiryWatcher:
         """)
 
         try:
-            expiring_result = await db.execute(
-                mark_expiring_sql, {"today": today, "warn_date": warn_date}
-            )
+            expiring_result = await db.execute(mark_expiring_sql, {"today": today, "warn_date": warn_date})
             expiring_rows = expiring_result.all()
 
-            expired_result = await db.execute(
-                mark_expired_sql, {"today": today}
-            )
+            expired_result = await db.execute(mark_expired_sql, {"today": today})
             expired_rows = expired_result.all()
 
             await db.commit()
@@ -225,14 +224,10 @@ class LicenseExpiryWatcher:
         """)
 
         try:
-            expiring_result = await db.execute(
-                mark_expiring_sql, {"today": today, "warn_date": warn_date}
-            )
+            expiring_result = await db.execute(mark_expiring_sql, {"today": today, "warn_date": warn_date})
             expiring_rows = expiring_result.all()
 
-            expired_result = await db.execute(
-                mark_expired_sql, {"today": today}
-            )
+            expired_result = await db.execute(mark_expired_sql, {"today": today})
             expired_rows = expired_result.all()
 
             await db.commit()
@@ -283,32 +278,36 @@ class LicenseExpiryWatcher:
             from shared.events.src.emitter import emit_event
 
             for item in result.get("expiring_items", []):
-                asyncio.create_task(emit_event(
-                    event_type=CivicEventType.LICENSE_EXPIRING.value,
-                    tenant_id=uuid.UUID(item["tenant_id"]),
-                    stream_id=item["id"],
-                    payload={
-                        "store_id": item["store_id"],
-                        "license_type": item["license_type"],
-                        "license_name": item["license_name"],
-                        "expiry_date": item["expiry_date"],
-                    },
-                    source_service="tx-civic",
-                ))
+                asyncio.create_task(
+                    emit_event(
+                        event_type=CivicEventType.LICENSE_EXPIRING.value,
+                        tenant_id=uuid.UUID(item["tenant_id"]),
+                        stream_id=item["id"],
+                        payload={
+                            "store_id": item["store_id"],
+                            "license_type": item["license_type"],
+                            "license_name": item["license_name"],
+                            "expiry_date": item["expiry_date"],
+                        },
+                        source_service="tx-civic",
+                    )
+                )
 
             for item in result.get("expired_items", []):
-                asyncio.create_task(emit_event(
-                    event_type=CivicEventType.LICENSE_EXPIRED.value,
-                    tenant_id=uuid.UUID(item["tenant_id"]),
-                    stream_id=item["id"],
-                    payload={
-                        "store_id": item["store_id"],
-                        "license_type": item["license_type"],
-                        "license_name": item["license_name"],
-                        "expiry_date": item["expiry_date"],
-                    },
-                    source_service="tx-civic",
-                ))
+                asyncio.create_task(
+                    emit_event(
+                        event_type=CivicEventType.LICENSE_EXPIRED.value,
+                        tenant_id=uuid.UUID(item["tenant_id"]),
+                        stream_id=item["id"],
+                        payload={
+                            "store_id": item["store_id"],
+                            "license_type": item["license_type"],
+                            "license_name": item["license_name"],
+                            "expiry_date": item["expiry_date"],
+                        },
+                        source_service="tx-civic",
+                    )
+                )
 
         except ImportError:
             logger.warning("event_emitter_not_available", hint="shared.events not installed")
@@ -323,18 +322,20 @@ class LicenseExpiryWatcher:
             from shared.events.src.emitter import emit_event
 
             for item in result.get("expiring_items", []):
-                asyncio.create_task(emit_event(
-                    event_type=CivicEventType.HEALTH_CERT_EXPIRING.value,
-                    tenant_id=uuid.UUID(item["tenant_id"]),
-                    stream_id=item["id"],
-                    payload={
-                        "store_id": item["store_id"],
-                        "employee_id": item["employee_id"],
-                        "employee_name": item["employee_name"],
-                        "expiry_date": item["expiry_date"],
-                    },
-                    source_service="tx-civic",
-                ))
+                asyncio.create_task(
+                    emit_event(
+                        event_type=CivicEventType.HEALTH_CERT_EXPIRING.value,
+                        tenant_id=uuid.UUID(item["tenant_id"]),
+                        stream_id=item["id"],
+                        payload={
+                            "store_id": item["store_id"],
+                            "employee_id": item["employee_id"],
+                            "employee_name": item["employee_name"],
+                            "expiry_date": item["expiry_date"],
+                        },
+                        source_service="tx-civic",
+                    )
+                )
 
         except ImportError:
             logger.warning("event_emitter_not_available", hint="shared.events not installed")

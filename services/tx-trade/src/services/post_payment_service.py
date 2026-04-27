@@ -9,6 +9,7 @@
   c. 点了某菜品 → 发"关联菜品券"（如点了鱼头→送酸菜鱼5元券）
   d. 消费满额 → 发"满赠券"
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -96,9 +97,7 @@ class PostPaymentService:
             return {"issued_coupons": [], "reason": "顾客不存在"}
 
         # 加载订单明细
-        items_result = await self.db.execute(
-            select(OrderItem).where(OrderItem.order_id == uuid.UUID(order_id))
-        )
+        items_result = await self.db.execute(select(OrderItem).where(OrderItem.order_id == uuid.UUID(order_id)))
         items = items_result.scalars().all()
         item_names = [i.item_name for i in items if i.item_name]
 

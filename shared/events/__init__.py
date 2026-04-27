@@ -2,22 +2,14 @@
 
 导出所有域的事件类型、数据类和发布器。
 """
+
 # 会员域（保持向后兼容）
-from .member_events import MemberEvent, MemberEventType
-from .event_publisher import MemberEventPublisher
 from .event_consumer import MemberEventConsumer
-
-# 交易域
-from .trade_events import TradeEvent, TradeEventType
-
-# 供应链域
-from .supply_events import SupplyEvent, SupplyEventType
+from .event_publisher import MemberEventPublisher
 
 # 财务域
 from .finance_events import FinanceEvent, FinanceEventType
-
-# 组织人事域
-from .org_events import OrgEvent, OrgEventType
+from .member_events import MemberEvent, MemberEventType
 
 # 商品菜单域
 from .menu_events import MenuEvent, MenuEventType
@@ -25,8 +17,10 @@ from .menu_events import MenuEvent, MenuEventType
 # 运营日清域
 from .ops_events import OpsEvent, OpsEventType
 
-# 通用发布器（推荐所有新代码使用）
-from .universal_publisher import UniversalPublisher
+# 组织人事域
+from .org_events import OrgEvent, OrgEventType
+from .src.consumer import EventConsumer
+from .src.emitter import emit_event, emits
 
 # ── 新统一事件总线框架（推荐所有新代码使用） ─────────────────────────
 from .src.event_base import TxEvent
@@ -49,55 +43,89 @@ from .src.event_types import (
     resolve_stream_type,
 )
 from .src.event_types import MemberEventType as MemberEventType2
-from .src.publisher import EventPublisher
-from .src.consumer import EventConsumer
-from .src.pg_notify import PgNotifier, PgListener
-from .src.pg_event_store import PgEventStore
-from .src.emitter import emit_event, emits
-from .src.projector import ProjectorBase
-from .src.projectors import ALL_PROJECTORS
 from .src.middleware import (
+    DeduplicationMiddleware,
     EventMiddleware,
     LoggingMiddleware,
     TenantIsolationMiddleware,
-    DeduplicationMiddleware,
     apply_middleware,
 )
+from .src.pg_event_store import PgEventStore
+from .src.pg_notify import PgListener, PgNotifier
+from .src.projector import ProjectorBase
+from .src.projectors import ALL_PROJECTORS
+from .src.publisher import EventPublisher
+
+# 供应链域
+from .supply_events import SupplyEvent, SupplyEventType
+
+# 交易域
+from .trade_events import TradeEvent, TradeEventType
+
+# 通用发布器（推荐所有新代码使用）
+from .universal_publisher import UniversalPublisher
 
 __all__ = [
     # 会员（旧域专属，保持向后兼容）
-    "MemberEvent", "MemberEventType", "MemberEventPublisher", "MemberEventConsumer",
+    "MemberEvent",
+    "MemberEventType",
+    "MemberEventPublisher",
+    "MemberEventConsumer",
     # 交易
-    "TradeEvent", "TradeEventType",
+    "TradeEvent",
+    "TradeEventType",
     # 供应链
-    "SupplyEvent", "SupplyEventType",
+    "SupplyEvent",
+    "SupplyEventType",
     # 财务
-    "FinanceEvent", "FinanceEventType",
+    "FinanceEvent",
+    "FinanceEventType",
     # 组织
-    "OrgEvent", "OrgEventType",
+    "OrgEvent",
+    "OrgEventType",
     # 菜单
-    "MenuEvent", "MenuEventType",
+    "MenuEvent",
+    "MenuEventType",
     # 运营
-    "OpsEvent", "OpsEventType",
+    "OpsEvent",
+    "OpsEventType",
     # 通用发布器（旧）
     "UniversalPublisher",
     # ── 新统一事件总线 ──
     "TxEvent",
     # 10大事件域
-    "OrderEventType", "DiscountEventType", "PaymentEventType",
-    "MemberEventType2", "InventoryEventType", "ChannelEventType",
-    "ReservationEventType", "SettlementEventType", "SafetyEventType",
-    "EnergyEventType", "ReviewEventType", "OpinionEventType", "RecipeEventType",
-    "KdsEventType", "AgentEventType",
-    "resolve_stream_key", "resolve_stream_type",
+    "OrderEventType",
+    "DiscountEventType",
+    "PaymentEventType",
+    "MemberEventType2",
+    "InventoryEventType",
+    "ChannelEventType",
+    "ReservationEventType",
+    "SettlementEventType",
+    "SafetyEventType",
+    "EnergyEventType",
+    "ReviewEventType",
+    "OpinionEventType",
+    "RecipeEventType",
+    "KdsEventType",
+    "AgentEventType",
+    "resolve_stream_key",
+    "resolve_stream_type",
     # 核心基础设施
-    "PgEventStore", "emit_event", "emits",
-    "ProjectorBase", "ALL_PROJECTORS",
+    "PgEventStore",
+    "emit_event",
+    "emits",
+    "ProjectorBase",
+    "ALL_PROJECTORS",
     # Redis Stream（兼容）
-    "EventPublisher", "EventConsumer",
-    "PgNotifier", "PgListener",
+    "EventPublisher",
+    "EventConsumer",
+    "PgNotifier",
+    "PgListener",
     # 中间件
-    "EventMiddleware", "LoggingMiddleware",
-    "TenantIsolationMiddleware", "DeduplicationMiddleware",
+    "EventMiddleware",
+    "LoggingMiddleware",
+    "TenantIsolationMiddleware",
+    "DeduplicationMiddleware",
     "apply_middleware",
 ]

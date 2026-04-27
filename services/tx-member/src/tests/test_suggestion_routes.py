@@ -12,6 +12,7 @@
 需要将 services/tx-member 目录加入 sys.path 并注入假 src.db 模块，
 然后通过 src.api.suggestion_routes 导入。
 """
+
 import os
 import sys
 import types
@@ -42,7 +43,6 @@ else:
     _fake_get_db = sys.modules["src.db"].get_db
 
 # ── 导入路由（相对导入解析为 src.db） ─────────────────────────────────────────
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
@@ -101,6 +101,7 @@ app.include_router(router)
 def _override(db):
     def _dep():
         return db
+
     return _dep
 
 
@@ -166,9 +167,7 @@ def test_create_suggestion_db_error():
     db = make_mock_db()
 
     # 第一次 execute → set_config 成功；第二次 execute → 模拟数据库故障
-    db.execute = AsyncMock(
-        side_effect=[MagicMock(), SQLAlchemyError("connection refused")]
-    )
+    db.execute = AsyncMock(side_effect=[MagicMock(), SQLAlchemyError("connection refused")])
 
     app.dependency_overrides[get_db] = _override(db)
     client = TestClient(app, raise_server_exceptions=False)

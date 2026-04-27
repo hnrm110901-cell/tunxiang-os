@@ -8,6 +8,7 @@
 5. 不同档口独立累单（A档口数据不影响B档口）
 6. 空档口返回空列表
 """
+
 import os
 import sys
 
@@ -20,21 +21,23 @@ import pytest
 
 # ── 测试工具 ──────────────────────────────────────────────────
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
 
 TENANT_ID = _uid()
 STORE_ID = _uid()
-DEPT_A = _uid()      # 切配档口A
-DEPT_B = _uid()      # 打荷档口B
-DISH_DUCK = _uid()   # 烤鸭
-DISH_FISH = _uid()   # 鱼头
-DISH_RICE = _uid()   # 米饭
+DEPT_A = _uid()  # 切配档口A
+DEPT_B = _uid()  # 打荷档口B
+DISH_DUCK = _uid()  # 烤鸭
+DISH_FISH = _uid()  # 鱼头
+DISH_RICE = _uid()  # 米饭
 
 
 class FakeRow:
     """模拟 SQLAlchemy Row"""
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -70,6 +73,7 @@ def _mock_db(*execute_results):
 
 # ── 测试 1: 多桌同款菜正确合并 ───────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_multi_table_same_dish_merged():
     """A3/B7/C1 三桌各点1份烤鸭，应合并为 total_qty=3"""
@@ -77,25 +81,16 @@ async def test_multi_table_same_dish_merged():
 
     # 三行任务数据，同一个 dish_id，不同桌台
     task_rows = [
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_DUCK, dish_name="烤鸭", quantity=1, table_no="A3"
-        ),
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_DUCK, dish_name="烤鸭", quantity=1, table_no="B7"
-        ),
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_DUCK, dish_name="烤鸭", quantity=2, table_no="C1"
-        ),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=1, table_no="A3"),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=1, table_no="B7"),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=2, table_no="C1"),
     ]
     base_qty_row = FakeRow()
-    base_qty_row.__dict__['0'] = 1  # base_quantity = 1（默认）
+    base_qty_row.__dict__["0"] = 1  # base_quantity = 1（默认）
 
     db = _mock_db(
-        FakeResult(rows=task_rows),       # get_batched_queue 主查询
-        FakeResult(one_or_none=None),     # get_dish_base_quantity → 无记录，返回默认1
+        FakeResult(rows=task_rows),  # get_batched_queue 主查询
+        FakeResult(one_or_none=None),  # get_dish_base_quantity → 无记录，返回默认1
     )
 
     groups = await BatchGroupService.get_batched_queue(
@@ -108,11 +103,12 @@ async def test_multi_table_same_dish_merged():
     assert len(groups) == 1
     g = groups[0]
     assert g.dish_name == "烤鸭"
-    assert g.total_qty == 4                    # 1+1+2
+    assert g.total_qty == 4  # 1+1+2
     assert set(g.table_list) == {"A3", "B7", "C1"}
 
 
 # ── 测试 2: batch_count 和 remainder 计算正确 ─────────────────
+
 
 @pytest.mark.asyncio
 async def test_batch_count_and_remainder():
@@ -120,15 +116,12 @@ async def test_batch_count_and_remainder():
     from services.batch_group_service import BatchGroup
 
     task_rows = [
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_DUCK, dish_name="烤鸭", quantity=8, table_no="A1"
-        ),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=8, table_no="A1"),
     ]
 
     db = _mock_db(
-        FakeResult(rows=task_rows),             # 主查询
-        FakeResult(one_or_none=FakeRow(**{'base_quantity': 3})),  # base_quantity = 3
+        FakeResult(rows=task_rows),  # 主查询
+        FakeResult(one_or_none=FakeRow(**{"base_quantity": 3})),  # base_quantity = 3
     )
 
     # 注入 fetchone 返回 base_quantity=3
@@ -138,8 +131,8 @@ async def test_batch_count_and_remainder():
         dish_name="烤鸭",
         total_qty=8,
         base_qty=3,
-        batch_count=8 // 3,   # 2
-        remainder=8 % 3,       # 2
+        batch_count=8 // 3,  # 2
+        remainder=8 % 3,  # 2
         table_list=["A1"],
         task_ids=[],
     )
@@ -168,6 +161,7 @@ async def test_exact_division_no_remainder():
 
 # ── 测试 3: base_quantity=1 时每份单独计批 ──────────────────
 
+
 @pytest.mark.asyncio
 async def test_base_qty_one_each_is_one_batch():
     """base_quantity=1：5份 → batch_count=5，remainder=0（标准视图行为）"""
@@ -178,8 +172,8 @@ async def test_base_qty_one_each_is_one_batch():
         dish_name="鱼头",
         total_qty=5,
         base_qty=1,
-        batch_count=5 // 1,   # 5
-        remainder=5 % 1,       # 0
+        batch_count=5 // 1,  # 5
+        remainder=5 % 1,  # 0
         table_list=["A1", "A2"],
         task_ids=[],
     )
@@ -188,6 +182,7 @@ async def test_base_qty_one_each_is_one_batch():
 
 
 # ── 测试 4: 基准份数设置与读取 ───────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_set_and_get_base_quantity():
@@ -213,9 +208,7 @@ async def test_set_and_get_base_quantity():
     db_set.commit.assert_awaited_once()
 
     # 测试 get_dish_base_quantity 读取回 4
-    db_get = _mock_db(
-        FakeResult(one_or_none=FakeRow(**{'base_quantity': 4}))
-    )
+    db_get = _mock_db(FakeResult(one_or_none=FakeRow(**{"base_quantity": 4})))
     # fetchone 需要返回一个有 [0] 属性的对象
     fake_row = MagicMock()
     fake_row.__getitem__ = MagicMock(return_value=4)
@@ -251,6 +244,7 @@ async def test_set_base_quantity_invalid_raises():
 
 # ── 测试 5: 不同档口独立累单 ─────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_different_depts_independent():
     """DEPT_A 有烤鸭×3，DEPT_B 有米饭×10，互不影响"""
@@ -258,14 +252,11 @@ async def test_different_depts_independent():
 
     # DEPT_A 查询
     dept_a_rows = [
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_DUCK, dish_name="烤鸭", quantity=3, table_no="A1"
-        ),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=3, table_no="A1"),
     ]
     db_a = _mock_db(
         FakeResult(rows=dept_a_rows),
-        FakeResult(one_or_none=None),   # base_qty 默认1
+        FakeResult(one_or_none=None),  # base_qty 默认1
     )
     groups_a = await BatchGroupService.get_batched_queue(
         dept_id=DEPT_A, store_id=STORE_ID, tenant_id=TENANT_ID, db=db_a
@@ -273,10 +264,7 @@ async def test_different_depts_independent():
 
     # DEPT_B 查询
     dept_b_rows = [
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_RICE, dish_name="米饭", quantity=10, table_no="B2"
-        ),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_RICE, dish_name="米饭", quantity=10, table_no="B2"),
     ]
     db_b = _mock_db(
         FakeResult(rows=dept_b_rows),
@@ -300,12 +288,13 @@ async def test_different_depts_independent():
 
 # ── 测试 6: 空档口返回空列表 ─────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_empty_dept_returns_empty_list():
     """档口无 pending 任务时返回空列表"""
     from services.batch_group_service import BatchGroupService
 
-    db = _mock_db(FakeResult(rows=[]))   # 主查询返回空
+    db = _mock_db(FakeResult(rows=[]))  # 主查询返回空
 
     groups = await BatchGroupService.get_batched_queue(
         dept_id=DEPT_A,
@@ -319,39 +308,29 @@ async def test_empty_dept_returns_empty_list():
 
 # ── 测试 7: 多菜品按总份数降序排列 ──────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_sorted_by_total_qty_desc():
     """多菜品时，总份数多的排在前面"""
     from services.batch_group_service import BatchGroupService
 
     task_rows = [
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_FISH, dish_name="鱼头", quantity=2, table_no="A1"
-        ),
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_DUCK, dish_name="烤鸭", quantity=8, table_no="B1"
-        ),
-        FakeRow(
-            task_id=_uid(), order_item_id=_uid(),
-            dish_id=DISH_RICE, dish_name="米饭", quantity=5, table_no="C1"
-        ),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_FISH, dish_name="鱼头", quantity=2, table_no="A1"),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=8, table_no="B1"),
+        FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_RICE, dish_name="米饭", quantity=5, table_no="C1"),
     ]
 
     # 三个菜品各需一次 base_quantity 查询，全部返回 None（默认1）
     db = _mock_db(
         FakeResult(rows=task_rows),
-        FakeResult(one_or_none=None),   # 鱼头 base_qty
-        FakeResult(one_or_none=None),   # 烤鸭 base_qty
-        FakeResult(one_or_none=None),   # 米饭 base_qty
+        FakeResult(one_or_none=None),  # 鱼头 base_qty
+        FakeResult(one_or_none=None),  # 烤鸭 base_qty
+        FakeResult(one_or_none=None),  # 米饭 base_qty
     )
 
-    groups = await BatchGroupService.get_batched_queue(
-        dept_id=DEPT_A, store_id=STORE_ID, tenant_id=TENANT_ID, db=db
-    )
+    groups = await BatchGroupService.get_batched_queue(dept_id=DEPT_A, store_id=STORE_ID, tenant_id=TENANT_ID, db=db)
 
     assert len(groups) == 3
     quantities = [g.total_qty for g in groups]
     assert quantities == sorted(quantities, reverse=True)
-    assert quantities[0] == 8   # 烤鸭最多
+    assert quantities[0] == 8  # 烤鸭最多

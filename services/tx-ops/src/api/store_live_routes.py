@@ -11,6 +11,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -198,12 +199,14 @@ async def get_live_dashboard(
             if sid:
                 if sid not in alerts_by_store:
                     alerts_by_store[sid] = []
-                alerts_by_store[sid].append({
-                    "type": "compliance",
-                    "message": row.title,
-                    "time": row.created_at.isoformat() if row.created_at else None,
-                    "severity": row.severity,
-                })
+                alerts_by_store[sid].append(
+                    {
+                        "type": "compliance",
+                        "message": row.title,
+                        "time": row.created_at.isoformat() if row.created_at else None,
+                        "severity": row.severity,
+                    }
+                )
 
         # Build per-store objects
         stores_out: List[Dict[str, Any]] = []
@@ -238,22 +241,24 @@ async def get_live_dashboard(
             if store_alerts:
                 alert_store_ids.add(sid)
 
-            stores_out.append({
-                "store_id": sid,
-                "store_name": s.store_name,
-                "status": "open" if is_open else "closed",
-                "open_since": ord_data.get("first_order_at"),
-                "revenue_fen": revenue_fen,
-                "orders": order_count,
-                "avg_ticket_fen": avg_ticket,
-                "current_diners": current_diners,
-                "total_seats": total_seats,
-                "seat_utilization": seat_util,
-                "table_turnover_rate": turnover_rate,
-                "waiting_count": 0,   # 排队人数需接入 waitlist 表，当前返回 0
-                "avg_wait_minutes": 0,
-                "alerts": store_alerts,
-            })
+            stores_out.append(
+                {
+                    "store_id": sid,
+                    "store_name": s.store_name,
+                    "status": "open" if is_open else "closed",
+                    "open_since": ord_data.get("first_order_at"),
+                    "revenue_fen": revenue_fen,
+                    "orders": order_count,
+                    "avg_ticket_fen": avg_ticket,
+                    "current_diners": current_diners,
+                    "total_seats": total_seats,
+                    "seat_utilization": seat_util,
+                    "table_turnover_rate": turnover_rate,
+                    "waiting_count": 0,  # 排队人数需接入 waitlist 表，当前返回 0
+                    "avg_wait_minutes": 0,
+                    "alerts": store_alerts,
+                }
+            )
 
         open_count = sum(1 for r in store_rows if r.status not in ("closed", "disabled", "maintenance"))
         closed_count_all = len(store_rows) - open_count

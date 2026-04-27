@@ -3,6 +3,7 @@
 跟踪市场热门菜品/食材/做法趋势，评估与品牌的适配度，
 推荐试点门店，创建试点计划并跟踪效果。
 """
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -15,25 +16,85 @@ logger = structlog.get_logger()
 
 # ─── 常量 ───
 
-OPPORTUNITY_STATUSES = ["discovered", "evaluating", "approved", "piloting",
-                        "scaling", "rejected", "archived"]
+OPPORTUNITY_STATUSES = ["discovered", "evaluating", "approved", "piloting", "scaling", "rejected", "archived"]
 
 OPPORTUNITY_CATEGORIES = [
-    "trending_dish", "trending_ingredient", "new_cooking_method",
-    "regional_specialty", "seasonal_item", "fusion_innovation",
-    "health_trend", "dessert_innovation",
+    "trending_dish",
+    "trending_ingredient",
+    "new_cooking_method",
+    "regional_specialty",
+    "seasonal_item",
+    "fusion_innovation",
+    "health_trend",
+    "dessert_innovation",
 ]
 
 # ─── 门店候选池（用于试点推荐） ───
 
 _STORE_POOL: list[dict] = [
-    {"store_id": "S001", "name": "芙蓉路旗舰店", "city": "长沙", "type": "flagship", "monthly_traffic": 12000, "avg_check_fen": 7800, "innovation_score": 0.9},
-    {"store_id": "S002", "name": "五一广场店", "city": "长沙", "type": "standard", "monthly_traffic": 9500, "avg_check_fen": 7200, "innovation_score": 0.7},
-    {"store_id": "S003", "name": "梅溪湖店", "city": "长沙", "type": "standard", "monthly_traffic": 7000, "avg_check_fen": 7000, "innovation_score": 0.8},
-    {"store_id": "S005", "name": "南山科技园店", "city": "深圳", "type": "flagship", "monthly_traffic": 11000, "avg_check_fen": 8500, "innovation_score": 0.85},
-    {"store_id": "S006", "name": "福田CBD店", "city": "深圳", "type": "premium", "monthly_traffic": 8000, "avg_check_fen": 9200, "innovation_score": 0.75},
-    {"store_id": "S010", "name": "天河城店", "city": "广州", "type": "standard", "monthly_traffic": 8500, "avg_check_fen": 7600, "innovation_score": 0.7},
-    {"store_id": "S015", "name": "光谷店", "city": "武汉", "type": "standard", "monthly_traffic": 6500, "avg_check_fen": 6800, "innovation_score": 0.65},
+    {
+        "store_id": "S001",
+        "name": "芙蓉路旗舰店",
+        "city": "长沙",
+        "type": "flagship",
+        "monthly_traffic": 12000,
+        "avg_check_fen": 7800,
+        "innovation_score": 0.9,
+    },
+    {
+        "store_id": "S002",
+        "name": "五一广场店",
+        "city": "长沙",
+        "type": "standard",
+        "monthly_traffic": 9500,
+        "avg_check_fen": 7200,
+        "innovation_score": 0.7,
+    },
+    {
+        "store_id": "S003",
+        "name": "梅溪湖店",
+        "city": "长沙",
+        "type": "standard",
+        "monthly_traffic": 7000,
+        "avg_check_fen": 7000,
+        "innovation_score": 0.8,
+    },
+    {
+        "store_id": "S005",
+        "name": "南山科技园店",
+        "city": "深圳",
+        "type": "flagship",
+        "monthly_traffic": 11000,
+        "avg_check_fen": 8500,
+        "innovation_score": 0.85,
+    },
+    {
+        "store_id": "S006",
+        "name": "福田CBD店",
+        "city": "深圳",
+        "type": "premium",
+        "monthly_traffic": 8000,
+        "avg_check_fen": 9200,
+        "innovation_score": 0.75,
+    },
+    {
+        "store_id": "S010",
+        "name": "天河城店",
+        "city": "广州",
+        "type": "standard",
+        "monthly_traffic": 8500,
+        "avg_check_fen": 7600,
+        "innovation_score": 0.7,
+    },
+    {
+        "store_id": "S015",
+        "name": "光谷店",
+        "city": "武汉",
+        "type": "standard",
+        "monthly_traffic": 6500,
+        "avg_check_fen": 6800,
+        "innovation_score": 0.65,
+    },
 ]
 
 
@@ -45,7 +106,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "category": "trending_dish",
         "source": "社交媒体趋势+竞对动态",
         "description": "酸汤火锅2025年下半年起持续走红，贵州酸汤+火锅形态创新，"
-                       "抖音相关话题播放超50亿。适合湘菜品牌延伸品类。",
+        "抖音相关话题播放超50亿。适合湘菜品牌延伸品类。",
         "market_heat_score": 0.95,
         "brand_fit_score": 0.75,
         "audience_fit_score": 0.85,
@@ -56,7 +117,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "category": "trending_dish",
         "source": "市场调研",
         "description": "潮汕牛肉火锅强调现切现涮，品质感强。一线城市已形成独立品类，"
-                       "二三线城市仍有空间。需要稳定牛肉供应链。",
+        "二三线城市仍有空间。需要稳定牛肉供应链。",
         "market_heat_score": 0.80,
         "brand_fit_score": 0.55,
         "audience_fit_score": 0.70,
@@ -66,8 +127,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "name": "日式烧鸟",
         "category": "trending_dish",
         "source": "社交媒体趋势",
-        "description": "日式烧鸟（yakitori）在一线城市年轻群体中爆火，"
-                       "单店模型轻、翻台率高。与湘菜品牌可做跨品类副线。",
+        "description": "日式烧鸟（yakitori）在一线城市年轻群体中爆火，单店模型轻、翻台率高。与湘菜品牌可做跨品类副线。",
         "market_heat_score": 0.88,
         "brand_fit_score": 0.40,
         "audience_fit_score": 0.75,
@@ -77,8 +137,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "name": "贵州酸汤鱼",
         "category": "regional_specialty",
         "source": "竞对动态+消费反馈",
-        "description": "贵州酸汤鱼与湘菜品牌高度契合，酸辣口味与湘菜调性一致。"
-                       "费大厨已上线酸汤系列，需要快速跟进。",
+        "description": "贵州酸汤鱼与湘菜品牌高度契合，酸辣口味与湘菜调性一致。费大厨已上线酸汤系列，需要快速跟进。",
         "market_heat_score": 0.85,
         "brand_fit_score": 0.90,
         "audience_fit_score": 0.88,
@@ -88,8 +147,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "name": "云南菌菇",
         "category": "seasonal_item",
         "source": "供应链情报",
-        "description": "云南野生菌菇6-9月应季，高端食材形象，"
-                       "菌菇火锅/菌菇煲汤在养生趋势下热度持续上升。",
+        "description": "云南野生菌菇6-9月应季，高端食材形象，菌菇火锅/菌菇煲汤在养生趋势下热度持续上升。",
         "market_heat_score": 0.78,
         "brand_fit_score": 0.80,
         "audience_fit_score": 0.82,
@@ -99,8 +157,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "name": "低温慢煮牛排",
         "category": "new_cooking_method",
         "source": "行业展会",
-        "description": "Sous vide低温慢煮技术应用于中餐，牛排嫩度和一致性好。"
-                       "设备投入不大，但需要厨师培训。",
+        "description": "Sous vide低温慢煮技术应用于中餐，牛排嫩度和一致性好。设备投入不大，但需要厨师培训。",
         "market_heat_score": 0.65,
         "brand_fit_score": 0.50,
         "audience_fit_score": 0.60,
@@ -110,8 +167,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "name": "鲜花饼",
         "category": "regional_specialty",
         "source": "消费者反馈",
-        "description": "鲜花饼从云南特产变为全国网红甜点，"
-                       "适合作为餐后甜点或伴手礼，提升客单价。",
+        "description": "鲜花饼从云南特产变为全国网红甜点，适合作为餐后甜点或伴手礼，提升客单价。",
         "market_heat_score": 0.60,
         "brand_fit_score": 0.45,
         "audience_fit_score": 0.65,
@@ -122,7 +178,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "category": "fusion_innovation",
         "source": "社交媒体趋势",
         "description": "小龙虾+各地风味（酸汤小龙虾、椰香小龙虾、冬阴功小龙虾），"
-                       "季节性爆品，5-9月旺季。湘式口味虾是强项可延伸。",
+        "季节性爆品，5-9月旺季。湘式口味虾是强项可延伸。",
         "market_heat_score": 0.82,
         "brand_fit_score": 0.88,
         "audience_fit_score": 0.90,
@@ -133,7 +189,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "category": "fusion_innovation",
         "source": "行业趋势",
         "description": "消费者对预制菜排斥情绪上升，但'高端预制菜'和'厨师现制+预制辅助'模式"
-                       "被接受度高。可用于外卖和零售渠道。",
+        "被接受度高。可用于外卖和零售渠道。",
         "market_heat_score": 0.55,
         "brand_fit_score": 0.60,
         "audience_fit_score": 0.50,
@@ -143,8 +199,7 @@ _SEED_OPPORTUNITIES: list[dict] = [
         "name": "分子料理甜品",
         "category": "dessert_innovation",
         "source": "行业展会",
-        "description": "分子料理技术应用于甜品，视觉效果惊艳，适合社交媒体传播。"
-                       "技术门槛高，但差异化明显。",
+        "description": "分子料理技术应用于甜品，视觉效果惊艳，适合社交媒体传播。技术门槛高，但差异化明显。",
         "market_heat_score": 0.70,
         "brand_fit_score": 0.35,
         "audience_fit_score": 0.72,
@@ -155,9 +210,11 @@ _SEED_OPPORTUNITIES: list[dict] = [
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class Opportunity:
     """新品/新原料机会"""
+
     opportunity_id: str
     name: str
     category: str
@@ -177,6 +234,7 @@ class Opportunity:
 @dataclass
 class PilotPlan:
     """试点计划"""
+
     plan_id: str
     opportunity_id: str
     stores: list[str]
@@ -270,16 +328,18 @@ class NewProductRadar:
                 continue
             if category and o.category != category:
                 continue
-            results.append({
-                "opportunity_id": o.opportunity_id,
-                "name": o.name,
-                "category": o.category,
-                "status": o.status,
-                "overall_score": o.overall_score,
-                "market_heat_score": o.market_heat_score,
-                "brand_fit_score": o.brand_fit_score,
-                "source": o.source,
-            })
+            results.append(
+                {
+                    "opportunity_id": o.opportunity_id,
+                    "name": o.name,
+                    "category": o.category,
+                    "status": o.status,
+                    "overall_score": o.overall_score,
+                    "market_heat_score": o.market_heat_score,
+                    "brand_fit_score": o.brand_fit_score,
+                    "source": o.source,
+                }
+            )
 
         if sort_by == "score":
             results.sort(key=lambda x: x["overall_score"], reverse=True)
@@ -308,10 +368,7 @@ class NewProductRadar:
                 "supply_stability": o.supply_stability_score,
                 "overall": o.overall_score,
             },
-            "pilot_plans": [
-                {"plan_id": p.plan_id, "status": p.status, "stores": p.stores}
-                for p in pilots
-            ],
+            "pilot_plans": [{"plan_id": p.plan_id, "status": p.status, "stores": p.stores} for p in pilots],
             "created_at": o.created_at,
         }
 
@@ -337,8 +394,8 @@ class NewProductRadar:
         o.overall_score = self._compute_score(o)
         o.updated_at = datetime.now(timezone.utc).isoformat()
 
-        recommendation = "强烈推荐试点" if o.overall_score >= 0.75 else (
-            "建议评估" if o.overall_score >= 0.55 else "暂不推荐"
+        recommendation = (
+            "强烈推荐试点" if o.overall_score >= 0.75 else ("建议评估" if o.overall_score >= 0.55 else "暂不推荐")
         )
 
         return {
@@ -372,15 +429,17 @@ class NewProductRadar:
                 fit_score += 0.2
             if store["type"] == "premium" and o.market_heat_score > 0.8:
                 fit_score += 0.1
-            scored_stores.append({
-                "store_id": store["store_id"],
-                "store_name": store["name"],
-                "city": store["city"],
-                "store_type": store["type"],
-                "monthly_traffic": store["monthly_traffic"],
-                "fit_score": round(fit_score, 2),
-                "reason": self._pilot_reason(store, o),
-            })
+            scored_stores.append(
+                {
+                    "store_id": store["store_id"],
+                    "store_name": store["name"],
+                    "city": store["city"],
+                    "store_type": store["type"],
+                    "monthly_traffic": store["monthly_traffic"],
+                    "fit_score": round(fit_score, 2),
+                    "reason": self._pilot_reason(store, o),
+                }
+            )
 
         scored_stores.sort(key=lambda x: x["fit_score"], reverse=True)
         return scored_stores[:3]
@@ -443,22 +502,62 @@ class NewProductRadar:
     def track_ingredient_trends(self, days: int = 90) -> list[dict]:
         """追踪食材趋势"""
         trends = [
-            {"ingredient": "贵州红酸汤", "category": "调味料", "trend": "rising",
-             "heat_score": 0.92, "note": "酸汤火锅/酸汤鱼带动，工业化生产成熟"},
-            {"ingredient": "云南松茸", "category": "菌菇", "trend": "seasonal_peak",
-             "heat_score": 0.85, "note": "7-9月应季，高端餐饮标配"},
-            {"ingredient": "湘西腊肉", "category": "腌腊制品", "trend": "stable",
-             "heat_score": 0.70, "note": "传统食材，品质升级需求增加"},
-            {"ingredient": "紫苏", "category": "香料", "trend": "rising",
-             "heat_score": 0.68, "note": "紫苏系列菜品在社交媒体走红"},
-            {"ingredient": "藤椒", "category": "调味料", "trend": "rising",
-             "heat_score": 0.80, "note": "藤椒味型持续流行，年轻消费者偏好"},
-            {"ingredient": "黑松露", "category": "高端食材", "trend": "stable",
-             "heat_score": 0.55, "note": "高端菜品点缀，国产替代价格下降"},
-            {"ingredient": "螺蛳粉调味", "category": "调味料", "trend": "declining",
-             "heat_score": 0.45, "note": "螺蛳粉热度回落，但臭味调料仍有一定市场"},
-            {"ingredient": "椰子水/椰浆", "category": "饮品原料", "trend": "rising",
-             "heat_score": 0.75, "note": "椰子鸡、椰香系列菜品持续增长"},
+            {
+                "ingredient": "贵州红酸汤",
+                "category": "调味料",
+                "trend": "rising",
+                "heat_score": 0.92,
+                "note": "酸汤火锅/酸汤鱼带动，工业化生产成熟",
+            },
+            {
+                "ingredient": "云南松茸",
+                "category": "菌菇",
+                "trend": "seasonal_peak",
+                "heat_score": 0.85,
+                "note": "7-9月应季，高端餐饮标配",
+            },
+            {
+                "ingredient": "湘西腊肉",
+                "category": "腌腊制品",
+                "trend": "stable",
+                "heat_score": 0.70,
+                "note": "传统食材，品质升级需求增加",
+            },
+            {
+                "ingredient": "紫苏",
+                "category": "香料",
+                "trend": "rising",
+                "heat_score": 0.68,
+                "note": "紫苏系列菜品在社交媒体走红",
+            },
+            {
+                "ingredient": "藤椒",
+                "category": "调味料",
+                "trend": "rising",
+                "heat_score": 0.80,
+                "note": "藤椒味型持续流行，年轻消费者偏好",
+            },
+            {
+                "ingredient": "黑松露",
+                "category": "高端食材",
+                "trend": "stable",
+                "heat_score": 0.55,
+                "note": "高端菜品点缀，国产替代价格下降",
+            },
+            {
+                "ingredient": "螺蛳粉调味",
+                "category": "调味料",
+                "trend": "declining",
+                "heat_score": 0.45,
+                "note": "螺蛳粉热度回落，但臭味调料仍有一定市场",
+            },
+            {
+                "ingredient": "椰子水/椰浆",
+                "category": "饮品原料",
+                "trend": "rising",
+                "heat_score": 0.75,
+                "note": "椰子鸡、椰香系列菜品持续增长",
+            },
         ]
         return [t for t in trends if t["heat_score"] >= 0.3]
 
@@ -467,21 +566,41 @@ class NewProductRadar:
     def detect_new_flavors(self) -> list[dict]:
         """自动检测新兴口味趋势"""
         return [
-            {"flavor": "酸汤味", "heat_score": 0.95, "trend": "rising",
-             "description": "贵州酸汤为基底，融合各地食材，2025-2026最热味型",
-             "recommendation": "强烈建议开发酸汤系列"},
-            {"flavor": "椰香味", "heat_score": 0.78, "trend": "rising",
-             "description": "东南亚风味融合，椰香鸡、椰子冻等持续走红",
-             "recommendation": "可开发椰香湘菜融合菜"},
-            {"flavor": "藤椒味", "heat_score": 0.80, "trend": "rising",
-             "description": "藤椒清麻口感受年轻人追捧，与传统花椒差异化",
-             "recommendation": "建议在凉菜/小吃系列增加藤椒味选项"},
-            {"flavor": "话梅味", "heat_score": 0.60, "trend": "emerging",
-             "description": "话梅排骨、话梅小番茄等甜酸口味在华东流行",
-             "recommendation": "可在甜品或小吃品类试水"},
-            {"flavor": "柠檬酸辣味", "heat_score": 0.72, "trend": "rising",
-             "description": "泰式酸辣+柠檬清爽，在夏季尤其受欢迎",
-             "recommendation": "建议夏季限定推出柠檬酸辣系列"},
+            {
+                "flavor": "酸汤味",
+                "heat_score": 0.95,
+                "trend": "rising",
+                "description": "贵州酸汤为基底，融合各地食材，2025-2026最热味型",
+                "recommendation": "强烈建议开发酸汤系列",
+            },
+            {
+                "flavor": "椰香味",
+                "heat_score": 0.78,
+                "trend": "rising",
+                "description": "东南亚风味融合，椰香鸡、椰子冻等持续走红",
+                "recommendation": "可开发椰香湘菜融合菜",
+            },
+            {
+                "flavor": "藤椒味",
+                "heat_score": 0.80,
+                "trend": "rising",
+                "description": "藤椒清麻口感受年轻人追捧，与传统花椒差异化",
+                "recommendation": "建议在凉菜/小吃系列增加藤椒味选项",
+            },
+            {
+                "flavor": "话梅味",
+                "heat_score": 0.60,
+                "trend": "emerging",
+                "description": "话梅排骨、话梅小番茄等甜酸口味在华东流行",
+                "recommendation": "可在甜品或小吃品类试水",
+            },
+            {
+                "flavor": "柠檬酸辣味",
+                "heat_score": 0.72,
+                "trend": "rising",
+                "description": "泰式酸辣+柠檬清爽，在夏季尤其受欢迎",
+                "recommendation": "建议夏季限定推出柠檬酸辣系列",
+            },
         ]
 
     # ─── 供应可行性评估 ───

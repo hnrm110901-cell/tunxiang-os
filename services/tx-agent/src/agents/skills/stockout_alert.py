@@ -5,6 +5,7 @@
 
 触发条件：库存变动事件 or 每15分钟定时扫描。
 """
+
 from typing import Any
 
 import structlog
@@ -14,9 +15,9 @@ from ..base import AgentResult, SkillAgent
 logger = structlog.get_logger()
 
 # 默认阈值
-DEFAULT_WARNING_PORTIONS = 5       # 剩余份数 <= 此值时预警
-DEFAULT_CRITICAL_PORTIONS = 2      # 剩余份数 <= 此值时紧急预警
-DEFAULT_FORECAST_HOURS = 3         # 预测未来N小时的消耗
+DEFAULT_WARNING_PORTIONS = 5  # 剩余份数 <= 此值时预警
+DEFAULT_CRITICAL_PORTIONS = 2  # 剩余份数 <= 此值时紧急预警
+DEFAULT_FORECAST_HOURS = 3  # 预测未来N小时的消耗
 
 
 class StockoutAlertAgent(SkillAgent):
@@ -109,7 +110,7 @@ class StockoutAlertAgent(SkillAgent):
                 "all_dishes": [dish_result],
             },
             reasoning=f"{dish_name} 剩余 {current_portions} 份，"
-                      f"时速 {avg_hourly:.1f} 份/h，{est_stockout_time}，{risk_level}",
+            f"时速 {avg_hourly:.1f} 份/h，{est_stockout_time}，{risk_level}",
             confidence=0.85 if len(hourly_sales) >= 3 else 0.65,
         )
 
@@ -139,13 +140,15 @@ class StockoutAlertAgent(SkillAgent):
             if dish_portions < DEFAULT_WARNING_PORTIONS:
                 continue
             if min_price <= dish_price <= max_price:
-                candidates.append({
-                    "name": dish.get("name", ""),
-                    "price_fen": dish_price,
-                    "remaining_portions": dish_portions,
-                    "category": dish_category,
-                    "match_score": self._calc_match_score(dish, price_range_fen),
-                })
+                candidates.append(
+                    {
+                        "name": dish.get("name", ""),
+                        "price_fen": dish_price,
+                        "remaining_portions": dish_portions,
+                        "category": dish_category,
+                        "match_score": self._calc_match_score(dish, price_range_fen),
+                    }
+                )
 
         # 按匹配度排序
         candidates.sort(key=lambda x: x["match_score"], reverse=True)
@@ -170,7 +173,8 @@ class StockoutAlertAgent(SkillAgent):
         dishes = params.get("dishes", [])
         if not dishes:
             return AgentResult(
-                success=False, action="batch_scan",
+                success=False,
+                action="batch_scan",
                 error="无菜品数据",
                 reasoning="批量扫描需要提供菜品列表",
                 confidence=1.0,
@@ -178,12 +182,14 @@ class StockoutAlertAgent(SkillAgent):
 
         at_risk: list[dict] = []
         for dish in dishes:
-            result = await self._predict_stockout({
-                "dish_name": dish.get("name", ""),
-                "current_portions": dish.get("remaining_portions", 0),
-                "hourly_sales": dish.get("hourly_sales", []),
-                "alternatives": dish.get("alternatives", []),
-            })
+            result = await self._predict_stockout(
+                {
+                    "dish_name": dish.get("name", ""),
+                    "current_portions": dish.get("remaining_portions", 0),
+                    "hourly_sales": dish.get("hourly_sales", []),
+                    "alternatives": dish.get("alternatives", []),
+                }
+            )
             at_risk_items = result.data.get("at_risk_dishes", [])
             at_risk.extend(at_risk_items)
 
@@ -202,8 +208,7 @@ class StockoutAlertAgent(SkillAgent):
                 "at_risk_count": len(at_risk),
                 "critical_count": critical_count,
             },
-            reasoning=f"扫描 {len(dishes)} 道菜品，{len(at_risk)} 道有沽清风险"
-                      f"（{critical_count} 道紧急）",
+            reasoning=f"扫描 {len(dishes)} 道菜品，{len(at_risk)} 道有沽清风险（{critical_count} 道紧急）",
             confidence=0.82,
         )
 

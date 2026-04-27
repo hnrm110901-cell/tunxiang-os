@@ -2,6 +2,7 @@
 
 使用 Claude Haiku 节省成本，适合高频的会员分析场景。
 """
+
 from __future__ import annotations
 
 import json
@@ -96,22 +97,18 @@ class MemberInsightAgent:
                     dish_counts[name] = dish_counts.get(name, 0) + 1
 
         top_dishes = sorted(dish_counts.items(), key=lambda x: -x[1])[:5]
-        top_dishes_str = (
-            ", ".join([f"{d[0]}({d[1]}次)" for d in top_dishes])
-            if top_dishes
-            else "暂无记录"
-        )
+        top_dishes_str = ", ".join([f"{d[0]}({d[1]}次)" for d in top_dishes]) if top_dishes else "暂无记录"
 
         total_spend_fen = member.get("total_spend_fen", 0)
         visit_count = max(len(orders), 1)
         avg_spend_per_visit = total_spend_fen / 100 / visit_count
 
         return f"""会员信息：
-- 等级：{member.get('level', '普通会员')}
+- 等级：{member.get("level", "普通会员")}
 - 累计消费：{total_spend_fen / 100:.0f}元
-- 消费次数：{member.get('visit_count', 0)}次
-- 上次消费：{member.get('last_visit_date', '未知')}
-- 积分余额：{member.get('points', 0)}分
+- 消费次数：{member.get("visit_count", 0)}次
+- 上次消费：{member.get("last_visit_date", "未知")}
+- 积分余额：{member.get("points", 0)}分
 
 近12个月消费记录：{len(orders)}笔订单
 常点菜品：{top_dishes_str}
@@ -140,7 +137,6 @@ class MemberInsightAgent:
             "next_visit_prediction": "数据不足，无法预测",
         }
 
-
     async def analyze_from_mv(self, tenant_id: str, store_id: str | None = None) -> dict:
         """从 mv_member_clv 快速读取会员 CLV 聚合数据，<5ms，无 Claude 调用。
 
@@ -149,6 +145,7 @@ class MemberInsightAgent:
         """
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
+
         from shared.ontology.src.database import get_db
 
         try:

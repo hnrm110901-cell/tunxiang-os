@@ -10,6 +10,7 @@
   POST /tags                    — 创建标签
   POST /segments                — 创建人群包
 """
+
 from __future__ import annotations
 
 import uuid
@@ -46,6 +47,7 @@ _RFM_LABEL_TO_CODE: dict[str, str] = {v: k for k, v in _RFM_LEVEL_LABELS.items()
 
 # ─── 请求模型 ────────────────────────────────────────────────
 
+
 class CreateTagRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=50, description="标签名称")
     type: str = Field(..., description="标签类型: behavior/preference/scene/lifecycle/tier/custom")
@@ -61,6 +63,7 @@ class CreateSegmentRequest(BaseModel):
 
 
 # ─── 辅助函数 ────────────────────────────────────────────────
+
 
 def _require_tenant(x_tenant_id: Optional[str]) -> uuid.UUID:
     if not x_tenant_id:
@@ -105,7 +108,7 @@ async def _query_dashboard(tenant_id: uuid.UUID, db: AsyncSession) -> dict:
 
     return {
         "total_members": total_members,
-        "total_members_mom": 0.0,          # 环比需要历史快照，暂留 0
+        "total_members_mom": 0.0,  # 环比需要历史快照，暂留 0
         "new_members_30d": new_members_30d,
         "new_members_mom": 0.0,
         "active_members_30d": active_members_30d,
@@ -115,7 +118,7 @@ async def _query_dashboard(tenant_id: uuid.UUID, db: AsyncSession) -> dict:
         "avg_clv_mom": 0.0,
         "total_stored_value_fen": total_stored_value_fen,
         "stored_value_mom": 0.0,
-        "member_revenue_ratio": 0.0,       # 需跨 orders 表计算，后续补充
+        "member_revenue_ratio": 0.0,  # 需跨 orders 表计算，后续补充
         "member_revenue_ratio_mom": 0.0,
         "gender_distribution": {},
         "age_distribution": [],
@@ -146,15 +149,17 @@ async def _query_rfm(tenant_id: uuid.UUID, db: AsyncSession) -> list[dict]:
         code = str(r["rfm_level"])
         label = _RFM_LEVEL_LABELS.get(code, code)
         cnt = int(r["cnt"])
-        result.append({
-            "level": label,
-            "code": code,
-            "count": cnt,
-            "ratio": round(cnt / total, 4),
-            "avg_frequency": float(r["avg_frequency"]),
-            "avg_monetary_fen": int(r["avg_monetary_fen"]),
-            "description": "",
-        })
+        result.append(
+            {
+                "level": label,
+                "code": code,
+                "count": cnt,
+                "ratio": round(cnt / total, 4),
+                "avg_frequency": float(r["avg_frequency"]),
+                "avg_monetary_fen": int(r["avg_monetary_fen"]),
+                "description": "",
+            }
+        )
 
     return result
 
@@ -199,18 +204,20 @@ async def _query_members_by_level(
     )
     items = []
     for r in rows.mappings():
-        items.append({
-            "member_id": r["member_id"],
-            "name": r["name"] or "",
-            "phone": r["phone"] or "",
-            "rfm_level": _RFM_LEVEL_LABELS.get(str(r["rfm_level"]), str(r["rfm_level"])),
-            "rfm_code": str(r["rfm_level"]),
-            "total_spent_fen": int(r["total_spent_fen"] or 0),
-            "visit_count": int(r["visit_count"] or 0),
-            "last_visit": r["last_visit"].isoformat() if r["last_visit"] else None,
-            "stored_value_fen": 0,   # customers 表暂无 stored_value 字段
-            "tags": list(r["tags"]) if r["tags"] else [],
-        })
+        items.append(
+            {
+                "member_id": r["member_id"],
+                "name": r["name"] or "",
+                "phone": r["phone"] or "",
+                "rfm_level": _RFM_LEVEL_LABELS.get(str(r["rfm_level"]), str(r["rfm_level"])),
+                "rfm_code": str(r["rfm_level"]),
+                "total_spent_fen": int(r["total_spent_fen"] or 0),
+                "visit_count": int(r["visit_count"] or 0),
+                "last_visit": r["last_visit"].isoformat() if r["last_visit"] else None,
+                "stored_value_fen": 0,  # customers 表暂无 stored_value 字段
+                "tags": list(r["tags"]) if r["tags"] else [],
+            }
+        )
 
     return items, total
 
@@ -242,25 +249,25 @@ async def _query_tags(
     # 在 Python 侧做 keyword 过滤（数据量小，避免复杂 SQL）
     filtered = [
         {
-            "tag_id": "",          # tags 存储为 ARRAY，无独立 tag_id
+            "tag_id": "",  # tags 存储为 ARRAY，无独立 tag_id
             "name": r["name"],
-            "type": "custom",      # 无类型字段，统一填 custom
+            "type": "custom",  # 无类型字段，统一填 custom
             "member_count": r["member_count"],
             "created_at": None,
         }
         for r in all_tags
-        if (not keyword or keyword in r["name"])
-        and (not tag_type or tag_type == "custom")
+        if (not keyword or keyword in r["name"]) and (not tag_type or tag_type == "custom")
     ]
 
     total = len(filtered)
     offset = (page - 1) * size
-    items = filtered[offset: offset + size]
+    items = filtered[offset : offset + size]
 
     return items, total
 
 
 # ─── 端点 ────────────────────────────────────────────────────
+
 
 @router.get("/dashboard")
 async def member_dashboard(

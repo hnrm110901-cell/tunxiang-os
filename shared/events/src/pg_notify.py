@@ -7,6 +7,7 @@ Redis Streams 适合可靠投递 + 重放，PG NOTIFY 适合实时推送。
 注意：PG NOTIFY payload 最大 8000 字节。超大 payload 应通过
 Redis Streams 传输，PG NOTIFY 仅发送事件 ID 作为通知信号。
 """
+
 from __future__ import annotations
 
 import asyncio

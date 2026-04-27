@@ -11,6 +11,7 @@
      不覆盖，只创建缺失记录。
   2. 生效价格优先级：门店时段/渠道规则 > 门店覆盖价 > 发布方案价 > 品牌标准价
 """
+
 import uuid as _uuid
 from datetime import datetime
 from typing import Optional
@@ -52,9 +53,7 @@ class BrandPublishService:
         if not plan_name or not plan_name.strip():
             raise ValueError("plan_name 不能为空")
         if target_type not in _VALID_TARGET_TYPES:
-            raise ValueError(
-                f"target_type 必须为 {_VALID_TARGET_TYPES} 之一，收到: {target_type!r}"
-            )
+            raise ValueError(f"target_type 必须为 {_VALID_TARGET_TYPES} 之一，收到: {target_type!r}")
         if target_type in ("region", "stores") and not target_ids:
             raise ValueError(f"target_type={target_type!r} 时 target_ids 不能为空")
 
@@ -84,13 +83,9 @@ class BrandPublishService:
         brand_id: Optional[str] = None,
         status: Optional[str] = None,
     ) -> dict:
-        return await self._repo.list_publish_plans(
-            page=page, size=size, brand_id=brand_id, status=status
-        )
+        return await self._repo.list_publish_plans(page=page, size=size, brand_id=brand_id, status=status)
 
-    async def add_items_to_plan(
-        self, plan_id: str, items: list[dict]
-    ) -> list[dict]:
+    async def add_items_to_plan(self, plan_id: str, items: list[dict]) -> list[dict]:
         """向发布方案添加菜品（含可选覆盖价）。草稿状态才可修改。"""
         plan = await self._repo.get_publish_plan(plan_id)
         if not plan:
@@ -147,14 +142,11 @@ class BrandPublishService:
                 for item in items:
                     dish_id = item["dish_id"]
                     # 检查门店是否已有该菜品的微调记录
-                    existing = await self._repo.get_store_dish_override(
-                        store_id=store_id, dish_id=dish_id
-                    )
+                    existing = await self._repo.get_store_dish_override(store_id=store_id, dish_id=dish_id)
                     if existing:
                         # 已有记录：不覆盖门店的 is_available 决策
                         # 只在没有 local_price 时同步方案中的 override_price
-                        if (existing["local_price_fen"] is None
-                                and item.get("override_price_fen") is not None):
+                        if existing["local_price_fen"] is None and item.get("override_price_fen") is not None:
                             await self._repo.upsert_store_dish_override(
                                 store_id=store_id,
                                 dish_id=dish_id,
@@ -230,8 +222,12 @@ class BrandPublishService:
     ) -> dict:
         """门店对品牌菜品进行微调（改价/改名/上下架等）。"""
         allowed_keys = {
-            "local_price_fen", "local_name", "local_description",
-            "local_image_url", "is_available", "sort_order",
+            "local_price_fen",
+            "local_name",
+            "local_description",
+            "local_image_url",
+            "is_available",
+            "sort_order",
         }
         update_data = {k: v for k, v in data.items() if k in allowed_keys}
         if not update_data:
@@ -293,21 +289,15 @@ class BrandPublishService:
     async def create_price_rule(self, data: dict) -> dict:
         rule_type = data.get("rule_type", "")
         if rule_type not in _VALID_RULE_TYPES:
-            raise ValueError(
-                f"rule_type 必须为 {_VALID_RULE_TYPES} 之一，收到: {rule_type!r}"
-            )
+            raise ValueError(f"rule_type 必须为 {_VALID_RULE_TYPES} 之一，收到: {rule_type!r}")
         adj_type = data.get("adjustment_type", "")
         if adj_type not in _VALID_ADJ_TYPES:
-            raise ValueError(
-                f"adjustment_type 必须为 {_VALID_ADJ_TYPES} 之一，收到: {adj_type!r}"
-            )
+            raise ValueError(f"adjustment_type 必须为 {_VALID_ADJ_TYPES} 之一，收到: {adj_type!r}")
         if not data.get("rule_name", "").strip():
             raise ValueError("rule_name 不能为空")
         channel = data.get("channel")
         if channel and channel not in _VALID_CHANNELS:
-            raise ValueError(
-                f"channel 必须为 {_VALID_CHANNELS} 之一，收到: {channel!r}"
-            )
+            raise ValueError(f"channel 必须为 {_VALID_CHANNELS} 之一，收到: {channel!r}")
 
         rule = await self._repo.create_price_rule(data)
         await self.db.commit()
@@ -329,9 +319,7 @@ class BrandPublishService:
         await self.db.commit()
         return result
 
-    async def bind_dishes_to_rule(
-        self, rule_id: str, dish_ids: list[str]
-    ) -> list[dict]:
+    async def bind_dishes_to_rule(self, rule_id: str, dish_ids: list[str]) -> list[dict]:
         if not dish_ids:
             raise ValueError("dish_ids 不能为空")
         existing = await self._repo.get_price_rule(rule_id)
@@ -365,9 +353,7 @@ class BrandPublishService:
             at_datetime = datetime.utcnow()
 
         if channel not in _VALID_CHANNELS:
-            raise ValueError(
-                f"channel 必须为 {_VALID_CHANNELS} 之一，收到: {channel!r}"
-            )
+            raise ValueError(f"channel 必须为 {_VALID_CHANNELS} 之一，收到: {channel!r}")
 
         # 1. 获取品牌标准价
         await self._repo._set_tenant()
@@ -391,17 +377,13 @@ class BrandPublishService:
         price_source = "brand_standard"
 
         # 2. 发布方案覆盖价
-        plan_override = await self._repo.get_plan_override_for_dish(
-            dish_id=dish_id, store_id=store_id
-        )
+        plan_override = await self._repo.get_plan_override_for_dish(dish_id=dish_id, store_id=store_id)
         if plan_override and plan_override.get("override_price_fen") is not None:
             base_price = int(plan_override["override_price_fen"])
             price_source = "publish_plan"
 
         # 3. 门店微调覆盖价
-        store_override = await self._repo.get_store_dish_override(
-            store_id=store_id, dish_id=dish_id
-        )
+        store_override = await self._repo.get_store_dish_override(store_id=store_id, dish_id=dish_id)
         if store_override and store_override.get("local_price_fen") is not None:
             base_price = int(store_override["local_price_fen"])
             price_source = "store_override"

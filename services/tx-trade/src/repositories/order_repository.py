@@ -6,6 +6,7 @@
   - 金额字段统一使用 int（分），严禁 float
   - 不直接 import 路由层任何模块（单向依赖）
 """
+
 from __future__ import annotations
 
 import uuid

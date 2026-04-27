@@ -3,6 +3,7 @@
 提供单店今日概览 + 多店概览（总部视角）。
 金额单位：分(fen)，前端展示时 /100 转元。
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -20,6 +21,7 @@ log = structlog.get_logger()
 
 
 # ─── 门店健康评分 ───
+
 
 async def calculate_health_score(
     store_id: str,
@@ -188,6 +190,7 @@ async def calculate_health_score(
 
 # ─── 纯函数：环比计算 ───
 
+
 def calc_pct_change(current: int, previous: int) -> Optional[float]:
     """计算百分比变化，previous 为 0 时返回 None"""
     if previous <= 0:
@@ -203,6 +206,7 @@ def find_peak_hour(hourly_revenue: dict[int, int]) -> Optional[int]:
 
 
 # ─── 单店今日总览 ───
+
 
 async def get_today_overview(
     store_id: str,
@@ -270,6 +274,7 @@ async def get_today_overview(
 
 # ─── 多店概览（总部视角） ───
 
+
 async def get_multi_store_overview(
     tenant_id: str,
     db,
@@ -287,13 +292,15 @@ async def get_multi_store_overview(
     results = []
     for store in stores:
         summary = await _query_daily_summary(db, store["store_id"], tenant_id, today)
-        results.append({
-            "store_id": store["store_id"],
-            "store_name": store["store_name"],
-            "revenue_fen": summary["revenue_fen"],
-            "orders": summary["order_count"],
-            "health_score": summary.get("health_score", 50.0),
-        })
+        results.append(
+            {
+                "store_id": store["store_id"],
+                "store_name": store["store_name"],
+                "revenue_fen": summary["revenue_fen"],
+                "orders": summary["order_count"],
+                "health_score": summary.get("health_score", 50.0),
+            }
+        )
 
     # 按营收降序排列
     results.sort(key=lambda x: x["revenue_fen"], reverse=True)
@@ -302,12 +309,14 @@ async def get_multi_store_overview(
 
 # ─── 数据库查询（通过统一SQL查询层） ───
 
+
 async def _query_daily_summary(db: AsyncSession, store_id: str, tenant_id: str, date) -> dict:
     """查询某日汇总数据，委托给 sql_queries 统一查询层"""
     revenue_data = await query_daily_revenue(store_id, date, tenant_id, db)
 
     # 翻台率需额外查询桌台会话
     from .sql_queries import query_table_sessions
+
     table_data = await query_table_sessions(store_id, date, tenant_id, db)
 
     health = await calculate_health_score(store_id, tenant_id, date, db)

@@ -10,6 +10,7 @@
   - 删除档口前必须先解绑所有菜品映射
   - 每道菜在同一租户下只允许有一个 is_primary=True 的映射
 """
+
 import uuid
 from typing import Optional
 
@@ -23,6 +24,7 @@ logger = structlog.get_logger()
 
 
 # ─── 出品部门 CRUD ───
+
 
 async def create_production_dept(
     tenant_id: str,
@@ -144,9 +146,13 @@ async def get_production_depts(
         bid = uuid.UUID(brand_id)
         conditions.append(ProductionDept.brand_id == bid)
 
-    stmt = select(ProductionDept).where(and_(*conditions)).order_by(
-        ProductionDept.sort_order.asc(),
-        ProductionDept.created_at.asc(),
+    stmt = (
+        select(ProductionDept)
+        .where(and_(*conditions))
+        .order_by(
+            ProductionDept.sort_order.asc(),
+            ProductionDept.created_at.asc(),
+        )
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -295,19 +301,21 @@ async def delete_production_dept(
     did = uuid.UUID(dept_id)
 
     # 检查是否有关联菜品映射
-    mapping_count_stmt = select(func.count()).select_from(DishDeptMapping).where(
-        and_(
-            DishDeptMapping.tenant_id == tid,
-            DishDeptMapping.production_dept_id == did,
-            DishDeptMapping.is_deleted == False,  # noqa: E712
+    mapping_count_stmt = (
+        select(func.count())
+        .select_from(DishDeptMapping)
+        .where(
+            and_(
+                DishDeptMapping.tenant_id == tid,
+                DishDeptMapping.production_dept_id == did,
+                DishDeptMapping.is_deleted == False,  # noqa: E712
+            )
         )
     )
     mapping_count = (await db.execute(mapping_count_stmt)).scalar() or 0
 
     if mapping_count > 0 and not force:
-        raise RuntimeError(
-            f"档口下还有 {mapping_count} 条菜品映射，请先解绑菜品或使用 force=True"
-        )
+        raise RuntimeError(f"档口下还有 {mapping_count} 条菜品映射，请先解绑菜品或使用 force=True")
 
     if force and mapping_count > 0:
         # 软删除所有菜品映射
@@ -321,9 +329,7 @@ async def delete_production_dept(
             )
             .values(is_deleted=True)
         )
-        logger.bind(dept_id=dept_id).info(
-            "production_dept.force_unbind_dishes", count=mapping_count
-        )
+        logger.bind(dept_id=dept_id).info("production_dept.force_unbind_dishes", count=mapping_count)
 
     dept.is_deleted = True
     await db.flush()
@@ -332,6 +338,7 @@ async def delete_production_dept(
 
 
 # ─── 菜品-档口映射管理 ───
+
 
 async def set_dish_dept_mapping(
     tenant_id: str,
@@ -450,9 +457,7 @@ async def batch_set_dish_dept_mappings(
         )
         results.append(mapping)
 
-    logger.bind(tenant_id=tenant_id).info(
-        "dish_dept_mapping.batch_set", count=len(results)
-    )
+    logger.bind(tenant_id=tenant_id).info("dish_dept_mapping.batch_set", count=len(results))
     return results
 
 
@@ -512,9 +517,7 @@ async def remove_dish_dept_mapping(
     mapping.is_deleted = True
     await db.flush()
 
-    logger.bind(tenant_id=tenant_id, dish_id=dish_id, dept_id=dept_id).info(
-        "dish_dept_mapping.removed"
-    )
+    logger.bind(tenant_id=tenant_id, dish_id=dish_id, dept_id=dept_id).info("dish_dept_mapping.removed")
 
 
 async def list_dish_mappings_for_dept(

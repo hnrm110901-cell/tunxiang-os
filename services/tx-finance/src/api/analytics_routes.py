@@ -3,6 +3,7 @@
 5 个端点：营收构成、折扣结构、优惠券成本、门店利润、财务稽核
 所有硬编码0已替换为真实 finance_analytics 服务调用。
 """
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from services.finance_analytics import (
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/v1/finance/analytics", tags=["finance-analytics"
 
 # ── 依赖注入 ──────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -34,6 +36,7 @@ def _require_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ── 1. 营收构成分析 ──────────────────────────────────────────
+
 
 @router.get("/revenue-composition")
 async def get_revenue_composition(
@@ -56,7 +59,9 @@ async def get_revenue_composition(
     except Exception as exc:
         logger.error(
             "get_revenue_composition.failed",
-            store_id=store_id, error=str(exc), exc_info=True,
+            store_id=store_id,
+            error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail="营收构成分析失败") from exc
 
@@ -64,6 +69,7 @@ async def get_revenue_composition(
 
 
 # ── 2. 折扣结构分析 ──────────────────────────────────────────
+
 
 @router.get("/discount-structure")
 async def get_discount_structure(
@@ -86,7 +92,9 @@ async def get_discount_structure(
     except Exception as exc:
         logger.error(
             "get_discount_structure.failed",
-            store_id=store_id, error=str(exc), exc_info=True,
+            store_id=store_id,
+            error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail="折扣结构分析失败") from exc
 
@@ -94,6 +102,7 @@ async def get_discount_structure(
 
 
 # ── 3. 优惠券成本分析 ────────────────────────────────────────
+
 
 @router.get("/coupon-cost")
 async def get_coupon_cost_analysis(
@@ -116,7 +125,9 @@ async def get_coupon_cost_analysis(
     except Exception as exc:
         logger.error(
             "get_coupon_cost_analysis.failed",
-            store_id=store_id, error=str(exc), exc_info=True,
+            store_id=store_id,
+            error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail="优惠券成本分析失败") from exc
 
@@ -124,6 +135,7 @@ async def get_coupon_cost_analysis(
 
 
 # ── 4. 门店利润分析 ──────────────────────────────────────────
+
 
 @router.get("/store-profit")
 async def get_store_profit_analysis(
@@ -146,7 +158,9 @@ async def get_store_profit_analysis(
     except Exception as exc:
         logger.error(
             "get_store_profit_analysis.failed",
-            store_id=store_id, error=str(exc), exc_info=True,
+            store_id=store_id,
+            error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail="门店利润分析失败") from exc
 
@@ -154,6 +168,7 @@ async def get_store_profit_analysis(
 
 
 # ── 5. 财务稽核视图 ──────────────────────────────────────────
+
 
 @router.get("/audit-view")
 async def get_financial_audit_view(
@@ -175,7 +190,9 @@ async def get_financial_audit_view(
     except Exception as exc:
         logger.error(
             "get_financial_audit_view.failed",
-            store_id=store_id, error=str(exc), exc_info=True,
+            store_id=store_id,
+            error=str(exc),
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail="财务稽核视图生成失败") from exc
 

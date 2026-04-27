@@ -165,15 +165,17 @@ class AttendanceEngine:
         self._clock_records.append(record)
 
         if status == "late" and diff_min > 0 and self.tenant_id:
-            asyncio.create_task(UniversalPublisher.publish(
-                event_type=OrgEventType.ATTENDANCE_LATE,
-                tenant_id=self.tenant_id,
-                store_id=store_id,
-                entity_id=employee_id,
-                event_data={"employee_id": employee_id, "late_minutes": diff_min, "schedule_id": shift_name},
-                source_service="tx-org",
-                extra_fields={"employee_id": employee_id},
-            ))
+            asyncio.create_task(
+                UniversalPublisher.publish(
+                    event_type=OrgEventType.ATTENDANCE_LATE,
+                    tenant_id=self.tenant_id,
+                    store_id=store_id,
+                    entity_id=employee_id,
+                    event_data={"employee_id": employee_id, "late_minutes": diff_min, "schedule_id": shift_name},
+                    source_service="tx-org",
+                    extra_fields={"employee_id": employee_id},
+                )
+            )
 
         return {
             "ok": True,
@@ -345,20 +347,22 @@ class AttendanceEngine:
             if on_leave:
                 overall_status = f"on_leave:{on_leave['leave_type']}"
 
-            results.append({
-                "employee_id": eid,
-                "date": date_str,
-                "scheduled_shift": scheduled_shift,
-                "clocked_in": clocked_in,
-                "clock_in_time": in_rec.get("actual_start") if in_rec else None,
-                "clock_in_status": in_rec.get("status") if in_rec else None,
-                "clocked_out": clocked_out,
-                "clock_out_time": out_rec.get("actual_end") if out_rec else None,
-                "clock_out_status": out_rec.get("status") if out_rec else None,
-                "work_hours": work_hours,
-                "status": overall_status,
-                "on_leave": on_leave,
-            })
+            results.append(
+                {
+                    "employee_id": eid,
+                    "date": date_str,
+                    "scheduled_shift": scheduled_shift,
+                    "clocked_in": clocked_in,
+                    "clock_in_time": in_rec.get("actual_start") if in_rec else None,
+                    "clock_in_status": in_rec.get("status") if in_rec else None,
+                    "clocked_out": clocked_out,
+                    "clock_out_time": out_rec.get("actual_end") if out_rec else None,
+                    "clock_out_status": out_rec.get("status") if out_rec else None,
+                    "work_hours": work_hours,
+                    "status": overall_status,
+                    "on_leave": on_leave,
+                }
+            )
 
         return results
 
@@ -400,10 +404,9 @@ class AttendanceEngine:
 
         # Gather all clock-in records for this employee/month
         in_records = [
-            r for r in self._clock_records
-            if r["employee_id"] == employee_id
-            and r["date"].startswith(month)
-            and r["clock_type"] == "in"
+            r
+            for r in self._clock_records
+            if r["employee_id"] == employee_id and r["date"].startswith(month) and r["clock_type"] == "in"
         ]
 
         seen_dates: set = set()
@@ -422,10 +425,9 @@ class AttendanceEngine:
 
         # Out records for early_leave / overtime
         out_records = [
-            r for r in self._clock_records
-            if r["employee_id"] == employee_id
-            and r["date"].startswith(month)
-            and r["clock_type"] == "out"
+            r
+            for r in self._clock_records
+            if r["employee_id"] == employee_id and r["date"].startswith(month) and r["clock_type"] == "out"
         ]
 
         for rec in out_records:
@@ -451,14 +453,10 @@ class AttendanceEngine:
         absent_count = len(absent_dates)
 
         # Scheduled days for attendance rate
-        scheduled_days = sum(
-            1 for d, s in emp_schedule.items() if d.startswith(month)
-        )
+        scheduled_days = sum(1 for d, s in emp_schedule.items() if d.startswith(month))
         attendance_rate = 0.0
         if scheduled_days > 0:
-            attendance_rate = round(
-                (scheduled_days - absent_count) / scheduled_days * 100, 1
-            )
+            attendance_rate = round((scheduled_days - absent_count) / scheduled_days * 100, 1)
 
         return {
             "employee_id": employee_id,
@@ -583,14 +581,16 @@ class AttendanceEngine:
         items: List[Dict[str, Any]] = []
         for lt, days in balance.items():
             info = LEAVE_TYPES.get(lt, {})
-            items.append({
-                "leave_type": lt,
-                "label": info.get("label", lt),
-                "total_days": info.get("default_days", 0),
-                "remaining_days": days,
-                "used_days": info.get("default_days", 0) - days,
-                "paid": info.get("paid", False),
-            })
+            items.append(
+                {
+                    "leave_type": lt,
+                    "label": info.get("label", lt),
+                    "total_days": info.get("default_days", 0),
+                    "remaining_days": days,
+                    "used_days": info.get("default_days", 0) - days,
+                    "paid": info.get("paid", False),
+                }
+            )
 
         return {
             "employee_id": employee_id,
@@ -671,65 +671,78 @@ class AttendanceEngine:
             status = rec["status"]
 
             if status == "absent":
-                anomalies.append({
-                    "employee_id": eid,
-                    "date": date_str,
-                    "anomaly_type": "absent",
-                    "severity": "high",
-                    "detail": f"已排班({rec['scheduled_shift']})但未打卡",
-                })
+                anomalies.append(
+                    {
+                        "employee_id": eid,
+                        "date": date_str,
+                        "anomaly_type": "absent",
+                        "severity": "high",
+                        "detail": f"已排班({rec['scheduled_shift']})但未打卡",
+                    }
+                )
 
             elif status == "missing_clock_out":
-                anomalies.append({
-                    "employee_id": eid,
-                    "date": date_str,
-                    "anomaly_type": "missing_clock_out",
-                    "severity": "medium",
-                    "detail": "已打卡上班但未打卡下班",
-                })
+                anomalies.append(
+                    {
+                        "employee_id": eid,
+                        "date": date_str,
+                        "anomaly_type": "missing_clock_out",
+                        "severity": "medium",
+                        "detail": "已打卡上班但未打卡下班",
+                    }
+                )
 
             elif status == "late":
-                anomalies.append({
-                    "employee_id": eid,
-                    "date": date_str,
-                    "anomaly_type": "late",
-                    "severity": "low",
-                    "detail": f"迟到（打卡时间: {rec['clock_in_time']}）",
-                })
+                anomalies.append(
+                    {
+                        "employee_id": eid,
+                        "date": date_str,
+                        "anomaly_type": "late",
+                        "severity": "low",
+                        "detail": f"迟到（打卡时间: {rec['clock_in_time']}）",
+                    }
+                )
 
             elif status == "early_leave":
-                anomalies.append({
-                    "employee_id": eid,
-                    "date": date_str,
-                    "anomaly_type": "early_leave",
-                    "severity": "low",
-                    "detail": f"早退（下班打卡: {rec['clock_out_time']}）",
-                })
+                anomalies.append(
+                    {
+                        "employee_id": eid,
+                        "date": date_str,
+                        "anomaly_type": "early_leave",
+                        "severity": "low",
+                        "detail": f"早退（下班打卡: {rec['clock_out_time']}）",
+                    }
+                )
 
             elif status == "unscheduled":
-                anomalies.append({
-                    "employee_id": eid,
-                    "date": date_str,
-                    "anomaly_type": "unscheduled_work",
-                    "severity": "medium",
-                    "detail": "非排班日但有打卡记录",
-                })
+                anomalies.append(
+                    {
+                        "employee_id": eid,
+                        "date": date_str,
+                        "anomaly_type": "unscheduled_work",
+                        "severity": "medium",
+                        "detail": "非排班日但有打卡记录",
+                    }
+                )
 
-        anomalies.sort(
-            key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x["severity"], 9)
-        )
+        anomalies.sort(key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x["severity"], 9))
 
         if anomalies and self.tenant_id:
             for anomaly in anomalies:
                 if anomaly["anomaly_type"] in ("absent", "missing_clock_out", "unscheduled_work"):
-                    asyncio.create_task(UniversalPublisher.publish(
-                        event_type=OrgEventType.ATTENDANCE_EXCEPTION,
-                        tenant_id=self.tenant_id,
-                        store_id=str(store_id),
-                        entity_id=anomaly["employee_id"],
-                        event_data={"employee_id": anomaly["employee_id"], "exception_type": anomaly["anomaly_type"]},
-                        source_service="tx-org",
-                        extra_fields={"employee_id": anomaly["employee_id"]},
-                    ))
+                    asyncio.create_task(
+                        UniversalPublisher.publish(
+                            event_type=OrgEventType.ATTENDANCE_EXCEPTION,
+                            tenant_id=self.tenant_id,
+                            store_id=str(store_id),
+                            entity_id=anomaly["employee_id"],
+                            event_data={
+                                "employee_id": anomaly["employee_id"],
+                                "exception_type": anomaly["anomaly_type"],
+                            },
+                            source_service="tx-org",
+                            extra_fields={"employee_id": anomaly["employee_id"]},
+                        )
+                    )
 
         return anomalies

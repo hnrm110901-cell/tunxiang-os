@@ -7,6 +7,7 @@ POST /api/v1/orders/{order_id}/settle
   如果 method=='tab': 写入 tab_records 表（如不存在就跳过）
   返回 {"ok": true, "data": {"order_id": ..., "paid_at": ...}}
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional

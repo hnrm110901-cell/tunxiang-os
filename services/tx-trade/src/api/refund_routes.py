@@ -4,13 +4,14 @@
   POST /api/v1/trade/refunds        — 提交退款申请
   GET  /api/v1/trade/refunds/{id}   — 查询退款状态
 """
+
 import asyncio
 import json
-import logging
 import uuid as uuid_mod
 from typing import List, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -19,10 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_mfa_audited
 from ..services.trade_audit_log import write_audit
 
-logger = logging.getLogger(__name__)
+# 用 structlog 替换 stdlib logging — Python 3.14 stdlib logger 在收到 error=
+# 等 reserved kwargs 时抛 TypeError；structlog 接受任意结构化字段。项目其他
+# 模块（trade_audit_log / audit_outbox / rbac 等）已统一用 structlog。
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/trade/refunds", tags=["refund"])
 
 
@@ -60,7 +64,7 @@ async def submit_refund(
     req: SubmitRefundRequest,
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin")),
+    user: UserContext = Depends(require_mfa_audited("refund.apply", "store_manager", "admin")),
 ):
     """提交退款申请，写入 refund_requests 表（仅店长/管理员）"""
     if req.refund_amount_fen <= 0:
@@ -102,26 +106,24 @@ async def submit_refund(
             from shared.events.src.emitter import emit_event
             from shared.events.src.event_types import OrderEventType
 
-            _evt = (
-                OrderEventType.REFUNDED
-                if req.refund_type == "full"
-                else OrderEventType.PARTIAL_REFUNDED
+            _evt = OrderEventType.REFUNDED if req.refund_type == "full" else OrderEventType.PARTIAL_REFUNDED
+            asyncio.create_task(
+                emit_event(
+                    event_type=_evt,
+                    tenant_id=tenant_id,
+                    stream_id=str(req.order_id),
+                    payload={
+                        "refund_id": refund_id,
+                        "order_id": str(req.order_id),
+                        "refund_type": req.refund_type,
+                        "refund_amount_fen": req.refund_amount_fen,
+                        "reasons": req.reasons,
+                        "status": "pending",
+                    },
+                    source_service="tx-trade",
+                    causation_id=str(req.order_id),
+                )
             )
-            asyncio.create_task(emit_event(
-                event_type=_evt,
-                tenant_id=tenant_id,
-                stream_id=str(req.order_id),
-                payload={
-                    "refund_id": refund_id,
-                    "order_id": str(req.order_id),
-                    "refund_type": req.refund_type,
-                    "refund_amount_fen": req.refund_amount_fen,
-                    "reasons": req.reasons,
-                    "status": "pending",
-                },
-                source_service="tx-trade",
-                causation_id=str(req.order_id),
-            ))
         except Exception:  # noqa: BLE001 — 事件写入失败不阻断主流程
             pass
 

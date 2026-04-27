@@ -9,10 +9,10 @@
 
 所有接口需要 X-Tenant-ID 请求头。
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
-from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -36,6 +36,7 @@ router = APIRouter(prefix="/api/v1/brain/content", tags=["content-hub"])
 def _get_model_router() -> Any:
     """获取 ModelRouter 实例（从应用状态中取，测试可替换）"""
     from ..services.model_router_singleton import get_model_router  # lazy import
+
     return get_model_router()
 
 
@@ -46,6 +47,7 @@ def _get_content_hub() -> ContentHub:
 async def _get_db() -> AsyncSession:  # type: ignore[misc]
     """数据库 Session 依赖（由 main.py 中的 SessionLocal 提供）"""
     from ..database import get_session
+
     async for session in get_session():
         yield session
 
@@ -63,6 +65,7 @@ def _require_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 class GenerateContentBody(BaseModel):
     """生成活动内容包请求体"""
+
     model_config = ConfigDict(extra="ignore")
 
     campaign_type: str  # new_dish_launch/member_win_back/holiday_promo/daily_special/birthday_care/churn_recovery
@@ -92,6 +95,7 @@ class DishStoryBody(BaseModel):
 
 class XHSNoteBody(BaseModel):
     """生成小红书种草笔记请求体"""
+
     model_config = ConfigDict(extra="ignore")
 
     store_name: str

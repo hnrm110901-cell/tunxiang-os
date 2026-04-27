@@ -6,6 +6,7 @@
 - GET  /api/v1/analytics/etl/status         — 查看同步状态
 - GET  /api/v1/analytics/etl/logs           — 查看最近同步日志
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -49,7 +50,11 @@ async def trigger_tenant_sync(tenant_id: str, body: Optional[TenantSyncRequest] 
     except (ConnectionError, TimeoutError, RuntimeError) as exc:
         return {"ok": False, "data": None, "error": {"code": "SYNC_FAILED", "message": str(exc)}}
     if not result.get("ok", False):
-        return {"ok": False, "data": None, "error": {"code": "TENANT_NOT_FOUND", "message": result.get("error", "未知错误")}}
+        return {
+            "ok": False,
+            "data": None,
+            "error": {"code": "TENANT_NOT_FOUND", "message": result.get("error", "未知错误")},
+        }
     return {"ok": True, "data": result, "error": None}
 
 

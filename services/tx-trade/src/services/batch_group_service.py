@@ -9,6 +9,7 @@
   → 计算 batch_count = total_qty // base_qty
   → 返回 BatchGroup 列表
 """
+
 from __future__ import annotations
 
 import uuid
@@ -26,14 +27,15 @@ logger = structlog.get_logger()
 @dataclass
 class BatchGroup:
     """单个菜品的批次合并结果"""
+
     dish_id: str
     dish_name: str
-    total_qty: int          # 档口所有pending任务的总份数
-    base_qty: int           # 基准批次份数（从 dish_dept_mappings.base_quantity 读取）
-    batch_count: int        # 可凑成的完整批次数 = total_qty // base_qty
-    remainder: int          # 剩余散单数 = total_qty % base_qty
-    table_list: List[str] = field(default_factory=list)   # 涉及桌台列表
-    task_ids: List[str] = field(default_factory=list)     # 涉及的 KDS task ID 列表
+    total_qty: int  # 档口所有pending任务的总份数
+    base_qty: int  # 基准批次份数（从 dish_dept_mappings.base_quantity 读取）
+    batch_count: int  # 可凑成的完整批次数 = total_qty // base_qty
+    remainder: int  # 剩余散单数 = total_qty % base_qty
+    table_list: List[str] = field(default_factory=list)  # 涉及桌台列表
+    task_ids: List[str] = field(default_factory=list)  # 涉及的 KDS task ID 列表
 
 
 class BatchGroupService:
@@ -239,9 +241,7 @@ class BatchGroupService:
         # 批量获取各菜品基准份数（并发查询）
         result_groups: List[BatchGroup] = []
         for dish_id, g in groups.items():
-            base_qty = await BatchGroupService.get_dish_base_quantity(
-                dish_id, dept_id, tenant_id, db
-            )
+            base_qty = await BatchGroupService.get_dish_base_quantity(dish_id, dept_id, tenant_id, db)
             total_qty = g["total_qty"]
             batch_count = total_qty // base_qty
             remainder = total_qty % base_qty

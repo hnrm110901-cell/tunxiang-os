@@ -14,6 +14,7 @@
   11. 自定义派单规则
   12. 未知预警类型报错
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -276,7 +277,11 @@ async def test_dispatch_dashboard():
     ]
 
     result = await get_dispatch_dashboard(
-        STORE, TENANT, db=None, now=now, tasks=tasks,
+        STORE,
+        TENANT,
+        db=None,
+        now=now,
+        tasks=tasks,
     )
 
     assert result["summary"]["pending"] == 1
@@ -429,12 +434,15 @@ async def test_invalid_notification_channel():
 @pytest.mark.asyncio
 async def test_register_custom_alert_handler():
     """注册自定义预警处理器后应可正常派单。"""
-    register_alert_handler("equipment_failure", {
-        "assignee_roles": ["maintenance"],
-        "severity": "severe",
-        "issue_type": "equipment",
-        "description_template": "设备故障: {summary}",
-    })
+    register_alert_handler(
+        "equipment_failure",
+        {
+            "assignee_roles": ["maintenance"],
+            "severity": "severe",
+            "issue_type": "equipment",
+            "description_template": "设备故障: {summary}",
+        },
+    )
 
     alert = {
         "alert_type": "equipment_failure",

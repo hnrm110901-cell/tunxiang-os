@@ -11,6 +11,7 @@
 
 所有端点必须携带 X-Tenant-ID Header（UUID 格式）。
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -35,6 +36,7 @@ _svc = AudienceSegmentationService()
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -54,6 +56,7 @@ def _parse_tenant(x_tenant_id: str) -> UUID:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class CustomSegmentRule(BaseModel):
     field: str = Field(..., description="字段名，如 r_score / tags / last_order_at")
     op: str = Field(..., description="操作符：eq/ne/gt/gte/lt/lte/in/contains/between")
@@ -68,6 +71,7 @@ class CreateSegmentRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_segments(
@@ -116,13 +120,15 @@ async def get_segment_detail(
     # 内置分群
     builtin = BUILTIN_SEGMENTS.get(segment_id)
     if builtin:
-        return ok_response({
-            "segment_id": segment_id,
-            "name": builtin["name"],
-            "description": builtin.get("description", ""),
-            "segment_type": "builtin",
-            "definition": builtin,
-        })
+        return ok_response(
+            {
+                "segment_id": segment_id,
+                "name": builtin["name"],
+                "description": builtin.get("description", ""),
+                "segment_type": "builtin",
+                "definition": builtin,
+            }
+        )
 
     # 自定义分群（使用 list 过滤）
     segments = await _svc.list_segments(tenant_id)
@@ -150,9 +156,9 @@ async def get_segment_members(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except httpx.HTTPError as exc:
-        logger.error("segment_members_http_error",
-                     segment_id=segment_id, tenant_id=str(tenant_id),
-                     error=str(exc), exc_info=exc)
+        logger.error(
+            "segment_members_http_error", segment_id=segment_id, tenant_id=str(tenant_id), error=str(exc), exc_info=exc
+        )
         raise HTTPException(status_code=502, detail=f"调用 tx-member 失败: {exc}")
     return ok_response(result)
 
@@ -169,9 +175,9 @@ async def count_segment(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except httpx.HTTPError as exc:
-        logger.error("segment_count_http_error",
-                     segment_id=segment_id, tenant_id=str(tenant_id),
-                     error=str(exc), exc_info=exc)
+        logger.error(
+            "segment_count_http_error", segment_id=segment_id, tenant_id=str(tenant_id), error=str(exc), exc_info=exc
+        )
         raise HTTPException(status_code=502, detail=f"调用 tx-member 失败: {exc}")
     return ok_response({"segment_id": segment_id, "count": count})
 

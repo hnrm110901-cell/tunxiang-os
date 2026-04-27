@@ -15,23 +15,23 @@ Agent 铁律：
 
 量化目标：备用金核销误差率 <0.1%，对账自动化率 >95%
 """
+
 from __future__ import annotations
 
-import asyncio
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
 # 对账差异阈值（分）
-_AUTO_RECONCILE_THRESHOLD = 50      # ≤50分：自动平账
-_STORE_MANAGER_THRESHOLD = 200      # 50-200分：通知店长
+_AUTO_RECONCILE_THRESHOLD = 50  # ≤50分：自动平账
+_STORE_MANAGER_THRESHOLD = 200  # 50-200分：通知店长
 # >200分：升级通知区域经理 + 费控管理员
 
 
@@ -51,9 +51,7 @@ class A6POSReconciliationAgent:
 
     # ── 1. 核心对账处理 ────────────────────────────────────────────────────
 
-    async def handle_daily_close(
-        self, event_data: dict[str, Any], db: AsyncSession
-    ) -> dict[str, Any]:
+    async def handle_daily_close(self, event_data: dict[str, Any], db: AsyncSession) -> dict[str, Any]:
         """处理 ops.daily_close 事件，执行备用金核销 + 对账。
 
         Args:
@@ -310,8 +308,8 @@ class A6POSReconciliationAgent:
 
         # 调用通知服务（失败不向上抛出，保证对账主流程不受影响）
         try:
-            from ..services import notification_service
             from ..models.expense_enums import NotificationEventType
+            from ..services import notification_service
 
             event_type = (
                 NotificationEventType.PETTY_CASH_LARGE_DISCREPANCY
@@ -362,8 +360,9 @@ class A6POSReconciliationAgent:
         如果当日日报不存在，创建一条 pending 状态的占位记录。
         返回 True 表示成功更新，False 表示无记录（占位记录已创建）。
         """
-        from ..models.cost_report import DailyCostReport
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from ..models.cost_report import DailyCostReport
 
         # 尝试更新已有记录
         stmt_update = (
@@ -393,18 +392,22 @@ class A6POSReconciliationAgent:
             return True
 
         # 不存在时插入占位记录（Worker 稍后会填充完整数据）
-        stmt_insert = pg_insert(DailyCostReport.__table__).values(
-            tenant_id=tenant_id,
-            store_id=store_id,
-            report_date=report_date,
-            pos_data_source=pos_source,
-            data_status="pending",
-        ).on_conflict_do_update(
-            constraint="uq_daily_cost_reports_tenant_store_date",
-            set_={
-                "pos_data_source": pos_source,
-                "updated_at": datetime.now(timezone.utc),
-            },
+        stmt_insert = (
+            pg_insert(DailyCostReport.__table__)
+            .values(
+                tenant_id=tenant_id,
+                store_id=store_id,
+                report_date=report_date,
+                pos_data_source=pos_source,
+                data_status="pending",
+            )
+            .on_conflict_do_update(
+                constraint="uq_daily_cost_reports_tenant_store_date",
+                set_={
+                    "pos_data_source": pos_source,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+            )
         )
         await db.execute(stmt_insert)
         await db.flush()
@@ -445,6 +448,7 @@ class A6POSReconciliationAgent:
 # ─────────────────────────────────────────────────────────────────────────────
 # 模块级便捷入口（保持与其他 Agent 模块接口一致）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def run(
     event_type: str,

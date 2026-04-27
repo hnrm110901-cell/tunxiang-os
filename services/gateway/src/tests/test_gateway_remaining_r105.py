@@ -2,6 +2,7 @@
 涵盖端点数 Top-2：dictionary_routes.py (9) / open_api_routes.py (8)
 测试数量：≥ 10
 """
+
 import sys
 import types
 import unittest.mock as _mock
@@ -27,12 +28,12 @@ sys.modules.setdefault("src.middleware.rate_limiter", _src_middleware_rate_limit
 sys.modules.setdefault("src.services", _src_services)
 sys.modules.setdefault("src.services.oauth2_service", _src_services_oauth2)
 
-import pytest
 import importlib.util
 import pathlib
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
 
 TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 APP_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -50,6 +51,7 @@ def _load_module(rel_path: str, name: str):
 # ════════════════════════════════════════════════════════════════════
 # PART 1 — dictionary_routes.py  (9 endpoints)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="module")
 def dict_client():
@@ -70,9 +72,7 @@ class TestDictionaryRoutes:
         assert body["data"]["total"] >= 8  # 8 preset dicts
 
     def test_list_dictionaries_with_keyword(self, dict_client):
-        r = dict_client.get(
-            "/api/v1/system/dictionaries", params={"keyword": "订单"}
-        )
+        r = dict_client.get("/api/v1/system/dictionaries", params={"keyword": "订单"})
         assert r.status_code == 200
         body = r.json()
         assert any("订单" in d["name"] for d in body["data"]["items"])
@@ -131,9 +131,7 @@ class TestDictionaryRoutes:
             "color": "#1890ff",
             "sort_order": 10,
         }
-        r = dict_client.post(
-            "/api/v1/system/dictionaries/order_status/items", json=payload
-        )
+        r = dict_client.post("/api/v1/system/dictionaries/order_status/items", json=payload)
         assert r.status_code == 200
         body = r.json()
         assert body["ok"] is True
@@ -147,17 +145,13 @@ class TestDictionaryRoutes:
         assert body["data"]["total"] >= 6  # 6 preset logs
 
     def test_audit_logs_filter_by_user(self, dict_client):
-        r = dict_client.get(
-            "/api/v1/system/audit-logs", params={"user_name": "李淳"}
-        )
+        r = dict_client.get("/api/v1/system/audit-logs", params={"user_name": "李淳"})
         assert r.status_code == 200
         body = r.json()
         assert all("李淳" in item["user_name"] for item in body["data"]["items"])
 
     def test_audit_logs_filter_by_action(self, dict_client):
-        r = dict_client.get(
-            "/api/v1/system/audit-logs", params={"action": "login"}
-        )
+        r = dict_client.get("/api/v1/system/audit-logs", params={"action": "login"})
         assert r.status_code == 200
         body = r.json()
         assert all(item["action"] == "login" for item in body["data"]["items"])
@@ -166,6 +160,7 @@ class TestDictionaryRoutes:
 # ════════════════════════════════════════════════════════════════════
 # PART 2 — open_api_routes.py  (8 endpoints)
 # ════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def open_api_client():
@@ -176,9 +171,9 @@ def open_api_client():
     # Override DB dependency → 503 path
     async def _no_db():
         from fastapi import HTTPException
+
         raise HTTPException(status_code=503, detail="数据库模块未配置")
 
-    from fastapi import Depends
     app.dependency_overrides[mod.get_db] = _no_db
 
     return TestClient(app, raise_server_exceptions=False), mod

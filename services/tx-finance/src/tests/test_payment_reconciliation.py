@@ -7,14 +7,13 @@ tx-finance 支付对账报表测试
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_payment_reconciliation.py -v
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
 from unittest.mock import AsyncMock, MagicMock
-
-import pytest
 
 # ─── 存根工具 ─────────────────────────────────────────────────────────────────
 
@@ -163,9 +162,9 @@ def _db_cashier_rows(cashiers: list[dict]) -> AsyncMock:
 def test_payment_reconciliation_by_channel():
     """多渠道聚合：grand_total_fen = sum(各渠道 total_amount_fen)，net = total - fee。"""
     channels = [
-        {"channel": "wechat",  "transaction_count": 100, "total_amount_fen": 200000, "fee_fen": 600},
-        {"channel": "alipay",  "transaction_count": 50,  "total_amount_fen": 100000, "fee_fen": 300},
-        {"channel": "cash",    "transaction_count": 20,  "total_amount_fen": 50000,  "fee_fen": 0},
+        {"channel": "wechat", "transaction_count": 100, "total_amount_fen": 200000, "fee_fen": 600},
+        {"channel": "alipay", "transaction_count": 50, "total_amount_fen": 100000, "fee_fen": 300},
+        {"channel": "cash", "transaction_count": 20, "total_amount_fen": 50000, "fee_fen": 0},
     ]
     db = _db_channel_rows(channels)
 
@@ -359,8 +358,13 @@ def test_crm_reconciliation_returns_structure():
 
     # 必需字段存在
     required_fields = [
-        "match_count", "mismatch_count", "total_diff_fen", "mismatch_items",
-        "start_date", "end_date", "used_mock",
+        "match_count",
+        "mismatch_count",
+        "total_diff_fen",
+        "mismatch_items",
+        "start_date",
+        "end_date",
+        "used_mock",
     ]
     for field in required_fields:
         assert field in data, f"缺少字段: {field}"
@@ -450,8 +454,10 @@ def test_tenant_isolation():
 
 def _get_tenant_db_placeholder(tenant_id: str):
     """占位符，用于隔离测试中区分不同 tenant 的 DB 依赖键。"""
+
     async def _dep():
         yield None
+
     _dep.__name__ = f"db_for_{tenant_id}"
     return _dep
 

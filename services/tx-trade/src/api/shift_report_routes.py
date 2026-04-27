@@ -11,6 +11,7 @@
 - GET  /shifts/{store_id}/operators        厨师绩效 (?date=&shift_id=)
 - GET  /shifts/{store_id}/export           导出CSV (?date=&shift_id=)
 """
+
 import csv
 import io
 from datetime import date, time
@@ -265,23 +266,33 @@ async def export_shift_report(
     writer.writerow(["档口对比"])
     writer.writerow(["档口ID", "档口名称", "总单量", "完成单量", "平均出品时间(秒)", "超时率(%)", "重做率(%)"])
     for dept in summary.dept_stats:
-        writer.writerow([
-            dept.dept_id, dept.dept_name, dept.total_tasks, dept.finished_tasks,
-            round(dept.avg_duration_seconds, 1),
-            round(dept.timeout_rate * 100, 1),
-            round(dept.remake_rate * 100, 1),
-        ])
+        writer.writerow(
+            [
+                dept.dept_id,
+                dept.dept_name,
+                dept.total_tasks,
+                dept.finished_tasks,
+                round(dept.avg_duration_seconds, 1),
+                round(dept.timeout_rate * 100, 1),
+                round(dept.remake_rate * 100, 1),
+            ]
+        )
     writer.writerow([])
 
     # 厨师绩效
     writer.writerow(["厨师绩效"])
     writer.writerow(["厨师ID", "姓名", "总单量", "完成单量", "平均出品时间(秒)", "重做率(%)"])
     for op in summary.operator_stats:
-        writer.writerow([
-            op.operator_id, op.operator_name, op.total_tasks, op.finished_tasks,
-            round(op.avg_duration_seconds, 1),
-            round(op.remake_rate * 100, 1),
-        ])
+        writer.writerow(
+            [
+                op.operator_id,
+                op.operator_name,
+                op.total_tasks,
+                op.finished_tasks,
+                round(op.avg_duration_seconds, 1),
+                round(op.remake_rate * 100, 1),
+            ]
+        )
 
     buf.seek(0)
     filename = f"shift_report_{summary.shift_name}_{summary.date}.csv"

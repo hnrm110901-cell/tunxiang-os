@@ -427,6 +427,12 @@ class SalaryAdvisorAgent(SkillAgent):
     priority = "P2"
     run_location = "cloud"
 
+    # Sprint D1 / PR 批次 6：纯薪酬建议，HRD 最终决策，不直接操作三约束，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "AI 薪酬顾问输出建议和风险预测供 HRD 参考，由人工最终决策调薪，不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
+
     def get_supported_actions(self) -> list[str]:
         return [
             "recommend_salary",
@@ -659,12 +665,12 @@ class SalaryAdvisorAgent(SkillAgent):
     }
 
     _POSITION_SALARY_BASELINE: dict[str, int] = {
-        "manager": 800000,   # 8000元/月
-        "chef": 650000,      # 6500元/月
-        "waiter": 420000,    # 4200元/月
-        "cashier": 400000,   # 4000元/月
+        "manager": 800000,  # 8000元/月
+        "chef": 650000,  # 6500元/月
+        "waiter": 420000,  # 4200元/月
+        "cashier": 400000,  # 4000元/月
         "head_chef": 1000000,  # 10000元/月
-        "cleaner": 350000,   # 3500元/月
+        "cleaner": 350000,  # 3500元/月
     }
 
     async def _budget_recommendation(self, params: dict[str, Any]) -> AgentResult:
@@ -691,9 +697,7 @@ class SalaryAdvisorAgent(SkillAgent):
         current_staff = await self._load_current_staffing(store_id)
 
         # 行业基准
-        bench = self._LABOR_RATE_BENCHMARKS.get(
-            cuisine_type, self._LABOR_RATE_BENCHMARKS["default"]
-        )
+        bench = self._LABOR_RATE_BENCHMARKS.get(cuisine_type, self._LABOR_RATE_BENCHMARKS["default"])
 
         # 计算当前人力成本率
         current_revenue = pnl_data.get("avg_monthly_revenue_fen", 0)
@@ -714,9 +718,7 @@ class SalaryAdvisorAgent(SkillAgent):
         suggested_budget_fen = int(predicted_revenue * target_rate)
 
         # 按岗位分解建议编制
-        position_plan = self._compute_position_plan(
-            suggested_budget_fen, current_staff, predicted_revenue
-        )
+        position_plan = self._compute_position_plan(suggested_budget_fen, current_staff, predicted_revenue)
 
         # 生成差异和理由
         budget_diff = suggested_budget_fen - current_labor
@@ -726,20 +728,11 @@ class SalaryAdvisorAgent(SkillAgent):
 
         reasons: list[str] = []
         if current_rate > bench["p75"]:
-            reasons.append(
-                f"当前人力成本率{current_rate:.1%}超过行业P75({bench['p75']:.1%})，"
-                f"建议控制人力支出"
-            )
+            reasons.append(f"当前人力成本率{current_rate:.1%}超过行业P75({bench['p75']:.1%})，建议控制人力支出")
         elif current_rate < bench["p25"]:
-            reasons.append(
-                f"当前人力成本率{current_rate:.1%}低于行业P25({bench['p25']:.1%})，"
-                f"可能存在人手不足风险"
-            )
+            reasons.append(f"当前人力成本率{current_rate:.1%}低于行业P25({bench['p25']:.1%})，可能存在人手不足风险")
         else:
-            reasons.append(
-                f"当前人力成本率{current_rate:.1%}处于行业合理区间"
-                f"({bench['p25']:.1%}-{bench['p75']:.1%})"
-            )
+            reasons.append(f"当前人力成本率{current_rate:.1%}处于行业合理区间({bench['p25']:.1%}-{bench['p75']:.1%})")
 
         if revenue_trend == "rising":
             reasons.append("营收呈上升趋势，建议适当增加编制以保障服务质量")
@@ -799,11 +792,14 @@ class SalaryAdvisorAgent(SkillAgent):
                 LIMIT 3
             """)
             try:
-                result = await self._db.execute(q, {
-                    "tenant_id": self.tenant_id,
-                    "store_id": store_id,
-                    "month": month,
-                })
+                result = await self._db.execute(
+                    q,
+                    {
+                        "tenant_id": self.tenant_id,
+                        "store_id": store_id,
+                        "month": month,
+                    },
+                )
                 row = result.mappings().first()
                 if row:
                     return dict(row)
@@ -813,7 +809,7 @@ class SalaryAdvisorAgent(SkillAgent):
         # Mock降级
         return {
             "avg_monthly_revenue_fen": 35000000,  # 35万元
-            "avg_monthly_labor_fen": 9800000,     # 9.8万元
+            "avg_monthly_labor_fen": 9800000,  # 9.8万元
             "revenue_trend": "stable",
         }
 
@@ -831,10 +827,13 @@ class SalaryAdvisorAgent(SkillAgent):
                 GROUP BY LOWER(COALESCE(role, 'waiter'))
             """)
             try:
-                result = await self._db.execute(q, {
-                    "tenant_id": self.tenant_id,
-                    "store_id": store_id,
-                })
+                result = await self._db.execute(
+                    q,
+                    {
+                        "tenant_id": self.tenant_id,
+                        "store_id": store_id,
+                    },
+                )
                 return [dict(r) for r in result.mappings()]
             except (OperationalError, ProgrammingError) as exc:
                 logger.warning("budget_staffing_fallback", error=str(exc))
@@ -876,14 +875,16 @@ class SalaryAdvisorAgent(SkillAgent):
             current_count = current_map.get(role, 0)
             diff = suggested_count - current_count
 
-            plan.append({
-                "role": role,
-                "role_label": _POSITION_LABEL.get(role, role),
-                "current_count": current_count,
-                "suggested_count": suggested_count,
-                "current_salary_fen": current_count * baseline,
-                "suggested_salary_fen": suggested_count * baseline,
-                "diff": diff,
-                "action": "增编" if diff > 0 else "减编" if diff < 0 else "持平",
-            })
+            plan.append(
+                {
+                    "role": role,
+                    "role_label": _POSITION_LABEL.get(role, role),
+                    "current_count": current_count,
+                    "suggested_count": suggested_count,
+                    "current_salary_fen": current_count * baseline,
+                    "suggested_salary_fen": suggested_count * baseline,
+                    "diff": diff,
+                    "action": "增编" if diff > 0 else "减编" if diff < 0 else "持平",
+                }
+            )
         return plan

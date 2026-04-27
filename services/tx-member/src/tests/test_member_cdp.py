@@ -25,6 +25,7 @@
 - services/tx-member 目录加入 sys.path，使 `src` 作为顶层包被导入。
 - shared.ontology.src.database 和 structlog 在 import 前注入为存根。
 """
+
 from __future__ import annotations
 
 import os
@@ -59,6 +60,7 @@ _db_mod = sys.modules["shared.ontology.src.database"]
 
 async def _fake_get_db():  # type: ignore[override]
     from sqlalchemy.ext.asyncio import AsyncSession
+
     yield AsyncMock(spec=AsyncSession)
 
 
@@ -101,7 +103,6 @@ sys.modules["src.services.points_mall_v2"] = _svc_stub
 
 # ─── 加载路由（包名方式，解析相对导入）──────────────────────────────────────
 
-import pytest  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -133,6 +134,7 @@ _PTS_HEADERS = {"X-Tenant-ID": TENANT_ID}
 # 场景 1：GET /api/v1/member/points-mall/products — 正常分页查询
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_mall_list_products_success():
     """list_products 返回含 items/total 分页结构 → 200，data.items 长度=2"""
     fake_page = {
@@ -162,6 +164,7 @@ def test_mall_list_products_success():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 2：GET /api/v1/member/points-mall/products/{id} — 商品详情正常返回
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_mall_get_product_success():
     """get_product 返回商品详情 → 200，data.id 与路径一致，product_type=dish"""
@@ -193,6 +196,7 @@ def test_mall_get_product_success():
 # 场景 3：GET /api/v1/member/points-mall/products/{id} — 商品不存在 → 404
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_mall_get_product_not_found():
     """get_product 抛出 ValueError('product_not_found') → HTTP 404（路由 status_map 正确）"""
     with patch(
@@ -212,6 +216,7 @@ def test_mall_get_product_not_found():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 4：POST /api/v1/member/points-mall/redeem — 积分兑换成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_mall_redeem_success():
     """redeem 完成原子事务 → 200，data 含 order_id / points_spent / status=pending"""
@@ -247,6 +252,7 @@ def test_mall_redeem_success():
 # 场景 5：POST /api/v1/member/points-mall/redeem — 积分不足 → 422
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_mall_redeem_insufficient_points():
     """redeem 抛出 ValueError('insufficient_points') → HTTP 422（业务逻辑校验）"""
     with patch(
@@ -271,6 +277,7 @@ def test_mall_redeem_insufficient_points():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 6：POST /api/v1/member/points/earn — 正常积分获取
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_pts_earn_points_success():
     """POST /earn 消费来源积分请求 → 200，响应含 card_id / earned / new_balance"""
@@ -297,6 +304,7 @@ def test_pts_earn_points_success():
 # 场景 7：POST /api/v1/member/points/spend — 积分抵现消耗
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_pts_spend_points_cash_offset():
     """POST /spend purpose=cash_offset → 200，响应含 spent=50 / new_balance"""
     client = TestClient(pts_app)
@@ -322,6 +330,7 @@ def test_pts_spend_points_cash_offset():
 # 场景 8：PUT /api/v1/member/points/types/{id}/multiplier — 积分倍数设置
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_pts_set_multiplier_member_day():
     """PUT /multiplier 会员日 3× → 200，响应含 multiplier=3.0 / card_type_id / conditions"""
     client = TestClient(pts_app)
@@ -345,6 +354,7 @@ def test_pts_set_multiplier_member_day():
 # 场景 9：GET /api/v1/member/points/cards/{id}/balance — 积分余额查询
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_pts_get_balance_structure():
     """GET /balance → 200，响应含 card_id / points(int) / growth_value(int)"""
     client = TestClient(pts_app)
@@ -366,6 +376,7 @@ def test_pts_get_balance_structure():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 场景 10：GET /api/v1/member/points/settlement/{month} — 跨店积分月结算
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_pts_cross_store_settlement():
     """GET /settlement/2026-03 → 200，响应含 month / store_settlements / 合计字段"""

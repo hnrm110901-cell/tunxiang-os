@@ -10,6 +10,7 @@
   - 查询预算执行进度（计划 vs 实际 vs 差异）
   - 多门店/多科目预算汇总
 """
+
 from __future__ import annotations
 
 import uuid
@@ -17,10 +18,9 @@ from datetime import date, timedelta
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.budget import Budget, BudgetExecution
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -117,9 +117,7 @@ class BudgetService:
         where_clause = and_(*conditions)
 
         # 总数
-        count_result = await db.execute(
-            select(func.count(Budget.id)).where(where_clause)
-        )
+        count_result = await db.execute(select(func.count(Budget.id)).where(where_clause))
         total = count_result.scalar_one()
 
         # 分页查询
@@ -199,8 +197,7 @@ class BudgetService:
 
         # 计算累计实际金额
         cumulative_result = await db.execute(
-            select(func.coalesce(func.sum(BudgetExecution.actual_amount_fen), 0))
-            .where(
+            select(func.coalesce(func.sum(BudgetExecution.actual_amount_fen), 0)).where(
                 BudgetExecution.budget_id == budget_id,
                 BudgetExecution.tenant_id == tenant_id,
                 BudgetExecution.is_deleted.is_(False),
@@ -210,11 +207,7 @@ class BudgetService:
 
         # 偏差计算
         variance_fen = cumulative_fen - budget.budget_amount_fen
-        variance_pct = (
-            round(variance_fen / budget.budget_amount_fen, 4)
-            if budget.budget_amount_fen != 0
-            else 0.0
-        )
+        variance_pct = round(variance_fen / budget.budget_amount_fen, 4) if budget.budget_amount_fen != 0 else 0.0
 
         execution = BudgetExecution(
             tenant_id=tenant_id,
@@ -257,16 +250,13 @@ class BudgetService:
         if category is not None:
             conditions.append(Budget.category == category)
 
-        result = await db.execute(
-            select(Budget).where(and_(*conditions)).order_by(Budget.period_start.desc())
-        )
+        result = await db.execute(select(Budget).where(and_(*conditions)).order_by(Budget.period_start.desc()))
         budgets = result.scalars().all()
 
         execution_summaries: list[dict] = []
         for b in budgets:
             actual_result = await db.execute(
-                select(func.coalesce(func.sum(BudgetExecution.actual_amount_fen), 0))
-                .where(
+                select(func.coalesce(func.sum(BudgetExecution.actual_amount_fen), 0)).where(
                     BudgetExecution.budget_id == b.id,
                     BudgetExecution.tenant_id == tenant_id,
                     BudgetExecution.is_deleted.is_(False),
@@ -274,32 +264,26 @@ class BudgetService:
             )
             actual_fen = int(actual_result.scalar_one())
             variance_fen = actual_fen - b.budget_amount_fen
-            variance_pct = (
-                round(variance_fen / b.budget_amount_fen, 4)
-                if b.budget_amount_fen != 0
-                else 0.0
-            )
-            utilization_pct = (
-                round(actual_fen / b.budget_amount_fen, 4)
-                if b.budget_amount_fen != 0
-                else 0.0
-            )
+            variance_pct = round(variance_fen / b.budget_amount_fen, 4) if b.budget_amount_fen != 0 else 0.0
+            utilization_pct = round(actual_fen / b.budget_amount_fen, 4) if b.budget_amount_fen != 0 else 0.0
 
-            execution_summaries.append({
-                "budget_id": str(b.id),
-                "store_id": str(b.store_id),
-                "department": b.department,
-                "category": b.category,
-                "period": b.period,
-                "period_start": str(b.period_start),
-                "period_end": str(b.period_end),
-                "budget_amount_fen": b.budget_amount_fen,
-                "actual_amount_fen": actual_fen,
-                "variance_fen": variance_fen,
-                "variance_pct": variance_pct,
-                "utilization_pct": utilization_pct,
-                "status": b.status,
-            })
+            execution_summaries.append(
+                {
+                    "budget_id": str(b.id),
+                    "store_id": str(b.store_id),
+                    "department": b.department,
+                    "category": b.category,
+                    "period": b.period,
+                    "period_start": str(b.period_start),
+                    "period_end": str(b.period_end),
+                    "budget_amount_fen": b.budget_amount_fen,
+                    "actual_amount_fen": actual_fen,
+                    "variance_fen": variance_fen,
+                    "variance_pct": variance_pct,
+                    "utilization_pct": utilization_pct,
+                    "status": b.status,
+                }
+            )
 
         return execution_summaries
 
@@ -340,9 +324,7 @@ class BudgetService:
         for b in active_budgets:
             period_days = (b.period_end - b.period_start).days or 1
             daily_avg = b.budget_amount_fen / period_days
-            daily_budget_by_category[b.category] = (
-                daily_budget_by_category.get(b.category, 0.0) + daily_avg
-            )
+            daily_budget_by_category[b.category] = daily_budget_by_category.get(b.category, 0.0) + daily_avg
 
         # 2) 取近30天历史执行日均
         history_start = today - timedelta(days=30)
@@ -385,14 +367,14 @@ class BudgetService:
         while current <= forecast_end:
             day_amount = round(daily_forecast)
             cumulative_fen += day_amount
-            forecast_items.append({
-                "date": str(current),
-                "predicted_outflow_fen": day_amount,
-                "cumulative_outflow_fen": cumulative_fen,
-                "budget_by_category": {
-                    k: round(v) for k, v in daily_budget_by_category.items()
-                },
-            })
+            forecast_items.append(
+                {
+                    "date": str(current),
+                    "predicted_outflow_fen": day_amount,
+                    "cumulative_outflow_fen": cumulative_fen,
+                    "budget_by_category": {k: round(v) for k, v in daily_budget_by_category.items()},
+                }
+            )
             current += timedelta(days=1)
 
         logger.info(
@@ -402,6 +384,8 @@ class BudgetService:
             daily_forecast_fen=round(daily_forecast),
         )
         return forecast_items
+
+
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -412,8 +396,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 log = structlog.get_logger(__name__)
 
 VALID_CATEGORIES = (
-    "revenue", "ingredient_cost", "labor_cost",
-    "fixed_cost", "marketing_cost", "total",
+    "revenue",
+    "ingredient_cost",
+    "labor_cost",
+    "fixed_cost",
+    "marketing_cost",
+    "total",
 )
 VALID_PERIOD_TYPES = ("monthly", "quarterly", "yearly")
 VALID_STATUSES = ("draft", "approved", "locked")
@@ -486,8 +474,14 @@ class BudgetService:
         )
         row = result.fetchone()
         await self.db.flush()
-        log.info("budget_plan_upserted", store_id=store_id, period=period,
-                 category=category, budget_fen=budget_fen, tenant_id=self.tenant_id)
+        log.info(
+            "budget_plan_upserted",
+            store_id=store_id,
+            period=period,
+            category=category,
+            budget_fen=budget_fen,
+            tenant_id=self.tenant_id,
+        )
         return self._plan_row(row)
 
     async def get_plan(self, plan_id: str) -> Optional[Dict[str, Any]]:
@@ -569,8 +563,7 @@ class BudgetService:
             },
         )
         await self.db.flush()
-        log.info("budget_plan_approved", plan_id=plan_id, approved_by=approved_by,
-                 tenant_id=self.tenant_id)
+        log.info("budget_plan_approved", plan_id=plan_id, approved_by=approved_by, tenant_id=self.tenant_id)
         return await self.get_plan(plan_id)  # type: ignore[return-value]
 
     # ══════════════════════════════════════════════════════
@@ -617,8 +610,13 @@ class BudgetService:
             },
         )
         await self.db.flush()
-        log.info("budget_execution_recorded", plan_id=plan_id, actual_fen=actual_fen,
-                 variance_fen=variance_fen, tenant_id=self.tenant_id)
+        log.info(
+            "budget_execution_recorded",
+            plan_id=plan_id,
+            actual_fen=actual_fen,
+            variance_fen=variance_fen,
+            tenant_id=self.tenant_id,
+        )
 
         return {
             "execution_id": str(exec_id),
@@ -675,7 +673,11 @@ class BudgetService:
             "variance_yuan": round(variance_fen / 100, 2),
             "variance_pct": variance_pct,
             "completion_rate": completion_rate,
-            "execution_status": "over_budget" if variance_fen > 0 else "under_budget" if variance_fen < 0 else "on_budget",
+            "execution_status": "over_budget"
+            if variance_fen > 0
+            else "under_budget"
+            if variance_fen < 0
+            else "on_budget",
             "last_tracked_at": str(row.tracked_at) if row else None,
         }
 
@@ -704,8 +706,10 @@ class BudgetService:
             """),
             {"tid": self._tid, "sid": sid, "ptype": period_type, "period": period},
         )
-        plans = {r.category: {"plan_id": str(r.id), "budget_fen": r.budget_fen, "status": r.status}
-                 for r in plans_result.fetchall()}
+        plans = {
+            r.category: {"plan_id": str(r.id), "budget_fen": r.budget_fen, "status": r.status}
+            for r in plans_result.fetchall()
+        }
 
         if not plans:
             return {
@@ -730,11 +734,14 @@ class BudgetService:
             """),
             {"tid": self._tid, "pids": plan_ids},
         )
-        executions = {str(r.budget_plan_id): {
-            "actual_fen": r.actual_fen,
-            "variance_fen": r.variance_fen,
-            "tracked_at": str(r.tracked_at),
-        } for r in exec_result.fetchall()}
+        executions = {
+            str(r.budget_plan_id): {
+                "actual_fen": r.actual_fen,
+                "variance_fen": r.variance_fen,
+                "tracked_at": str(r.tracked_at),
+            }
+            for r in exec_result.fetchall()
+        }
 
         categories = []
         total_budget = 0
@@ -746,19 +753,21 @@ class BudgetService:
             vfen = afen - bfen
             total_budget += bfen
             total_actual += afen
-            categories.append({
-                "category": cat,
-                "plan_id": p["plan_id"],
-                "budget_fen": bfen,
-                "budget_yuan": round(bfen / 100, 2),
-                "actual_fen": afen,
-                "actual_yuan": round(afen / 100, 2),
-                "variance_fen": vfen,
-                "variance_pct": round(vfen / bfen * 100, 2) if bfen != 0 else None,
-                "completion_rate": round(afen / bfen * 100, 2) if bfen > 0 else 0.0,
-                "plan_status": p["status"],
-                "last_tracked_at": exc.get("tracked_at"),
-            })
+            categories.append(
+                {
+                    "category": cat,
+                    "plan_id": p["plan_id"],
+                    "budget_fen": bfen,
+                    "budget_yuan": round(bfen / 100, 2),
+                    "actual_fen": afen,
+                    "actual_yuan": round(afen / 100, 2),
+                    "variance_fen": vfen,
+                    "variance_pct": round(vfen / bfen * 100, 2) if bfen != 0 else None,
+                    "completion_rate": round(afen / bfen * 100, 2) if bfen > 0 else 0.0,
+                    "plan_status": p["status"],
+                    "last_tracked_at": exc.get("tracked_at"),
+                }
+            )
 
         return {
             "store_id": store_id,

@@ -20,12 +20,12 @@
     GET /api/v1/analysis/dish/new-performance
     GET /api/v1/analysis/dish/optimization
 """
+
 import sys
 import types
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -84,21 +84,13 @@ sys.modules["src.services.inventory_analysis"] = _fake_inv_svc
 
 _fake_dish_svc = types.ModuleType("src.services.dish_analysis")
 
-_fake_dish_svc.sales_ranking = MagicMock(
-    return_value=[{"dish_id": "d1", "dish_name": "红烧肉", "sales_qty": 100}]
-)
-_fake_dish_svc.return_rate_analysis = MagicMock(
-    return_value={"items": [], "reasons": {}}
-)
+_fake_dish_svc.sales_ranking = MagicMock(return_value=[{"dish_id": "d1", "dish_name": "红烧肉", "sales_qty": 100}])
+_fake_dish_svc.return_rate_analysis = MagicMock(return_value={"items": [], "reasons": {}})
 _fake_dish_svc.negative_review_dishes = MagicMock(return_value=[])
 _fake_dish_svc.stockout_frequency = MagicMock(return_value=[])
-_fake_dish_svc.dish_structure_analysis = MagicMock(
-    return_value={"star": [], "cash_cow": [], "question": [], "dog": []}
-)
+_fake_dish_svc.dish_structure_analysis = MagicMock(return_value={"star": [], "cash_cow": [], "question": [], "dog": []})
 _fake_dish_svc.new_dish_performance = MagicMock(return_value=[])
-_fake_dish_svc.menu_optimization_suggestions = MagicMock(
-    return_value={"suggestions": []}
-)
+_fake_dish_svc.menu_optimization_suggestions = MagicMock(return_value={"suggestions": []})
 
 sys.modules["src.services.dish_analysis"] = _fake_dish_svc
 
@@ -109,8 +101,8 @@ sys.modules["src.services.dish_margin"] = _fake_dish_margin
 
 # ─── 导入路由 ─────────────────────────────────────────────────────────────────
 
-from src.api.inventory_analysis_routes import router as inventory_router  # noqa: E402
 from src.api.dish_analysis_routes import router as dish_router  # noqa: E402
+from src.api.inventory_analysis_routes import router as inventory_router  # noqa: E402
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
@@ -165,9 +157,7 @@ class TestInventoryTurnover:
         assert resp.status_code == 422
 
     def test_service_value_error_returns_400(self):
-        _fake_inv_svc.inventory_turnover = AsyncMock(
-            side_effect=ValueError("invalid date range")
-        )
+        _fake_inv_svc.inventory_turnover = AsyncMock(side_effect=ValueError("invalid date range"))
         resp = self.client.post(
             f"/api/v1/analytics/inventory/stores/{_STORE_ID}/turnover",
             headers=_HEADERS,
@@ -252,9 +242,7 @@ class TestInventoryFoodSafetyRisk:
         self.client = _make_client(inventory_router)
 
     def test_missing_tenant_returns_422(self):
-        resp = self.client.get(
-            f"/api/v1/analytics/inventory/stores/{_STORE_ID}/food-safety-risk"
-        )
+        resp = self.client.get(f"/api/v1/analytics/inventory/stores/{_STORE_ID}/food-safety-risk")
         assert resp.status_code == 422
 
     def test_valid_request_returns_200(self):
@@ -269,9 +257,7 @@ class TestInventoryFoodSafetyRisk:
         assert "risk_level" in body["data"]
 
     def test_service_value_error_returns_400(self):
-        _fake_inv_svc.food_safety_risk_graph = AsyncMock(
-            side_effect=ValueError("store not found")
-        )
+        _fake_inv_svc.food_safety_risk_graph = AsyncMock(side_effect=ValueError("store not found"))
         resp = self.client.get(
             f"/api/v1/analytics/inventory/stores/{_STORE_ID}/food-safety-risk",
             headers=_HEADERS,
@@ -292,9 +278,7 @@ class TestDishSalesRanking:
         self.client = _make_client(dish_router)
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analysis/dish/sales-ranking?store_id={_VALID_UUID}"
-        )
+        resp = self.client.get(f"/api/v1/analysis/dish/sales-ranking?store_id={_VALID_UUID}")
         assert resp.status_code == 400
 
     def test_missing_store_id_returns_422(self):
@@ -344,9 +328,7 @@ class TestDishReturnRate:
         self.client = _make_client(dish_router)
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analysis/dish/return-rate?store_id={_VALID_UUID}"
-        )
+        resp = self.client.get(f"/api/v1/analysis/dish/return-rate?store_id={_VALID_UUID}")
         assert resp.status_code == 400
 
     def test_valid_request_returns_200(self):
@@ -385,8 +367,7 @@ class TestDishNegativeReviews:
 
     def test_invalid_date_range_returns_422(self):
         resp = self.client.get(
-            f"/api/v1/analysis/dish/negative-reviews?store_id={_VALID_UUID}"
-            "&start_date=2026-04-01&end_date=2026-03-01",
+            f"/api/v1/analysis/dish/negative-reviews?store_id={_VALID_UUID}&start_date=2026-04-01&end_date=2026-03-01",
             headers={"X-Tenant-ID": _VALID_UUID},
         )
         assert resp.status_code == 422
@@ -461,7 +442,5 @@ class TestDishMenuOptimization:
         assert "suggestions" in body["data"]
 
     def test_missing_tenant_returns_400(self):
-        resp = self.client.get(
-            f"/api/v1/analysis/dish/optimization?store_id={_VALID_UUID}"
-        )
+        resp = self.client.get(f"/api/v1/analysis/dish/optimization?store_id={_VALID_UUID}")
         assert resp.status_code == 400

@@ -3,6 +3,7 @@
 将 Orchestrator 和 Skill Agent 的决策持久化到 agent_decision_logs 表。
 留痕失败只 warn，绝不阻断主业务流程。
 """
+
 from typing import Optional
 from uuid import UUID
 
@@ -119,12 +120,8 @@ class DecisionLogService:
                     "success": getattr(result, "success", False),
                     "data": result_data,
                 },
-                constraints_check=result_data.get("constraints_check", {})
-                if isinstance(result_data, dict)
-                else {},
-                confidence=result_data.get("confidence", 1.0)
-                if isinstance(result_data, dict)
-                else 1.0,
+                constraints_check=result_data.get("constraints_check", {}) if isinstance(result_data, dict) else {},
+                confidence=result_data.get("confidence", 1.0) if isinstance(result_data, dict) else 1.0,
                 plan_id=plan_id,
             )
             db.add(record)

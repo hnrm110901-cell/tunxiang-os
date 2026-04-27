@@ -11,6 +11,7 @@
   - receiving_routes.py 已修复为顶层导入（from ..services.receiving_service import ...）
   - patch 路径：api.receiving_routes.<func_name>（路由模块已绑定的名称）
 """
+
 from __future__ import annotations
 
 import os
@@ -18,14 +19,11 @@ import sys
 import uuid
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.receiving_routes import router as receiving_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.receiving_routes import router as receiving_router
 
 # ─── App 组装 ─────────────────────────────────────────────────────────────────
 
@@ -46,6 +44,7 @@ _ROUTE_MOD = "api.receiving_routes"
 
 def _now_iso() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -79,10 +78,22 @@ class TestCreateReceiving:
                 "purchase_order_id": str(uuid.uuid4()),
                 "receiver_id": str(uuid.uuid4()),
                 "items": [
-                    {"ingredient_id": str(uuid.uuid4()), "name": "猪肉",
-                     "ordered_qty": 100.0, "received_qty": 98.0, "quality": "pass", "notes": ""},
-                    {"ingredient_id": str(uuid.uuid4()), "name": "白菜",
-                     "ordered_qty": 50.0, "received_qty": 50.0, "quality": "pass", "notes": ""},
+                    {
+                        "ingredient_id": str(uuid.uuid4()),
+                        "name": "猪肉",
+                        "ordered_qty": 100.0,
+                        "received_qty": 98.0,
+                        "quality": "pass",
+                        "notes": "",
+                    },
+                    {
+                        "ingredient_id": str(uuid.uuid4()),
+                        "name": "白菜",
+                        "ordered_qty": 50.0,
+                        "received_qty": 50.0,
+                        "quality": "pass",
+                        "notes": "",
+                    },
                 ],
             }
             resp = client.post("/api/v1/supply/receiving", json=body, headers=HEADERS)
@@ -116,8 +127,14 @@ class TestCreateReceiving:
                 "purchase_order_id": str(uuid.uuid4()),
                 "receiver_id": str(uuid.uuid4()),
                 "items": [
-                    {"ingredient_id": str(uuid.uuid4()), "name": "牛肉",
-                     "ordered_qty": 50.0, "received_qty": 40.0, "quality": "fail", "notes": "变质"},
+                    {
+                        "ingredient_id": str(uuid.uuid4()),
+                        "name": "牛肉",
+                        "ordered_qty": 50.0,
+                        "received_qty": 40.0,
+                        "quality": "fail",
+                        "notes": "变质",
+                    },
                 ],
             }
             resp = client.post("/api/v1/supply/receiving", json=body, headers=HEADERS)
@@ -205,8 +222,7 @@ class TestCreateTransferOld:
             body = {
                 "from_store_id": STORE_A,
                 "to_store_id": STORE_B,
-                "items": [{"ingredient_id": str(uuid.uuid4()), "name": "大米",
-                           "quantity": 20.0, "unit": "kg"}],
+                "items": [{"ingredient_id": str(uuid.uuid4()), "name": "大米", "quantity": 20.0, "unit": "kg"}],
             }
             resp = client.post("/api/v1/supply/transfers", json=body, headers=HEADERS)
 
@@ -227,8 +243,7 @@ class TestCreateTransferOld:
             body = {
                 "from_store_id": STORE_A,
                 "to_store_id": STORE_A,
-                "items": [{"ingredient_id": str(uuid.uuid4()), "name": "大米",
-                           "quantity": 5.0, "unit": "kg"}],
+                "items": [{"ingredient_id": str(uuid.uuid4()), "name": "大米", "quantity": 5.0, "unit": "kg"}],
             }
             resp = client.post("/api/v1/supply/transfers", json=body, headers=HEADERS)
 

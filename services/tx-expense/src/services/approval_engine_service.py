@@ -9,20 +9,22 @@
 
 金额约定：所有金额参数和存储均为分(fen)。
 """
+
 from __future__ import annotations
 
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.events.src.emitter import emit_event
+from src.services import notification_service, org_integration_service
+
 from ..models.approval_engine import ApprovalInstance, ApprovalNode, ApprovalRoutingRule
 from ..models.expense_application import ExpenseApplication, ExpenseScenario
 from ..models.expense_enums import (
@@ -33,8 +35,6 @@ from ..models.expense_enums import (
     ExpenseStatus,
 )
 from ..models.expense_events import EXPENSE_APPLICATION_APPROVED, EXPENSE_APPLICATION_REJECTED
-from src.services import notification_service
-from src.services import org_integration_service
 
 logger = structlog.get_logger(__name__)
 
@@ -43,9 +43,9 @@ logger = structlog.get_logger(__name__)
 # 金额档位常量（单位：分 fen）
 # ─────────────────────────────────────────────────────────────────────────────
 
-_TIER_STORE_MANAGER: int = 50_000       # < 500 元 → 店长
-_TIER_REGION_MANAGER: int = 200_000     # < 2000 元 → 区域经理
-_TIER_BRAND_FINANCE: int = 1_000_000   # < 10000 元 → 品牌财务
+_TIER_STORE_MANAGER: int = 50_000  # < 500 元 → 店长
+_TIER_REGION_MANAGER: int = 200_000  # < 2000 元 → 区域经理
+_TIER_BRAND_FINANCE: int = 1_000_000  # < 10000 元 → 品牌财务
 # >= 1_000_000 → 品牌CFO
 
 
@@ -56,6 +56,7 @@ def _now_utc() -> datetime:
 # ─────────────────────────────────────────────────────────────────────────────
 # 路由计算（私有）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _compute_routing_chain(
     db: AsyncSession,
@@ -94,9 +95,7 @@ async def _compute_routing_chain(
         if rule.scenario_code is not None and rule.scenario_code != scenario_code:
             continue
         # 金额区间匹配
-        amount_in_range = rule.amount_min <= total_amount and (
-            rule.amount_max == -1 or total_amount <= rule.amount_max
-        )
+        amount_in_range = rule.amount_min <= total_amount and (rule.amount_max == -1 or total_amount <= rule.amount_max)
         if amount_in_range:
             matched_rules.append(rule)
 
@@ -104,12 +103,14 @@ async def _compute_routing_chain(
         # 使用 DB 自定义规则：按 node_index 排序（此处按 amount_min 近似排序）
         chain = []
         for idx, rule in enumerate(matched_rules):
-            chain.append({
-                "role": rule.approver_role,
-                "node_index": idx,
-                "approver_count": rule.approver_count,
-                "routing_type": rule.routing_type,
-            })
+            chain.append(
+                {
+                    "role": rule.approver_role,
+                    "node_index": idx,
+                    "approver_count": rule.approver_count,
+                    "routing_type": rule.routing_type,
+                }
+            )
         logger.info(
             "approval_routing_from_db",
             tenant_id=str(tenant_id),
@@ -124,10 +125,18 @@ async def _compute_routing_chain(
     # 特殊场景：合同付款固定双签
     if scenario_code == ExpenseScenarioCode.CONTRACT_PAYMENT.value:
         chain = [
-            {"role": "brand_finance", "node_index": 0, "approver_count": 1,
-             "routing_type": ApprovalRoutingType.SCENARIO_FIXED.value},
-            {"role": "brand_cfo", "node_index": 1, "approver_count": 1,
-             "routing_type": ApprovalRoutingType.SCENARIO_FIXED.value},
+            {
+                "role": "brand_finance",
+                "node_index": 0,
+                "approver_count": 1,
+                "routing_type": ApprovalRoutingType.SCENARIO_FIXED.value,
+            },
+            {
+                "role": "brand_cfo",
+                "node_index": 1,
+                "approver_count": 1,
+                "routing_type": ApprovalRoutingType.SCENARIO_FIXED.value,
+            },
         ]
         logger.info(
             "approval_routing_contract_fixed_dual_sign",
@@ -170,6 +179,7 @@ async def _compute_routing_chain(
 # 审批实例创建
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def create_approval_instance(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -187,11 +197,15 @@ async def create_approval_instance(
     log = logger.bind(tenant_id=str(tenant_id), application_id=str(application_id))
 
     # 查询申请
-    stmt = select(ExpenseApplication).where(
-        ExpenseApplication.id == application_id,
-        ExpenseApplication.tenant_id == tenant_id,
-        ExpenseApplication.is_deleted == False,  # noqa: E712
-    ).options(selectinload(ExpenseApplication.scenario))
+    stmt = (
+        select(ExpenseApplication)
+        .where(
+            ExpenseApplication.id == application_id,
+            ExpenseApplication.tenant_id == tenant_id,
+            ExpenseApplication.is_deleted == False,  # noqa: E712
+        )
+        .options(selectinload(ExpenseApplication.scenario))
+    )
     result = await db.execute(stmt)
     application = result.scalar_one_or_none()
 
@@ -311,6 +325,7 @@ async def create_approval_instance(
 # 审批动作推进
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def process_approval_action(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -382,9 +397,7 @@ async def process_approval_action(
         )
 
     if current_node.status != ApprovalNodeStatus.PENDING.value:
-        raise ValueError(
-            f"Node {current_node.node_index} is already in status '{current_node.status}'."
-        )
+        raise ValueError(f"Node {current_node.node_index} is already in status '{current_node.status}'.")
 
     now = _now_utc()
     next_approver_id: Optional[uuid.UUID] = None
@@ -596,6 +609,7 @@ async def process_approval_action(
 # 查询接口
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def get_pending_approvals(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -618,11 +632,7 @@ async def get_pending_approvals(
         ApprovalNode.is_deleted == False,  # noqa: E712
     ]
 
-    count_stmt = (
-        select(func.count())
-        .select_from(ApprovalNode)
-        .where(*base_where)
-    )
+    count_stmt = select(func.count()).select_from(ApprovalNode).where(*base_where)
     count_result = await db.execute(count_stmt)
     total_count = count_result.scalar_one()
 
@@ -634,9 +644,9 @@ async def get_pending_approvals(
         .offset(offset)
         .limit(page_size)
         .options(
-            selectinload(ApprovalNode.instance).selectinload(ApprovalInstance.application).selectinload(
-                ExpenseApplication.scenario
-            ),
+            selectinload(ApprovalNode.instance)
+            .selectinload(ApprovalInstance.application)
+            .selectinload(ExpenseApplication.scenario),
         )
     )
     nodes_result = await db.execute(nodes_stmt)
@@ -645,23 +655,29 @@ async def get_pending_approvals(
     items = []
     for node in nodes:
         application = node.instance.application if node.instance else None
-        items.append({
-            "node_id": str(node.id),
-            "node_index": node.node_index,
-            "instance_id": str(node.instance_id),
-            "approver_role": node.approver_role,
-            "created_at": node.created_at.isoformat() if node.created_at else None,
-            "application": {
-                "id": str(application.id) if application else None,
-                "title": application.title if application else None,
-                "total_amount": application.total_amount if application else None,
-                "status": application.status if application else None,
-                "applicant_id": str(application.applicant_id) if application else None,
-                "store_id": str(application.store_id) if application else None,
-                "scenario_code": application.scenario.code if (application and application.scenario) else None,
-                "submitted_at": application.submitted_at.isoformat() if (application and application.submitted_at) else None,
-            } if application else None,
-        })
+        items.append(
+            {
+                "node_id": str(node.id),
+                "node_index": node.node_index,
+                "instance_id": str(node.instance_id),
+                "approver_role": node.approver_role,
+                "created_at": node.created_at.isoformat() if node.created_at else None,
+                "application": {
+                    "id": str(application.id) if application else None,
+                    "title": application.title if application else None,
+                    "total_amount": application.total_amount if application else None,
+                    "status": application.status if application else None,
+                    "applicant_id": str(application.applicant_id) if application else None,
+                    "store_id": str(application.store_id) if application else None,
+                    "scenario_code": application.scenario.code if (application and application.scenario) else None,
+                    "submitted_at": application.submitted_at.isoformat()
+                    if (application and application.submitted_at)
+                    else None,
+                }
+                if application
+                else None,
+            }
+        )
 
     return items, total_count
 
@@ -694,23 +710,23 @@ async def get_approval_trace(
     instance = result.scalar_one_or_none()
 
     if instance is None:
-        raise LookupError(
-            f"No approval instance found for application {application_id} in tenant {tenant_id}"
-        )
+        raise LookupError(f"No approval instance found for application {application_id} in tenant {tenant_id}")
 
     nodes_data = []
     for node in sorted(instance.nodes, key=lambda n: n.node_index):
-        nodes_data.append({
-            "node_id": str(node.id),
-            "node_index": node.node_index,
-            "approver_id": str(node.approver_id),
-            "approver_role": node.approver_role,
-            "status": node.status,
-            "action": node.action,
-            "comment": node.comment,
-            "acted_at": node.acted_at.isoformat() if node.acted_at else None,
-            "created_at": node.created_at.isoformat() if node.created_at else None,
-        })
+        nodes_data.append(
+            {
+                "node_id": str(node.id),
+                "node_index": node.node_index,
+                "approver_id": str(node.approver_id),
+                "approver_role": node.approver_role,
+                "status": node.status,
+                "action": node.action,
+                "comment": node.comment,
+                "acted_at": node.acted_at.isoformat() if node.acted_at else None,
+                "created_at": node.created_at.isoformat() if node.created_at else None,
+            }
+        )
 
     return {
         "instance": {
@@ -738,6 +754,7 @@ async def send_reminder_for_pending(
     返回 {"reminded": N}
     """
     from datetime import timedelta
+
     from sqlalchemy import select
 
     cutoff = _now_utc() - timedelta(hours=hours_threshold)
@@ -750,9 +767,7 @@ async def send_reminder_for_pending(
             ApprovalNode.created_at < cutoff,
             ApprovalNode.is_deleted == False,  # noqa: E712
         )
-        .options(
-            selectinload(ApprovalNode.instance).selectinload(ApprovalInstance.application)
-        )
+        .options(selectinload(ApprovalNode.instance).selectinload(ApprovalInstance.application))
     )
     result = await db.execute(stmt)
     nodes = list(result.scalars().all())
@@ -763,9 +778,7 @@ async def send_reminder_for_pending(
         if application is None:
             continue
 
-        pending_hours = int(
-            (_now_utc() - node.created_at).total_seconds() / 3600
-        )
+        pending_hours = int((_now_utc() - node.created_at).total_seconds() / 3600)
 
         _app_reminder = application
         _node_approver_id = node.approver_id

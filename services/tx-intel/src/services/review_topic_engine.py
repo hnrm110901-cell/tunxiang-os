@@ -3,6 +3,7 @@
 从大量顾客评价中抽取结构化主题，区分好评/差评，
 识别菜品提及、服务提及、卫生问题等，输出可执行的改进建议和营销素材。
 """
+
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -29,16 +30,55 @@ TOPIC_TYPES = {
 # ─── 关键词提取规则（模拟 NLP） ───
 
 _POSITIVE_KEYWORDS = [
-    "好吃", "美味", "鲜嫩", "入味", "惊艳", "推荐", "回头客", "满意",
-    "服务好", "态度好", "热情", "干净", "整洁", "快", "划算", "值",
-    "正宗", "地道", "分量足", "新鲜", "环境好", "氛围好",
+    "好吃",
+    "美味",
+    "鲜嫩",
+    "入味",
+    "惊艳",
+    "推荐",
+    "回头客",
+    "满意",
+    "服务好",
+    "态度好",
+    "热情",
+    "干净",
+    "整洁",
+    "快",
+    "划算",
+    "值",
+    "正宗",
+    "地道",
+    "分量足",
+    "新鲜",
+    "环境好",
+    "氛围好",
 ]
 
 _NEGATIVE_KEYWORDS = [
-    "难吃", "太咸", "太辣", "太油", "不新鲜", "冷了", "分量少",
-    "服务差", "态度差", "忽视", "脏", "不干净", "油腻", "苍蝇",
-    "慢", "等太久", "贵", "不值", "坑", "失望", "差评",
-    "头发", "异物", "拉肚子",
+    "难吃",
+    "太咸",
+    "太辣",
+    "太油",
+    "不新鲜",
+    "冷了",
+    "分量少",
+    "服务差",
+    "态度差",
+    "忽视",
+    "脏",
+    "不干净",
+    "油腻",
+    "苍蝇",
+    "慢",
+    "等太久",
+    "贵",
+    "不值",
+    "坑",
+    "失望",
+    "差评",
+    "头发",
+    "异物",
+    "拉肚子",
 ]
 
 _DISH_KEYWORDS = {
@@ -61,13 +101,35 @@ _DISH_KEYWORDS = {
 }
 
 _SERVICE_KEYWORDS = [
-    "服务", "服务员", "态度", "热情", "微笑", "倒水", "加菜",
-    "催菜", "上菜", "等位", "排队", "预订", "包间",
+    "服务",
+    "服务员",
+    "态度",
+    "热情",
+    "微笑",
+    "倒水",
+    "加菜",
+    "催菜",
+    "上菜",
+    "等位",
+    "排队",
+    "预订",
+    "包间",
 ]
 
 _HYGIENE_KEYWORDS = [
-    "干净", "整洁", "卫生", "脏", "油腻", "异物", "头发",
-    "苍蝇", "蟑螂", "桌面", "地面", "洗手间", "餐具",
+    "干净",
+    "整洁",
+    "卫生",
+    "脏",
+    "油腻",
+    "异物",
+    "头发",
+    "苍蝇",
+    "蟑螂",
+    "桌面",
+    "地面",
+    "洗手间",
+    "餐具",
 ]
 
 # ─── 种子评价数据 ───
@@ -94,9 +156,11 @@ _SEED_REVIEWS: list[dict] = [
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class ReviewAnalysis:
     """单条评价分析结果"""
+
     review_id: str
     store_id: str
     rating: int
@@ -111,6 +175,7 @@ class ReviewAnalysis:
 @dataclass
 class TopicAggregate:
     """主题聚合"""
+
     topic_type: str
     topic_name: str
     mention_count: int = 0
@@ -130,8 +195,9 @@ class ReviewTopicEngine:
 
     def _load_seed_data(self) -> None:
         self.analyze_reviews(_SEED_REVIEWS)
-        logger.info("review_topic_seed_loaded", analyses=len(self._analyses),
-                     topic_aggregates=len(self._topic_aggregates))
+        logger.info(
+            "review_topic_seed_loaded", analyses=len(self._analyses), topic_aggregates=len(self._topic_aggregates)
+        )
 
     # ─── 评价分析 ───
 
@@ -145,20 +211,22 @@ class ReviewTopicEngine:
         for review in reviews:
             analysis = self._analyze_single(review)
             self._analyses.append(analysis)
-            results.append({
-                "review_id": analysis.review_id,
-                "store_id": analysis.store_id,
-                "sentiment": analysis.sentiment,
-                "topics": analysis.topics,
-                "dishes_mentioned": analysis.dishes_mentioned,
-                "is_actionable": analysis.is_actionable,
-            })
+            results.append(
+                {
+                    "review_id": analysis.review_id,
+                    "store_id": analysis.store_id,
+                    "sentiment": analysis.sentiment,
+                    "topics": analysis.topics,
+                    "dishes_mentioned": analysis.dishes_mentioned,
+                    "is_actionable": analysis.is_actionable,
+                }
+            )
             sentiments.append(analysis.sentiment)
             for t in analysis.topics:
                 topic_counter[t["topic_name"]] += 1
-                self._update_aggregate(t["topic_type"], t["topic_name"],
-                                       analysis.sentiment, analysis.store_id,
-                                       analysis.content)
+                self._update_aggregate(
+                    t["topic_type"], t["topic_name"], analysis.sentiment, analysis.store_id, analysis.content
+                )
             for d in analysis.dishes_mentioned:
                 dish_counter[d] += 1
 
@@ -216,11 +284,13 @@ class ReviewTopicEngine:
         for kw in _HYGIENE_KEYWORDS:
             if kw in content:
                 is_negative = any(nw in content for nw in ["脏", "油腻", "异物", "头发", "苍蝇", "蟑螂", "不干净"])
-                topics.append({
-                    "topic_type": "hygiene",
-                    "topic_name": "卫生问题" if is_negative else "卫生好评",
-                    "keyword": kw,
-                })
+                topics.append(
+                    {
+                        "topic_type": "hygiene",
+                        "topic_name": "卫生问题" if is_negative else "卫生好评",
+                        "keyword": kw,
+                    }
+                )
                 break
 
         # 等待时间
@@ -230,10 +300,12 @@ class ReviewTopicEngine:
         # 性价比
         if any(kw in content for kw in ["性价比", "值", "划算", "贵", "不值", "坑"]):
             is_good = any(w in content for w in ["划算", "值", "性价比高"])
-            topics.append({
-                "topic_type": "value_for_money",
-                "topic_name": "性价比好" if is_good else "性价比差",
-            })
+            topics.append(
+                {
+                    "topic_type": "value_for_money",
+                    "topic_name": "性价比好" if is_good else "性价比差",
+                }
+            )
 
         # 是否可执行
         is_actionable = rating <= 2 or any(t["topic_type"] in ("negative", "hygiene", "wait_time") for t in topics)
@@ -250,8 +322,9 @@ class ReviewTopicEngine:
             analyzed_at=datetime.now(timezone.utc).isoformat(),
         )
 
-    def _update_aggregate(self, topic_type: str, topic_name: str,
-                          sentiment: float, store_id: str, content: str) -> None:
+    def _update_aggregate(
+        self, topic_type: str, topic_name: str, sentiment: float, store_id: str, content: str
+    ) -> None:
         """更新主题聚合"""
         key = f"{topic_type}:{topic_name}"
         if key not in self._topic_aggregates:
@@ -308,9 +381,7 @@ class ReviewTopicEngine:
 
     # ─── 菜品提及 ───
 
-    def get_dish_mentions(
-        self, store_id: Optional[str] = None, days: int = 30
-    ) -> list[dict]:
+    def get_dish_mentions(self, store_id: Optional[str] = None, days: int = 30) -> list[dict]:
         """获取菜品提及排行"""
         dish_data: dict[str, dict] = {}
         for analysis in self._analyses:
@@ -336,7 +407,9 @@ class ReviewTopicEngine:
         results = []
         for d in dish_data.values():
             d["avg_rating"] = round(d["ratings_sum"] / d["total_mentions"], 1) if d["total_mentions"] > 0 else 0
-            d["positive_rate"] = round(d["positive_mentions"] / d["total_mentions"] * 100, 1) if d["total_mentions"] > 0 else 0
+            d["positive_rate"] = (
+                round(d["positive_mentions"] / d["total_mentions"] * 100, 1) if d["total_mentions"] > 0 else 0
+            )
             del d["ratings_sum"]
             results.append(d)
 
@@ -351,8 +424,13 @@ class ReviewTopicEngine:
         for sid in store_ids:
             analyses = [a for a in self._analyses if a.store_id == sid]
             if not analyses:
-                store_data[sid] = {"review_count": 0, "avg_sentiment": 0, "avg_rating": 0,
-                                   "top_positive": [], "top_negative": []}
+                store_data[sid] = {
+                    "review_count": 0,
+                    "avg_sentiment": 0,
+                    "avg_rating": 0,
+                    "top_positive": [],
+                    "top_negative": [],
+                }
                 continue
 
             avg_sent = sum(a.sentiment for a in analyses) / len(analyses)
@@ -398,17 +476,19 @@ class ReviewTopicEngine:
 
             severity = "high" if agg.mention_count >= 3 else ("medium" if agg.mention_count >= 2 else "low")
 
-            issues.append({
-                "topic_type": agg.topic_type,
-                "topic_type_cn": TOPIC_TYPES.get(agg.topic_type, agg.topic_type),
-                "topic_name": agg.topic_name,
-                "mention_count": agg.mention_count,
-                "avg_sentiment": agg.avg_sentiment,
-                "severity": severity,
-                "affected_stores": agg.store_ids,
-                "sample_reviews": agg.sample_reviews,
-                "suggested_action": self._suggest_action(agg),
-            })
+            issues.append(
+                {
+                    "topic_type": agg.topic_type,
+                    "topic_type_cn": TOPIC_TYPES.get(agg.topic_type, agg.topic_type),
+                    "topic_name": agg.topic_name,
+                    "mention_count": agg.mention_count,
+                    "avg_sentiment": agg.avg_sentiment,
+                    "severity": severity,
+                    "affected_stores": agg.store_ids,
+                    "sample_reviews": agg.sample_reviews,
+                    "suggested_action": self._suggest_action(agg),
+                }
+            )
 
         issues.sort(key=lambda x: {"high": 0, "medium": 1, "low": 2}[x["severity"]])
         return issues
@@ -447,14 +527,16 @@ class ReviewTopicEngine:
             if store_id and store_id not in agg.store_ids:
                 continue
 
-            highlights.append({
-                "topic_type": agg.topic_type,
-                "topic_name": agg.topic_name,
-                "mention_count": agg.mention_count,
-                "avg_sentiment": agg.avg_sentiment,
-                "marketing_angle": self._marketing_angle(agg),
-                "sample_reviews": agg.sample_reviews,
-            })
+            highlights.append(
+                {
+                    "topic_type": agg.topic_type,
+                    "topic_name": agg.topic_name,
+                    "mention_count": agg.mention_count,
+                    "avg_sentiment": agg.avg_sentiment,
+                    "marketing_angle": self._marketing_angle(agg),
+                    "sample_reviews": agg.sample_reviews,
+                }
+            )
 
         highlights.sort(key=lambda x: x["mention_count"], reverse=True)
         return highlights
@@ -499,10 +581,12 @@ class ReviewTopicEngine:
             week_start = now - timedelta(weeks=w)
             # 模拟递增趋势
             count = max(0, base + (weeks - w))
-            trend_data.append({
-                "week_start": week_start.strftime("%Y-%m-%d"),
-                "mention_count": count,
-                "sentiment_avg": round(0.3 + (weeks - w) * 0.02, 2),
-            })
+            trend_data.append(
+                {
+                    "week_start": week_start.strftime("%Y-%m-%d"),
+                    "mention_count": count,
+                    "sentiment_avg": round(0.3 + (weeks - w) * 0.02, 2),
+                }
+            )
 
         return trend_data

@@ -5,9 +5,8 @@
   tier_upgrade_logs    — v130 迁移，升降级记录
   member_cards         — 早期迁移，会员卡（含积分、消费等级）
 """
-from datetime import datetime, timezone
-from typing import Any, Optional
-from uuid import uuid4
+
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -23,6 +22,7 @@ router = APIRouter(prefix="/api/v1/member/tiers", tags=["member-tiers"])
 
 
 # ── 请求模型 ──────────────────────────────────────────────────
+
 
 class TierConfig(BaseModel):
     name: str
@@ -40,6 +40,7 @@ class TierConfig(BaseModel):
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────
+
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -69,6 +70,7 @@ def _row_to_tier(row: Any) -> dict[str, Any]:
 
 
 # ── 端点 ──────────────────────────────────────────────────────
+
 
 @router.get("")
 async def list_tiers(

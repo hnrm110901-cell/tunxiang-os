@@ -11,6 +11,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -60,7 +61,7 @@ def _row_to_briefing_summary(row: Any) -> Dict[str, Any]:
         "id": f"daily-{report_date}",
         "type": "daily",
         "title": f"{report_date} 日经营简报",
-        "subtitle": f"全品牌汇总数据",
+        "subtitle": "全品牌汇总数据",
         "generated_at": str(row.max_updated_at) if row.max_updated_at else None,
         "period": {"start": report_date, "end": report_date},
         "status": "published",
@@ -75,9 +76,7 @@ def _row_to_briefing_summary(row: Any) -> Dict[str, Any]:
             "total_orders": row.total_orders,
             "avg_ticket_fen": row.avg_ticket_fen,
             "gross_margin_pct": (
-                round(float(row.avg_gross_margin) * 100, 1)
-                if row.avg_gross_margin is not None
-                else None
+                round(float(row.avg_gross_margin) * 100, 1) if row.avg_gross_margin is not None else None
             ),
         },
         "store_rankings": [],
@@ -118,12 +117,7 @@ async def list_briefings(
     try:
         await _set_rls(db, x_tenant_id)
 
-        count_result = await db.execute(
-            text(
-                "SELECT COUNT(DISTINCT report_date) AS cnt "
-                "FROM daily_business_reports"
-            )
-        )
+        count_result = await db.execute(text("SELECT COUNT(DISTINCT report_date) AS cnt FROM daily_business_reports"))
         total = count_result.scalar() or 0
 
         offset = (page - 1) * size
@@ -172,9 +166,10 @@ async def get_briefing_detail(
     # 解析日期：格式 daily-YYYY-MM-DD
     if not briefing_id.startswith("daily-"):
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="简报不存在")
 
-    report_date_str = briefing_id[len("daily-"):]
+    report_date_str = briefing_id[len("daily-") :]
 
     try:
         await _set_rls(db, x_tenant_id)
@@ -202,6 +197,7 @@ async def get_briefing_detail(
 
         if row is None:
             from fastapi import HTTPException
+
             raise HTTPException(status_code=404, detail="简报不存在")
 
         # 按门店排名
@@ -238,6 +234,7 @@ async def get_briefing_detail(
     except SQLAlchemyError as exc:
         log.error("briefing_detail_db_error", error=str(exc), briefing_id=briefing_id, tenant_id=x_tenant_id)
         from fastapi import HTTPException
+
         raise HTTPException(status_code=503, detail="数据库暂时不可用")
 
 
@@ -247,10 +244,16 @@ async def subscribe_briefings(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> Dict[str, Any]:
     """订阅/更新简报推送设置（订阅配置存储尚未落表，返回确认响应）。"""
-    log.info("briefing_subscription_updated", user_id=body.user_id,
-             types=body.briefing_types, channels=body.channels, tenant_id=x_tenant_id)
+    log.info(
+        "briefing_subscription_updated",
+        user_id=body.user_id,
+        types=body.briefing_types,
+        channels=body.channels,
+        tenant_id=x_tenant_id,
+    )
 
     from datetime import datetime, timezone
+
     return {
         "ok": True,
         "data": {

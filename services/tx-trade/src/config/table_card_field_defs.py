@@ -5,23 +5,26 @@ Module: services/tx-trade/src/config/table_card_field_defs.py
 Complete field definitions and schema for all possible smart table card fields.
 """
 
-from typing import Any, Dict, List, Optional
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FieldCategory(str, Enum):
     """Field category for organizational purposes."""
-    IDENTITY = "identity"      # Table/customer identification
-    STATUS = "status"          # Current state/status
-    FINANCIAL = "financial"    # Financial/monetary data
-    SERVICE = "service"        # Service-related flags/data
-    TIMING = "timing"          # Time-based metrics
-    CUSTOM = "custom"          # Custom/extension fields
+
+    IDENTITY = "identity"  # Table/customer identification
+    STATUS = "status"  # Current state/status
+    FINANCIAL = "financial"  # Financial/monetary data
+    SERVICE = "service"  # Service-related flags/data
+    TIMING = "timing"  # Time-based metrics
+    CUSTOM = "custom"  # Custom/extension fields
 
 
 class FieldType(str, Enum):
     """Data type of field value."""
+
     STRING = "string"
     NUMBER = "number"
     BOOLEAN = "boolean"
@@ -36,6 +39,7 @@ class FieldType(str, Enum):
 
 class FieldVisibility(str, Enum):
     """Default visibility settings."""
+
     ALWAYS = "always"
     PRO_ONLY = "pro_only"
     CONDITIONAL = "conditional"
@@ -44,6 +48,7 @@ class FieldVisibility(str, Enum):
 
 class FieldDefinition(BaseModel):
     """Complete definition of a table card field."""
+
     model_config = ConfigDict(from_attributes=True)
 
     key: str = Field(description="Unique field key identifier")
@@ -55,29 +60,15 @@ class FieldDefinition(BaseModel):
     default_visible: bool = Field(default=True, description="Default visibility")
     visibility: FieldVisibility = Field(default=FieldVisibility.ALWAYS)
     render_hint: Optional[str] = Field(
-        default=None,
-        description="Frontend render hint (e.g., 'large', 'warning_color', 'blink')"
+        default=None, description="Frontend render hint (e.g., 'large', 'warning_color', 'blink')"
     )
-    business_types: List[str] = Field(
-        default=["pro", "standard", "lite"],
-        description="Business types where visible"
-    )
+    business_types: List[str] = Field(default=["pro", "standard", "lite"], description="Business types where visible")
     requires_data_source: Optional[str] = Field(
-        default=None,
-        description="Required data source (table, order, customer, reservation)"
+        default=None, description="Required data source (table, order, customer, reservation)"
     )
-    computed_from: Optional[List[str]] = Field(
-        default=None,
-        description="Fields this is computed from"
-    )
-    validation_rules: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Validation rules for values"
-    )
-    formatting: Optional[Dict[str, str]] = Field(
-        default=None,
-        description="Formatting hints (precision, unit, etc.)"
-    )
+    computed_from: Optional[List[str]] = Field(default=None, description="Fields this is computed from")
+    validation_rules: Optional[Dict[str, Any]] = Field(default=None, description="Validation rules for values")
+    formatting: Optional[Dict[str, str]] = Field(default=None, description="Formatting hints (precision, unit, etc.)")
 
 
 # ============================================================================
@@ -138,7 +129,6 @@ FIELD_DEFINITIONS: Dict[str, FieldDefinition] = {
         requires_data_source="customer",
         business_types=["pro", "standard"],
     ),
-
     # ========== STATUS FIELDS ==========
     "status": FieldDefinition(
         key="status",
@@ -183,7 +173,6 @@ FIELD_DEFINITIONS: Dict[str, FieldDefinition] = {
         render_hint="critical_color_blink",
         requires_data_source="reservation",
     ),
-
     # ========== FINANCIAL FIELDS ==========
     "amount": FieldDefinition(
         key="amount",
@@ -232,7 +221,6 @@ FIELD_DEFINITIONS: Dict[str, FieldDefinition] = {
         formatting={"currency": "CNY", "decimals": 2},
         business_types=["pro"],
     ),
-
     # ========== SERVICE FIELDS ==========
     "guest_count": FieldDefinition(
         key="guest_count",
@@ -327,7 +315,6 @@ FIELD_DEFINITIONS: Dict[str, FieldDefinition] = {
         requires_data_source="customer",
         business_types=["pro", "standard"],
     ),
-
     # ========== TIMING FIELDS ==========
     "duration": FieldDefinition(
         key="duration",
@@ -424,7 +411,6 @@ FIELD_DEFINITIONS: Dict[str, FieldDefinition] = {
         requires_data_source="reservation",
         business_types=["pro", "standard"],
     ),
-
     # ========== CUSTOM/EXTENSION FIELDS ==========
     "birthday_badge": FieldDefinition(
         key="birthday_badge",
@@ -510,11 +496,7 @@ def get_fields_by_category(category: FieldCategory) -> Dict[str, FieldDefinition
 
 def get_fields_by_business_type(business_type: str) -> Dict[str, FieldDefinition]:
     """Get all fields available for a business type."""
-    return {
-        k: v
-        for k, v in FIELD_DEFINITIONS.items()
-        if business_type in v.business_types
-    }
+    return {k: v for k, v in FIELD_DEFINITIONS.items() if business_type in v.business_types}
 
 
 def validate_field_key(field_key: str) -> bool:

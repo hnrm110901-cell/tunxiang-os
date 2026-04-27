@@ -2,6 +2,7 @@
 多区域管理路由 — 区域主数据CRUD + 层级树
 Y-H2
 """
+
 from __future__ import annotations
 
 import json
@@ -123,9 +124,7 @@ async def list_regions(
             params["limit"] = size
             params["offset"] = (page - 1) * size
 
-            count_result = await db.execute(
-                text(f"SELECT COUNT(*) FROM regions r WHERE {where}"), params
-            )
+            count_result = await db.execute(text(f"SELECT COUNT(*) FROM regions r WHERE {where}"), params)
             total = count_result.scalar() or 0
 
         sql = text(f"""
@@ -250,15 +249,17 @@ async def get_region_detail(
         raise
     except (SQLAlchemyError, OSError, RuntimeError, ValueError) as exc:
         logger.warning("get_region_detail_db_unavailable", error=str(exc))
-        return _ok({
-            "region_id": region_id,
-            "name": "未知区域",
-            "level": 1,
-            "tax_rate": 0.06,
-            "store_count": 0,
-            "child_count": 0,
-            "degraded": True,
-        })
+        return _ok(
+            {
+                "region_id": region_id,
+                "name": "未知区域",
+                "level": 1,
+                "tax_rate": 0.06,
+                "store_count": 0,
+                "child_count": 0,
+                "degraded": True,
+            }
+        )
 
 
 @router.post("")
@@ -295,29 +296,34 @@ async def create_region(
         RETURNING id::text AS region_id, name, level
     """)
 
-    result = await db.execute(sql, {
-        "id": region_id,
-        "tenant_id": tenant_id,
-        "parent_id": req.parent_id,
-        "name": req.name,
-        "region_code": req.region_code,
-        "level": req.level,
-        "brand_id": req.brand_id,
-        "manager_id": req.manager_id,
-        "tax_rate": str(req.tax_rate),
-        "freight_template": json.dumps(req.freight_template),
-        "now": now,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "id": region_id,
+            "tenant_id": tenant_id,
+            "parent_id": req.parent_id,
+            "name": req.name,
+            "region_code": req.region_code,
+            "level": req.level,
+            "brand_id": req.brand_id,
+            "manager_id": req.manager_id,
+            "tax_rate": str(req.tax_rate),
+            "freight_template": json.dumps(req.freight_template),
+            "now": now,
+        },
+    )
     await db.commit()
     row = result.fetchone()
 
     logger.info("create_region", tenant_id=tenant_id, region_id=region_id, name=req.name)
-    return _ok({
-        "region_id": row._mapping["region_id"] if row else region_id,
-        "name": req.name,
-        "level": req.level,
-        "parent_id": req.parent_id,
-    })
+    return _ok(
+        {
+            "region_id": row._mapping["region_id"] if row else region_id,
+            "name": req.name,
+            "level": req.level,
+            "parent_id": req.parent_id,
+        }
+    )
 
 
 @router.put("/{region_id}")
@@ -494,28 +500,31 @@ async def get_region_performance(
             total_revenue_fen += d["total_revenue_fen"]
             store_stats.append(d)
 
-        logger.info("get_region_performance", tenant_id=tenant_id, region_id=region_id,
-                    stores=len(store_stats))
-        return _ok({
-            "region_id": region_id,
-            "region_name": region_name,
-            "total_revenue_fen": total_revenue_fen,
-            "store_count": len(store_stats),
-            "stores": store_stats,
-        })
+        logger.info("get_region_performance", tenant_id=tenant_id, region_id=region_id, stores=len(store_stats))
+        return _ok(
+            {
+                "region_id": region_id,
+                "region_name": region_name,
+                "total_revenue_fen": total_revenue_fen,
+                "store_count": len(store_stats),
+                "stores": store_stats,
+            }
+        )
 
     except HTTPException:
         raise
     except (SQLAlchemyError, OSError, RuntimeError, ValueError) as exc:
         logger.warning("get_region_performance_db_unavailable", error=str(exc))
-        return _ok({
-            "region_id": region_id,
-            "region_name": "未知区域",
-            "total_revenue_fen": 0,
-            "store_count": 0,
-            "stores": [],
-            "degraded": True,
-        })
+        return _ok(
+            {
+                "region_id": region_id,
+                "region_name": "未知区域",
+                "total_revenue_fen": 0,
+                "store_count": 0,
+                "stores": [],
+                "degraded": True,
+            }
+        )
 
 
 @router.put("/{region_id}/tax-rate")
@@ -552,12 +561,19 @@ async def update_region_tax_rate(
     )
     await db.commit()
 
-    logger.info("update_region_tax_rate", tenant_id=tenant_id, region_id=region_id,
-                tax_rate=req.tax_rate, region_name=region_name)
-    return _ok({
-        "region_id": region_id,
-        "region_name": region_name,
-        "tax_rate": req.tax_rate,
-        "updated": True,
-        "note": f"区域 [{region_name}] 税率已更新为 {req.tax_rate * 100:.2f}%，影响该区域所有门店发票税率",
-    })
+    logger.info(
+        "update_region_tax_rate",
+        tenant_id=tenant_id,
+        region_id=region_id,
+        tax_rate=req.tax_rate,
+        region_name=region_name,
+    )
+    return _ok(
+        {
+            "region_id": region_id,
+            "region_name": region_name,
+            "tax_rate": req.tax_rate,
+            "updated": True,
+            "note": f"区域 [{region_name}] 税率已更新为 {req.tax_rate * 100:.2f}%，影响该区域所有门店发票税率",
+        }
+    )

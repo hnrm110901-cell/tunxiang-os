@@ -15,6 +15,7 @@
   - 错误码: 400 INVALID_DOMAIN / 401 AUTH_MISSING / 500 INTERNAL_ERROR
   - 新代码禁用 except Exception（§XIV）
 """
+
 from __future__ import annotations
 
 import time
@@ -40,16 +41,18 @@ router = APIRouter(prefix="/api/v1/flags", tags=["feature-flags"])
 # ────────────────────────────────────────────────────────────────────
 
 # 允许的 domain 白名单 — 新增 domain 时需在此注册
-ALLOWED_DOMAINS: frozenset[str] = frozenset({
-    "trade",
-    "agents",
-    "edge",
-    "growth",
-    "member",
-    "org",
-    "supply",
-    "all",
-})
+ALLOWED_DOMAINS: frozenset[str] = frozenset(
+    {
+        "trade",
+        "agents",
+        "edge",
+        "growth",
+        "member",
+        "org",
+        "supply",
+        "all",
+    }
+)
 
 # 缓存配置：60 秒 TTL，最多 256 条（防止恶意构造 tenant_id 导致内存膨胀）
 _CACHE_TTL_SECONDS: float = 60.0
@@ -59,6 +62,7 @@ _CACHE_MAX_ENTRIES: int = 256
 # ────────────────────────────────────────────────────────────────────
 # 进程内 TTL LRU 缓存
 # ────────────────────────────────────────────────────────────────────
+
 
 class _TTLCache:
     """极简 TTL LRU 缓存 — 无第三方依赖。
@@ -110,6 +114,7 @@ _CACHE = _TTLCache(ttl=_CACHE_TTL_SECONDS, max_entries=_CACHE_MAX_ENTRIES)
 # Pydantic 响应模型
 # ────────────────────────────────────────────────────────────────────
 
+
 class FlagsData(BaseModel):
     flags: dict[str, bool] = Field(
         default_factory=dict,
@@ -132,6 +137,7 @@ class FlagsResponse(BaseModel):
 # ────────────────────────────────────────────────────────────────────
 # 辅助函数
 # ────────────────────────────────────────────────────────────────────
+
 
 def _new_request_id() -> str:
     return str(uuid.uuid4())
@@ -224,6 +230,7 @@ def _cache_key(domain: str, context: FlagContext) -> str:
 # ────────────────────────────────────────────────────────────────────
 # 路由
 # ────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "",

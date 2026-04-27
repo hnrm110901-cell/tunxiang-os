@@ -7,10 +7,10 @@
 
 调度方式：由 APScheduler 或 Celery Beat 调用（参照项目现有调度方式）。
 """
+
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -35,7 +35,9 @@ class MonthlyPettyCashSettlementWorker:
         查询失败时降级为 DEFAULT_TENANT_ID 环境变量（向后兼容单租户部署）。
         """
         import os as _os
+
         from sqlalchemy import text as _text
+
         from shared.ontology.src.database import get_db_no_rls
 
         try:
@@ -90,11 +92,14 @@ class MonthlyPettyCashSettlementWorker:
             {settlements_generated, accounts_processed, notifications_sent}
         """
         from shared.ontology.src.database import TenantSession
+
         from ..agents.a1_petty_cash_guardian import run as a1_run
 
         async with TenantSession(str(tenant_id)) as db:
             result = await a1_run(
-                db, tenant_id, "monthly_settlement",
+                db,
+                tenant_id,
+                "monthly_settlement",
                 {"settlement_month": settlement_month},
             )
         return {

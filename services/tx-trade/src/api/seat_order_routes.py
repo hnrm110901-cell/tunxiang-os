@@ -1,4 +1,5 @@
 """座位点单 API Routes"""
+
 from typing import Optional
 from uuid import UUID
 
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/orders", tags=["seat-order"])
 
 # ─── 请求体 ───
 
+
 class InitSeatsBody(BaseModel):
     seat_count: int = Field(..., ge=1, le=20)
 
@@ -43,6 +45,7 @@ class CalculateSplitBody(BaseModel):
 
 
 # ─── 响应体 ───
+
 
 class SeatsResponse(BaseModel):
     ok: bool = True
@@ -65,6 +68,7 @@ class SelfPayLinkResponse(BaseModel):
 
 
 # ─── 路由 ───
+
 
 @router.post("/{order_id}/seats/init", response_model=SeatsResponse, status_code=status.HTTP_201_CREATED)
 async def init_order_seats(

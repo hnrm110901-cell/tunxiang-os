@@ -22,6 +22,7 @@
 14. GET  /api/v1/content/{tid}/performance — 模板不存在返回 NOT_FOUND
 15. POST /api/v1/content/validate          — 含禁用词返回 valid=False + errors
 """
+
 import os
 import sys
 
@@ -30,14 +31,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import types
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import OperationalError
 
 # ── 注入假依赖模块（若尚未注入） ─────────────────────────────────────────────
+
 
 def _ensure_module(path: str):
     parts = path.split(".")
@@ -46,13 +46,16 @@ def _ensure_module(path: str):
         if key not in sys.modules:
             sys.modules[key] = types.ModuleType(key)
 
+
 _ensure_module("shared.ontology.src.database")
 _ensure_module("shared.events.src.emitter")
 
 # get_db stub（若还未写入）
 if not hasattr(sys.modules["shared.ontology.src.database"], "get_db"):
+
     async def _fake_get_db():
         yield None
+
     sys.modules["shared.ontology.src.database"].get_db = _fake_get_db
 
 if not hasattr(sys.modules["shared.events.src.emitter"], "emit_event"):
@@ -60,8 +63,10 @@ if not hasattr(sys.modules["shared.events.src.emitter"], "emit_event"):
 
 # ── 加载路由 ──────────────────────────────────────────────────────────────────
 
-from api.channel_routes import router as channel_router, get_db as channel_get_db
-from api.content_routes import router as content_router, get_db as content_get_db
+from api.channel_routes import get_db as channel_get_db
+from api.channel_routes import router as channel_router
+from api.content_routes import get_db as content_get_db
+from api.content_routes import router as content_router
 
 channel_app = FastAPI()
 channel_app.include_router(channel_router)
@@ -80,8 +85,10 @@ _NOW = datetime(2026, 4, 4, 10, 0, tzinfo=timezone.utc)
 
 # ── 辅助工具 ──────────────────────────────────────────────────────────────────
 
+
 class _FakeRow:
     """模拟 SQLAlchemy named-column row"""
+
     def __init__(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
@@ -101,6 +108,7 @@ def _make_db(*execute_side_effects):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # === channel_routes 测试 ===
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 # 场景 1: POST /send — 正常发送
 def test_send_message_ok():
@@ -345,6 +353,7 @@ def test_get_send_log_ok():
 # === content_routes 测试 ===
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 # 场景 10: POST /templates — 正常创建
 def test_create_template_ok():
     """正常创建自定义模板，返回 template_id"""
@@ -511,7 +520,7 @@ def test_validate_content_forbidden_words():
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["ok"] is True          # HTTP 响应本身 ok
+    assert body["ok"] is True  # HTTP 响应本身 ok
     assert body["data"]["valid"] is False
     assert len(body["data"]["errors"]) > 0
 

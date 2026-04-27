@@ -8,6 +8,7 @@
   4. 写入 cost_snapshots 表
   5. 无BOM时 fallback 到 dish.cost_fen（OrderItem.cost_fen）字段
 """
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -23,18 +24,20 @@ logger = structlog.get_logger(__name__)
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DishCostResult:
     """单道菜品的成本计算结果"""
+
     order_item_id: uuid.UUID
     dish_id: uuid.UUID
     quantity: int
-    selling_price: Decimal           # 单价（分）
-    raw_material_cost: Decimal       # 原料成本（分），已含损耗
+    selling_price: Decimal  # 单价（分）
+    raw_material_cost: Decimal  # 原料成本（分），已含损耗
     labor_cost_allocated: Decimal = Decimal("0")
     overhead_allocated: Decimal = Decimal("0")
     bom_version_id: Optional[uuid.UUID] = None
-    cost_source: str = "bom"        # bom | standard_cost
+    cost_source: str = "bom"  # bom | standard_cost
 
     @property
     def total_cost(self) -> Decimal:
@@ -55,6 +58,7 @@ class DishCostResult:
 @dataclass
 class OrderCostResult:
     """整笔订单的成本汇总"""
+
     order_id: uuid.UUID
     tenant_id: uuid.UUID
     items: list[DishCostResult] = field(default_factory=list)
@@ -62,9 +66,7 @@ class OrderCostResult:
 
     @property
     def total_cost(self) -> Decimal:
-        return sum(
-            item.raw_material_cost * item.quantity for item in self.items
-        )
+        return sum(item.raw_material_cost * item.quantity for item in self.items)
 
     @property
     def total_selling_price(self) -> Decimal:
@@ -75,12 +77,11 @@ class OrderCostResult:
         if self.total_selling_price <= 0:
             return Decimal("0")
         gp = self.total_selling_price - self.total_cost
-        return (gp / self.total_selling_price).quantize(
-            Decimal("0.0001"), rounding=ROUND_HALF_UP
-        )
+        return (gp / self.total_selling_price).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
 # ─── CostEngine ──────────────────────────────────────────────────────────────
+
 
 class CostEngine:
     """财务成本计算引擎
@@ -248,7 +249,7 @@ class CostEngine:
             for bom_item in bom.items:
                 qty = Decimal(str(bom_item.standard_qty))
                 unit_cost = Decimal(str(bom_item.unit_cost_fen or 0))
-                raw_cost += (qty * unit_cost / yield_rate)
+                raw_cost += qty * unit_cost / yield_rate
 
             raw_cost = raw_cost.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
@@ -413,21 +414,23 @@ class CostEngine:
 
         rows = []
         for item in result.items:
-            rows.append({
-                "tenant_id": str(result.tenant_id),
-                "order_id": str(result.order_id),
-                "order_item_id": str(item.order_item_id),
-                "dish_id": str(item.dish_id),
-                "raw_material_cost": float(item.raw_material_cost),
-                "labor_cost_allocated": float(item.labor_cost_allocated),
-                "overhead_allocated": float(item.overhead_allocated),
-                "total_cost": float(item.total_cost),
-                "selling_price": float(item.selling_price),
-                "gross_margin_rate": float(item.gross_margin_rate),
-                "bom_version_id": str(item.bom_version_id) if item.bom_version_id else None,
-                "cost_source": item.cost_source,
-                "computed_at": result.computed_at.isoformat() if result.computed_at else None,
-            })
+            rows.append(
+                {
+                    "tenant_id": str(result.tenant_id),
+                    "order_id": str(result.order_id),
+                    "order_item_id": str(item.order_item_id),
+                    "dish_id": str(item.dish_id),
+                    "raw_material_cost": float(item.raw_material_cost),
+                    "labor_cost_allocated": float(item.labor_cost_allocated),
+                    "overhead_allocated": float(item.overhead_allocated),
+                    "total_cost": float(item.total_cost),
+                    "selling_price": float(item.selling_price),
+                    "gross_margin_rate": float(item.gross_margin_rate),
+                    "bom_version_id": str(item.bom_version_id) if item.bom_version_id else None,
+                    "cost_source": item.cost_source,
+                    "computed_at": result.computed_at.isoformat() if result.computed_at else None,
+                }
+            )
 
         await db.execute(
             text("""
@@ -472,8 +475,7 @@ class CostEngine:
         end_dt = datetime.combine(biz_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
         result = await db.execute(
-            select(Order.id)
-            .where(
+            select(Order.id).where(
                 and_(
                     Order.store_id == store_id,
                     Order.tenant_id == tenant_id,

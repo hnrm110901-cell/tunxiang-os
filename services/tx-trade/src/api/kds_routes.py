@@ -2,6 +2,7 @@
 
 所有接口需要 X-Tenant-ID header。
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -13,6 +14,7 @@ from shared.ontology.src.database import get_db
 from ..services.cooking_scheduler import calculate_cooking_order, get_dept_load
 from ..services.cooking_timeout import check_timeouts, get_timeout_config
 from ..services.kds_actions import (
+    batch_scan_complete,
     check_rush_overdue,
     confirm_rush,
     finish_cooking,
@@ -20,6 +22,7 @@ from ..services.kds_actions import (
     report_shortage,
     request_remake,
     request_rush,
+    scan_complete_dish,
     start_cooking,
 )
 from ..services.kds_dispatch import (
@@ -41,6 +44,7 @@ def _get_tenant_id(request: Request) -> str:
 
 
 # ─── 请求模型 ───
+
 
 class DispatchItem(BaseModel):
     dish_id: str
@@ -72,7 +76,16 @@ class RushConfirmReq(BaseModel):
     promised_minutes: int  # 承诺在多少分钟内完成（厨师设定）
 
 
+class ScanCompleteReq(BaseModel):
+    barcode: str
+
+
+class BatchScanReq(BaseModel):
+    barcodes: list[str]
+
+
 # ─── 分单与队列 ───
+
 
 @router.post("/dispatch/{order_id}")
 async def api_dispatch_order(
@@ -195,6 +208,7 @@ async def api_resolve_dept(
 
 # ─── KDS 操作 ───
 
+
 @router.post("/task/{task_id}/start")
 async def api_start_cooking(
     task_id: str,
@@ -314,9 +328,11 @@ async def api_rush_status(
         task_uuid = _uuid.UUID(task_id)
     except ValueError:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="无效的 task_id 或 tenant_id")
 
     from datetime import datetime, timezone
+
     stmt = select(KDSTask).where(
         and_(
             KDSTask.id == task_uuid,
@@ -330,11 +346,7 @@ async def api_rush_status(
 
     now = datetime.now(timezone.utc)
     promised_at = db_task.promised_at
-    is_overdue = (
-        promised_at is not None
-        and db_task.status not in ("done", "cancelled")
-        and promised_at < now
-    )
+    is_overdue = promised_at is not None and db_task.status not in ("done", "cancelled") and promised_at < now
 
     return {
         "ok": True,
@@ -365,7 +377,62 @@ async def api_rush_overdue_check(
     return result
 
 
+# ─── 扫码划菜 ───
+
+
+@router.post("/scan-complete")
+async def api_scan_complete(
+    body: ScanCompleteReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """单个扫码划菜 — 扫描条码确认菜品出品完成
+
+    扫码后自动：
+    1. 更新 order_item 的扫码状态
+    2. 关联 KDS Task 标记为 done
+    3. 记录划菜日志（含出品耗时）
+    4. 检查订单是否全部完成
+    """
+    tenant_id = _get_tenant_id(request)
+    scanned_by = request.headers.get("X-Operator-ID", "unknown")
+    result = await scan_complete_dish(
+        barcode=body.barcode,
+        scanned_by=scanned_by,
+        db=db,
+        tenant_id=tenant_id,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "扫码失败"))
+    return result
+
+
+@router.post("/batch-scan")
+async def api_batch_scan(
+    body: BatchScanReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """批量扫码划菜 — 一次确认多个菜品出品完成
+
+    适用场景：同桌多道菜同时出品，一次性扫描所有条码。
+    单次最多50个条码。
+    """
+    tenant_id = _get_tenant_id(request)
+    scanned_by = request.headers.get("X-Operator-ID", "unknown")
+    result = await batch_scan_complete(
+        barcodes=body.barcodes,
+        scanned_by=scanned_by,
+        db=db,
+        tenant_id=tenant_id,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "批量扫码失败"))
+    return result
+
+
 # ─── 超时预警 ───
+
 
 @router.get("/timeouts/{store_id}")
 async def api_check_timeouts(

@@ -12,6 +12,7 @@
 
 所有金额：分（fen）。禁止 broad except，最外层兜底带 exc_info=True。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,9 +43,11 @@ def _day_window(biz_date: date) -> tuple[datetime, datetime]:
 
 # ─── 数据类 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DailyRevenueSummary:
     """P0-1: 营业收入汇总表"""
+
     store_id: str
     biz_date: str
     gross_revenue_fen: int
@@ -74,6 +77,7 @@ class DailyRevenueSummary:
 @dataclass
 class PaymentDiscountReport:
     """P0-2: 门店付款折扣表"""
+
     store_id: str
     biz_date: str
     total_discount_fen: int
@@ -97,17 +101,18 @@ class PaymentDiscountReport:
 @dataclass
 class CashflowByStore:
     """P0-3: 门店日现金流报表"""
+
     store_id: str
     biz_date: str
-    cash_in_fen: int            # 现金收入
-    wechat_in_fen: int          # 微信收款
-    alipay_in_fen: int          # 支付宝收款
-    unionpay_in_fen: int        # 银联收款
+    cash_in_fen: int  # 现金收入
+    wechat_in_fen: int  # 微信收款
+    alipay_in_fen: int  # 支付宝收款
+    unionpay_in_fen: int  # 银联收款
     member_balance_in_fen: int  # 会员余额收款
-    credit_in_fen: int          # 挂账收款
-    total_in_fen: int           # 总流入
-    refund_out_fen: int         # 退款流出
-    net_cashflow_fen: int       # 净现金流
+    credit_in_fen: int  # 挂账收款
+    total_in_fen: int  # 总流入
+    refund_out_fen: int  # 退款流出
+    net_cashflow_fen: int  # 净现金流
     payment_detail: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -132,11 +137,12 @@ class CashflowByStore:
 @dataclass
 class DishSalesStats:
     """P0-4: 菜品销售统计表"""
+
     store_id: str
     biz_date: str
     total_dish_count: int
     total_revenue_fen: int
-    top_dishes: list[dict[str, Any]] = field(default_factory=list)    # 销量TOP20
+    top_dishes: list[dict[str, Any]] = field(default_factory=list)  # 销量TOP20
     by_category: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -153,6 +159,7 @@ class DishSalesStats:
 @dataclass
 class BillingAudit:
     """P0-5: 账单稽核表"""
+
     store_id: str
     audit_date: str
     order_count: int
@@ -198,15 +205,16 @@ class BillingAudit:
 @dataclass
 class RealtimeStoreStats:
     """P0-6: 门店实时营业统计（当日截至当前时刻）"""
+
     store_id: str
-    as_of: str                  # ISO 时间戳
+    as_of: str  # ISO 时间戳
     biz_date: str
     revenue_so_far_fen: int
     order_count_so_far: int
     avg_ticket_fen: int
     last_hour_revenue_fen: int
     last_hour_order_count: int
-    peak_hour: str              # "14:00"
+    peak_hour: str  # "14:00"
     peak_revenue_fen: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -229,16 +237,26 @@ class RealtimeStoreStats:
 # ─── ReportEngine ─────────────────────────────────────────────────────────────
 
 _PAYMENT_LABELS = {
-    "cash": "现金", "wechat": "微信", "alipay": "支付宝",
-    "unionpay": "银联", "credit": "挂账", "member_balance": "会员余额",
+    "cash": "现金",
+    "wechat": "微信",
+    "alipay": "支付宝",
+    "unionpay": "银联",
+    "credit": "挂账",
+    "member_balance": "会员余额",
 }
 _CHANNEL_LABELS = {
-    "dine_in": "堂食", "takeaway": "外带", "delivery": "外卖",
-    "banquet": "宴席", "catering": "团餐", "retail": "零售",
+    "dine_in": "堂食",
+    "takeaway": "外带",
+    "delivery": "外卖",
+    "banquet": "宴席",
+    "catering": "团餐",
+    "retail": "零售",
 }
 _DISCOUNT_LABELS = {
-    "coupon": "活动优惠", "vip": "会员折扣",
-    "manager": "经理折扣", "promotion": "促销活动",
+    "coupon": "活动优惠",
+    "vip": "会员折扣",
+    "manager": "经理折扣",
+    "promotion": "促销活动",
 }
 
 
@@ -256,9 +274,7 @@ class ReportEngine:
     ) -> DailyRevenueSummary:
         """营业收入汇总：渠道分布 + 餐段分布"""
         start_dt, end_dt = _day_window(biz_date)
-        log = logger.bind(
-            tenant_id=str(tenant_id), store_id=str(store_id), biz_date=str(biz_date)
-        )
+        log = logger.bind(tenant_id=str(tenant_id), store_id=str(store_id), biz_date=str(biz_date))
 
         # 总汇
         agg = await db.execute(
@@ -266,15 +282,16 @@ class ReportEngine:
                 func.coalesce(func.sum(Order.total_amount_fen), 0).label("gross"),
                 func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
                 func.count(Order.id).label("cnt"),
+            ).where(
+                and_(
+                    Order.tenant_id == tenant_id,
+                    Order.store_id == store_id,
+                    Order.status.in_(_COMPLETED),
+                    Order.order_time >= start_dt,
+                    Order.order_time <= end_dt,
+                    Order.is_deleted == False,  # noqa: E712
+                )
             )
-            .where(and_(
-                Order.tenant_id == tenant_id,
-                Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt,
-                Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
         )
         row = agg.one()
         gross_fen = int(row.gross)
@@ -282,37 +299,49 @@ class ReportEngine:
         order_count = int(row.cnt)
 
         # 退菜
-        refund_fen = int((await db.execute(
-            select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
-            .join(Order, OrderItem.order_id == Order.id)
-            .where(and_(
-                Order.tenant_id == tenant_id,
-                Order.store_id == store_id,
-                Order.order_time >= start_dt,
-                Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.return_flag == True,  # noqa: E712
-            ))
-        )).scalar_one())
+        refund_fen = int(
+            (
+                await db.execute(
+                    select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
+                    .join(Order, OrderItem.order_id == Order.id)
+                    .where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.is_deleted == False,  # noqa: E712
+                            OrderItem.return_flag == True,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
         net_fen = gross_fen - discount_fen - refund_fen
         avg_ticket = net_fen // order_count if order_count > 0 else 0
 
         # 按渠道
-        ch_rows = (await db.execute(
-            select(
-                Order.order_type,
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
-                func.count(Order.id).label("cnt"),
+        ch_rows = (
+            await db.execute(
+                select(
+                    Order.order_type,
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+                    func.count(Order.id).label("cnt"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by(Order.order_type)
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by(Order.order_type)
-        )).all()
+        ).all()
         by_channel = [
             {
                 "channel": r.order_type or "other",
@@ -325,20 +354,27 @@ class ReportEngine:
         ]
 
         # 按小时（餐段分析）
-        hr_rows = (await db.execute(
-            select(
-                extract("hour", Order.order_time).label("hr"),
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
-                func.count(Order.id).label("cnt"),
+        hr_rows = (
+            await db.execute(
+                select(
+                    extract("hour", Order.order_time).label("hr"),
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+                    func.count(Order.id).label("cnt"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by("hr")
+                .order_by("hr")
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by("hr").order_by("hr")
-        )).all()
+        ).all()
         by_meal_period = [
             {
                 "hour": f"{int(r.hr):02d}:00",
@@ -351,11 +387,16 @@ class ReportEngine:
         log.info("daily_revenue_summary_generated", net_revenue_fen=net_fen, order_count=order_count)
 
         return DailyRevenueSummary(
-            store_id=str(store_id), biz_date=str(biz_date),
-            gross_revenue_fen=gross_fen, discount_fen=discount_fen,
-            refund_fen=refund_fen, net_revenue_fen=net_fen,
-            order_count=order_count, avg_ticket_fen=avg_ticket,
-            by_channel=by_channel, by_meal_period=by_meal_period,
+            store_id=str(store_id),
+            biz_date=str(biz_date),
+            gross_revenue_fen=gross_fen,
+            discount_fen=discount_fen,
+            refund_fen=refund_fen,
+            net_revenue_fen=net_fen,
+            order_count=order_count,
+            avg_ticket_fen=avg_ticket,
+            by_channel=by_channel,
+            by_meal_period=by_meal_period,
         )
 
     # ── P0-2: 门店付款折扣表 ────────────────────────────────
@@ -371,39 +412,50 @@ class ReportEngine:
         start_dt, end_dt = _day_window(biz_date)
 
         # 总折扣 & 总毛收
-        totals = (await db.execute(
-            select(
-                func.coalesce(func.sum(Order.total_amount_fen), 0).label("gross"),
-                func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
+        totals = (
+            await db.execute(
+                select(
+                    func.coalesce(func.sum(Order.total_amount_fen), 0).label("gross"),
+                    func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
+                ).where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-        )).one()
+        ).one()
         gross_fen = int(totals.gross)
         total_discount_fen = int(totals.discount)
         discount_rate = _safe_ratio(total_discount_fen, gross_fen)
 
         # 按支付方式
-        pm_rows = (await db.execute(
-            select(
-                func.coalesce(
-                    Order.order_metadata["payment_method"].as_string(), text("'unknown'")
-                ).label("method"),
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("amount"),
-                func.count(Order.id).label("cnt"),
+        pm_rows = (
+            await db.execute(
+                select(
+                    func.coalesce(Order.order_metadata["payment_method"].as_string(), text("'unknown'")).label(
+                        "method"
+                    ),
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("amount"),
+                    func.count(Order.id).label("cnt"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by("method")
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by("method")
-        )).all()
+        ).all()
         by_payment_method = [
             {
                 "method": r.method or "unknown",
@@ -416,20 +468,26 @@ class ReportEngine:
         ]
 
         # 按折扣类型
-        dt_rows = (await db.execute(
-            select(
-                func.coalesce(Order.discount_type, text("'other'")).label("dtype"),
-                func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
-                func.count(Order.id).label("cnt"),
+        dt_rows = (
+            await db.execute(
+                select(
+                    func.coalesce(Order.discount_type, text("'other'")).label("dtype"),
+                    func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
+                    func.count(Order.id).label("cnt"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.discount_amount_fen > 0,
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by("dtype")
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.discount_amount_fen > 0,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by("dtype")
-        )).all()
+        ).all()
         by_discount_type = [
             {
                 "type": r.dtype or "other",
@@ -442,27 +500,40 @@ class ReportEngine:
         ]
 
         # 赠菜金额
-        gift_fen = int((await db.execute(
-            select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
-            .join(Order, OrderItem.order_id == Order.id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.gift_flag == True,  # noqa: E712
-            ))
-        )).scalar_one())
+        gift_fen = int(
+            (
+                await db.execute(
+                    select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
+                    .join(Order, OrderItem.order_id == Order.id)
+                    .where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.is_deleted == False,  # noqa: E712
+                            OrderItem.gift_flag == True,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
         logger.info(
             "payment_discount_report_generated",
-            tenant_id=str(tenant_id), store_id=str(store_id), biz_date=str(biz_date),
+            tenant_id=str(tenant_id),
+            store_id=str(store_id),
+            biz_date=str(biz_date),
             total_discount_fen=total_discount_fen,
         )
 
         return PaymentDiscountReport(
-            store_id=str(store_id), biz_date=str(biz_date),
-            total_discount_fen=total_discount_fen, discount_rate=discount_rate,
-            by_payment_method=by_payment_method, by_discount_type=by_discount_type,
+            store_id=str(store_id),
+            biz_date=str(biz_date),
+            total_discount_fen=total_discount_fen,
+            discount_rate=discount_rate,
+            by_payment_method=by_payment_method,
+            by_discount_type=by_discount_type,
             gift_amount_fen=gift_fen,
         )
 
@@ -478,56 +549,76 @@ class ReportEngine:
         """各支付渠道流入 + 退款流出 = 净现金流"""
         start_dt, end_dt = _day_window(biz_date)
 
-        pm_rows = (await db.execute(
-            select(
-                func.coalesce(
-                    Order.order_metadata["payment_method"].as_string(), text("'unknown'")
-                ).label("method"),
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("amount"),
-                func.count(Order.id).label("cnt"),
+        pm_rows = (
+            await db.execute(
+                select(
+                    func.coalesce(Order.order_metadata["payment_method"].as_string(), text("'unknown'")).label(
+                        "method"
+                    ),
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("amount"),
+                    func.count(Order.id).label("cnt"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by("method")
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by("method")
-        )).all()
+        ).all()
 
         pm_map: dict[str, int] = {}
         payment_detail: list[dict[str, Any]] = []
         for r in pm_rows:
             m = r.method or "unknown"
             pm_map[m] = int(r.amount)
-            payment_detail.append({
-                "method": m,
-                "label": _PAYMENT_LABELS.get(m, m),
-                "amount_fen": int(r.amount),
-                "order_count": int(r.cnt),
-            })
+            payment_detail.append(
+                {
+                    "method": m,
+                    "label": _PAYMENT_LABELS.get(m, m),
+                    "amount_fen": int(r.amount),
+                    "order_count": int(r.cnt),
+                }
+            )
 
         total_in_fen = sum(pm_map.values())
 
-        refund_fen = int((await db.execute(
-            select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
-            .join(Order, OrderItem.order_id == Order.id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.return_flag == True,  # noqa: E712
-            ))
-        )).scalar_one())
+        refund_fen = int(
+            (
+                await db.execute(
+                    select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
+                    .join(Order, OrderItem.order_id == Order.id)
+                    .where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.is_deleted == False,  # noqa: E712
+                            OrderItem.return_flag == True,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
         logger.info(
             "cashflow_by_store_generated",
-            tenant_id=str(tenant_id), store_id=str(store_id), biz_date=str(biz_date),
-            total_in_fen=total_in_fen, refund_fen=refund_fen,
+            tenant_id=str(tenant_id),
+            store_id=str(store_id),
+            biz_date=str(biz_date),
+            total_in_fen=total_in_fen,
+            refund_fen=refund_fen,
         )
 
         return CashflowByStore(
-            store_id=str(store_id), biz_date=str(biz_date),
+            store_id=str(store_id),
+            biz_date=str(biz_date),
             cash_in_fen=pm_map.get("cash", 0),
             wechat_in_fen=pm_map.get("wechat", 0),
             alipay_in_fen=pm_map.get("alipay", 0),
@@ -554,50 +645,72 @@ class ReportEngine:
         start_dt, end_dt = _day_window(biz_date)
 
         # TOP-N 菜品
-        dish_rows = (await db.execute(
-            select(
-                OrderItem.dish_id,
-                OrderItem.item_name,
-                func.sum(OrderItem.quantity).label("qty"),
-                func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue"),
-                func.coalesce(func.avg(OrderItem.unit_price_fen), 0).label("avg_price"),
+        dish_rows = (
+            await db.execute(
+                select(
+                    OrderItem.dish_id,
+                    OrderItem.item_name,
+                    func.sum(OrderItem.quantity).label("qty"),
+                    func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue"),
+                    func.coalesce(func.avg(OrderItem.unit_price_fen), 0).label("avg_price"),
+                )
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                        OrderItem.gift_flag == False,  # noqa: E712  exclude gifts
+                    )
+                )
+                .group_by(OrderItem.dish_id, OrderItem.item_name)
+                .order_by(func.sum(OrderItem.quantity).desc())
+                .limit(top_n)
             )
-            .join(Order, OrderItem.order_id == Order.id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.gift_flag == False,  # noqa: E712  exclude gifts
-            ))
-            .group_by(OrderItem.dish_id, OrderItem.item_name)
-            .order_by(func.sum(OrderItem.quantity).desc())
-            .limit(top_n)
-        )).all()
+        ).all()
 
-        total_revenue_fen = int((await db.execute(
-            select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
-            .join(Order, OrderItem.order_id == Order.id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.gift_flag == False,  # noqa: E712
-            ))
-        )).scalar_one())
+        total_revenue_fen = int(
+            (
+                await db.execute(
+                    select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
+                    .join(Order, OrderItem.order_id == Order.id)
+                    .where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.status.in_(_COMPLETED),
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.is_deleted == False,  # noqa: E712
+                            OrderItem.gift_flag == False,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
-        total_dish_qty = int((await db.execute(
-            select(func.coalesce(func.sum(OrderItem.quantity), 0))
-            .join(Order, OrderItem.order_id == Order.id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.gift_flag == False,  # noqa: E712
-            ))
-        )).scalar_one())
+        total_dish_qty = int(
+            (
+                await db.execute(
+                    select(func.coalesce(func.sum(OrderItem.quantity), 0))
+                    .join(Order, OrderItem.order_id == Order.id)
+                    .where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.status.in_(_COMPLETED),
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.is_deleted == False,  # noqa: E712
+                            OrderItem.gift_flag == False,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
         top_dishes = [
             {
@@ -612,26 +725,32 @@ class ReportEngine:
         ]
 
         # 按分类汇总
-        cat_rows = (await db.execute(
-            select(
-                DishCategory.id.label("cat_id"),
-                DishCategory.name.label("cat_name"),
-                func.sum(OrderItem.quantity).label("qty"),
-                func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue"),
+        cat_rows = (
+            await db.execute(
+                select(
+                    DishCategory.id.label("cat_id"),
+                    DishCategory.name.label("cat_name"),
+                    func.sum(OrderItem.quantity).label("qty"),
+                    func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("revenue"),
+                )
+                .join(Order, OrderItem.order_id == Order.id)
+                .join(Dish, OrderItem.dish_id == Dish.id)
+                .join(DishCategory, Dish.category_id == DishCategory.id)
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                        OrderItem.gift_flag == False,  # noqa: E712
+                    )
+                )
+                .group_by(DishCategory.id, DishCategory.name)
+                .order_by(func.sum(OrderItem.subtotal_fen).desc())
             )
-            .join(Order, OrderItem.order_id == Order.id)
-            .join(Dish, OrderItem.dish_id == Dish.id)
-            .join(DishCategory, Dish.category_id == DishCategory.id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.gift_flag == False,  # noqa: E712
-            ))
-            .group_by(DishCategory.id, DishCategory.name)
-            .order_by(func.sum(OrderItem.subtotal_fen).desc())
-        )).all()
+        ).all()
         by_category = [
             {
                 "category_id": str(r.cat_id) if r.cat_id else None,
@@ -645,12 +764,15 @@ class ReportEngine:
 
         logger.info(
             "dish_sales_stats_generated",
-            tenant_id=str(tenant_id), store_id=str(store_id), biz_date=str(biz_date),
+            tenant_id=str(tenant_id),
+            store_id=str(store_id),
+            biz_date=str(biz_date),
             total_dish_qty=total_dish_qty,
         )
 
         return DishSalesStats(
-            store_id=str(store_id), biz_date=str(biz_date),
+            store_id=str(store_id),
+            biz_date=str(biz_date),
             total_dish_count=total_dish_qty,
             total_revenue_fen=total_revenue_fen,
             top_dishes=top_dishes,
@@ -670,88 +792,125 @@ class ReportEngine:
         start_dt, end_dt = _day_window(biz_date)
 
         # 订单汇总
-        agg = (await db.execute(
-            select(
-                func.count(Order.id).label("cnt"),
-                func.coalesce(func.sum(Order.total_amount_fen), 0).label("gross"),
-                func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("net"),
+        agg = (
+            await db.execute(
+                select(
+                    func.count(Order.id).label("cnt"),
+                    func.coalesce(func.sum(Order.total_amount_fen), 0).label("gross"),
+                    func.coalesce(func.sum(Order.discount_amount_fen), 0).label("discount"),
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("net"),
+                ).where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-        )).one()
+        ).one()
 
         # 退菜
-        ret = (await db.execute(
-            select(
-                func.count(OrderItem.id).label("cnt"),
-                func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("amount"),
+        ret = (
+            await db.execute(
+                select(
+                    func.count(OrderItem.id).label("cnt"),
+                    func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("amount"),
+                )
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                        OrderItem.return_flag == True,  # noqa: E712
+                    )
+                )
             )
-            .join(Order, Order.id == OrderItem.order_id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.return_flag == True,  # noqa: E712
-            ))
-        )).one()
+        ).one()
 
         # 赠菜
-        gift = (await db.execute(
-            select(
-                func.count(OrderItem.id).label("cnt"),
-                func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("amount"),
+        gift = (
+            await db.execute(
+                select(
+                    func.count(OrderItem.id).label("cnt"),
+                    func.coalesce(func.sum(OrderItem.subtotal_fen), 0).label("amount"),
+                )
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                        OrderItem.gift_flag == True,  # noqa: E712
+                    )
+                )
             )
-            .join(Order, Order.id == OrderItem.order_id)
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-                OrderItem.gift_flag == True,  # noqa: E712
-            ))
-        )).one()
+        ).one()
 
         # 异常订单 & 毛利告警
-        abnormal_count = int((await db.execute(
-            select(func.count(Order.id))
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.abnormal_flag == True,  # noqa: E712
-            ))
-        )).scalar_one())
+        abnormal_count = int(
+            (
+                await db.execute(
+                    select(func.count(Order.id)).where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.abnormal_flag == True,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
-        margin_alert_count = int((await db.execute(
-            select(func.count(Order.id))
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.margin_alert_flag == True,  # noqa: E712
-            ))
-        )).scalar_one())
+        margin_alert_count = int(
+            (
+                await db.execute(
+                    select(func.count(Order.id)).where(
+                        and_(
+                            Order.tenant_id == tenant_id,
+                            Order.store_id == store_id,
+                            Order.order_time >= start_dt,
+                            Order.order_time <= end_dt,
+                            Order.margin_alert_flag == True,  # noqa: E712
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
 
         # 按小时
-        hourly_rows = (await db.execute(
-            select(
-                extract("hour", Order.order_time).label("hr"),
-                func.count(Order.id).label("cnt"),
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+        hourly_rows = (
+            await db.execute(
+                select(
+                    extract("hour", Order.order_time).label("hr"),
+                    func.count(Order.id).label("cnt"),
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= end_dt,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by("hr")
+                .order_by("hr")
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= end_dt,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by("hr").order_by("hr")
-        )).all()
+        ).all()
         hourly_breakdown = [
-            {"hour": f"{int(r.hr):02d}:00", "order_count": int(r.cnt), "revenue_fen": int(r.rev)}
-            for r in hourly_rows
+            {"hour": f"{int(r.hr):02d}:00", "order_count": int(r.cnt), "revenue_fen": int(r.rev)} for r in hourly_rows
         ]
 
         refund_fen = int(ret.amount)
@@ -759,11 +918,14 @@ class ReportEngine:
 
         logger.info(
             "billing_audit_generated",
-            tenant_id=str(tenant_id), store_id=str(store_id), biz_date=str(biz_date),
+            tenant_id=str(tenant_id),
+            store_id=str(store_id),
+            biz_date=str(biz_date),
         )
 
         return BillingAudit(
-            store_id=str(store_id), audit_date=str(biz_date),
+            store_id=str(store_id),
+            audit_date=str(biz_date),
             order_count=int(agg.cnt),
             gross_revenue_fen=int(agg.gross),
             discount_fen=int(agg.discount),
@@ -795,58 +957,76 @@ class ReportEngine:
         last_hour_start = now - timedelta(hours=1)
 
         # 今日截至现在
-        agg = (await db.execute(
-            select(
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
-                func.count(Order.id).label("cnt"),
+        agg = (
+            await db.execute(
+                select(
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+                    func.count(Order.id).label("cnt"),
+                ).where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= actual_end,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= actual_end,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-        )).one()
+        ).one()
         revenue_so_far = int(agg.rev)
         order_count_so_far = int(agg.cnt)
         avg_ticket = revenue_so_far // order_count_so_far if order_count_so_far > 0 else 0
 
         # 最近一小时
-        last_hr = (await db.execute(
-            select(
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
-                func.count(Order.id).label("cnt"),
+        last_hr = (
+            await db.execute(
+                select(
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+                    func.count(Order.id).label("cnt"),
+                ).where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= last_hour_start,
+                        Order.order_time <= actual_end,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= last_hour_start, Order.order_time <= actual_end,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-        )).one()
+        ).one()
 
         # 高峰小时（今日迄今）
-        peak_rows = (await db.execute(
-            select(
-                extract("hour", Order.order_time).label("hr"),
-                func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+        peak_rows = (
+            await db.execute(
+                select(
+                    extract("hour", Order.order_time).label("hr"),
+                    func.coalesce(func.sum(Order.final_amount_fen), 0).label("rev"),
+                )
+                .where(
+                    and_(
+                        Order.tenant_id == tenant_id,
+                        Order.store_id == store_id,
+                        Order.status.in_(_COMPLETED),
+                        Order.order_time >= start_dt,
+                        Order.order_time <= actual_end,
+                        Order.is_deleted == False,  # noqa: E712
+                    )
+                )
+                .group_by("hr")
+                .order_by(func.sum(Order.final_amount_fen).desc())
+                .limit(1)
             )
-            .where(and_(
-                Order.tenant_id == tenant_id, Order.store_id == store_id,
-                Order.status.in_(_COMPLETED),
-                Order.order_time >= start_dt, Order.order_time <= actual_end,
-                Order.is_deleted == False,  # noqa: E712
-            ))
-            .group_by("hr").order_by(func.sum(Order.final_amount_fen).desc())
-            .limit(1)
-        )).first()
+        ).first()
 
         peak_hour = f"{int(peak_rows.hr):02d}:00" if peak_rows else "--"
         peak_revenue = int(peak_rows.rev) if peak_rows else 0
 
         logger.info(
             "realtime_store_stats_generated",
-            tenant_id=str(tenant_id), store_id=str(store_id),
+            tenant_id=str(tenant_id),
+            store_id=str(store_id),
             revenue_so_far_fen=revenue_so_far,
         )
 

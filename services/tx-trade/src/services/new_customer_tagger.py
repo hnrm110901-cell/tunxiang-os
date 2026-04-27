@@ -17,6 +17,7 @@ SCHEMA SQL（需手动执行，禁止创建迁移文件）：
   -- items_json->>'douyin_user_id'   抖音用户ID
   -- items_json->>'platform_user_id' 通用平台用户ID
 """
+
 from __future__ import annotations
 
 import threading

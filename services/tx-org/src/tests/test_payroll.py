@@ -35,13 +35,14 @@ STORE_ID = str(uuid4())
 EMP_ID = str(uuid4())
 EMP_ID_2 = str(uuid4())
 
-BASE_SALARY_FEN = 600_000       # 6000 元/月
-WORK_DAYS = 22                   # 22 个工作日/月（2026-03）
+BASE_SALARY_FEN = 600_000  # 6000 元/月
+WORK_DAYS = 22  # 22 个工作日/月（2026-03）
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  1. 基本工资 + 考勤扣款
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestBaseSalaryAndAttendance:
     """基本工资 + 考勤扣款（缺勤按天扣）"""
@@ -131,6 +132,7 @@ class TestBaseSalaryAndAttendance:
 #  2. 提成计算
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestCommission:
     """提成计算（销售额 × 提成率）"""
 
@@ -148,8 +150,8 @@ class TestCommission:
             absence_days=0,
             late_count=0,
             early_leave_count=0,
-            sales_amount_fen=10_000_000,   # 10 万元
-            commission_rate=0.005,          # 0.5%
+            sales_amount_fen=10_000_000,  # 10 万元
+            commission_rate=0.005,  # 0.5%
         )
         assert record.commission == pytest.approx(500.0, abs=0.5)
 
@@ -196,6 +198,7 @@ class TestCommission:
 # ══════════════════════════════════════════════════════════════════════════════
 #  3. 五险一金计算
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSocialInsurance:
     """五险一金计算（2026年标准）"""
@@ -252,9 +255,7 @@ class TestSocialInsurance:
         calc = SocialInsuranceCalculator(city="changsha")
         result = calc.calculate(gross_salary_fen=600_000)
         breakdown = result["breakdown"]
-        expected_personal = sum(
-            v["personal_fen"] for v in breakdown.values()
-        )
+        expected_personal = sum(v["personal_fen"] for v in breakdown.values())
         assert result["personal_total"] == expected_personal
 
     def test_city_config_override(self):
@@ -270,6 +271,7 @@ class TestSocialInsurance:
 # ══════════════════════════════════════════════════════════════════════════════
 #  4. 个税计算（累计预扣法）
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestIncomeTax:
     """个税计算（2024年累计预扣法）"""
@@ -342,6 +344,7 @@ class TestIncomeTax:
 #  5. 净工资公式验证
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestNetSalaryFormula:
     """净工资 = 应发工资 - 五险一金个人部分 - 个税"""
 
@@ -387,6 +390,7 @@ class TestNetSalaryFormula:
 # ══════════════════════════════════════════════════════════════════════════════
 #  6. 多月累计个税
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestCumulativeTax:
     """多月累计个税：前几月已缴税影响当月税率"""
@@ -459,6 +463,7 @@ class TestCumulativeTax:
 # ══════════════════════════════════════════════════════════════════════════════
 #  7. 全勤奖
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestFullAttendanceBonus:
     """全勤奖：当月出勤率100%时附加奖金"""
@@ -566,6 +571,7 @@ class TestFullAttendanceBonus:
 #  8. tenant_id 隔离
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestTenantIsolation:
     """tenant_id 隔离：不同租户的工资记录互不干扰"""
 
@@ -615,12 +621,24 @@ class TestTenantIsolation:
         """批量计算时 tenant_id 正确传递到每条记录"""
         engine = PayrollEngine()
         employees = [
-            {"employee_id": str(uuid4()), "base_salary_fen": 500_000,
-             "work_days_in_month": WORK_DAYS, "attendance_days": WORK_DAYS,
-             "absence_days": 0, "late_count": 0, "early_leave_count": 0},
-            {"employee_id": str(uuid4()), "base_salary_fen": 600_000,
-             "work_days_in_month": WORK_DAYS, "attendance_days": WORK_DAYS,
-             "absence_days": 0, "late_count": 0, "early_leave_count": 0},
+            {
+                "employee_id": str(uuid4()),
+                "base_salary_fen": 500_000,
+                "work_days_in_month": WORK_DAYS,
+                "attendance_days": WORK_DAYS,
+                "absence_days": 0,
+                "late_count": 0,
+                "early_leave_count": 0,
+            },
+            {
+                "employee_id": str(uuid4()),
+                "base_salary_fen": 600_000,
+                "work_days_in_month": WORK_DAYS,
+                "attendance_days": WORK_DAYS,
+                "absence_days": 0,
+                "late_count": 0,
+                "early_leave_count": 0,
+            },
         ]
         summary = engine.batch_compute(
             tenant_id=TENANT_A,
@@ -636,6 +654,7 @@ class TestTenantIsolation:
 # ══════════════════════════════════════════════════════════════════════════════
 #  附加：工资单状态流转
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestPayrollRecordStatus:
     """工资单状态：draft → confirmed → paid"""

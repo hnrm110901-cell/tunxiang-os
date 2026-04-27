@@ -8,19 +8,19 @@ TC-P2-14 — CRM三级分销体系测试
 4. test_abuse_detection              — 防刷检测：同member_id重复绑定，幂等返回不报错
 5. test_referral_stats               — 统计接口：字段存在且为数值类型
 """
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-from fastapi.testclient import TestClient
+
+import os
 import re
 import sys
-import os
+
+from fastapi.testclient import TestClient
 
 # 确保测试可以导入服务模块
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # 构建一个轻量级 FastAPI 测试应用，只挂载三级分销路由
 from fastapi import FastAPI
+
 from src.api.distribution_routes import router as distribution_router
 
 _test_app = FastAPI()
@@ -32,6 +32,7 @@ TENANT_HEADER = {"X-Tenant-ID": "test-tenant-001"}
 # ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
+
 
 def _client() -> TestClient:
     return TestClient(_test_app)
@@ -53,14 +54,19 @@ def _get(client: TestClient, path: str, params: dict | None = None) -> dict:
 # 1. 生成推荐码
 # ---------------------------------------------------------------------------
 
+
 def test_generate_referral_code() -> None:
     """推荐码必须满足：长度6字符 / 仅大写字母+数字 / TX前缀 / 两次生成结果唯一"""
     client = _client()
 
-    result1 = _post(client, "/api/v1/growth/referral/links", {
-        "member_id": "mem-gen-001",
-        "channel": "wechat",
-    })
+    result1 = _post(
+        client,
+        "/api/v1/growth/referral/links",
+        {
+            "member_id": "mem-gen-001",
+            "channel": "wechat",
+        },
+    )
     assert result1["ok"] is True
     code1: str = result1["data"]["referral_code"]
 
@@ -70,10 +76,14 @@ def test_generate_referral_code() -> None:
     assert code1.startswith("TX"), f"推荐码应以TX开头，实际：{code1}"
 
     # 唯一性：同一会员再次生成得到不同的码
-    result2 = _post(client, "/api/v1/growth/referral/links", {
-        "member_id": "mem-gen-002",
-        "channel": "wechat",
-    })
+    result2 = _post(
+        client,
+        "/api/v1/growth/referral/links",
+        {
+            "member_id": "mem-gen-002",
+            "channel": "wechat",
+        },
+    )
     assert result2["ok"] is True
     code2: str = result2["data"]["referral_code"]
     assert code1 != code2, "两次生成的推荐码不应相同"
@@ -90,6 +100,7 @@ def test_generate_referral_code() -> None:
 # ---------------------------------------------------------------------------
 # 2. 绑定三级链路（A推荐B→B推荐C→C推荐D）
 # ---------------------------------------------------------------------------
+
 
 def test_bind_three_level_chain() -> None:
     """
@@ -110,10 +121,14 @@ def test_bind_three_level_chain() -> None:
     code_a = r_a["data"]["referral_code"]
 
     # Step2: B 通过 A 的码绑定
-    r_bind_b = _post(client, "/api/v1/growth/referral/bind", {
-        "referee_id": "mem-chain-b",
-        "referral_code": code_a,
-    })
+    r_bind_b = _post(
+        client,
+        "/api/v1/growth/referral/bind",
+        {
+            "referee_id": "mem-chain-b",
+            "referral_code": code_a,
+        },
+    )
     assert r_bind_b["ok"] is True
     rel_b = r_bind_b["data"]["relationship"]
     assert rel_b["referee_id"] == "mem-chain-b"
@@ -126,10 +141,14 @@ def test_bind_three_level_chain() -> None:
     code_b = r_b["data"]["referral_code"]
 
     # Step4: C 通过 B 的码绑定
-    r_bind_c = _post(client, "/api/v1/growth/referral/bind", {
-        "referee_id": "mem-chain-c",
-        "referral_code": code_b,
-    })
+    r_bind_c = _post(
+        client,
+        "/api/v1/growth/referral/bind",
+        {
+            "referee_id": "mem-chain-c",
+            "referral_code": code_b,
+        },
+    )
     assert r_bind_c["ok"] is True
     rel_c = r_bind_c["data"]["relationship"]
     assert rel_c["level1_id"] == "mem-chain-b"  # 直接推荐人是B
@@ -141,29 +160,28 @@ def test_bind_three_level_chain() -> None:
     code_c = r_c["data"]["referral_code"]
 
     # Step6: D 通过 C 的码绑定
-    r_bind_d = _post(client, "/api/v1/growth/referral/bind", {
-        "referee_id": "mem-chain-d",
-        "referral_code": code_c,
-    })
+    r_bind_d = _post(
+        client,
+        "/api/v1/growth/referral/bind",
+        {
+            "referee_id": "mem-chain-d",
+            "referral_code": code_c,
+        },
+    )
     assert r_bind_d["ok"] is True
     rel_d = r_bind_d["data"]["relationship"]
 
     # 核心断言：D 的三级推荐关系
     assert rel_d["referee_id"] == "mem-chain-d"
-    assert rel_d["level1_id"] == "mem-chain-c", (
-        f"D的level1应为C，实际为 {rel_d['level1_id']}"
-    )
-    assert rel_d["level2_id"] == "mem-chain-b", (
-        f"D的level2应为B，实际为 {rel_d['level2_id']}"
-    )
-    assert rel_d["level3_id"] == "mem-chain-a", (
-        f"D的level3应为A，实际为 {rel_d['level3_id']}"
-    )
+    assert rel_d["level1_id"] == "mem-chain-c", f"D的level1应为C，实际为 {rel_d['level1_id']}"
+    assert rel_d["level2_id"] == "mem-chain-b", f"D的level2应为B，实际为 {rel_d['level2_id']}"
+    assert rel_d["level3_id"] == "mem-chain-a", f"D的level3应为A，实际为 {rel_d['level3_id']}"
 
 
 # ---------------------------------------------------------------------------
 # 3. 奖励计算
 # ---------------------------------------------------------------------------
+
 
 def test_reward_calculation() -> None:
     """
@@ -188,11 +206,15 @@ def test_reward_calculation() -> None:
     _post(client, "/api/v1/growth/referral/bind", {"referee_id": "mem-calc-d", "referral_code": code_c})
 
     # 触发奖励计算：D 消费 10000 分
-    result = _post(client, "/api/v1/growth/referral/rewards/calculate", {
-        "order_id": "ord-test-001",
-        "member_id": "mem-calc-d",
-        "order_amount_fen": 10000,
-    })
+    result = _post(
+        client,
+        "/api/v1/growth/referral/rewards/calculate",
+        {
+            "order_id": "ord-test-001",
+            "member_id": "mem-calc-d",
+            "order_amount_fen": 10000,
+        },
+    )
     assert result["ok"] is True
     data = result["data"]
 
@@ -226,6 +248,7 @@ def test_reward_calculation() -> None:
 # 4. 防刷检测：同member_id重复绑定应幂等
 # ---------------------------------------------------------------------------
 
+
 def test_abuse_detection() -> None:
     """
     同一 referee_id 重复调用 /bind 应幂等：
@@ -240,18 +263,26 @@ def test_abuse_detection() -> None:
     code = r_link["data"]["referral_code"]
 
     # 第一次绑定
-    r1 = _post(client, "/api/v1/growth/referral/bind", {
-        "referee_id": "mem-abuse-b",
-        "referral_code": code,
-    })
+    r1 = _post(
+        client,
+        "/api/v1/growth/referral/bind",
+        {
+            "referee_id": "mem-abuse-b",
+            "referral_code": code,
+        },
+    )
     assert r1["ok"] is True
     assert r1["data"]["idempotent"] is False
 
     # 第二次绑定（相同 referee_id + 相同码）
-    r2 = _post(client, "/api/v1/growth/referral/bind", {
-        "referee_id": "mem-abuse-b",
-        "referral_code": code,
-    })
+    r2 = _post(
+        client,
+        "/api/v1/growth/referral/bind",
+        {
+            "referee_id": "mem-abuse-b",
+            "referral_code": code,
+        },
+    )
     assert r2["ok"] is True, "重复绑定应幂等返回，不应报错"
     assert r2["data"]["idempotent"] is True, "第二次绑定应返回 idempotent=True"
 
@@ -261,21 +292,24 @@ def test_abuse_detection() -> None:
     assert rel1["level1_id"] == rel2["level1_id"]
 
     # 异常检测接口应标记 DUPLICATE_BIND
-    abuse_result = _post(client, "/api/v1/growth/referral/detect-abuse", {
-        "referee_id": "mem-abuse-b",
-        "referral_code": code,
-    })
+    abuse_result = _post(
+        client,
+        "/api/v1/growth/referral/detect-abuse",
+        {
+            "referee_id": "mem-abuse-b",
+            "referral_code": code,
+        },
+    )
     assert abuse_result["ok"] is True
     abuse_data = abuse_result["data"]
     assert abuse_data["is_abuse"] is True, "重复绑定应被标记为异常"
-    assert "DUPLICATE_BIND" in abuse_data["flags"], (
-        f"异常标志应包含 DUPLICATE_BIND，实际：{abuse_data['flags']}"
-    )
+    assert "DUPLICATE_BIND" in abuse_data["flags"], f"异常标志应包含 DUPLICATE_BIND，实际：{abuse_data['flags']}"
 
 
 # ---------------------------------------------------------------------------
 # 5. 统计接口
 # ---------------------------------------------------------------------------
+
 
 def test_referral_stats() -> None:
     """

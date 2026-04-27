@@ -8,6 +8,7 @@
   5. action 空串被拒（ValueError）
   6. user_id 空字符串被拒（ValueError）
 """
+
 from __future__ import annotations
 
 import uuid

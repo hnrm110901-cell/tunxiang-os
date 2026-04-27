@@ -11,6 +11,7 @@
   - [VALIDATION] phone 空字符串校验
   - [STATS] get_queue_history 改用 SQL 聚合统计，避免二次全表扫描
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -40,6 +41,7 @@ def _today_str() -> str:
 # ─── 排队号前缀规则 ───
 # A系列：1-4人小桌  B系列：5-8人中桌  C系列：9+人大桌
 
+
 def _size_prefix(party_size: int) -> str:
     if party_size <= 4:
         return "A"
@@ -67,8 +69,8 @@ _DEFAULT_AVG_DINING_DURATION: dict[str, int] = {
 # 各桌型典型门店桌数默认配置
 _DEFAULT_TABLE_COUNTS: dict[str, int] = {
     "A": 15,  # 小桌15张
-    "B": 8,   # 中桌8张
-    "C": 4,   # 大桌4张
+    "B": 8,  # 中桌8张
+    "C": 4,  # 大桌4张
 }
 
 
@@ -210,9 +212,7 @@ class QueueService:
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
         if record.status != "waiting":
-            raise ValueError(
-                f"Cannot call queue {queue_id}: current status is '{record.status}', expected 'waiting'"
-            )
+            raise ValueError(f"Cannot call queue {queue_id}: current status is '{record.status}', expected 'waiting'")
 
         now = _now_iso()
         record.status = "called"
@@ -258,9 +258,7 @@ class QueueService:
             "party_size": record.party_size,
             "called_at": now,
             "notification_sent": True,
-            "auto_skip_at": (
-                datetime.fromisoformat(now) + timedelta(minutes=10)
-            ).isoformat(),
+            "auto_skip_at": (datetime.fromisoformat(now) + timedelta(minutes=10)).isoformat(),
         }
 
     # ─── 顾客到店 ───
@@ -379,8 +377,7 @@ class QueueService:
             raise ValueError(f"Queue record not found: {queue_id}")
         if record.status not in ("waiting", "called"):
             raise ValueError(
-                f"Cannot skip queue {queue_id}: "
-                f"current status is '{record.status}', expected 'waiting' or 'called'"
+                f"Cannot skip queue {queue_id}: current status is '{record.status}', expected 'waiting' or 'called'"
             )
 
         now = _now_iso()
@@ -421,9 +418,7 @@ class QueueService:
         if not record:
             raise ValueError(f"Queue record not found: {queue_id}")
         if record.status in ("seated", "skipped", "cancelled"):
-            raise ValueError(
-                f"Cannot cancel queue {queue_id}: already in terminal status '{record.status}'"
-            )
+            raise ValueError(f"Cannot cancel queue {queue_id}: already in terminal status '{record.status}'")
 
         now = _now_iso()
         record.status = "cancelled"
@@ -471,18 +466,18 @@ class QueueService:
             # 计算该桌型平均等位时间
             avg_wait = self._calculate_wait_time(prefix, len(prefix_waiting))
 
-            groups.append({
-                "prefix": prefix,
-                "size_category": SIZE_CATEGORY_LABELS[prefix],
-                "waiting_count": len(prefix_waiting),
-                "called_count": len(prefix_called),
-                "avg_wait_min": avg_wait["estimated_wait_min"],
-                "next_queue_numbers": [
-                    q.queue_number for q in sorted(
-                        prefix_waiting, key=lambda x: x.priority_ts
-                    )[:3]
-                ],
-            })
+            groups.append(
+                {
+                    "prefix": prefix,
+                    "size_category": SIZE_CATEGORY_LABELS[prefix],
+                    "waiting_count": len(prefix_waiting),
+                    "called_count": len(prefix_called),
+                    "avg_wait_min": avg_wait["estimated_wait_min"],
+                    "next_queue_numbers": [
+                        q.queue_number for q in sorted(prefix_waiting, key=lambda x: x.priority_ts)[:3]
+                    ],
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -658,11 +653,117 @@ class QueueService:
         next_item = waiting[0]
         return await self.call_number(next_item.queue_id)
 
+    # ─── 排队大屏数据 ───
+
+    async def get_queue_display(self, store_id: str) -> dict:
+        """排队大屏数据 — 面向顾客显示屏的综合信息
+
+        包含：各桌型排队概况、下一位叫号信息、预估等待时间、
+        今日接待统计。适用于门店排队显示大屏。
+
+        Args:
+            store_id: 门店ID
+
+        Returns:
+            {
+                store_id, date, groups: [{prefix, label, waiting, next_numbers, est_wait_min}],
+                summary: {total_waiting, total_seated_today, avg_wait_min},
+                recent_called: [{queue_number, customer_name, called_at}]
+            }
+        """
+        today = _today_str()
+        all_records = await self._repo.list_by_store_date(store_id, today)
+
+        waiting = [q for q in all_records if q.status == "waiting"]
+        called = [q for q in all_records if q.status == "called"]
+        seated = [q for q in all_records if q.status == "seated"]
+
+        # 按桌型分组构建大屏数据
+        groups: list[dict] = []
+        for prefix in ["A", "B", "C"]:
+            prefix_waiting = sorted(
+                [q for q in waiting if q.prefix == prefix],
+                key=lambda x: x.priority_ts,
+            )
+            prefix_called = sorted(
+                [q for q in called if q.prefix == prefix],
+                key=lambda x: x.called_at or "",
+                reverse=True,
+            )
+
+            est = self._calculate_wait_time(prefix, len(prefix_waiting))
+
+            # 下一批待叫号码（最多5个）
+            next_numbers = [q.queue_number for q in prefix_waiting[:5]]
+
+            # 最近叫号（最多3个）
+            recent = []
+            for q in prefix_called[:3]:
+                recent.append(
+                    {
+                        "queue_number": q.queue_number,
+                        "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
+                        "called_at": q.called_at,
+                    }
+                )
+
+            groups.append(
+                {
+                    "prefix": prefix,
+                    "label": SIZE_CATEGORY_LABELS[prefix],
+                    "waiting_count": len(prefix_waiting),
+                    "called_count": len(prefix_called),
+                    "est_wait_min": est["estimated_wait_min"],
+                    "next_numbers": next_numbers,
+                    "recent_called": recent,
+                }
+            )
+
+        # 全部最近叫号记录（按时间倒序，最多10条）
+        all_called_sorted = sorted(called, key=lambda x: x.called_at or "", reverse=True)
+        recent_called = []
+        for q in all_called_sorted[:10]:
+            recent_called.append(
+                {
+                    "queue_number": q.queue_number,
+                    "customer_name": q.customer_name[:1] + "**" if len(q.customer_name) > 1 else q.customer_name,
+                    "party_size": q.party_size,
+                    "called_at": q.called_at,
+                }
+            )
+
+        # 平均等位时间（已入座的等位时间均值）
+        avg_wait_min = 0
+        if seated:
+            total_wait = 0
+            count = 0
+            for q in seated:
+                if q.taken_at and q.seated_at:
+                    taken_dt = datetime.fromisoformat(q.taken_at)
+                    seated_dt = datetime.fromisoformat(q.seated_at)
+                    total_wait += int((seated_dt - taken_dt).total_seconds() / 60)
+                    count += 1
+            if count > 0:
+                avg_wait_min = round(total_wait / count)
+
+        return {
+            "store_id": store_id,
+            "date": today,
+            "groups": groups,
+            "summary": {
+                "total_waiting": len(waiting),
+                "total_called": len(called),
+                "total_seated_today": len(seated),
+                "total_today": len(all_records),
+                "avg_wait_min": avg_wait_min,
+            },
+            "recent_called": recent_called,
+            "updated_at": _now_iso(),
+        }
+
     # ─── 内部辅助方法 ───
 
-    def _calculate_wait_time(
-        self, prefix: str, ahead_count: int
-    ) -> dict:
+    def _calculate_wait_time(self, prefix: str, ahead_count: int) -> dict:
         """计算预估等位时间
 
         算法：
@@ -688,6 +789,7 @@ class QueueService:
 
 
 # ─── 模块级便捷函数（兼容 reservation_flow.py 的调用风格） ───
+
 
 async def take_queue_number(
     db: AsyncSession,

@@ -31,6 +31,7 @@
   - TestClient + app.dependency_overrides[get_db] + AsyncMock side_effect
   - 全部 mock，不需要真实 DB
 """
+
 from __future__ import annotations
 
 import sys
@@ -39,7 +40,6 @@ import uuid
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -65,8 +65,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db"):
+
     async def _placeholder_get_db():  # pragma: no cover
         yield None
+
     _db_mod.get_db = _placeholder_get_db
 
 # structlog 存根
@@ -112,8 +114,9 @@ _review.get_review_history = AsyncMock()
 _review.sign_off_review = AsyncMock()
 
 # ── 导入路由 ────────────────────────────────────────────────────────────────────
-from ..api.ops_routes import router as ops_router  # noqa: E402
 from shared.ontology.src.database import get_db  # noqa: E402
+
+from ..api.ops_routes import router as ops_router  # noqa: E402
 
 # ── FastAPI 应用 ─────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -127,9 +130,11 @@ HEADERS = {"X-Tenant-ID": TENANT}
 
 # ── 辅助 ─────────────────────────────────────────────────────────────────────────
 
+
 def _override(db_mock: AsyncMock):
     async def _dep() -> AsyncGenerator:
         yield db_mock
+
     return _dep
 
 
@@ -168,6 +173,7 @@ class TestOpeningChecklist:
         ):
             # ops_routes 做内联 import：需 patch 在函数体的命名空间下
             import src.api.ops_routes as _mod
+
             with patch.object(_mod, "__builtins__", __builtins__):
                 # 改为 patch 整个服务模块引用
                 pass
@@ -191,9 +197,7 @@ class TestOpeningChecklist:
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
 
-        _store_opening.create_opening_checklist = AsyncMock(
-            side_effect=ValueError("今日检查单已存在")
-        )
+        _store_opening.create_opening_checklist = AsyncMock(side_effect=ValueError("今日检查单已存在"))
 
         with TestClient(app) as client:
             resp = client.post(
@@ -423,9 +427,7 @@ class TestReportException:
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
 
-        _exc_wf.report_exception = AsyncMock(
-            side_effect=ValueError("未知异常类型")
-        )
+        _exc_wf.report_exception = AsyncMock(side_effect=ValueError("未知异常类型"))
 
         with TestClient(app) as client:
             resp = client.post(
@@ -655,9 +657,7 @@ class TestFinalizeClosing:
         db = _make_db()
         app.dependency_overrides[get_db] = _override(db)
 
-        _closing.finalize_closing = AsyncMock(
-            side_effect=ValueError("闭店检查单未完成")
-        )
+        _closing.finalize_closing = AsyncMock(side_effect=ValueError("闭店检查单未完成"))
 
         with TestClient(app) as client:
             resp = client.post(

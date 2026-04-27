@@ -19,6 +19,7 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 import asyncio
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -199,15 +200,17 @@ async def create_fastfood_order(
         total_fen=total_fen,
     )
 
-    return _ok({
-        "fast_food_order_id": str(order_id),
-        "call_number": call_number,
-        "order_type": req.order_type,
-        "total_fen": total_fen,
-        "status": "pending",
-        "items": [item.model_dump() for item in req.items],
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "fast_food_order_id": str(order_id),
+            "call_number": call_number,
+            "order_type": req.order_type,
+            "total_fen": total_fen,
+            "status": "pending",
+            "items": [item.model_dump() for item in req.items],
+            "created_at": now.isoformat(),
+        }
+    )
 
 
 # ─── 2. 查询订单列表 ──────────────────────────────────────────────────────────
@@ -326,6 +329,7 @@ async def mark_order_ready(
     # 广播叫号到叫号屏 WebSocket
     try:
         from .calling_screen_routes import broadcast_call_number
+
         asyncio.create_task(
             broadcast_call_number(
                 store_id=store_id,
@@ -344,12 +348,14 @@ async def mark_order_ready(
         store_id=store_id,
     )
 
-    return _ok({
-        "fast_food_order_id": order_id,
-        "call_number": call_number,
-        "status": "ready",
-        "ready_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "fast_food_order_id": order_id,
+            "call_number": call_number,
+            "status": "ready",
+            "ready_at": now.isoformat(),
+        }
+    )
 
 
 # ─── 4. 待取餐号列表 ─────────────────────────────────────────────────────────
@@ -454,6 +460,7 @@ async def recall_number(
     # 广播叫号信号
     try:
         from .calling_screen_routes import broadcast_call_number
+
         asyncio.create_task(
             broadcast_call_number(
                 store_id=updated_store_id,
@@ -473,12 +480,14 @@ async def recall_number(
         operator_id=req.operator_id,
     )
 
-    return _ok({
-        "call_number": call_number,
-        "fast_food_order_id": order_id,
-        "status": "called",
-        "called_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "call_number": call_number,
+            "fast_food_order_id": order_id,
+            "status": "called",
+            "called_at": now.isoformat(),
+        }
+    )
 
 
 # ─── 内部工具：原子性分配取餐号 ──────────────────────────────────────────────

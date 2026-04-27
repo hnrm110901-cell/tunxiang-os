@@ -59,14 +59,19 @@ router = APIRouter(prefix="/api/v1/org/franchise", tags=["franchise-management"]
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 _VALID_FRANCHISEE_STATUSES = {
-    "applying", "signing", "preparing", "operating", "suspended", "terminated",
+    "applying",
+    "signing",
+    "preparing",
+    "operating",
+    "suspended",
+    "terminated",
 }
 _STATUS_TRANSITIONS: dict[str, set[str]] = {
-    "applying":   {"signing", "terminated"},
-    "signing":    {"preparing", "terminated"},
-    "preparing":  {"operating", "terminated"},
-    "operating":  {"suspended", "terminated"},
-    "suspended":  {"operating", "terminated"},
+    "applying": {"signing", "terminated"},
+    "signing": {"preparing", "terminated"},
+    "preparing": {"operating", "terminated"},
+    "operating": {"suspended", "terminated"},
+    "suspended": {"operating", "terminated"},
     "terminated": set(),
 }
 _VALID_TIERS = {"standard", "premium", "flagship"}
@@ -167,7 +172,8 @@ class CreateFranchiseStoreReq(BaseModel):
     store_name: str = Field(..., max_length=200)
     open_date: Optional[str] = Field(None, description="YYYY-MM-DD")
     template_store_id: Optional[str] = Field(
-        None, max_length=100,
+        None,
+        max_length=100,
         description="若填写则创建后自动触发门店复制",
     )
 
@@ -670,6 +676,7 @@ async def create_royalty_rule(
         raise HTTPException(status_code=422, detail="rule_type=tiered_revenue 时 tiers 必填")
 
     import json
+
     tiers_json = json.dumps(req.tiers) if req.tiers else None
 
     row = await db.execute(
@@ -794,6 +801,7 @@ async def generate_royalty_bill(
         )
 
     import json as _json
+
     tiers = _json.loads(rule.tiers) if rule.tiers else None
     rate_applied, royalty_amount_fen = _calculate_royalty(
         rule_type=rule.rule_type,
@@ -886,9 +894,7 @@ async def list_royalty_bills(
         params["status"] = status
 
     where = " AND ".join(conditions)
-    total_row = await db.execute(
-        text(f"SELECT count(*) FROM franchise_royalty_bills WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT count(*) FROM franchise_royalty_bills WHERE {where}"), params)
     total: int = total_row.scalar_one()
 
     rows = await db.execute(
@@ -966,10 +972,7 @@ def _compute_overall_score(
     fs_rate = (food_safety / Decimal("10")) if food_safety else Decimal("0.7")
 
     score = (
-        rev_rate * Decimal("40")
-        + ord_rate * Decimal("30")
-        + sat_rate * Decimal("15")
-        + fs_rate * Decimal("15")
+        rev_rate * Decimal("40") + ord_rate * Decimal("30") + sat_rate * Decimal("15") + fs_rate * Decimal("15")
     ).quantize(Decimal("0.01"))
 
     # 层级建议
@@ -1044,13 +1047,9 @@ async def create_kpi_record(
             "order_count_target": req.order_count_target,
             "order_count_actual": req.order_count_actual,
             "customer_satisfaction_score": (
-                str(req.customer_satisfaction_score)
-                if req.customer_satisfaction_score is not None else None
+                str(req.customer_satisfaction_score) if req.customer_satisfaction_score is not None else None
             ),
-            "food_safety_score": (
-                str(req.food_safety_score)
-                if req.food_safety_score is not None else None
-            ),
+            "food_safety_score": (str(req.food_safety_score) if req.food_safety_score is not None else None),
             "overall_score": str(overall_score),
             "tier_recommendation": tier_recommendation,
         },
@@ -1083,9 +1082,7 @@ async def list_kpi_records(
         params["year_prefix"] = f"{year}-%"
 
     where = " AND ".join(conditions)
-    total_row = await db.execute(
-        text(f"SELECT count(*) FROM franchise_kpi_records WHERE {where}"), params
-    )
+    total_row = await db.execute(text(f"SELECT count(*) FROM franchise_kpi_records WHERE {where}"), params)
     total: int = total_row.scalar_one()
 
     rows = await db.execute(
@@ -1175,21 +1172,23 @@ async def kpi_dashboard(
     )
     bill_summary = dict(bill_row.one()._mapping)
 
-    return _ok({
-        "franchisee": {
-            "id": str(franchisee.id),
-            "legal_name": franchisee.legal_name,
-            "brand_name": franchisee.brand_name,
-            "current_tier": franchisee.tier,
-            "status": franchisee.status,
-        },
-        "summary": {
-            "revenue_completion_rate_pct": rev_completion_rate,
-            "order_completion_rate_pct": ord_completion_rate,
-            "avg_overall_score": avg_score,
-            "tier_recommendation": latest_tier_rec,
-            "overdue_total_fen": int(bill_summary.get("overdue_total_fen", 0)),
-            "overdue_bill_count": int(bill_summary.get("overdue_count", 0)),
-        },
-        "kpi_trend": kpi_list,
-    })
+    return _ok(
+        {
+            "franchisee": {
+                "id": str(franchisee.id),
+                "legal_name": franchisee.legal_name,
+                "brand_name": franchisee.brand_name,
+                "current_tier": franchisee.tier,
+                "status": franchisee.status,
+            },
+            "summary": {
+                "revenue_completion_rate_pct": rev_completion_rate,
+                "order_completion_rate_pct": ord_completion_rate,
+                "avg_overall_score": avg_score,
+                "tier_recommendation": latest_tier_rec,
+                "overdue_total_fen": int(bill_summary.get("overdue_total_fen", 0)),
+                "overdue_bill_count": int(bill_summary.get("overdue_count", 0)),
+            },
+            "kpi_trend": kpi_list,
+        }
+    )

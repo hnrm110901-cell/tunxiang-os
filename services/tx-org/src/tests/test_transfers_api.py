@@ -9,19 +9,20 @@
 
 注意：transfers.py 使用内存存储（_transfer_store），无需 mock DB。
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 
-import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
 from uuid import uuid4
 
 import api.transfers as transfers_module
+import pytest
 from api.transfers import router as transfer_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 app = FastAPI()
 app.include_router(transfer_router)
@@ -65,6 +66,7 @@ def _create_transfer_payload(**overrides):
 
 
 # ─── POST /transfers ──────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_create_transfer_ok(headers):
@@ -116,6 +118,7 @@ async def test_create_transfer_invalid_dates(headers):
 
 # ─── GET /transfers ───────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_list_transfers_empty(headers):
     """无借调单时返回空列表。"""
@@ -155,8 +158,10 @@ async def test_list_transfers_filter_by_store(headers):
             "/api/v1/org/transfers",
             headers=headers,
             json=_create_transfer_payload(
-                from_store_id=store_c, from_store_name="长沙三店",
-                to_store_id="store-d-004", to_store_name="长沙四店",
+                from_store_id=store_c,
+                from_store_name="长沙三店",
+                to_store_id="store-d-004",
+                to_store_name="长沙四店",
             ),
         )
         r = await client.get(
@@ -171,13 +176,12 @@ async def test_list_transfers_filter_by_store(headers):
 
 # ─── POST /transfers/{id}/approve ─────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_approve_transfer_ok(headers):
     """审批借调单，状态变为 approved，带 approver_id。"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        create_r = await client.post(
-            "/api/v1/org/transfers", headers=headers, json=_create_transfer_payload()
-        )
+        create_r = await client.post("/api/v1/org/transfers", headers=headers, json=_create_transfer_payload())
         transfer_id = create_r.json()["data"]["id"]
 
         r = await client.post(
@@ -208,27 +212,28 @@ async def test_approve_transfer_not_found(headers):
 
 # ─── POST /cost-split ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_cost_split_ok(headers):
     """成本分摊：正常路径返回 time_split 和 cost_split。"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        create_r = await client.post(
-            "/api/v1/org/transfers", headers=headers, json=_create_transfer_payload()
-        )
+        create_r = await client.post("/api/v1/org/transfers", headers=headers, json=_create_transfer_payload())
         transfer_id = create_r.json()["data"]["id"]
 
         r = await client.post(
             "/api/v1/org/cost-split",
             headers=headers,
             json={
-                "transfers": [{
-                    "id": transfer_id,
-                    "employee_id": EMP_ID,
-                    "from_store_id": STORE_A,
-                    "to_store_id": STORE_B,
-                    "start_date": "2026-04-10",
-                    "end_date": "2026-04-20",
-                }],
+                "transfers": [
+                    {
+                        "id": transfer_id,
+                        "employee_id": EMP_ID,
+                        "from_store_id": STORE_A,
+                        "to_store_id": STORE_B,
+                        "start_date": "2026-04-10",
+                        "end_date": "2026-04-20",
+                    }
+                ],
                 "attendance_records": [
                     {
                         "employee_id": EMP_ID,
@@ -268,13 +273,12 @@ async def test_cost_split_missing_required_fields(headers):
 
 # ─── POST /cost-split/report ─────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_cost_report_summary_ok(headers):
     """summary 报告正常路径。"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        create_r = await client.post(
-            "/api/v1/org/transfers", headers=headers, json=_create_transfer_payload()
-        )
+        create_r = await client.post("/api/v1/org/transfers", headers=headers, json=_create_transfer_payload())
         transfer_id = create_r.json()["data"]["id"]
 
         r = await client.post(
@@ -282,14 +286,16 @@ async def test_cost_report_summary_ok(headers):
             headers=headers,
             json={
                 "report_type": "summary",
-                "transfers": [{
-                    "id": transfer_id,
-                    "employee_id": EMP_ID,
-                    "from_store_id": STORE_A,
-                    "to_store_id": STORE_B,
-                    "start_date": "2026-04-10",
-                    "end_date": "2026-04-20",
-                }],
+                "transfers": [
+                    {
+                        "id": transfer_id,
+                        "employee_id": EMP_ID,
+                        "from_store_id": STORE_A,
+                        "to_store_id": STORE_B,
+                        "start_date": "2026-04-10",
+                        "end_date": "2026-04-20",
+                    }
+                ],
                 "attendance_records": [
                     {
                         "employee_id": EMP_ID,

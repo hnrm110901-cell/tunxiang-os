@@ -54,8 +54,16 @@ ORDER BY biz_date DESC, avg_serve_min DESC
 
 DIMENSIONS = ["store_name", "biz_date", "kds_station"]
 METRICS = [
-    "order_count", "avg_serve_min", "min_serve_min", "max_serve_min",
-    "within_10min", "within_20min", "within_30min", "over_30min",
-    "timeout_rate_pct", "timeout_count", "time_limit_min",
+    "order_count",
+    "avg_serve_min",
+    "min_serve_min",
+    "max_serve_min",
+    "within_10min",
+    "within_20min",
+    "within_30min",
+    "over_30min",
+    "timeout_rate_pct",
+    "timeout_count",
+    "time_limit_min",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

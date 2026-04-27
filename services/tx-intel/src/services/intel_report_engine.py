@@ -2,6 +2,7 @@
 
 支持竞对周报、需求周报、新品周报、食材周报、区域周报、月度市场报告、专题报告。
 """
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -15,8 +16,12 @@ logger = structlog.get_logger()
 # ─── 常量 ───
 
 REPORT_TYPES = [
-    "competitor_weekly", "demand_weekly", "new_product_weekly",
-    "ingredient_weekly", "district_weekly", "monthly_market",
+    "competitor_weekly",
+    "demand_weekly",
+    "new_product_weekly",
+    "ingredient_weekly",
+    "district_weekly",
+    "monthly_market",
     "special_topic",
 ]
 
@@ -27,9 +32,11 @@ FREQUENCIES = ["weekly", "biweekly", "monthly"]
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class ReportSection:
     """报告章节"""
+
     title: str
     content: str
     data: dict = field(default_factory=dict)
@@ -39,6 +46,7 @@ class ReportSection:
 @dataclass
 class IntelReport:
     """情报报告"""
+
     report_id: str
     report_type: str
     title: str
@@ -54,6 +62,7 @@ class IntelReport:
 @dataclass
 class AutoSchedule:
     """自动报告计划"""
+
     schedule_id: str
     report_type: str
     frequency: str
@@ -160,8 +169,7 @@ class IntelReportEngine:
             ReportSection(
                 title="二、价格变动监测",
                 content=(
-                    "太二午市套餐降价15%（39.9元），望湘园菜单精简SKU从120+降至80。"
-                    "行业整体呈现'精简SKU+套餐引流'趋势。"
+                    "太二午市套餐降价15%（39.9元），望湘园菜单精简SKU从120+降至80。行业整体呈现'精简SKU+套餐引流'趋势。"
                 ),
             ),
             ReportSection(
@@ -323,14 +331,16 @@ class IntelReportEngine:
         for r in self._reports.values():
             if report_type and r.report_type != report_type:
                 continue
-            results.append({
-                "report_id": r.report_id,
-                "report_type": r.report_type,
-                "title": r.title,
-                "city": r.city,
-                "generated_at": r.generated_at,
-                "status": r.status,
-            })
+            results.append(
+                {
+                    "report_id": r.report_id,
+                    "report_type": r.report_type,
+                    "title": r.title,
+                    "city": r.city,
+                    "generated_at": r.generated_at,
+                    "status": r.status,
+                }
+            )
         results.sort(key=lambda x: x["generated_at"], reverse=True)
         return results
 

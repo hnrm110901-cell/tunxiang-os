@@ -3,6 +3,7 @@
 字段映射参考饿了么开放平台文档（open.ele.me/openapi）。
 签名算法：HMAC-SHA256（app_secret 为 key，按参数名字典序拼接为 data）。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -53,23 +54,23 @@ class ElemeAdapter(BaseDeliveryAdapter):
                     unit_price_yuan: float = float(ri.get("price", 0))
                     unit_price_fen: int = round(unit_price_yuan * 100)
                     qty: int = int(ri.get("quantity", 1))
-                    items.append(DeliveryOrderItem(
-                        platform_item_id=str(ri.get("id", "")),
-                        name=ri.get("name", ""),
-                        qty=qty,
-                        unit_price_fen=unit_price_fen,
-                        spec=ri.get("sku_id"),
-                        total_fen=unit_price_fen * qty,
-                    ))
+                    items.append(
+                        DeliveryOrderItem(
+                            platform_item_id=str(ri.get("id", "")),
+                            name=ri.get("name", ""),
+                            qty=qty,
+                            unit_price_fen=unit_price_fen,
+                            spec=ri.get("sku_id"),
+                            total_fen=unit_price_fen * qty,
+                        )
+                    )
 
             # 配送时间：饿了么使用 ISO 8601 字符串
             deliver_time_str: Optional[str] = raw.get("deliverTime")
             estimated_delivery_at: Optional[datetime] = None
             if deliver_time_str:
                 try:
-                    estimated_delivery_at = datetime.fromisoformat(
-                        deliver_time_str.replace("Z", "+00:00")
-                    )
+                    estimated_delivery_at = datetime.fromisoformat(deliver_time_str.replace("Z", "+00:00"))
                 except ValueError:
                     pass
 

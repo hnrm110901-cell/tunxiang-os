@@ -7,16 +7,16 @@
   4. channel-test mock 模式连通性验证
   5. 未知触发事件返回 422
 """
+
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 # 使用独立 FastAPI app 测试路由
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from ..api.ai_marketing_routes import router
 
@@ -31,6 +31,7 @@ TENANT_HEADERS = {"X-Tenant-ID": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}
 # 辅助：mock DB session 依赖
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _override_db():
     mock_session = AsyncMock()
     mock_session.execute = AsyncMock()
@@ -44,6 +45,7 @@ def _override_db():
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 1: campaign-brief 返回内容包 + 受众 + 渠道计划
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_campaign_brief_returns_content_package() -> None:
@@ -95,6 +97,7 @@ async def test_campaign_brief_returns_content_package() -> None:
 # 测试 2: auto-journey 路由到正确 Agent action
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_auto_journey_routes_to_correct_action() -> None:
     """post_order 事件 → execute_post_order_touch action"""
@@ -138,6 +141,7 @@ async def test_auto_journey_routes_to_correct_action() -> None:
 # 测试 3: 未知触发事件返回 422
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_unknown_trigger_event_returns_422() -> None:
     """未知 trigger_event 应返回 422 Unprocessable Entity"""
     response = client.post(
@@ -155,6 +159,7 @@ def test_unknown_trigger_event_returns_422() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 4: performance-summary 包含必要字段
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_performance_summary_format() -> None:
     """营销效果报告包含必要字段"""
@@ -178,6 +183,7 @@ def test_performance_summary_format() -> None:
 # 测试 5: channel-test mock 模式
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_channel_test_mock_mode() -> None:
     """渠道连通性测试在 mock 模式下正常运行（无需真实凭据）"""
     response = client.post(
@@ -199,6 +205,7 @@ def test_channel_test_mock_mode() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 6: campaign-brief ContentHub 不可用时降级
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_campaign_brief_fallback_when_brain_unavailable() -> None:

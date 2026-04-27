@@ -19,8 +19,7 @@ from __future__ import annotations
 import os
 import uuid
 from datetime import date, timedelta
-from typing import Any, Dict, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict
 
 import pytest
 import pytest_asyncio

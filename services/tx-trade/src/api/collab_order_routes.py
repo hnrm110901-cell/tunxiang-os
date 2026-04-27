@@ -19,6 +19,7 @@ WebSocket：
   WS     /api/v1/collab-order/ws/session/{session_token}      — 顾客端订阅
   WS     /api/v1/collab-order/ws/waiter/{store_id}            — 服务员端订阅
 """
+
 import asyncio
 import uuid
 
@@ -387,7 +388,7 @@ async def call_waiter(
     try:
         call = await svc.call_waiter(
             session_token=token,
-            store_id=uuid.UUID(str(session.table_id)),   # 实际使用 session 关联的 store_id
+            store_id=uuid.UUID(str(session.table_id)),  # 实际使用 session 关联的 store_id
             table_id=session.table_id,
             call_type=req.call_type,
             note=req.note,

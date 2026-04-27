@@ -7,6 +7,7 @@ GET  /api/v1/discount/audit-log/high-risk — 高风险折扣记录
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -19,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services.discount_audit_service import DiscountAuditService
 
 router = APIRouter(prefix="/api/v1/discount", tags=["discount-audit"])
@@ -48,7 +49,9 @@ async def get_audit_log(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("admin", "tenant_admin", "auditor", "audit_admin")),
+    user: UserContext = Depends(
+        require_role_audited("discount.audit.read", "admin", "tenant_admin", "auditor", "audit_admin")
+    ),
 ):
     """GET /api/v1/discount/audit-log — 折扣审计记录列表（管理员/审计员）"""
     tenant_id = _get_tenant_id(request)
@@ -78,7 +81,9 @@ async def get_audit_summary(
     store_id: Optional[str] = Query(None),
     period: str = Query("today", pattern="^(today|week|month)$"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("admin", "tenant_admin", "auditor", "audit_admin")),
+    user: UserContext = Depends(
+        require_role_audited("discount.audit.summary", "admin", "tenant_admin", "auditor", "audit_admin")
+    ),
 ):
     """GET /api/v1/discount/audit-log/summary — 按操作员汇总折扣统计"""
     from datetime import timedelta, timezone
@@ -109,17 +114,17 @@ async def get_audit_summary(
         items = log_result.get("items", [])
         total_count = log_result.get("total", 0)
         total_discount = sum(float(i["discount_amount"]) for i in items)
-        high_risk_count = sum(
-            op["high_risk_count"] for op in high_risk_result.get("summary", [])
-        )
+        high_risk_count = sum(op["high_risk_count"] for op in high_risk_result.get("summary", []))
 
-        return _ok({
-            "period": period,
-            "total_count": total_count,
-            "total_discount_amount": round(total_discount, 2),
-            "high_risk_count": high_risk_count,
-            "by_operator": high_risk_result.get("summary", []),
-        })
+        return _ok(
+            {
+                "period": period,
+                "total_count": total_count,
+                "total_discount_amount": round(total_discount, 2),
+                "high_risk_count": high_risk_count,
+                "by_operator": high_risk_result.get("summary", []),
+            }
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
@@ -134,7 +139,9 @@ async def get_high_risk(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("admin", "tenant_admin", "auditor", "audit_admin")),
+    user: UserContext = Depends(
+        require_role_audited("discount.audit.high_risk", "admin", "tenant_admin", "auditor", "audit_admin")
+    ),
 ):
     """GET /api/v1/discount/audit-log/high-risk — 折扣率超过阈值的记录列表"""
     from decimal import Decimal
@@ -150,7 +157,8 @@ async def get_high_risk(
         )
         threshold = Decimal(threshold_pct) / 100
         high_risk_items = [
-            item for item in result["items"]
+            item
+            for item in result["items"]
             if Decimal(item["original_amount"]) > 0
             and Decimal(item["discount_amount"]) / Decimal(item["original_amount"]) >= threshold
         ]
@@ -160,11 +168,13 @@ async def get_high_risk(
             threshold_pct=threshold_pct,
         )
 
-        return _ok({
-            "items": high_risk_items,
-            "threshold_pct": threshold_pct,
-            "operator_summary": summary_result.get("summary", []),
-        })
+        return _ok(
+            {
+                "items": high_risk_items,
+                "threshold_pct": threshold_pct,
+                "operator_summary": summary_result.get("summary", []),
+            }
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:

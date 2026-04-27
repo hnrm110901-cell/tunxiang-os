@@ -10,6 +10,7 @@
   TX_PAY_URL — tx-pay 服务地址（默认 http://localhost:8013）
   TX_PAY_ENABLED — 是否启用 tx-pay 桥接（默认 false，渐进开启）
 """
+
 from __future__ import annotations
 
 import os

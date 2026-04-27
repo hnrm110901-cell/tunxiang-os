@@ -6,6 +6,7 @@
 
 所有金额单位：分（fen）。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -20,8 +21,8 @@ from shared.ontology.src.enums import OrderStatus
 
 from ..models.enums import PaymentStatus, RefundType
 from ..models.payment import Payment, Refund
-from .shouqianba_client import ShouqianbaClient, ShouqianbaError
 from .lakala_client import LakalaClient, LakalaError
+from .shouqianba_client import ShouqianbaClient, ShouqianbaError
 
 logger = structlog.get_logger()
 
@@ -105,9 +106,7 @@ class PaymentGateway:
         method_config = self.PAYMENT_METHODS[method]
 
         order_uuid = uuid.UUID(order_id)
-        result = await self.db.execute(
-            select(Order).where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
-        )
+        result = await self.db.execute(select(Order).where(Order.id == order_uuid, Order.tenant_id == self.tenant_id))
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
@@ -430,11 +429,7 @@ class PaymentGateway:
                 raise RuntimeError("支付客户端未配置，无法处理在线退款")
 
         total_refunded_after = already_refunded_fen + refund_amount_fen
-        refund_type = (
-            RefundType.full.value
-            if total_refunded_after == payment.amount_fen
-            else RefundType.partial.value
-        )
+        refund_type = RefundType.full.value if total_refunded_after == payment.amount_fen else RefundType.partial.value
 
         refund_record = Refund(
             id=uuid.uuid4(),
@@ -477,9 +472,7 @@ class PaymentGateway:
     async def split_payment(self, order_id: str, splits: list[dict]) -> dict:
         """拆单支付 — 多种支付方式组合，任一失败自动回滚"""
         order_uuid = uuid.UUID(order_id)
-        result = await self.db.execute(
-            select(Order).where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
-        )
+        result = await self.db.execute(select(Order).where(Order.id == order_uuid, Order.tenant_id == self.tenant_id))
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
@@ -489,9 +482,9 @@ class PaymentGateway:
 
         for idx, s in enumerate(splits):
             if "method" not in s or "amount_fen" not in s:
-                raise ValueError(f"拆单第{idx+1}项缺少 method 或 amount_fen")
+                raise ValueError(f"拆单第{idx + 1}项缺少 method 或 amount_fen")
             if not isinstance(s["amount_fen"], int) or s["amount_fen"] <= 0:
-                raise ValueError(f"拆单第{idx+1}项金额必须为正整数(分)")
+                raise ValueError(f"拆单第{idx + 1}项金额必须为正整数(分)")
 
         total_split = sum(s["amount_fen"] for s in splits)
         if total_split != order.final_amount_fen:
@@ -565,7 +558,7 @@ class PaymentGateway:
 
                 await self.db.flush()
 
-                error_msg = f"第{i+1}笔支付失败: {str(e)}"
+                error_msg = f"第{i + 1}笔支付失败: {str(e)}"
                 if rollback_errors:
                     error_msg += f"; 回滚异常(需人工介入): {'; '.join(rollback_errors)}"
 

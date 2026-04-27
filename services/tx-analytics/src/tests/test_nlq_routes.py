@@ -7,9 +7,10 @@
   POST /api/v1/nlq/execute-action   — 执行操作（已知+未知action）
   POST /api/v1/nlq/query            — 旧版兼容端点
 """
+
 import sys
 import types
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # ─── 预置假模块 ───
 
@@ -54,10 +55,9 @@ _svc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _svc_root not in sys.path:
     sys.path.insert(0, _svc_root)
 
+import api.nlq_routes as _nlq_mod
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-import api.nlq_routes as _nlq_mod
 
 _app = FastAPI()
 _app.include_router(_nlq_mod.router)
@@ -70,6 +70,7 @@ HEADERS = {"X-Tenant-ID": TENANT}
 # ═══════════════════════════════════════
 # 意图匹配单元测试
 # ═══════════════════════════════════════
+
 
 class TestIntentMatching:
     """测试 50 个模板的正则意图匹配"""
@@ -153,6 +154,7 @@ class TestIntentMatching:
 # POST /api/v1/nlq/ask
 # ═══════════════════════════════════════
 
+
 class TestNLQAsk:
     def test_ask_returns_ok_with_intent(self):
         """命中模板的问题返回 ok:True + intent"""
@@ -231,6 +233,7 @@ class TestNLQAsk:
 # GET /api/v1/nlq/suggestions
 # ═══════════════════════════════════════
 
+
 class TestNLQSuggestions:
     def test_returns_ok_true(self):
         resp = _client.get("/api/v1/nlq/suggestions", headers=HEADERS)
@@ -256,6 +259,7 @@ class TestNLQSuggestions:
 # GET /api/v1/nlq/history
 # ═══════════════════════════════════════
 
+
 class TestNLQHistory:
     def test_returns_ok_true(self):
         resp = _client.get("/api/v1/nlq/history", headers=HEADERS)
@@ -272,6 +276,7 @@ class TestNLQHistory:
 # ═══════════════════════════════════════
 # POST /api/v1/nlq/execute-action
 # ═══════════════════════════════════════
+
 
 class TestNLQExecuteAction:
     def test_unknown_action_returns_error(self):
@@ -291,6 +296,7 @@ class TestNLQExecuteAction:
 # POST /api/v1/nlq/query (兼容旧端点)
 # ═══════════════════════════════════════
 
+
 class TestNLQQueryCompat:
     def test_query_compat_works(self):
         """旧版 /query 端点仍然可用"""
@@ -308,6 +314,7 @@ class TestNLQQueryCompat:
 # ═══════════════════════════════════════
 # 格式化辅助函数测试
 # ═══════════════════════════════════════
+
 
 class TestFormatHelpers:
     def test_fen_to_yuan(self):

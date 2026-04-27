@@ -3,6 +3,7 @@
 字段映射参考抖音开放平台文档（open.douyin.com/platform/doc/delivery）。
 签名算法：SHA256（将 token + timestamp + nonce + encrypt_msg 排序后拼接再 SHA256）。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -48,20 +49,21 @@ class DouyinAdapter(BaseDeliveryAdapter):
             for ri in raw_items:
                 unit_price_fen: int = int(ri.get("price", 0))
                 qty: int = int(ri.get("num", 1))
-                items.append(DeliveryOrderItem(
-                    platform_item_id=str(ri.get("sku_id", "")),
-                    name=ri.get("title", ""),
-                    qty=qty,
-                    unit_price_fen=unit_price_fen,
-                    spec=ri.get("spec_name"),
-                    total_fen=unit_price_fen * qty,
-                ))
+                items.append(
+                    DeliveryOrderItem(
+                        platform_item_id=str(ri.get("sku_id", "")),
+                        name=ri.get("title", ""),
+                        qty=qty,
+                        unit_price_fen=unit_price_fen,
+                        spec=ri.get("spec_name"),
+                        total_fen=unit_price_fen * qty,
+                    )
+                )
 
             delivery_info: dict = raw.get("delivery_info", {})
             expect_ts: Optional[int] = raw.get("expect_time")
             estimated_delivery_at: Optional[datetime] = (
-                datetime.fromtimestamp(expect_ts, tz=timezone.utc)
-                if expect_ts else None
+                datetime.fromtimestamp(expect_ts, tz=timezone.utc) if expect_ts else None
             )
 
             order = DeliveryOrder(

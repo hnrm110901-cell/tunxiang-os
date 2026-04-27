@@ -1,4 +1,5 @@
 """薪资台账双视角服务：管理端台账与员工端工资条。"""
+
 from __future__ import annotations
 
 from datetime import date, datetime

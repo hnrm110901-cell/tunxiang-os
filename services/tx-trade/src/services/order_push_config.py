@@ -18,6 +18,7 @@
 -- CREATE POLICY store_push_configs_tenant ON store_push_configs
 --   USING (tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID);
 """
+
 import uuid
 from enum import Enum
 from typing import Optional
@@ -30,15 +31,18 @@ logger = structlog.get_logger()
 
 # ─── 枚举 ───
 
+
 class OrderPushMode(str, Enum):
     """出单推送模式。"""
-    IMMEDIATE    = "immediate"     # 下单即推
+
+    IMMEDIATE = "immediate"  # 下单即推
     POST_PAYMENT = "post_payment"  # 收银核销后推
 
 
 _DEFAULT_MODE = OrderPushMode.IMMEDIATE
 
 # ─── 内部查询辅助 ───
+
 
 async def _fetch_mode_row(
     store_id: str,
@@ -59,15 +63,13 @@ async def _fetch_mode_row(
     except ValueError as exc:
         raise ValueError(f"无效的 store_id 或 tenant_id: {exc}") from exc
 
-    stmt = text(
-        "SELECT push_mode FROM store_push_configs "
-        "WHERE tenant_id = :tid AND store_id = :sid AND TRUE LIMIT 1"
-    )
+    stmt = text("SELECT push_mode FROM store_push_configs WHERE tenant_id = :tid AND store_id = :sid AND TRUE LIMIT 1")
     row = (await db.execute(stmt, {"tid": tid, "sid": sid})).one_or_none()
     return row[0] if row else None
 
 
 # ─── 服务类 ───
+
 
 class OrderPushConfigService:
     """门店出单推送模式配置服务。
@@ -97,17 +99,13 @@ class OrderPushConfigService:
         """
         raw = await _fetch_mode_row(store_id, tenant_id, db)
         if raw is None:
-            logger.bind(store_id=store_id).debug(
-                "order_push_config.get_store_mode.default"
-            )
+            logger.bind(store_id=store_id).debug("order_push_config.get_store_mode.default")
             return _DEFAULT_MODE
 
         try:
             return OrderPushMode(raw)
         except ValueError:
-            logger.bind(store_id=store_id, raw=raw).warning(
-                "order_push_config.get_store_mode.unknown_value_fallback"
-            )
+            logger.bind(store_id=store_id, raw=raw).warning("order_push_config.get_store_mode.unknown_value_fallback")
             return _DEFAULT_MODE
 
     @classmethod
@@ -147,9 +145,7 @@ class OrderPushConfigService:
         await db.execute(upsert_sql, {"tid": tid, "sid": sid, "mode": mode.value})
         await db.flush()
 
-        logger.bind(store_id=store_id, mode=mode.value).info(
-            "order_push_config.set_store_mode.ok"
-        )
+        logger.bind(store_id=store_id, mode=mode.value).info("order_push_config.set_store_mode.ok")
 
     @classmethod
     async def should_push_on_order(

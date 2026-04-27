@@ -60,11 +60,12 @@ from shared.ontology.src.database import get_db
 from ..services.unified_schedule_service import (
     auto_detect_gaps,
     batch_create_schedules,
-    create_schedule as svc_create_schedule,
     detect_conflicts,
-    get_fill_suggestions,
     get_week_schedule,
     swap_schedules,
+)
+from ..services.unified_schedule_service import (
+    create_schedule as svc_create_schedule,
 )
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -76,9 +77,7 @@ router = APIRouter(prefix="/api/v1/schedules", tags=["unified-schedules"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -212,20 +211,22 @@ async def api_create_schedule(
 
     result = await svc_create_schedule(db, tenant_id, req.model_dump())
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SCHEDULE_CREATED,
-        tenant_id=UUID(tenant_id),
-        stream_id=result["schedule_id"],
-        payload={
-            "employee_id": req.employee_id,
-            "store_id": req.store_id,
-            "schedule_date": req.schedule_date.isoformat(),
-            "shift_start": req.shift_start,
-            "shift_end": req.shift_end,
-        },
-        store_id=UUID(req.store_id) if req.store_id else None,
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SCHEDULE_CREATED,
+            tenant_id=UUID(tenant_id),
+            stream_id=result["schedule_id"],
+            payload={
+                "employee_id": req.employee_id,
+                "store_id": req.store_id,
+                "schedule_date": req.schedule_date.isoformat(),
+                "shift_start": req.shift_start,
+                "shift_end": req.shift_end,
+            },
+            store_id=UUID(req.store_id) if req.store_id else None,
+            source_service="tx-org",
+        )
+    )
 
     log.info("schedule_created", employee_id=req.employee_id, store_id=req.store_id, tenant_id=tenant_id)
     return _ok(result)
@@ -242,23 +243,30 @@ async def api_batch_create_schedules(
     await _set_tenant(db, tenant_id)
 
     result = await batch_create_schedules(
-        db, tenant_id, req.template_id, req.employee_ids, req.start_date, req.end_date,
+        db,
+        tenant_id,
+        req.template_id,
+        req.employee_ids,
+        req.start_date,
+        req.end_date,
     )
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SCHEDULE_BATCH_CREATED,
-        tenant_id=UUID(tenant_id),
-        stream_id=req.store_id,
-        payload={
-            "store_id": req.store_id,
-            "template_id": req.template_id,
-            "employee_count": len(req.employee_ids),
-            "inserted": result["inserted"],
-            "skipped": result["skipped_conflicts"],
-        },
-        store_id=UUID(req.store_id) if req.store_id else None,
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SCHEDULE_BATCH_CREATED,
+            tenant_id=UUID(tenant_id),
+            stream_id=req.store_id,
+            payload={
+                "store_id": req.store_id,
+                "template_id": req.template_id,
+                "employee_count": len(req.employee_ids),
+                "inserted": result["inserted"],
+                "skipped": result["skipped_conflicts"],
+            },
+            store_id=UUID(req.store_id) if req.store_id else None,
+            source_service="tx-org",
+        )
+    )
 
     log.info(
         "schedules_batch_created",
@@ -326,26 +334,32 @@ async def api_update_schedule(
 
     row_data = dict(row)
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SCHEDULE_UPDATED,
-        tenant_id=UUID(tenant_id),
-        stream_id=schedule_id,
-        payload={"schedule_id": schedule_id, "changes": changes},
-        store_id=UUID(str(row_data["store_id"])),
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SCHEDULE_UPDATED,
+            tenant_id=UUID(tenant_id),
+            stream_id=schedule_id,
+            payload={"schedule_id": schedule_id, "changes": changes},
+            store_id=UUID(str(row_data["store_id"])),
+            source_service="tx-org",
+        )
+    )
 
     log.info("schedule_updated", schedule_id=schedule_id, changes=changes, tenant_id=tenant_id)
-    return _ok({
-        "schedule_id": str(row_data["id"]),
-        "employee_id": str(row_data["employee_id"]),
-        "schedule_date": row_data["schedule_date"].isoformat() if hasattr(row_data["schedule_date"], "isoformat") else str(row_data["schedule_date"]),
-        "shift_start": str(row_data["shift_start"]),
-        "shift_end": str(row_data["shift_end"]),
-        "status": row_data["status"],
-        "role": row_data.get("role"),
-        "notes": row_data.get("notes"),
-    })
+    return _ok(
+        {
+            "schedule_id": str(row_data["id"]),
+            "employee_id": str(row_data["employee_id"]),
+            "schedule_date": row_data["schedule_date"].isoformat()
+            if hasattr(row_data["schedule_date"], "isoformat")
+            else str(row_data["schedule_date"]),
+            "shift_start": str(row_data["shift_start"]),
+            "shift_end": str(row_data["shift_end"]),
+            "status": row_data["status"],
+            "role": row_data.get("role"),
+            "notes": row_data.get("notes"),
+        }
+    )
 
 
 @router.delete("/{schedule_id}")
@@ -374,22 +388,28 @@ async def api_delete_schedule(
 
     row_data = dict(row)
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SCHEDULE_CANCELLED,
-        tenant_id=UUID(tenant_id),
-        stream_id=schedule_id,
-        payload={"schedule_id": schedule_id, "employee_id": str(row_data["employee_id"])},
-        store_id=UUID(str(row_data["store_id"])),
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SCHEDULE_CANCELLED,
+            tenant_id=UUID(tenant_id),
+            stream_id=schedule_id,
+            payload={"schedule_id": schedule_id, "employee_id": str(row_data["employee_id"])},
+            store_id=UUID(str(row_data["store_id"])),
+            source_service="tx-org",
+        )
+    )
 
     log.info("schedule_cancelled", schedule_id=schedule_id, tenant_id=tenant_id)
-    return _ok({
-        "schedule_id": str(row_data["id"]),
-        "employee_id": str(row_data["employee_id"]),
-        "schedule_date": row_data["schedule_date"].isoformat() if hasattr(row_data["schedule_date"], "isoformat") else str(row_data["schedule_date"]),
-        "status": "cancelled",
-    })
+    return _ok(
+        {
+            "schedule_id": str(row_data["id"]),
+            "employee_id": str(row_data["employee_id"]),
+            "schedule_date": row_data["schedule_date"].isoformat()
+            if hasattr(row_data["schedule_date"], "isoformat")
+            else str(row_data["schedule_date"]),
+            "status": "cancelled",
+        }
+    )
 
 
 @router.get("/employee/{employee_id}/week")
@@ -424,7 +444,9 @@ async def api_get_employee_week(
     shifts = [
         {
             "schedule_id": str(row["id"]),
-            "date": row["schedule_date"].isoformat() if hasattr(row["schedule_date"], "isoformat") else str(row["schedule_date"]),
+            "date": row["schedule_date"].isoformat()
+            if hasattr(row["schedule_date"], "isoformat")
+            else str(row["schedule_date"]),
             "shift_start": str(row["shift_start"]),
             "shift_end": str(row["shift_end"]),
             "status": row["status"],
@@ -437,13 +459,15 @@ async def api_get_employee_week(
     ]
 
     log.info("employee_week_queried", employee_id=employee_id, start_date=str(start_date), tenant_id=tenant_id)
-    return _ok({
-        "employee_id": employee_id,
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "shifts": shifts,
-        "total_shifts": len(shifts),
-    })
+    return _ok(
+        {
+            "employee_id": employee_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "shifts": shifts,
+            "total_shifts": len(shifts),
+        }
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -466,14 +490,16 @@ async def api_get_conflicts(
     conflicts = await detect_conflicts(db, tenant_id, store_id, start_date, end_date)
 
     log.info("conflicts_checked", store_id=store_id, conflict_count=len(conflicts), tenant_id=tenant_id)
-    return _ok({
-        "store_id": store_id,
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "conflicts": conflicts,
-        "conflict_count": len(conflicts),
-        "has_conflicts": len(conflicts) > 0,
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "conflicts": conflicts,
+            "conflict_count": len(conflicts),
+            "has_conflicts": len(conflicts) > 0,
+        }
+    )
 
 
 @router.post("/validate")
@@ -499,20 +525,22 @@ async def api_validate_schedules(
     # 检测待创建排班之间的内部冲突
     internal_conflicts: list[dict[str, Any]] = []
     for i, a in enumerate(req.schedules):
-        for b in req.schedules[i + 1:]:
+        for b in req.schedules[i + 1 :]:
             if (
                 a.employee_id == b.employee_id
                 and a.schedule_date == b.schedule_date
                 and a.shift_start < b.shift_end
                 and a.shift_end > b.shift_start
             ):
-                internal_conflicts.append({
-                    "employee_id": a.employee_id,
-                    "date": a.schedule_date.isoformat(),
-                    "type": "internal",
-                    "shift_a": {"start": a.shift_start, "end": a.shift_end},
-                    "shift_b": {"start": b.shift_start, "end": b.shift_end},
-                })
+                internal_conflicts.append(
+                    {
+                        "employee_id": a.employee_id,
+                        "date": a.schedule_date.isoformat(),
+                        "type": "internal",
+                        "shift_a": {"start": a.shift_start, "end": a.shift_end},
+                        "shift_b": {"start": b.shift_start, "end": b.shift_end},
+                    }
+                )
 
     # 检测待创建排班与已有排班的冲突
     cross_conflicts: list[dict[str, Any]] = []
@@ -527,28 +555,35 @@ async def api_validate_schedules(
                 "AND shift_start < :new_end::time AND shift_end > :new_start::time"
             ),
             {
-                "tid": tenant_id, "eid": s.employee_id,
-                "d": s.schedule_date, "new_start": s.shift_start, "new_end": s.shift_end,
+                "tid": tenant_id,
+                "eid": s.employee_id,
+                "d": s.schedule_date,
+                "new_start": s.shift_start,
+                "new_end": s.shift_end,
             },
         )
         for row in check_result.mappings().fetchall():
-            cross_conflicts.append({
-                "employee_id": s.employee_id,
-                "date": s.schedule_date.isoformat(),
-                "type": "cross_existing",
-                "new_shift": {"start": s.shift_start, "end": s.shift_end},
-                "existing_schedule_id": str(row["id"]),
-                "existing_shift": {"start": str(row["shift_start"]), "end": str(row["shift_end"])},
-            })
+            cross_conflicts.append(
+                {
+                    "employee_id": s.employee_id,
+                    "date": s.schedule_date.isoformat(),
+                    "type": "cross_existing",
+                    "new_shift": {"start": s.shift_start, "end": s.shift_end},
+                    "existing_schedule_id": str(row["id"]),
+                    "existing_shift": {"start": str(row["shift_start"]), "end": str(row["shift_end"])},
+                }
+            )
 
     all_conflicts = existing_conflicts + internal_conflicts + cross_conflicts
 
     log.info("schedules_validated", store_id=req.store_id, conflict_count=len(all_conflicts), tenant_id=tenant_id)
-    return _ok({
-        "conflicts": all_conflicts,
-        "conflict_count": len(all_conflicts),
-        "is_valid": len(all_conflicts) == 0,
-    })
+    return _ok(
+        {
+            "conflicts": all_conflicts,
+            "conflict_count": len(all_conflicts),
+            "is_valid": len(all_conflicts) == 0,
+        }
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -613,15 +648,17 @@ async def api_swap_request(
         to_employee=req.to_employee_id,
         tenant_id=tenant_id,
     )
-    return _ok({
-        "request_id": str(row_data["id"]),
-        "from_schedule_id": req.from_schedule_id,
-        "from_employee_id": str(orig_data["employee_id"]),
-        "to_employee_id": req.to_employee_id,
-        "status": "pending",
-        "reason": req.reason,
-        "created_at": str(row_data["created_at"]),
-    })
+    return _ok(
+        {
+            "request_id": str(row_data["id"]),
+            "from_schedule_id": req.from_schedule_id,
+            "from_employee_id": str(orig_data["employee_id"]),
+            "to_employee_id": req.to_employee_id,
+            "status": "pending",
+            "reason": req.reason,
+            "created_at": str(row_data["created_at"]),
+        }
+    )
 
 
 @router.get("/swap-requests")
@@ -665,7 +702,9 @@ async def api_get_swap_requests(
             "from_employee_name": row.get("from_employee_name"),
             "to_employee_id": str(row["to_employee_id"]),
             "to_employee_name": row.get("to_employee_name"),
-            "schedule_date": row["schedule_date"].isoformat() if row.get("schedule_date") and hasattr(row["schedule_date"], "isoformat") else str(row.get("schedule_date", "")),
+            "schedule_date": row["schedule_date"].isoformat()
+            if row.get("schedule_date") and hasattr(row["schedule_date"], "isoformat")
+            else str(row.get("schedule_date", "")),
             "shift_start": str(row.get("shift_start", "")),
             "shift_end": str(row.get("shift_end", "")),
             "reason": row.get("reason"),
@@ -708,31 +747,32 @@ async def api_approve_swap(
 
     # 执行调班：更新原排班的 employee_id
     swap_result = await swap_schedules(
-        db, tenant_id, str(sr_data["from_schedule_id"]), str(sr_data["to_employee_id"]),
+        db,
+        tenant_id,
+        str(sr_data["from_schedule_id"]),
+        str(sr_data["to_employee_id"]),
     )
 
     # 更新申请状态
     await db.execute(
-        text(
-            "UPDATE schedule_swap_requests "
-            "SET status = 'approved', reviewed_at = NOW() "
-            "WHERE id = :rid::uuid"
-        ),
+        text("UPDATE schedule_swap_requests SET status = 'approved', reviewed_at = NOW() WHERE id = :rid::uuid"),
         {"rid": request_id},
     )
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SCHEDULE_SWAPPED,
-        tenant_id=UUID(tenant_id),
-        stream_id=str(sr_data["from_schedule_id"]),
-        payload={
-            "request_id": request_id,
-            "from_employee_id": str(sr_data["from_employee_id"]),
-            "to_employee_id": str(sr_data["to_employee_id"]),
-        },
-        store_id=UUID(str(sr_data["store_id"])),
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SCHEDULE_SWAPPED,
+            tenant_id=UUID(tenant_id),
+            stream_id=str(sr_data["from_schedule_id"]),
+            payload={
+                "request_id": request_id,
+                "from_employee_id": str(sr_data["from_employee_id"]),
+                "to_employee_id": str(sr_data["to_employee_id"]),
+            },
+            store_id=UUID(str(sr_data["store_id"])),
+            source_service="tx-org",
+        )
+    )
 
     log.info("swap_approved", request_id=request_id, tenant_id=tenant_id)
     return _ok({"request_id": request_id, "status": "approved", **swap_result})
@@ -843,9 +883,13 @@ async def api_create_gap(
             "RETURNING id, created_at"
         ),
         {
-            "tid": tenant_id, "store_id": req.store_id,
-            "gap_date": req.gap_date, "start": req.shift_start, "end": req.shift_end,
-            "role": req.role, "reason": req.reason,
+            "tid": tenant_id,
+            "store_id": req.store_id,
+            "gap_date": req.gap_date,
+            "start": req.shift_start,
+            "end": req.shift_end,
+            "role": req.role,
+            "reason": req.reason,
         },
     )
     row = result.mappings().first()
@@ -854,29 +898,36 @@ async def api_create_gap(
 
     row_data = dict(row)
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SHIFT_GAP_OPENED,
-        tenant_id=UUID(tenant_id),
-        stream_id=str(row_data["id"]),
-        payload={
-            "store_id": req.store_id, "gap_date": req.gap_date.isoformat(),
-            "role": req.role, "shift_start": req.shift_start, "shift_end": req.shift_end,
-        },
-        store_id=UUID(req.store_id),
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SHIFT_GAP_OPENED,
+            tenant_id=UUID(tenant_id),
+            stream_id=str(row_data["id"]),
+            payload={
+                "store_id": req.store_id,
+                "gap_date": req.gap_date.isoformat(),
+                "role": req.role,
+                "shift_start": req.shift_start,
+                "shift_end": req.shift_end,
+            },
+            store_id=UUID(req.store_id),
+            source_service="tx-org",
+        )
+    )
 
     log.info("gap_created", gap_id=str(row_data["id"]), store_id=req.store_id, tenant_id=tenant_id)
-    return _ok({
-        "gap_id": str(row_data["id"]),
-        "store_id": req.store_id,
-        "gap_date": req.gap_date.isoformat(),
-        "shift_start": req.shift_start,
-        "shift_end": req.shift_end,
-        "role": req.role,
-        "status": "open",
-        "created_at": str(row_data["created_at"]),
-    })
+    return _ok(
+        {
+            "gap_id": str(row_data["id"]),
+            "store_id": req.store_id,
+            "gap_date": req.gap_date.isoformat(),
+            "shift_start": req.shift_start,
+            "shift_end": req.shift_end,
+            "role": req.role,
+            "status": "open",
+            "created_at": str(row_data["created_at"]),
+        }
+    )
 
 
 @router.post("/gaps/{gap_id}/claim")
@@ -910,23 +961,29 @@ async def api_claim_gap(
 
     row_data = dict(row)
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SHIFT_GAP_CLAIMED,
-        tenant_id=UUID(tenant_id),
-        stream_id=gap_id,
-        payload={"gap_id": gap_id, "claimed_by": employee_id},
-        store_id=UUID(str(row_data["store_id"])),
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SHIFT_GAP_CLAIMED,
+            tenant_id=UUID(tenant_id),
+            stream_id=gap_id,
+            payload={"gap_id": gap_id, "claimed_by": employee_id},
+            store_id=UUID(str(row_data["store_id"])),
+            source_service="tx-org",
+        )
+    )
 
     log.info("gap_claimed", gap_id=gap_id, employee_id=employee_id, tenant_id=tenant_id)
-    return _ok({
-        "gap_id": gap_id,
-        "status": "claimed",
-        "claimed_by": employee_id,
-        "gap_date": row_data["gap_date"].isoformat() if hasattr(row_data["gap_date"], "isoformat") else str(row_data["gap_date"]),
-        "role": row_data["role"],
-    })
+    return _ok(
+        {
+            "gap_id": gap_id,
+            "status": "claimed",
+            "claimed_by": employee_id,
+            "gap_date": row_data["gap_date"].isoformat()
+            if hasattr(row_data["gap_date"], "isoformat")
+            else str(row_data["gap_date"]),
+            "role": row_data["role"],
+        }
+    )
 
 
 @router.post("/gaps/{gap_id}/fill")
@@ -967,9 +1024,12 @@ async def api_fill_gap(
             "RETURNING id"
         ),
         {
-            "tid": tenant_id, "store_id": str(gap_data["store_id"]),
-            "eid": req.employee_id, "d": gap_data["gap_date"],
-            "start": str(gap_data["shift_start"]), "end": str(gap_data["shift_end"]),
+            "tid": tenant_id,
+            "store_id": str(gap_data["store_id"]),
+            "eid": req.employee_id,
+            "d": gap_data["gap_date"],
+            "start": str(gap_data["shift_start"]),
+            "end": str(gap_data["shift_end"]),
             "role": gap_data["role"],
         },
     )
@@ -978,29 +1038,31 @@ async def api_fill_gap(
     # 更新缺口状态
     await db.execute(
         text(
-            "UPDATE shift_gaps "
-            "SET status = 'filled', filled_by = :eid::uuid, updated_at = NOW() "
-            "WHERE id = :gid::uuid"
+            "UPDATE shift_gaps SET status = 'filled', filled_by = :eid::uuid, updated_at = NOW() WHERE id = :gid::uuid"
         ),
         {"gid": gap_id, "eid": req.employee_id},
     )
 
-    asyncio.create_task(emit_event(
-        event_type=OrgEventType.SHIFT_GAP_FILLED,
-        tenant_id=UUID(tenant_id),
-        stream_id=gap_id,
-        payload={"gap_id": gap_id, "filled_by": req.employee_id},
-        store_id=UUID(str(gap_data["store_id"])),
-        source_service="tx-org",
-    ))
+    asyncio.create_task(
+        emit_event(
+            event_type=OrgEventType.SHIFT_GAP_FILLED,
+            tenant_id=UUID(tenant_id),
+            stream_id=gap_id,
+            payload={"gap_id": gap_id, "filled_by": req.employee_id},
+            store_id=UUID(str(gap_data["store_id"])),
+            source_service="tx-org",
+        )
+    )
 
     log.info("gap_filled", gap_id=gap_id, employee_id=req.employee_id, tenant_id=tenant_id)
-    return _ok({
-        "gap_id": gap_id,
-        "status": "filled",
-        "filled_by": req.employee_id,
-        "new_schedule_id": str(new_schedule["id"]) if new_schedule else None,
-    })
+    return _ok(
+        {
+            "gap_id": gap_id,
+            "status": "filled",
+            "filled_by": req.employee_id,
+            "new_schedule_id": str(new_schedule["id"]) if new_schedule else None,
+        }
+    )
 
 
 @router.post("/gaps/auto-detect")
@@ -1017,12 +1079,14 @@ async def api_auto_detect_gaps(
     gaps = await auto_detect_gaps(db, tenant_id, store_id, gap_date)
 
     log.info("gaps_auto_detected", store_id=store_id, date=str(gap_date), gap_count=len(gaps), tenant_id=tenant_id)
-    return _ok({
-        "store_id": store_id,
-        "date": gap_date.isoformat(),
-        "detected_gaps": gaps,
-        "gap_count": len(gaps),
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "date": gap_date.isoformat(),
+            "detected_gaps": gaps,
+            "gap_count": len(gaps),
+        }
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1095,9 +1159,14 @@ async def api_create_template(
             "RETURNING id, created_at"
         ),
         {
-            "tid": tenant_id, "store_id": req.store_id,
-            "name": req.name, "start": req.shift_start, "end": req.shift_end,
-            "break_min": req.break_minutes, "color": req.color, "desc": req.description,
+            "tid": tenant_id,
+            "store_id": req.store_id,
+            "name": req.name,
+            "start": req.shift_start,
+            "end": req.shift_end,
+            "break_min": req.break_minutes,
+            "color": req.color,
+            "desc": req.description,
         },
     )
     row = result.mappings().first()
@@ -1107,17 +1176,19 @@ async def api_create_template(
     row_data = dict(row)
 
     log.info("template_created", template_id=str(row_data["id"]), name=req.name, tenant_id=tenant_id)
-    return _ok({
-        "template_id": str(row_data["id"]),
-        "store_id": req.store_id,
-        "name": req.name,
-        "shift_start": req.shift_start,
-        "shift_end": req.shift_end,
-        "break_minutes": req.break_minutes,
-        "color": req.color,
-        "description": req.description,
-        "created_at": str(row_data["created_at"]),
-    })
+    return _ok(
+        {
+            "template_id": str(row_data["id"]),
+            "store_id": req.store_id,
+            "name": req.name,
+            "shift_start": req.shift_start,
+            "shift_end": req.shift_end,
+            "break_minutes": req.break_minutes,
+            "color": req.color,
+            "description": req.description,
+            "created_at": str(row_data["created_at"]),
+        }
+    )
 
 
 @router.put("/templates/{template_id}")
@@ -1170,16 +1241,18 @@ async def api_update_template(
     row_data = dict(row)
 
     log.info("template_updated", template_id=template_id, changes=changes, tenant_id=tenant_id)
-    return _ok({
-        "template_id": str(row_data["id"]),
-        "store_id": str(row_data["store_id"]),
-        "name": row_data["name"],
-        "shift_start": str(row_data["shift_start"]),
-        "shift_end": str(row_data["shift_end"]),
-        "break_minutes": row_data.get("break_minutes", 0),
-        "color": row_data.get("color"),
-        "description": row_data.get("description"),
-    })
+    return _ok(
+        {
+            "template_id": str(row_data["id"]),
+            "store_id": str(row_data["store_id"]),
+            "name": row_data["name"],
+            "shift_start": str(row_data["shift_start"]),
+            "shift_end": str(row_data["shift_end"]),
+            "break_minutes": row_data.get("break_minutes", 0),
+            "color": row_data.get("color"),
+            "description": row_data.get("description"),
+        }
+    )
 
 
 @router.delete("/templates/{template_id}")
@@ -1296,25 +1369,27 @@ async def api_get_statistics(
     swap_rate = round(total_swaps / total_shifts * 100, 1) if total_shifts > 0 else 0
 
     log.info("statistics_queried", store_id=store_id, month=month, tenant_id=tenant_id)
-    return _ok({
-        "store_id": store_id,
-        "month": month,
-        "schedule": {
-            "total_shifts": total_shifts,
-            "employee_count": employee_count,
-            "total_hours": round(total_hours, 1),
-            "avg_hours_per_employee": avg_hours,
-            "cancelled_count": cancelled_count,
-        },
-        "gaps": {
-            "total_gaps": total_gaps,
-            "filled_gaps": filled_gaps,
-            "open_gaps": open_gaps,
-            "gap_rate_pct": gap_rate,
-        },
-        "swaps": {
-            "total_swaps": total_swaps,
-            "approved_swaps": approved_swaps,
-            "swap_rate_pct": swap_rate,
-        },
-    })
+    return _ok(
+        {
+            "store_id": store_id,
+            "month": month,
+            "schedule": {
+                "total_shifts": total_shifts,
+                "employee_count": employee_count,
+                "total_hours": round(total_hours, 1),
+                "avg_hours_per_employee": avg_hours,
+                "cancelled_count": cancelled_count,
+            },
+            "gaps": {
+                "total_gaps": total_gaps,
+                "filled_gaps": filled_gaps,
+                "open_gaps": open_gaps,
+                "gap_rate_pct": gap_rate,
+            },
+            "swaps": {
+                "total_swaps": total_swaps,
+                "approved_swaps": approved_swaps,
+                "swap_rate_pct": swap_rate,
+            },
+        }
+    )

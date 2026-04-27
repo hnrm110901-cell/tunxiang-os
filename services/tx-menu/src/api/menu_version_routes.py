@@ -7,6 +7,7 @@
 # from .api.menu_version_routes import router as menu_version_router
 # app.include_router(menu_version_router, prefix="/api/v1/menu")
 """
+
 from typing import Optional
 
 import structlog
@@ -45,9 +46,7 @@ class RollbackReq(BaseModel):
 class StoreOverrideReq(BaseModel):
     add_dishes: list[dict] = Field(default_factory=list, description="本店独有菜品")
     remove_dishes: list[str] = Field(default_factory=list, description="停售菜品 dish_id 列表")
-    price_overrides: dict[str, int] = Field(
-        default_factory=dict, description="{dish_id: price_fen} 本店价格覆盖"
-    )
+    price_overrides: dict[str, int] = Field(default_factory=dict, description="{dish_id: price_fen} 本店价格覆盖")
 
 
 class ConfirmAppliedReq(BaseModel):

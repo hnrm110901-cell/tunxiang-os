@@ -6,6 +6,7 @@
 所有金额单位：分（fen）。
 RLS 由 get_db_with_tenant 在连接级设置，这里额外显式传入 tenant_id 作双重过滤。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -30,9 +31,7 @@ def _day_window(biz_date: date) -> tuple[datetime, datetime]:
     return start, end
 
 
-def _range_window(
-    start_date: date, end_date: date
-) -> tuple[datetime, datetime]:
+def _range_window(start_date: date, end_date: date) -> tuple[datetime, datetime]:
     """返回日期区间的 UTC 时间窗口"""
     start = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     end = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
@@ -93,9 +92,7 @@ class RevenueAggregationRepository:
         start_dt, end_dt = _day_window(biz_date)
 
         result = await db.execute(
-            select(
-                func.coalesce(func.sum(OrderItem.subtotal_fen), 0)
-            )
+            select(func.coalesce(func.sum(OrderItem.subtotal_fen), 0))
             .join(Order, OrderItem.order_id == Order.id)
             .where(
                 and_(

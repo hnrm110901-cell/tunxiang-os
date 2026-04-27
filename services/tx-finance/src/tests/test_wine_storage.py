@@ -8,17 +8,14 @@
   5. test_expiring_report              — GET /wine-storage/report/expiring 到期筛选
   6. test_summary_report               — GET /wine-storage/report/summary 存酒汇总
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
-
-import pytest
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  sys.modules 存根注入
@@ -40,8 +37,10 @@ _ensure_stub("shared.ontology")
 _ensure_stub("shared.ontology.src")
 _db_mod = _ensure_stub("shared.ontology.src.database")
 if not hasattr(_db_mod, "get_db_with_tenant"):
+
     async def _placeholder_get_db_with_tenant(tenant_id: str):
         yield None
+
     _db_mod.get_db_with_tenant = _placeholder_get_db_with_tenant
 
 _ensure_stub("shared.events")
@@ -49,11 +48,13 @@ _ensure_stub("shared.events.src")
 _ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
 _ev_types = _ensure_stub("shared.events.src.event_types")
 if not hasattr(_ev_types, "WineStorageEventType"):
+
     class _FakeWineStorageEventType:
         STORED = "wine.stored"
         RETRIEVED = "wine.retrieved"
         EXTENDED = "wine.extended"
         EXPIRED = "wine.expired"
+
     _ev_types.WineStorageEventType = _FakeWineStorageEventType
 
 if "structlog" not in sys.modules:
@@ -68,11 +69,12 @@ if "asyncpg" not in sys.modules:
 #  导入路由
 # ══════════════════════════════════════════════════════════════════════════════
 
-from ..api.wine_storage_routes import router as wine_router  # noqa: E402
-from shared.ontology.src.database import get_db_with_tenant  # noqa: E402
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from shared.ontology.src.database import get_db_with_tenant  # noqa: E402
+
+from ..api.wine_storage_routes import router as wine_router  # noqa: E402
 
 app = FastAPI()
 app.include_router(wine_router)
@@ -91,13 +93,17 @@ def _make_row_mapping(data: dict):
     class FakeMapping:
         def __init__(self, d):
             self._data = d
+
         def __getitem__(self, key):
             return self._data[key]
+
         def get(self, key, default=None):
             return self._data.get(key, default)
+
     class FakeRow:
         def __init__(self, d):
             self._mapping = FakeMapping(d)
+
     return FakeRow(data)
 
 
@@ -146,8 +152,13 @@ def _make_db_returning(rows: list[dict] | None = None, insert_id: str | None = N
     result_mock.rowcount = 1
     if insert_id:
         insert_result = MagicMock()
-        insert_result.fetchone.return_value = _make_row_mapping({"id": uuid.UUID(insert_id), "created_at": datetime.now(timezone.utc)})
-        insert_result.mappings.return_value.first.return_value = {"id": uuid.UUID(insert_id), "created_at": datetime.now(timezone.utc)}
+        insert_result.fetchone.return_value = _make_row_mapping(
+            {"id": uuid.UUID(insert_id), "created_at": datetime.now(timezone.utc)}
+        )
+        insert_result.mappings.return_value.first.return_value = {
+            "id": uuid.UUID(insert_id),
+            "created_at": datetime.now(timezone.utc),
+        }
         db.execute = AsyncMock(return_value=insert_result)
     else:
         db.execute = AsyncMock(return_value=result_mock)
@@ -160,6 +171,7 @@ def _make_db_returning(rows: list[dict] | None = None, insert_id: str | None = N
 def _override_db(db_mock: AsyncMock):
     async def _dep(x_tenant_id: str = ""):
         yield db_mock
+
     return _dep
 
 

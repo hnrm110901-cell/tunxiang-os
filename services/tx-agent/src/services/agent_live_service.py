@@ -10,6 +10,7 @@ Sprint 8+: 更多 Agent 逐步上线
 
 升级条件：Level 1 累计 100+ 决策且采纳率 > 80% 方可升到 Level 2。
 """
+
 from __future__ import annotations
 
 import time
@@ -108,14 +109,16 @@ class AgentLiveService:
         for agent_id, info in self._registry.items():
             agent_decisions = [d for d in self._decisions if d["agent_id"] == agent_id]
             last_exec = agent_decisions[-1]["created_at"] if agent_decisions else None
-            result.append({
-                "agent_id": agent_id,
-                "enabled": info["enabled"],
-                "level": info["level"],
-                "sprint": info["sprint"],
-                "decision_count": len(agent_decisions),
-                "last_execution": last_exec,
-            })
+            result.append(
+                {
+                    "agent_id": agent_id,
+                    "enabled": info["enabled"],
+                    "level": info["level"],
+                    "sprint": info["sprint"],
+                    "decision_count": len(agent_decisions),
+                    "last_execution": last_exec,
+                }
+            )
         return result
 
     # ─── 核心执行 ─────────────────────────────────────────────
@@ -321,24 +324,14 @@ class AgentLiveService:
         """
         agent_decisions = [d for d in self._decisions if d["agent_id"] == agent_id]
         total = len(agent_decisions)
-        adopted = sum(
-            1 for d in agent_decisions
-            if d.get("status") in ("executed", "adopted", "approved")
-        )
+        adopted = sum(1 for d in agent_decisions if d.get("status") in ("executed", "adopted", "approved"))
         adoption_rate = round(adopted / total * 100, 1) if total > 0 else 0.0
 
         # 效果评分：取有 confidence 的决策平均值
-        scores = [
-            d["result"]["confidence"]
-            for d in agent_decisions
-            if d.get("result", {}).get("confidence", 0) > 0
-        ]
+        scores = [d["result"]["confidence"] for d in agent_decisions if d.get("result", {}).get("confidence", 0) > 0]
         effectiveness_score = round(sum(scores) / len(scores) * 100, 1) if scores else 0.0
 
-        ready = (
-            total >= MIN_L1_DECISIONS_FOR_UPGRADE
-            and adoption_rate >= MIN_ADOPTION_RATE_FOR_UPGRADE
-        )
+        ready = total >= MIN_L1_DECISIONS_FOR_UPGRADE and adoption_rate >= MIN_ADOPTION_RATE_FOR_UPGRADE
 
         return {
             "agent_id": agent_id,
@@ -415,10 +408,7 @@ class AgentLiveService:
             推送记录列表
         """
         cutoff = time.time() - days * 86400
-        return [
-            p for p in self._push_history
-            if p["store_id"] == store_id and p["sent_at"] >= cutoff
-        ]
+        return [p for p in self._push_history if p["store_id"] == store_id and p["sent_at"] >= cutoff]
 
     # ─── 内部辅助 ─────────────────────────────────────────────
 

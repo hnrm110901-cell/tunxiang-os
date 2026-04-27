@@ -8,6 +8,7 @@ GET /api/v1/wecom/jssdk-config?url={当前页面URL}
   str = "jsapi_ticket={ticket}&noncestr={nonce}&timestamp={ts}&url={url}"
   signature = sha1(str)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,9 +25,9 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/wecom", tags=["wecom-jssdk"])
 
 # ─── 企微配置（环境变量） ────────────────────────────────────────────
-_CORP_ID: str    = os.getenv("WECOM_CORP_ID", "")
-_AGENT_ID: str   = os.getenv("WECOM_AGENT_ID", "")
-_SECRET: str     = os.getenv("WECOM_SECRET", "")
+_CORP_ID: str = os.getenv("WECOM_CORP_ID", "")
+_AGENT_ID: str = os.getenv("WECOM_AGENT_ID", "")
+_SECRET: str = os.getenv("WECOM_SECRET", "")
 
 # ─── jsapi_ticket 内存缓存（有效期 7200 秒，提前 300 秒刷新） ────────
 _ticket_cache: dict[str, object] = {
@@ -40,12 +41,7 @@ WECOM_API_BASE = "https://qyapi.weixin.qq.com/cgi-bin"
 
 async def _get_access_token() -> str:
     """获取企微 access_token（复用 external_sdk 逻辑，此处独立实现避免循环依赖）"""
-    url = (
-        f"{WECOM_API_BASE}/gettoken"
-        f"?grant_type=client_credential"
-        f"&corpid={_CORP_ID}"
-        f"&corpsecret={_SECRET}"
-    )
+    url = f"{WECOM_API_BASE}/gettoken?grant_type=client_credential&corpid={_CORP_ID}&corpsecret={_SECRET}"
     async with httpx.AsyncClient(timeout=10) as client:
         try:
             resp = await client.get(url)
@@ -121,11 +117,7 @@ async def _get_agent_ticket(token: str) -> str:
 async def _get_tickets() -> tuple[str, str]:
     """获取 jsapi_ticket + agent_ticket，带内存缓存（7200s，提前 300s 刷新）"""
     now = time.time()
-    if (
-        _ticket_cache["ticket"]
-        and _ticket_cache["agent_ticket"]
-        and now < float(_ticket_cache["expires_at"]) - 300
-    ):
+    if _ticket_cache["ticket"] and _ticket_cache["agent_ticket"] and now < float(_ticket_cache["expires_at"]) - 300:
         return str(_ticket_cache["ticket"]), str(_ticket_cache["agent_ticket"])
 
     token = await _get_access_token()
@@ -146,12 +138,7 @@ def _sign(ticket: str, nonce: str, timestamp: int, url: str) -> str:
       sha1("jsapi_ticket=...&noncestr=...&timestamp=...&url=...")
     参数按字典序拼接（j < n < t < u）。
     """
-    raw = (
-        f"jsapi_ticket={ticket}"
-        f"&noncestr={nonce}"
-        f"&timestamp={timestamp}"
-        f"&url={url}"
-    )
+    raw = f"jsapi_ticket={ticket}&noncestr={nonce}&timestamp={timestamp}&url={url}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
@@ -176,7 +163,7 @@ async def get_jssdk_config(
     jsapi_ticket, agent_ticket = await _get_tickets()
 
     # 每次请求生成新的 nonce + timestamp（安全要求）
-    nonce = secrets.token_hex(8)          # 16 字符随机串
+    nonce = secrets.token_hex(8)  # 16 字符随机串
     timestamp = int(time.time())
 
     signature = _sign(jsapi_ticket, nonce, timestamp, url)
@@ -187,11 +174,11 @@ async def get_jssdk_config(
     return {
         "ok": True,
         "data": {
-            "appId":          _CORP_ID,
-            "timestamp":      timestamp,
-            "nonceStr":       nonce,
-            "signature":      signature,
+            "appId": _CORP_ID,
+            "timestamp": timestamp,
+            "nonceStr": nonce,
+            "signature": signature,
             "agentSignature": agent_signature,
-            "agentId":        _AGENT_ID,
+            "agentId": _AGENT_ID,
         },
     }

@@ -10,6 +10,7 @@
 注：平台 API 对接为 mock 实现，生产环境需配置各平台 API Key。
 核销记录必须关联 order_id，确保财务对账闭环。
 """
+
 import re
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -389,10 +390,7 @@ async def redeem_coupon(
         raise ValueError(f"券状态异常，无法核销: {coupon.get('status')}")
 
     if coupon.get("platform") != platform:
-        raise ValueError(
-            f"平台不匹配: 券属于 {coupon.get('platform')}，"
-            f"请求核销平台为 {platform}"
-        )
+        raise ValueError(f"平台不匹配: 券属于 {coupon.get('platform')}，请求核销平台为 {platform}")
 
     now = datetime.now(timezone.utc)
     coupon["status"] = "redeemed"
@@ -495,7 +493,10 @@ async def reconcile_platform(
     """
     target_date = date.fromisoformat(date_str)
     records = _PlatformCouponStore.list_by_store(
-        store_id, target_date, target_date, platform=platform,
+        store_id,
+        target_date,
+        target_date,
+        platform=platform,
     )
 
     system_total_fen = sum(r.get("deal_amount_fen", 0) for r in records)

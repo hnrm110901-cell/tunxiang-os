@@ -3,6 +3,7 @@
 所有操作强制 tenant_id 租户隔离。
 使用 in-memory 存储（可替换为 DB 实现）。
 """
+
 import json
 import os
 import uuid
@@ -37,6 +38,7 @@ async def _get_redis() -> Optional[Any]:
         return _redis_client
     try:
         import redis.asyncio as aioredis  # type: ignore
+
         client = aioredis.from_url(
             os.getenv("REDIS_URL", "redis://localhost:6379/0"),
             encoding="utf-8",
@@ -92,7 +94,6 @@ def _now_iso() -> str:
 
 
 class MenuVersionService:
-
     @staticmethod
     async def create_version(
         *,
@@ -127,10 +128,9 @@ class MenuVersionService:
         # 统计该品牌下本季度的版本数（v1, v2...）
         prefix = f"{now.year}.Q{quarter}."
         existing = [
-            v for v in _versions.values()
-            if v["tenant_id"] == tenant_id
-            and v["brand_id"] == brand_id
-            and v["version_no"].startswith(prefix)
+            v
+            for v in _versions.values()
+            if v["tenant_id"] == tenant_id and v["brand_id"] == brand_id and v["version_no"].startswith(prefix)
         ]
         seq = len(existing) + 1
         version_no = f"{prefix}v{seq}"
@@ -182,10 +182,7 @@ class MenuVersionService:
         if not tenant_id:
             raise ValueError("tenant_id 不能为空")
 
-        items = [
-            v for v in _versions.values()
-            if v["tenant_id"] == tenant_id and not v["is_deleted"]
-        ]
+        items = [v for v in _versions.values() if v["tenant_id"] == tenant_id and not v["is_deleted"]]
         if brand_id:
             items = [v for v in items if v["brand_id"] == brand_id]
 
@@ -193,7 +190,7 @@ class MenuVersionService:
         items.sort(key=lambda v: v["created_at"], reverse=True)
         total = len(items)
         start = (page - 1) * size
-        return {"items": items[start:start + size], "total": total, "page": page, "size": size}
+        return {"items": items[start : start + size], "total": total, "page": page, "size": size}
 
     @staticmethod
     async def publish_to_stores(
@@ -363,10 +360,9 @@ class MenuVersionService:
 
         # 找该门店最新的 applied 或 pending 记录
         store_records = [
-            r for r in _dispatch_records.values()
-            if r["tenant_id"] == tenant_id
-            and r["store_id"] == store_id
-            and not r["is_deleted"]
+            r
+            for r in _dispatch_records.values()
+            if r["tenant_id"] == tenant_id and r["store_id"] == store_id and not r["is_deleted"]
         ]
         if not store_records:
             raise ValueError(f"门店没有下发记录: {store_id}")
@@ -407,7 +403,8 @@ class MenuVersionService:
             raise ValueError("tenant_id 不能为空")
 
         store_records = [
-            r for r in _dispatch_records.values()
+            r
+            for r in _dispatch_records.values()
             if r["tenant_id"] == tenant_id
             and r["store_id"] == store_id
             and r["status"] == DISPATCH_STATUS_APPLIED
@@ -451,10 +448,9 @@ class MenuVersionService:
         if not tenant_id:
             raise ValueError("tenant_id 不能为空")
         return [
-            r for r in _dispatch_records.values()
-            if r["tenant_id"] == tenant_id
-            and r["version_id"] == version_id
-            and not r["is_deleted"]
+            r
+            for r in _dispatch_records.values()
+            if r["tenant_id"] == tenant_id and r["version_id"] == version_id and not r["is_deleted"]
         ]
 
 

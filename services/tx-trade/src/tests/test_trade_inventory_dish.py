@@ -18,6 +18,7 @@ dish_dept_mapping_routes 场景：
   9. GET  /kds/dish-dept-mappings/by-dish/{id} — 返回某菜品所有映射
   10. DELETE /kds/dish-dept-mappings/{id}       — 映射不存在时返回 404
 """
+
 import os
 import sys
 import types
@@ -31,8 +32,8 @@ from fastapi.testclient import TestClient
 # ─── 路径准备 ──────────────────────────────────────────────────────────────────
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-_SRC_DIR   = os.path.join(_TESTS_DIR, "..")
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -40,6 +41,7 @@ for _p in [_SRC_DIR, _ROOT_DIR]:
 
 
 # ─── 建立 src 包层级，使相对导入正常工作 ────────────────────────────────────────
+
 
 def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
     if pkg_name not in sys.modules:
@@ -49,10 +51,10 @@ def _ensure_pkg(pkg_name: str, pkg_path: str) -> None:
         sys.modules[pkg_name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
-_ensure_pkg("src.models",   os.path.join(_SRC_DIR, "models"))
+_ensure_pkg("src.models", os.path.join(_SRC_DIR, "models"))
 
 
 # ─── structlog 存根 ───────────────────────────────────────────────────────────
@@ -65,22 +67,24 @@ if "structlog" not in sys.modules:
 
 # ─── 共享工具 ─────────────────────────────────────────────────────────────────
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
 
-TENANT_ID     = _uid()
-STORE_ID      = _uid()
+TENANT_ID = _uid()
+STORE_ID = _uid()
 INGREDIENT_ID = _uid()
-DISH_ID_1     = _uid()
-DEPT_ID_1     = _uid()
-MAPPING_ID    = _uid()
+DISH_ID_1 = _uid()
+DEPT_ID_1 = _uid()
+MAPPING_ID = _uid()
 
 _BASE_HEADERS = {"X-Tenant-ID": TENANT_ID}
 
 
 class FakeRow:
     """模拟 SQLAlchemy Row 对象"""
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -88,6 +92,7 @@ class FakeRow:
 
 class FakeResult:
     """模拟 SQLAlchemy CursorResult"""
+
     def __init__(self, rows=None, scalar_value=None):
         self._rows = rows or []
         self._scalar = scalar_value
@@ -113,16 +118,17 @@ def _make_db(*execute_results):
 def _override_db(db):
     def _dep():
         return db
+
     return _dep
 
 
 # ─── 导入路由（必须以 src.api.* 导入，使相对导入可解析）────────────────────────
 
-from shared.ontology.src.database import get_db           # noqa: E402
+from shared.ontology.src.database import get_db  # noqa: E402
+from src.api.dish_dept_mapping_routes import router as ddm_router  # type: ignore[import]  # noqa: E402
 
 # inventory_menu_routes 通过相对导入引用 src.services.*
-from src.api.inventory_menu_routes import router as inv_router   # type: ignore[import]  # noqa: E402
-from src.api.dish_dept_mapping_routes import router as ddm_router  # type: ignore[import]  # noqa: E402
+from src.api.inventory_menu_routes import router as inv_router  # type: ignore[import]  # noqa: E402
 
 inv_app = FastAPI()
 inv_app.include_router(inv_router)
@@ -138,6 +144,7 @@ ddm_app.include_router(ddm_router)
 
 class _ImpactedDish:
     """最小化的 ImpactedDish 存根，供测试构造返回值用"""
+
     def __init__(self, dish_id: str, dish_name: str, estimated_servings: int = 0):
         self.dish_id = dish_id
         self.dish_name = dish_name
@@ -145,6 +152,7 @@ class _ImpactedDish:
 
 
 # ─── 测试1: stock-update 正常路径，有菜品被自动下架 ───────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_stock_update_triggers_auto_soldout():
@@ -180,6 +188,7 @@ async def test_stock_update_triggers_auto_soldout():
 
 # ─── 测试2: stock-update 库存充足，无菜品被下架 ──────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_stock_update_no_soldout_when_sufficient():
     """POST stock-update：库存充足时 auto_soldout_dishes 为空列表"""
@@ -207,6 +216,7 @@ async def test_stock_update_no_soldout_when_sufficient():
 
 # ─── 测试3: soldout-watch 返回预警列表 ───────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_soldout_watch_returns_alert_list():
     """GET /soldout-watch：正常返回低库存预警菜品列表"""
@@ -214,7 +224,7 @@ async def test_soldout_watch_returns_alert_list():
 
     alert_items = [
         {"dish_id": DISH_ID_1, "dish_name": "招牌红烧肉", "urgency": "critical"},
-        {"dish_id": _uid(),    "dish_name": "清蒸鲈鱼",   "urgency": "warning"},
+        {"dish_id": _uid(), "dish_name": "清蒸鲈鱼", "urgency": "warning"},
     ]
     db = AsyncMock()
     inv_app.dependency_overrides[get_db] = _override_db(db)
@@ -238,6 +248,7 @@ async def test_soldout_watch_returns_alert_list():
 
 
 # ─── 测试4: restock 补货恢复菜品上架 ─────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_restock_restores_dishes():
@@ -268,6 +279,7 @@ async def test_restock_restores_dishes():
 
 
 # ─── 测试5: dashboard 返回汇总仪表盘 ─────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_inventory_dashboard_returns_summary():
@@ -308,6 +320,7 @@ async def test_inventory_dashboard_returns_summary():
 
 # ─── 测试6: GET /dish-dept-mappings 分页查询 ─────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_list_dish_dept_mappings_pagination():
     """GET /dish-dept-mappings：正常分页查询，返回 items + total"""
@@ -327,9 +340,9 @@ async def test_list_dish_dept_mappings_pagination():
     )
     # 3次 execute：set_config RLS → COUNT query → list query
     db = _make_db(
-        FakeResult(),               # set_config RLS
-        FakeResult(scalar_value=1), # COUNT
-        FakeResult(rows=[row]),     # list
+        FakeResult(),  # set_config RLS
+        FakeResult(scalar_value=1),  # COUNT
+        FakeResult(rows=[row]),  # list
     )
     ddm_app.dependency_overrides[get_db] = _override_db(db)
 
@@ -351,6 +364,7 @@ async def test_list_dish_dept_mappings_pagination():
 
 
 # ─── 测试7: POST /dish-dept-mappings 缺少 X-Tenant-ID → 400 ─────────────────
+
 
 def test_upsert_mapping_missing_tenant_returns_400():
     """POST /dish-dept-mappings：不传 X-Tenant-ID header 时返回 400"""
@@ -374,17 +388,18 @@ def test_upsert_mapping_missing_tenant_returns_400():
 
 # ─── 测试8: POST /batch 批量导入返回创建计数 ─────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_batch_import_returns_created_count():
     """POST /dish-dept-mappings/batch：2条新增，返回 created=2 updated=0"""
     # 执行顺序：set_config → NOW() → check1(空) → insert1 → check2(空) → insert2
     db = _make_db(
-        FakeResult(),                   # set_config RLS
+        FakeResult(),  # set_config RLS
         FakeResult(scalar_value=None),  # SELECT NOW()
-        FakeResult(rows=[]),            # check existing mapping1 → 不存在
-        FakeResult(),                   # INSERT mapping1
-        FakeResult(rows=[]),            # check existing mapping2 → 不存在
-        FakeResult(),                   # INSERT mapping2
+        FakeResult(rows=[]),  # check existing mapping1 → 不存在
+        FakeResult(),  # INSERT mapping1
+        FakeResult(rows=[]),  # check existing mapping2 → 不存在
+        FakeResult(),  # INSERT mapping2
     )
     ddm_app.dependency_overrides[get_db] = _override_db(db)
 
@@ -394,7 +409,7 @@ async def test_batch_import_returns_created_count():
         json={
             "mappings": [
                 {"dish_id": DISH_ID_1, "dept_id": DEPT_ID_1, "dept_name": "热菜"},
-                {"dish_id": _uid(),    "dept_id": _uid(),     "dept_name": "冷菜"},
+                {"dish_id": _uid(), "dept_id": _uid(), "dept_name": "冷菜"},
             ],
             "store_id": STORE_ID,
             "replace_existing": False,
@@ -411,6 +426,7 @@ async def test_batch_import_returns_created_count():
 
 
 # ─── 测试9: GET /by-dish/{dish_id} 返回某菜品的所有映射 ──────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_mappings_by_dish_returns_list():
@@ -451,13 +467,14 @@ async def test_get_mappings_by_dish_returns_list():
 
 # ─── 测试10: DELETE /dish-dept-mappings/{id} 映射不存在 → 404 ────────────────
 
+
 @pytest.mark.asyncio
 async def test_delete_mapping_not_found_returns_404():
     """DELETE /dish-dept-mappings/{id}：映射不存在时返回 404"""
     # set_config → check SELECT → 返回空（不存在）
     db = _make_db(
-        FakeResult(),        # set_config RLS
-        FakeResult(rows=[]), # SELECT id ... → 不存在
+        FakeResult(),  # set_config RLS
+        FakeResult(rows=[]),  # SELECT id ... → 不存在
     )
     ddm_app.dependency_overrides[get_db] = _override_db(db)
 

@@ -2,6 +2,7 @@
 
 扩展 BOM 基础模块，支持工艺卡、工序路由、原料替代和版本生命周期。
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -108,14 +109,16 @@ async def create_craft_card(
                 "now": now,
             },
         )
-        created_steps.append({
-            "id": str(step_id),
-            "seq": step["seq"],
-            "name": step["name"],
-            "duration_seconds": step.get("duration_seconds", 0),
-            "temperature": step.get("temperature"),
-            "tool": step.get("tool"),
-        })
+        created_steps.append(
+            {
+                "id": str(step_id),
+                "seq": step["seq"],
+                "name": step["name"],
+                "duration_seconds": step.get("duration_seconds", 0),
+                "temperature": step.get("temperature"),
+                "tool": step.get("tool"),
+            }
+        )
 
     await db.flush()
 
@@ -200,13 +203,15 @@ async def set_dept_routing(
                 "now": now,
             },
         )
-        created_routes.append({
-            "id": str(route_id),
-            "seq": route["seq"],
-            "dept_id": route["dept_id"],
-            "process_name": route["process_name"],
-            "estimated_seconds": route.get("estimated_seconds", 0),
-        })
+        created_routes.append(
+            {
+                "id": str(route_id),
+                "seq": route["seq"],
+                "dept_id": route["dept_id"],
+                "process_name": route["process_name"],
+                "estimated_seconds": route.get("estimated_seconds", 0),
+            }
+        )
 
     await db.flush()
 
@@ -288,13 +293,15 @@ async def set_substitute_rules(
                 "now": now,
             },
         )
-        created_rules.append({
-            "id": str(rule_id),
-            "substitute_id": sub["substitute_id"],
-            "ratio": sub.get("ratio", 1.0),
-            "priority": sub.get("priority", 1),
-            "conditions": sub.get("conditions"),
-        })
+        created_rules.append(
+            {
+                "id": str(rule_id),
+                "substitute_id": sub["substitute_id"],
+                "ratio": sub.get("ratio", 1.0),
+                "priority": sub.get("priority", 1),
+                "conditions": sub.get("conditions"),
+            }
+        )
 
     await db.flush()
 

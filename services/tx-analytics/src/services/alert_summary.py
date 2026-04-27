@@ -3,6 +3,7 @@
 异常类型：discount_anomaly / cooking_timeout / stockout / margin_drop / food_safety
 严重级别：critical / warning / info
 """
+
 from datetime import datetime
 
 import structlog
@@ -27,6 +28,7 @@ SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 
 
 # ─── 纯函数：统计聚合 ───
+
 
 def aggregate_alert_stats(alerts: list[dict]) -> dict:
     """从告警列表聚合统计数据
@@ -70,6 +72,7 @@ def sort_alerts_by_severity(alerts: list[dict]) -> list[dict]:
 
 # ─── 今日告警列表 ───
 
+
 async def get_today_alerts(
     store_id: str,
     tenant_id: str,
@@ -94,6 +97,7 @@ async def get_today_alerts(
 
 # ─── 异常统计（全租户） ───
 
+
 async def get_alert_stats(
     tenant_id: str,
     db,
@@ -111,9 +115,8 @@ async def get_alert_stats(
 
 # ─── 数据库查询（通过统一SQL查询层） ───
 
-async def _query_today_alerts(
-    db: AsyncSession, store_id: str, tenant_id: str
-) -> list[dict]:
+
+async def _query_today_alerts(db: AsyncSession, store_id: str, tenant_id: str) -> list[dict]:
     """查询今日告警，委托给 sql_queries 统一查询层
 
     额外添加 _ts 字段用于排序。

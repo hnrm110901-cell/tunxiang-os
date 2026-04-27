@@ -1,8 +1,9 @@
 """快速开店 — 配置克隆 API (真实DB + RLS)"""
+
 from typing import List, Literal
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -76,6 +77,7 @@ async def _count_table_rows(db: AsyncSession, table: str, store_id: str) -> int:
 
 # ---- API 端点 ----
 
+
 @router.post("/stores/clone")
 async def clone_store_config(
     req: StoreCloneRequest,
@@ -86,8 +88,10 @@ async def clone_store_config(
     if req.source_store_id == req.target_store_id:
         results = [
             CloneItemResult(
-                item=item, success=False,
-                message="源门店与目标门店不能相同", count=0,
+                item=item,
+                success=False,
+                message="源门店与目标门店不能相同",
+                count=0,
             )
             for item in req.clone_items
         ]
@@ -110,30 +114,45 @@ async def clone_store_config(
     for item in req.clone_items:
         table = _ITEM_TABLE_MAP.get(item)
         if not table:
-            results.append(CloneItemResult(
-                item=item, success=False,
-                message=f"未知配置项: {item}", count=0,
-            ))
+            results.append(
+                CloneItemResult(
+                    item=item,
+                    success=False,
+                    message=f"未知配置项: {item}",
+                    count=0,
+                )
+            )
             continue
 
         try:
             count = await _count_table_rows(db, table, req.source_store_id)
-            results.append(CloneItemResult(
+            results.append(
+                CloneItemResult(
+                    item=item,
+                    success=True,
+                    message=f"成功克隆 {count} 条{item}配置",
+                    count=count,
+                )
+            )
+            log.info(
+                "store_clone_item",
                 item=item,
-                success=True,
-                message=f"成功克隆 {count} 条{item}配置",
+                table=table,
+                source=req.source_store_id,
+                target=req.target_store_id,
                 count=count,
-            ))
-            log.info("store_clone_item", item=item, table=table,
-                     source=req.source_store_id, target=req.target_store_id,
-                     count=count, tenant_id=x_tenant_id)
+                tenant_id=x_tenant_id,
+            )
         except SQLAlchemyError as exc:
-            log.error("store_clone_item_error", item=item, exc_info=True,
-                      error=str(exc), tenant_id=x_tenant_id)
-            results.append(CloneItemResult(
-                item=item, success=False,
-                message=f"克隆 {item} 失败: 数据库错误", count=0,
-            ))
+            log.error("store_clone_item_error", item=item, exc_info=True, error=str(exc), tenant_id=x_tenant_id)
+            results.append(
+                CloneItemResult(
+                    item=item,
+                    success=False,
+                    message=f"克隆 {item} 失败: 数据库错误",
+                    count=0,
+                )
+            )
 
     succeeded = sum(1 for r in results if r.success)
     return {

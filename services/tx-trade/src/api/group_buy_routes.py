@@ -8,6 +8,7 @@
 6. POST   /api/v1/group-buy/expire-check          超时处理（定时任务）
 7. GET    /api/v1/group-buy/activities/{id}       活动详情
 """
+
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
@@ -33,6 +34,7 @@ def error_response(msg: str, status: int = 400) -> dict:
 
 # ── 请求模型 ──────────────────────────────────────────────────
 
+
 class CreateActivityReq(BaseModel):
     name: str
     product_id: str
@@ -56,6 +58,7 @@ class JoinTeamReq(BaseModel):
 
 
 # ── 1. 创建拼团活动 ──────────────────────────────────────────
+
 
 @router.post("/activities")
 async def create_activity(
@@ -86,6 +89,7 @@ async def create_activity(
 
 # ── 2. 活动列表 ──────────────────────────────────────────────
 
+
 @router.get("/activities")
 async def list_activities(
     status: Optional[str] = Query(None),
@@ -95,12 +99,17 @@ async def list_activities(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     result = await group_buy_service.list_activities(
-        tenant_id=x_tenant_id, db=db, status=status, page=page, size=size,
+        tenant_id=x_tenant_id,
+        db=db,
+        status=status,
+        page=page,
+        size=size,
     )
     return ok_response(result)
 
 
 # ── 3. 发起拼团 ──────────────────────────────────────────────
+
 
 @router.post("/teams")
 async def create_team(
@@ -122,6 +131,7 @@ async def create_team(
 
 
 # ── 4. 参与拼团 ──────────────────────────────────────────────
+
 
 @router.post("/teams/{team_id}/join")
 async def join_team(
@@ -145,6 +155,7 @@ async def join_team(
 
 # ── 5. 拼团详情 ──────────────────────────────────────────────
 
+
 @router.get("/teams/{team_id}")
 async def get_team_detail(
     team_id: str,
@@ -152,7 +163,9 @@ async def get_team_detail(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     result = await group_buy_service.get_team_detail(
-        team_id=team_id, tenant_id=x_tenant_id, db=db,
+        team_id=team_id,
+        tenant_id=x_tenant_id,
+        db=db,
     )
     if result is None:
         return error_response("team_not_found")
@@ -161,13 +174,15 @@ async def get_team_detail(
 
 # ── 6. 超时处理 ──────────────────────────────────────────────
 
+
 @router.post("/expire-check")
 async def expire_check(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     result = await group_buy_service.expire_teams(
-        tenant_id=x_tenant_id, db=db,
+        tenant_id=x_tenant_id,
+        db=db,
     )
     await db.commit()
     return ok_response(result)

@@ -11,6 +11,7 @@
   - 分页：GET /changes 支持 since / page / size 参数
   - 错误处理：具体异常类型，不使用 broad except
 """
+
 from __future__ import annotations
 
 import json
@@ -31,19 +32,23 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/sync", tags=["edge-sync"])
 
 # 云端 sync_changelog 允许写入的表白名单
-ALLOWED_TABLES: frozenset[str] = frozenset({
-    "orders",
-    "order_items",
-    "members",
-    "dishes",
-    "inventory_records",
-})
+ALLOWED_TABLES: frozenset[str] = frozenset(
+    {
+        "orders",
+        "order_items",
+        "members",
+        "dishes",
+        "inventory_records",
+    }
+)
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────────
 
+
 class ChangeRecordIn(BaseModel):
     """边缘推送的单条变更记录"""
+
     change_id: str = Field(description="变更唯一 ID（边缘生成，用于去重）")
     table_name: str = Field(description="目标表名")
     record_id: str = Field(description="记录主键")
@@ -55,6 +60,7 @@ class ChangeRecordIn(BaseModel):
 
 class IngestRequest(BaseModel):
     """批量变更推送请求体"""
+
     changes: List[ChangeRecordIn] = Field(min_length=1, max_length=500)
 
 
@@ -67,6 +73,7 @@ class IngestResponse(BaseModel):
 
 class ChangeRecordOut(BaseModel):
     """云端返回给边缘的变更记录"""
+
     change_id: str
     table_name: str
     record_id: str
@@ -85,6 +92,7 @@ class ChangesResponse(BaseModel):
 
 # ─── 依赖：获取租户 ID ────────────────────────────────────────────────────
 
+
 def _require_tenant(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
 ) -> str:
@@ -94,6 +102,7 @@ def _require_tenant(
 
 
 # ─── 路由实现 ─────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/ingest",
@@ -123,9 +132,7 @@ async def ingest_changes(
                 payload_tenant=change.tenant_id,
             )
             response.errors.append(change.change_id)
-            response.error_messages.append(
-                f"{change.change_id}: tenant_id mismatch"
-            )
+            response.error_messages.append(f"{change.change_id}: tenant_id mismatch")
             continue
 
         # 表名白名单校验
@@ -136,9 +143,7 @@ async def ingest_changes(
                 change_id=change.change_id,
             )
             response.errors.append(change.change_id)
-            response.error_messages.append(
-                f"{change.change_id}: table '{change.table_name}' not in allowlist"
-            )
+            response.error_messages.append(f"{change.change_id}: table '{change.table_name}' not in allowlist")
             continue
 
         try:
@@ -159,9 +164,7 @@ async def ingest_changes(
 
             else:
                 # INSERT / UPDATE：先检查云端版本是否更新
-                is_conflict = await _check_cloud_version_newer(
-                    db, change, changed_at
-                )
+                is_conflict = await _check_cloud_version_newer(db, change, changed_at)
                 if is_conflict:
                     logger.info(
                         "sync_ingest.conflict_cloud_newer",
@@ -192,9 +195,7 @@ async def ingest_changes(
                 exc_info=True,
             )
             response.errors.append(change.change_id)
-            response.error_messages.append(
-                f"{change.change_id}: db error — {type(exc).__name__}"
-            )
+            response.error_messages.append(f"{change.change_id}: db error — {type(exc).__name__}")
 
     await db.commit()
 
@@ -293,15 +294,17 @@ async def get_cloud_changes(
             changed_at_str = changed_at.isoformat()
         else:
             changed_at_str = str(changed_at)
-        items.append(ChangeRecordOut(
-            change_id=str(d.get("change_id", "")),
-            table_name=d["table_name"],
-            record_id=str(d["record_id"]),
-            operation=d["operation"],
-            data=data,
-            tenant_id=d["tenant_id"],
-            changed_at=changed_at_str,
-        ))
+        items.append(
+            ChangeRecordOut(
+                change_id=str(d.get("change_id", "")),
+                table_name=d["table_name"],
+                record_id=str(d["record_id"]),
+                operation=d["operation"],
+                data=data,
+                tenant_id=d["tenant_id"],
+                changed_at=changed_at_str,
+            )
+        )
 
     response = ChangesResponse(
         items=items,
@@ -321,6 +324,7 @@ async def get_cloud_changes(
 
 
 # ─── 内部辅助函数 ─────────────────────────────────────────────────────────
+
 
 async def _check_already_processed(db: AsyncSession, change_id: str) -> bool:
     """检查 change_id 是否已写入 sync_ingested_log（幂等去重）"""
@@ -386,13 +390,11 @@ async def _upsert_record(db: AsyncSession, change: ChangeRecordIn) -> None:
     columns = list(data.keys())
     col_list = ", ".join(f'"{c}"' for c in columns)
     placeholders = ", ".join(f":{c}" for c in columns)
-    update_set = ", ".join(
-        f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id"
-    )
+    update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
     sql = (
         f'INSERT INTO "{change.table_name}" ({col_list}) '
         f"VALUES ({placeholders}) "
-        f'ON CONFLICT (id) DO UPDATE SET {update_set}'
+        f"ON CONFLICT (id) DO UPDATE SET {update_set}"
     )
     row = {c: data.get(c) for c in columns}
     await db.execute(text(sql), row)

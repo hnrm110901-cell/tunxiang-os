@@ -6,6 +6,7 @@
   - 版本激活
   - 多租户隔离
 """
+
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -201,8 +202,10 @@ async def test_delete_bom_template():
     update_items_result = MagicMock()
 
     session.execute.side_effect = [
-        set_config_result, check_result,
-        update_template_result, update_items_result,
+        set_config_result,
+        check_result,
+        update_template_result,
+        update_items_result,
     ]
 
     svc = BOMService(session, TENANT_A)
@@ -258,8 +261,10 @@ async def test_activate_version():
     activate_result = MagicMock()
 
     session.execute.side_effect = [
-        set_config_result, query_result,
-        deactivate_result, activate_result,
+        set_config_result,
+        query_result,
+        deactivate_result,
+        activate_result,
     ]
 
     svc = BOMService(session, TENANT_A)
@@ -286,30 +291,36 @@ async def test_calculate_dish_cost_normal():
     bom_id = uuid.uuid4()
     bom_result = MagicMock()
     bom_mappings = MagicMock()
-    bom_mappings.first.return_value = _make_mapping({
-        "id": bom_id,
-        "version": "v1",
-        "yield_rate": 0.9,
-    })
+    bom_mappings.first.return_value = _make_mapping(
+        {
+            "id": bom_id,
+            "version": "v1",
+            "yield_rate": 0.9,
+        }
+    )
     bom_result.mappings.return_value = bom_mappings
 
     items_data = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "standard_qty": 0.5,
-            "unit": "kg",
-            "bom_unit_cost_fen": 3500,
-            "waste_factor": 0.1,
-            "ingredient_unit_price_fen": 3000,
-        }),
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_2),
-            "standard_qty": 2.0,
-            "unit": "个",
-            "bom_unit_cost_fen": 200,
-            "waste_factor": 0,
-            "ingredient_unit_price_fen": 180,
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "standard_qty": 0.5,
+                "unit": "kg",
+                "bom_unit_cost_fen": 3500,
+                "waste_factor": 0.1,
+                "ingredient_unit_price_fen": 3000,
+            }
+        ),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_2),
+                "standard_qty": 2.0,
+                "unit": "个",
+                "bom_unit_cost_fen": 200,
+                "waste_factor": 0,
+                "ingredient_unit_price_fen": 180,
+            }
+        ),
     ]
     items_result = MagicMock()
     items_mappings = MagicMock()
@@ -366,22 +377,26 @@ async def test_calculate_dish_cost_no_price():
     bom_id = uuid.uuid4()
     bom_result = MagicMock()
     bom_mappings = MagicMock()
-    bom_mappings.first.return_value = _make_mapping({
-        "id": bom_id,
-        "version": "v1",
-        "yield_rate": 1.0,
-    })
+    bom_mappings.first.return_value = _make_mapping(
+        {
+            "id": bom_id,
+            "version": "v1",
+            "yield_rate": 1.0,
+        }
+    )
     bom_result.mappings.return_value = bom_mappings
 
     items_data = [
-        _make_mapping({
-            "ingredient_id": uuid.UUID(INGREDIENT_1),
-            "standard_qty": 1.0,
-            "unit": "kg",
-            "bom_unit_cost_fen": None,
-            "waste_factor": 0,
-            "ingredient_unit_price_fen": None,
-        }),
+        _make_mapping(
+            {
+                "ingredient_id": uuid.UUID(INGREDIENT_1),
+                "standard_qty": 1.0,
+                "unit": "kg",
+                "bom_unit_cost_fen": None,
+                "waste_factor": 0,
+                "ingredient_unit_price_fen": None,
+            }
+        ),
     ]
     items_result = MagicMock()
     items_mappings = MagicMock()
@@ -452,10 +467,12 @@ async def test_calculate_order_cost():
         }
 
     with patch.object(calc, "calculate_dish_cost", side_effect=mock_dish_cost):
-        result = await calc.calculate_order_cost([
-            {"dish_id": DISH_ID, "quantity": 3},
-            {"dish_id": str(uuid.uuid4()), "quantity": 2},
-        ])
+        result = await calc.calculate_order_cost(
+            [
+                {"dish_id": DISH_ID, "quantity": 3},
+                {"dish_id": str(uuid.uuid4()), "quantity": 2},
+            ]
+        )
 
     assert result["total_theoretical_cost_fen"] == 5000
     assert len(result["per_item"]) == 2

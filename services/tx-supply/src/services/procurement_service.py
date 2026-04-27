@@ -3,6 +3,7 @@
 流程：请购 → 审批 → 下单 → 收货 → 验收 → 入库
 状态机：draft → pending_approval → approved → ordered → received → inspected → stocked / rejected
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -38,6 +39,7 @@ def can_procurement_transition(current: str, target: str) -> bool:
 
 # ─── 请购单 ───
 
+
 def create_requisition(
     store_id: str,
     requester_id: str,
@@ -67,6 +69,7 @@ def create_requisition(
 
 # ─── 审批 ───
 
+
 def approve_requisition(requisition: dict, approver_id: str, comment: str = "") -> dict:
     """审批请购单"""
     if requisition.get("status") != "pending_approval":
@@ -93,6 +96,7 @@ def reject_requisition(requisition: dict, approver_id: str, reason: str) -> dict
 
 # ─── 采购下单 ───
 
+
 def create_purchase_order(
     requisition: dict,
     supplier_id: str,
@@ -117,6 +121,7 @@ def create_purchase_order(
 
 
 # ─── 收货验收 ───
+
 
 def receive_delivery(po: dict, received_items: list[dict]) -> dict:
     """收货登记
@@ -155,6 +160,7 @@ def inspect_and_stock(delivery: dict, inspector_id: str) -> dict:
 
 # ─── 智能补货建议 ───
 
+
 def suggest_procurement(inventory_alerts: list[dict], supplier_prices: dict) -> list[dict]:
     """基于库存预警自动生成采购建议
     Args:
@@ -176,15 +182,17 @@ def suggest_procurement(inventory_alerts: list[dict], supplier_prices: dict) -> 
         price_info = supplier_prices.get(alert.get("ingredient_id"), {})
         est_cost = int(restock_qty * price_info.get("price_fen", 0))
 
-        suggestions.append({
-            "item_name": item_name,
-            "ingredient_id": alert.get("ingredient_id"),
-            "current_qty": current,
-            "restock_qty": round(restock_qty, 1),
-            "supplier": price_info.get("supplier", "待选"),
-            "estimated_cost_fen": est_cost,
-            "urgency": "critical" if current <= 0 else "urgent" if current < min_qty else "normal",
-        })
+        suggestions.append(
+            {
+                "item_name": item_name,
+                "ingredient_id": alert.get("ingredient_id"),
+                "current_qty": current,
+                "restock_qty": round(restock_qty, 1),
+                "supplier": price_info.get("supplier", "待选"),
+                "estimated_cost_fen": est_cost,
+                "urgency": "critical" if current <= 0 else "urgent" if current < min_qty else "normal",
+            }
+        )
 
     suggestions.sort(key=lambda s: {"critical": 0, "urgent": 1, "normal": 2}[s["urgency"]])
     return suggestions

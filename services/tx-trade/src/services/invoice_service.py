@@ -7,6 +7,7 @@
   - invoice_requests：顾客餐后申请开票，关联餐饮订单
   - invoices（v238）：员工上传发票图片，用于费控报销
 """
+
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -66,10 +67,7 @@ async def create_invoice_request(
         if missing:
             raise ValueError(f"VAT special invoice requires: {', '.join(missing)}")
 
-    invoice_no = (
-        f"INV{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        f"{uuid.uuid4().hex[:6].upper()}"
-    )
+    invoice_no = f"INV{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
 
     try:
         await db.execute(
@@ -416,14 +414,16 @@ async def get_invoice_ledger(
     type_counts: dict[str, int] = {}
 
     for row in rows:
-        matched.append({
-            "invoice_id": str(row["id"]),
-            "invoice_no": row["invoice_no"],
-            "invoice_type": row["invoice_type"],
-            "amount_fen": row["amount_fen"],
-            "status": row["status"],
-            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-        })
+        matched.append(
+            {
+                "invoice_id": str(row["id"]),
+                "invoice_no": row["invoice_no"],
+                "invoice_type": row["invoice_type"],
+                "amount_fen": row["amount_fen"],
+                "status": row["status"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            }
+        )
         total_amount_fen += row["amount_fen"] or 0
         t = row["invoice_type"]
         type_counts[t] = type_counts.get(t, 0) + 1

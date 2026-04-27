@@ -51,6 +51,7 @@ def _sample_dishes():
 # 1. 价格计算 — 服务费阶梯
 # ═══════════════════════════════════════════════════════════
 
+
 class TestPriceCalculation:
     """验证价格计算逻辑：菜品费+服务费(阶梯)+食材费+交通费"""
 
@@ -77,8 +78,11 @@ class TestPriceCalculation:
         """总价 = 菜品费 + 服务费 + 食材费 + 交通费"""
         dishes = _sample_dishes()
         result = await calculate_price(
-            dishes=dishes, guest_count=4, distance_km=10.0,
-            tenant_id=TENANT, db=None,
+            dishes=dishes,
+            guest_count=4,
+            distance_km=10.0,
+            tenant_id=TENANT,
+            db=None,
         )
 
         # 菜品费: 16800 + 28800 = 45600
@@ -97,6 +101,7 @@ class TestPriceCalculation:
 # 2. 厨师列表查询
 # ═══════════════════════════════════════════════════════════
 
+
 class TestChefListing:
     """验证厨师列表筛选逻辑"""
 
@@ -104,8 +109,11 @@ class TestChefListing:
     async def test_list_all_chefs_in_area(self):
         """查询长沙区域所有可用厨师"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         assert len(chefs) == 3  # 示例数据有3位厨师
 
@@ -113,8 +121,11 @@ class TestChefListing:
     async def test_filter_by_cuisine_type(self):
         """按菜系筛选"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type="粤菜",
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type="粤菜",
+            tenant_id=TENANT,
+            db=None,
         )
         assert len(chefs) == 1
         assert chefs[0]["name"] == "李师傅"
@@ -123,8 +134,11 @@ class TestChefListing:
     async def test_filter_wrong_area_returns_empty(self):
         """查询不存在的区域返回空"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="北京", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="北京",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         assert len(chefs) == 0
 
@@ -132,6 +146,7 @@ class TestChefListing:
 # ═══════════════════════════════════════════════════════════
 # 3. 创建预约
 # ═══════════════════════════════════════════════════════════
+
 
 class TestCreateBooking:
     """验证预约创建"""
@@ -141,8 +156,11 @@ class TestCreateBooking:
         """正常创建预约"""
         # 先获取一个厨师ID
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         chef_id = chefs[0]["id"]
 
@@ -167,16 +185,22 @@ class TestCreateBooking:
     async def test_create_booking_no_dishes_fails(self):
         """没有菜品时创建失败"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         with pytest.raises(ValueError, match="至少选择一道菜品"):
             await create_booking(
-                customer_id="cust-001", dishes=[],
+                customer_id="cust-001",
+                dishes=[],
                 chef_id=chefs[0]["id"],
                 service_datetime="2026-04-01T18:00:00",
-                address="test", guest_count=4,
-                tenant_id=TENANT, db=None,
+                address="test",
+                guest_count=4,
+                tenant_id=TENANT,
+                db=None,
             )
 
     @pytest.mark.asyncio
@@ -185,17 +209,21 @@ class TestCreateBooking:
         cah_mod._ensure_sample_chefs(TENANT)
         with pytest.raises(ValueError, match="厨师不存在"):
             await create_booking(
-                customer_id="cust-001", dishes=_sample_dishes(),
+                customer_id="cust-001",
+                dishes=_sample_dishes(),
                 chef_id="INVALID_ID",
                 service_datetime="2026-04-01T18:00:00",
-                address="test", guest_count=4,
-                tenant_id=TENANT, db=None,
+                address="test",
+                guest_count=4,
+                tenant_id=TENANT,
+                db=None,
             )
 
 
 # ═══════════════════════════════════════════════════════════
 # 4. 全生命周期 — 确认→开始→完成→评价
 # ═══════════════════════════════════════════════════════════
+
 
 class TestBookingLifecycle:
     """验证预约全生命周期流转"""
@@ -204,32 +232,43 @@ class TestBookingLifecycle:
     async def test_full_lifecycle(self):
         """pending → confirmed → cooking → completed → rated"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         chef_id = chefs[0]["id"]
 
         # 创建
         booking = await create_booking(
-            customer_id="cust-001", dishes=_sample_dishes(),
-            chef_id=chef_id, service_datetime="2026-04-01T18:00:00",
-            address="长沙市", guest_count=6,
-            tenant_id=TENANT, db=None,
+            customer_id="cust-001",
+            dishes=_sample_dishes(),
+            chef_id=chef_id,
+            service_datetime="2026-04-01T18:00:00",
+            address="长沙市",
+            guest_count=6,
+            tenant_id=TENANT,
+            db=None,
         )
         assert booking["status"] == "pending"
 
         # 确认
         booking = await confirm_booking(
-            booking_id=booking["id"], payment_id="pay-001",
-            tenant_id=TENANT, db=None,
+            booking_id=booking["id"],
+            payment_id="pay-001",
+            tenant_id=TENANT,
+            db=None,
         )
         assert booking["status"] == "confirmed"
         assert booking["payment_id"] == "pay-001"
 
         # 厨师开始服务
         booking = await start_service(
-            booking_id=booking["id"], chef_id=chef_id,
-            tenant_id=TENANT, db=None,
+            booking_id=booking["id"],
+            chef_id=chef_id,
+            tenant_id=TENANT,
+            db=None,
         )
         assert booking["status"] == "cooking"
 
@@ -237,16 +276,19 @@ class TestBookingLifecycle:
         booking = await complete_service(
             booking_id=booking["id"],
             photos=["https://img.example.com/1.jpg", "https://img.example.com/2.jpg"],
-            tenant_id=TENANT, db=None,
+            tenant_id=TENANT,
+            db=None,
         )
         assert booking["status"] == "completed"
         assert len(booking["photos"]) == 2
 
         # 评价
         booking = await rate_service(
-            booking_id=booking["id"], rating=5,
+            booking_id=booking["id"],
+            rating=5,
             comment="厨艺精湛，服务一流！",
-            tenant_id=TENANT, db=None,
+            tenant_id=TENANT,
+            db=None,
         )
         assert booking["status"] == "rated"
         assert booking["rating"] == 5
@@ -256,28 +298,38 @@ class TestBookingLifecycle:
     async def test_cannot_start_pending_booking(self):
         """pending状态不能直接开始服务"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         chef_id = chefs[0]["id"]
 
         booking = await create_booking(
-            customer_id="cust-001", dishes=_sample_dishes(),
-            chef_id=chef_id, service_datetime="2026-04-01T18:00:00",
-            address="长沙市", guest_count=2,
-            tenant_id=TENANT, db=None,
+            customer_id="cust-001",
+            dishes=_sample_dishes(),
+            chef_id=chef_id,
+            service_datetime="2026-04-01T18:00:00",
+            address="长沙市",
+            guest_count=2,
+            tenant_id=TENANT,
+            db=None,
         )
 
         with pytest.raises(ValueError, match="不允许开始服务"):
             await start_service(
-                booking_id=booking["id"], chef_id=chef_id,
-                tenant_id=TENANT, db=None,
+                booking_id=booking["id"],
+                chef_id=chef_id,
+                tenant_id=TENANT,
+                db=None,
             )
 
 
 # ═══════════════════════════════════════════════════════════
 # 5. 预约历史
 # ═══════════════════════════════════════════════════════════
+
 
 class TestBookingHistory:
     """验证预约历史分页查询"""
@@ -286,8 +338,11 @@ class TestBookingHistory:
     async def test_booking_history_pagination(self):
         """分页查询预约历史"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         chef_id = chefs[0]["id"]
 
@@ -298,14 +353,19 @@ class TestBookingHistory:
                 customer_id="cust-page",
                 dishes=_sample_dishes(),
                 chef_id=chef_id,
-                service_datetime=f"2026-04-0{i+1}T18:00:00",
-                address="长沙市", guest_count=4,
-                tenant_id=TENANT, db=None,
+                service_datetime=f"2026-04-0{i + 1}T18:00:00",
+                address="长沙市",
+                guest_count=4,
+                tenant_id=TENANT,
+                db=None,
             )
 
         result = await get_booking_history(
-            customer_id="cust-page", tenant_id=TENANT, db=None,
-            page=1, size=2,
+            customer_id="cust-page",
+            tenant_id=TENANT,
+            db=None,
+            page=1,
+            size=2,
         )
         assert result["total"] == 3
         assert len(result["items"]) == 2
@@ -316,6 +376,7 @@ class TestBookingHistory:
 # 6. 厨师排期
 # ═══════════════════════════════════════════════════════════
 
+
 class TestChefSchedule:
     """验证厨师排期查询"""
 
@@ -323,14 +384,19 @@ class TestChefSchedule:
     async def test_chef_schedule_month(self):
         """查询厨师某月排期"""
         chefs = await list_available_chefs(
-            date="2026-04-01", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-01",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         chef_id = chefs[0]["id"]
 
         schedule = await get_chef_schedule(
-            chef_id=chef_id, month="2026-04",
-            tenant_id=TENANT, db=None,
+            chef_id=chef_id,
+            month="2026-04",
+            tenant_id=TENANT,
+            db=None,
         )
         assert schedule["chef_id"] == chef_id
         assert schedule["month"] == "2026-04"
@@ -342,25 +408,36 @@ class TestChefSchedule:
     async def test_schedule_shows_booked_dates(self):
         """确认预约后，排期中该日期不可用"""
         chefs = await list_available_chefs(
-            date="2026-04-15", area="长沙", cuisine_type=None,
-            tenant_id=TENANT, db=None,
+            date="2026-04-15",
+            area="长沙",
+            cuisine_type=None,
+            tenant_id=TENANT,
+            db=None,
         )
         chef_id = chefs[0]["id"]
 
         booking = await create_booking(
-            customer_id="cust-001", dishes=_sample_dishes(),
-            chef_id=chef_id, service_datetime="2026-04-15T18:00:00",
-            address="长沙市", guest_count=4,
-            tenant_id=TENANT, db=None,
+            customer_id="cust-001",
+            dishes=_sample_dishes(),
+            chef_id=chef_id,
+            service_datetime="2026-04-15T18:00:00",
+            address="长沙市",
+            guest_count=4,
+            tenant_id=TENANT,
+            db=None,
         )
         await confirm_booking(
-            booking_id=booking["id"], payment_id="pay-002",
-            tenant_id=TENANT, db=None,
+            booking_id=booking["id"],
+            payment_id="pay-002",
+            tenant_id=TENANT,
+            db=None,
         )
 
         schedule = await get_chef_schedule(
-            chef_id=chef_id, month="2026-04",
-            tenant_id=TENANT, db=None,
+            chef_id=chef_id,
+            month="2026-04",
+            tenant_id=TENANT,
+            db=None,
         )
         # 4月15日应标记为不可用
         apr15 = next(d for d in schedule["calendar"] if d["date"] == "2026-04-15")

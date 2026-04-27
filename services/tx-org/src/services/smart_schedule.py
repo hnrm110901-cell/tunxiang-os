@@ -194,13 +194,13 @@ SHIFT_DEFINITIONS: Dict[str, Dict[str, Any]] = {
 #  劳动法约束常量
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-MAX_HOURS_WEEK_STANDARD = 40          # 标准工时制
-MAX_HOURS_WEEK_COMPREHENSIVE = 44     # 综合工时制
-MIN_REST_BETWEEN_SHIFTS_HOURS = 11    # 班次间最少休息
-MAX_CONSECUTIVE_DAYS = 6              # 最多连续工作天数
-MAX_OVERTIME_MONTH_HOURS = 36         # 月加班上限
-MAX_HOURS_DAY_MINOR = 8              # 未成年日工时上限
-MINOR_NIGHT_SHIFT_CUTOFF = 22        # 未成年不得夜班（22:00后）
+MAX_HOURS_WEEK_STANDARD = 40  # 标准工时制
+MAX_HOURS_WEEK_COMPREHENSIVE = 44  # 综合工时制
+MIN_REST_BETWEEN_SHIFTS_HOURS = 11  # 班次间最少休息
+MAX_CONSECUTIVE_DAYS = 6  # 最多连续工作天数
+MAX_OVERTIME_MONTH_HOURS = 36  # 月加班上限
+MAX_HOURS_DAY_MINOR = 8  # 未成年日工时上限
+MINOR_NIGHT_SHIFT_CUTOFF = 22  # 未成年不得夜班（22:00后）
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  客流系数（基于长沙餐饮经验）
@@ -208,22 +208,32 @@ MINOR_NIGHT_SHIFT_CUTOFF = 22        # 未成年不得夜班（22:00后）
 
 # 星期系数（周一=0 ~ 周日=6）
 DAY_OF_WEEK_FACTOR: Dict[int, float] = {
-    0: 0.85,   # 周一
-    1: 0.90,   # 周二
-    2: 0.90,   # 周三
-    3: 0.95,   # 周四
-    4: 1.10,   # 周五
-    5: 1.30,   # 周六
-    6: 1.25,   # 周日
+    0: 0.85,  # 周一
+    1: 0.90,  # 周二
+    2: 0.90,  # 周三
+    3: 0.95,  # 周四
+    4: 1.10,  # 周五
+    5: 1.30,  # 周六
+    6: 1.25,  # 周日
 }
 
 # 小时分布（每小时占全天客流比例）— 典型湘菜馆
 HOURLY_DISTRIBUTION: Dict[int, float] = {
-    8: 0.005,   9: 0.01,   10: 0.03,
-    11: 0.10,  12: 0.18,  13: 0.12,  14: 0.05,
-    15: 0.02,  16: 0.03,
-    17: 0.08,  18: 0.15,  19: 0.10,  20: 0.06,
-    21: 0.02,  22: 0.005,
+    8: 0.005,
+    9: 0.01,
+    10: 0.03,
+    11: 0.10,
+    12: 0.18,
+    13: 0.12,
+    14: 0.05,
+    15: 0.02,
+    16: 0.03,
+    17: 0.08,
+    18: 0.15,
+    19: 0.10,
+    20: 0.06,
+    21: 0.02,
+    22: 0.005,
 }
 
 # 天气系数
@@ -239,11 +249,11 @@ WEATHER_FACTOR: Dict[str, float] = {
 # 节假日系数
 HOLIDAY_FACTOR: Dict[str, float] = {
     "normal": 1.0,
-    "holiday": 1.50,        # 法定节假日
-    "holiday_eve": 1.20,    # 节前一天
+    "holiday": 1.50,  # 法定节假日
+    "holiday_eve": 1.20,  # 节前一天
     "spring_festival": 0.40,  # 春节（长沙人回乡多，市区冷清）
-    "national_day": 1.60,   # 国庆（旅游旺季）
-    "valentines": 1.35,     # 情人节等
+    "national_day": 1.60,  # 国庆（旅游旺季）
+    "valentines": 1.35,  # 情人节等
 }
 
 # 岗位服务标准
@@ -349,18 +359,20 @@ class SmartScheduleService:
                 is_peak = True
                 peak_type = "dinner"
 
-            hourly_predictions.append({
-                "hour": hour,
-                "predicted_customers": count,
-                "is_peak": is_peak,
-                "peak_type": peak_type,
-                "factors": {
-                    "day_of_week": dow_factor,
-                    "weather": w_factor,
-                    "holiday": h_factor,
-                    "event": event_factor,
-                },
-            })
+            hourly_predictions.append(
+                {
+                    "hour": hour,
+                    "predicted_customers": count,
+                    "is_peak": is_peak,
+                    "peak_type": peak_type,
+                    "factors": {
+                        "day_of_week": dow_factor,
+                        "weather": w_factor,
+                        "holiday": h_factor,
+                        "event": event_factor,
+                    },
+                }
+            )
 
         # 如果按班次粒度聚合
         if granularity == "shift":
@@ -378,24 +390,19 @@ class SmartScheduleService:
         for shift_name, shift_def in SHIFT_DEFINITIONS.items():
             start = shift_def["start_hour"]
             end = shift_def["end_hour"]
-            total_customers = sum(
-                h["predicted_customers"]
-                for h in hourly
-                if start <= h["hour"] < end
+            total_customers = sum(h["predicted_customers"] for h in hourly if start <= h["hour"] < end)
+            peak_hours = [h["hour"] for h in hourly if start <= h["hour"] < end and h["is_peak"]]
+            shift_data.append(
+                {
+                    "shift": shift_name,
+                    "label": shift_def["label"],
+                    "start_hour": start,
+                    "end_hour": end,
+                    "predicted_customers": total_customers,
+                    "peak_hours": peak_hours,
+                    "date": target_date.isoformat(),
+                }
             )
-            peak_hours = [
-                h["hour"] for h in hourly
-                if start <= h["hour"] < end and h["is_peak"]
-            ]
-            shift_data.append({
-                "shift": shift_name,
-                "label": shift_def["label"],
-                "start_hour": start,
-                "end_hour": end,
-                "predicted_customers": total_customers,
-                "peak_hours": peak_hours,
-                "date": target_date.isoformat(),
-            })
         return shift_data
 
     # ──────────────────────────────────────────────────────
@@ -415,17 +422,20 @@ class SmartScheduleService:
         Returns: {hour: {waiter, chef, cashier, host}, total_shifts}
         Consider: kitchen prep (before open), cleanup (after close)
         """
-        hourly_traffic = self.predict_traffic(
-            store_id, target_date, "hour", weather, holiday_type
-        )
+        hourly_traffic = self.predict_traffic(store_id, target_date, "hour", weather, holiday_type)
         total_tables = self.store_config.get("total_tables", 30)
         open_h = self.store_config.get("open_hour", 10)
         close_h = self.store_config.get("close_hour", 22)
 
         hourly_needs: Dict[int, Dict[str, int]] = {}
         total_person_hours: Dict[str, float] = {
-            "waiter": 0, "chef_hot": 0, "chef_cold": 0,
-            "chef_dim_sum": 0, "cashier": 0, "host": 0, "manager": 0,
+            "waiter": 0,
+            "chef_hot": 0,
+            "chef_cold": 0,
+            "chef_dim_sum": 0,
+            "cashier": 0,
+            "host": 0,
+            "manager": 0,
         }
 
         # Kitchen prep: 2 hours before open
@@ -477,8 +487,13 @@ class SmartScheduleService:
 
         # Cleanup: 1 hour after close
         hourly_needs[close_h + 1] = {
-            "waiter": 1, "chef_hot": 0, "chef_cold": 0,
-            "chef_dim_sum": 0, "cashier": 0, "host": 0, "manager": 0,
+            "waiter": 1,
+            "chef_hot": 0,
+            "chef_cold": 0,
+            "chef_dim_sum": 0,
+            "cashier": 0,
+            "host": 0,
+            "manager": 0,
         }
         total_person_hours["waiter"] += 1
 
@@ -554,9 +569,7 @@ class SmartScheduleService:
                 assigned: List[str] = []
 
                 # Greedy assignment: for each needed role, find best available employee
-                for role, count_needed in sorted(
-                    shift_skill_needs.items(), key=lambda x: x[1], reverse=True
-                ):
+                for role, count_needed in sorted(shift_skill_needs.items(), key=lambda x: x[1], reverse=True):
                     if count_needed <= 0:
                         continue
 
@@ -599,10 +612,7 @@ class SmartScheduleService:
 
             # Update consecutive days
             for emp_id in employee_consecutive_days:
-                if any(
-                    emp_id in emps
-                    for emps in day_schedule.values()
-                ):
+                if any(emp_id in emps for emps in day_schedule.values()):
                     employee_consecutive_days[emp_id] += 1
                 else:
                     employee_consecutive_days[emp_id] = 0
@@ -781,8 +791,7 @@ class SmartScheduleService:
         if old_shift:
             sch["employee_hours_summary"][employee_id] -= SHIFT_DEFINITIONS[old_shift]["duration_hours"]
         sch["employee_hours_summary"][employee_id] = (
-            sch["employee_hours_summary"].get(employee_id, 0)
-            + SHIFT_DEFINITIONS[new_shift]["duration_hours"]
+            sch["employee_hours_summary"].get(employee_id, 0) + SHIFT_DEFINITIONS[new_shift]["duration_hours"]
         )
 
         # Re-validate
@@ -846,8 +855,8 @@ class SmartScheduleService:
         # Update hours
         hours_a = SHIFT_DEFINITIONS[shift_a]["duration_hours"]
         hours_b = SHIFT_DEFINITIONS[shift_b]["duration_hours"]
-        sch["employee_hours_summary"][employee_a] += (hours_b - hours_a)
-        sch["employee_hours_summary"][employee_b] += (hours_a - hours_b)
+        sch["employee_hours_summary"][employee_a] += hours_b - hours_a
+        sch["employee_hours_summary"][employee_b] += hours_a - hours_b
 
         sch["validation"] = self.validate_schedule(sch)
 
@@ -885,13 +894,15 @@ class SmartScheduleService:
             emp = emp_lookup.get(emp_id, {})
             max_week = emp.get("max_hours_week", MAX_HOURS_WEEK_STANDARD)
             if total_hours > max_week:
-                violations.append({
-                    "employee_id": emp_id,
-                    "employee_name": emp.get("name", "unknown"),
-                    "rule": "weekly_hours_cap",
-                    "detail": f"周工时 {total_hours}h 超出上限 {max_week}h",
-                    "severity": "error",
-                })
+                violations.append(
+                    {
+                        "employee_id": emp_id,
+                        "employee_name": emp.get("name", "unknown"),
+                        "rule": "weekly_hours_cap",
+                        "detail": f"周工时 {total_hours}h 超出上限 {max_week}h",
+                        "severity": "error",
+                    }
+                )
 
         # --- Rule 2: Consecutive days ---
         emp_work_dates: Dict[str, List[str]] = {}
@@ -918,13 +929,15 @@ class SmartScheduleService:
 
             if max_consecutive > MAX_CONSECUTIVE_DAYS:
                 emp = emp_lookup.get(emp_id, {})
-                violations.append({
-                    "employee_id": emp_id,
-                    "employee_name": emp.get("name", "unknown"),
-                    "rule": "max_consecutive_days",
-                    "detail": f"连续工作 {max_consecutive} 天，超出上限 {MAX_CONSECUTIVE_DAYS} 天",
-                    "severity": "error",
-                })
+                violations.append(
+                    {
+                        "employee_id": emp_id,
+                        "employee_name": emp.get("name", "unknown"),
+                        "rule": "max_consecutive_days",
+                        "detail": f"连续工作 {max_consecutive} 天，超出上限 {MAX_CONSECUTIVE_DAYS} 天",
+                        "severity": "error",
+                    }
+                )
 
         # --- Rule 3: Minor restrictions ---
         for date_str, day_sch in schedule.items():
@@ -934,21 +947,25 @@ class SmartScheduleService:
                     emp = emp_lookup.get(emp_id, {})
                     if emp.get("is_minor", False):
                         if shift_def.get("end_hour", 0) > MINOR_NIGHT_SHIFT_CUTOFF:
-                            violations.append({
-                                "employee_id": emp_id,
-                                "employee_name": emp.get("name", "unknown"),
-                                "rule": "minor_night_shift",
-                                "detail": f"未成年人 {date_str} 排到夜班（结束于 {shift_def['end_hour']}:00 > {MINOR_NIGHT_SHIFT_CUTOFF}:00）",
-                                "severity": "error",
-                            })
+                            violations.append(
+                                {
+                                    "employee_id": emp_id,
+                                    "employee_name": emp.get("name", "unknown"),
+                                    "rule": "minor_night_shift",
+                                    "detail": f"未成年人 {date_str} 排到夜班（结束于 {shift_def['end_hour']}:00 > {MINOR_NIGHT_SHIFT_CUTOFF}:00）",
+                                    "severity": "error",
+                                }
+                            )
                         if shift_def.get("duration_hours", 0) > MAX_HOURS_DAY_MINOR:
-                            violations.append({
-                                "employee_id": emp_id,
-                                "employee_name": emp.get("name", "unknown"),
-                                "rule": "minor_daily_hours",
-                                "detail": f"未成年人 {date_str} 工时 {shift_def['duration_hours']}h > {MAX_HOURS_DAY_MINOR}h 上限",
-                                "severity": "error",
-                            })
+                            violations.append(
+                                {
+                                    "employee_id": emp_id,
+                                    "employee_name": emp.get("name", "unknown"),
+                                    "rule": "minor_daily_hours",
+                                    "detail": f"未成年人 {date_str} 工时 {shift_def['duration_hours']}h > {MAX_HOURS_DAY_MINOR}h 上限",
+                                    "severity": "error",
+                                }
+                            )
 
         # --- Rule 4: Rest between shifts ---
         for emp_id, dates in emp_work_dates.items():
@@ -976,13 +993,15 @@ class SmartScheduleService:
                     rest_hours = (24 - last_end) + first_start
                     if rest_hours < MIN_REST_BETWEEN_SHIFTS_HOURS:
                         emp = emp_lookup.get(emp_id, {})
-                        violations.append({
-                            "employee_id": emp_id,
-                            "employee_name": emp.get("name", "unknown"),
-                            "rule": "min_rest_between_shifts",
-                            "detail": f"{sorted_dates[i-1]}→{sorted_dates[i]} 休息仅 {rest_hours}h < {MIN_REST_BETWEEN_SHIFTS_HOURS}h",
-                            "severity": "warning",
-                        })
+                        violations.append(
+                            {
+                                "employee_id": emp_id,
+                                "employee_name": emp.get("name", "unknown"),
+                                "rule": "min_rest_between_shifts",
+                                "detail": f"{sorted_dates[i - 1]}→{sorted_dates[i]} 休息仅 {rest_hours}h < {MIN_REST_BETWEEN_SHIFTS_HOURS}h",
+                                "severity": "warning",
+                            }
+                        )
 
         # --- Rule 5: Overtime estimate (monthly projection) ---
         standard_weekly = MAX_HOURS_WEEK_STANDARD
@@ -992,13 +1011,15 @@ class SmartScheduleService:
             overtime_month_est = overtime_week * 4.33
             if overtime_month_est > MAX_OVERTIME_MONTH_HOURS:
                 emp = emp_lookup.get(emp_id, {})
-                violations.append({
-                    "employee_id": emp_id,
-                    "employee_name": emp.get("name", "unknown"),
-                    "rule": "monthly_overtime_cap",
-                    "detail": f"预估月加班 {overtime_month_est:.0f}h 超出 {MAX_OVERTIME_MONTH_HOURS}h 上限",
-                    "severity": "warning",
-                })
+                violations.append(
+                    {
+                        "employee_id": emp_id,
+                        "employee_name": emp.get("name", "unknown"),
+                        "rule": "monthly_overtime_cap",
+                        "detail": f"预估月加班 {overtime_month_est:.0f}h 超出 {MAX_OVERTIME_MONTH_HOURS}h 上限",
+                        "severity": "warning",
+                    }
+                )
 
         is_valid = not any(v["severity"] == "error" for v in violations)
 
@@ -1047,16 +1068,18 @@ class SmartScheduleService:
             # Preference bonus
             preference_bonus = 0.1 if shift_name in emp.get("preferred_shifts", []) else 0
 
-            results.append({
-                "employee_id": emp["employee_id"],
-                "name": emp["name"],
-                "position": emp["position"],
-                "skills": list(emp_skills),
-                "matched_skills": list(matched_skills),
-                "match_score": round(match_score + preference_bonus, 2),
-                "preferred_shift": shift_name in emp.get("preferred_shifts", []),
-                "hourly_rate_fen": emp["hourly_rate_fen"],
-            })
+            results.append(
+                {
+                    "employee_id": emp["employee_id"],
+                    "name": emp["name"],
+                    "position": emp["position"],
+                    "skills": list(emp_skills),
+                    "matched_skills": list(matched_skills),
+                    "match_score": round(match_score + preference_bonus, 2),
+                    "preferred_shift": shift_name in emp.get("preferred_shifts", []),
+                    "hourly_rate_fen": emp["hourly_rate_fen"],
+                }
+            )
 
         results.sort(key=lambda x: x["match_score"], reverse=True)
         return results
@@ -1118,18 +1141,21 @@ class SmartScheduleService:
                 traffic_ratio = day_actual / day_predicted if day_predicted > 0 else 1.0
                 if traffic_ratio < 0.85:
                     # Overstaffed
-                    overstaffed_hours += sum(
-                        SHIFT_DEFINITIONS.get(sn, {}).get("duration_hours", 0) * len(el)
-                        for sn, el in day_sch.items()
-                    ) * (1 - traffic_ratio) * 0.5
+                    overstaffed_hours += (
+                        sum(
+                            SHIFT_DEFINITIONS.get(sn, {}).get("duration_hours", 0) * len(el)
+                            for sn, el in day_sch.items()
+                        )
+                        * (1 - traffic_ratio)
+                        * 0.5
+                    )
                 elif traffic_ratio > 1.15:
                     understaffed_hours += (traffic_ratio - 1) * 8  # approximate
 
         prediction_accuracy = 0.0
         if total_predicted_customers > 0:
             prediction_accuracy = round(
-                (1 - abs(total_actual_customers - total_predicted_customers)
-                 / total_predicted_customers) * 100, 1
+                (1 - abs(total_actual_customers - total_predicted_customers) / total_predicted_customers) * 100, 1
             )
 
         return {
@@ -1146,9 +1172,7 @@ class SmartScheduleService:
             "prediction_accuracy_pct": prediction_accuracy,
             "overstaffed_hours": round(overstaffed_hours, 1),
             "understaffed_hours": round(understaffed_hours, 1),
-            "efficiency_score": round(
-                max(0, 100 - overstaffed_hours - understaffed_hours * 2), 1
-            ),
+            "efficiency_score": round(max(0, 100 - overstaffed_hours - understaffed_hours * 2), 1),
         }
 
     def get_overtime_report(
@@ -1188,24 +1212,24 @@ class SmartScheduleService:
         for emp_id, total_hours in emp_monthly_hours.items():
             emp = emp_lookup.get(emp_id, {})
             overtime_hours = max(0, total_hours - standard_monthly_hours)
-            overtime_cost_fen = int(
-                overtime_hours * emp.get("hourly_rate_fen", 2500) * 1.5
-            )
+            overtime_cost_fen = int(overtime_hours * emp.get("hourly_rate_fen", 2500) * 1.5)
             exceeds_cap = overtime_hours > MAX_OVERTIME_MONTH_HOURS
 
-            report.append({
-                "employee_id": emp_id,
-                "employee_name": emp.get("name", "unknown"),
-                "position": emp.get("position", "unknown"),
-                "work_days": emp_work_days.get(emp_id, 0),
-                "total_hours": round(total_hours, 1),
-                "standard_hours": standard_monthly_hours,
-                "overtime_hours": round(overtime_hours, 1),
-                "overtime_cost_fen": overtime_cost_fen,
-                "overtime_cost_yuan": round(overtime_cost_fen / 100, 2),
-                "exceeds_monthly_cap": exceeds_cap,
-                "cap_hours": MAX_OVERTIME_MONTH_HOURS,
-            })
+            report.append(
+                {
+                    "employee_id": emp_id,
+                    "employee_name": emp.get("name", "unknown"),
+                    "position": emp.get("position", "unknown"),
+                    "work_days": emp_work_days.get(emp_id, 0),
+                    "total_hours": round(total_hours, 1),
+                    "standard_hours": standard_monthly_hours,
+                    "overtime_hours": round(overtime_hours, 1),
+                    "overtime_cost_fen": overtime_cost_fen,
+                    "overtime_cost_yuan": round(overtime_cost_fen / 100, 2),
+                    "exceeds_monthly_cap": exceeds_cap,
+                    "cap_hours": MAX_OVERTIME_MONTH_HOURS,
+                }
+            )
 
         report.sort(key=lambda x: x["overtime_hours"], reverse=True)
         return report

@@ -10,6 +10,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 import json
@@ -143,14 +144,16 @@ async def get_inspection_rankings(
         rows = result.mappings().all()
         rankings = []
         for i, row in enumerate(rows, start=1):
-            rankings.append({
-                "rank": i,
-                "store_id": str(row["store_id"]),
-                "avg_score": round(float(row["avg_score"]), 1),
-                "inspection_count": row["inspection_count"],
-                "min_score": round(float(row["min_score"]), 1),
-                "max_score": round(float(row["max_score"]), 1),
-            })
+            rankings.append(
+                {
+                    "rank": i,
+                    "store_id": str(row["store_id"]),
+                    "avg_score": round(float(row["avg_score"]), 1),
+                    "inspection_count": row["inspection_count"],
+                    "min_score": round(float(row["min_score"]), 1),
+                    "max_score": round(float(row["max_score"]), 1),
+                }
+            )
         return {
             "ok": True,
             "data": {
@@ -327,8 +330,7 @@ async def get_inspection(
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        log.error("inspection_get_db_error", error=str(exc), report_id=report_id,
-                  tenant_id=x_tenant_id)
+        log.error("inspection_get_db_error", error=str(exc), report_id=report_id, tenant_id=x_tenant_id)
         raise HTTPException(status_code=500, detail="数据库错误，获取报告详情失败")
 
 
@@ -378,14 +380,12 @@ async def submit_inspection(
         row = result.mappings().one()
         await db.commit()
         record = _serialize_row(row)
-        log.info("inspection_submitted", report_id=report_id,
-                 store_id=str(record["store_id"]), tenant_id=x_tenant_id)
+        log.info("inspection_submitted", report_id=report_id, store_id=str(record["store_id"]), tenant_id=x_tenant_id)
         return {"ok": True, "data": record}
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        log.error("inspection_submit_db_error", error=str(exc), report_id=report_id,
-                  tenant_id=x_tenant_id)
+        log.error("inspection_submit_db_error", error=str(exc), report_id=report_id, tenant_id=x_tenant_id)
         raise HTTPException(status_code=500, detail="数据库错误，提交报告失败")
 
 
@@ -441,12 +441,12 @@ async def acknowledge_inspection(
         row = result.mappings().one()
         await db.commit()
         record = _serialize_row(row)
-        log.info("inspection_acknowledged", report_id=report_id,
-                 acknowledged_by=body.acknowledged_by, tenant_id=x_tenant_id)
+        log.info(
+            "inspection_acknowledged", report_id=report_id, acknowledged_by=body.acknowledged_by, tenant_id=x_tenant_id
+        )
         return {"ok": True, "data": record}
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        log.error("inspection_acknowledge_db_error", error=str(exc), report_id=report_id,
-                  tenant_id=x_tenant_id)
+        log.error("inspection_acknowledge_db_error", error=str(exc), report_id=report_id, tenant_id=x_tenant_id)
         raise HTTPException(status_code=500, detail="数据库错误，确认报告失败")

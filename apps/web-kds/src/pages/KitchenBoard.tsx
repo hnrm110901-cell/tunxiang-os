@@ -7,7 +7,7 @@
  * 深色背景，触控优化（最小48px按钮，最小20px菜品字体）
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch/components/TXKDSTicket';
+import { TXKDSTicket, type TXKDSTicketItem } from '@tx/touch';
 import { useKdsWebSocket, type KDSTicket, type RemakeAlert } from '../hooks/useKdsWebSocket';
 import { warmUpAudio } from '../utils/audio';
 import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';

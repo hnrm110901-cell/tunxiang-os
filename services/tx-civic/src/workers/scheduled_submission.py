@@ -6,6 +6,7 @@
 - 执行上报（调用城市适配器）
 - 更新状态（accepted/rejected/retry/failed）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -42,7 +43,9 @@ class ScheduledSubmissionWorker:
     async def _fetch_tenant_ids(self, db: AsyncSession) -> list[str]:
         """获取所有租户 ID 列表。"""
         result = await db.execute(
-            text("SELECT DISTINCT tenant_id FROM civic_submissions WHERE is_deleted = FALSE AND status IN ('pending', 'retry')")
+            text(
+                "SELECT DISTINCT tenant_id FROM civic_submissions WHERE is_deleted = FALSE AND status IN ('pending', 'retry')"
+            )
         )
         return [str(row[0]) for row in result.all()]
 
@@ -183,9 +186,7 @@ class ScheduledSubmissionWorker:
         """)
 
         try:
-            result = await db.execute(
-                sql, {"now": now, "max_retry": MAX_RETRY_COUNT, "limit": BATCH_SIZE}
-            )
+            result = await db.execute(sql, {"now": now, "max_retry": MAX_RETRY_COUNT, "limit": BATCH_SIZE})
             rows = result.all()
         except SQLAlchemyError as exc:
             logger.error("fetch_retryable_failed", error=str(exc), exc_info=True)
@@ -235,9 +236,7 @@ class ScheduledSubmissionWorker:
         )
 
         # 标记为 submitting
-        await self._update_status(
-            db, submission_id, SubmissionStatus.submitting, retry_count
-        )
+        await self._update_status(db, submission_id, SubmissionStatus.submitting, retry_count)
 
         try:
             # 获取城市适配器并执行上报
@@ -252,7 +251,10 @@ class ScheduledSubmissionWorker:
                     submission_id=str(submission_id),
                 )
                 await self._update_status(
-                    db, submission_id, SubmissionStatus.failed, retry_count,
+                    db,
+                    submission_id,
+                    SubmissionStatus.failed,
+                    retry_count,
                     error_message=f"No adapter for city={city_code} domain={domain}",
                 )
                 await self._emit_event(item, SubmissionStatus.failed)
@@ -263,7 +265,10 @@ class ScheduledSubmissionWorker:
 
             if submit_result.get("accepted"):
                 await self._update_status(
-                    db, submission_id, SubmissionStatus.accepted, retry_count,
+                    db,
+                    submission_id,
+                    SubmissionStatus.accepted,
+                    retry_count,
                     response_data=submit_result,
                 )
                 await self._emit_event(item, SubmissionStatus.accepted)
@@ -271,7 +276,10 @@ class ScheduledSubmissionWorker:
 
             if submit_result.get("rejected"):
                 await self._update_status(
-                    db, submission_id, SubmissionStatus.rejected, retry_count,
+                    db,
+                    submission_id,
+                    SubmissionStatus.rejected,
+                    retry_count,
                     error_message=submit_result.get("reason", "rejected by platform"),
                     response_data=submit_result,
                 )
@@ -286,7 +294,10 @@ class ScheduledSubmissionWorker:
             new_retry_count = retry_count + 1
             if new_retry_count >= MAX_RETRY_COUNT:
                 await self._update_status(
-                    db, submission_id, SubmissionStatus.failed, new_retry_count,
+                    db,
+                    submission_id,
+                    SubmissionStatus.failed,
+                    new_retry_count,
                     error_message=f"Max retries exceeded: {exc}",
                 )
                 await self._emit_event(item, SubmissionStatus.failed)
@@ -298,11 +309,14 @@ class ScheduledSubmissionWorker:
                 return "failed"
 
             # 指数退避计算下次重试时间
-            backoff_minutes = RETRY_BASE_MINUTES * (2 ** retry_count)
+            backoff_minutes = RETRY_BASE_MINUTES * (2**retry_count)
             next_retry = datetime.now(timezone.utc) + timedelta(minutes=backoff_minutes)
 
             await self._update_status(
-                db, submission_id, SubmissionStatus.retry, new_retry_count,
+                db,
+                submission_id,
+                SubmissionStatus.retry,
+                new_retry_count,
                 next_retry_at=next_retry,
                 error_message=str(exc),
             )
@@ -318,7 +332,10 @@ class ScheduledSubmissionWorker:
         except (ValueError, KeyError, RuntimeError) as exc:
             # 不可重试的错误
             await self._update_status(
-                db, submission_id, SubmissionStatus.failed, retry_count,
+                db,
+                submission_id,
+                SubmissionStatus.failed,
+                retry_count,
                 error_message=str(exc),
             )
             await self._emit_event(item, SubmissionStatus.failed)
@@ -364,14 +381,18 @@ class ScheduledSubmissionWorker:
         """)
 
         import json
-        await db.execute(sql, {
-            "id": submission_id,
-            "status": status.value,
-            "retry_count": retry_count,
-            "next_retry_at": next_retry_at,
-            "error_message": error_message,
-            "response_data": json.dumps(response_data) if response_data else None,
-        })
+
+        await db.execute(
+            sql,
+            {
+                "id": submission_id,
+                "status": status.value,
+                "retry_count": retry_count,
+                "next_retry_at": next_retry_at,
+                "error_message": error_message,
+                "response_data": json.dumps(response_data) if response_data else None,
+            },
+        )
         await db.commit()
 
     async def _emit_event(
@@ -394,17 +415,19 @@ class ScheduledSubmissionWorker:
                 else CivicEventType.SUBMISSION_FAILED.value
             )
 
-            asyncio.create_task(emit_event(
-                event_type=event_type,
-                tenant_id=item["tenant_id"],
-                stream_id=str(item["id"]),
-                payload={
-                    "store_id": str(item["store_id"]),
-                    "city_code": item["city_code"],
-                    "domain": item["domain"],
-                    "status": status.value,
-                },
-                source_service="tx-civic",
-            ))
+            asyncio.create_task(
+                emit_event(
+                    event_type=event_type,
+                    tenant_id=item["tenant_id"],
+                    stream_id=str(item["id"]),
+                    payload={
+                        "store_id": str(item["store_id"]),
+                        "city_code": item["city_code"],
+                        "domain": item["domain"],
+                        "status": status.value,
+                    },
+                    source_service="tx-civic",
+                )
+            )
         except ImportError:
             logger.warning("event_emitter_not_available", hint="shared.events not installed")

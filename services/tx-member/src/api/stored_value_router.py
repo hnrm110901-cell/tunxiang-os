@@ -13,6 +13,7 @@
 注：本路由使用 stored_value_service.StoredValueService，
     充值赠送规则查询 sv_charge_rules（v057 迁移新增表）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,6 +43,7 @@ _svc = StoredValueService()
 # 依赖
 # ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -57,6 +59,7 @@ def _parse_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> uui
 # ──────────────────────────────────────────────────────────────────
 # 请求 / 响应模型
 # ──────────────────────────────────────────────────────────────────
+
 
 class ChargeReq(BaseModel):
     amount_fen: int = Field(..., gt=0, description="充值金额（分）")
@@ -78,9 +81,7 @@ class RefundReq(BaseModel):
 
 class ExchangePointsReq(BaseModel):
     points: int = Field(..., gt=0, description="兑换积分数")
-    points_to_fen_ratio: int = Field(
-        default=100, gt=0, description="每多少积分兑换 1 分钱（默认 100:1）"
-    )
+    points_to_fen_ratio: int = Field(default=100, gt=0, description="每多少积分兑换 1 分钱（默认 100:1）")
 
 
 class CreateChargeRuleReq(BaseModel):
@@ -95,6 +96,7 @@ class CreateChargeRuleReq(BaseModel):
 # ──────────────────────────────────────────────────────────────────
 # 充值
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/members/{member_id}/sv/charge",
@@ -117,12 +119,15 @@ async def charge(
     from models.stored_value import StoredValueCard
 
     card_result = await db.execute(
-        select(StoredValueCard).where(
+        select(StoredValueCard)
+        .where(
             StoredValueCard.customer_id == member_id,
             StoredValueCard.tenant_id == tenant_id,
             StoredValueCard.status == "active",
             StoredValueCard.is_deleted.is_(False),
-        ).order_by(StoredValueCard.created_at.asc()).limit(1)
+        )
+        .order_by(StoredValueCard.created_at.asc())
+        .limit(1)
     )
     card = card_result.scalar_one_or_none()
 
@@ -133,11 +138,7 @@ async def charge(
             customer_id=member_id,
             tenant_id=tenant_id,
         )
-        card_result2 = await db.execute(
-            select(StoredValueCard).where(
-                StoredValueCard.id == uuid.UUID(card_data["id"])
-            )
-        )
+        card_result2 = await db.execute(select(StoredValueCard).where(StoredValueCard.id == uuid.UUID(card_data["id"])))
         card = card_result2.scalar_one()
 
     # 查询赠送规则
@@ -178,6 +179,7 @@ async def charge(
 # 消费核销
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/members/{member_id}/sv/consume",
     summary="消费核销（乐观锁防并发超扣）",
@@ -214,6 +216,7 @@ async def consume(
 # ──────────────────────────────────────────────────────────────────
 # 退款
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/sv/transactions/{tx_id}/refund",
@@ -262,6 +265,7 @@ async def refund(
 # 余额查询
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/members/{member_id}/sv/balance",
     summary="查询会员储值余额",
@@ -275,11 +279,14 @@ async def get_balance(
     from models.stored_value import StoredValueCard
 
     card_result = await db.execute(
-        select(StoredValueCard).where(
+        select(StoredValueCard)
+        .where(
             StoredValueCard.customer_id == member_id,
             StoredValueCard.tenant_id == tenant_id,
             StoredValueCard.is_deleted.is_(False),
-        ).order_by(StoredValueCard.created_at.asc()).limit(1)
+        )
+        .order_by(StoredValueCard.created_at.asc())
+        .limit(1)
     )
     card = card_result.scalar_one_or_none()
     if not card:
@@ -296,6 +303,7 @@ async def get_balance(
 # 交易流水
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/members/{member_id}/sv/transactions",
     summary="查询会员储值流水",
@@ -311,18 +319,25 @@ async def get_transactions(
     from models.stored_value import StoredValueCard
 
     card_result = await db.execute(
-        select(StoredValueCard).where(
+        select(StoredValueCard)
+        .where(
             StoredValueCard.customer_id == member_id,
             StoredValueCard.tenant_id == tenant_id,
             StoredValueCard.is_deleted.is_(False),
-        ).order_by(StoredValueCard.created_at.asc()).limit(1)
+        )
+        .order_by(StoredValueCard.created_at.asc())
+        .limit(1)
     )
     card = card_result.scalar_one_or_none()
     if not card:
         raise HTTPException(status_code=404, detail=f"会员 {member_id} 尚未开储值卡")
 
     result = await _svc.get_transactions_by_id(
-        db=db, card_id=card.id, tenant_id=tenant_id, page=page, size=size,
+        db=db,
+        card_id=card.id,
+        tenant_id=tenant_id,
+        page=page,
+        size=size,
     )
     return {"ok": True, "data": result}
 
@@ -330,6 +345,7 @@ async def get_transactions(
 # ──────────────────────────────────────────────────────────────────
 # 充值赠送规则
 # ──────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/sv/charge-rules",
@@ -423,6 +439,7 @@ async def create_charge_rule(
 # 积分兑换余额
 # ──────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/members/{member_id}/sv/exchange-points",
     summary="积分兑换储值余额",
@@ -454,6 +471,7 @@ async def exchange_points(
 # ──────────────────────────────────────────────────────────────────
 # 内部辅助
 # ──────────────────────────────────────────────────────────────────
+
 
 async def _match_charge_bonus(
     db: AsyncSession,

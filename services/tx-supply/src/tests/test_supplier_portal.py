@@ -4,6 +4,7 @@
 - 供应商: 湘江渔港(海鲜)、马王堆市场(蔬菜)、新农都冻品(冻品)
 - 食材: 鲈鱼、基围虾、波士顿龙虾、空心菜、冻鱿鱼
 """
+
 import os
 import sys
 
@@ -19,19 +20,22 @@ def _make_service_with_suppliers():
     svc = SupplierPortalService()
 
     s1 = svc.register_supplier(
-        "湘江渔港水产", "seafood",
+        "湘江渔港水产",
+        "seafood",
         {"person": "张海生", "phone": "13812345678", "address": "长沙市望城区渔港路88号"},
         ["食品经营许可证", "水产品检验检疫证", "ISO22000", "HACCP"],
         "net30",
     )
     s2 = svc.register_supplier(
-        "马王堆蔬菜批发", "vegetable",
+        "马王堆蔬菜批发",
+        "vegetable",
         {"person": "李菜农", "phone": "13987654321", "address": "长沙市芙蓉区马王堆路"},
         ["食品经营许可证", "有机认证"],
         "cod",
     )
     s3 = svc.register_supplier(
-        "新农都冻品中心", "frozen",
+        "新农都冻品中心",
+        "frozen",
         {"person": "王冻品", "phone": "13611112222", "address": "长沙市开福区新农都"},
         ["食品经营许可证", "冷链运输资质", "ISO22000"],
         "net60",
@@ -43,25 +47,30 @@ def _make_service_with_suppliers():
 def _inject_delivery_records(svc, supplier_id, count=20, on_time_rate=0.9, quality_rate=0.95):
     """注入交付记录"""
     import random
+
     random.seed(42)
 
     for i in range(count):
         day = f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}"
-        svc._add_delivery_record(supplier_id, {
-            "date": day,
-            "on_time": random.random() < on_time_rate,
-            "quality": "pass" if random.random() < quality_rate else "fail",
-            "ingredient": "鲈鱼" if i % 3 == 0 else "基围虾" if i % 3 == 1 else "空心菜",
-            "total_fen": random.randint(50000, 200000),
-            "price_competitiveness": random.randint(65, 95),
-            "service_rating": random.randint(70, 95),
-            "price_adherence": True,
-        })
+        svc._add_delivery_record(
+            supplier_id,
+            {
+                "date": day,
+                "on_time": random.random() < on_time_rate,
+                "quality": "pass" if random.random() < quality_rate else "fail",
+                "ingredient": "鲈鱼" if i % 3 == 0 else "基围虾" if i % 3 == 1 else "空心菜",
+                "total_fen": random.randint(50000, 200000),
+                "price_competitiveness": random.randint(65, 95),
+                "service_rating": random.randint(70, 95),
+                "price_adherence": True,
+            },
+        )
 
 
 def _inject_price_history(svc, ingredient, base_price, count=30, volatility=0.05):
     """注入价格历史"""
     import random
+
     random.seed(123)
 
     entries = []
@@ -70,11 +79,13 @@ def _inject_price_history(svc, ingredient, base_price, count=30, volatility=0.05
         day = f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}"
         fluctuation = random.uniform(-volatility, volatility)
         price = int(base_price * (1 + fluctuation))
-        entries.append({
-            "date": f"{day}T00:00:00+00:00",
-            "supplier_id": "any",
-            "price_fen": price,
-        })
+        entries.append(
+            {
+                "date": f"{day}T00:00:00+00:00",
+                "supplier_id": "any",
+                "price_fen": price,
+            }
+        )
 
     svc._add_price_history(ingredient, entries)
 
@@ -88,7 +99,8 @@ class TestSupplierManagement:
     def test_register_supplier(self):
         svc = SupplierPortalService()
         s = svc.register_supplier(
-            "湘江渔港水产", "seafood",
+            "湘江渔港水产",
+            "seafood",
             {"person": "张海生", "phone": "138xxx"},
             ["食品经营许可证", "ISO22000"],
         )
@@ -159,8 +171,7 @@ class TestAutoBidding:
         _inject_delivery_records(svc, s1["supplier_id"], count=20, on_time_rate=0.95, quality_rate=0.98)
         _inject_delivery_records(svc, s3["supplier_id"], count=15, on_time_rate=0.7, quality_rate=0.8)
 
-        rfq = svc.request_quotes("波士顿龙虾", 100, "2026-04-01",
-                                  [s1["supplier_id"], s3["supplier_id"]])
+        rfq = svc.request_quotes("波士顿龙虾", 100, "2026-04-01", [s1["supplier_id"], s3["supplier_id"]])
 
         svc._submit_quote(rfq["rfq_id"], s1["supplier_id"], 18000, 3, "空运新鲜直达")
         svc._submit_quote(rfq["rfq_id"], s3["supplier_id"], 15000, 5, "冻品发货")
@@ -233,10 +244,23 @@ class TestContractManagement:
         contract = svc.create_contract(
             s1["supplier_id"],
             [
-                {"ingredient_id": "ing_bass", "name": "鲈鱼", "agreed_price_fen": 3500, "min_quantity": 100, "unit": "kg"},
-                {"ingredient_id": "ing_shrimp", "name": "基围虾", "agreed_price_fen": 5600, "min_quantity": 50, "unit": "kg"},
+                {
+                    "ingredient_id": "ing_bass",
+                    "name": "鲈鱼",
+                    "agreed_price_fen": 3500,
+                    "min_quantity": 100,
+                    "unit": "kg",
+                },
+                {
+                    "ingredient_id": "ing_shrimp",
+                    "name": "基围虾",
+                    "agreed_price_fen": 5600,
+                    "min_quantity": 50,
+                    "unit": "kg",
+                },
             ],
-            "2026-01-01", "2026-06-30",
+            "2026-01-01",
+            "2026-06-30",
             pricing_terms="季度固定价，市场波动超10%可协商调整",
             payment_terms="net30",
             penalties={"late_delivery_pct": 5, "quality_failure_pct": 10, "max_penalty_pct": 30},
@@ -275,9 +299,13 @@ class TestContractManagement:
         today = date.today()
         soon = today + timedelta(days=15)
         svc.create_contract(
-            s1["supplier_id"], [],
-            str(today - timedelta(days=180)), str(soon),
-            "", "net30", {},
+            s1["supplier_id"],
+            [],
+            str(today - timedelta(days=180)),
+            str(soon),
+            "",
+            "net30",
+            {},
         )
 
         expiring = svc.check_contract_expiry(days_ahead=30)
@@ -512,13 +540,16 @@ class TestSupplyChainRisk:
 
         # 只有一个供应商，且有大量采购
         for i in range(20):
-            svc._add_delivery_record(s1["supplier_id"], {
-                "date": f"2026-01-{1 + i:02d}",
-                "on_time": True,
-                "quality": "pass",
-                "ingredient": "鲈鱼",
-                "total_fen": 100000,
-            })
+            svc._add_delivery_record(
+                s1["supplier_id"],
+                {
+                    "date": f"2026-01-{1 + i:02d}",
+                    "on_time": True,
+                    "quality": "pass",
+                    "ingredient": "鲈鱼",
+                    "total_fen": 100000,
+                },
+            )
 
         assessment = svc.assess_risk(STORE_ID)
         risk_types = {r["type"] for r in assessment["risks"]}
@@ -538,12 +569,14 @@ class TestEndToEndWorkflow:
 
         # 1. 注册供应商
         s1 = svc.register_supplier(
-            "湘江渔港", "seafood",
+            "湘江渔港",
+            "seafood",
             {"person": "张三", "phone": "138xxx"},
             ["食品经营许可证", "ISO22000", "HACCP", "水产检疫"],
         )
         s2 = svc.register_supplier(
-            "南海水产", "seafood",
+            "南海水产",
+            "seafood",
             {"person": "李四", "phone": "139xxx"},
             ["食品经营许可证"],
         )
@@ -568,9 +601,19 @@ class TestEndToEndWorkflow:
         # 6. 签订合同
         contract = svc.create_contract(
             winner_id,
-            [{"ingredient_id": "ing_bass", "name": "鲈鱼", "agreed_price_fen": 3500, "min_quantity": 200, "unit": "kg"}],
-            "2026-04-01", "2026-09-30",
-            "半年固定价", "net30",
+            [
+                {
+                    "ingredient_id": "ing_bass",
+                    "name": "鲈鱼",
+                    "agreed_price_fen": 3500,
+                    "min_quantity": 200,
+                    "unit": "kg",
+                }
+            ],
+            "2026-04-01",
+            "2026-09-30",
+            "半年固定价",
+            "net30",
             {"late_delivery_pct": 5, "quality_failure_pct": 10, "max_penalty_pct": 30},
         )
         assert contract["status"] == "active"

@@ -5,6 +5,7 @@
 
 迁移自 tunxiang V2.x service/agent.py + training/agent.py
 """
+
 import statistics
 from typing import Any
 
@@ -41,10 +42,15 @@ class SmartServiceAgent(SkillAgent):
 
     def get_supported_actions(self) -> list[str]:
         return [
-            "analyze_feedback", "handle_complaint", "generate_improvements",
-            "assess_training_needs", "generate_training_plan",
-            "track_training_progress", "evaluate_effectiveness",
-            "analyze_skill_gaps", "manage_certificates",
+            "analyze_feedback",
+            "handle_complaint",
+            "generate_improvements",
+            "assess_training_needs",
+            "generate_training_plan",
+            "track_training_progress",
+            "evaluate_effectiveness",
+            "analyze_skill_gaps",
+            "manage_certificates",
         ]
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -83,7 +89,8 @@ class SmartServiceAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="handle_complaint",
+            success=True,
+            action="handle_complaint",
             data={
                 "complaint_type": complaint_type,
                 "priority": priority,
@@ -109,23 +116,31 @@ class SmartServiceAgent(SkillAgent):
             required = ROLE_SKILLS.get(role, [])
 
             missing = [s for s in required if s not in current_skills]
-            urgency = "high" if performance_score < 60 or len(missing) >= 3 else \
-                      "medium" if performance_score < 80 or len(missing) >= 1 else "low"
+            urgency = (
+                "high"
+                if performance_score < 60 or len(missing) >= 3
+                else "medium"
+                if performance_score < 80 or len(missing) >= 1
+                else "low"
+            )
 
             if missing or performance_score < 80:
-                needs.append({
-                    "employee": emp.get("name", ""),
-                    "role": role,
-                    "missing_skills": missing,
-                    "performance_score": performance_score,
-                    "urgency": urgency,
-                    "recommended_courses": [f"{s}培训" for s in missing[:3]],
-                })
+                needs.append(
+                    {
+                        "employee": emp.get("name", ""),
+                        "role": role,
+                        "missing_skills": missing,
+                        "performance_score": performance_score,
+                        "urgency": urgency,
+                        "recommended_courses": [f"{s}培训" for s in missing[:3]],
+                    }
+                )
 
         needs.sort(key=lambda n: {"high": 0, "medium": 1, "low": 2}[n["urgency"]])
 
         return AgentResult(
-            success=True, action="assess_training_needs",
+            success=True,
+            action="assess_training_needs",
             data={"needs": needs, "total": len(needs)},
             reasoning=f"{len(needs)} 名员工需要培训，{sum(1 for n in needs if n['urgency'] == 'high')} 人紧急",
             confidence=0.8,
@@ -142,19 +157,22 @@ class SmartServiceAgent(SkillAgent):
             score = current_scores.get(skill, 0)
             gap = max(0, 80 - score)  # 80分为合格线
             if gap > 0:
-                gaps.append({
-                    "skill": skill,
-                    "current_score": score,
-                    "target_score": 80,
-                    "gap": gap,
-                    "impact_yuan": gap * 50,  # 简化：每分差距=50元/月潜在损失
-                })
+                gaps.append(
+                    {
+                        "skill": skill,
+                        "current_score": score,
+                        "target_score": 80,
+                        "gap": gap,
+                        "impact_yuan": gap * 50,  # 简化：每分差距=50元/月潜在损失
+                    }
+                )
 
         gaps.sort(key=lambda g: g["gap"], reverse=True)
         total_impact = sum(g["impact_yuan"] for g in gaps)
 
         return AgentResult(
-            success=True, action="analyze_skill_gaps",
+            success=True,
+            action="analyze_skill_gaps",
             data={
                 "role": role,
                 "gaps": gaps,
@@ -180,7 +198,8 @@ class SmartServiceAgent(SkillAgent):
         retention_rate = min(100, post_avg / max(1, pre_avg) * 100) if pre_avg > 0 else 0
 
         return AgentResult(
-            success=True, action="evaluate_effectiveness",
+            success=True,
+            action="evaluate_effectiveness",
             data={
                 "pre_avg_score": round(pre_avg, 1),
                 "post_avg_score": round(post_avg, 1),
@@ -203,21 +222,24 @@ class SmartServiceAgent(SkillAgent):
         for issue in issues[:5]:
             issue_type = issue.get("type", "other")
             count = issue.get("count", 0)
-            improvements.append({
-                "issue": issue_type,
-                "occurrence": count,
-                "suggestion": {
-                    "wait_time": "增加高峰时段人手，优化出餐流程",
-                    "food_quality": "加强厨房质检，更新SOP操作规范",
-                    "service_attitude": "开展服务礼仪培训，建立激励机制",
-                    "hygiene": "增加清洁频次，引入检查打卡制度",
-                }.get(issue_type, "针对性改进"),
-                "priority": "high" if count >= 5 else "medium",
-                "expected_effect": f"预计减少 {min(count, count // 2 + 1)} 次同类问题",
-            })
+            improvements.append(
+                {
+                    "issue": issue_type,
+                    "occurrence": count,
+                    "suggestion": {
+                        "wait_time": "增加高峰时段人手，优化出餐流程",
+                        "food_quality": "加强厨房质检，更新SOP操作规范",
+                        "service_attitude": "开展服务礼仪培训，建立激励机制",
+                        "hygiene": "增加清洁频次，引入检查打卡制度",
+                    }.get(issue_type, "针对性改进"),
+                    "priority": "high" if count >= 5 else "medium",
+                    "expected_effect": f"预计减少 {min(count, count // 2 + 1)} 次同类问题",
+                }
+            )
 
         return AgentResult(
-            success=True, action="generate_improvements",
+            success=True,
+            action="generate_improvements",
             data={"improvements": improvements, "total": len(improvements)},
             reasoning=f"生成 {len(improvements)} 条改进建议",
             confidence=0.8,
@@ -229,33 +251,60 @@ class SmartServiceAgent(SkillAgent):
             return AgentResult(success=True, action="analyze_feedback", data={"total": 0}, confidence=0.5)
         positive = sum(1 for f in feedbacks if f.get("rating", 3) >= 4)
         negative = sum(1 for f in feedbacks if f.get("rating", 3) <= 2)
-        return AgentResult(success=True, action="analyze_feedback",
-                         data={"total": len(feedbacks), "positive": positive, "negative": negative,
-                               "sentiment_score": round(positive / len(feedbacks) * 100, 1)},
-                         reasoning=f"好评 {positive}/{len(feedbacks)}", confidence=0.8)
+        return AgentResult(
+            success=True,
+            action="analyze_feedback",
+            data={
+                "total": len(feedbacks),
+                "positive": positive,
+                "negative": negative,
+                "sentiment_score": round(positive / len(feedbacks) * 100, 1),
+            },
+            reasoning=f"好评 {positive}/{len(feedbacks)}",
+            confidence=0.8,
+        )
 
     async def _training_plan(self, params: dict) -> AgentResult:
         role = params.get("role", "waiter")
         gaps = params.get("skill_gaps", [])
-        plan = [{"week": i+1, "skill": g, "method": "实操+理论", "hours": 4} for i, g in enumerate(gaps[:4])]
-        return AgentResult(success=True, action="generate_training_plan",
-                         data={"role": role, "plan": plan, "total_weeks": len(plan), "total_hours": len(plan) * 4},
-                         reasoning=f"为 {role} 生成 {len(plan)} 周培训计划", confidence=0.8)
+        plan = [{"week": i + 1, "skill": g, "method": "实操+理论", "hours": 4} for i, g in enumerate(gaps[:4])]
+        return AgentResult(
+            success=True,
+            action="generate_training_plan",
+            data={"role": role, "plan": plan, "total_weeks": len(plan), "total_hours": len(plan) * 4},
+            reasoning=f"为 {role} 生成 {len(plan)} 周培训计划",
+            confidence=0.8,
+        )
 
     async def _track_progress(self, params: dict) -> AgentResult:
         records = params.get("records", [])
         completed = sum(1 for r in records if r.get("completed"))
         total = len(records)
-        return AgentResult(success=True, action="track_training_progress",
-                         data={"completed": completed, "total": total,
-                               "completion_pct": round(completed / total * 100, 1) if total > 0 else 0},
-                         reasoning=f"完成 {completed}/{total}", confidence=0.9)
+        return AgentResult(
+            success=True,
+            action="track_training_progress",
+            data={
+                "completed": completed,
+                "total": total,
+                "completion_pct": round(completed / total * 100, 1) if total > 0 else 0,
+            },
+            reasoning=f"完成 {completed}/{total}",
+            confidence=0.9,
+        )
 
     async def _manage_certs(self, params: dict) -> AgentResult:
         certs = params.get("certificates", [])
         expiring = [c for c in certs if c.get("remaining_days", 999) <= 30]
         expired = [c for c in certs if c.get("remaining_days", 999) <= 0]
-        return AgentResult(success=True, action="manage_certificates",
-                         data={"total": len(certs), "expired": len(expired), "expiring": len(expiring),
-                               "needs_attention": expired + expiring},
-                         reasoning=f"{len(expired)} 过期，{len(expiring)} 即将过期", confidence=0.9)
+        return AgentResult(
+            success=True,
+            action="manage_certificates",
+            data={
+                "total": len(certs),
+                "expired": len(expired),
+                "expiring": len(expiring),
+                "needs_attention": expired + expiring,
+            },
+            reasoning=f"{len(expired)} 过期，{len(expiring)} 即将过期",
+            confidence=0.9,
+        )

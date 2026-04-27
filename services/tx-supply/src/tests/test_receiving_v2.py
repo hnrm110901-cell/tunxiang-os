@@ -8,6 +8,7 @@
 - 全部拒收
 - 多租户隔离
 """
+
 from __future__ import annotations
 
 import os
@@ -303,9 +304,7 @@ class TestInspectItem:
             actual_quantity=Decimal("20"),
             accepted_quantity=Decimal("20"),
         )
-        order = await get_receiving_order(
-            order_id=order_id, tenant_id=TENANT_ID, db=db_session
-        )
+        order = await get_receiving_order(order_id=order_id, tenant_id=TENANT_ID, db=db_session)
         assert order["status"] == ReceivingOrderStatus.inspecting.value
 
 
@@ -341,9 +340,7 @@ class TestCompleteReceiving:
             items=items,
             db=db_session,
         )
-        detail = await get_receiving_order(
-            order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session
-        )
+        detail = await get_receiving_order(order_id=order_info["order_id"], tenant_id=TENANT_ID, db=db_session)
         return order_info["order_id"], detail["items"]
 
     @pytest.mark.asyncio
@@ -377,9 +374,10 @@ class TestCompleteReceiving:
 
         # 验证库存已增加：原来 10kg，入库 20kg = 30kg
         from sqlalchemy import select
-        ing = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(INGREDIENT_ID))
-        )).scalar_one()
+
+        ing = (
+            await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(INGREDIENT_ID)))
+        ).scalar_one()
         assert ing.current_quantity == 30.0  # 10 + 20
 
     @pytest.mark.asyncio
@@ -419,9 +417,10 @@ class TestCompleteReceiving:
 
         # 虾原来 3kg，验收通过 7kg = 10kg
         from sqlalchemy import select
-        ing2 = (await db_session.execute(
-            select(Ingredient).where(Ingredient.id == uuid.UUID(INGREDIENT_ID_2))
-        )).scalar_one()
+
+        ing2 = (
+            await db_session.execute(select(Ingredient).where(Ingredient.id == uuid.UUID(INGREDIENT_ID_2)))
+        ).scalar_one()
         assert ing2.current_quantity == 10.0  # 3 + 7
 
     @pytest.mark.asyncio
@@ -466,12 +465,19 @@ class TestCompleteReceiving:
         )
 
         from sqlalchemy import select
-        txns = (await db_session.execute(
-            select(IngredientTransaction).where(
-                IngredientTransaction.transaction_type == TransactionType.receiving.value,
-                IngredientTransaction.tenant_id == uuid.UUID(TENANT_ID),
+
+        txns = (
+            (
+                await db_session.execute(
+                    select(IngredientTransaction).where(
+                        IngredientTransaction.transaction_type == TransactionType.receiving.value,
+                        IngredientTransaction.tenant_id == uuid.UUID(TENANT_ID),
+                    )
+                )
             )
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(txns) == 2
         for txn in txns:
             assert txn.quantity_after > txn.quantity_before
@@ -514,11 +520,11 @@ class TestRejectAll:
         """全部拒收后库存不应变化"""
         from sqlalchemy import select as sa_select
 
-        before = (await db_session.execute(
-            sa_select(Ingredient.current_quantity).where(
-                Ingredient.id == uuid.UUID(INGREDIENT_ID)
+        before = (
+            await db_session.execute(
+                sa_select(Ingredient.current_quantity).where(Ingredient.id == uuid.UUID(INGREDIENT_ID))
             )
-        )).scalar()
+        ).scalar()
 
         items = [
             {
@@ -543,11 +549,11 @@ class TestRejectAll:
             db=db_session,
         )
 
-        after = (await db_session.execute(
-            sa_select(Ingredient.current_quantity).where(
-                Ingredient.id == uuid.UUID(INGREDIENT_ID)
+        after = (
+            await db_session.execute(
+                sa_select(Ingredient.current_quantity).where(Ingredient.id == uuid.UUID(INGREDIENT_ID))
             )
-        )).scalar()
+        ).scalar()
         assert before == after
 
 

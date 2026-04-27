@@ -5,6 +5,7 @@
 
 迁移自 tunxiang V2.x decision_agent.py + business_intel/agent.py
 """
+
 import statistics
 from typing import Any, Optional
 
@@ -17,8 +18,13 @@ logger = structlog.get_logger(__name__)
 
 # 场景优先级（从 scenario_matcher.py 迁移）
 SCENARIO_PRIORITY = [
-    "high_cost", "high_waste", "holiday_peak", "revenue_down",
-    "weekend", "new_dish", "weekday_normal",
+    "high_cost",
+    "high_waste",
+    "holiday_peak",
+    "revenue_down",
+    "weekend",
+    "new_dish",
+    "weekday_normal",
 ]
 
 
@@ -48,7 +54,7 @@ class FinanceAuditAgent(SkillAgent):
             "root_cause_analysis",
             "check_pl_anomaly",
             "get_settlement_snapshot",  # Phase 3: 读 mv_daily_settlement
-            "get_pnl_snapshot",         # Phase 3: 读 mv_store_pnl
+            "get_pnl_snapshot",  # Phase 3: 读 mv_store_pnl
         ]
 
     def get_action_config(self, action: str) -> ActionConfig:
@@ -205,8 +211,8 @@ class FinanceAuditAgent(SkillAgent):
                 "deviation_pct": deviation_pct,
                 "z_score": round(z_score, 2),
             },
-            reasoning=f"今日营收 ¥{actual_fen/100:.0f}，历史均值 ¥{avg/100:.0f}，"
-                      f"偏差 {deviation_pct:+.1f}%（{severity}）",
+            reasoning=f"今日营收 ¥{actual_fen / 100:.0f}，历史均值 ¥{avg / 100:.0f}，"
+            f"偏差 {deviation_pct:+.1f}%（{severity}）",
             confidence=0.85 if len(history_fen) >= 14 else 0.65,
         )
 
@@ -274,8 +280,7 @@ class FinanceAuditAgent(SkillAgent):
                 "trend_pct": round(trend * 100, 1),
                 "avg_daily": round(statistics.mean(predictions)),
             },
-            reasoning=f"预测 {days_ahead} 天总订单 {sum(predictions)}，"
-                      f"趋势 {trend*100:+.1f}%",
+            reasoning=f"预测 {days_ahead} 天总订单 {sum(predictions)}，趋势 {trend * 100:+.1f}%",
             confidence=0.75,
         )
 
@@ -341,7 +346,9 @@ class FinanceAuditAgent(SkillAgent):
         if len(daily_orders) < 2:
             return AgentResult(success=False, action="analyze_order_trend", error="至少需要2天数据")
 
-        order_trend = "up" if daily_orders[-1] > daily_orders[0] else "down" if daily_orders[-1] < daily_orders[0] else "flat"
+        order_trend = (
+            "up" if daily_orders[-1] > daily_orders[0] else "down" if daily_orders[-1] < daily_orders[0] else "flat"
+        )
         avg_orders = round(statistics.mean(daily_orders))
         avg_ticket_fen = 0
         if daily_orders and daily_revenue_fen and sum(daily_orders) > 0:
@@ -358,15 +365,19 @@ class FinanceAuditAgent(SkillAgent):
                 "total_orders": sum(daily_orders),
                 "period_days": len(daily_orders),
             },
-            reasoning=f"订单趋势 {order_trend}，日均 {avg_orders} 单，客单价 ¥{avg_ticket_fen/100:.0f}",
+            reasoning=f"订单趋势 {order_trend}，日均 {avg_orders} 单，客单价 ¥{avg_ticket_fen / 100:.0f}",
             confidence=0.8,
         )
 
     async def _get_report(self, params: dict) -> AgentResult:
         report_type = params.get("report_type", "period_summary")
-        return AgentResult(success=True, action="get_financial_report",
-                         data={"report_type": report_type, "generated": True},
-                         reasoning=f"生成 {report_type} 报表", confidence=0.9)
+        return AgentResult(
+            success=True,
+            action="get_financial_report",
+            data={"report_type": report_type, "generated": True},
+            reasoning=f"生成 {report_type} 报表",
+            confidence=0.9,
+        )
 
     async def _biz_insight(self, params: dict) -> AgentResult:
         metrics = params.get("metrics", {})
@@ -377,9 +388,13 @@ class FinanceAuditAgent(SkillAgent):
             insights.append({"type": "revenue_drop", "detail": "营收下滑，关注客流变化", "priority": 1})
         if not insights:
             insights.append({"type": "stable", "detail": "经营稳定，维持当前策略", "priority": 3})
-        return AgentResult(success=True, action="generate_biz_insight",
-                         data={"insights": insights, "total": len(insights)},
-                         reasoning=f"生成 {len(insights)} 条经营洞察", confidence=0.8)
+        return AgentResult(
+            success=True,
+            action="generate_biz_insight",
+            data={"insights": insights, "total": len(insights)},
+            reasoning=f"生成 {len(insights)} 条经营洞察",
+            confidence=0.8,
+        )
 
     # ─── 成本分析（真实DB） ───
 
@@ -399,7 +414,8 @@ class FinanceAuditAgent(SkillAgent):
                 date_to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
             # 查询实际营收
-            rev_row = await self._db.execute(text("""
+            rev_row = await self._db.execute(
+                text("""
                 SELECT
                     COALESCE(SUM(final_amount_fen), 0) as revenue_fen,
                     COUNT(*) as order_count
@@ -409,12 +425,14 @@ class FinanceAuditAgent(SkillAgent):
                   AND status = 'completed'
                   AND created_at >= :date_from::date
                   AND created_at < :date_to::date + INTERVAL '1 day'
-            """), {"tenant_id": self.tenant_id, "store_id": store_id,
-                   "date_from": date_from, "date_to": date_to})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
+            )
             rev = dict(rev_row.mappings().first() or {})
 
             # 查询成本（从BOM计算，如无BOM则用营收*行业均值估算）
-            cost_row = await self._db.execute(text("""
+            cost_row = await self._db.execute(
+                text("""
                 SELECT COALESCE(SUM(oi.quantity * COALESCE(d.cost_price_fen, oi.unit_price_fen * 0.35)), 0) as cost_fen
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
@@ -424,8 +442,9 @@ class FinanceAuditAgent(SkillAgent):
                   AND o.status = 'completed'
                   AND o.created_at >= :date_from::date
                   AND o.created_at < :date_to::date + INTERVAL '1 day'
-            """), {"tenant_id": self.tenant_id, "store_id": store_id,
-                   "date_from": date_from, "date_to": date_to})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
+            )
             cost = dict(cost_row.mappings().first() or {})
 
             revenue_fen = int(rev.get("revenue_fen") or 0)
@@ -442,10 +461,14 @@ class FinanceAuditAgent(SkillAgent):
                         tenant_id=self.tenant_id,
                         task_type="cost_analysis",
                         system="你是餐饮财务顾问，根据成本数据给出简洁的经营建议，100字内，中文。",
-                        messages=[{"role": "user", "content":
-                            f"营收{revenue_fen/100:.0f}元，成本{cost_fen/100:.0f}元，"
-                            f"毛利率{gross_margin:.1%}，订单数{order_count}，"
-                            f"统计区间{date_from}至{date_to}。请评估并给出改善建议。"}],
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": f"营收{revenue_fen / 100:.0f}元，成本{cost_fen / 100:.0f}元，"
+                                f"毛利率{gross_margin:.1%}，订单数{order_count}，"
+                                f"统计区间{date_from}至{date_to}。请评估并给出改善建议。",
+                            }
+                        ],
                         max_tokens=200,
                         db=self._db,
                     )
@@ -453,7 +476,8 @@ class FinanceAuditAgent(SkillAgent):
                     logger.warning("finance_audit_llm_fallback", error=str(exc))
 
             return AgentResult(
-                success=True, action="cost_analysis",
+                success=True,
+                action="cost_analysis",
                 data={
                     "revenue_fen": revenue_fen,
                     "cost_fen": cost_fen,
@@ -465,7 +489,7 @@ class FinanceAuditAgent(SkillAgent):
                     "date_to": date_to,
                     "analysis": analysis,
                 },
-                reasoning=f"营收{revenue_fen/100:.0f}元，毛利率{gross_margin:.1%}，{analysis[:40] if analysis else '规则计算'}",
+                reasoning=f"营收{revenue_fen / 100:.0f}元，毛利率{gross_margin:.1%}，{analysis[:40] if analysis else '规则计算'}",
                 confidence=0.95 if analysis else 0.85,
                 inference_layer="cloud" if analysis else "edge",
             )
@@ -477,9 +501,14 @@ class FinanceAuditAgent(SkillAgent):
         gross = revenue - total_cost
         margin = gross / revenue if revenue > 0 else 0
         return AgentResult(
-            success=True, action="cost_analysis",
-            data={"revenue_fen": revenue, "cost_fen": total_cost,
-                  "gross_profit_fen": gross, "gross_margin": round(margin, 4)},
+            success=True,
+            action="cost_analysis",
+            data={
+                "revenue_fen": revenue,
+                "cost_fen": total_cost,
+                "gross_profit_fen": gross,
+                "gross_margin": round(margin, 4),
+            },
             reasoning=f"毛利率{margin:.1%}",
             confidence=0.8,
         )
@@ -498,7 +527,8 @@ class FinanceAuditAgent(SkillAgent):
             if not date:
                 date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-            rows = await self._db.execute(text("""
+            rows = await self._db.execute(
+                text("""
                 SELECT
                     p.method,
                     COUNT(*) as txn_count,
@@ -511,14 +541,17 @@ class FinanceAuditAgent(SkillAgent):
                   AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
                   AND DATE(p.created_at) = :date::date
                 GROUP BY p.method
-            """), {"tenant_id": self.tenant_id, "store_id": store_id, "date": date})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id, "date": date},
+            )
 
             by_method = [dict(r) for r in rows.mappings()]
             total_paid = sum(r["paid_fen"] for r in by_method)
             total_refunded = sum(r["refunded_fen"] for r in by_method)
 
             return AgentResult(
-                success=True, action="daily_reconciliation",
+                success=True,
+                action="daily_reconciliation",
                 data={
                     "date": date,
                     "by_method": by_method,
@@ -527,14 +560,15 @@ class FinanceAuditAgent(SkillAgent):
                     "net_fen": total_paid - total_refunded,
                     "discrepancies": [],  # 需接入第三方平台数据才能对比
                 },
-                reasoning=f"{date}实收{total_paid/100:.0f}元，退款{total_refunded/100:.0f}元，净收{(total_paid-total_refunded)/100:.0f}元",
+                reasoning=f"{date}实收{total_paid / 100:.0f}元，退款{total_refunded / 100:.0f}元，净收{(total_paid - total_refunded) / 100:.0f}元",
                 confidence=1.0,
                 inference_layer="edge",
             )
 
         # 降级
         return AgentResult(
-            success=True, action="daily_reconciliation",
+            success=True,
+            action="daily_reconciliation",
             data={"date": params.get("date", ""), "discrepancies": [], "total_paid_fen": 0},
             reasoning="无DB连接，无法查询真实对账数据",
             confidence=0.3,
@@ -557,10 +591,7 @@ class FinanceAuditAgent(SkillAgent):
         new_daily_total_fen = current_daily_total_fen + order_amount_fen
 
         # 目标达成率
-        achievement_pct = (
-            round(new_daily_total_fen / daily_target_fen * 100, 1)
-            if daily_target_fen > 0 else None
-        )
+        achievement_pct = round(new_daily_total_fen / daily_target_fen * 100, 1) if daily_target_fen > 0 else None
 
         # 若有 DB，从 orders 表实时聚合今日营收
         actual_daily_fen: Optional[int] = None
@@ -568,15 +599,19 @@ class FinanceAuditAgent(SkillAgent):
             from datetime import datetime, timezone
 
             from sqlalchemy import text
+
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            row = await self._db.execute(text("""
+            row = await self._db.execute(
+                text("""
                 SELECT COALESCE(SUM(final_amount_fen), 0) as daily_revenue
                 FROM orders
                 WHERE tenant_id = :tenant_id
                   AND (:store_id::UUID IS NULL OR store_id = :store_id::UUID)
                   AND status = 'completed'
                   AND DATE(completed_at) = :today::date
-            """), {"tenant_id": self.tenant_id, "store_id": store_id, "today": today})
+            """),
+                {"tenant_id": self.tenant_id, "store_id": store_id, "today": today},
+            )
             r = dict(row.mappings().first() or {})
             actual_daily_fen = int(r.get("daily_revenue") or 0)
 
@@ -603,7 +638,7 @@ class FinanceAuditAgent(SkillAgent):
                 "data_source": "db_realtime" if actual_daily_fen is not None else "incremental",
             },
             reasoning=(
-                f"日营收更新：今日累计¥{report_total/100:.0f}"
+                f"日营收更新：今日累计¥{report_total / 100:.0f}"
                 + (f"，目标达成{achievement_pct}%" if achievement_pct is not None else "")
             ),
             confidence=0.95 if actual_daily_fen is not None else 0.8,
@@ -637,9 +672,9 @@ class FinanceAuditAgent(SkillAgent):
 
         # 是否需要财务复核
         needs_finance_review = (
-            discount_amount_fen > 20000 or   # 单笔折扣超200元
-            discount_rate > 0.5 or           # 折扣率超50%
-            margin_breached                  # 毛利跌穿底线
+            discount_amount_fen > 20000  # 单笔折扣超200元
+            or discount_rate > 0.5  # 折扣率超50%
+            or margin_breached  # 毛利跌穿底线
         )
 
         logger.info(
@@ -692,7 +727,9 @@ class FinanceAuditAgent(SkillAgent):
         summary: dict = {}
         if self._db and store_id and shift_date:
             from sqlalchemy import text
-            row = await self._db.execute(text("""
+
+            row = await self._db.execute(
+                text("""
                 SELECT
                     COUNT(*) as order_count,
                     COALESCE(SUM(final_amount_fen), 0) as revenue_fen,
@@ -708,12 +745,14 @@ class FinanceAuditAgent(SkillAgent):
                        OR (:shift_type = 'day' AND EXTRACT(HOUR FROM completed_at) BETWEEN 6 AND 17)
                        OR (:shift_type = 'night' AND (EXTRACT(HOUR FROM completed_at) >= 18
                                                        OR EXTRACT(HOUR FROM completed_at) < 6)))
-            """), {
-                "tenant_id": self.tenant_id,
-                "store_id": store_id,
-                "shift_date": shift_date,
-                "shift_type": shift_type,
-            })
+            """),
+                {
+                    "tenant_id": self.tenant_id,
+                    "store_id": store_id,
+                    "shift_date": shift_date,
+                    "shift_type": shift_type,
+                },
+            )
             r = dict(row.mappings().first() or {})
             order_count = int(r.get("order_count") or 0)
             revenue_fen = int(r.get("revenue_fen") or 0)
@@ -758,10 +797,14 @@ class FinanceAuditAgent(SkillAgent):
                     tenant_id=self.tenant_id,
                     task_type="standard_analysis",
                     system="你是餐饮财务助理，根据班次数据给出一句话简短点评（30字内），重点关注异常数据。",
-                    messages=[{"role": "user", "content":
-                        f"{shift_date} {shift_type}班：{order_count}单，"
-                        f"净营收¥{net_revenue_fen/100:.0f}，"
-                        f"折扣率{discount_rate:.1%}，客单价¥{avg_order_value_fen/100:.0f}。"}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"{shift_date} {shift_type}班：{order_count}单，"
+                            f"净营收¥{net_revenue_fen / 100:.0f}，"
+                            f"折扣率{discount_rate:.1%}，客单价¥{avg_order_value_fen / 100:.0f}。",
+                        }
+                    ],
                     max_tokens=80,
                     db=self._db,
                 )
@@ -776,8 +819,7 @@ class FinanceAuditAgent(SkillAgent):
             data=summary,
             reasoning=(
                 f"{shift_date} {shift_type}班摘要：{order_count}单，"
-                f"净营收¥{net_revenue_fen/100:.0f}"
-                + (f"，{commentary}" if commentary else "")
+                f"净营收¥{net_revenue_fen / 100:.0f}" + (f"，{commentary}" if commentary else "")
             ),
             confidence=0.95 if self._db else 0.8,
             inference_layer="cloud" if commentary else "edge",
@@ -807,16 +849,10 @@ class FinanceAuditAgent(SkillAgent):
         variance_amount_fen = int(abs(variance_qty) * unit_price_fen)
 
         # 差异类型
-        variance_type = (
-            "short_delivery" if variance_qty < 0 else
-            "over_delivery" if variance_qty > 0 else
-            "matched"
-        )
+        variance_type = "short_delivery" if variance_qty < 0 else "over_delivery" if variance_qty > 0 else "matched"
 
         # 是否需要财务介入（差异金额>100元 或 差异率>5%）
-        needs_finance_action = (
-            variance_amount_fen > 10000 or abs(variance_pct) > 0.05
-        )
+        needs_finance_action = variance_amount_fen > 10000 or abs(variance_pct) > 0.05
 
         recommended_action = []
         if variance_type == "short_delivery" and needs_finance_action:
@@ -857,7 +893,7 @@ class FinanceAuditAgent(SkillAgent):
             reasoning=(
                 f"收货差异：{ingredient_name} {variance_type}，"
                 f"差异{variance_qty:+.2f}（{variance_pct:+.1%}），"
-                f"涉及金额¥{variance_amount_fen/100:.0f}"
+                f"涉及金额¥{variance_amount_fen / 100:.0f}"
             ),
             confidence=0.9,
         )
@@ -926,7 +962,7 @@ class FinanceAuditAgent(SkillAgent):
             },
             reasoning=(
                 f"审批{'通过' if approved else '拒绝'}：{approval_type}，"
-                f"金额¥{amount_fen/100:.0f}，财务动作={finance_action}"
+                f"金额¥{amount_fen / 100:.0f}，财务动作={finance_action}"
             ),
             confidence=0.9,
         )
@@ -956,49 +992,59 @@ class FinanceAuditAgent(SkillAgent):
         hypotheses: list[dict] = []
 
         if waste_rate > 0.05:
-            hypotheses.append({
-                "cause": "食材损耗偏高",
-                "evidence": f"损耗率 {waste_rate:.1%}（阈值5%）",
-                "impact_pct": round(waste_rate * actual_cost_rate * 100, 1),
-                "suggested_action": "核查库存管理规范，减少备货量，优化先进先出",
-                "priority": 1,
-            })
+            hypotheses.append(
+                {
+                    "cause": "食材损耗偏高",
+                    "evidence": f"损耗率 {waste_rate:.1%}（阈值5%）",
+                    "impact_pct": round(waste_rate * actual_cost_rate * 100, 1),
+                    "suggested_action": "核查库存管理规范，减少备货量，优化先进先出",
+                    "priority": 1,
+                }
+            )
 
         if purchasing_variance > 0.08:
-            hypotheses.append({
-                "cause": "采购价格偏高",
-                "evidence": f"采购差异率 {purchasing_variance:.1%}",
-                "impact_pct": round(purchasing_variance * 10, 1),
-                "suggested_action": "重新议价或启动比价采购",
-                "priority": 2,
-            })
+            hypotheses.append(
+                {
+                    "cause": "采购价格偏高",
+                    "evidence": f"采购差异率 {purchasing_variance:.1%}",
+                    "impact_pct": round(purchasing_variance * 10, 1),
+                    "suggested_action": "重新议价或启动比价采购",
+                    "priority": 2,
+                }
+            )
 
         if discount_rate > 0.15:
-            hypotheses.append({
-                "cause": "折扣过度导致毛利侵蚀",
-                "evidence": f"折扣率 {discount_rate:.1%}（偏高）",
-                "impact_pct": round(discount_rate * 5, 1),
-                "suggested_action": "收紧折扣授权，重审折扣政策",
-                "priority": 3,
-            })
+            hypotheses.append(
+                {
+                    "cause": "折扣过度导致毛利侵蚀",
+                    "evidence": f"折扣率 {discount_rate:.1%}（偏高）",
+                    "impact_pct": round(discount_rate * 5, 1),
+                    "suggested_action": "收紧折扣授权，重审折扣政策",
+                    "priority": 3,
+                }
+            )
 
         if portion_over:
-            hypotheses.append({
-                "cause": "出品份量超标准",
-                "evidence": "多门店报告份量超出SOP标准",
-                "impact_pct": 3.0,
-                "suggested_action": "加强厨房SOP培训，使用标准量器",
-                "priority": 4,
-            })
+            hypotheses.append(
+                {
+                    "cause": "出品份量超标准",
+                    "evidence": "多门店报告份量超出SOP标准",
+                    "impact_pct": 3.0,
+                    "suggested_action": "加强厨房SOP培训，使用标准量器",
+                    "priority": 4,
+                }
+            )
 
         if not hypotheses:
-            hypotheses.append({
-                "cause": "原因待查",
-                "evidence": f"成本率{actual_cost_rate:.1%} 超目标{over_rate:.1%}，但各分项指标正常",
-                "impact_pct": round(over_rate * 100, 1),
-                "suggested_action": "人工抽查近期采购单和出库记录",
-                "priority": 1,
-            })
+            hypotheses.append(
+                {
+                    "cause": "原因待查",
+                    "evidence": f"成本率{actual_cost_rate:.1%} 超目标{over_rate:.1%}，但各分项指标正常",
+                    "impact_pct": round(over_rate * 100, 1),
+                    "suggested_action": "人工抽查近期采购单和出库记录",
+                    "priority": 1,
+                }
+            )
 
         # 按优先级排序
         hypotheses.sort(key=lambda h: h["priority"])
@@ -1008,17 +1054,20 @@ class FinanceAuditAgent(SkillAgent):
         llm_analysis = ""
         if self._router and hypotheses:
             try:
-                hypothesis_text = "\n".join([
-                    f"- {h['cause']}: {h['evidence']}，建议{h['suggested_action']}"
-                    for h in hypotheses[:3]
-                ])
+                hypothesis_text = "\n".join(
+                    [f"- {h['cause']}: {h['evidence']}，建议{h['suggested_action']}" for h in hypotheses[:3]]
+                )
                 llm_analysis = await self._router.complete(
                     tenant_id=self.tenant_id,
                     task_type="cost_analysis",
                     system="你是餐饮运营顾问，根据成本超标分析给出最优先的一个改善建议，50字内，中文。",
-                    messages=[{"role": "user", "content":
-                        f"{date_range}成本率{actual_cost_rate:.1%}，目标{target_cost_rate:.1%}，"
-                        f"超出{over_rate:.1%}。根因假设：\n{hypothesis_text}"}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"{date_range}成本率{actual_cost_rate:.1%}，目标{target_cost_rate:.1%}，"
+                            f"超出{over_rate:.1%}。根因假设：\n{hypothesis_text}",
+                        }
+                    ],
                     max_tokens=120,
                     db=self._db,
                 )
@@ -1040,8 +1089,7 @@ class FinanceAuditAgent(SkillAgent):
             },
             reasoning=(
                 f"成本超标根因：{top_cause['cause']}，"
-                f"建议{top_cause['suggested_action']}"
-                + (f"。AI补充: {llm_analysis[:30]}" if llm_analysis else "")
+                f"建议{top_cause['suggested_action']}" + (f"。AI补充: {llm_analysis[:30]}" if llm_analysis else "")
             ),
             confidence=0.8 if not llm_analysis else 0.88,
             inference_layer="cloud" if llm_analysis else "edge",
@@ -1082,30 +1130,36 @@ class FinanceAuditAgent(SkillAgent):
             std_rev = statistics.stdev(history_revenue_fen) if len(history_revenue_fen) >= 2 else avg_rev * 0.1
             z_rev = (revenue_fen - avg_rev) / std_rev if std_rev > 0 else 0
             if abs(z_rev) > 2.0:
-                anomalies.append({
-                    "dimension": "revenue",
-                    "severity": "critical" if abs(z_rev) > 3 else "warning",
-                    "detail": f"营收¥{revenue_fen/100:.0f}，偏离均值{z_rev:+.1f}个标准差",
-                    "z_score": round(z_rev, 2),
-                })
+                anomalies.append(
+                    {
+                        "dimension": "revenue",
+                        "severity": "critical" if abs(z_rev) > 3 else "warning",
+                        "detail": f"营收¥{revenue_fen / 100:.0f}，偏离均值{z_rev:+.1f}个标准差",
+                        "z_score": round(z_rev, 2),
+                    }
+                )
 
         # 检测2：毛利率
         if gross_margin < 0.25:
-            anomalies.append({
-                "dimension": "gross_margin",
-                "severity": "critical" if gross_margin < 0.15 else "warning",
-                "detail": f"毛利率{gross_margin:.1%}，低于警戒线25%",
-                "value": round(gross_margin, 4),
-            })
+            anomalies.append(
+                {
+                    "dimension": "gross_margin",
+                    "severity": "critical" if gross_margin < 0.15 else "warning",
+                    "detail": f"毛利率{gross_margin:.1%}，低于警戒线25%",
+                    "value": round(gross_margin, 4),
+                }
+            )
 
         # 检测3：毛利润绝对值（低于1000元触发）
         if 0 < revenue_fen > 0 and gross_profit_fen < 100000:
-            anomalies.append({
-                "dimension": "gross_profit_absolute",
-                "severity": "warning",
-                "detail": f"毛利润¥{gross_profit_fen/100:.0f}，绝对值偏低",
-                "value": gross_profit_fen,
-            })
+            anomalies.append(
+                {
+                    "dimension": "gross_profit_absolute",
+                    "severity": "warning",
+                    "detail": f"毛利润¥{gross_profit_fen / 100:.0f}，绝对值偏低",
+                    "value": gross_profit_fen,
+                }
+            )
 
         # 检测4：客单价异常
         if history_ticket and len(history_ticket) >= 3 and avg_ticket_fen > 0:
@@ -1113,17 +1167,17 @@ class FinanceAuditAgent(SkillAgent):
             if avg_t > 0:
                 ticket_deviation = abs(avg_ticket_fen - avg_t) / avg_t
                 if ticket_deviation > 0.2:
-                    anomalies.append({
-                        "dimension": "avg_ticket",
-                        "severity": "warning",
-                        "detail": f"客单价¥{avg_ticket_fen/100:.0f}，偏离均值{ticket_deviation:.1%}",
-                        "deviation_pct": round(ticket_deviation, 4),
-                    })
+                    anomalies.append(
+                        {
+                            "dimension": "avg_ticket",
+                            "severity": "warning",
+                            "detail": f"客单价¥{avg_ticket_fen / 100:.0f}，偏离均值{ticket_deviation:.1%}",
+                            "deviation_pct": round(ticket_deviation, 4),
+                        }
+                    )
 
         overall_status = (
-            "critical" if any(a["severity"] == "critical" for a in anomalies) else
-            "warning" if anomalies else
-            "normal"
+            "critical" if any(a["severity"] == "critical" for a in anomalies) else "warning" if anomalies else "normal"
         )
 
         return AgentResult(
@@ -1165,17 +1219,20 @@ class FinanceAuditAgent(SkillAgent):
 
         if not store_id:
             return AgentResult(
-                success=False, action="get_settlement_snapshot",
+                success=False,
+                action="get_settlement_snapshot",
                 error="缺少 store_id",
             )
 
         if not self._db:
             return AgentResult(
-                success=False, action="get_settlement_snapshot",
+                success=False,
+                action="get_settlement_snapshot",
                 error="无DB连接，无法读取物化视图",
             )
 
-        row = await self._db.execute(text("""
+        row = await self._db.execute(
+            text("""
             SELECT
                 status, total_orders, total_revenue_fen,
                 cash_declared_fen, pos_system_fen, gap_fen,
@@ -1186,16 +1243,19 @@ class FinanceAuditAgent(SkillAgent):
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id::UUID
               AND stat_date = :stat_date
-        """), {
-            "tenant_id": self.tenant_id,
-            "store_id": store_id,
-            "stat_date": stat_date,
-        })
+        """),
+            {
+                "tenant_id": self.tenant_id,
+                "store_id": store_id,
+                "stat_date": stat_date,
+            },
+        )
 
         r = row.mappings().first()
         if not r:
             return AgentResult(
-                success=True, action="get_settlement_snapshot",
+                success=True,
+                action="get_settlement_snapshot",
                 data={
                     "store_id": store_id,
                     "stat_date": stat_date.isoformat() if hasattr(stat_date, "isoformat") else str(stat_date),
@@ -1220,7 +1280,8 @@ class FinanceAuditAgent(SkillAgent):
         risk = "high" if abs(gap_fen) > 10000 or status == "discrepancy" else "low"
 
         return AgentResult(
-            success=True, action="get_settlement_snapshot",
+            success=True,
+            action="get_settlement_snapshot",
             data=data,
             reasoning=(
                 f"日结快照（{stat_date}）：状态={status}，"
@@ -1246,17 +1307,20 @@ class FinanceAuditAgent(SkillAgent):
 
         if not store_id:
             return AgentResult(
-                success=False, action="get_pnl_snapshot",
+                success=False,
+                action="get_pnl_snapshot",
                 error="缺少 store_id",
             )
 
         if not self._db:
             return AgentResult(
-                success=False, action="get_pnl_snapshot",
+                success=False,
+                action="get_pnl_snapshot",
                 error="无DB连接，无法读取物化视图",
             )
 
-        row = await self._db.execute(text("""
+        row = await self._db.execute(
+            text("""
             SELECT
                 brand_id, revenue_fen, cost_fen, gross_profit_fen,
                 gross_margin, order_count, avg_ticket_fen,
@@ -1266,16 +1330,19 @@ class FinanceAuditAgent(SkillAgent):
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id::UUID
               AND stat_date = :stat_date
-        """), {
-            "tenant_id": self.tenant_id,
-            "store_id": store_id,
-            "stat_date": stat_date,
-        })
+        """),
+            {
+                "tenant_id": self.tenant_id,
+                "store_id": store_id,
+                "stat_date": stat_date,
+            },
+        )
 
         r = row.mappings().first()
         if not r:
             return AgentResult(
-                success=True, action="get_pnl_snapshot",
+                success=True,
+                action="get_pnl_snapshot",
                 data={
                     "store_id": store_id,
                     "stat_date": stat_date.isoformat() if hasattr(stat_date, "isoformat") else str(stat_date),
@@ -1298,12 +1365,13 @@ class FinanceAuditAgent(SkillAgent):
         margin_status = "healthy" if gross_margin >= 0.6 else ("warning" if gross_margin >= 0.5 else "critical")
 
         return AgentResult(
-            success=True, action="get_pnl_snapshot",
+            success=True,
+            action="get_pnl_snapshot",
             data=data,
             reasoning=(
                 f"P&L快照（{stat_date}）：营收¥{data['revenue_yuan']}，"
-                f"毛利率{gross_margin*100:.1f}%（{margin_status}），"
-                f"均客单¥{int(data.get('avg_ticket_fen') or 0)/100:.0f}"
+                f"毛利率{gross_margin * 100:.1f}%（{margin_status}），"
+                f"均客单¥{int(data.get('avg_ticket_fen') or 0) / 100:.0f}"
             ),
             confidence=0.95,
             inference_layer="cloud",

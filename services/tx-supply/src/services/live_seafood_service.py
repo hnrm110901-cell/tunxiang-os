@@ -4,6 +4,7 @@
 
 所有金额单位：分（fen）。重量单位：千克（kg）。温度单位：摄氏度（C）。
 """
+
 import math
 import uuid
 from dataclasses import dataclass, field
@@ -159,9 +160,11 @@ SPECIES_DATABASE: dict[str, dict] = {
 
 # ─── 数据模型 ───
 
+
 @dataclass
 class TankStatus:
     """海鲜池状态"""
+
     tank_id: str
     species: list[str]  # species keys from SPECIES_DATABASE
     temperature: float  # celsius
@@ -192,12 +195,12 @@ def _parse_iso(s: str) -> datetime:
 
 # ─── 内存存储（生产环境替换为 DB Repository） ───
 
-_batches: dict[str, dict] = {}       # batch_id -> intake record
-_tanks: dict[str, dict] = {}         # tank_id -> tank state
-_inspections: dict[str, list] = {}   # tank_id -> [inspection records]
-_market_prices: dict[str, dict] = {} # species -> current price info
-_price_history: dict[str, list] = {} # species -> [price records]
-_sales: dict[str, dict] = {}         # sale_id -> sale record
+_batches: dict[str, dict] = {}  # batch_id -> intake record
+_tanks: dict[str, dict] = {}  # tank_id -> tank state
+_inspections: dict[str, list] = {}  # tank_id -> [inspection records]
+_market_prices: dict[str, dict] = {}  # species -> current price info
+_price_history: dict[str, list] = {}  # species -> [price records]
+_sales: dict[str, dict] = {}  # sale_id -> sale record
 _compliance_logs: dict[str, list] = {}  # store_id -> [compliance records]
 
 
@@ -234,8 +237,7 @@ class LiveSeafoodService:
             intake_date: 进货日期 (ISO)，默认当前时间
         """
         if species not in SPECIES_DATABASE:
-            raise ValueError(f"Unknown species: {species}. "
-                             f"Known: {list(SPECIES_DATABASE.keys())}")
+            raise ValueError(f"Unknown species: {species}. Known: {list(SPECIES_DATABASE.keys())}")
         if quantity_kg <= 0:
             raise ValueError("quantity_kg must be positive")
         if unit_price_fen <= 0:
@@ -280,8 +282,9 @@ class LiveSeafoodService:
         # 更新池子库存
         self._add_to_tank(tank_id, species, quantity_kg)
 
-        logger.info("seafood_intake_recorded", batch_id=batch_id, species=species,
-                     quantity_kg=quantity_kg, tank_id=tank_id)
+        logger.info(
+            "seafood_intake_recorded", batch_id=batch_id, species=species, quantity_kg=quantity_kg, tank_id=tank_id
+        )
         return record
 
     def _add_to_tank(self, tank_id: str, species: str, quantity_kg: float) -> None:
@@ -344,14 +347,21 @@ class LiveSeafoodService:
         alerts = self._check_parameter_alerts(tank)
         tank["alerts"] = alerts
         tank["alert_level"] = (
-            "critical" if any(a["severity"] == "critical" for a in alerts) else
-            "warning" if any(a["severity"] == "warning" for a in alerts) else
-            "normal"
+            "critical"
+            if any(a["severity"] == "critical" for a in alerts)
+            else "warning"
+            if any(a["severity"] == "warning" for a in alerts)
+            else "normal"
         )
 
-        logger.info("tank_status_updated", tank_id=tank_id,
-                     temp=temperature, salinity=salinity, ph=ph,
-                     alert_level=tank["alert_level"])
+        logger.info(
+            "tank_status_updated",
+            tank_id=tank_id,
+            temp=temperature,
+            salinity=salinity,
+            ph=ph,
+            alert_level=tank["alert_level"],
+        )
         return {
             "tank_id": tank_id,
             "temperature": temperature,
@@ -381,60 +391,72 @@ class LiveSeafoodService:
             if temp < sp["temp_min"]:
                 diff = sp["temp_min"] - temp
                 severity = "critical" if diff > 3 else "warning"
-                alerts.append({
-                    "type": "temperature_low",
-                    "detail": f"{name}水温过低: {temp}C (要求 {sp['temp_min']}-{sp['temp_max']}C)",
-                    "severity": severity,
-                    "species": species_key,
-                })
+                alerts.append(
+                    {
+                        "type": "temperature_low",
+                        "detail": f"{name}水温过低: {temp}C (要求 {sp['temp_min']}-{sp['temp_max']}C)",
+                        "severity": severity,
+                        "species": species_key,
+                    }
+                )
             elif temp > sp["temp_max"]:
                 diff = temp - sp["temp_max"]
                 severity = "critical" if diff > 3 else "warning"
-                alerts.append({
-                    "type": "temperature_high",
-                    "detail": f"{name}水温过高: {temp}C (要求 {sp['temp_min']}-{sp['temp_max']}C)",
-                    "severity": severity,
-                    "species": species_key,
-                })
+                alerts.append(
+                    {
+                        "type": "temperature_high",
+                        "detail": f"{name}水温过高: {temp}C (要求 {sp['temp_min']}-{sp['temp_max']}C)",
+                        "severity": severity,
+                        "species": species_key,
+                    }
+                )
 
             # 盐度检查
             if sal < sp["salinity_min"]:
                 diff = sp["salinity_min"] - sal
                 severity = "critical" if diff > 3 else "warning"
-                alerts.append({
-                    "type": "salinity_low",
-                    "detail": f"{name}盐度过低: {sal}ppt (要求 {sp['salinity_min']}-{sp['salinity_max']}ppt)",
-                    "severity": severity,
-                    "species": species_key,
-                })
+                alerts.append(
+                    {
+                        "type": "salinity_low",
+                        "detail": f"{name}盐度过低: {sal}ppt (要求 {sp['salinity_min']}-{sp['salinity_max']}ppt)",
+                        "severity": severity,
+                        "species": species_key,
+                    }
+                )
             elif sal > sp["salinity_max"]:
                 diff = sal - sp["salinity_max"]
                 severity = "critical" if diff > 3 else "warning"
-                alerts.append({
-                    "type": "salinity_high",
-                    "detail": f"{name}盐度过高: {sal}ppt (要求 {sp['salinity_min']}-{sp['salinity_max']}ppt)",
-                    "severity": severity,
-                    "species": species_key,
-                })
+                alerts.append(
+                    {
+                        "type": "salinity_high",
+                        "detail": f"{name}盐度过高: {sal}ppt (要求 {sp['salinity_min']}-{sp['salinity_max']}ppt)",
+                        "severity": severity,
+                        "species": species_key,
+                    }
+                )
 
             # pH检查
             if ph < sp["ph_min"] or ph > sp["ph_max"]:
-                alerts.append({
-                    "type": "ph_out_of_range",
-                    "detail": f"{name}pH异常: {ph} (要求 {sp['ph_min']}-{sp['ph_max']})",
-                    "severity": "warning",
-                    "species": species_key,
-                })
+                alerts.append(
+                    {
+                        "type": "ph_out_of_range",
+                        "detail": f"{name}pH异常: {ph} (要求 {sp['ph_min']}-{sp['ph_max']})",
+                        "severity": "warning",
+                        "species": species_key,
+                    }
+                )
 
             # 密度检查
             if density > sp["max_density_kg_per_sqm"]:
                 severity = "critical" if density > sp["max_density_kg_per_sqm"] * 1.3 else "warning"
-                alerts.append({
-                    "type": "overstocked",
-                    "detail": f"{name}密度过高: {density:.1f}kg/m2 (上限 {sp['max_density_kg_per_sqm']}kg/m2)",
-                    "severity": severity,
-                    "species": species_key,
-                })
+                alerts.append(
+                    {
+                        "type": "overstocked",
+                        "detail": f"{name}密度过高: {density:.1f}kg/m2 (上限 {sp['max_density_kg_per_sqm']}kg/m2)",
+                        "severity": severity,
+                        "species": species_key,
+                    }
+                )
 
         return alerts
 
@@ -449,27 +471,31 @@ class LiveSeafoodService:
             species_info = []
             for sp_key in tank.get("species", []):
                 sp = SPECIES_DATABASE.get(sp_key, {})
-                species_info.append({
-                    "key": sp_key,
-                    "name_cn": sp.get("name_cn", sp_key),
-                    "optimal_temp": f"{sp.get('temp_min', '?')}-{sp.get('temp_max', '?')}C",
-                    "optimal_salinity": f"{sp.get('salinity_min', '?')}-{sp.get('salinity_max', '?')}ppt",
-                })
+                species_info.append(
+                    {
+                        "key": sp_key,
+                        "name_cn": sp.get("name_cn", sp_key),
+                        "optimal_temp": f"{sp.get('temp_min', '?')}-{sp.get('temp_max', '?')}C",
+                        "optimal_salinity": f"{sp.get('salinity_min', '?')}-{sp.get('salinity_max', '?')}ppt",
+                    }
+                )
 
-            results.append({
-                "tank_id": tank_id,
-                "species": species_info,
-                "temperature": tank["temperature"],
-                "salinity": tank["salinity"],
-                "ph": tank["ph"],
-                "density_kg_per_sqm": round(tank["density_kg_per_sqm"], 2),
-                "water_quality": tank["water_quality"],
-                "current_stock_kg": round(tank["current_stock_kg"], 2),
-                "last_water_change": tank.get("last_water_change"),
-                "alert_level": tank["alert_level"],
-                "alert_count": len(tank.get("alerts", [])),
-                "alerts": tank.get("alerts", []),
-            })
+            results.append(
+                {
+                    "tank_id": tank_id,
+                    "species": species_info,
+                    "temperature": tank["temperature"],
+                    "salinity": tank["salinity"],
+                    "ph": tank["ph"],
+                    "density_kg_per_sqm": round(tank["density_kg_per_sqm"], 2),
+                    "water_quality": tank["water_quality"],
+                    "current_stock_kg": round(tank["current_stock_kg"], 2),
+                    "last_water_change": tank.get("last_water_change"),
+                    "alert_level": tank["alert_level"],
+                    "alert_count": len(tank.get("alerts", [])),
+                    "alerts": tank.get("alerts", []),
+                }
+            )
 
         return results
 
@@ -484,11 +510,13 @@ class LiveSeafoodService:
             alerts = self._check_parameter_alerts(tank)
             tank["alerts"] = alerts
             for alert in alerts:
-                all_alerts.append({
-                    "tank_id": tank_id,
-                    **alert,
-                    "checked_at": _now_iso(),
-                })
+                all_alerts.append(
+                    {
+                        "tank_id": tank_id,
+                        **alert,
+                        "checked_at": _now_iso(),
+                    }
+                )
 
         # Sort: critical first
         severity_order = {"critical": 0, "warning": 1, "info": 2}
@@ -564,9 +592,13 @@ class LiveSeafoodService:
 
         _inspections.setdefault(tank_id, []).append(record)
 
-        logger.info("seafood_inspection_recorded", inspection_id=inspection_id,
-                     tank_id=tank_id, mortality_kg=mortality_kg,
-                     mortality_rate=round(mortality_rate, 4))
+        logger.info(
+            "seafood_inspection_recorded",
+            inspection_id=inspection_id,
+            tank_id=tank_id,
+            mortality_kg=mortality_kg,
+            mortality_rate=round(mortality_rate, 4),
+        )
         return record
 
     def get_mortality_trend(self, species: str, days: int = 30) -> dict:
@@ -600,12 +632,14 @@ class LiveSeafoodService:
         for date_key in sorted(daily_data.keys()):
             d = daily_data[date_key]
             rate = d["mortality_kg"] / d["stock_kg"] if d["stock_kg"] > 0 else 0
-            trend.append({
-                "date": date_key,
-                "mortality_kg": round(d["mortality_kg"], 2),
-                "stock_kg": round(d["stock_kg"], 2),
-                "mortality_rate": round(rate, 4),
-            })
+            trend.append(
+                {
+                    "date": date_key,
+                    "mortality_kg": round(d["mortality_kg"], 2),
+                    "stock_kg": round(d["stock_kg"], 2),
+                    "mortality_rate": round(rate, 4),
+                }
+            )
             total_mortality += d["mortality_kg"]
             total_stock += d["stock_kg"]
 
@@ -620,10 +654,13 @@ class LiveSeafoodService:
             "avg_mortality_rate": round(avg_rate, 4),
             "baseline_mortality_rate": baseline,
             "status": (
-                "excellent" if avg_rate < baseline * 0.5 else
-                "good" if avg_rate <= baseline else
-                "concerning" if avg_rate <= baseline * 2 else
-                "critical"
+                "excellent"
+                if avg_rate < baseline * 0.5
+                else "good"
+                if avg_rate <= baseline
+                else "concerning"
+                if avg_rate <= baseline * 2
+                else "critical"
             ),
             "total_mortality_kg": round(total_mortality, 2),
         }
@@ -666,24 +703,24 @@ class LiveSeafoodService:
         # 偏离越大，风险指数级增长
         risk_factor = 1.0
         if temp_deviation > 1.0:
-            risk_factor *= (1 + (temp_deviation - 1.0) * 3)  # 温度超出范围，风险×3
+            risk_factor *= 1 + (temp_deviation - 1.0) * 3  # 温度超出范围，风险×3
         else:
-            risk_factor *= (1 + temp_deviation * 0.5)
+            risk_factor *= 1 + temp_deviation * 0.5
 
         if sal_deviation > 1.0:
-            risk_factor *= (1 + (sal_deviation - 1.0) * 2)
+            risk_factor *= 1 + (sal_deviation - 1.0) * 2
         else:
-            risk_factor *= (1 + sal_deviation * 0.3)
+            risk_factor *= 1 + sal_deviation * 0.3
 
         if ph_deviation > 1.0:
-            risk_factor *= (1 + (ph_deviation - 1.0) * 1.5)
+            risk_factor *= 1 + (ph_deviation - 1.0) * 1.5
         else:
-            risk_factor *= (1 + ph_deviation * 0.2)
+            risk_factor *= 1 + ph_deviation * 0.2
 
         if density_ratio > 1.0:
-            risk_factor *= (1 + (density_ratio - 1.0) * 2)
+            risk_factor *= 1 + (density_ratio - 1.0) * 2
         elif density_ratio > 0.8:
-            risk_factor *= (1 + (density_ratio - 0.8) * 0.5)
+            risk_factor *= 1 + (density_ratio - 0.8) * 0.5
 
         # 水质因子
         wq_factor = {"excellent": 0.8, "good": 1.0, "fair": 1.5, "poor": 3.0}
@@ -747,8 +784,13 @@ class LiveSeafoodService:
             "predicted_loss_kg_24h": round(tank["current_stock_kg"] * predicted_rate, 2),
         }
 
-        logger.info("mortality_predicted", tank_id=tank_id, species=species,
-                     predicted_rate=round(predicted_rate, 4), risk_level=risk_level)
+        logger.info(
+            "mortality_predicted",
+            tank_id=tank_id,
+            species=species,
+            predicted_rate=round(predicted_rate, 4),
+            risk_level=risk_level,
+        )
         return result
 
     # ─── 4. Market Price Engine (时价管理) ───
@@ -786,14 +828,15 @@ class LiveSeafoodService:
         _market_prices[species] = price_record
 
         # 追加历史记录
-        _price_history.setdefault(species, []).append({
-            "price_fen": market_price_fen,
-            "source": source,
-            "recorded_at": _now_iso(),
-        })
+        _price_history.setdefault(species, []).append(
+            {
+                "price_fen": market_price_fen,
+                "source": source,
+                "recorded_at": _now_iso(),
+            }
+        )
 
-        logger.info("market_price_updated", species=species,
-                     price_fen=market_price_fen, source=source)
+        logger.info("market_price_updated", species=species, price_fen=market_price_fen, source=source)
         return price_record
 
     def calculate_selling_price(
@@ -855,8 +898,7 @@ class LiveSeafoodService:
             "note": price_note,
         }
 
-        logger.info("selling_price_calculated", species=species,
-                     recommended_fen=recommended_price)
+        logger.info("selling_price_calculated", species=species, recommended_fen=recommended_price)
         return result
 
     def get_price_history(self, species: str, days: int = 90) -> list[dict]:
@@ -953,10 +995,7 @@ class LiveSeafoodService:
         if batch["status"] != "active":
             raise ValueError(f"Batch {batch_id} is {batch['status']}, cannot sell")
         if weight_kg > batch["remaining_kg"]:
-            raise ValueError(
-                f"Insufficient stock: requested {weight_kg}kg, "
-                f"remaining {batch['remaining_kg']}kg"
-            )
+            raise ValueError(f"Insufficient stock: requested {weight_kg}kg, remaining {batch['remaining_kg']}kg")
 
         sp = SPECIES_DATABASE[species]
         sale_id = f"SALE-{_gen_id()}"
@@ -1002,8 +1041,13 @@ class LiveSeafoodService:
 
         _sales[sale_id] = sale
 
-        logger.info("seafood_sale_recorded", sale_id=sale_id, species=species,
-                     weight_kg=weight_kg, margin_rate=round(margin_rate, 4))
+        logger.info(
+            "seafood_sale_recorded",
+            sale_id=sale_id,
+            species=species,
+            weight_kg=weight_kg,
+            margin_rate=round(margin_rate, 4),
+        )
         return sale
 
     def calculate_yield_rate(
@@ -1037,11 +1081,7 @@ class LiveSeafoodService:
             "actual_yield_rate": round(actual_yield, 4),
             "standard_yield_rate": standard_yield,
             "deviation": round(deviation, 4),
-            "status": (
-                "excellent" if deviation > 0.05 else
-                "normal" if deviation >= -0.05 else
-                "below_standard"
-            ),
+            "status": ("excellent" if deviation > 0.05 else "normal" if deviation >= -0.05 else "below_standard"),
             "waste_kg": round(raw_weight_kg - cooked_weight_kg, 2),
             "waste_rate": round(1 - actual_yield, 4),
         }
@@ -1069,37 +1109,41 @@ class LiveSeafoodService:
             inspections = _inspections.get(tank_id, [])
             inspection_summary = []
             for insp in inspections[-5:]:  # 最近5次巡检
-                inspection_summary.append({
-                    "date": insp["inspected_at"],
-                    "inspector": insp["inspector"],
-                    "mortality_kg": insp["mortality_kg"],
-                    "water_quality": insp.get("water_quality"),
-                })
+                inspection_summary.append(
+                    {
+                        "date": insp["inspected_at"],
+                        "inspector": insp["inspector"],
+                        "mortality_kg": insp["mortality_kg"],
+                        "water_quality": insp.get("water_quality"),
+                    }
+                )
 
-            traces.append({
-                "sale": {
-                    "sale_id": sale["sale_id"],
-                    "weight_kg": sale["weight_kg"],
-                    "cooking_method": sale["cooking_method"],
-                    "sold_at": sale["sold_at"],
-                },
-                "batch": {
-                    "batch_id": sale["batch_id"],
-                    "intake_date": batch.get("intake_date"),
-                    "expiry_date": batch.get("expiry_date"),
-                    "quarantine_cert": batch.get("quarantine_cert"),
-                    "supplier_id": batch.get("supplier_id"),
-                },
-                "tank": {
-                    "tank_id": tank_id,
-                    "temperature": tank.get("temperature"),
-                    "salinity": tank.get("salinity"),
-                    "water_quality": tank.get("water_quality"),
-                },
-                "inspections": inspection_summary,
-                "species": sale["species"],
-                "species_name_cn": sale["species_name_cn"],
-            })
+            traces.append(
+                {
+                    "sale": {
+                        "sale_id": sale["sale_id"],
+                        "weight_kg": sale["weight_kg"],
+                        "cooking_method": sale["cooking_method"],
+                        "sold_at": sale["sold_at"],
+                    },
+                    "batch": {
+                        "batch_id": sale["batch_id"],
+                        "intake_date": batch.get("intake_date"),
+                        "expiry_date": batch.get("expiry_date"),
+                        "quarantine_cert": batch.get("quarantine_cert"),
+                        "supplier_id": batch.get("supplier_id"),
+                    },
+                    "tank": {
+                        "tank_id": tank_id,
+                        "temperature": tank.get("temperature"),
+                        "salinity": tank.get("salinity"),
+                        "water_quality": tank.get("water_quality"),
+                    },
+                    "inspections": inspection_summary,
+                    "species": sale["species"],
+                    "species_name_cn": sale["species_name_cn"],
+                }
+            )
 
         return {
             "order_item_id": order_item_id,
@@ -1178,12 +1222,14 @@ class LiveSeafoodService:
                 continue
             if not batch.get("quarantine_cert"):
                 cert_valid = False
-                issues.append({
-                    "type": "missing_quarantine_cert",
-                    "severity": "critical",
-                    "detail": f"批次 {batch_id} ({batch.get('species_name_cn', batch['species'])}) 缺少检疫证",
-                    "batch_id": batch_id,
-                })
+                issues.append(
+                    {
+                        "type": "missing_quarantine_cert",
+                        "severity": "critical",
+                        "detail": f"批次 {batch_id} ({batch.get('species_name_cn', batch['species'])}) 缺少检疫证",
+                        "batch_id": batch_id,
+                    }
+                )
 
         # 2. 温度是否在范围内
         temp_ok = True
@@ -1196,12 +1242,14 @@ class LiveSeafoodService:
                     continue
                 if tank["temperature"] < sp["temp_min"] or tank["temperature"] > sp["temp_max"]:
                     temp_ok = False
-                    issues.append({
-                        "type": "temperature_out_of_range",
-                        "severity": "warning",
-                        "detail": f"池 {tank_id} {sp['name_cn']} 温度 {tank['temperature']}C 超出 {sp['temp_min']}-{sp['temp_max']}C",
-                        "tank_id": tank_id,
-                    })
+                    issues.append(
+                        {
+                            "type": "temperature_out_of_range",
+                            "severity": "warning",
+                            "detail": f"池 {tank_id} {sp['name_cn']} 温度 {tank['temperature']}C 超出 {sp['temp_min']}-{sp['temp_max']}C",
+                            "tank_id": tank_id,
+                        }
+                    )
 
         # 3. 过期批次检查
         no_expired = True
@@ -1214,19 +1262,23 @@ class LiveSeafoodService:
                 expiry_dt = _parse_iso(batch["expiry_date"])
                 if now > expiry_dt:
                     no_expired = False
-                    issues.append({
-                        "type": "expired_batch",
-                        "severity": "critical",
-                        "detail": f"批次 {batch_id} ({batch.get('species_name_cn')}) 已过期 (到期: {batch['expiry_date'][:10]})",
-                        "batch_id": batch_id,
-                    })
+                    issues.append(
+                        {
+                            "type": "expired_batch",
+                            "severity": "critical",
+                            "detail": f"批次 {batch_id} ({batch.get('species_name_cn')}) 已过期 (到期: {batch['expiry_date'][:10]})",
+                            "batch_id": batch_id,
+                        }
+                    )
                 elif (expiry_dt - now).days <= 2:
-                    issues.append({
-                        "type": "near_expiry_batch",
-                        "severity": "warning",
-                        "detail": f"批次 {batch_id} ({batch.get('species_name_cn')}) 即将过期 ({(expiry_dt - now).days}天后)",
-                        "batch_id": batch_id,
-                    })
+                    issues.append(
+                        {
+                            "type": "near_expiry_batch",
+                            "severity": "warning",
+                            "detail": f"批次 {batch_id} ({batch.get('species_name_cn')}) 即将过期 ({(expiry_dt - now).days}天后)",
+                            "batch_id": batch_id,
+                        }
+                    )
 
         # 4. 溯源完整性
         traceability_complete = True
@@ -1237,12 +1289,14 @@ class LiveSeafoodService:
                 continue
             if not batch.get("supplier_id") or not batch.get("quarantine_cert") or not batch.get("tank_id"):
                 traceability_complete = False
-                issues.append({
-                    "type": "incomplete_traceability",
-                    "severity": "warning",
-                    "detail": f"批次 {batch_id} 溯源信息不完整",
-                    "batch_id": batch_id,
-                })
+                issues.append(
+                    {
+                        "type": "incomplete_traceability",
+                        "severity": "warning",
+                        "detail": f"批次 {batch_id} 溯源信息不完整",
+                        "batch_id": batch_id,
+                    }
+                )
 
         # 5. 巡检频率检查
         for tank_id, tank in _tanks.items():
@@ -1253,19 +1307,23 @@ class LiveSeafoodService:
                 last_insp = _parse_iso(inspections[-1]["inspected_at"])
                 hours_since = (now - last_insp).total_seconds() / 3600
                 if hours_since > 24:
-                    issues.append({
-                        "type": "inspection_overdue",
-                        "severity": "warning",
-                        "detail": f"池 {tank_id} 超过{int(hours_since)}小时未巡检",
-                        "tank_id": tank_id,
-                    })
+                    issues.append(
+                        {
+                            "type": "inspection_overdue",
+                            "severity": "warning",
+                            "detail": f"池 {tank_id} 超过{int(hours_since)}小时未巡检",
+                            "tank_id": tank_id,
+                        }
+                    )
             elif tank["current_stock_kg"] > 0:
-                issues.append({
-                    "type": "no_inspection_record",
-                    "severity": "warning",
-                    "detail": f"池 {tank_id} 有库存但无巡检记录",
-                    "tank_id": tank_id,
-                })
+                issues.append(
+                    {
+                        "type": "no_inspection_record",
+                        "severity": "warning",
+                        "detail": f"池 {tank_id} 有库存但无巡检记录",
+                        "tank_id": tank_id,
+                    }
+                )
 
         # 总体评分
         critical_count = sum(1 for i in issues if i["severity"] == "critical")
@@ -1281,10 +1339,13 @@ class LiveSeafoodService:
             "traceability_complete": traceability_complete,
             "compliance_score": compliance_score,
             "compliance_level": (
-                "excellent" if compliance_score >= 90 else
-                "good" if compliance_score >= 70 else
-                "needs_improvement" if compliance_score >= 50 else
-                "critical"
+                "excellent"
+                if compliance_score >= 90
+                else "good"
+                if compliance_score >= 70
+                else "needs_improvement"
+                if compliance_score >= 50
+                else "critical"
             ),
             "critical_issues": critical_count,
             "warning_issues": warning_count,
@@ -1301,16 +1362,10 @@ class LiveSeafoodService:
         compliance = self.check_compliance(target_store)
 
         # 统计活跃批次
-        active_batches = [
-            b for b in _batches.values()
-            if b.get("store_id") == target_store and b["status"] == "active"
-        ]
+        active_batches = [b for b in _batches.values() if b.get("store_id") == target_store and b["status"] == "active"]
 
         # 统计池子
-        active_tanks = [
-            t for t in _tanks.values()
-            if t.get("store_id") == target_store and t["current_stock_kg"] > 0
-        ]
+        active_tanks = [t for t in _tanks.values() if t.get("store_id") == target_store and t["current_stock_kg"] > 0]
 
         # 统计巡检
         total_inspections = 0
@@ -1368,9 +1423,7 @@ class LiveSeafoodService:
         for batch in active_batches:
             sp = batch["species"]
             species_breakdown[sp] = species_breakdown.get(sp, 0) + batch["remaining_kg"]
-        report["inventory_summary"]["species_breakdown"] = {
-            k: round(v, 2) for k, v in species_breakdown.items()
-        }
+        report["inventory_summary"]["species_breakdown"] = {k: round(v, 2) for k, v in species_breakdown.items()}
 
         # 生成建议
         if compliance["compliance_score"] < 70:

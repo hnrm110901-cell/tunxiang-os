@@ -4,6 +4,7 @@
 叠加规则：同类型不叠加，不同类型可叠加。
 优先级：商品券(free_item/upgrade/buy_gift) > 折扣券(discount) > 代金券(cash)。
 """
+
 import random
 import string
 import uuid
@@ -20,13 +21,13 @@ logger = structlog.get_logger()
 
 
 class CouponType(str, Enum):
-    CASH = "cash"            # 代金券（固定面值/不找零/门槛）
-    DISCOUNT = "discount"    # 折扣券（按订单/菜品/分类）
+    CASH = "cash"  # 代金券（固定面值/不找零/门槛）
+    DISCOUNT = "discount"  # 折扣券（按订单/菜品/分类）
     FREE_ITEM = "free_item"  # 商品券-免费兑换
-    UPGRADE = "upgrade"      # 商品券-加价换购
-    BUY_GIFT = "buy_gift"    # 商品券-买赠
-    GIFT = "gift"            # 礼品券（实物/批量制券）
-    DELIVERY = "delivery"    # 配送券（外卖配送费）
+    UPGRADE = "upgrade"  # 商品券-加价换购
+    BUY_GIFT = "buy_gift"  # 商品券-买赠
+    GIFT = "gift"  # 礼品券（实物/批量制券）
+    DELIVERY = "delivery"  # 配送券（外卖配送费）
 
 
 # 优先级：数字越小优先级越高
@@ -49,6 +50,7 @@ ITEM_COUPON_TYPES = {CouponType.FREE_ITEM, CouponType.UPGRADE, CouponType.BUY_GI
 
 class _CouponTemplateStore:
     """券模板存储"""
+
     _templates: dict[str, dict] = {}
 
     @classmethod
@@ -70,6 +72,7 @@ class _CouponTemplateStore:
 
 class _CouponInstanceStore:
     """券实例存储（已发放的券）"""
+
     _instances: dict[str, dict] = {}
 
     @classmethod
@@ -91,7 +94,8 @@ class _CouponInstanceStore:
     @classmethod
     def list_by_customer(cls, customer_id: str, tenant_id: str) -> list[dict]:
         return [
-            i for i in cls._instances.values()
+            i
+            for i in cls._instances.values()
             if i.get("customer_id") == customer_id and i.get("tenant_id") == tenant_id
         ]
 
@@ -102,6 +106,7 @@ class _CouponInstanceStore:
 
 class _RevenueRuleStore:
     """券收入规则存储"""
+
     _rules: dict[str, dict] = {}
 
     @classmethod
@@ -214,8 +219,7 @@ async def batch_issue(
     max_count = template.get("max_issue_count")
     if max_count and template["issued_count"] + len(target_customers) > max_count:
         raise ValueError(
-            f"超出最大发放量: 已发{template['issued_count']}, "
-            f"本次{len(target_customers)}, 上限{max_count}"
+            f"超出最大发放量: 已发{template['issued_count']}, 本次{len(target_customers)}, 上限{max_count}"
         )
 
     now = datetime.now(timezone.utc)
@@ -226,6 +230,7 @@ async def batch_issue(
         expires_at = template.get("expires_at")
         if not expires_at and template.get("valid_days"):
             from datetime import timedelta
+
             expires_at = (now + timedelta(days=template["valid_days"])).isoformat()
 
         instance = {
@@ -390,12 +395,14 @@ async def check_stacking_rules(
     # 检测同类型冲突
     for ct, group in type_groups.items():
         if len(group) > 1:
-            conflicts.append({
-                "conflict_type": "same_type_stack",
-                "coupon_type": ct,
-                "count": len(group),
-                "message": f"同类型券({ct})不可叠加，已选{len(group)}张",
-            })
+            conflicts.append(
+                {
+                    "conflict_type": "same_type_stack",
+                    "coupon_type": ct,
+                    "count": len(group),
+                    "message": f"同类型券({ct})不可叠加，已选{len(group)}张",
+                }
+            )
 
     # 每种类型取面值/折扣最优的一张
     applicable: list[dict] = []
@@ -462,12 +469,14 @@ async def calculate_discount(
         # 检查门槛
         min_amount = coupon.get("min_order_amount_fen", 0)
         if min_amount > 0 and total_fen < min_amount:
-            details.append({
-                "code": coupon.get("code"),
-                "coupon_type": ct,
-                "discount_fen": 0,
-                "reason": f"未达门槛: 订单{total_fen}分 < 要求{min_amount}分",
-            })
+            details.append(
+                {
+                    "code": coupon.get("code"),
+                    "coupon_type": ct,
+                    "discount_fen": 0,
+                    "reason": f"未达门槛: 订单{total_fen}分 < 要求{min_amount}分",
+                }
+            )
             continue
 
         if ct == CouponType.CASH.value:
@@ -521,11 +530,13 @@ async def calculate_discount(
         remaining_fen = max(0, remaining_fen - discount_fen)
         total_discount_fen += discount_fen
 
-        details.append({
-            "code": coupon.get("code"),
-            "coupon_type": ct,
-            "discount_fen": discount_fen,
-        })
+        details.append(
+            {
+                "code": coupon.get("code"),
+                "coupon_type": ct,
+                "discount_fen": discount_fen,
+            }
+        )
 
     logger.info(
         "discount_calculated",

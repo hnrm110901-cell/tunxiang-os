@@ -4,13 +4,14 @@
 负责审批通过/驳回/转交/路由规则管理。
 共6个端点，覆盖费用审批节点流转与路由配置。
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from src.models.expense_enums import ApprovalAction
 
 try:
     from src.services.approval_engine_service import ApprovalEngineService
+
     _approval_svc = ApprovalEngineService()
 except ImportError:
     _approval_svc = None  # type: ignore[assignment]
@@ -30,6 +32,7 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # 依赖注入
 # ---------------------------------------------------------------------------
+
 
 async def get_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> UUID:
     try:
@@ -55,6 +58,7 @@ def _get_approval_service() -> "ApprovalEngineService":
 # Pydantic Schema
 # ---------------------------------------------------------------------------
 
+
 class ApprovalRequest(BaseModel):
     comment: Optional[str] = Field(None, description="审批意见（可选）")
 
@@ -78,6 +82,7 @@ class PaginatedResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点实现
 # ---------------------------------------------------------------------------
+
 
 @router.post("/applications/{application_id}/approve")
 async def approve_application(
@@ -104,11 +109,7 @@ async def approve_application(
         if trace is None:
             raise HTTPException(status_code=404, detail="审批实例不存在，请确认申请已提交")
 
-        instance_id = (
-            trace.get("instance_id")
-            if isinstance(trace, dict)
-            else getattr(trace, "instance_id", None)
-        )
+        instance_id = trace.get("instance_id") if isinstance(trace, dict) else getattr(trace, "instance_id", None)
         if instance_id is None:
             raise HTTPException(status_code=404, detail="无法获取审批实例ID")
 
@@ -160,11 +161,7 @@ async def reject_application(
         if trace is None:
             raise HTTPException(status_code=404, detail="审批实例不存在，请确认申请已提交")
 
-        instance_id = (
-            trace.get("instance_id")
-            if isinstance(trace, dict)
-            else getattr(trace, "instance_id", None)
-        )
+        instance_id = trace.get("instance_id") if isinstance(trace, dict) else getattr(trace, "instance_id", None)
         if instance_id is None:
             raise HTTPException(status_code=404, detail="无法获取审批实例ID")
 
@@ -272,11 +269,7 @@ async def transfer_approval(
         if trace is None:
             raise HTTPException(status_code=404, detail="审批实例不存在，请确认申请已提交")
 
-        instance_id = (
-            trace.get("instance_id")
-            if isinstance(trace, dict)
-            else getattr(trace, "instance_id", None)
-        )
+        instance_id = trace.get("instance_id") if isinstance(trace, dict) else getattr(trace, "instance_id", None)
         if instance_id is None:
             raise HTTPException(status_code=404, detail="无法获取审批实例ID")
 
@@ -295,7 +288,7 @@ async def transfer_approval(
             from_approver=str(current_user_id),
             to_approver=str(body.transfer_to_id),
         )
-        return {"ok": True, "data": result, "message": f"审批已转交"}
+        return {"ok": True, "data": result, "message": "审批已转交"}
     except HTTPException:
         raise
     except ValueError as exc:

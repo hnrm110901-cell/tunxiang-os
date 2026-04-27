@@ -6,6 +6,7 @@
 - 会话超时自动清理
 - 同一门店多设备并发会话
 """
+
 from __future__ import annotations
 
 import time
@@ -253,15 +254,17 @@ class VoiceSessionManager:
                 session["status"] = "expired"
                 continue
 
-            active.append({
-                "session_id": session["session_id"],
-                "employee_id": session["employee_id"],
-                "device_type": session["device_type"],
-                "turn_count": len(session["turns"]),
-                "created_at": session["created_at"],
-                "updated_at": session["updated_at"],
-                "idle_seconds": round(now - session["updated_at"], 1),
-            })
+            active.append(
+                {
+                    "session_id": session["session_id"],
+                    "employee_id": session["employee_id"],
+                    "device_type": session["device_type"],
+                    "turn_count": len(session["turns"]),
+                    "created_at": session["created_at"],
+                    "updated_at": session["updated_at"],
+                    "idle_seconds": round(now - session["updated_at"], 1),
+                }
+            )
 
         return active
 

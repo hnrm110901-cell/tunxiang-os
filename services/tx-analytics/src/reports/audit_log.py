@@ -53,12 +53,21 @@ ORDER BY o.created_at DESC
 """
 
 DIMENSIONS = [
-    "store_name", "biz_date", "order_no", "status",
-    "discount_type", "abnormal_type",
+    "store_name",
+    "biz_date",
+    "order_no",
+    "status",
+    "discount_type",
+    "abnormal_type",
 ]
 METRICS = [
-    "total_amount_fen", "discount_fen", "actual_fen",
-    "item_count", "return_count",
-    "abnormal_flag", "margin_alert_flag", "manual_adjust",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "item_count",
+    "return_count",
+    "abnormal_flag",
+    "margin_alert_flag",
+    "manual_adjust",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

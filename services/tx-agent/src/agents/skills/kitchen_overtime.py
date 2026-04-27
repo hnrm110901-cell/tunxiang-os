@@ -12,6 +12,7 @@
 - KDS.ITEM_COMPLETED → 记录出餐时间
 - 定时扫描（每60秒） → 检测超时项
 """
+
 from typing import Any
 
 import structlog
@@ -76,7 +77,8 @@ class KitchenOvertimeAgent(SkillAgent):
         # （checker 会验证 max_elapsed <= max_serve_minutes）
         max_elapsed = max((item.get("elapsed_minutes", 0) for item in pending_items), default=0)
         return AgentResult(
-            success=True, action="scan_overtime_items",
+            success=True,
+            action="scan_overtime_items",
             data={
                 "overtime_count": len(overtime),
                 "warning_count": len(warning),
@@ -113,11 +115,15 @@ class KitchenOvertimeAgent(SkillAgent):
             causes.append({"cause": "equipment_issue", "label": "设备故障", "weight": 0.85})
             primary_cause = "equipment_issue"
         if station_queue_length > 8:
-            causes.append({"cause": "queue_overload", "label": f"档口积压（{station_queue_length}单待制）", "weight": 0.7})
+            causes.append(
+                {"cause": "queue_overload", "label": f"档口积压（{station_queue_length}单待制）", "weight": 0.7}
+            )
             if primary_cause == "unknown":
                 primary_cause = "queue_overload"
         if station_staff_count < 2 and station_queue_length > 4:
-            causes.append({"cause": "understaffed", "label": f"人手不足（{station_staff_count}人值档）", "weight": 0.65})
+            causes.append(
+                {"cause": "understaffed", "label": f"人手不足（{station_staff_count}人值档）", "weight": 0.65}
+            )
             if primary_cause == "unknown":
                 primary_cause = "understaffed"
 
@@ -131,7 +137,7 @@ class KitchenOvertimeAgent(SkillAgent):
             try:
                 resp = await self._router.complete(
                     prompt=f"餐厅{station}档口出餐超时{elapsed}分钟，当前积压{station_queue_length}单，"
-                           f"值档{station_staff_count}人。请给出1条简短处理建议（30字以内）。",
+                    f"值档{station_staff_count}人。请给出1条简短处理建议（30字以内）。",
                     max_tokens=50,
                 )
                 if resp:
@@ -140,7 +146,8 @@ class KitchenOvertimeAgent(SkillAgent):
                 pass
 
         return AgentResult(
-            success=True, action="analyze_overtime_cause",
+            success=True,
+            action="analyze_overtime_cause",
             data={
                 "primary_cause": primary_cause,
                 "causes": causes,
@@ -161,11 +168,11 @@ class KitchenOvertimeAgent(SkillAgent):
         table_no = item.get("table_no", "")
         station = item.get("kitchen_station", "")
 
-        logger.info("auto_rush_notify",
-                     order_no=order_no, dish=dish_name, table=table_no, station=station)
+        logger.info("auto_rush_notify", order_no=order_no, dish=dish_name, table=table_no, station=station)
 
         return AgentResult(
-            success=True, action="auto_rush_notify",
+            success=True,
+            action="auto_rush_notify",
             data={
                 "order_no": order_no,
                 "dish_name": dish_name,
@@ -188,18 +195,21 @@ class KitchenOvertimeAgent(SkillAgent):
             avg_time = stat.get("avg_serve_minutes", 0)
             overtime_rate = stat.get("overtime_rate", 0)
             if overtime_rate > 0.2 or avg_time > 20:
-                bottlenecks.append({
-                    "station": stat.get("station_name", ""),
-                    "avg_serve_minutes": avg_time,
-                    "overtime_rate": overtime_rate,
-                    "pending_count": stat.get("pending_count", 0),
-                    "severity": "critical" if overtime_rate > 0.4 else "warning",
-                })
+                bottlenecks.append(
+                    {
+                        "station": stat.get("station_name", ""),
+                        "avg_serve_minutes": avg_time,
+                        "overtime_rate": overtime_rate,
+                        "pending_count": stat.get("pending_count", 0),
+                        "severity": "critical" if overtime_rate > 0.4 else "warning",
+                    }
+                )
 
         bottlenecks.sort(key=lambda x: x["overtime_rate"], reverse=True)
 
         return AgentResult(
-            success=True, action="get_station_bottleneck",
+            success=True,
+            action="get_station_bottleneck",
             data={"bottlenecks": bottlenecks, "total_stations": len(station_stats)},
             reasoning=f"{len(station_stats)}个档口中，{len(bottlenecks)}个存在瓶颈",
             confidence=0.85,
@@ -216,7 +226,8 @@ class KitchenOvertimeAgent(SkillAgent):
         predicted = avg_cook_minutes + queue_ahead * 3  # 每个排队项增加约3分钟
 
         return AgentResult(
-            success=True, action="predict_serve_time",
+            success=True,
+            action="predict_serve_time",
             data={
                 "dish_name": dish_name,
                 "station": station,
@@ -244,10 +255,11 @@ class KitchenOvertimeAgent(SkillAgent):
         }
 
         return AgentResult(
-            success=True, action="get_overtime_stats",
+            success=True,
+            action="get_overtime_stats",
             data=stats,
             reasoning=f"{period}出品{stats['total_items']}项，超时{stats['overtime_count']}项（{stats['overtime_rate']:.1%}），"
-                      f"平均出餐{stats['avg_serve_minutes']:.1f}分钟",
+            f"平均出餐{stats['avg_serve_minutes']:.1f}分钟",
             confidence=0.9,
             inference_layer="edge",
         )

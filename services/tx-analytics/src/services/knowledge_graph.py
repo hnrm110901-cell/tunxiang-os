@@ -16,6 +16,7 @@ Graph Structure:
 (Decision)-[:HAD_OUTCOME]->(Outcome)
 (BestPractice)-[:DISCOVERED_AT]->(Store)-[:APPLICABLE_TO]->(BusinessType)
 """
+
 import re
 import statistics
 import time
@@ -34,7 +35,10 @@ logger = structlog.get_logger()
 @dataclass
 class QueryIntent:
     """自然语言查询意图"""
-    intent_type: str  # aggregate/ranking/comparison/trend/root_cause/recommendation/benchmark/best_practice/dish_analysis
+
+    intent_type: (
+        str  # aggregate/ranking/comparison/trend/root_cause/recommendation/benchmark/best_practice/dish_analysis
+    )
     entities: dict = field(default_factory=dict)
     metric: str = ""
     aggregation: str = "avg"
@@ -45,6 +49,7 @@ class QueryIntent:
 @dataclass
 class NLQueryResult:
     """自然语言查询结果"""
+
     question: str
     intent: QueryIntent
     answer: str
@@ -93,56 +98,40 @@ QUESTION_PATTERNS = {
         re.compile(
             r"(?P<city>[\u4e00-\u9fff]{2,4})(地区|区域)(?P<type>[\u4e00-\u9fff]+)的(平均)?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)(是多少|有多少|怎么样)"
         ),
-        re.compile(
-            r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)(平均|总计)?(是多少|有多少)"
-        ),
+        re.compile(r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)(平均|总计)?(是多少|有多少)"),
     ],
     "benchmark": [
         re.compile(
             r"我们的(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量).*(跟|和|与).*(行业|同行).*(比|对比|相比|怎么样)"
         ),
-        re.compile(
-            r"(行业|同行|对标)(平均|标准|基准|水平).*?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)"
-        ),
-        re.compile(
-            r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量).*(跟|和|与).*(行业|同行)"
-        ),
+        re.compile(r"(行业|同行|对标)(平均|标准|基准|水平).*?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)"),
+        re.compile(r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量).*(跟|和|与).*(行业|同行)"),
     ],
     "trend": [
         re.compile(
             r"(上周|上月|最近|这周|本月)\s*(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量)\s*(变化|趋势|走势|下降|上升|增长)"
         ),
-        re.compile(
-            r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量)(为什么|怎么)(下降|上升|变化)了"
-        ),
+        re.compile(r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量)(为什么|怎么)(下降|上升|变化)了"),
     ],
     "ranking": [
-        re.compile(r"哪些门店的?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量|表现|业绩)(最高|最低|最好|最差)"),
         re.compile(
-            r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量)(排名|排行|TOP|top)(?P<n>\d+)?"
+            r"哪些门店的?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量|表现|业绩)(最高|最低|最好|最差)"
         ),
+        re.compile(r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量|销量)(排名|排行|TOP|top)(?P<n>\d+)?"),
         re.compile(r"(表现|业绩)(最好|最差)的(门店|菜品|员工)"),
     ],
     "dish_analysis": [
-        re.compile(
-            r"(?P<dish>[\u4e00-\u9fff]{2,6})的(最优|最佳|推荐)?(定价|价格)(区间|范围)?(是多少)?"
-        ),
+        re.compile(r"(?P<dish>[\u4e00-\u9fff]{2,6})的(最优|最佳|推荐)?(定价|价格)(区间|范围)?(是多少)?"),
         re.compile(r"(?P<dish>[\u4e00-\u9fff]{2,6})(卖得怎么样|销量|表现|趋势)"),
         re.compile(r"(?P<dish>[\u4e00-\u9fff]{2,6})的(成本|毛利|利润)(率|是多少)?"),
     ],
     "recommendation": [
-        re.compile(
-            r"(推荐|建议|适合).*?(?P<guest_count>\d+)人.*?(?P<type>宴会|聚餐|商务|生日)"
-        ),
+        re.compile(r"(推荐|建议|适合).*?(?P<guest_count>\d+)人.*?(?P<type>宴会|聚餐|商务|生日)"),
         re.compile(r"(什么菜|哪些菜|推荐菜品).*(适合|推荐|应该)"),
     ],
     "best_practice": [
-        re.compile(
-            r"(最佳实践|成功经验|怎么提升|如何改善).*?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)"
-        ),
-        re.compile(
-            r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)(怎么提升|如何改善|提升方法)"
-        ),
+        re.compile(r"(最佳实践|成功经验|怎么提升|如何改善).*?(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)"),
+        re.compile(r"(?P<metric>翻台率|客单价|毛利率|人效|坪效|营业额|客流量)(怎么提升|如何改善|提升方法)"),
     ],
 }
 
@@ -200,18 +189,14 @@ class KnowledgeGraphService:
             self._out_edges[from_type] = {}
         if from_id not in self._out_edges[from_type]:
             self._out_edges[from_type][from_id] = []
-        self._out_edges[from_type][from_id].append(
-            (to_type, to_id, rel_type, props)
-        )
+        self._out_edges[from_type][from_id].append((to_type, to_id, rel_type, props))
 
         # 反向索引
         if to_type not in self._in_edges:
             self._in_edges[to_type] = {}
         if to_id not in self._in_edges[to_type]:
             self._in_edges[to_type][to_id] = []
-        self._in_edges[to_type][to_id].append(
-            (from_type, from_id, rel_type, props)
-        )
+        self._in_edges[to_type][to_id].append((from_type, from_id, rel_type, props))
 
         self._last_updated = datetime.now()
         return {"ok": True, "relationship": rel_type, "from": from_id, "to": to_id}
@@ -241,12 +226,14 @@ class KnowledgeGraphService:
                     continue
                 entity = self.get_entity(to_type, to_id)
                 if entity:
-                    results.append({
-                        "entity": entity,
-                        "relationship": r_type,
-                        "direction": "out",
-                        "properties": props,
-                    })
+                    results.append(
+                        {
+                            "entity": entity,
+                            "relationship": r_type,
+                            "direction": "out",
+                            "properties": props,
+                        }
+                    )
 
         if direction in ("in", "both"):
             edges = self._in_edges.get(entity_type, {}).get(entity_id, [])
@@ -255,12 +242,14 @@ class KnowledgeGraphService:
                     continue
                 entity = self.get_entity(from_type, from_id)
                 if entity:
-                    results.append({
-                        "entity": entity,
-                        "relationship": r_type,
-                        "direction": "in",
-                        "properties": props,
-                    })
+                    results.append(
+                        {
+                            "entity": entity,
+                            "relationship": r_type,
+                            "direction": "in",
+                            "properties": props,
+                        }
+                    )
 
         return results
 
@@ -358,7 +347,11 @@ class KnowledgeGraphService:
             self.add_entity("store_metric", metric_id, metric)
             if store_id:
                 self.add_relationship(
-                    "store", store_id, "HAS_METRIC", "store_metric", metric_id,
+                    "store",
+                    store_id,
+                    "HAS_METRIC",
+                    "store_metric",
+                    metric_id,
                     {"date": metric.get("date", "")},
                 )
             counts["metrics"] += 1
@@ -375,12 +368,20 @@ class KnowledgeGraphService:
 
         agent_id = decision_data.get("agent_id", "")
         if agent_id:
-            self.add_entity("agent", agent_id, {
-                "name": decision_data.get("agent_name", agent_id),
-                "type": "skill_agent",
-            })
+            self.add_entity(
+                "agent",
+                agent_id,
+                {
+                    "name": decision_data.get("agent_name", agent_id),
+                    "type": "skill_agent",
+                },
+            )
             self.add_relationship(
-                "agent", agent_id, "MADE_DECISION", "decision", decision_id,
+                "agent",
+                agent_id,
+                "MADE_DECISION",
+                "decision",
+                decision_id,
                 {"date": decision_data.get("date", "")},
             )
 
@@ -406,15 +407,11 @@ class KnowledgeGraphService:
 
         store_id = practice.get("discovered_at_store", "")
         if store_id:
-            self.add_relationship(
-                "best_practice", practice_id, "DISCOVERED_AT", "store", store_id
-            )
+            self.add_relationship("best_practice", practice_id, "DISCOVERED_AT", "store", store_id)
 
         for btype in practice.get("applicable_to", []):
             self.add_entity("business_type", btype, {"name": btype})
-            self.add_relationship(
-                "best_practice", practice_id, "APPLICABLE_TO", "business_type", btype
-            )
+            self.add_relationship("best_practice", practice_id, "APPLICABLE_TO", "business_type", btype)
 
         return {"ok": True, "practice_id": practice_id}
 
@@ -432,9 +429,7 @@ class KnowledgeGraphService:
     # 3. Natural Language Query (自然语言查询)
     # ──────────────────────────────────────
 
-    def query_natural_language(
-        self, question: str, tenant_id: Optional[str] = None
-    ) -> NLQueryResult:
+    def query_natural_language(self, question: str, tenant_id: Optional[str] = None) -> NLQueryResult:
         """自然语言查询入口"""
         start = time.perf_counter()
 
@@ -518,13 +513,25 @@ class KnowledgeGraphService:
             first_this = now.replace(day=1)
             last_month_end = first_this - timedelta(days=1)
             last_month_start = last_month_end.replace(day=1)
-            time_range = {"start": last_month_start.strftime("%Y-%m-%d"), "end": last_month_end.strftime("%Y-%m-%d"), "period": "month"}
+            time_range = {
+                "start": last_month_start.strftime("%Y-%m-%d"),
+                "end": last_month_end.strftime("%Y-%m-%d"),
+                "period": "month",
+            }
         elif "本月" in question or "这个月" in question:
             now = datetime.now()
-            time_range = {"start": now.replace(day=1).strftime("%Y-%m-%d"), "end": now.strftime("%Y-%m-%d"), "period": "month"}
+            time_range = {
+                "start": now.replace(day=1).strftime("%Y-%m-%d"),
+                "end": now.strftime("%Y-%m-%d"),
+                "period": "month",
+            }
         elif "最近" in question:
             now = datetime.now()
-            time_range = {"start": (now - timedelta(days=7)).strftime("%Y-%m-%d"), "end": now.strftime("%Y-%m-%d"), "period": "week"}
+            time_range = {
+                "start": (now - timedelta(days=7)).strftime("%Y-%m-%d"),
+                "end": now.strftime("%Y-%m-%d"),
+                "period": "week",
+            }
 
         # 聚合方式
         if "总计" in question or "总共" in question:
@@ -659,11 +666,13 @@ class KnowledgeGraphService:
             metrics = self._get_store_metrics(store_id, intent.time_range)
             vals = [m.get(metric_key, 0) for m in metrics if metric_key in m]
             if vals:
-                ranking.append({
-                    "store_id": store_id,
-                    "store_name": store.get("name", store_id),
-                    "value": round(statistics.mean(vals), 2),
-                })
+                ranking.append(
+                    {
+                        "store_id": store_id,
+                        "store_name": store.get("name", store_id),
+                        "value": round(statistics.mean(vals), 2),
+                    }
+                )
 
         descending = "bottom" not in intent.aggregation
         ranking.sort(key=lambda x: x["value"], reverse=descending)
@@ -697,18 +706,20 @@ class KnowledgeGraphService:
             metrics = self._get_store_metrics(store_id, intent.time_range)
             for m in metrics:
                 if metric_key in m:
-                    all_metrics.append({
-                        "date": m.get("date", ""),
-                        "store": store.get("name", store_id),
-                        "value": m[metric_key],
-                    })
+                    all_metrics.append(
+                        {
+                            "date": m.get("date", ""),
+                            "store": store.get("name", store_id),
+                            "value": m[metric_key],
+                        }
+                    )
 
         all_metrics.sort(key=lambda x: x["date"])
 
         # 计算变化
         if len(all_metrics) >= 2:
             first_half = all_metrics[: len(all_metrics) // 2]
-            second_half = all_metrics[len(all_metrics) // 2:]
+            second_half = all_metrics[len(all_metrics) // 2 :]
             avg_first = statistics.mean([m["value"] for m in first_half]) if first_half else 0
             avg_second = statistics.mean([m["value"] for m in second_half]) if second_half else 0
             change_pct = ((avg_second - avg_first) / avg_first * 100) if avg_first else 0
@@ -779,12 +790,14 @@ class KnowledgeGraphService:
             selected = available[:count]
             for dish in selected:
                 price = dish.get("price", 0)
-                recommended.append({
-                    "name": dish.get("name", ""),
-                    "category": cat,
-                    "price": price,
-                    "serves": dish.get("serves", "4-6人"),
-                })
+                recommended.append(
+                    {
+                        "name": dish.get("name", ""),
+                        "category": cat,
+                        "price": price,
+                        "serves": dish.get("serves", "4-6人"),
+                    }
+                )
                 total_price += price
 
         per_person = total_price / max(guest_count, 1)
@@ -834,9 +847,13 @@ class KnowledgeGraphService:
                 matched.append(practice)
 
         # 同时查找高绩效门店
-        top_stores = self._query_ranking(QueryIntent(
-            intent_type="ranking", metric=metric_key, aggregation="top_3",
-        ))
+        top_stores = self._query_ranking(
+            QueryIntent(
+                intent_type="ranking",
+                metric=metric_key,
+                aggregation="top_3",
+            )
+        )
 
         return {
             "type": "best_practice",
@@ -1051,15 +1068,14 @@ class KnowledgeGraphService:
     def _format_as_chart_data(self, query_result: dict) -> str:
         """将结果格式化为图表数据JSON"""
         import json
+
         return json.dumps(query_result, ensure_ascii=False, default=str)
 
     # ──────────────────────────────────────
     # 7. Best Practice Discovery (最佳实践发现)
     # ──────────────────────────────────────
 
-    def discover_best_practices(
-        self, metric: str, min_improvement: float = 0.1
-    ) -> list[dict]:
+    def discover_best_practices(self, metric: str, min_improvement: float = 0.1) -> list[dict]:
         """发现最佳实践"""
         decisions = self._entities.get("decision", {})
         practices: list[dict] = []
@@ -1076,14 +1092,16 @@ class KnowledgeGraphService:
             dec_metric = dec.get("metric", "")
 
             if dec_metric == metric and improvement >= min_improvement * 100:
-                practices.append({
-                    "decision_id": dec_id,
-                    "description": dec.get("description", ""),
-                    "store_id": dec.get("store_id", ""),
-                    "metric": metric,
-                    "improvement_pct": improvement,
-                    "action": dec.get("action", ""),
-                })
+                practices.append(
+                    {
+                        "decision_id": dec_id,
+                        "description": dec.get("description", ""),
+                        "store_id": dec.get("store_id", ""),
+                        "metric": metric,
+                        "improvement_pct": improvement,
+                        "action": dec.get("action", ""),
+                    }
+                )
 
         practices.sort(key=lambda x: x.get("improvement_pct", 0), reverse=True)
         return practices
@@ -1241,15 +1259,73 @@ class KnowledgeGraphService:
     def _get_default_benchmark(self, metric: str) -> dict:
         """行业默认基准（当数据不足时使用）"""
         defaults = {
-            "turnover_rate": {"avg": 2.1, "p25": 1.5, "p50": 2.0, "p75": 2.6, "p90": 3.2, "best_in_class": 4.0, "sample_size": 0},
-            "avg_check": {"avg": 85, "p25": 55, "p50": 80, "p75": 110, "p90": 150, "best_in_class": 220, "sample_size": 0},
-            "profit_margin": {"avg": 62, "p25": 52, "p50": 60, "p75": 68, "p90": 75, "best_in_class": 82, "sample_size": 0},
-            "labor_efficiency": {"avg": 480, "p25": 320, "p50": 450, "p75": 580, "p90": 720, "best_in_class": 950, "sample_size": 0},
-            "space_efficiency": {"avg": 45, "p25": 28, "p50": 42, "p75": 58, "p90": 75, "best_in_class": 110, "sample_size": 0},
-            "revenue": {"avg": 28000, "p25": 15000, "p50": 25000, "p75": 38000, "p90": 55000, "best_in_class": 85000, "sample_size": 0},
-            "customer_count": {"avg": 220, "p25": 120, "p50": 200, "p75": 300, "p90": 420, "best_in_class": 600, "sample_size": 0},
+            "turnover_rate": {
+                "avg": 2.1,
+                "p25": 1.5,
+                "p50": 2.0,
+                "p75": 2.6,
+                "p90": 3.2,
+                "best_in_class": 4.0,
+                "sample_size": 0,
+            },
+            "avg_check": {
+                "avg": 85,
+                "p25": 55,
+                "p50": 80,
+                "p75": 110,
+                "p90": 150,
+                "best_in_class": 220,
+                "sample_size": 0,
+            },
+            "profit_margin": {
+                "avg": 62,
+                "p25": 52,
+                "p50": 60,
+                "p75": 68,
+                "p90": 75,
+                "best_in_class": 82,
+                "sample_size": 0,
+            },
+            "labor_efficiency": {
+                "avg": 480,
+                "p25": 320,
+                "p50": 450,
+                "p75": 580,
+                "p90": 720,
+                "best_in_class": 950,
+                "sample_size": 0,
+            },
+            "space_efficiency": {
+                "avg": 45,
+                "p25": 28,
+                "p50": 42,
+                "p75": 58,
+                "p90": 75,
+                "best_in_class": 110,
+                "sample_size": 0,
+            },
+            "revenue": {
+                "avg": 28000,
+                "p25": 15000,
+                "p50": 25000,
+                "p75": 38000,
+                "p90": 55000,
+                "best_in_class": 85000,
+                "sample_size": 0,
+            },
+            "customer_count": {
+                "avg": 220,
+                "p25": 120,
+                "p50": 200,
+                "p75": 300,
+                "p90": 420,
+                "best_in_class": 600,
+                "sample_size": 0,
+            },
         }
-        return defaults.get(metric, {"avg": 0, "p25": 0, "p50": 0, "p75": 0, "p90": 0, "best_in_class": 0, "sample_size": 0})
+        return defaults.get(
+            metric, {"avg": 0, "p25": 0, "p50": 0, "p75": 0, "p90": 0, "best_in_class": 0, "sample_size": 0}
+        )
 
     def _generate_suggestions(self, intent: QueryIntent) -> list[str]:
         """根据当前意图生成推荐后续问题"""
@@ -1316,22 +1392,68 @@ class KnowledgeGraphService:
 def seed_knowledge_graph() -> KnowledgeGraphService:
     """创建并填充种子数据的知识图谱"""
     import random
+
     random.seed(42)
 
     kg = KnowledgeGraphService()
 
     # ── 5 家门店 ──
     stores = [
-        {"id": "store_cs_furong", "name": "长沙芙蓉路店", "city": "长沙", "province": "湖南",
-         "brand": "尝在一起", "business_type": "海鲜酒楼", "area_sqm": 350, "seats": 180, "staff_count": 28},
-        {"id": "store_cs_wuyi", "name": "长沙五一店", "city": "长沙", "province": "湖南",
-         "brand": "尝在一起", "business_type": "海鲜酒楼", "area_sqm": 280, "seats": 140, "staff_count": 22},
-        {"id": "store_wh_guanggu", "name": "武汉光谷店", "city": "武汉", "province": "湖北",
-         "brand": "尝在一起", "business_type": "海鲜酒楼", "area_sqm": 320, "seats": 160, "staff_count": 25},
-        {"id": "store_sz_nanshan", "name": "深圳南山店", "city": "深圳", "province": "广东",
-         "brand": "尝在一起", "business_type": "海鲜酒楼", "area_sqm": 400, "seats": 200, "staff_count": 32},
-        {"id": "store_bj_guomao", "name": "北京国贸店", "city": "北京", "province": "北京",
-         "brand": "尝在一起", "business_type": "海鲜酒楼", "area_sqm": 450, "seats": 220, "staff_count": 35},
+        {
+            "id": "store_cs_furong",
+            "name": "长沙芙蓉路店",
+            "city": "长沙",
+            "province": "湖南",
+            "brand": "尝在一起",
+            "business_type": "海鲜酒楼",
+            "area_sqm": 350,
+            "seats": 180,
+            "staff_count": 28,
+        },
+        {
+            "id": "store_cs_wuyi",
+            "name": "长沙五一店",
+            "city": "长沙",
+            "province": "湖南",
+            "brand": "尝在一起",
+            "business_type": "海鲜酒楼",
+            "area_sqm": 280,
+            "seats": 140,
+            "staff_count": 22,
+        },
+        {
+            "id": "store_wh_guanggu",
+            "name": "武汉光谷店",
+            "city": "武汉",
+            "province": "湖北",
+            "brand": "尝在一起",
+            "business_type": "海鲜酒楼",
+            "area_sqm": 320,
+            "seats": 160,
+            "staff_count": 25,
+        },
+        {
+            "id": "store_sz_nanshan",
+            "name": "深圳南山店",
+            "city": "深圳",
+            "province": "广东",
+            "brand": "尝在一起",
+            "business_type": "海鲜酒楼",
+            "area_sqm": 400,
+            "seats": 200,
+            "staff_count": 32,
+        },
+        {
+            "id": "store_bj_guomao",
+            "name": "北京国贸店",
+            "city": "北京",
+            "province": "北京",
+            "brand": "尝在一起",
+            "business_type": "海鲜酒楼",
+            "area_sqm": 450,
+            "seats": 220,
+            "staff_count": 35,
+        },
     ]
 
     # ── 30 道菜品 ──
@@ -1343,16 +1465,30 @@ def seed_knowledge_graph() -> KnowledgeGraphService:
         {"id": "dish_04", "name": "皮蛋豆腐", "category": "凉菜", "price": 22, "cost": 6, "serves": "2-4人"},
         {"id": "dish_05", "name": "凉拌木耳", "category": "凉菜", "price": 18, "cost": 5, "serves": "2-4人"},
         # 热菜
-        {"id": "dish_06", "name": "剁椒鱼头", "category": "热菜", "price": 128, "cost": 42, "serves": "4-6人",
-         "ingredients": [
-             {"id": "ing_01", "name": "鳙鱼头", "unit_price": 28, "unit": "kg"},
-             {"id": "ing_02", "name": "剁椒酱", "unit_price": 15, "unit": "kg"},
-             {"id": "ing_03", "name": "小葱", "unit_price": 6, "unit": "kg"},
-         ]},
-        {"id": "dish_07", "name": "清蒸鲈鱼", "category": "热菜", "price": 98, "cost": 35, "serves": "2-4人",
-         "ingredients": [
-             {"id": "ing_04", "name": "鲈鱼", "unit_price": 32, "unit": "kg"},
-         ]},
+        {
+            "id": "dish_06",
+            "name": "剁椒鱼头",
+            "category": "热菜",
+            "price": 128,
+            "cost": 42,
+            "serves": "4-6人",
+            "ingredients": [
+                {"id": "ing_01", "name": "鳙鱼头", "unit_price": 28, "unit": "kg"},
+                {"id": "ing_02", "name": "剁椒酱", "unit_price": 15, "unit": "kg"},
+                {"id": "ing_03", "name": "小葱", "unit_price": 6, "unit": "kg"},
+            ],
+        },
+        {
+            "id": "dish_07",
+            "name": "清蒸鲈鱼",
+            "category": "热菜",
+            "price": 98,
+            "cost": 35,
+            "serves": "2-4人",
+            "ingredients": [
+                {"id": "ing_04", "name": "鲈鱼", "unit_price": 32, "unit": "kg"},
+            ],
+        },
         {"id": "dish_08", "name": "蒜蓉粉丝蒸扇贝", "category": "热菜", "price": 68, "cost": 22, "serves": "2-4人"},
         {"id": "dish_09", "name": "香辣蟹", "category": "热菜", "price": 168, "cost": 65, "serves": "4-6人"},
         {"id": "dish_10", "name": "白灼基围虾", "category": "热菜", "price": 88, "cost": 38, "serves": "2-4人"},
@@ -1417,11 +1553,51 @@ def seed_knowledge_graph() -> KnowledgeGraphService:
 
     # ── 为每家门店导入数据 ──
     base_metrics = {
-        "store_cs_furong": {"revenue": 32000, "order_count": 180, "turnover_rate": 2.4, "avg_check": 95, "labor_efficiency": 580, "profit_margin": 65, "customer_count": 260},
-        "store_cs_wuyi": {"revenue": 25000, "order_count": 150, "turnover_rate": 2.0, "avg_check": 82, "labor_efficiency": 480, "profit_margin": 60, "customer_count": 210},
-        "store_wh_guanggu": {"revenue": 28000, "order_count": 160, "turnover_rate": 2.2, "avg_check": 88, "labor_efficiency": 520, "profit_margin": 62, "customer_count": 230},
-        "store_sz_nanshan": {"revenue": 45000, "order_count": 220, "turnover_rate": 2.8, "avg_check": 120, "labor_efficiency": 650, "profit_margin": 68, "customer_count": 310},
-        "store_bj_guomao": {"revenue": 52000, "order_count": 250, "turnover_rate": 3.0, "avg_check": 135, "labor_efficiency": 720, "profit_margin": 70, "customer_count": 350},
+        "store_cs_furong": {
+            "revenue": 32000,
+            "order_count": 180,
+            "turnover_rate": 2.4,
+            "avg_check": 95,
+            "labor_efficiency": 580,
+            "profit_margin": 65,
+            "customer_count": 260,
+        },
+        "store_cs_wuyi": {
+            "revenue": 25000,
+            "order_count": 150,
+            "turnover_rate": 2.0,
+            "avg_check": 82,
+            "labor_efficiency": 480,
+            "profit_margin": 60,
+            "customer_count": 210,
+        },
+        "store_wh_guanggu": {
+            "revenue": 28000,
+            "order_count": 160,
+            "turnover_rate": 2.2,
+            "avg_check": 88,
+            "labor_efficiency": 520,
+            "profit_margin": 62,
+            "customer_count": 230,
+        },
+        "store_sz_nanshan": {
+            "revenue": 45000,
+            "order_count": 220,
+            "turnover_rate": 2.8,
+            "avg_check": 120,
+            "labor_efficiency": 650,
+            "profit_margin": 68,
+            "customer_count": 310,
+        },
+        "store_bj_guomao": {
+            "revenue": 52000,
+            "order_count": 250,
+            "turnover_rate": 3.0,
+            "avg_check": 135,
+            "labor_efficiency": 720,
+            "profit_margin": 70,
+            "customer_count": 350,
+        },
     }
 
     # 30天指标
@@ -1441,17 +1617,19 @@ def seed_knowledge_graph() -> KnowledgeGraphService:
             jitter = 1 + (random.random() - 0.5) * 0.15
             wk_jitter = weekend_mult * jitter
 
-            metrics_list.append({
-                "id": f"{sid}_{date_str}",
-                "date": date_str,
-                "revenue": round(base["revenue"] * wk_jitter),
-                "order_count": round(base["order_count"] * wk_jitter),
-                "turnover_rate": round(base["turnover_rate"] * wk_jitter, 2),
-                "avg_check": round(base["avg_check"] * (1 + (random.random() - 0.5) * 0.08), 1),
-                "labor_efficiency": round(base["labor_efficiency"] * wk_jitter),
-                "profit_margin": round(base["profit_margin"] + (random.random() - 0.5) * 6, 1),
-                "customer_count": round(base["customer_count"] * wk_jitter),
-            })
+            metrics_list.append(
+                {
+                    "id": f"{sid}_{date_str}",
+                    "date": date_str,
+                    "revenue": round(base["revenue"] * wk_jitter),
+                    "order_count": round(base["order_count"] * wk_jitter),
+                    "turnover_rate": round(base["turnover_rate"] * wk_jitter, 2),
+                    "avg_check": round(base["avg_check"] * (1 + (random.random() - 0.5) * 0.08), 1),
+                    "labor_efficiency": round(base["labor_efficiency"] * wk_jitter),
+                    "profit_margin": round(base["profit_margin"] + (random.random() - 0.5) * 6, 1),
+                    "customer_count": round(base["customer_count"] * wk_jitter),
+                }
+            )
 
         store_data = {
             "store": store,
@@ -1462,26 +1640,166 @@ def seed_knowledge_graph() -> KnowledgeGraphService:
 
     # ── 20 条 Agent 决策 ──
     decision_templates = [
-        {"agent": "discount_guard", "agent_name": "折扣守护Agent", "desc": "检测到异常折扣：桌号15，折扣幅度超过40%", "metric": "profit_margin", "action": "拦截折扣并通知店长", "improvement": 3.2},
-        {"agent": "discount_guard", "agent_name": "折扣守护Agent", "desc": "VIP客户折扣合理性校验", "metric": "profit_margin", "action": "允许VIP折扣，毛利在底线之上", "improvement": 0},
-        {"agent": "menu_planner", "agent_name": "智能排菜Agent", "desc": "周三下午茶套餐推荐", "metric": "revenue", "action": "推出下午茶套餐68元/位", "improvement": 8.5},
-        {"agent": "menu_planner", "agent_name": "智能排菜Agent", "desc": "低毛利菜品预警：水煮鱼成本上涨", "metric": "profit_margin", "action": "建议调整水煮鱼定价至85元", "improvement": 5.1},
-        {"agent": "dispatch", "agent_name": "出餐调度Agent", "desc": "午高峰出餐延迟预警", "metric": "turnover_rate", "action": "建议提前备菜，增加一名帮厨", "improvement": 12.0},
-        {"agent": "dispatch", "agent_name": "出餐调度Agent", "desc": "晚高峰桌台调度优化", "metric": "turnover_rate", "action": "启用快速翻台模式", "improvement": 8.0},
-        {"agent": "member_insight", "agent_name": "会员洞察Agent", "desc": "沉睡会员召回建议", "metric": "customer_count", "action": "向120名沉睡会员发送定向优惠券", "improvement": 6.5},
-        {"agent": "member_insight", "agent_name": "会员洞察Agent", "desc": "高价值客户流失预警", "metric": "customer_count", "action": "为3名高价值客户安排店长回访", "improvement": 2.0},
-        {"agent": "inventory", "agent_name": "库存预警Agent", "desc": "鳙鱼头库存不足，预计明天售罄", "metric": "revenue", "action": "紧急补货50kg鳙鱼头", "improvement": 0},
-        {"agent": "inventory", "agent_name": "库存预警Agent", "desc": "基围虾临近保质期", "metric": "profit_margin", "action": "今日推出基围虾特价套餐消化库存", "improvement": 4.0},
-        {"agent": "finance_audit", "agent_name": "财务稽核Agent", "desc": "发现收银差异：现金收入与系统记录不符", "metric": "revenue", "action": "触发收银稽核流程", "improvement": 1.5},
-        {"agent": "finance_audit", "agent_name": "财务稽核Agent", "desc": "供应商账单异常：蔬菜价格偏离市场价20%", "metric": "profit_margin", "action": "建议与供应商重新议价", "improvement": 3.8},
-        {"agent": "patrol", "agent_name": "巡店质检Agent", "desc": "后厨卫生检查评分偏低", "metric": "customer_satisfaction", "action": "安排深度清洁并重新培训", "improvement": 0},
-        {"agent": "patrol", "agent_name": "巡店质检Agent", "desc": "前厅服务评分下降", "metric": "customer_satisfaction", "action": "组织服务标准化培训", "improvement": 5.0},
-        {"agent": "menu_planner", "agent_name": "智能排菜Agent", "desc": "季节性菜品调整建议", "metric": "revenue", "action": "上线3道春季新品，下线2道冬季菜", "improvement": 6.2},
-        {"agent": "dispatch", "agent_name": "出餐调度Agent", "desc": "外卖高峰出餐优化", "metric": "turnover_rate", "action": "外卖单独设置出餐通道", "improvement": 10.0},
-        {"agent": "member_insight", "agent_name": "会员洞察Agent", "desc": "生日营销建议", "metric": "customer_count", "action": "本周生日会员推送专属套餐", "improvement": 3.0},
-        {"agent": "inventory", "agent_name": "库存预警Agent", "desc": "调料库存充足，建议减少采购频次", "metric": "profit_margin", "action": "将调料采购频次从每周改为双周", "improvement": 1.2},
-        {"agent": "discount_guard", "agent_name": "折扣守护Agent", "desc": "团购券核销异常", "metric": "profit_margin", "action": "暂停异常团购券并人工复核", "improvement": 2.5},
-        {"agent": "menu_planner", "agent_name": "智能排菜Agent", "desc": "剁椒鱼头定价优化", "metric": "revenue", "action": "建议将剁椒鱼头从128元调至138元", "improvement": 7.8},
+        {
+            "agent": "discount_guard",
+            "agent_name": "折扣守护Agent",
+            "desc": "检测到异常折扣：桌号15，折扣幅度超过40%",
+            "metric": "profit_margin",
+            "action": "拦截折扣并通知店长",
+            "improvement": 3.2,
+        },
+        {
+            "agent": "discount_guard",
+            "agent_name": "折扣守护Agent",
+            "desc": "VIP客户折扣合理性校验",
+            "metric": "profit_margin",
+            "action": "允许VIP折扣，毛利在底线之上",
+            "improvement": 0,
+        },
+        {
+            "agent": "menu_planner",
+            "agent_name": "智能排菜Agent",
+            "desc": "周三下午茶套餐推荐",
+            "metric": "revenue",
+            "action": "推出下午茶套餐68元/位",
+            "improvement": 8.5,
+        },
+        {
+            "agent": "menu_planner",
+            "agent_name": "智能排菜Agent",
+            "desc": "低毛利菜品预警：水煮鱼成本上涨",
+            "metric": "profit_margin",
+            "action": "建议调整水煮鱼定价至85元",
+            "improvement": 5.1,
+        },
+        {
+            "agent": "dispatch",
+            "agent_name": "出餐调度Agent",
+            "desc": "午高峰出餐延迟预警",
+            "metric": "turnover_rate",
+            "action": "建议提前备菜，增加一名帮厨",
+            "improvement": 12.0,
+        },
+        {
+            "agent": "dispatch",
+            "agent_name": "出餐调度Agent",
+            "desc": "晚高峰桌台调度优化",
+            "metric": "turnover_rate",
+            "action": "启用快速翻台模式",
+            "improvement": 8.0,
+        },
+        {
+            "agent": "member_insight",
+            "agent_name": "会员洞察Agent",
+            "desc": "沉睡会员召回建议",
+            "metric": "customer_count",
+            "action": "向120名沉睡会员发送定向优惠券",
+            "improvement": 6.5,
+        },
+        {
+            "agent": "member_insight",
+            "agent_name": "会员洞察Agent",
+            "desc": "高价值客户流失预警",
+            "metric": "customer_count",
+            "action": "为3名高价值客户安排店长回访",
+            "improvement": 2.0,
+        },
+        {
+            "agent": "inventory",
+            "agent_name": "库存预警Agent",
+            "desc": "鳙鱼头库存不足，预计明天售罄",
+            "metric": "revenue",
+            "action": "紧急补货50kg鳙鱼头",
+            "improvement": 0,
+        },
+        {
+            "agent": "inventory",
+            "agent_name": "库存预警Agent",
+            "desc": "基围虾临近保质期",
+            "metric": "profit_margin",
+            "action": "今日推出基围虾特价套餐消化库存",
+            "improvement": 4.0,
+        },
+        {
+            "agent": "finance_audit",
+            "agent_name": "财务稽核Agent",
+            "desc": "发现收银差异：现金收入与系统记录不符",
+            "metric": "revenue",
+            "action": "触发收银稽核流程",
+            "improvement": 1.5,
+        },
+        {
+            "agent": "finance_audit",
+            "agent_name": "财务稽核Agent",
+            "desc": "供应商账单异常：蔬菜价格偏离市场价20%",
+            "metric": "profit_margin",
+            "action": "建议与供应商重新议价",
+            "improvement": 3.8,
+        },
+        {
+            "agent": "patrol",
+            "agent_name": "巡店质检Agent",
+            "desc": "后厨卫生检查评分偏低",
+            "metric": "customer_satisfaction",
+            "action": "安排深度清洁并重新培训",
+            "improvement": 0,
+        },
+        {
+            "agent": "patrol",
+            "agent_name": "巡店质检Agent",
+            "desc": "前厅服务评分下降",
+            "metric": "customer_satisfaction",
+            "action": "组织服务标准化培训",
+            "improvement": 5.0,
+        },
+        {
+            "agent": "menu_planner",
+            "agent_name": "智能排菜Agent",
+            "desc": "季节性菜品调整建议",
+            "metric": "revenue",
+            "action": "上线3道春季新品，下线2道冬季菜",
+            "improvement": 6.2,
+        },
+        {
+            "agent": "dispatch",
+            "agent_name": "出餐调度Agent",
+            "desc": "外卖高峰出餐优化",
+            "metric": "turnover_rate",
+            "action": "外卖单独设置出餐通道",
+            "improvement": 10.0,
+        },
+        {
+            "agent": "member_insight",
+            "agent_name": "会员洞察Agent",
+            "desc": "生日营销建议",
+            "metric": "customer_count",
+            "action": "本周生日会员推送专属套餐",
+            "improvement": 3.0,
+        },
+        {
+            "agent": "inventory",
+            "agent_name": "库存预警Agent",
+            "desc": "调料库存充足，建议减少采购频次",
+            "metric": "profit_margin",
+            "action": "将调料采购频次从每周改为双周",
+            "improvement": 1.2,
+        },
+        {
+            "agent": "discount_guard",
+            "agent_name": "折扣守护Agent",
+            "desc": "团购券核销异常",
+            "metric": "profit_margin",
+            "action": "暂停异常团购券并人工复核",
+            "improvement": 2.5,
+        },
+        {
+            "agent": "menu_planner",
+            "agent_name": "智能排菜Agent",
+            "desc": "剁椒鱼头定价优化",
+            "metric": "revenue",
+            "action": "建议将剁椒鱼头从128元调至138元",
+            "improvement": 7.8,
+        },
     ]
 
     store_ids = [s["id"] for s in stores]
@@ -1489,7 +1807,7 @@ def seed_knowledge_graph() -> KnowledgeGraphService:
         sid = store_ids[i % len(store_ids)]
         date = (base_date + timedelta(days=i % 30)).strftime("%Y-%m-%d")
         decision = {
-            "id": f"dec_{i+1:03d}",
+            "id": f"dec_{i + 1:03d}",
             "agent_id": tmpl["agent"],
             "agent_name": tmpl["agent_name"],
             "store_id": sid,
@@ -1500,7 +1818,9 @@ def seed_knowledge_graph() -> KnowledgeGraphService:
             "outcome": {
                 "improvement_pct": tmpl["improvement"],
                 "applied": tmpl["improvement"] > 0,
-                "result_description": f"实施后{METRIC_CN_MAP.get(tmpl['metric'], tmpl['metric'])}提升{tmpl['improvement']}%" if tmpl["improvement"] > 0 else "已执行",
+                "result_description": f"实施后{METRIC_CN_MAP.get(tmpl['metric'], tmpl['metric'])}提升{tmpl['improvement']}%"
+                if tmpl["improvement"] > 0
+                else "已执行",
             },
         }
         kg.ingest_decision_data(decision)

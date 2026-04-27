@@ -3,6 +3,7 @@
 面向消费者小程序 enterprise-meal / enterprise-orders 页面。
 4 个端点接入 enterprise_meal_menus / enterprise_meal_accounts / enterprise_meal_orders 表。
 """
+
 import json
 from datetime import date, datetime
 from typing import Optional
@@ -14,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..security.rbac import UserContext, require_role
+from ..security.rbac import UserContext, require_role_audited
 from ..services.trade_audit_log import write_audit
 
 router = APIRouter(
@@ -127,10 +128,12 @@ async def get_enterprise_account(
         row = result.mappings().first()
         if row is None:
             return _ok(empty)
-        return _ok({
-            "balance_fen": row["balance_fen"],
-            "meal_count_remaining": row["meal_count_remaining"],
-        })
+        return _ok(
+            {
+                "balance_fen": row["balance_fen"],
+                "meal_count_remaining": row["meal_count_remaining"],
+            }
+        )
     except SQLAlchemyError:
         return _ok(empty)
 
@@ -142,9 +145,14 @@ async def get_enterprise_account(
 async def create_enterprise_meal_order(
     req: CreateEnterpriseMealOrderReq,
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(require_role("store_manager", "admin", "cashier")),
+    user: UserContext = Depends(require_role_audited("enterprise_meal.order.create", "store_manager", "admin")),
 ):
-    """提交企业订餐订单，写入 enterprise_meal_orders（店长/管理员/收银员）"""
+    """提交企业订餐订单，写入 enterprise_meal_orders（店长/管理员）。
+
+    R-A4-4 / Tier1：cashier 角色已移除 — 企业团餐单笔金额常 ¥80k+（徐记
+    2025 年企业大单），cashier 不应能创建。如收银员需要代下单，由店长
+    操作其登录账号。
+    """
     meal_date = req.meal_date or date.today().isoformat()
     dish_ids = json.dumps([item.dish_id for item in req.items])
 
@@ -159,15 +167,18 @@ async def create_enterprise_meal_order(
                  :dish_ids::JSONB, :amount_fen, 'account', 'confirmed')
             RETURNING id
         """)
-        result = await db.execute(sql, {
-            "tid": req.company_id,
-            "sid": req.store_id or req.company_id,
-            "eid": req.employee_id or req.company_id,
-            "md": meal_date,
-            "mt": req.meal_type,
-            "dish_ids": dish_ids,
-            "amount_fen": req.total_fen,
-        })
+        result = await db.execute(
+            sql,
+            {
+                "tid": req.company_id,
+                "sid": req.store_id or req.company_id,
+                "eid": req.employee_id or req.company_id,
+                "md": meal_date,
+                "mt": req.meal_type,
+                "dish_ids": dish_ids,
+                "amount_fen": req.total_fen,
+            },
+        )
         await db.commit()
         row = result.first()
         order_id = str(row[0]) if row else "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
@@ -183,21 +194,25 @@ async def create_enterprise_meal_order(
             amount_fen=req.total_fen,
             client_ip=user.client_ip,
         )
-        return _ok({
-            "order_id": order_id,
-            "status": "accepted",
-            "total_fen": req.total_fen,
-            "items_count": len(req.items),
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "status": "accepted",
+                "total_fen": req.total_fen,
+                "items_count": len(req.items),
+            }
+        )
     except SQLAlchemyError:
         await db.rollback()
         order_id = "EMO" + datetime.now().strftime("%Y%m%d%H%M%S")
-        return _ok({
-            "order_id": order_id,
-            "status": "accepted",
-            "total_fen": req.total_fen,
-            "items_count": len(req.items),
-        })
+        return _ok(
+            {
+                "order_id": order_id,
+                "status": "accepted",
+                "total_fen": req.total_fen,
+                "items_count": len(req.items),
+            }
+        )
 
 
 # ─── 4. 获取企业订餐历史 ───
@@ -239,13 +254,17 @@ async def get_enterprise_meal_orders(
                 "id": str(row["id"]),
                 "store_id": str(row["store_id"]),
                 "employee_id": str(row["employee_id"]),
-                "meal_date": row["meal_date"].isoformat() if hasattr(row["meal_date"], "isoformat") else str(row["meal_date"]),
+                "meal_date": row["meal_date"].isoformat()
+                if hasattr(row["meal_date"], "isoformat")
+                else str(row["meal_date"]),
                 "meal_type": row["meal_type"],
                 "dish_ids": row["dish_ids"] if isinstance(row["dish_ids"], list) else json.loads(row["dish_ids"]),
                 "amount_fen": row["amount_fen"],
                 "payment_method": row["payment_method"],
                 "status": row["status"],
-                "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+                "created_at": row["created_at"].isoformat()
+                if hasattr(row["created_at"], "isoformat")
+                else str(row["created_at"]),
             }
             for row in rows
         ]

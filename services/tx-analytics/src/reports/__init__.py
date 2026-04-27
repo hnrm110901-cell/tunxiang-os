@@ -168,16 +168,16 @@ _SCM_REPORTS = [
 ]
 
 # 全部报表
-_ALL_REPORTS = _P0_REPORTS + _OTHER_REPORTS + [
-    m for m in _P1_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS
-] + [
-    m for m in _P2_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS and m not in _P1_REPORTS
-] + _SCM_REPORTS
+_ALL_REPORTS = (
+    _P0_REPORTS
+    + _OTHER_REPORTS
+    + [m for m in _P1_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS]
+    + [m for m in _P2_REPORTS if m not in _P0_REPORTS and m not in _OTHER_REPORTS and m not in _P1_REPORTS]
+    + _SCM_REPORTS
+)
 
 # 报表注册表: REPORT_ID -> 模块
-REPORT_REGISTRY: dict[str, object] = {
-    mod.REPORT_ID: mod for mod in _ALL_REPORTS
-}
+REPORT_REGISTRY: dict[str, object] = {mod.REPORT_ID: mod for mod in _ALL_REPORTS}
 
 # 按分类索引
 REPORTS_BY_CATEGORY: dict[str, list[object]] = {}

@@ -1,4 +1,5 @@
 """小票打印服务测试"""
+
 import os
 import sys
 
@@ -15,7 +16,13 @@ def _sample_order():
         "discount_amount_fen": 1000,
         "final_amount_fen": 15800,
         "items": [
-            {"item_name": "剁椒鱼头", "quantity": 1, "subtotal_fen": 8800, "kitchen_station": "热菜档", "notes": "少辣"},
+            {
+                "item_name": "剁椒鱼头",
+                "quantity": 1,
+                "subtotal_fen": 8800,
+                "kitchen_station": "热菜档",
+                "notes": "少辣",
+            },
             {"item_name": "农家小炒肉", "quantity": 1, "subtotal_fen": 4200, "kitchen_station": "热菜档", "notes": ""},
             {"item_name": "凉拌黄瓜", "quantity": 2, "subtotal_fen": 1800, "kitchen_station": "凉菜档", "notes": ""},
             {"item_name": "米饭", "quantity": 3, "subtotal_fen": 2000, "kitchen_station": None, "notes": ""},
@@ -39,7 +46,7 @@ class TestFormatReceipt:
 
     def test_contains_cut_command(self):
         result = ReceiptService.format_receipt(_sample_order())
-        assert b'\x1d\x56\x00' in result  # GS V 0 = cut
+        assert b"\x1d\x56\x00" in result  # GS V 0 = cut
 
     def test_58mm_and_80mm_differ(self):
         r58 = ReceiptService.format_receipt(_sample_order(), paper_width=58)

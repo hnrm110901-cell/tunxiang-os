@@ -58,7 +58,7 @@ SOCIAL_INSURANCE_RATES: Dict[str, Dict[str, float]] = {
 # 长沙2026社保基数上下限（月，元 → 分）
 SOCIAL_INSURANCE_BASE_LIMITS: Dict[str, Dict[str, int]] = {
     "changsha": {
-        "floor_fen": 374_700,   # 下限 3747 元
+        "floor_fen": 374_700,  # 下限 3747 元
         "ceiling_fen": 2_124_300,  # 上限 21243 元
     },
 }
@@ -66,7 +66,7 @@ SOCIAL_INSURANCE_BASE_LIMITS: Dict[str, Dict[str, int]] = {
 # 住房公积金基数上下限
 HOUSING_FUND_BASE_LIMITS: Dict[str, Dict[str, int]] = {
     "changsha": {
-        "floor_fen": 197_000,   # 下限 1970 元
+        "floor_fen": 197_000,  # 下限 1970 元
         "ceiling_fen": 2_890_800,  # 上限 28908 元
     },
 }
@@ -93,63 +93,103 @@ MONTHLY_EXEMPTION_YUAN = 5_000
 
 EMPLOYEE_SALARY_CONFIG: List[Dict[str, Any]] = [
     {
-        "employee_id": "EMP001", "name": "张伟", "position": "店长",
-        "base_salary_fen": 800_000, "position_allowance_fen": 100_000,
-        "commission_rate": 0.005, "seniority_months": 33,
+        "employee_id": "EMP001",
+        "name": "张伟",
+        "position": "店长",
+        "base_salary_fen": 800_000,
+        "position_allowance_fen": 100_000,
+        "commission_rate": 0.005,
+        "seniority_months": 33,
         "housing_fund_rate": 0.08,
     },
     {
-        "employee_id": "EMP002", "name": "李娜", "position": "副店长",
-        "base_salary_fen": 700_000, "position_allowance_fen": 80_000,
-        "commission_rate": 0.004, "seniority_months": 18,
+        "employee_id": "EMP002",
+        "name": "李娜",
+        "position": "副店长",
+        "base_salary_fen": 700_000,
+        "position_allowance_fen": 80_000,
+        "commission_rate": 0.004,
+        "seniority_months": 18,
         "housing_fund_rate": 0.08,
     },
     {
-        "employee_id": "EMP003", "name": "王强", "position": "主厨",
-        "base_salary_fen": 900_000, "position_allowance_fen": 120_000,
-        "commission_rate": 0.0, "seniority_months": 48,
+        "employee_id": "EMP003",
+        "name": "王强",
+        "position": "主厨",
+        "base_salary_fen": 900_000,
+        "position_allowance_fen": 120_000,
+        "commission_rate": 0.0,
+        "seniority_months": 48,
         "housing_fund_rate": 0.08,
     },
     {
-        "employee_id": "EMP004", "name": "刘洋", "position": "厨师",
-        "base_salary_fen": 650_000, "position_allowance_fen": 50_000,
-        "commission_rate": 0.0, "seniority_months": 26,
+        "employee_id": "EMP004",
+        "name": "刘洋",
+        "position": "厨师",
+        "base_salary_fen": 650_000,
+        "position_allowance_fen": 50_000,
+        "commission_rate": 0.0,
+        "seniority_months": 26,
         "housing_fund_rate": 0.05,
     },
     {
-        "employee_id": "EMP005", "name": "陈静", "position": "厨师",
-        "base_salary_fen": 600_000, "position_allowance_fen": 50_000,
-        "commission_rate": 0.0, "seniority_months": 22,
+        "employee_id": "EMP005",
+        "name": "陈静",
+        "position": "厨师",
+        "base_salary_fen": 600_000,
+        "position_allowance_fen": 50_000,
+        "commission_rate": 0.0,
+        "seniority_months": 22,
         "housing_fund_rate": 0.05,
     },
     {
-        "employee_id": "EMP006", "name": "赵敏", "position": "收银员",
-        "base_salary_fen": 450_000, "position_allowance_fen": 30_000,
-        "commission_rate": 0.002, "seniority_months": 13,
+        "employee_id": "EMP006",
+        "name": "赵敏",
+        "position": "收银员",
+        "base_salary_fen": 450_000,
+        "position_allowance_fen": 30_000,
+        "commission_rate": 0.002,
+        "seniority_months": 13,
         "housing_fund_rate": 0.05,
     },
     {
-        "employee_id": "EMP007", "name": "周磊", "position": "服务员",
-        "base_salary_fen": 400_000, "position_allowance_fen": 20_000,
-        "commission_rate": 0.003, "seniority_months": 9,
+        "employee_id": "EMP007",
+        "name": "周磊",
+        "position": "服务员",
+        "base_salary_fen": 400_000,
+        "position_allowance_fen": 20_000,
+        "commission_rate": 0.003,
+        "seniority_months": 9,
         "housing_fund_rate": 0.05,
     },
     {
-        "employee_id": "EMP008", "name": "孙丽", "position": "服务员",
-        "base_salary_fen": 400_000, "position_allowance_fen": 20_000,
-        "commission_rate": 0.003, "seniority_months": 7,
+        "employee_id": "EMP008",
+        "name": "孙丽",
+        "position": "服务员",
+        "base_salary_fen": 400_000,
+        "position_allowance_fen": 20_000,
+        "commission_rate": 0.003,
+        "seniority_months": 7,
         "housing_fund_rate": 0.05,
     },
     {
-        "employee_id": "EMP009", "name": "吴浩", "position": "服务员",
-        "base_salary_fen": 380_000, "position_allowance_fen": 0,
-        "commission_rate": 0.002, "seniority_months": 2,
+        "employee_id": "EMP009",
+        "name": "吴浩",
+        "position": "服务员",
+        "base_salary_fen": 380_000,
+        "position_allowance_fen": 0,
+        "commission_rate": 0.002,
+        "seniority_months": 2,
         "housing_fund_rate": 0.05,
     },
     {
-        "employee_id": "EMP010", "name": "黄芳", "position": "迎宾",
-        "base_salary_fen": 420_000, "position_allowance_fen": 20_000,
-        "commission_rate": 0.002, "seniority_months": 5,
+        "employee_id": "EMP010",
+        "name": "黄芳",
+        "position": "迎宾",
+        "base_salary_fen": 420_000,
+        "position_allowance_fen": 20_000,
+        "commission_rate": 0.002,
+        "seniority_months": 5,
         "housing_fund_rate": 0.05,
     },
 ]
@@ -224,39 +264,58 @@ class PayrollService:
         housing_fund_employee = int(hf_base * housing_fund_rate)
 
         total_company = (
-            pension_company + medical_company + unemployment_company
-            + work_injury_company + maternity_company + housing_fund_company
+            pension_company
+            + medical_company
+            + unemployment_company
+            + work_injury_company
+            + maternity_company
+            + housing_fund_company
         )
         total_employee = (
-            pension_employee + medical_employee + unemployment_employee
-            + work_injury_employee + maternity_employee + housing_fund_employee
+            pension_employee
+            + medical_employee
+            + unemployment_employee
+            + work_injury_employee
+            + maternity_employee
+            + housing_fund_employee
         )
 
         return {
             "si_base_fen": si_base,
             "hf_base_fen": hf_base,
             "pension": {
-                "company_fen": pension_company, "employee_fen": pension_employee,
-                "company_rate": rates["pension_company"], "employee_rate": rates["pension_employee"],
+                "company_fen": pension_company,
+                "employee_fen": pension_employee,
+                "company_rate": rates["pension_company"],
+                "employee_rate": rates["pension_employee"],
             },
             "medical": {
-                "company_fen": medical_company, "employee_fen": medical_employee,
-                "company_rate": rates["medical_company"], "employee_rate": rates["medical_employee"],
+                "company_fen": medical_company,
+                "employee_fen": medical_employee,
+                "company_rate": rates["medical_company"],
+                "employee_rate": rates["medical_employee"],
             },
             "unemployment": {
-                "company_fen": unemployment_company, "employee_fen": unemployment_employee,
-                "company_rate": rates["unemployment_company"], "employee_rate": rates["unemployment_employee"],
+                "company_fen": unemployment_company,
+                "employee_fen": unemployment_employee,
+                "company_rate": rates["unemployment_company"],
+                "employee_rate": rates["unemployment_employee"],
             },
             "work_injury": {
-                "company_fen": work_injury_company, "employee_fen": work_injury_employee,
-                "company_rate": rates["work_injury_company"], "employee_rate": 0.0,
+                "company_fen": work_injury_company,
+                "employee_fen": work_injury_employee,
+                "company_rate": rates["work_injury_company"],
+                "employee_rate": 0.0,
             },
             "maternity": {
-                "company_fen": maternity_company, "employee_fen": maternity_employee,
-                "company_rate": rates["maternity_company"], "employee_rate": 0.0,
+                "company_fen": maternity_company,
+                "employee_fen": maternity_employee,
+                "company_rate": rates["maternity_company"],
+                "employee_rate": 0.0,
             },
             "housing_fund": {
-                "company_fen": housing_fund_company, "employee_fen": housing_fund_employee,
+                "company_fen": housing_fund_company,
+                "employee_fen": housing_fund_employee,
                 "rate": housing_fund_rate,
             },
             "total_company_fen": total_company,
@@ -434,9 +493,7 @@ class PayrollService:
         seniority_sub = compute_seniority_subsidy(config.get("seniority_months", 0))
 
         # 6. Full attendance bonus (300 yuan)
-        full_attendance = compute_full_attendance_bonus(
-            absence_days, late_count, early_leave_count, 30_000
-        )
+        full_attendance = compute_full_attendance_bonus(absence_days, late_count, early_leave_count, 30_000)
 
         # 7. Deductions: late / early / absence
         absence_ded = compute_absence_deduction(base_salary, absence_days, work_days_in_month)
@@ -456,8 +513,13 @@ class PayrollService:
 
         # 9. Gross salary (before tax)
         gross = (
-            base_pay + position_allowance + commission
-            + total_overtime_pay + perf_bonus + seniority_sub + full_attendance
+            base_pay
+            + position_allowance
+            + commission
+            + total_overtime_pay
+            + perf_bonus
+            + seniority_sub
+            + full_attendance
         )
 
         # 10. Pre-tax deductions
@@ -490,7 +552,6 @@ class PayrollService:
             "month": month,
             "work_days_in_month": work_days_in_month,
             "attendance_days": attendance_days,
-
             # Income items
             "base_pay_fen": base_pay,
             "position_allowance_fen": position_allowance,
@@ -505,11 +566,9 @@ class PayrollService:
             "performance_bonus_fen": perf_bonus,
             "seniority_subsidy_fen": seniority_sub,
             "full_attendance_bonus_fen": full_attendance,
-
             # Gross
             "gross_salary_fen": gross,
             "gross_salary_yuan": round(gross / 100, 2),
-
             # Deductions
             "absence_deduction_fen": absence_ded,
             "late_deduction_fen": late_ded,
@@ -518,10 +577,8 @@ class PayrollService:
             "housing_fund_employee_fen": hf_employee,
             "tax_fen": tax_fen,
             "tax_detail": tax_result,
-
             # Social insurance full detail
             "social_insurance_detail": si,
-
             # Net
             "total_deduction_fen": total_deduction,
             "total_deduction_yuan": round(total_deduction / 100, 2),
@@ -698,13 +755,15 @@ class PayrollService:
         for batch_id, batch in self._payroll_batches.items():
             for emp_data in batch.get("employees", []):
                 if emp_data.get("employee_id") == employee_id:
-                    history.append({
-                        "batch_id": batch_id,
-                        "month": batch["month"],
-                        "status": batch["status"],
-                        "gross_salary_yuan": emp_data.get("gross_salary_yuan", 0),
-                        "net_pay_yuan": emp_data.get("net_pay_yuan", 0),
-                    })
+                    history.append(
+                        {
+                            "batch_id": batch_id,
+                            "month": batch["month"],
+                            "status": batch["status"],
+                            "gross_salary_yuan": emp_data.get("gross_salary_yuan", 0),
+                            "net_pay_yuan": emp_data.get("net_pay_yuan", 0),
+                        }
+                    )
         return history[-months:]
 
     def get_store_labor_cost(

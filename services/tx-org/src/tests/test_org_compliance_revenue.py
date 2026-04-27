@@ -184,13 +184,13 @@ _contrib_route_mod = _load_route_module(
 # ──────────────────────────────────────────────────────────────────────────────
 # 普通绝对导入（compliance_alert_routes 无相对 service 导入）
 # ──────────────────────────────────────────────────────────────────────────────
-import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
 from uuid import uuid4
 
-from api.compliance_alert_routes import router as compliance_router
 import api.compliance_alert_routes as _ca_mod
+import pytest
+from api.compliance_alert_routes import router as compliance_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 # 从路由模块本身获取 get_db 引用，确保 dependency_overrides key 与路由实际使用的一致
 get_db = _ca_mod.get_db
@@ -227,6 +227,7 @@ ALERT_ID = str(uuid4())
 # ──────────────────────────────────────────────────────────────────────────────
 # 工具函数
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _make_row(data: dict) -> MagicMock:
     row = MagicMock()
@@ -267,12 +268,14 @@ def _mock_db() -> AsyncMock:
 def _override_db(mock_session: AsyncMock):
     async def _inner():
         yield mock_session
+
     return _inner
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Part 1 — compliance_alert_routes.py  [1-7]
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.anyio
 async def test_compliance_list_alerts_ok():
@@ -281,14 +284,26 @@ async def test_compliance_list_alerts_ok():
 
     count_result = _make_sync_result(scalar=2)
 
-    row1 = _make_row({
-        "alert_id": ALERT_ID, "employee_id": EMP_ID, "store_id": STORE_ID,
-        "alert_type": "health_cert_expiry", "severity": "high",
-        "title": "健康证将在5天后到期", "description": "到期: 2026-04-10",
-        "status": "pending", "acknowledged_by": None, "acknowledged_at": None,
-        "resolved_by": None, "resolved_at": None, "resolution_note": None,
-        "created_at": None, "employee_name": "张三", "employee_phone": "13800138000",
-    })
+    row1 = _make_row(
+        {
+            "alert_id": ALERT_ID,
+            "employee_id": EMP_ID,
+            "store_id": STORE_ID,
+            "alert_type": "health_cert_expiry",
+            "severity": "high",
+            "title": "健康证将在5天后到期",
+            "description": "到期: 2026-04-10",
+            "status": "pending",
+            "acknowledged_by": None,
+            "acknowledged_at": None,
+            "resolved_by": None,
+            "resolved_at": None,
+            "resolution_note": None,
+            "created_at": None,
+            "employee_name": "张三",
+            "employee_phone": "13800138000",
+        }
+    )
     list_result = _make_sync_result(fetchall=[row1])
 
     # set_config + count + list
@@ -297,9 +312,7 @@ async def test_compliance_list_alerts_ok():
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/compliance/alerts", headers=HEADERS)
     finally:
         app_compliance.dependency_overrides.clear()
@@ -322,9 +335,7 @@ async def test_compliance_get_alert_detail_not_found():
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.get(f"/api/v1/compliance/alerts/{ALERT_ID}", headers=HEADERS)
     finally:
         app_compliance.dependency_overrides.clear()
@@ -346,9 +357,7 @@ async def test_compliance_acknowledge_alert_ok():
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.post(
                 f"/api/v1/compliance/alerts/{ALERT_ID}/acknowledge",
                 headers=HEADERS,
@@ -377,9 +386,7 @@ async def test_compliance_resolve_alert_not_found():
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.post(
                 f"/api/v1/compliance/alerts/{ALERT_ID}/resolve",
                 headers=HEADERS,
@@ -399,24 +406,28 @@ async def test_compliance_dashboard_ok():
 
     set_result = MagicMock()
 
-    overview_row = _make_row({
-        "total": 10, "pending_count": 3, "acknowledged_count": 4, "resolved_count": 3,
-        "critical_count": 1, "high_count": 2, "medium_count": 4, "low_count": 3,
-    })
+    overview_row = _make_row(
+        {
+            "total": 10,
+            "pending_count": 3,
+            "acknowledged_count": 4,
+            "resolved_count": 3,
+            "critical_count": 1,
+            "high_count": 2,
+            "medium_count": 4,
+            "low_count": 3,
+        }
+    )
     overview_result = _make_sync_result(fetchone=overview_row)
     type_result = _make_sync_result(fetchall=[])
     store_result = _make_sync_result(fetchall=[])
     trend_result = _make_sync_result(fetchall=[])
 
-    db.execute = AsyncMock(
-        side_effect=[set_result, overview_result, type_result, store_result, trend_result]
-    )
+    db.execute = AsyncMock(side_effect=[set_result, overview_result, type_result, store_result, trend_result])
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.get("/api/v1/compliance/dashboard", headers=HEADERS)
     finally:
         app_compliance.dependency_overrides.clear()
@@ -437,9 +448,7 @@ async def test_compliance_scan_invalid_type():
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/compliance/scan",
                 headers=HEADERS,
@@ -458,23 +467,30 @@ async def test_compliance_export_alerts_ok():
     db = _mock_db()
 
     set_result = MagicMock()
-    export_row = _make_row({
-        "alert_id": ALERT_ID, "alert_type": "contract_expiry",
-        "severity": "medium", "title": "合同将到期", "description": "30天内",
-        "status": "pending", "resolution_note": None,
-        "created_at": None, "resolved_at": None,
-        "employee_name": "李四", "employee_phone": "13900139000",
-        "store_id": STORE_ID, "department_name": "前厅",
-    })
+    export_row = _make_row(
+        {
+            "alert_id": ALERT_ID,
+            "alert_type": "contract_expiry",
+            "severity": "medium",
+            "title": "合同将到期",
+            "description": "30天内",
+            "status": "pending",
+            "resolution_note": None,
+            "created_at": None,
+            "resolved_at": None,
+            "employee_name": "李四",
+            "employee_phone": "13900139000",
+            "store_id": STORE_ID,
+            "department_name": "前厅",
+        }
+    )
     export_result = _make_sync_result(fetchall=[export_row])
 
     db.execute = AsyncMock(side_effect=[set_result, export_result])
     app_compliance.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_compliance), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_compliance), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/compliance/alerts/export",
                 headers=HEADERS,
@@ -493,6 +509,7 @@ async def test_compliance_export_alerts_ok():
 # Part 2 — revenue_schedule_routes.py  [8-12]
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.anyio
 async def test_rev_sched_analysis_ok():
     """[8] GET /api/v1/revenue-schedule/analysis — 正常返回 ok=True。"""
@@ -502,16 +519,16 @@ async def test_rev_sched_analysis_ok():
     with patch.object(
         _rev_service,
         "analyze_revenue_pattern",
-        new=AsyncMock(return_value={
-            "store_id": STORE_ID,
-            "patterns": [{"slot": "lunch", "avg_revenue_fen": 50000}],
-            "weeks": 4,
-        }),
+        new=AsyncMock(
+            return_value={
+                "store_id": STORE_ID,
+                "patterns": [{"slot": "lunch", "avg_revenue_fen": 50000}],
+                "weeks": 4,
+            }
+        ),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_rev), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_rev), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/api/v1/revenue-schedule/analysis",
                     headers=HEADERS,
@@ -538,9 +555,7 @@ async def test_rev_sched_optimal_plan_value_error():
         new=AsyncMock(side_effect=ValueError("门店数据不足，无法生成方案")),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_rev), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_rev), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/api/v1/revenue-schedule/optimal-plan",
                     headers=HEADERS,
@@ -562,17 +577,17 @@ async def test_rev_sched_apply_plan_ok():
     with patch.object(
         _rev_service,
         "apply_plan_as_draft",
-        new=AsyncMock(return_value={
-            "store_id": STORE_ID,
-            "week_start": "2026-04-06",
-            "status": "draft",
-            "created": 7,
-        }),
+        new=AsyncMock(
+            return_value={
+                "store_id": STORE_ID,
+                "week_start": "2026-04-06",
+                "status": "draft",
+                "created": 7,
+            }
+        ),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_rev), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_rev), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/api/v1/revenue-schedule/apply-plan",
                     headers=HEADERS,
@@ -607,9 +622,13 @@ async def test_rev_sched_comparison_ok():
                 "weekday_name": "周一",
                 "slots": [
                     {
-                        "slot_name": "午餐", "start_time": "11:00", "end_time": "14:00",
-                        "predicted_revenue_fen": 120000, "optimal_staff": 5,
-                        "current_staff": 3, "delta": 2,
+                        "slot_name": "午餐",
+                        "start_time": "11:00",
+                        "end_time": "14:00",
+                        "predicted_revenue_fen": 120000,
+                        "optimal_staff": 5,
+                        "current_staff": 3,
+                        "delta": 2,
                     }
                 ],
             }
@@ -623,9 +642,7 @@ async def test_rev_sched_comparison_ok():
         new=AsyncMock(return_value=plan_with_delta),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_rev), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_rev), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/api/v1/revenue-schedule/comparison",
                     headers=HEADERS,
@@ -650,16 +667,16 @@ async def test_rev_sched_savings_estimate_ok():
     with patch.object(
         _rev_service,
         "estimate_monthly_savings",
-        new=AsyncMock(return_value={
-            "store_id": STORE_ID,
-            "month": "2026-04",
-            "estimated_savings_fen": 48000,
-        }),
+        new=AsyncMock(
+            return_value={
+                "store_id": STORE_ID,
+                "month": "2026-04",
+                "estimated_savings_fen": 48000,
+            }
+        ),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_rev), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_rev), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/api/v1/revenue-schedule/savings-estimate",
                     headers=HEADERS,
@@ -678,6 +695,7 @@ async def test_rev_sched_savings_estimate_ok():
 # Part 3 — contribution_routes.py  [13-17]
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.anyio
 async def test_contrib_score_ok():
     """[13] GET /api/v1/contribution/score/{emp_id} — 正常返回 ok=True。"""
@@ -687,17 +705,17 @@ async def test_contrib_score_ok():
     with patch.object(
         _contrib_service,
         "calculate_score",
-        new=AsyncMock(return_value={
-            "employee_id": EMP_ID,
-            "score": 88.5,
-            "rank": 2,
-            "dimensions": {"sales": 90, "attendance": 87},
-        }),
+        new=AsyncMock(
+            return_value={
+                "employee_id": EMP_ID,
+                "score": 88.5,
+                "rank": 2,
+                "dimensions": {"sales": 90, "attendance": 87},
+            }
+        ),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_contrib), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_contrib), base_url="http://test") as ac:
                 resp = await ac.get(
                     f"/api/v1/contribution/score/{EMP_ID}",
                     headers=HEADERS,
@@ -718,9 +736,7 @@ async def test_contrib_rankings_missing_tenant():
     app_contrib.dependency_overrides[get_db] = _override_db(db)
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_contrib), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_contrib), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/contribution/rankings",
                 params={"store_id": STORE_ID},
@@ -751,9 +767,7 @@ async def test_contrib_recalculate_ok():
         new=AsyncMock(return_value=expected),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_contrib), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_contrib), base_url="http://test") as ac:
                 resp = await ac.post(
                     "/api/v1/contribution/recalculate",
                     headers=HEADERS,
@@ -794,9 +808,7 @@ async def test_contrib_store_comparison_ok():
         new=AsyncMock(side_effect=side_effects),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_contrib), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_contrib), base_url="http://test") as ac:
                 resp = await ac.get(
                     "/api/v1/contribution/store-comparison",
                     headers=HEADERS,
@@ -832,9 +844,7 @@ async def test_contrib_trend_ok():
         new=AsyncMock(return_value=trend_data),
     ):
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app_contrib), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app_contrib), base_url="http://test") as ac:
                 resp = await ac.get(
                     f"/api/v1/contribution/trend/{EMP_ID}",
                     headers=HEADERS,

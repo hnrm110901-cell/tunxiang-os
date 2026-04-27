@@ -7,18 +7,16 @@
 
 持久化层: PostgreSQL (SQLAlchemy async) + RLS 租户隔离
 """
+
 from __future__ import annotations
 
 import math
+import os
 import uuid
 from datetime import datetime, timezone
-import os
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, text, and_
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_supply.src.models.central_kitchen import (
     DeliveryItemORM,
     DeliveryTripORM,
@@ -27,6 +25,8 @@ from services.tx_supply.src.models.central_kitchen import (
 from services.tx_supply.src.services.production_plan_service import (
     _store_geo,
 )
+from sqlalchemy import and_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
@@ -43,6 +43,18 @@ _AMAP_DRIVING_URL = "https://restapi.amap.com/v3/direction/driving"
 # 地球半径（km）- 用于 Haversine 距离计算
 _EARTH_RADIUS_KM = 6371.0
 
+# ─── 轻量内存共享存储（用于路线/司机任务的临时状态，DB 迁移未覆盖的遗留路径） ───
+_SHARED_STORE: Dict[str, Any] = {
+    "trips": {},
+    "now_iso": lambda: datetime.now(timezone.utc).isoformat(),
+    "gen_id": lambda prefix: f"{prefix}_{uuid.uuid4().hex[:12]}",
+}
+
+
+def _shared() -> Dict[str, Any]:
+    """返回进程内共享内存存储（trips / now_iso / gen_id）。"""
+    return _SHARED_STORE
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     """在当前 DB 连接上设置 RLS 租户上下文"""
@@ -53,7 +65,6 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 
 
 class DeliveryRouteService:
-
     def _get_store_geo(self, store_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
         """获取门店地理信息"""
         return _store_geo.get(f"{tenant_id}:{store_id}")
@@ -86,12 +97,10 @@ class DeliveryRouteService:
         # 按纬度排序分组（生产环境可替换为 sklearn KMeans）
         stores_with_geo.sort(key=lambda x: (round(x[1], 1), x[2]))
         grouped_with_geo = [
-            [s[0] for s in stores_with_geo[i : i + max_per_trip]]
-            for i in range(0, len(stores_with_geo), max_per_trip)
+            [s[0] for s in stores_with_geo[i : i + max_per_trip]] for i in range(0, len(stores_with_geo), max_per_trip)
         ]
         grouped_without_geo = [
-            stores_without_geo[i : i + max_per_trip]
-            for i in range(0, len(stores_without_geo), max_per_trip)
+            stores_without_geo[i : i + max_per_trip] for i in range(0, len(stores_without_geo), max_per_trip)
         ]
         return grouped_with_geo + grouped_without_geo
 
@@ -144,10 +153,7 @@ class DeliveryRouteService:
                 if not c_geo:
                     continue
                 # 欧氏距离近似（中国境内短距离精度足够）
-                dist = math.sqrt(
-                    (last_geo["lat"] - c_geo["lat"]) ** 2
-                    + (last_geo["lng"] - c_geo["lng"]) ** 2
-                )
+                dist = math.sqrt((last_geo["lat"] - c_geo["lat"]) ** 2 + (last_geo["lng"] - c_geo["lng"]) ** 2)
                 if dist < nearest_dist:
                     nearest_dist = dist
                     nearest = candidate
@@ -260,9 +266,7 @@ class DeliveryRouteService:
         d_lng = math.radians(lng2 - lng1)
         a = (
             math.sin(d_lat / 2) ** 2
-            + math.cos(math.radians(lat1))
-            * math.cos(math.radians(lat2))
-            * math.sin(d_lng / 2) ** 2
+            + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lng / 2) ** 2
         )
         return _EARTH_RADIUS_KM * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
@@ -301,8 +305,10 @@ class DeliveryRouteService:
                 if not c_geo:
                     continue
                 dist = self._haversine_km(
-                    last_geo["lat"], last_geo["lng"],
-                    c_geo["lat"], c_geo["lng"],
+                    last_geo["lat"],
+                    last_geo["lng"],
+                    c_geo["lat"],
+                    c_geo["lng"],
                 )
                 if dist < nearest_dist:
                     nearest_dist = dist
@@ -331,7 +337,7 @@ class DeliveryRouteService:
                                 "key": AMAP_API_KEY,
                                 "origin": f"{prev_geo['lng']},{prev_geo['lat']}",
                                 "destination": f"{geo['lng']},{geo['lat']}",
-                                "strategy": 0,   # 最快路线
+                                "strategy": 0,  # 最快路线
                                 "output": "json",
                             }
                             resp = await client.get(_AMAP_DRIVING_URL, params=params)
@@ -355,8 +361,10 @@ class DeliveryRouteService:
                                 # fallback：Haversine 估算（1.4 迂回系数）
                                 if prev_geo and geo:
                                     hav_km = self._haversine_km(
-                                        prev_geo["lat"], prev_geo["lng"],
-                                        geo["lat"], geo["lng"],
+                                        prev_geo["lat"],
+                                        prev_geo["lng"],
+                                        geo["lat"],
+                                        geo["lng"],
                                     )
                                     segment_distance_m = round(hav_km * 1400)
                         except (httpx.HTTPError, KeyError, ValueError) as exc:
@@ -366,15 +374,17 @@ class DeliveryRouteService:
                                 error=str(exc),
                             )
 
-                result.append({
-                    "store_id": store_id,
-                    "sequence": i + 1,
-                    "address": geo.get("address", ""),
-                    "lat": geo.get("lat"),
-                    "lng": geo.get("lng"),
-                    "segment_distance_m": segment_distance_m,
-                    "segment_duration_s": segment_duration_s,
-                })
+                result.append(
+                    {
+                        "store_id": store_id,
+                        "sequence": i + 1,
+                        "address": geo.get("address", ""),
+                        "lat": geo.get("lat"),
+                        "lng": geo.get("lng"),
+                        "segment_distance_m": segment_distance_m,
+                        "segment_duration_s": segment_duration_s,
+                    }
+                )
 
         log.info(
             "amap_route_planned",
@@ -477,14 +487,9 @@ class DeliveryRouteService:
         if str(trip.tenant_id) != tenant_id:
             raise ValueError(f"配送单 {trip_id} 不属于当前租户")
 
-        unsigned = [
-            item for item in trip.items
-            if item.status not in ("signed", "disputed")
-        ]
+        unsigned = [item for item in trip.items if item.status not in ("signed", "disputed")]
         if unsigned:
-            raise ValueError(
-                f"配送单 {trip_id} 仍有 {len(unsigned)} 条明细未签收，无法更新库存"
-            )
+            raise ValueError(f"配送单 {trip_id} 仍有 {len(unsigned)} 条明细未签收，无法更新库存")
 
         inventory_records: List[Dict[str, Any]] = []
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -515,14 +520,11 @@ class DeliveryRouteService:
         # 检查计划下所有配送单是否全部完成
         plan = await db.get(ProductionPlanORM, trip.plan_id)
         if plan:
-            stmt = (
-                select(DeliveryTripORM)
-                .where(
-                    and_(
-                        DeliveryTripORM.plan_id == plan.id,
-                        DeliveryTripORM.tenant_id == uuid.UUID(tenant_id),
-                        DeliveryTripORM.is_deleted == False,  # noqa: E712
-                    )
+            stmt = select(DeliveryTripORM).where(
+                and_(
+                    DeliveryTripORM.plan_id == plan.id,
+                    DeliveryTripORM.tenant_id == uuid.UUID(tenant_id),
+                    DeliveryTripORM.is_deleted == False,  # noqa: E712
                 )
             )
             result = await db.execute(stmt)
@@ -603,9 +605,7 @@ class DeliveryRouteService:
             route_sequence = self.build_route_sequence(store_ids, tenant_id)
 
         # 估算总距离（如果 route_sequence 包含 segment_distance_m 则使用真实值）
-        total_distance_m = sum(
-            s.get("segment_distance_m") or 0 for s in route_sequence
-        )
+        total_distance_m = sum(s.get("segment_distance_m") or 0 for s in route_sequence)
         if total_distance_m == 0:
             # fallback：Haversine 累加估算
             geo_map: Dict[str, Dict[str, Any]] = {}
@@ -619,9 +619,12 @@ class DeliveryRouteService:
                 if prev_geo and curr_geo:
                     total_distance_m += round(
                         self._haversine_km(
-                            prev_geo["lat"], prev_geo["lng"],
-                            curr_geo["lat"], curr_geo["lng"],
-                        ) * 1000
+                            prev_geo["lat"],
+                            prev_geo["lng"],
+                            curr_geo["lat"],
+                            curr_geo["lng"],
+                        )
+                        * 1000
                     )
 
         route = {
@@ -640,7 +643,7 @@ class DeliveryRouteService:
         # 存入共享 trips 便于后续 get_driver_task / update_delivery_progress 读取
         _shared()["trips"][route_id] = {
             **route,
-            "plan_id": kitchen_id,   # 使用 kitchen_id 作为 plan_id 占位
+            "plan_id": kitchen_id,  # 使用 kitchen_id 作为 plan_id 占位
             "items": [],
         }
 
@@ -677,29 +680,33 @@ class DeliveryRouteService:
         items_by_store: Dict[str, List[Dict[str, Any]]] = {}
         for item in trip.get("items", []):
             sid = item.get("store_id", "")
-            items_by_store.setdefault(sid, []).append({
-                "ingredient_id": item.get("ingredient_id"),
-                "ingredient_name": item.get("ingredient_name", ""),
-                "planned_qty": item.get("planned_qty"),
-                "unit": item.get("unit", "kg"),
-                "status": item.get("status", "pending"),
-            })
+            items_by_store.setdefault(sid, []).append(
+                {
+                    "ingredient_id": item.get("ingredient_id"),
+                    "ingredient_name": item.get("ingredient_name", ""),
+                    "planned_qty": item.get("planned_qty"),
+                    "unit": item.get("unit", "kg"),
+                    "status": item.get("status", "pending"),
+                }
+            )
 
         route_sequence = trip.get("route_sequence", [])
         driver_task = []
         for stop in route_sequence:
             sid = stop["store_id"]
-            driver_task.append({
-                "sequence": stop["sequence"],
-                "store_id": sid,
-                "address": stop.get("address", ""),
-                "lat": stop.get("lat"),
-                "lng": stop.get("lng"),
-                "items": items_by_store.get(sid, []),
-                "delivery_status": trip.get(f"_stop_status_{sid}", "pending"),
-                "segment_distance_m": stop.get("segment_distance_m"),
-                "segment_duration_s": stop.get("segment_duration_s"),
-            })
+            driver_task.append(
+                {
+                    "sequence": stop["sequence"],
+                    "store_id": sid,
+                    "address": stop.get("address", ""),
+                    "lat": stop.get("lat"),
+                    "lng": stop.get("lng"),
+                    "items": items_by_store.get(sid, []),
+                    "delivery_status": trip.get(f"_stop_status_{sid}", "pending"),
+                    "segment_distance_m": stop.get("segment_distance_m"),
+                    "segment_duration_s": stop.get("segment_duration_s"),
+                }
+            )
 
         log.info(
             "get_driver_task",
@@ -767,8 +774,7 @@ class DeliveryRouteService:
 
         # 若所有门店均为 delivered，自动标记路线完成
         all_delivered = all(
-            trip.get(f"_stop_status_{s['store_id']}") == "delivered"
-            for s in trip.get("route_sequence", [])
+            trip.get(f"_stop_status_{s['store_id']}") == "delivered" for s in trip.get("route_sequence", [])
         )
         if all_delivered:
             trip["status"] = "completed"

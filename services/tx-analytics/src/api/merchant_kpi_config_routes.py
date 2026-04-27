@@ -10,6 +10,7 @@
   PUT  /api/v1/analytics/merchant-kpi/configs        — 更新商户 KPI 权重配置
   GET  /api/v1/analytics/merchant-kpi/score/{store_id} — 根据权重计算门店经营综合评分
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -34,20 +35,20 @@ DEFAULT_MERCHANT_KPI_WEIGHTS: dict[str, dict[str, float]] = {
     # 尝在一起 — 火锅快轻餐：翻台优先
     "czyz": {
         "revenue_growth": 0.20,
-        "table_turnover": 0.20,      # 翻台率（高权重）
+        "table_turnover": 0.20,  # 翻台率（高权重）
         "avg_ticket": 0.10,
         "margin_rate": 0.20,
         "member_repurchase": 0.10,
-        "dish_time": 0.15,           # 出餐速度（高权重）
+        "dish_time": 0.15,  # 出餐速度（高权重）
         "daily_settlement": 0.05,
     },
     # 最黔线 — 正餐：客单/会员优先
     "zqx": {
         "revenue_growth": 0.20,
         "table_turnover": 0.10,
-        "avg_ticket": 0.20,          # 客单价（高权重）
+        "avg_ticket": 0.20,  # 客单价（高权重）
         "margin_rate": 0.20,
-        "member_repurchase": 0.20,   # 复购率（高权重）
+        "member_repurchase": 0.20,  # 复购率（高权重）
         "dish_time": 0.05,
         "daily_settlement": 0.05,
     },
@@ -55,11 +56,11 @@ DEFAULT_MERCHANT_KPI_WEIGHTS: dict[str, dict[str, float]] = {
     "sgc": {
         "revenue_growth": 0.15,
         "table_turnover": 0.05,
-        "avg_ticket": 0.25,          # 客单价（最高权重）
+        "avg_ticket": 0.25,  # 客单价（最高权重）
         "margin_rate": 0.20,
         "member_repurchase": 0.15,
         "dish_time": 0.05,
-        "banquet_deposit_rate": 0.15, # 宴会定金比率（高权重）
+        "banquet_deposit_rate": 0.15,  # 宴会定金比率（高权重）
         "daily_settlement": 0.00,
     },
     # 默认（其他商户）
@@ -88,6 +89,7 @@ KPI_DESCRIPTIONS: dict[str, str] = {
 
 # ─── 依赖 ─────────────────────────────────────────────────────────────────────
 
+
 async def _get_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -98,6 +100,7 @@ def _get_tenant(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> str:
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class KpiWeightItem(BaseModel):
     kpi_key: str = Field(..., description="KPI 标识符，如 revenue_growth / margin_rate")
@@ -113,6 +116,7 @@ class MerchantKpiWeightUpdate(BaseModel):
 
 # ─── 端点 ─────────────────────────────────────────────────────────────────────
 
+
 @router.get("/configs", summary="获取商户 KPI 权重配置")
 async def get_merchant_kpi_configs(
     merchant_code: str | None = None,
@@ -127,12 +131,15 @@ async def get_merchant_kpi_configs(
     # 尝试读取 DB 自定义配置
     db_configs: dict[str, dict[str, Any]] = {}
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT merchant_code, weights, notes, updated_at
             FROM merchant_kpi_weight_configs
             WHERE tenant_id = :tid::uuid
               AND (:mc IS NULL OR merchant_code = :mc)
-        """), {"tid": tenant_id, "mc": merchant_code})
+        """),
+            {"tid": tenant_id, "mc": merchant_code},
+        )
         for row in r.mappings().all():
             db_configs[row["merchant_code"]] = {
                 "weights": row["weights"],
@@ -169,14 +176,16 @@ async def get_merchant_kpi_configs(
             }
             for k, v in entry["weights"].items()
         ]
-        result.append({
-            "merchant_code": code,
-            "weights": weights_with_desc,
-            "weight_sum": round(sum(entry["weights"].values()), 4),
-            "notes": entry["notes"],
-            "source": entry["source"],
-            "updated_at": entry["updated_at"],
-        })
+        result.append(
+            {
+                "merchant_code": code,
+                "weights": weights_with_desc,
+                "weight_sum": round(sum(entry["weights"].values()), 4),
+                "notes": entry["notes"],
+                "source": entry["source"],
+                "updated_at": entry["updated_at"],
+            }
+        )
 
     return {"ok": True, "data": result}
 
@@ -192,8 +201,9 @@ async def update_merchant_kpi_config(
     权重之和应为 1.0，否则返回 400。
     写入 merchant_kpi_weight_configs 表（幂等 UPSERT）。
     """
-    from fastapi import HTTPException
     import json
+
+    from fastapi import HTTPException
 
     weight_sum = round(sum(body.weights.values()), 4)
     if abs(weight_sum - 1.0) > 0.01:
@@ -204,7 +214,8 @@ async def update_merchant_kpi_config(
 
     now = datetime.now(timezone.utc)
     try:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO merchant_kpi_weight_configs
                 (tenant_id, merchant_code, weights, notes, updated_at)
             VALUES
@@ -214,13 +225,15 @@ async def update_merchant_kpi_config(
                 weights    = EXCLUDED.weights,
                 notes      = EXCLUDED.notes,
                 updated_at = EXCLUDED.updated_at
-        """), {
-            "tid": tenant_id,
-            "mc": body.merchant_code,
-            "weights": json.dumps(body.weights),
-            "notes": body.notes,
-            "now": now,
-        })
+        """),
+            {
+                "tid": tenant_id,
+                "mc": body.merchant_code,
+                "weights": json.dumps(body.weights),
+                "notes": body.notes,
+                "now": now,
+            },
+        )
         await db.commit()
     except SQLAlchemyError as exc:
         await db.rollback()
@@ -256,6 +269,7 @@ async def get_store_kpi_score(
     merchant_code 不传则使用 default 权重。
     """
     from datetime import timezone as tz
+
     now_utc = datetime.now(tz.utc)
     year, month = now_utc.year, now_utc.month
 
@@ -263,10 +277,13 @@ async def get_store_kpi_score(
     code = merchant_code or "default"
     weights = DEFAULT_MERCHANT_KPI_WEIGHTS.get(code, DEFAULT_MERCHANT_KPI_WEIGHTS["default"])
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT weights FROM merchant_kpi_weight_configs
             WHERE tenant_id = :tid::uuid AND merchant_code = :mc
-        """), {"tid": tenant_id, "mc": code})
+        """),
+            {"tid": tenant_id, "mc": code},
+        )
         row = r.mappings().fetchone()
         if row:
             weights = row["weights"]
@@ -274,7 +291,7 @@ async def get_store_kpi_score(
         pass
 
     # 采集各项原始指标（简化版：直接查本月数据）
-    from .monthly_brief_routes import _month_metrics, _month_member_metrics, _month_compliance_score
+    from .monthly_brief_routes import _month_compliance_score, _month_member_metrics, _month_metrics
 
     this_m = await _month_metrics(db, tenant_id, year, month)
     member = await _month_member_metrics(db, tenant_id, year, month)
@@ -288,7 +305,9 @@ async def get_store_kpi_score(
         "margin_rate": min(100, this_m.get("margin_rate", 0) * 1.5),
         "member_repurchase": min(100, member.get("repurchase_rate", 0) * 2.5),
         "dish_time": 75.0,  # 需接出餐时间数据，暂估
-        "daily_settlement": min(100, (compliance.get("settled_days", 0) / max(1, this_m.get("business_days", 1))) * 100),
+        "daily_settlement": min(
+            100, (compliance.get("settled_days", 0) / max(1, this_m.get("business_days", 1))) * 100
+        ),
         "banquet_deposit_rate": 70.0,  # 需接宴会数据，暂估
     }
 
@@ -299,13 +318,15 @@ async def get_store_kpi_score(
         raw = raw_scores.get(kpi_key, 70.0)
         contribution = raw * w
         weighted_score += contribution
-        score_detail.append({
-            "kpi_key": kpi_key,
-            "description": KPI_DESCRIPTIONS.get(kpi_key, kpi_key),
-            "weight": w,
-            "raw_score": round(raw, 1),
-            "contribution": round(contribution, 2),
-        })
+        score_detail.append(
+            {
+                "kpi_key": kpi_key,
+                "description": KPI_DESCRIPTIONS.get(kpi_key, kpi_key),
+                "weight": w,
+                "raw_score": round(raw, 1),
+                "contribution": round(contribution, 2),
+            }
+        )
 
     final_score = round(weighted_score, 1)
     grade = "A" if final_score >= 85 else ("B" if final_score >= 70 else ("C" if final_score >= 55 else "D"))

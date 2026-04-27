@@ -6,6 +6,7 @@
   GET  /api/v1/ops/settlement/monitor/overdue  — 逾期未结门店列表
   POST /api/v1/ops/settlement/monitor/remark   — 手动标记备注
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -15,7 +16,6 @@ import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
@@ -103,8 +103,7 @@ async def _query_db_stores(
     now: datetime,
 ) -> List[Dict[str, Any]]:
     """从 DB 查询 daily_settlements + stores 联表。"""
-    filters = ["ds.tenant_id = :tenant_id", "ds.settlement_date = :settlement_date",
-               "ds.is_deleted = FALSE"]
+    filters = ["ds.tenant_id = :tenant_id", "ds.settlement_date = :settlement_date", "ds.is_deleted = FALSE"]
     params: Dict[str, Any] = {"tenant_id": tenant_id, "settlement_date": settlement_date}
     if brand_id:
         filters.append("s.brand_id = :brand_id")
@@ -179,9 +178,14 @@ async def get_settlement_monitor(
     target_date = settlement_date or date.today()
     now = datetime.now(tz=timezone.utc)
 
-    log.info("settlement_monitor_query",
-             tenant_id=x_tenant_id, settlement_date=target_date.isoformat(),
-             brand_id=brand_id, region_id=region_id, status=status)
+    log.info(
+        "settlement_monitor_query",
+        tenant_id=x_tenant_id,
+        settlement_date=target_date.isoformat(),
+        brand_id=brand_id,
+        region_id=region_id,
+        status=status,
+    )
 
     stores = await _query_db_stores(db, x_tenant_id, target_date, brand_id, region_id, status, now)
     summary = _compute_summary(stores)
@@ -206,8 +210,7 @@ async def get_settlement_history(
     """历史日结完成率趋势（近 N 天）。"""
     today = date.today()
 
-    log.info("settlement_history_query",
-             tenant_id=x_tenant_id, days=days, brand_id=brand_id)
+    log.info("settlement_history_query", tenant_id=x_tenant_id, days=days, brand_id=brand_id)
 
     brand_filter = "AND s.brand_id = :brand_id" if brand_id else ""
     params: Dict[str, Any] = {
@@ -240,14 +243,16 @@ async def get_settlement_history(
         total = m["total"] or 0
         completed = m["completed"] or 0
         rate = round(completed / total * 100, 1) if total > 0 else 0.0
-        trend.append({
-            "date": m["settlement_date"].isoformat()
-            if hasattr(m["settlement_date"], "isoformat")
-            else str(m["settlement_date"]),
-            "total_stores": total,
-            "completed_count": completed,
-            "completion_rate": rate,
-        })
+        trend.append(
+            {
+                "date": m["settlement_date"].isoformat()
+                if hasattr(m["settlement_date"], "isoformat")
+                else str(m["settlement_date"]),
+                "total_stores": total,
+                "completed_count": completed,
+                "completion_rate": rate,
+            }
+        )
 
     return {
         "ok": True,
@@ -276,11 +281,13 @@ async def get_overdue_stores(
     for s in stores:
         minutes = _overdue_minutes(s, now)
         if s["status"] == "overdue" or (minutes is not None and minutes > 0):
-            overdue_stores.append({
-                **s,
-                "status": "overdue",
-                "overdue_minutes": minutes or 0,
-            })
+            overdue_stores.append(
+                {
+                    **s,
+                    "status": "overdue",
+                    "overdue_minutes": minutes or 0,
+                }
+            )
 
     return {
         "ok": True,
@@ -302,9 +309,13 @@ async def add_settlement_remark(
     date_str = body.settlement_date.isoformat()
     now = datetime.now(tz=timezone.utc)
 
-    log.info("settlement_remark_update",
-             tenant_id=x_tenant_id, store_id=body.store_id,
-             settlement_date=date_str, operator_id=body.operator_id)
+    log.info(
+        "settlement_remark_update",
+        tenant_id=x_tenant_id,
+        store_id=body.store_id,
+        settlement_date=date_str,
+        operator_id=body.operator_id,
+    )
 
     sql = text("""
         UPDATE daily_settlements
@@ -314,13 +325,16 @@ async def add_settlement_remark(
           AND settlement_date = :settlement_date
           AND is_deleted = FALSE
     """)
-    result = await db.execute(sql, {
-        "remark": body.remark,
-        "updated_at": now,
-        "tenant_id": x_tenant_id,
-        "store_id": body.store_id,
-        "settlement_date": body.settlement_date,
-    })
+    result = await db.execute(
+        sql,
+        {
+            "remark": body.remark,
+            "updated_at": now,
+            "tenant_id": x_tenant_id,
+            "store_id": body.store_id,
+            "settlement_date": body.settlement_date,
+        },
+    )
     await db.commit()
 
     return {

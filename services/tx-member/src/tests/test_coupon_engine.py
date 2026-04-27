@@ -1,4 +1,5 @@
 """优惠券引擎测试 — 7种券类型 + 叠加 + 计算 + 统计 + API"""
+
 import os
 import sys
 
@@ -305,9 +306,9 @@ class TestCalculateDiscount:
             "delivery_fee_fen": 0,
         }
         coupons = [
-            {"coupon_type": "free_item", "item_dish_id": "d1"},   # -3000
-            {"coupon_type": "discount", "discount_rate": 90},      # 7000 * 10% = -700
-            {"coupon_type": "cash", "face_value_fen": 500},        # -500
+            {"coupon_type": "free_item", "item_dish_id": "d1"},  # -3000
+            {"coupon_type": "discount", "discount_rate": 90},  # 7000 * 10% = -700
+            {"coupon_type": "cash", "face_value_fen": 500},  # -500
         ]
         result = await calculate_discount(coupons, order, TENANT)
         assert result["total_discount_fen"] == 3000 + 700 + 500

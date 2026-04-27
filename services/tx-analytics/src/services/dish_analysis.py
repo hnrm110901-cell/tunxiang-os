@@ -6,6 +6,7 @@
 金额单位: 分(fen), int
 比率: 百分比, Decimal(5,2)
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -21,12 +22,13 @@ log = structlog.get_logger()
 
 # ─── 四象限阈值 ───
 DEFAULT_SALES_MEDIAN_MULTIPLIER = Decimal("1.0")  # 以中位数为界
-DEFAULT_MARGIN_THRESHOLD_PCT = Decimal("50.00")    # 毛利率 50% 为界
+DEFAULT_MARGIN_THRESHOLD_PCT = Decimal("50.00")  # 毛利率 50% 为界
 
 
 # ══════════════════════════════════════════════
 # 纯函数
 # ══════════════════════════════════════════════
+
 
 def compute_sales_ranking(
     dish_sales: list[dict],
@@ -76,9 +78,7 @@ def compute_return_rate(total_qty: int, return_qty: int) -> Decimal:
     """纯函数：计算退菜率（百分比）"""
     if total_qty <= 0:
         return Decimal("0.00")
-    return (Decimal(return_qty) / Decimal(total_qty) * 100).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
+    return (Decimal(return_qty) / Decimal(total_qty) * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def classify_quadrant(
@@ -175,6 +175,7 @@ def generate_optimization_suggestion(
 # ══════════════════════════════════════════════
 # 业务函数（需要 DB）
 # ══════════════════════════════════════════════
+
 
 def sales_ranking(
     store_id: uuid.UUID,
@@ -307,9 +308,7 @@ def negative_review_dishes(
         total = item.get("total_reviews", 0)
         neg = item.get("negative_count", 0)
         item["negative_rate"] = (
-            (Decimal(neg) / Decimal(total) * 100).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+            (Decimal(neg) / Decimal(total) * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             if total > 0
             else Decimal("0.00")
         )
@@ -344,10 +343,8 @@ def stockout_frequency(
     for d in data:
         d["total_days"] = total_days
         stockout_days = d.get("stockout_days", 0)
-        d["stockout_day_rate"] = (
-            (Decimal(stockout_days) / Decimal(total_days) * 100).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+        d["stockout_day_rate"] = (Decimal(stockout_days) / Decimal(total_days) * 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
     data.sort(key=lambda x: x.get("stockout_count", 0), reverse=True)
@@ -390,7 +387,12 @@ def dish_structure_analysis(
 
     # 复用 dish_margin.py 获取毛利排行（已含 sales_qty）
     margin_data = get_dish_margin_ranking(
-        store_id, date_range, tenant_id, db, sort_by="margin_rate", limit=9999,
+        store_id,
+        date_range,
+        tenant_id,
+        db,
+        sort_by="margin_rate",
+        limit=9999,
     )
     if not margin_data:
         return {
@@ -468,18 +470,26 @@ def new_dish_performance(
         days_on = max((date.today() - launch).days, 1)
         d["days_on_menu"] = days_on
         total = d.get("total_sales", 0)
-        d["daily_avg_sales"] = (
-            Decimal(total) / Decimal(days_on)
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        d["daily_avg_sales"] = (Decimal(total) / Decimal(days_on)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         # 销量趋势（按天）
         d["sales_trend"] = _query_daily_sales_trend(
-            d["dish_id"], store_id, launch, date.today(), tenant_id, db,
+            d["dish_id"],
+            store_id,
+            launch,
+            date.today(),
+            tenant_id,
+            db,
         )
 
         # 复购率
         d["repurchase_rate"] = _query_repurchase_rate(
-            d["dish_id"], store_id, launch, date.today(), tenant_id, db,
+            d["dish_id"],
+            store_id,
+            launch,
+            date.today(),
+            tenant_id,
+            db,
         )
 
     # 按日均销量排行
@@ -587,6 +597,7 @@ def menu_optimization_suggestions(
 # DB 访问桩
 # ══════════════════════════════════════════════
 
+
 def _query_dish_sales(
     store_id: uuid.UUID,
     start_date: date,
@@ -599,7 +610,9 @@ def _query_dish_sales(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT oi.dish_id, d.dish_name, d.category_id,
                    COALESCE(SUM(oi.quantity), 0) AS sales_qty,
                    COALESCE(SUM(oi.subtotal_fen), 0) AS sales_amount_fen
@@ -613,12 +626,14 @@ def _query_dish_sales(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name, d.category_id
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         return [
             {
                 "dish_id": str(row["dish_id"]),
@@ -645,7 +660,9 @@ def _query_return_data(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT oi.dish_id, d.dish_name,
                    COALESCE(SUM(oi.quantity), 0) AS total_qty,
                    COALESCE(SUM(CASE WHEN oi.return_flag = TRUE THEN oi.quantity ELSE 0 END), 0) AS return_qty
@@ -659,12 +676,14 @@ def _query_return_data(
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name
             HAVING SUM(CASE WHEN oi.return_flag = TRUE THEN oi.quantity ELSE 0 END) > 0
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         return [
             {
                 "dish_id": str(row["dish_id"]),
@@ -690,7 +709,9 @@ def _query_return_reasons(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT COALESCE(oi.return_reason, '未说明') AS reason,
                    COUNT(*) AS count
             FROM order_items oi
@@ -703,16 +724,15 @@ def _query_return_reasons(
               AND oi.is_deleted = FALSE
             GROUP BY COALESCE(oi.return_reason, '未说明')
             ORDER BY count DESC
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
-        return [
-            {"reason": row["reason"], "count": row["count"]}
-            for row in result.mappings().all()
-        ]
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
+        return [{"reason": row["reason"], "count": row["count"]} for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []
 
@@ -730,7 +750,9 @@ def _query_negative_reviews(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT r.dish_id, d.dish_name,
                    AVG(r.rating) AS avg_rating,
                    COUNT(*) FILTER (WHERE r.rating <= :min_rating) AS negative_count,
@@ -745,13 +767,15 @@ def _query_negative_reviews(
             GROUP BY r.dish_id, d.dish_name
             HAVING COUNT(*) FILTER (WHERE r.rating <= :min_rating) > 0
             ORDER BY negative_count DESC
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-            "min_rating": min_rating,
-        })
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "min_rating": min_rating,
+            },
+        )
         return [
             {
                 "dish_id": str(row["dish_id"]),
@@ -779,7 +803,9 @@ def _query_stockout_records(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT s.dish_id, d.dish_name,
                    COUNT(*) AS stockout_count,
                    COUNT(DISTINCT DATE(s.stockout_at)) AS stockout_days,
@@ -792,12 +818,14 @@ def _query_stockout_records(
               AND s.is_deleted = FALSE
             GROUP BY s.dish_id, d.dish_name
             ORDER BY stockout_count DESC
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         return [
             {
                 "dish_id": str(row["dish_id"]),
@@ -823,7 +851,9 @@ def _query_new_dishes(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT d.id AS dish_id, d.dish_name, d.sell_start_date AS launch_date,
                    d.rating,
                    COALESCE(SUM(oi.quantity), 0) AS total_sales
@@ -836,11 +866,13 @@ def _query_new_dishes(
               AND d.is_available = TRUE AND d.is_deleted = FALSE
               AND d.sell_start_date >= :cutoff_date
             GROUP BY d.id, d.dish_name, d.sell_start_date, d.rating
-        """), {
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "cutoff_date": cutoff_date,
-        })
+        """),
+            {
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "cutoff_date": cutoff_date,
+            },
+        )
         return [
             {
                 "dish_id": str(row["dish_id"]),
@@ -868,7 +900,9 @@ def _query_daily_sales_trend(
         return []
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             SELECT DATE(o.order_time) AS sale_date,
                    COALESCE(SUM(oi.quantity), 0) AS daily_qty
             FROM order_items oi
@@ -882,13 +916,15 @@ def _query_daily_sales_trend(
               AND oi.is_deleted = FALSE
             GROUP BY DATE(o.order_time)
             ORDER BY sale_date
-        """), {
-            "dish_id": dish_id,
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        """),
+            {
+                "dish_id": dish_id,
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         return [row["daily_qty"] for row in result.mappings().all()]
     except (ImportError, AttributeError):
         return []
@@ -907,7 +943,9 @@ def _query_repurchase_rate(
         return Decimal("0.00")
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
+
+        result = db.execute(
+            text("""
             WITH customer_orders AS (
                 SELECT o.customer_id, COUNT(DISTINCT o.id) AS order_count
                 FROM order_items oi
@@ -926,18 +964,20 @@ def _query_repurchase_rate(
                 COUNT(*) AS total_customers,
                 COUNT(*) FILTER (WHERE order_count >= 2) AS repeat_customers
             FROM customer_orders
-        """), {
-            "dish_id": dish_id,
-            "store_id": store_id,
-            "tenant_id": tenant_id,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        """),
+            {
+                "dish_id": dish_id,
+                "store_id": store_id,
+                "tenant_id": tenant_id,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
         row = result.mappings().first()
         if row and row["total_customers"] > 0:
-            return (
-                Decimal(row["repeat_customers"]) / Decimal(row["total_customers"]) * 100
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            return (Decimal(row["repeat_customers"]) / Decimal(row["total_customers"]) * 100).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
         return Decimal("0.00")
     except (ImportError, AttributeError):
         return Decimal("0.00")

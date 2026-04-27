@@ -9,18 +9,18 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
-import json
 from datetime import date
 from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 
 from shared.ontology.src.database import get_db
 
@@ -115,8 +115,13 @@ async def start_shift(
         for k, v in record.items():
             if hasattr(v, "isoformat"):
                 record[k] = v.isoformat()
-        log.info("shift_started", shift_id=str(record["id"]), store_id=body.store_id,
-                 shift_type=body.shift_type, tenant_id=x_tenant_id)
+        log.info(
+            "shift_started",
+            shift_id=str(record["id"]),
+            store_id=body.store_id,
+            shift_type=body.shift_type,
+            tenant_id=x_tenant_id,
+        )
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -204,8 +209,7 @@ async def initiate_handover(
             if hasattr(v, "isoformat"):
                 record[k] = v.isoformat()
 
-        log.info("shift_handover_initiated", shift_id=shift_id,
-                 cash_diff_fen=cash_diff_fen, tenant_id=x_tenant_id)
+        log.info("shift_handover_initiated", shift_id=shift_id, cash_diff_fen=cash_diff_fen, tenant_id=x_tenant_id)
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -254,11 +258,7 @@ async def confirm_handover(
                 "disputed": body.disputed,
                 "dispute_reason": body.dispute_reason,
                 "received_by": body.received_by,
-                "appended_note": (
-                    f"\n[争议] {body.dispute_reason}"
-                    if body.disputed and body.dispute_reason
-                    else ""
-                ),
+                "appended_note": (f"\n[争议] {body.dispute_reason}" if body.disputed and body.dispute_reason else ""),
             },
         )
         row = result.mappings().one()
@@ -269,8 +269,7 @@ async def confirm_handover(
             if hasattr(v, "isoformat"):
                 record[k] = v.isoformat()
 
-        log.info("shift_handover_confirmed", shift_id=shift_id,
-                 status=new_status, tenant_id=x_tenant_id)
+        log.info("shift_handover_confirmed", shift_id=shift_id, status=new_status, tenant_id=x_tenant_id)
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -393,9 +392,7 @@ async def get_shift_summary(
             "cash_balanced": shift["cash_diff_fen"] == 0,
             "device_total": len(device_checklist),
             "device_failed": len(failed_devices),
-            "failed_devices": [
-                {k: _iso(v) for k, v in d.items()} for d in failed_devices
-            ],
+            "failed_devices": [{k: _iso(v) for k, v in d.items()} for d in failed_devices],
             "start_time": _iso(shift["start_time"]),
             "end_time": _iso(shift["end_time"]),
         }

@@ -21,6 +21,7 @@
 运行位置：云端（Claude API, ModelRouter MODERATE）
 优先级：P1
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -36,18 +37,23 @@ except ImportError:
 
 try:
     from services.tx_supply.src.services.dish_margin import batch_dish_margin as _batch_dish_margin  # noqa: F401
+
     _DISH_MARGIN_AVAILABLE = True
 except ImportError:
     _DISH_MARGIN_AVAILABLE = False
 
 try:
-    from services.tx_finance.src.services.contribution_margin_engine import ContributionMarginEngine as _CMEngine  # noqa: F401
+    from services.tx_finance.src.services.contribution_margin_engine import (
+        ContributionMarginEngine as _CMEngine,  # noqa: F401
+    )
+
     _CM_ENGINE_AVAILABLE = True
 except ImportError:
     _CM_ENGINE_AVAILABLE = False
 
 try:
     from services.tx_finance.src.services.scenario_simulator import ScenarioSimulator as _ScenarioSimulator
+
     _SCENARIO_SIM_AVAILABLE = True
 except ImportError:
     _ScenarioSimulator = None  # type: ignore[assignment,misc]
@@ -57,28 +63,28 @@ log = structlog.get_logger(__name__)
 
 # ─── 成本偏差阈值 ───────────────────────────────────────────────────────────────
 VARIANCE_THRESHOLDS = {
-    "minor":    0.05,
+    "minor": 0.05,
     "moderate": 0.10,
-    "severe":   0.20,
+    "severe": 0.20,
 }
 
 # ─── 根因类别（对齐文档5因素） ────────────────────────────────────────────────────
 ROOT_CAUSE_TYPES = {
-    "over_portioning":    "份量超标",
-    "yield_deviation":    "出成率偏差",
-    "waste_excess":       "报废损耗",
-    "unknown_loss":       "盗损/未记录",
-    "bom_inaccurate":     "BOM配方不准",
-    "price_fluctuation":  "采购价波动",
-    "supplier_change":    "供应商变更",
+    "over_portioning": "份量超标",
+    "yield_deviation": "出成率偏差",
+    "waste_excess": "报废损耗",
+    "unknown_loss": "盗损/未记录",
+    "bom_inaccurate": "BOM配方不准",
+    "price_fluctuation": "采购价波动",
+    "supplier_change": "供应商变更",
 }
 
 # ─── 渠道默认佣金率 ──────────────────────────────────────────────────────────────
 CHANNEL_COMMISSION = {
-    "dine_in":   0.0,
-    "takeaway":  0.22,
-    "meituan":   0.20,
-    "douyin":    0.18,
+    "dine_in": 0.0,
+    "takeaway": 0.22,
+    "meituan": 0.20,
+    "douyin": 0.18,
     "self_order": 0.0,
 }
 
@@ -126,21 +132,22 @@ class CostDiagnosisAgent(SkillAgent):
 
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
-            "diagnose":            self._diagnose,
-            "root_cause":          self._root_cause,
-            "suggest_fix":         self._suggest_fix,
-            "dish_margin":         self._dish_margin,
-            "stocktake_gap":       self._stocktake_gap,
+            "diagnose": self._diagnose,
+            "root_cause": self._root_cause,
+            "suggest_fix": self._suggest_fix,
+            "dish_margin": self._dish_margin,
+            "stocktake_gap": self._stocktake_gap,
             "contribution_margin": self._contribution_margin,
-            "break_even":          self._break_even,
-            "scenario_simulate":   self._scenario_simulate,
-            "price_trend_alert":   self._price_trend_alert,
+            "break_even": self._break_even,
+            "scenario_simulate": self._scenario_simulate,
+            "price_trend_alert": self._price_trend_alert,
             "channel_cost_compare": self._channel_cost_compare,
         }
         handler = dispatch.get(action)
         if not handler:
             return AgentResult(
-                success=False, action=action,
+                success=False,
+                action=action,
                 error=f"Unsupported action: {action}. Supported: {list(dispatch.keys())}",
             )
         return await handler(params)
@@ -163,7 +170,8 @@ class CostDiagnosisAgent(SkillAgent):
 
         if not dishes:
             return AgentResult(
-                success=False, action="diagnose",
+                success=False,
+                action="diagnose",
                 error="无菜品成本数据，请提供 dishes 列表",
             )
 
@@ -186,15 +194,17 @@ class CostDiagnosisAgent(SkillAgent):
             severity = _classify_severity(variance_rate)
 
             if severity != "normal":
-                variances.append({
-                    "dish_name": name,
-                    "expected_cost_fen": expected,
-                    "actual_cost_fen": actual,
-                    "variance_rate": variance_rate,
-                    "variance_amount_fen": variance_amount,
-                    "quantity_sold": qty,
-                    "severity": severity,
-                })
+                variances.append(
+                    {
+                        "dish_name": name,
+                        "expected_cost_fen": expected,
+                        "actual_cost_fen": actual,
+                        "variance_rate": variance_rate,
+                        "variance_amount_fen": variance_amount,
+                        "quantity_sold": qty,
+                        "severity": severity,
+                    }
+                )
 
         variances.sort(key=lambda x: abs(x["variance_amount_fen"]), reverse=True)
         overall_variance = _safe_ratio(total_actual - total_expected, total_expected)
@@ -207,7 +217,8 @@ class CostDiagnosisAgent(SkillAgent):
         _log_model_call()
 
         return AgentResult(
-            success=True, action="diagnose",
+            success=True,
+            action="diagnose",
             data={
                 "store_id": store_id,
                 "date": date_str,
@@ -253,7 +264,8 @@ class CostDiagnosisAgent(SkillAgent):
 
         if not bom_items:
             return AgentResult(
-                success=False, action="root_cause",
+                success=False,
+                action="root_cause",
                 error="无BOM数据，无法进行根因分析",
             )
 
@@ -276,7 +288,9 @@ class CostDiagnosisAgent(SkillAgent):
             # 1. 采购价波动
             if std_price > 0 and abs(actual_price - std_price) / std_price > 0.05:
                 impact = int((actual_price - std_price) * std_qty)
-                causes.append(_make_cause("price_fluctuation", ing_name, (actual_price - std_price) / std_price, impact))
+                causes.append(
+                    _make_cause("price_fluctuation", ing_name, (actual_price - std_price) / std_price, impact)
+                )
                 total_known_impact += abs(impact)
 
             # 2. 份量超标（实际用量 > BOM标准量）
@@ -289,7 +303,9 @@ class CostDiagnosisAgent(SkillAgent):
             actual_yield = 1.0 - actual_waste
             if std_yield > 0 and (std_yield - actual_yield) / std_yield > 0.05:
                 yield_cost_extra = int(std_qty * std_price * ((1 / actual_yield) - (1 / std_yield)))
-                causes.append(_make_cause("yield_deviation", ing_name, (std_yield - actual_yield) / std_yield, yield_cost_extra))
+                causes.append(
+                    _make_cause("yield_deviation", ing_name, (std_yield - actual_yield) / std_yield, yield_cost_extra)
+                )
                 total_known_impact += yield_cost_extra
 
             # 4. 报废损耗（实际废弃率 > 阈值）
@@ -312,7 +328,8 @@ class CostDiagnosisAgent(SkillAgent):
         primary_cause = causes[0]["cause_type_label"]
 
         return AgentResult(
-            success=True, action="root_cause",
+            success=True,
+            action="root_cause",
             data={
                 "dish_id": dish_id,
                 "dish_name": dish_name,
@@ -405,21 +422,26 @@ class CostDiagnosisAgent(SkillAgent):
             monthly_saving = int(impact * template["saving_pct"] * (monthly_qty if monthly_qty > 0 else 1))
             total_saving_estimate_fen += monthly_saving
 
-            actions.append({
-                "action": template["action"],
-                "priority": "high" if ct in ("bom_inaccurate", "price_fluctuation", "over_portioning") else "medium",
-                "category": template["category"],
-                "cause_type": ct,
-                "cause_label": ROOT_CAUSE_TYPES.get(ct, ct),
-                "detail": template["detail"].replace("{ingredient}", c.get("ingredient", "")),
-                "estimated_monthly_saving_fen": monthly_saving,
-                "saving_pct": template["saving_pct"],
-            })
+            actions.append(
+                {
+                    "action": template["action"],
+                    "priority": "high"
+                    if ct in ("bom_inaccurate", "price_fluctuation", "over_portioning")
+                    else "medium",
+                    "category": template["category"],
+                    "cause_type": ct,
+                    "cause_label": ROOT_CAUSE_TYPES.get(ct, ct),
+                    "detail": template["detail"].replace("{ingredient}", c.get("ingredient", "")),
+                    "estimated_monthly_saving_fen": monthly_saving,
+                    "saving_pct": template["saving_pct"],
+                }
+            )
 
         actions.sort(key=lambda x: x["estimated_monthly_saving_fen"], reverse=True)
 
         return AgentResult(
-            success=True, action="suggest_fix",
+            success=True,
+            action="suggest_fix",
             data={
                 "dish_name": dish_name,
                 "actions": actions,
@@ -449,7 +471,8 @@ class CostDiagnosisAgent(SkillAgent):
         dishes = params.get("dishes", [])
         if not dishes:
             return AgentResult(
-                success=False, action="dish_margin",
+                success=False,
+                action="dish_margin",
                 error="无菜品数据，请提供 dishes 列表",
             )
 
@@ -465,17 +488,19 @@ class CostDiagnosisAgent(SkillAgent):
             gross_profit = effective_price - cost
             margin_rate = _safe_ratio(gross_profit, effective_price)
 
-            results.append({
-                "dish_name": d.get("dish_name", ""),
-                "selling_price_fen": price,
-                "effective_price_fen": effective_price,
-                "bom_cost_fen": cost,
-                "gross_profit_fen": gross_profit,
-                "margin_rate": margin_rate,
-                "monthly_quantity": qty,
-                "total_gross_profit_fen": gross_profit * qty,
-                "channel": channel,
-            })
+            results.append(
+                {
+                    "dish_name": d.get("dish_name", ""),
+                    "selling_price_fen": price,
+                    "effective_price_fen": effective_price,
+                    "bom_cost_fen": cost,
+                    "gross_profit_fen": gross_profit,
+                    "margin_rate": margin_rate,
+                    "monthly_quantity": qty,
+                    "total_gross_profit_fen": gross_profit * qty,
+                    "channel": channel,
+                }
+            )
 
         if not results:
             return AgentResult(success=False, action="dish_margin", error="菜品数据无效")
@@ -512,7 +537,8 @@ class CostDiagnosisAgent(SkillAgent):
             }
 
         return AgentResult(
-            success=True, action="dish_margin",
+            success=True,
+            action="dish_margin",
             data={
                 "dishes": results,
                 "dish_count": len(results),
@@ -558,15 +584,16 @@ class CostDiagnosisAgent(SkillAgent):
 
         if not ingredients:
             return AgentResult(
-                success=False, action="stocktake_gap",
+                success=False,
+                action="stocktake_gap",
                 error="无盘点数据，请提供 ingredients 盘点信息",
             )
 
         CAUSE_LABELS = {
-            "over_portioning":  "份量偏差",
-            "waste_excess":     "报废损耗",
-            "unknown_loss":     "盗损/未记录",
-            "bom_inaccurate":   "BOM配方误差",
+            "over_portioning": "份量偏差",
+            "waste_excess": "报废损耗",
+            "unknown_loss": "盗损/未记录",
+            "bom_inaccurate": "BOM配方误差",
         }
 
         items = []
@@ -605,24 +632,27 @@ class CostDiagnosisAgent(SkillAgent):
             else:
                 primary_cause = "bom_inaccurate"
 
-            items.append({
-                "ingredient_name": name,
-                "unit_price_fen": unit_price,
-                "actual_usage_qty": round(actual_usage, 3),
-                "theoretical_usage_qty": round(theoretical, 3),
-                "variance_qty": round(variance_qty, 3),
-                "variance_fen": variance_fen,
-                "recorded_waste_qty": round(recorded_waste, 3),
-                "unexplained_qty": round(unexplained_qty, 3),
-                "unexplained_fen": unexplained_fen,
-                "primary_cause": primary_cause,
-                "primary_cause_label": CAUSE_LABELS.get(primary_cause, primary_cause),
-            })
+            items.append(
+                {
+                    "ingredient_name": name,
+                    "unit_price_fen": unit_price,
+                    "actual_usage_qty": round(actual_usage, 3),
+                    "theoretical_usage_qty": round(theoretical, 3),
+                    "variance_qty": round(variance_qty, 3),
+                    "variance_fen": variance_fen,
+                    "recorded_waste_qty": round(recorded_waste, 3),
+                    "unexplained_qty": round(unexplained_qty, 3),
+                    "unexplained_fen": unexplained_fen,
+                    "primary_cause": primary_cause,
+                    "primary_cause_label": CAUSE_LABELS.get(primary_cause, primary_cause),
+                }
+            )
 
         items.sort(key=lambda x: abs(x["variance_fen"]), reverse=True)
 
         return AgentResult(
-            success=True, action="stocktake_gap",
+            success=True,
+            action="stocktake_gap",
             data={
                 "store_id": store_id,
                 "period": period,
@@ -661,7 +691,8 @@ class CostDiagnosisAgent(SkillAgent):
 
         if not dishes:
             return AgentResult(
-                success=False, action="contribution_margin",
+                success=False,
+                action="contribution_margin",
                 error="无菜品数据",
             )
 
@@ -680,15 +711,17 @@ class CostDiagnosisAgent(SkillAgent):
             total_revenue += price * qty
             total_variable += var_cost * qty
 
-            dish_results.append({
-                "dish_name": d.get("dish_name", ""),
-                "selling_price_fen": price,
-                "variable_cost_fen": var_cost,
-                "contribution_margin_fen": cm,
-                "cm_rate": cm_rate,
-                "monthly_quantity": qty,
-                "monthly_cm_fen": monthly_cm,
-            })
+            dish_results.append(
+                {
+                    "dish_name": d.get("dish_name", ""),
+                    "selling_price_fen": price,
+                    "variable_cost_fen": var_cost,
+                    "contribution_margin_fen": cm,
+                    "cm_rate": cm_rate,
+                    "monthly_quantity": qty,
+                    "monthly_cm_fen": monthly_cm,
+                }
+            )
 
         dish_results.sort(key=lambda x: x["monthly_cm_fen"], reverse=True)
 
@@ -699,7 +732,8 @@ class CostDiagnosisAgent(SkillAgent):
         operating_profit = total_cm_fen - fixed_cost
 
         return AgentResult(
-            success=True, action="contribution_margin",
+            success=True,
+            action="contribution_margin",
             data={
                 "dishes": dish_results,
                 "weighted_avg_cm_rate": weighted_cm_rate,
@@ -739,12 +773,14 @@ class CostDiagnosisAgent(SkillAgent):
 
         if cm_rate <= 0:
             return AgentResult(
-                success=False, action="break_even",
+                success=False,
+                action="break_even",
                 error="边际贡献率必须大于0",
             )
         if fixed_cost <= 0:
             return AgentResult(
-                success=False, action="break_even",
+                success=False,
+                action="break_even",
                 error="固定成本必须大于0",
             )
 
@@ -764,7 +800,8 @@ class CostDiagnosisAgent(SkillAgent):
         status = "above" if safety_margin_fen >= 0 else "below"
 
         return AgentResult(
-            success=True, action="break_even",
+            success=True,
+            action="break_even",
             data={
                 "fixed_cost_fen": fixed_cost,
                 "weighted_cm_rate": cm_rate,
@@ -781,8 +818,11 @@ class CostDiagnosisAgent(SkillAgent):
             reasoning=(
                 f"月度保本营业额 {break_even_revenue / 100:.0f} 元（约 {break_even_covers} 桌次），"
                 f"日均需达到 {daily_break_even / 100:.0f} 元。"
-                + (f"当前安全边际 {safety_margin_fen / 100:+.0f} 元（{safety_margin_rate:.1%}）。"
-                   if current_revenue > 0 else "")
+                + (
+                    f"当前安全边际 {safety_margin_fen / 100:+.0f} 元（{safety_margin_rate:.1%}）。"
+                    if current_revenue > 0
+                    else ""
+                )
             ),
             confidence=0.95,
         )
@@ -806,21 +846,24 @@ class CostDiagnosisAgent(SkillAgent):
 
         if not scenario_type:
             return AgentResult(
-                success=False, action="scenario_simulate",
+                success=False,
+                action="scenario_simulate",
                 error="请指定 scenario_type：ingredient_price_change / dish_price_change / close_period / staff_change",
             )
 
         if _SCENARIO_SIM_AVAILABLE:
             sim_result = _ScenarioSimulator().simulate(scenario_type, scenario_params, context)
             return AgentResult(
-                success=True, action="scenario_simulate",
+                success=True,
+                action="scenario_simulate",
                 data=sim_result.to_dict(),
                 reasoning=sim_result.recommendation,
                 confidence=0.80,
             )
 
         return AgentResult(
-            success=True, action="scenario_simulate",
+            success=True,
+            action="scenario_simulate",
             data={"scenario_type": scenario_type, "note": "简化模拟（完整引擎未加载）"},
             reasoning=f"已收到 {scenario_type} 场景模拟请求，请确保 tx-finance/scenario_simulator.py 可访问",
             confidence=0.5,
@@ -844,7 +887,8 @@ class CostDiagnosisAgent(SkillAgent):
 
         if not price_history:
             return AgentResult(
-                success=False, action="price_trend_alert",
+                success=False,
+                action="price_trend_alert",
                 error="无价格历史数据",
             )
 
@@ -871,32 +915,37 @@ class CostDiagnosisAgent(SkillAgent):
             recent_change = _safe_ratio(prices[-1] - prices[-2], prices[-2])
 
             if consecutive_rises >= consecutive_required:
-                alerts.append({
-                    "ingredient_name": name,
-                    "ingredient_id": ing_id,
-                    "alert_level": "critical" if consecutive_rises >= 5 else "warning",
-                    "consecutive_rises": consecutive_rises,
-                    "total_drift_pct": total_drift,
-                    "recent_change_pct": recent_change,
-                    "latest_price_fen": prices[-1],
-                    "baseline_price_fen": prices[0],
-                    "recommendation": (
-                        f"已连续 {consecutive_rises} 次涨价，累计涨幅 {total_drift:.1%}。"
-                        "建议立即比价并联系替代供应商。"
-                    ),
-                })
+                alerts.append(
+                    {
+                        "ingredient_name": name,
+                        "ingredient_id": ing_id,
+                        "alert_level": "critical" if consecutive_rises >= 5 else "warning",
+                        "consecutive_rises": consecutive_rises,
+                        "total_drift_pct": total_drift,
+                        "recent_change_pct": recent_change,
+                        "latest_price_fen": prices[-1],
+                        "baseline_price_fen": prices[0],
+                        "recommendation": (
+                            f"已连续 {consecutive_rises} 次涨价，累计涨幅 {total_drift:.1%}。"
+                            "建议立即比价并联系替代供应商。"
+                        ),
+                    }
+                )
             else:
-                stable.append({
-                    "ingredient_name": name,
-                    "ingredient_id": ing_id,
-                    "total_drift_pct": total_drift,
-                    "latest_price_fen": prices[-1],
-                })
+                stable.append(
+                    {
+                        "ingredient_name": name,
+                        "ingredient_id": ing_id,
+                        "total_drift_pct": total_drift,
+                        "latest_price_fen": prices[-1],
+                    }
+                )
 
         alerts.sort(key=lambda x: x["consecutive_rises"], reverse=True)
 
         return AgentResult(
-            success=True, action="price_trend_alert",
+            success=True,
+            action="price_trend_alert",
             data={
                 "alerts": alerts,
                 "stable_count": len(stable),
@@ -925,7 +974,8 @@ class CostDiagnosisAgent(SkillAgent):
         dishes = params.get("dishes", [])
         if not dishes:
             return AgentResult(
-                success=False, action="channel_cost_compare",
+                success=False,
+                action="channel_cost_compare",
                 error="无菜品数据",
             )
 
@@ -960,16 +1010,18 @@ class CostDiagnosisAgent(SkillAgent):
             channel_totals["takeaway"]["cost_fen"] += cost * take_qty
             channel_totals["takeaway"]["qty"] += take_qty
 
-            dish_compare.append({
-                "dish_name": d.get("dish_name", ""),
-                "dine_in_margin_rate": dine_gp_rate,
-                "takeaway_margin_rate": take_gp_rate,
-                "margin_gap": round(dine_gp_rate - take_gp_rate, 4),
-                "dine_in_gp_fen": dine_gp,
-                "takeaway_gp_fen": take_gp,
-                "commission_rate": commission,
-                "commission_fen_per_dish": int(price * commission),
-            })
+            dish_compare.append(
+                {
+                    "dish_name": d.get("dish_name", ""),
+                    "dine_in_margin_rate": dine_gp_rate,
+                    "takeaway_margin_rate": take_gp_rate,
+                    "margin_gap": round(dine_gp_rate - take_gp_rate, 4),
+                    "dine_in_gp_fen": dine_gp,
+                    "takeaway_gp_fen": take_gp,
+                    "commission_rate": commission,
+                    "commission_fen_per_dish": int(price * commission),
+                }
+            )
 
         # 渠道汇总毛利率
         channel_summary = {}
@@ -987,16 +1039,13 @@ class CostDiagnosisAgent(SkillAgent):
         dish_compare.sort(key=lambda x: abs(x["margin_gap"]), reverse=True)
 
         return AgentResult(
-            success=True, action="channel_cost_compare",
+            success=True,
+            action="channel_cost_compare",
             data={
                 "dishes": dish_compare,
                 "channel_summary": channel_summary,
-                "margin_gap_avg": round(
-                    sum(d["margin_gap"] for d in dish_compare) / max(len(dish_compare), 1), 4
-                ),
-                "high_commission_dishes": [
-                    d for d in dish_compare if d["commission_fen_per_dish"] > 500
-                ],
+                "margin_gap_avg": round(sum(d["margin_gap"] for d in dish_compare) / max(len(dish_compare), 1), 4),
+                "high_commission_dishes": [d for d in dish_compare if d["commission_fen_per_dish"] > 500],
             },
             reasoning=(
                 f"堂食综合毛利率 {channel_summary['dine_in']['margin_rate']:.1%}，"
@@ -1008,6 +1057,7 @@ class CostDiagnosisAgent(SkillAgent):
 
 
 # ─── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _make_cause(cause_type: str, ingredient: str, variance_rate: float, impact_fen: int) -> dict:
     return {
@@ -1026,8 +1076,12 @@ def _log_model_call() -> None:
         try:
             model = router.get_model("anomaly_detection")
             router.log_call(
-                task_type="anomaly_detection", model=model,
-                input_tokens=0, output_tokens=0, latency_ms=0, success=True,
+                task_type="anomaly_detection",
+                model=model,
+                input_tokens=0,
+                output_tokens=0,
+                latency_ms=0,
+                success=True,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             log.warning("model_router.log_call_failed", error=str(exc))

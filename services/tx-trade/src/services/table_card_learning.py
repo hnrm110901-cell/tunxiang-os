@@ -7,20 +7,19 @@ Uses 20%/day exponential decay algorithm.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 
 class FieldClickEvent(BaseModel):
     """Record of a field click event."""
+
     field_key: str
     store_id: str
     table_no: str
@@ -32,6 +31,7 @@ class FieldClickEvent(BaseModel):
 
 class FieldRanking(BaseModel):
     """Ranking of field importance based on learning."""
+
     field_key: str
     score: float = Field(default=0.0, ge=0.0, le=100.0)
     click_count: int = 0
@@ -41,6 +41,7 @@ class FieldRanking(BaseModel):
 
 class FieldLearningAggregate(BaseModel):
     """Aggregated learning data for a field."""
+
     field_key: str
     total_clicks: int
     click_score: float
@@ -61,6 +62,7 @@ SCORE_NORMALIZATION_MAX = 100.0
 # ============================================================================
 # Self-Learning Engine
 # ============================================================================
+
 
 class TableCardLearningEngine:
     """
@@ -120,9 +122,7 @@ class TableCardLearningEngine:
             # Note: Assumes table_card_click_logs table exists
             # Actual insert would use SQLAlchemy ORM model
 
-            logger.info(
-                f"Recorded click: {field_key} @ {store_id}/{table_no} ({meal_period})"
-            )
+            logger.info(f"Recorded click: {field_key} @ {store_id}/{table_no} ({meal_period})")
             return True
 
         except (ValueError, TypeError, AttributeError, KeyError) as e:
@@ -157,9 +157,7 @@ class TableCardLearningEngine:
             click_counts[event.field_key] += 1
 
         # Apply decay algorithm and normalize scores
-        scores = await self._compute_decayed_scores(
-            tenant_id, store_id, meal_period, click_counts
-        )
+        scores = await self._compute_decayed_scores(tenant_id, store_id, meal_period, click_counts)
 
         # Sort by score descending and limit
         sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -194,9 +192,7 @@ class TableCardLearningEngine:
                 continue
 
             # Get first click timestamp for this field
-            first_click_at = await self._get_first_click_timestamp(
-                tenant_id, store_id, field_key, meal_period
-            )
+            first_click_at = await self._get_first_click_timestamp(tenant_id, store_id, field_key, meal_period)
 
             if not first_click_at:
                 # Fallback: use current time (no decay)
@@ -209,7 +205,7 @@ class TableCardLearningEngine:
                 days_elapsed = 0
 
             # Apply exponential decay: score = count * 0.8^days
-            decay_factor = DECAY_RATE_PER_DAY ** days_elapsed
+            decay_factor = DECAY_RATE_PER_DAY**days_elapsed
             decayed_score = count * decay_factor
 
             # Normalize to 0-100 range
@@ -233,6 +229,7 @@ class TableCardLearningEngine:
         """
         try:
             from sqlalchemy import text
+
             result = await self.db.execute(
                 text("""
                     SELECT MIN(clicked_at)
@@ -286,9 +283,7 @@ class TableCardLearningEngine:
 
             events = self.memory_cache[cache_key]
             # Keep only recent events
-            self.memory_cache[cache_key] = [
-                e for e in events if e.clicked_at > cutoff_date
-            ]
+            self.memory_cache[cache_key] = [e for e in events if e.clicked_at > cutoff_date]
             affected += len(events) - len(self.memory_cache[cache_key])
 
         logger.info(f"Decayed {affected} old click records for {store_id}")
@@ -318,9 +313,7 @@ class TableCardLearningEngine:
         rankings = await self.get_field_rankings(store_id, meal_period, tenant_id, top_n)
         recommendations = list(rankings.keys())
 
-        logger.debug(
-            f"Recommendations for {store_id}/{meal_period}: {recommendations}"
-        )
+        logger.debug(f"Recommendations for {store_id}/{meal_period}: {recommendations}")
         return recommendations
 
     async def get_learning_stats(
@@ -362,11 +355,7 @@ class TableCardLearningEngine:
                 if not latest_click or event.clicked_at > latest_click:
                     latest_click = event.clicked_at
 
-        days_active = (
-            (latest_click - earliest_click).days + 1
-            if earliest_click and latest_click
-            else 0
-        )
+        days_active = (latest_click - earliest_click).days + 1 if earliest_click and latest_click else 0
 
         return {
             "store_id": store_id,
@@ -377,9 +366,7 @@ class TableCardLearningEngine:
             "days_active": days_active,
             "earliest_click": earliest_click,
             "latest_click": latest_click,
-            "avg_clicks_per_field": (
-                total_clicks / len(field_clicks) if field_clicks else 0
-            ),
+            "avg_clicks_per_field": (total_clicks / len(field_clicks) if field_clicks else 0),
         }
 
     async def reset_learning(
@@ -413,9 +400,7 @@ class TableCardLearningEngine:
             affected += len(self.memory_cache[cache_key])
             del self.memory_cache[cache_key]
 
-        logger.warning(
-            f"Reset learning data: {affected} records for {store_id}/{meal_period}"
-        )
+        logger.warning(f"Reset learning data: {affected} records for {store_id}/{meal_period}")
         return affected
 
     async def export_learning_data(

@@ -7,6 +7,7 @@ tx-finance 扩展路由测试
     cd /Users/lichun/tunxiang-os/services/tx-finance
     pytest src/tests/test_finance_extended.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -31,9 +32,7 @@ def _make_stub(name: str, **attrs) -> types.ModuleType:
 # ── structlog 存根 ────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _stub_log = MagicMock()
-    _stub_log.get_logger.return_value = MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _stub_log.get_logger.return_value = MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     sys.modules["structlog"] = _stub_log
 
 # ── sqlalchemy 系列存根 ───────────────────────────────────────────────────────
@@ -94,10 +93,10 @@ sys.modules["services.vat_service"] = _vat_svc_stub
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 
-from src.api import vat_routes, wine_storage_routes  # noqa: E402
-
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+from src.api import vat_routes, wine_storage_routes  # noqa: E402
 
 # ─── 公共常量 ─────────────────────────────────────────────────────────────────
 
@@ -121,9 +120,7 @@ def _mock_db_single(first_val: Any = None) -> AsyncMock:
     session = AsyncMock()
     result = MagicMock()
     result.mappings.return_value.first.return_value = first_val
-    result.mappings.return_value.all.return_value = (
-        [first_val] if first_val else []
-    )
+    result.mappings.return_value.all.return_value = [first_val] if first_val else []
     result.scalar.return_value = 1
     # 第一次 execute 用于 _set_tenant（如有），后续返回 result
     session.execute = AsyncMock(side_effect=[result, result, result, result])
@@ -334,9 +331,7 @@ class TestWineStorageRoutes:
     def _build_app(self, db_session: AsyncMock) -> FastAPI:
         app = FastAPI()
         app.include_router(wine_storage_routes.router)
-        app.dependency_overrides[wine_storage_routes._get_tenant_db] = (
-            lambda: db_session
-        )
+        app.dependency_overrides[wine_storage_routes._get_tenant_db] = lambda: db_session
         return app
 
     def _wine_row(self, storage_id: str | None = None) -> dict:

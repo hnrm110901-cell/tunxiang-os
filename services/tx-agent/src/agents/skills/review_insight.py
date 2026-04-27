@@ -2,6 +2,7 @@
 
 评论主题提取、情感分析、评分趋势监测、差评根因分析、评论关键词云、评论回复建议。
 """
+
 from typing import Any
 
 from ..base import AgentResult, SkillAgent
@@ -25,6 +26,13 @@ class ReviewInsightAgent(SkillAgent):
     description = "评论主题提取、情感分析、评分趋势、差评根因分析、关键词云、回复建议"
     priority = "P1"
     run_location = "cloud"
+
+    # Sprint D1 / PR 批次 6：纯评论 NLP 分析，不触发业务决策，豁免
+    constraint_scope = set()
+    constraint_waived_reason = (
+        "评论主题洞察纯 NLP 情感/主题分析，输出差评根因和回复建议供运营参考，"
+        "不直接操作毛利/食安/客户体验三条业务约束维度"
+    )
 
     def get_supported_actions(self) -> list[str]:
         return [
@@ -73,21 +81,25 @@ class ReviewInsightAgent(SkillAgent):
         total_reviews = len(reviews)
 
         return AgentResult(
-            success=True, action="extract_review_topics",
+            success=True,
+            action="extract_review_topics",
             data={
-                "topics": [{
-                    "topic": k,
-                    "topic_name": v["name"],
-                    "mention_count": v["total"],
-                    "mention_pct": round(v["total"] / max(1, total_reviews) * 100, 1),
-                    "positive": v["positive"],
-                    "negative": v["negative"],
-                    "sentiment_ratio": round(v["positive"] / max(1, v["total"]), 2),
-                } for k, v in ranked_topics if v["total"] > 0],
+                "topics": [
+                    {
+                        "topic": k,
+                        "topic_name": v["name"],
+                        "mention_count": v["total"],
+                        "mention_pct": round(v["total"] / max(1, total_reviews) * 100, 1),
+                        "positive": v["positive"],
+                        "negative": v["negative"],
+                        "sentiment_ratio": round(v["positive"] / max(1, v["total"]), 2),
+                    }
+                    for k, v in ranked_topics
+                    if v["total"] > 0
+                ],
                 "total_reviews": total_reviews,
             },
-            reasoning=f"从 {total_reviews} 条评论中提取 "
-                      f"{sum(1 for _, v in ranked_topics if v['total'] > 0)} 个主题",
+            reasoning=f"从 {total_reviews} 条评论中提取 {sum(1 for _, v in ranked_topics if v['total'] > 0)} 个主题",
             confidence=0.8,
         )
 
@@ -119,22 +131,27 @@ class ReviewInsightAgent(SkillAgent):
                 score = 0.5
 
             results[sentiment] += 1
-            review_sentiments.append({
-                "review_id": review.get("review_id", ""),
-                "sentiment": sentiment,
-                "score": round(score, 2),
-                "text_preview": text[:50],
-            })
+            review_sentiments.append(
+                {
+                    "review_id": review.get("review_id", ""),
+                    "sentiment": sentiment,
+                    "score": round(score, 2),
+                    "text_preview": text[:50],
+                }
+            )
 
         total = len(reviews)
         return AgentResult(
-            success=True, action="analyze_sentiment",
+            success=True,
+            action="analyze_sentiment",
             data={
-                "distribution": {k: {"count": v, "pct": round(v / max(1, total) * 100, 1)}
-                                for k, v in results.items()},
+                "distribution": {k: {"count": v, "pct": round(v / max(1, total) * 100, 1)} for k, v in results.items()},
                 "total_reviews": total,
-                "overall_sentiment": "正面" if results["positive"] > results["negative"] * 2 else
-                                    "负面" if results["negative"] > results["positive"] else "中性",
+                "overall_sentiment": "正面"
+                if results["positive"] > results["negative"] * 2
+                else "负面"
+                if results["negative"] > results["positive"]
+                else "中性",
                 "details": review_sentiments[:20],
             },
             reasoning=f"情感分析: 正面{results['positive']}、中性{results['neutral']}、负面{results['negative']}",
@@ -155,20 +172,28 @@ class ReviewInsightAgent(SkillAgent):
             prev_avg = period_ratings[i - 1].get("avg_rating", avg) if i > 0 else avg
             change = round(avg - prev_avg, 2)
 
-            trends.append({
-                "period": period.get("period", ""),
-                "avg_rating": avg,
-                "review_count": count,
-                "change": change,
-                "direction": "上升" if change > 0.1 else "下降" if change < -0.1 else "持平",
-            })
+            trends.append(
+                {
+                    "period": period.get("period", ""),
+                    "avg_rating": avg,
+                    "review_count": count,
+                    "change": change,
+                    "direction": "上升" if change > 0.1 else "下降" if change < -0.1 else "持平",
+                }
+            )
 
         latest = trends[-1] if trends else {}
-        overall_direction = "上升" if len(trends) >= 2 and trends[-1]["avg_rating"] > trends[0]["avg_rating"] else \
-                           "下降" if len(trends) >= 2 and trends[-1]["avg_rating"] < trends[0]["avg_rating"] else "持平"
+        overall_direction = (
+            "上升"
+            if len(trends) >= 2 and trends[-1]["avg_rating"] > trends[0]["avg_rating"]
+            else "下降"
+            if len(trends) >= 2 and trends[-1]["avg_rating"] < trends[0]["avg_rating"]
+            else "持平"
+        )
 
         return AgentResult(
-            success=True, action="track_rating_trend",
+            success=True,
+            action="track_rating_trend",
             data={
                 "trends": trends,
                 "latest_avg": latest.get("avg_rating", 0),
@@ -199,15 +224,19 @@ class ReviewInsightAgent(SkillAgent):
         total = len(bad_reviews)
 
         return AgentResult(
-            success=True, action="analyze_bad_review_root_cause",
+            success=True,
+            action="analyze_bad_review_root_cause",
             data={
-                "root_causes": [{
-                    "cause": k,
-                    "cause_name": v["name"],
-                    "count": v["count"],
-                    "pct": round(v["count"] / max(1, total) * 100, 1),
-                    "examples": v["examples"],
-                } for k, v in ranked],
+                "root_causes": [
+                    {
+                        "cause": k,
+                        "cause_name": v["name"],
+                        "count": v["count"],
+                        "pct": round(v["count"] / max(1, total) * 100, 1),
+                        "examples": v["examples"],
+                    }
+                    for k, v in ranked
+                ],
                 "total_bad_reviews": total,
                 "top_cause": ranked[0][1]["name"] if ranked else "无",
             },
@@ -236,10 +265,10 @@ class ReviewInsightAgent(SkillAgent):
         ranked = sorted(all_keywords.items(), key=lambda x: x[1], reverse=True)[:30]
 
         return AgentResult(
-            success=True, action="generate_keyword_cloud",
+            success=True,
+            action="generate_keyword_cloud",
             data={
-                "keywords": [{"word": k, "count": v, "weight": round(v / max(1, len(reviews)), 2)}
-                            for k, v in ranked],
+                "keywords": [{"word": k, "count": v, "weight": round(v / max(1, len(reviews)), 2)} for k, v in ranked],
                 "total_reviews": len(reviews),
                 "top_keyword": ranked[0][0] if ranked else "无",
             },
@@ -274,16 +303,19 @@ class ReviewInsightAgent(SkillAgent):
                 reply = f"非常抱歉！关于{issue_text}，我们高度重视并将立即改进。请联系我们获取补偿。"
                 urgency = "high"
 
-            suggestions.append({
-                "review_id": review.get("review_id", ""),
-                "rating": rating,
-                "suggested_reply": reply,
-                "urgency": urgency,
-                "platform": review.get("platform", "大众点评"),
-            })
+            suggestions.append(
+                {
+                    "review_id": review.get("review_id", ""),
+                    "rating": rating,
+                    "suggested_reply": reply,
+                    "urgency": urgency,
+                    "platform": review.get("platform", "大众点评"),
+                }
+            )
 
         return AgentResult(
-            success=True, action="suggest_review_replies",
+            success=True,
+            action="suggest_review_replies",
             data={
                 "suggestions": suggestions,
                 "total": len(suggestions),

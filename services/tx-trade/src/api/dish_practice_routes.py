@@ -9,6 +9,7 @@
   DELETE /api/v1/dishes/{dish_id}/practices/{id}     删除做法
   GET  /api/v1/practices/templates                    通用做法模板
 """
+
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -21,9 +22,7 @@ router = APIRouter(prefix="/api/v1", tags=["dish-practices"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -34,9 +33,7 @@ def _get_tenant_id(request: Request) -> str:
 
 class AddPracticeReq(BaseModel):
     name: str = Field(..., min_length=1, max_length=50, description="做法名称")
-    additional_price_fen: int = Field(
-        default=0, ge=0, description="加价（分），0表示不加价"
-    )
+    additional_price_fen: int = Field(default=0, ge=0, description="加价（分），0表示不加价")
     materials: list[dict] = Field(
         default_factory=list,
         description='配料调整 [{"name": "辣椒", "amount": "少许"}]',

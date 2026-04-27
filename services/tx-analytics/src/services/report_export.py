@@ -4,6 +4,7 @@
 CSV 使用 utf-8-sig 编码（兼容 Windows Excel 直接打开中文）。
 Excel 使用 openpyxl 引擎。
 """
+
 from __future__ import annotations
 
 import csv
@@ -76,10 +77,7 @@ def to_excel(
         from openpyxl import Workbook
         from openpyxl.styles import Alignment, Font, numbers
     except ImportError as exc:
-        raise ImportError(
-            "openpyxl is required for Excel export. "
-            "Install it with: pip install openpyxl"
-        ) from exc
+        raise ImportError("openpyxl is required for Excel export. Install it with: pip install openpyxl") from exc
 
     log.info(
         "report_export.to_excel",

@@ -2,6 +2,7 @@
 
 路由前缀: /api/v1/printer
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException

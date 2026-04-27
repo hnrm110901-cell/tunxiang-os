@@ -50,9 +50,17 @@ ORDER BY biz_date DESC, s.store_name
 
 DIMENSIONS = ["store_name", "store_code", "biz_date"]
 METRICS = [
-    "total_orders", "paid_orders", "cancelled_orders",
-    "total_amount_fen", "discount_fen", "actual_fen", "variance_fen",
-    "anomaly_count", "margin_alert_count", "manual_discount_count",
-    "return_order_count", "discount_rate_pct",
+    "total_orders",
+    "paid_orders",
+    "cancelled_orders",
+    "total_amount_fen",
+    "discount_fen",
+    "actual_fen",
+    "variance_fen",
+    "anomaly_count",
+    "margin_alert_count",
+    "manual_discount_count",
+    "return_order_count",
+    "discount_rate_pct",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

@@ -10,6 +10,7 @@
 7. 毛利底线保护
 8. CONFIG_SCHEMA结构校验
 """
+
 import asyncio
 import os
 import sys
@@ -87,11 +88,14 @@ class TestConsumptionCashback(unittest.TestCase):
             "cashback_rules": [{"min_spend_fen": 10000, "cashback_fen": 1000}],
             "excluded_order_types": ["delivery"],
         }
-        result = self._run(execute(
-            "cust1", config,
-            {"total_fen": 20000, "order_type": "delivery", "order_id": "o1"},
-            "t1",
-        ))
+        result = self._run(
+            execute(
+                "cust1",
+                config,
+                {"total_fen": 20000, "order_type": "delivery", "order_id": "o1"},
+                "t1",
+            )
+        )
         self.assertFalse(result["success"])
         self.assertEqual(result["reason"], "order_type_excluded")
 

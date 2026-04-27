@@ -9,6 +9,7 @@
 6. TOP 限制：最多返回10条
 7. 租户隔离（不同租户数据互不干扰）
 """
+
 import os
 import sys
 
@@ -21,6 +22,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 # ── 测试工具 ──────────────────────────────────────────────────
+
 
 def _uid() -> str:
     return str(uuid.uuid4())
@@ -56,6 +58,7 @@ def _mock_db(*execute_results):
 
 # ── 测试 1: 畅销榜按出单数降序 ───────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_hot_dishes_sorted_desc():
     """畅销榜按 order_count 降序，rank 字段正确"""
@@ -63,18 +66,20 @@ async def test_hot_dishes_sorted_desc():
 
     hot_rows = [
         FakeRow(dish_id=_uid(), dish_name="剁椒鱼头", order_count=42),
-        FakeRow(dish_id=_uid(), dish_name="小炒肉",   order_count=35),
-        FakeRow(dish_id=_uid(), dish_name="米饭",     order_count=28),
+        FakeRow(dish_id=_uid(), dish_name="小炒肉", order_count=35),
+        FakeRow(dish_id=_uid(), dish_name="米饭", order_count=28),
     ]
 
     db = _mock_db(
-        FakeResult(rows=hot_rows),    # hot
-        FakeResult(rows=[]),          # remake
-        FakeResult(rows=[]),          # cold
+        FakeResult(rows=hot_rows),  # hot
+        FakeResult(rows=[]),  # remake
+        FakeResult(rows=[]),  # cold
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2026, 3, 30),
     )
 
@@ -92,30 +97,33 @@ async def test_hot_dishes_sorted_desc():
 
 # ── 测试 2: 退菜榜按退菜率降序 ───────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_remake_dishes_sorted_by_rate():
     """退菜榜按退菜率降序，退菜率最高的排第1"""
     from services.dish_ranking_service import DishRankingService
 
     remake_rows = [
-        FakeRow(dish_id=_uid(), dish_name="外婆鸡",   remake_count=5,  total_count=20, remake_rate=0.25),
-        FakeRow(dish_id=_uid(), dish_name="爆炒腰花", remake_count=3,  total_count=6,  remake_rate=0.5),
-        FakeRow(dish_id=_uid(), dish_name="拆骨肉",   remake_count=2,  total_count=40, remake_rate=0.05),
+        FakeRow(dish_id=_uid(), dish_name="外婆鸡", remake_count=5, total_count=20, remake_rate=0.25),
+        FakeRow(dish_id=_uid(), dish_name="爆炒腰花", remake_count=3, total_count=6, remake_rate=0.5),
+        FakeRow(dish_id=_uid(), dish_name="拆骨肉", remake_count=2, total_count=40, remake_rate=0.05),
     ]
 
     db = _mock_db(
-        FakeResult(rows=[]),          # hot
-        FakeResult(rows=remake_rows), # remake
-        FakeResult(rows=[]),          # cold
+        FakeResult(rows=[]),  # hot
+        FakeResult(rows=remake_rows),  # remake
+        FakeResult(rows=[]),  # cold
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2026, 3, 30),
     )
 
     assert len(rankings.remake) == 3
-    assert rankings.remake[0].dish_name == "外婆鸡"   # 顺序来自SQL，已排好
+    assert rankings.remake[0].dish_name == "外婆鸡"  # 顺序来自SQL，已排好
     assert rankings.remake[0].rank == 1
     assert rankings.remake[0].count == 5
     assert rankings.remake[0].rate == 0.25
@@ -123,25 +131,28 @@ async def test_remake_dishes_sorted_by_rate():
 
 # ── 测试 3: 滞销榜含零销量菜品 ───────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_cold_dishes_include_zero_sales():
     """滞销榜应包含今日零销量菜品（来自 dishes 主表的 LEFT JOIN）"""
     from services.dish_ranking_service import DishRankingService
 
     cold_rows = [
-        FakeRow(dish_id=_uid(), dish_name="凉拌黄瓜",  order_count=0),  # 零销量
-        FakeRow(dish_id=_uid(), dish_name="皮蛋豆腐",  order_count=0),  # 零销量
-        FakeRow(dish_id=_uid(), dish_name="清炒时蔬",  order_count=1),
+        FakeRow(dish_id=_uid(), dish_name="凉拌黄瓜", order_count=0),  # 零销量
+        FakeRow(dish_id=_uid(), dish_name="皮蛋豆腐", order_count=0),  # 零销量
+        FakeRow(dish_id=_uid(), dish_name="清炒时蔬", order_count=1),
     ]
 
     db = _mock_db(
-        FakeResult(rows=[]),          # hot
-        FakeResult(rows=[]),          # remake
-        FakeResult(rows=cold_rows),   # cold
+        FakeResult(rows=[]),  # hot
+        FakeResult(rows=[]),  # remake
+        FakeResult(rows=cold_rows),  # cold
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2026, 3, 30),
     )
 
@@ -155,6 +166,7 @@ async def test_cold_dishes_include_zero_sales():
 
 # ── 测试 4: 退菜率精确计算 ───────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_remake_rate_precision():
     """退菜率 = remake_count / total_count，精确到小数（round 4位）"""
@@ -162,11 +174,7 @@ async def test_remake_rate_precision():
 
     # 3/7 ≈ 0.4286
     remake_rows = [
-        FakeRow(
-            dish_id=_uid(), dish_name="测试菜",
-            remake_count=3, total_count=7,
-            remake_rate=round(3 / 7, 4)
-        ),
+        FakeRow(dish_id=_uid(), dish_name="测试菜", remake_count=3, total_count=7, remake_rate=round(3 / 7, 4)),
     ]
 
     db = _mock_db(
@@ -176,7 +184,9 @@ async def test_remake_rate_precision():
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2026, 3, 30),
     )
 
@@ -186,19 +196,22 @@ async def test_remake_rate_precision():
 
 # ── 测试 5: 空日期无数据返回空列表 ───────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_no_data_returns_empty_lists():
     """指定日期无订单数据时，三个榜单均返回空列表"""
     from services.dish_ranking_service import DishRankingService
 
     db = _mock_db(
-        FakeResult(rows=[]),   # hot 空
-        FakeResult(rows=[]),   # remake 空
-        FakeResult(rows=[]),   # cold 空
+        FakeResult(rows=[]),  # hot 空
+        FakeResult(rows=[]),  # remake 空
+        FakeResult(rows=[]),  # cold 空
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2020, 1, 1),  # 很久以前，无数据
     )
 
@@ -209,16 +222,14 @@ async def test_no_data_returns_empty_lists():
 
 # ── 测试 6: TOP 限制最多返回10条 ─────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_top_n_limit():
     """即使数据库返回超过10条，仍只保留10条（SQL LIMIT 保证）"""
     from services.dish_ranking_service import TOP_N, DishRankingService
 
     # 模拟 SQL 已按 LIMIT 10 返回最多10条
-    hot_rows = [
-        FakeRow(dish_id=_uid(), dish_name=f"菜品{i}", order_count=100 - i)
-        for i in range(TOP_N)
-    ]
+    hot_rows = [FakeRow(dish_id=_uid(), dish_name=f"菜品{i}", order_count=100 - i) for i in range(TOP_N)]
 
     db = _mock_db(
         FakeResult(rows=hot_rows),
@@ -227,7 +238,9 @@ async def test_top_n_limit():
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2026, 3, 30),
     )
 
@@ -236,6 +249,7 @@ async def test_top_n_limit():
 
 
 # ── 测试 7: 租户隔离 ─────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_tenant_isolation():
@@ -256,7 +270,9 @@ async def test_tenant_isolation():
         FakeResult(rows=[]),
     )
     rankings_a = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db_a,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db_a,
         query_date=date(2026, 3, 30),
     )
 
@@ -267,7 +283,9 @@ async def test_tenant_isolation():
         FakeResult(rows=[]),
     )
     rankings_b = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_B, db=db_b,
+        store_id=STORE_ID,
+        tenant_id=TENANT_B,
+        db=db_b,
         query_date=date(2026, 3, 30),
     )
 
@@ -279,6 +297,7 @@ async def test_tenant_isolation():
 
 
 # ── 测试 8: as_of 时间戳存在 ─────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_as_of_timestamp_present():
@@ -294,7 +313,9 @@ async def test_as_of_timestamp_present():
     )
 
     rankings = await DishRankingService.get_rankings(
-        store_id=STORE_ID, tenant_id=TENANT_A, db=db,
+        store_id=STORE_ID,
+        tenant_id=TENANT_A,
+        db=db,
         query_date=date(2026, 3, 30),
     )
 

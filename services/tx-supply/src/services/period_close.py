@@ -6,6 +6,7 @@
 收发结存: 期初 + 本期收入 - 本期发出 = 期末
 应付账款: 供应商应付统计
 """
+
 from __future__ import annotations
 
 import uuid
@@ -53,9 +54,7 @@ async def close_period(
         月结结果
     """
     if pending_count > 0:
-        raise ValueError(
-            f"存在 {pending_count} 张未完成单据, 请先处理后再月结"
-        )
+        raise ValueError(f"存在 {pending_count} 张未完成单据, 请先处理后再月结")
 
     # 检查是否已月结
     if period_data is not None and period_data.get("is_closed"):
@@ -165,18 +164,14 @@ async def create_cost_adjustment(
         成本调整单
     """
     if period_closed:
-        raise ValueError(
-            f"{month} 已月结, 不可修改当月成本。如需调整请先反月结"
-        )
+        raise ValueError(f"{month} 已月结, 不可修改当月成本。如需调整请先反月结")
     if not items:
         raise ValueError("成本调整单必须包含至少一项")
 
     adj_id = _gen_id("cadj")
     now = _now_iso()
 
-    total_diff_fen = sum(
-        i.get("new_cost_fen", 0) - i.get("old_cost_fen", 0) for i in items
-    )
+    total_diff_fen = sum(i.get("new_cost_fen", 0) - i.get("old_cost_fen", 0) for i in items)
 
     record: Dict[str, Any] = {
         "adjustment_id": adj_id,
@@ -304,11 +299,13 @@ async def get_receipt_balance(
         total_issued_fen += issued_cost
         total_closing_fen += closing_cost
 
-        items.append({
-            **row,
-            "closing_qty": closing_qty,
-            "closing_cost_fen": closing_cost,
-        })
+        items.append(
+            {
+                **row,
+                "closing_qty": closing_qty,
+                "closing_cost_fen": closing_cost,
+            }
+        )
 
     log.info(
         "receipt_balance_queried",

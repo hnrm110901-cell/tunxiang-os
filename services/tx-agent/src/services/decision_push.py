@@ -11,6 +11,7 @@ MAX_DESC_CHARS = 512
 
 # ─── 晨推 08:00 格式 ───
 
+
 def format_morning_card(decisions: list[dict]) -> str:
     """晨推卡片描述：Top3 决策，面向老板"""
     if not decisions:
@@ -31,6 +32,7 @@ def format_morning_card(decisions: list[dict]) -> str:
 
 # ─── 午推 12:00 格式 ───
 
+
 def format_noon_anomaly(waste_summary: dict, decisions: list[dict]) -> str:
     """午推异常推送：损耗+决策，面向店长"""
     lines = []
@@ -44,7 +46,9 @@ def format_noon_anomaly(waste_summary: dict, decisions: list[dict]) -> str:
     top5 = waste_summary.get("top5", [])
     if top5:
         t = top5[0]
-        lines.append(f"  损耗第1：{t.get('item_name', '')} ¥{t.get('waste_cost_yuan', 0):.0f}，归因：{t.get('action', '')[:20]}")
+        lines.append(
+            f"  损耗第1：{t.get('item_name', '')} ¥{t.get('waste_cost_yuan', 0):.0f}，归因：{t.get('action', '')[:20]}"
+        )
 
     for d in decisions[:2]:
         saving = d.get("expected_saving_yuan", 0)
@@ -55,6 +59,7 @@ def format_noon_anomaly(waste_summary: dict, decisions: list[dict]) -> str:
 
 
 # ─── 战前 17:30 格式 ───
+
 
 def format_prebattle(decisions: list[dict], store_name: str) -> str:
     """战前核查：库存+紧急决策，面向经理"""
@@ -82,6 +87,7 @@ def format_prebattle(decisions: list[dict], store_name: str) -> str:
 
 # ─── 晚推 20:30 格式 ───
 
+
 def format_evening_recap(decisions: list[dict], pending_count: int) -> str:
     """晚推经营简报：回顾+待批，面向全员"""
     lines = []
@@ -105,6 +111,7 @@ def format_evening_recap(decisions: list[dict], pending_count: int) -> str:
 
 # ─── 推送决策逻辑 ───
 
+
 def should_push_noon(waste_status: str, has_anomaly_decisions: bool) -> bool:
     """午推是否推送：仅 warning/critical 时"""
     return waste_status in ("warning", "critical") or has_anomaly_decisions
@@ -112,10 +119,7 @@ def should_push_noon(waste_status: str, has_anomaly_decisions: bool) -> bool:
 
 def should_push_prebattle(decisions: list[dict]) -> bool:
     """战前是否推送：有库存/紧急决策时"""
-    return any(
-        d.get("source") == "inventory" or d.get("urgency_hours", 999) < 4
-        for d in decisions
-    )
+    return any(d.get("source") == "inventory" or d.get("urgency_hours", 999) < 4 for d in decisions)
 
 
 def should_push_evening(pending_count: int, has_decisions: bool) -> bool:

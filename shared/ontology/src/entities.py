@@ -3,30 +3,47 @@
 从 tunxiang V2.x 模型提取，统一添加 tenant_id + RLS 支持。
 金额统一存分（fen），展示时 /100 转元。
 """
+
 import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, Date, DateTime, Float, Integer, Numeric, String, Text,
-    ForeignKey, Index, UniqueConstraint, func,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSON, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import TenantBase
 from .enums import (
-    OrderStatus, StoreStatus, InventoryStatus, TransactionType,
-    EmploymentStatus, EmploymentType, StorageType, RFMLevel,
-    ReceivingOrderStatus, ReceivingItemStatus, TransferOrderStatus,
+    EmploymentStatus,
+    EmploymentType,
+    InventoryStatus,
+    OrderStatus,
+    ReceivingItemStatus,
+    ReceivingOrderStatus,
+    StorageType,
+    StoreStatus,
+    TransferOrderStatus,
 )
-
 
 # ─────────────────────────────────────────────
 # 1. Customer — 顾客（Golden ID 全渠道画像）
 # ─────────────────────────────────────────────
 
+
 class Customer(TenantBase):
     """CDP 统一消费者身份 — Golden ID"""
+
     __tablename__ = "customers"
 
     primary_phone: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
@@ -85,7 +102,9 @@ class Customer(TenantBase):
     eleme_user_id: Mapped[str | None] = mapped_column(String(128), index=True, comment="饿了么用户ID")
 
     # 企业微信客户联系（SCRM）
-    wecom_external_userid: Mapped[str | None] = mapped_column(String(128), index=True, comment="企微客户联系外部联系人ID")
+    wecom_external_userid: Mapped[str | None] = mapped_column(
+        String(128), index=True, comment="企微客户联系外部联系人ID"
+    )
     wecom_follow_user: Mapped[str | None] = mapped_column(String(100), comment="负责跟进的导购（企微userid）")
     wecom_follow_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), comment="加好友时间")
     wecom_remark: Mapped[str | None] = mapped_column(String(500), comment="导购备注")
@@ -101,6 +120,7 @@ class Customer(TenantBase):
 # 2. Store — 门店
 # ─────────────────────────────────────────────
 
+
 class Store(TenantBase):
     """门店 — 桌台拓扑, 档口配置, 人效模型, 经营指标
 
@@ -109,6 +129,7 @@ class Store(TenantBase):
     - has_physical_seats: False for virtual stores
     - address/seats: optional for virtual stores
     """
+
     __tablename__ = "stores"
 
     store_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -119,11 +140,14 @@ class Store(TenantBase):
 
     # 修正#7: 门店类型 — 支持虚拟门店
     store_type: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="physical",
+        String(30),
+        nullable=False,
+        default="physical",
         comment="physical/virtual/central_kitchen/warehouse",
     )
     has_physical_seats: Mapped[bool] = mapped_column(
-        Boolean, default=True,
+        Boolean,
+        default=True,
         comment="True for restaurants, False for warehouses/virtual",
     )
 
@@ -158,7 +182,9 @@ class Store(TenantBase):
     waste_rate_target: Mapped[float | None] = mapped_column(Float, comment="损耗率目标(%)")
     rectification_close_rate: Mapped[float | None] = mapped_column(Float, comment="整改关闭率")
     meal_periods: Mapped[dict | None] = mapped_column(JSON, comment="餐段配置[{name,start,end}]")
-    business_type: Mapped[str | None] = mapped_column(String(30), comment="fine_dining/fast_food/retail/catering/pro/standard/lite")
+    business_type: Mapped[str | None] = mapped_column(
+        String(30), comment="fine_dining/fast_food/retail/catering/pro/standard/lite"
+    )
 
     # 品智借鉴：门店标签多维度分类
     store_category: Mapped[str | None] = mapped_column(String(50), comment="门店类别：商场店/街边店/社区店")
@@ -169,8 +195,12 @@ class Store(TenantBase):
     license_expiry: Mapped[str | None] = mapped_column(Date, comment="授权到期日期")
 
     # 品智借鉴：日结/班别配置
-    settlement_mode: Mapped[str | None] = mapped_column(String(20), default="auto+manual", comment="日结方式：auto/manual/auto+manual")
-    shift_type: Mapped[str | None] = mapped_column(String(20), default="no_shift", comment="班别：no_shift/two_shift/three_shift")
+    settlement_mode: Mapped[str | None] = mapped_column(
+        String(20), default="auto+manual", comment="日结方式：auto/manual/auto+manual"
+    )
+    shift_type: Mapped[str | None] = mapped_column(
+        String(20), default="no_shift", comment="班别：no_shift/two_shift/three_shift"
+    )
 
     # 灵活扩展
     store_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, default=dict, comment="灵活扩展字段")
@@ -180,11 +210,15 @@ class Store(TenantBase):
 # 3. Dish — 菜品
 # ─────────────────────────────────────────────
 
+
 class DishCategory(TenantBase):
     """菜品分类（支持多级）"""
+
     __tablename__ = "dish_categories"
 
-    store_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), index=True, comment="所属门店，NULL=集团通用分类")
+    store_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id"), index=True, comment="所属门店，NULL=集团通用分类"
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     code: Mapped[str | None] = mapped_column(String(50))
     parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("dish_categories.id"))
@@ -197,9 +231,12 @@ class DishCategory(TenantBase):
 
 class Dish(TenantBase):
     """菜品主档 — BOM 配方, 各渠道价格, 毛利模型, 四象限分类"""
+
     __tablename__ = "dishes"
 
-    store_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), index=True, comment="所属门店，NULL=集团通用菜品")
+    store_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id"), index=True, comment="所属门店，NULL=集团通用菜品"
+    )
     dish_name: Mapped[str] = mapped_column(String(100), nullable=False)
     dish_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("dish_categories.id"))
@@ -268,6 +305,7 @@ class Dish(TenantBase):
 
 class DishIngredient(TenantBase):
     """菜品-食材关联（BOM 配方）"""
+
     __tablename__ = "dish_ingredients"
 
     dish_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dishes.id"), nullable=False)
@@ -287,6 +325,7 @@ class DishIngredient(TenantBase):
 # 4. Order — 订单
 # ─────────────────────────────────────────────
 
+
 class Order(TenantBase):
     """订单 — 全渠道统一, 折扣明细, 核销记录, 出餐状态
 
@@ -295,6 +334,7 @@ class Order(TenantBase):
     - sales_channel → sales_channel_id 引用配置表，非硬编码枚举
     - order_type 明确订单类型
     """
+
     __tablename__ = "orders"
 
     order_no: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
@@ -308,11 +348,14 @@ class Order(TenantBase):
 
     # 修正#7: 订单类型 + 渠道引用配置表
     order_type: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="dine_in",
+        String(30),
+        nullable=False,
+        default="dine_in",
         comment="dine_in/takeaway/delivery/retail/catering/banquet",
     )
     sales_channel_id: Mapped[str | None] = mapped_column(
-        String(50), index=True,
+        String(50),
+        index=True,
         comment="引用SalesChannel配置表, e.g. ch_meituan",
     )
 
@@ -332,7 +375,8 @@ class Order(TenantBase):
     # 修正#7: metadata 存放 table_no/guest_count 等可选上下文
     # table_number 不再是顶层字段 — 预制菜/外卖/B2B 无桌台
     order_metadata: Mapped[dict | None] = mapped_column(
-        JSON, default=dict,
+        JSON,
+        default=dict,
         comment='{"table_no": "A03", "guest_count": 4, "delivery_address": "..."}',
     )
 
@@ -355,9 +399,7 @@ class Order(TenantBase):
     table_transfer_from: Mapped[str | None] = mapped_column(String(20), comment="转台前桌号")
 
     # 关联
-    items: Mapped[list["OrderItem"]] = relationship(
-        "OrderItem", back_populates="order", cascade="all, delete-orphan"
-    )
+    items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_order_store_status", "store_id", "status"),
@@ -367,6 +409,7 @@ class Order(TenantBase):
 
 class OrderItem(TenantBase):
     """订单明细"""
+
     __tablename__ = "order_items"
 
     order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False, index=True)
@@ -397,6 +440,11 @@ class OrderItem(TenantBase):
     gift_reason: Mapped[str | None] = mapped_column(String(200), comment="赠菜原因")
     combo_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="所属套餐ID(NULL=非套餐)")
 
+    # 条码划菜（v342）
+    barcode: Mapped[str | None] = mapped_column(String(30), comment="菜品条码(格式:门店编号-MMDD-桌号-序号)")
+    barcode_scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="条码扫描确认时间")
+    scanned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="扫码确认人ID")
+
     order: Mapped["Order"] = relationship("Order", back_populates="items")
 
 
@@ -404,8 +452,10 @@ class OrderItem(TenantBase):
 # 5. Ingredient — 食材
 # ─────────────────────────────────────────────
 
+
 class IngredientMaster(TenantBase):
     """食材主档（集团级字典表）"""
+
     __tablename__ = "ingredient_masters"
 
     canonical_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -432,6 +482,7 @@ class IngredientMaster(TenantBase):
 
 class Ingredient(TenantBase):
     """门店库存台账"""
+
     __tablename__ = "ingredients"
 
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
@@ -451,10 +502,15 @@ class Ingredient(TenantBase):
 
 class IngredientTransaction(TenantBase):
     """库存流水"""
+
     __tablename__ = "ingredient_transactions"
 
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False, index=True)
-    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True, comment="门店ID(便于按店查询)")
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False, index=True
+    )
+    store_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True, comment="门店ID(便于按店查询)"
+    )
     transaction_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="purchase/usage/waste/adjustment")
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     unit_cost_fen: Mapped[int | None] = mapped_column(Integer, comment="单位成本(分)")
@@ -466,7 +522,9 @@ class IngredientTransaction(TenantBase):
 
     # 操作人与时间
     performed_by: Mapped[str | None] = mapped_column(String(100), comment="操作人")
-    transaction_time: Mapped[str | None] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="操作时间")
+    transaction_time: Mapped[str | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), comment="操作时间"
+    )
 
     reference_id: Mapped[str | None] = mapped_column(String(100), comment="关联单据号")
     notes: Mapped[str | None] = mapped_column(String(500))
@@ -478,8 +536,10 @@ class IngredientTransaction(TenantBase):
 # 6. Employee — 员工
 # ─────────────────────────────────────────────
 
+
 class Employee(TenantBase):
     """员工 — 角色, 技能, 排班, 业绩提成, 效率指标"""
+
     __tablename__ = "employees"
 
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
@@ -538,22 +598,18 @@ class Employee(TenantBase):
 # 7. ReceivingOrder — 收货验收单
 # ─────────────────────────────────────────────
 
+
 class ReceivingOrder(TenantBase):
     """收货验收单 — 供应商送货到门店时的验收记录"""
+
     __tablename__ = "receiving_orders"
 
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True
-    )
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
     procurement_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True, comment="关联采购单（可为NULL表示非计划收货）"
     )
-    supplier_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True
-    )
-    delivery_note_no: Mapped[str | None] = mapped_column(
-        String(100), comment="供应商送货单号"
-    )
+    supplier_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    delivery_note_no: Mapped[str | None] = mapped_column(String(100), comment="供应商送货单号")
     status: Mapped[str] = mapped_column(
         String(30),
         default=ReceivingOrderStatus.draft.value,
@@ -563,9 +619,7 @@ class ReceivingOrder(TenantBase):
     total_items: Mapped[int] = mapped_column(Integer, default=0)
     received_items: Mapped[int] = mapped_column(Integer, default=0)
     rejected_items: Mapped[int] = mapped_column(Integer, default=0)
-    receiver_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True, comment="收货员"
-    )
+    receiver_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, comment="收货员")
     inspected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     remarks: Mapped[str | None] = mapped_column(Text)
@@ -577,40 +631,25 @@ class ReceivingOrder(TenantBase):
 
 class ReceivingOrderItem(TenantBase):
     """收货验收单明细"""
+
     __tablename__ = "receiving_order_items"
 
     receiving_order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("receiving_orders.id"), nullable=False, index=True
     )
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False
-    )
-    ingredient_name: Mapped[str] = mapped_column(
-        String(100), nullable=False, comment="冗余存储，防食材删除后丢失"
-    )
-    expected_quantity: Mapped[float] = mapped_column(
-        Numeric(12, 3), nullable=False, comment="采购单预期数量"
-    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False)
+    ingredient_name: Mapped[str] = mapped_column(String(100), nullable=False, comment="冗余存储，防食材删除后丢失")
+    expected_quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False, comment="采购单预期数量")
     expected_unit: Mapped[str] = mapped_column(String(20), nullable=False)
-    actual_quantity: Mapped[float] = mapped_column(
-        Numeric(12, 3), default=0, comment="实际到货数量"
-    )
-    accepted_quantity: Mapped[float] = mapped_column(
-        Numeric(12, 3), default=0, comment="验收通过数量"
-    )
-    rejected_quantity: Mapped[float] = mapped_column(
-        Numeric(12, 3), default=0, comment="拒收数量"
-    )
-    unit_price_fen: Mapped[int | None] = mapped_column(
-        Integer, comment="到货价格（分），可能与采购价不同"
-    )
+    actual_quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0, comment="实际到货数量")
+    accepted_quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0, comment="验收通过数量")
+    rejected_quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0, comment="拒收数量")
+    unit_price_fen: Mapped[int | None] = mapped_column(Integer, comment="到货价格（分），可能与采购价不同")
     batch_no: Mapped[str | None] = mapped_column(String(100), comment="批次号")
     production_date: Mapped[datetime | None] = mapped_column(Date)
     expiry_date: Mapped[datetime | None] = mapped_column(Date, comment="保质期")
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
-    quality_photos: Mapped[dict | None] = mapped_column(
-        JSONB, default=list, comment="质检照片URL列表"
-    )
+    quality_photos: Mapped[dict | None] = mapped_column(JSONB, default=list, comment="质检照片URL列表")
     status: Mapped[str] = mapped_column(
         String(20),
         default=ReceivingItemStatus.pending.value,
@@ -624,17 +663,17 @@ class ReceivingOrderItem(TenantBase):
 # 8. TransferOrder — 门店调拨单
 # ─────────────────────────────────────────────
 
+
 class TransferOrder(TenantBase):
     """门店间库存调拨单"""
+
     __tablename__ = "transfer_orders"
 
     from_store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True,
-        comment="调出门店"
+        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True, comment="调出门店"
     )
     to_store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True,
-        comment="调入门店"
+        UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True, comment="调入门店"
     )
     status: Mapped[str] = mapped_column(
         String(20),
@@ -658,30 +697,21 @@ class TransferOrder(TenantBase):
 
 class TransferOrderItem(TenantBase):
     """门店调拨单明细"""
+
     __tablename__ = "transfer_order_items"
 
     transfer_order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("transfer_orders.id"), nullable=False, index=True
     )
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False
-    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingredients.id"), nullable=False)
     ingredient_name: Mapped[str] = mapped_column(String(100), nullable=False)
     requested_quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
-    approved_quantity: Mapped[float | None] = mapped_column(
-        Numeric(12, 3), comment="审批时可调整"
-    )
-    shipped_quantity: Mapped[float | None] = mapped_column(
-        Numeric(12, 3), comment="实际发货数量"
-    )
-    received_quantity: Mapped[float | None] = mapped_column(
-        Numeric(12, 3), comment="实际签收数量"
-    )
+    approved_quantity: Mapped[float | None] = mapped_column(Numeric(12, 3), comment="审批时可调整")
+    shipped_quantity: Mapped[float | None] = mapped_column(Numeric(12, 3), comment="实际发货数量")
+    received_quantity: Mapped[float | None] = mapped_column(Numeric(12, 3), comment="实际签收数量")
     batch_no: Mapped[str | None] = mapped_column(String(100), comment="库存批次号")
-    unit_cost_fen: Mapped[int | None] = mapped_column(
-        Integer, comment="成本价（分），用于财务核算"
-    )
+    unit_cost_fen: Mapped[int | None] = mapped_column(Integer, comment="成本价（分），用于财务核算")
 
     order: Mapped["TransferOrder"] = relationship("TransferOrder", back_populates="items")
     training_completed: Mapped[list | None] = mapped_column(ARRAY(String), default=list)

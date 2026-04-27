@@ -16,6 +16,7 @@
   POST /self-pickup/{id}/ready    — 标记备餐完成（KDS 回调）
   POST /self-pickup/{id}/confirm  — 顾客确认取货
 """
+
 from __future__ import annotations
 
 import random
@@ -156,15 +157,17 @@ async def create_self_pickup_order(
     )
     await db.commit()
 
-    return _ok({
-        "order_id": str(order_id),
-        "order_no": order_no,
-        "pickup_code": pickup_code,
-        "status": "paid",
-        "total_amount_fen": body.total_amount_fen,
-        "pickup_channel": body.pickup_channel,
-        "created_at": now.isoformat(),
-    })
+    return _ok(
+        {
+            "order_id": str(order_id),
+            "order_no": order_no,
+            "pickup_code": pickup_code,
+            "status": "paid",
+            "total_amount_fen": body.total_amount_fen,
+            "pickup_channel": body.pickup_channel,
+            "created_at": now.isoformat(),
+        }
+    )
 
 
 @router.get("/queue", summary="门店自提排队大板")
@@ -183,10 +186,7 @@ async def get_pickup_queue(
     """
     tid = _get_tenant_id(request)
 
-    where_clause = (
-        "AND pickup_confirmed_at IS NOT NULL" if include_confirmed
-        else "AND pickup_confirmed_at IS NULL"
-    )
+    where_clause = "AND pickup_confirmed_at IS NOT NULL" if include_confirmed else "AND pickup_confirmed_at IS NULL"
 
     result = await db.execute(
         text(f"""
@@ -219,10 +219,12 @@ async def get_pickup_queue(
     ready = sum(1 for r in rows if r["pickup_status"] == "ready")
     confirmed = sum(1 for r in rows if r["pickup_status"] == "confirmed")
 
-    return _ok({
-        "orders": rows,
-        "summary": {"preparing": preparing, "ready": ready, "confirmed": confirmed},
-    })
+    return _ok(
+        {
+            "orders": rows,
+            "summary": {"preparing": preparing, "ready": ready, "confirmed": confirmed},
+        }
+    )
 
 
 @router.post("/{order_id}/ready", summary="标记备餐完成（KDS 回调）")
@@ -259,13 +261,15 @@ async def mark_ready(
 
     # TODO: 触发叫号推送（WebSocket → 叫号屏 + 顾客小程序通知）
 
-    return _ok({
-        "order_id": str(order_id),
-        "order_no": row["order_no"],
-        "pickup_code": row["pickup_code"],
-        "pickup_ready_at": now.isoformat(),
-        "message": f"取餐码 {row['pickup_code']} 备餐完成，请叫号",
-    })
+    return _ok(
+        {
+            "order_id": str(order_id),
+            "order_no": row["order_no"],
+            "pickup_code": row["pickup_code"],
+            "pickup_ready_at": now.isoformat(),
+            "message": f"取餐码 {row['pickup_code']} 备餐完成，请叫号",
+        }
+    )
 
 
 @router.post("/{order_id}/confirm", summary="顾客确认取货")
@@ -308,10 +312,12 @@ async def confirm_pickup(
     )
     await db.commit()
 
-    return _ok({
-        "order_id": str(order_id),
-        "order_no": row["order_no"],
-        "pickup_code": row["pickup_code"],
-        "pickup_confirmed_at": now.isoformat(),
-        "message": "取货完成",
-    })
+    return _ok(
+        {
+            "order_id": str(order_id),
+            "order_no": row["order_no"],
+            "pickup_code": row["pickup_code"],
+            "pickup_confirmed_at": now.isoformat(),
+            "message": "取货完成",
+        }
+    )

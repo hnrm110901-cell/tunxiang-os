@@ -6,6 +6,7 @@
 - 损耗归因：多维度分析
 - 使用 Mock 代替真实 DB
 """
+
 import os
 import sys
 import uuid
@@ -80,27 +81,33 @@ class TestCalcStatus:
 
     def test_normal_stock(self):
         from services.auto_deduction import _calc_status
+
         assert _calc_status(10.0, 5.0) == "normal"
 
     def test_low_stock(self):
         from services.auto_deduction import _calc_status
+
         assert _calc_status(4.0, 5.0) == "low"
 
     def test_critical_stock(self):
         from services.auto_deduction import _calc_status
+
         # min_qty=10, 0.3*10=3, current=2 < 3 → critical
         assert _calc_status(2.0, 10.0) == "critical"
 
     def test_out_of_stock(self):
         from services.auto_deduction import _calc_status
+
         assert _calc_status(0.0, 5.0) == "out_of_stock"
 
     def test_negative_stock(self):
         from services.auto_deduction import _calc_status
+
         assert _calc_status(-1.0, 5.0) == "out_of_stock"
 
     def test_exact_min_boundary(self):
         from services.auto_deduction import _calc_status
+
         # current == min_qty → low
         assert _calc_status(5.0, 5.0) == "low"
 

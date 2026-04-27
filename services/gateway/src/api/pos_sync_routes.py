@@ -7,6 +7,7 @@ POS 同步状态与日志查询 API 路由
 
 所有端点需要 X-Tenant-ID header（由 TenantMiddleware 注入）。
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -42,13 +43,15 @@ async def get_sync_logs(
     tenant_id: Optional[str] = getattr(request.state, "tenant_id", None)
 
     if not tenant_id:
-        return ok({
-            "items": [],
-            "total": 0,
-            "page": page,
-            "size": size,
-            "message": "X-Tenant-ID 未配置，返回空结果",
-        })
+        return ok(
+            {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "message": "X-Tenant-ID 未配置，返回空结果",
+            }
+        )
 
     since = datetime.now(tz=timezone.utc) - timedelta(days=days)
     offset = (page - 1) * size
@@ -127,28 +130,34 @@ async def get_sync_logs(
             days=days,
             total=total,
         )
-        return ok({
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-        })
+        return ok(
+            {
+                "items": items,
+                "total": total,
+                "page": page,
+                "size": size,
+            }
+        )
 
     except ImportError:
         logger.warning("sync_logs_db_not_configured")
-        return ok({
-            "items": [],
-            "total": 0,
-            "page": page,
-            "size": size,
-            "message": "数据库未配置，返回空结果",
-        })
+        return ok(
+            {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "message": "数据库未配置，返回空结果",
+            }
+        )
     except (OSError, RuntimeError, ValueError) as exc:
         logger.error("sync_logs_query_failed", error=str(exc), exc_info=True)
-        return ok({
-            "items": [],
-            "total": 0,
-            "page": page,
-            "size": size,
-            "message": f"查询失败: {exc}",
-        })
+        return ok(
+            {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "message": f"查询失败: {exc}",
+            }
+        )

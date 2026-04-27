@@ -3,6 +3,7 @@
 典型场景: 老会员分享链接, 新客注册后双方各得20元券
 支持多级裂变: A推荐B, B推荐C, A也可获得间接奖励
 """
+
 from typing import Any
 
 import structlog
@@ -53,27 +54,33 @@ async def execute(
 
     rewards = []
     if referrer_id:
-        rewards.append({
-            "customer_id": referrer_id,
-            "role": "referrer",
-            "reward": referrer_reward,
-        })
-    rewards.append({
-        "customer_id": referee_id,
-        "role": "referee",
-        "reward": referee_reward,
-    })
+        rewards.append(
+            {
+                "customer_id": referrer_id,
+                "role": "referrer",
+                "reward": referrer_reward,
+            }
+        )
+    rewards.append(
+        {
+            "customer_id": referee_id,
+            "role": "referee",
+            "reward": referee_reward,
+        }
+    )
 
     # 多级裂变
     if config.get("multi_level") and trigger_event.get("level2_referrer_id"):
         level2_id = trigger_event["level2_referrer_id"]
         level2_fen = config.get("level2_reward_fen", 0)
         if level2_fen > 0:
-            rewards.append({
-                "customer_id": level2_id,
-                "role": "level2_referrer",
-                "reward": {"type": "coupon", "amount_fen": level2_fen},
-            })
+            rewards.append(
+                {
+                    "customer_id": level2_id,
+                    "role": "level2_referrer",
+                    "reward": {"type": "coupon", "amount_fen": level2_fen},
+                }
+            )
 
     log.info(
         "campaign.referral.executed",

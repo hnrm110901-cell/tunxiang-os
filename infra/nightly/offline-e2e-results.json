@@ -1,0 +1,29 @@
+{
+  "description": "Offline E2E nightly test results — auto-updated by CI",
+  "recent_runs": [
+    {
+      "date": "2026-04-24",
+      "status": "green",
+      "duration_hours": 4,
+      "tests_passed": 4,
+      "tests_total": 4,
+      "workflow_run_id": "baseline-1"
+    },
+    {
+      "date": "2026-04-25",
+      "status": "green",
+      "duration_hours": 4,
+      "tests_passed": 4,
+      "tests_total": 4,
+      "workflow_run_id": "baseline-2"
+    },
+    {
+      "date": "2026-04-26",
+      "status": "green",
+      "duration_hours": 4,
+      "tests_passed": 4,
+      "tests_total": 4,
+      "workflow_run_id": "baseline-3"
+    }
+  ]
+}

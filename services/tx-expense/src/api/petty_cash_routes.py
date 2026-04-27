@@ -4,11 +4,11 @@
 共8个端点，覆盖备用金账户的完整生命周期：
   开户 → 日常支出录入 → 余额查看 → 月末核销 → 补充申请 → 离职归还
 """
+
 from __future__ import annotations
 
-import asyncio
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import structlog
@@ -42,6 +42,7 @@ async def require_finance_role(
         )
     return x_user_role
 
+
 try:
     from src.services import petty_cash_service
 except ImportError:
@@ -60,19 +61,20 @@ log = structlog.get_logger(__name__)
 # Pydantic Schemas
 # ---------------------------------------------------------------------------
 
+
 class PettyCashAccountCreate(BaseModel):
     store_id: UUID
     brand_id: UUID
-    keeper_id: UUID           # 保管人员工ID（通常是店长）
-    approved_limit: int       # 审批额度上限（分）
-    warning_threshold: int    # 预警阈值（分）
+    keeper_id: UUID  # 保管人员工ID（通常是店长）
+    approved_limit: int  # 审批额度上限（分）
+    warning_threshold: int  # 预警阈值（分）
     opening_balance: int = 0  # 期初余额（分），默认0
 
 
 class ExpenseRecordCreate(BaseModel):
-    amount: int               # 支出金额（分，正整数）
+    amount: int  # 支出金额（分，正整数）
     description: str = Field(..., max_length=200)
-    expense_date: Optional[date] = None   # 默认今天
+    expense_date: Optional[date] = None  # 默认今天
     reference_id: Optional[UUID] = None
     reference_type: Optional[str] = None
     notes: Optional[str] = None
@@ -105,6 +107,7 @@ class GenerateSettlementRequest(BaseModel):
 # 工具函数
 # ---------------------------------------------------------------------------
 
+
 def _fen_to_yuan(fen: int) -> str:
     """分转元，保留两位小数，返回字符串。"""
     return f"{fen / 100:.2f}"
@@ -136,9 +139,7 @@ def _account_to_dict(account: Any, include_transactions: bool = False) -> Dict[s
         "updated_at": account.updated_at.isoformat() if account.updated_at else None,
     }
     if include_transactions and hasattr(account, "transactions") and account.transactions:
-        data["recent_transactions"] = [
-            _transaction_to_dict(t) for t in account.transactions
-        ]
+        data["recent_transactions"] = [_transaction_to_dict(t) for t in account.transactions]
     return data
 
 
@@ -195,6 +196,7 @@ def _settlement_to_dict(settlement: Any) -> Dict[str, Any]:
 def _require_petty_cash_service() -> Any:
     if petty_cash_service is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=503, detail="备用金服务暂不可用，请稍后重试")
     return petty_cash_service
 
@@ -202,6 +204,7 @@ def _require_petty_cash_service() -> Any:
 # ---------------------------------------------------------------------------
 # 端点1：POST /accounts — 开设备用金账户
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/accounts",
@@ -255,6 +258,7 @@ async def create_petty_cash_account(
 # 端点2：GET /accounts/{store_id} — 查询门店备用金账户
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/accounts/{store_id}",
     summary="查询门店备用金账户",
@@ -291,6 +295,7 @@ async def get_petty_cash_account(
 # ---------------------------------------------------------------------------
 # 端点3：POST /accounts/{account_id}/expenses — 录入日常支出
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/accounts/{account_id}/expenses",
@@ -379,6 +384,7 @@ async def record_expense(
 # 端点4：GET /accounts/{account_id}/balance — 查询实时余额
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/accounts/{account_id}/balance",
     summary="查询实时余额",
@@ -403,6 +409,7 @@ async def get_account_balance(
 
     # 复用内部工具查询账户（防跨租户）
     from sqlalchemy import select
+
     from src.models.petty_cash import PettyCashAccount
 
     stmt = select(PettyCashAccount).where(
@@ -414,6 +421,7 @@ async def get_account_balance(
 
     if account is None:
         from fastapi import HTTPException
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="备用金账户不存在或无权限访问",
@@ -436,6 +444,7 @@ async def get_account_balance(
 # ---------------------------------------------------------------------------
 # 端点5：POST /accounts/{account_id}/pos-reconcile — POS日结手动对账
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/accounts/{account_id}/pos-reconcile",
@@ -467,6 +476,7 @@ async def pos_reconcile(
 
     # 先通过 account_id 获取 store_id
     from sqlalchemy import select
+
     from src.models.petty_cash import PettyCashAccount
 
     stmt = select(PettyCashAccount).where(
@@ -478,6 +488,7 @@ async def pos_reconcile(
 
     if account is None:
         from fastapi import HTTPException
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="备用金账户不存在或无权限访问",
@@ -518,6 +529,7 @@ async def pos_reconcile(
 # 端点6：GET /settlements — 查询月末核销单列表
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/settlements",
     summary="查询月末核销单列表",
@@ -526,7 +538,9 @@ async def pos_reconcile(
 async def list_settlements(
     store_id: Optional[UUID] = Query(None, description="按门店过滤（可选）"),
     settlement_month: Optional[str] = Query(None, description="按月份过滤，格式 YYYY-MM（可选）"),
-    settlement_status: Optional[str] = Query(None, alias="status", description="按状态过滤：draft/submitted/confirmed/closed（可选）"),
+    settlement_status: Optional[str] = Query(
+        None, alias="status", description="按状态过滤：draft/submitted/confirmed/closed（可选）"
+    ),
     page: int = Query(1, ge=1, description="页码，从1开始"),
     size: int = Query(20, ge=1, le=100, description="每页数量，最大100"),
     db: AsyncSession = Depends(get_db),
@@ -541,7 +555,8 @@ async def list_settlements(
     - **status**: 可选，draft/submitted/confirmed/closed
     - **page** / **size**: 分页参数
     """
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
+
     from src.models.petty_cash import PettyCashSettlement
 
     conditions = [PettyCashSettlement.tenant_id == tenant_id]
@@ -586,6 +601,7 @@ async def list_settlements(
 # 端点7：POST /settlements/generate — 手动触发生成月末核销单
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/settlements/generate",
     status_code=status.HTTP_201_CREATED,
@@ -613,6 +629,7 @@ async def generate_monthly_settlement(
 
     # 先查询门店账户 ID
     from sqlalchemy import select
+
     from src.models.petty_cash import PettyCashAccount
 
     stmt = select(PettyCashAccount).where(
@@ -624,6 +641,7 @@ async def generate_monthly_settlement(
 
     if account is None:
         from fastapi import HTTPException
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="该门店尚未开设备用金账户，无法生成核销单",
@@ -656,6 +674,7 @@ async def generate_monthly_settlement(
 # ---------------------------------------------------------------------------
 # 端点8：POST /settlements/confirm — 财务确认核销单
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/settlements/confirm",

@@ -16,6 +16,7 @@
   13. 无角色员工 — 所有操作被拒
   14. PermissionCheckResult 工厂方法
 """
+
 import os
 import sys
 import uuid
@@ -102,7 +103,7 @@ SUPERVISOR_ROLE = _make_role(
 
 ADMIN_ROLE = _make_role(
     level=10,
-    max_discount_rate=0.0,   # 0.0 = 无限制
+    max_discount_rate=0.0,  # 0.0 = 无限制
     max_wipeoff_fen=999999,
     max_gift_fen=999999,
     data_query_days=9999,
@@ -165,7 +166,7 @@ class TestDiscountPermission:
         svc = _make_service_with_role(WAITER_ROLE)
         result = await svc.check_discount_permission(
             employee_id=EMP_ID,
-            discount_rate=90.0,   # 刚好等于下限
+            discount_rate=90.0,  # 刚好等于下限
             tenant_id=TENANT_ID,
             session=MOCK_SESSION,
         )
@@ -176,7 +177,7 @@ class TestDiscountPermission:
         svc = _make_service_with_role(WAITER_ROLE)  # can_override_discount=False
         result = await svc.check_discount_permission(
             employee_id=EMP_ID,
-            discount_rate=85.0,   # 低于 90.0 下限
+            discount_rate=85.0,  # 低于 90.0 下限
             tenant_id=TENANT_ID,
             session=MOCK_SESSION,
         )
@@ -200,7 +201,7 @@ class TestDiscountPermission:
         svc = _make_service_with_role(MANAGER_ROLE)  # can_override_discount=True, level=7
         result = await svc.check_discount_permission(
             employee_id=EMP_ID,
-            discount_rate=60.0,   # 低于 70.0
+            discount_rate=60.0,  # 低于 70.0
             tenant_id=TENANT_ID,
             session=MOCK_SESSION,
         )
@@ -213,7 +214,7 @@ class TestDiscountPermission:
         svc = _make_service_with_role(ADMIN_ROLE)
         result = await svc.check_discount_permission(
             employee_id=EMP_ID,
-            discount_rate=1.0,    # 极低折扣
+            discount_rate=1.0,  # 极低折扣
             tenant_id=TENANT_ID,
             session=MOCK_SESSION,
         )
@@ -255,7 +256,7 @@ class TestWipeoffPermission:
         svc = _make_service_with_role(CASHIER_ROLE)
         result = await svc.check_wipeoff_permission(
             employee_id=EMP_ID,
-            amount_fen=1500,   # 超过 1000 上限
+            amount_fen=1500,  # 超过 1000 上限
             tenant_id=TENANT_ID,
             session=MOCK_SESSION,
         )
@@ -321,7 +322,7 @@ class TestGiftPermission:
         svc = _make_service_with_role(CASHIER_ROLE)
         result = await svc.check_gift_permission(
             employee_id=EMP_ID,
-            amount_fen=8000,   # 超过 5000
+            amount_fen=8000,  # 超过 5000
             tenant_id=TENANT_ID,
             session=MOCK_SESSION,
         )

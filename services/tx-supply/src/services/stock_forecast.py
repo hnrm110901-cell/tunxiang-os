@@ -3,6 +3,7 @@
 基于近 7 天平均消耗计算安全库存，预测沽清日期，生成采购建议。
 安全天数默认 3 天。
 """
+
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -46,16 +47,13 @@ async def _get_daily_consumption(
     sid = _uuid(store_id)
     since = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
-    q = (
-        select(func.coalesce(func.sum(IngredientTransaction.quantity), 0))
-        .where(
-            IngredientTransaction.tenant_id == tid,
-            IngredientTransaction.ingredient_id == iid,
-            IngredientTransaction.store_id == sid,
-            IngredientTransaction.transaction_type == TransactionType.usage.value,
-            IngredientTransaction.is_deleted == False,  # noqa: E712
-            IngredientTransaction.created_at >= since,
-        )
+    q = select(func.coalesce(func.sum(IngredientTransaction.quantity), 0)).where(
+        IngredientTransaction.tenant_id == tid,
+        IngredientTransaction.ingredient_id == iid,
+        IngredientTransaction.store_id == sid,
+        IngredientTransaction.transaction_type == TransactionType.usage.value,
+        IngredientTransaction.is_deleted == False,  # noqa: E712
+        IngredientTransaction.created_at >= since,
     )
     result = await db.execute(q)
     total = float(result.scalar() or 0)
@@ -83,13 +81,10 @@ async def check_safety_stock(
     tid = _uuid(tenant_id)
     sid = _uuid(store_id)
 
-    ing_q = (
-        select(Ingredient)
-        .where(
-            Ingredient.tenant_id == tid,
-            Ingredient.store_id == sid,
-            Ingredient.is_deleted == False,  # noqa: E712
-        )
+    ing_q = select(Ingredient).where(
+        Ingredient.tenant_id == tid,
+        Ingredient.store_id == sid,
+        Ingredient.is_deleted == False,  # noqa: E712
     )
     result = await db.execute(ing_q)
     ingredients = result.scalars().all()
@@ -97,7 +92,10 @@ async def check_safety_stock(
     items = []
     for ing in ingredients:
         daily = await _get_daily_consumption(
-            str(ing.id), store_id, tenant_id, db,
+            str(ing.id),
+            store_id,
+            tenant_id,
+            db,
         )
         safety_qty = daily * safety_days
 
@@ -111,16 +109,18 @@ async def check_safety_stock(
         else:
             status = "critical"
 
-        items.append({
-            "ingredient_id": str(ing.id),
-            "ingredient_name": ing.ingredient_name,
-            "category": ing.category,
-            "unit": ing.unit,
-            "current_qty": ing.current_quantity,
-            "safety_qty": round(effective_safety, 2),
-            "daily_consumption": round(daily, 2),
-            "status": status,
-        })
+        items.append(
+            {
+                "ingredient_id": str(ing.id),
+                "ingredient_name": ing.ingredient_name,
+                "category": ing.category,
+                "unit": ing.unit,
+                "current_qty": ing.current_quantity,
+                "safety_qty": round(effective_safety, 2),
+                "daily_consumption": round(daily, 2),
+                "status": status,
+            }
+        )
 
     # 优先展示 critical > low > ok
     priority = {"critical": 0, "low": 1, "ok": 2}
@@ -166,7 +166,10 @@ async def predict_stockout(
         raise ValueError(f"原料 {ingredient_id} 在门店 {store_id} 不存在")
 
     daily = await _get_daily_consumption(
-        ingredient_id, store_id, tenant_id, db,
+        ingredient_id,
+        store_id,
+        tenant_id,
+        db,
     )
 
     today = date.today()
@@ -250,18 +253,20 @@ async def suggest_reorder(
 
         urgency = "urgent" if item["status"] == "critical" else "normal"
 
-        suggestions.append({
-            "ingredient_id": item["ingredient_id"],
-            "ingredient_name": item["ingredient_name"],
-            "category": item["category"],
-            "unit": item["unit"],
-            "reorder_qty": round(reorder_qty, 2),
-            "urgency": urgency,
-            "estimated_cost_fen": estimated_cost,
-            "daily_consumption": daily,
-            "current_qty": item["current_qty"],
-            "safety_qty": item["safety_qty"],
-        })
+        suggestions.append(
+            {
+                "ingredient_id": item["ingredient_id"],
+                "ingredient_name": item["ingredient_name"],
+                "category": item["category"],
+                "unit": item["unit"],
+                "reorder_qty": round(reorder_qty, 2),
+                "urgency": urgency,
+                "estimated_cost_fen": estimated_cost,
+                "daily_consumption": daily,
+                "current_qty": item["current_qty"],
+                "safety_qty": item["safety_qty"],
+            }
+        )
 
     # urgent 排前面
     suggestions.sort(key=lambda x: 0 if x["urgency"] == "urgent" else 1)

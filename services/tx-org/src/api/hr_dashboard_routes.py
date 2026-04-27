@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
@@ -29,9 +28,7 @@ router = APIRouter(prefix="/api/v1/hr/dashboard", tags=["hr-dashboard"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -207,10 +204,12 @@ async def hr_dashboard(
         for row in r.mappings():
             d = row["date"]
             d_str = d.isoformat() if hasattr(d, "isoformat") else str(d)
-            attendance_trend.append({
-                "date": d_str,
-                "rate": round(float(row["rate"]) * 100, 1),
-            })
+            attendance_trend.append(
+                {
+                    "date": d_str,
+                    "rate": round(float(row["rate"]) * 100, 1),
+                }
+            )
     except (OperationalError, ProgrammingError) as exc:
         log.warning("hr_dashboard_trend_failed", error=str(exc))
 
@@ -221,31 +220,35 @@ async def hr_dashboard(
         for row in r.mappings():
             ca = row["created_at"]
             ca_str = ca.isoformat() if hasattr(ca, "isoformat") else str(ca)
-            agent_summaries.append({
-                "agent_id": str(row["agent_id"]),
-                "decision_type": str(row["decision_type"]),
-                "reasoning": str(row["reasoning"] or ""),
-                "confidence": float(row["confidence"]) if row["confidence"] else 0,
-                "created_at": ca_str,
-            })
+            agent_summaries.append(
+                {
+                    "agent_id": str(row["agent_id"]),
+                    "decision_type": str(row["decision_type"]),
+                    "reasoning": str(row["reasoning"] or ""),
+                    "confidence": float(row["confidence"]) if row["confidence"] else 0,
+                    "created_at": ca_str,
+                }
+            )
     except (OperationalError, ProgrammingError) as exc:
         log.warning("hr_dashboard_agent_failed", error=str(exc))
 
     # 人工成本率（本月）— 需薪资+营收数据，暂置0
     labor_cost_rate = 0.0
 
-    return _ok({
-        "total_headcount": total_headcount,
-        "today": {
-            "expected": expected,
-            "present": present,
-            "absent": absent,
-        },
-        "pending_leave": pending_leave,
-        "schedule_conflicts": conflicts,
-        "open_alerts": open_alerts,
-        "pending_payroll": pending_payroll,
-        "labor_cost_rate": labor_cost_rate,
-        "attendance_trend": attendance_trend,
-        "agent_summaries": agent_summaries,
-    })
+    return _ok(
+        {
+            "total_headcount": total_headcount,
+            "today": {
+                "expected": expected,
+                "present": present,
+                "absent": absent,
+            },
+            "pending_leave": pending_leave,
+            "schedule_conflicts": conflicts,
+            "open_alerts": open_alerts,
+            "pending_payroll": pending_payroll,
+            "labor_cost_rate": labor_cost_rate,
+            "attendance_trend": attendance_trend,
+            "agent_summaries": agent_summaries,
+        }
+    )

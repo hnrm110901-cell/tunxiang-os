@@ -52,6 +52,7 @@
 #     status VARCHAR(20) DEFAULT 'pending' -- pending/delivered/signed/disputed
 # );
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -76,7 +77,7 @@ class ProductionPlan:
     id: str
     tenant_id: str
     kitchen_id: str
-    plan_date: str          # ISO date string: YYYY-MM-DD
+    plan_date: str  # ISO date string: YYYY-MM-DD
     status: str = "draft"
     total_items: int = 0
     created_by: Optional[str] = None

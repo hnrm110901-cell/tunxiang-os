@@ -38,6 +38,7 @@ _HTTP_TIMEOUT: float = 10.0  # 秒
 # 基类
 # ---------------------------------------------------------------------------
 
+
 class BaseActionExecutor(ABC):
     """所有 Action Executor 的抽象基类。"""
 
@@ -67,6 +68,7 @@ class BaseActionExecutor(ABC):
 # Wait — 等待
 # ---------------------------------------------------------------------------
 
+
 class WaitActionExecutor(BaseActionExecutor):
     """等待步骤：无实际动作，时间推迟由 JourneyEngine 处理。"""
 
@@ -89,6 +91,7 @@ class WaitActionExecutor(BaseActionExecutor):
 # ---------------------------------------------------------------------------
 # WeCom — 企业微信消息
 # ---------------------------------------------------------------------------
+
 
 class WeComActionExecutor(BaseActionExecutor):
     """发企业微信消息（调用 tx-ops WeCom API）。"""
@@ -153,6 +156,7 @@ class WeComActionExecutor(BaseActionExecutor):
 # SMS — 短信
 # ---------------------------------------------------------------------------
 
+
 class SMSActionExecutor(BaseActionExecutor):
     """发短信（调用 tx-ops SMS adapter）。"""
 
@@ -213,6 +217,7 @@ class SMSActionExecutor(BaseActionExecutor):
 # Miniapp Push — 小程序推送
 # ---------------------------------------------------------------------------
 
+
 class MiniappPushActionExecutor(BaseActionExecutor):
     """小程序推送（调用 tx-member 订阅消息接口）。"""
 
@@ -270,6 +275,7 @@ class MiniappPushActionExecutor(BaseActionExecutor):
 # ---------------------------------------------------------------------------
 # Coupon — 发放优惠券
 # ---------------------------------------------------------------------------
+
 
 class CouponActionExecutor(BaseActionExecutor):
     """发放优惠券（调用 tx-member 优惠券接口）。"""
@@ -344,6 +350,7 @@ class CouponActionExecutor(BaseActionExecutor):
 # Tag — 打标签
 # ---------------------------------------------------------------------------
 
+
 class TagActionExecutor(BaseActionExecutor):
     """给客户打标签（调用 tx-member 客户标签接口）。"""
 
@@ -403,6 +410,7 @@ class TagActionExecutor(BaseActionExecutor):
 # Branch — 条件分支
 # ---------------------------------------------------------------------------
 
+
 class BranchActionExecutor(BaseActionExecutor):
     """
     条件分支：根据客户行为/属性数据，决定走 true_next 还是 false_next。
@@ -437,6 +445,7 @@ class BranchActionExecutor(BaseActionExecutor):
         condition_met = False
         if actual is not None:
             from engine.journey_engine import OPERATORS
+
             op_fn = OPERATORS.get(operator)
             if op_fn:
                 try:
@@ -464,6 +473,7 @@ class BranchActionExecutor(BaseActionExecutor):
 # ---------------------------------------------------------------------------
 # Notify Staff — 通知门店人员
 # ---------------------------------------------------------------------------
+
 
 class NotifyStaffActionExecutor(BaseActionExecutor):
     """通知门店人员（调用 tx-ops 企微通知接口）。"""
@@ -525,6 +535,7 @@ class NotifyStaffActionExecutor(BaseActionExecutor):
 # Noop — 兜底执行器
 # ---------------------------------------------------------------------------
 
+
 class NoopActionExecutor(BaseActionExecutor):
     """未知 action_type 的兜底执行器，记录警告并返回成功。"""
 
@@ -553,6 +564,7 @@ class NoopActionExecutor(BaseActionExecutor):
 # ---------------------------------------------------------------------------
 # Registry — 统一注册表
 # ---------------------------------------------------------------------------
+
 
 class ActionExecutorRegistry:
     """Action Executor 注册表，按 action_type 分发执行器。"""
@@ -583,6 +595,7 @@ class ActionExecutorRegistry:
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+
 
 def _render_template(template: str, context: dict) -> str:
     """简单模板渲染：将 {key} 替换为 context[key] 的值。"""

@@ -89,6 +89,7 @@ services:
       TX_PREDICT_URL:  http://tx-predict:8013
       TX_CIVIC_URL:    http://tx-civic:8014
       TX_PAY_URL:      http://tx-pay:8016
+      TX_DEVFORGE_URL: http://tx-devforge:8017
       WECOM_CORP_ID:   ${WECOM_CORP_ID:-}
       WECOM_AGENT_ID:  ${WECOM_AGENT_ID:-}
       WECOM_SECRET:    ${WECOM_SECRET:-}
@@ -305,6 +306,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ── DevForge 内部研发平台 :8017 ───────────────────────────────
+  # 注意：与 tx-forge（外部 ISV 应用市场）严格区分
+  tx-devforge:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-devforge/Dockerfile
+    ports:
+      - "${DEVFORGE_PORT:-8017}:8017"
+    environment:
+      <<: *common-env
+      DEVFORGE_DATABASE_URL: ${DEVFORGE_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:-changeme_dev}@postgres:5432/${POSTGRES_DB:-tunxiang_os}}
+      DEVFORGE_PORT: "8017"
+      DEVFORGE_LOG_LEVEL: ${DEVFORGE_LOG_LEVEL:-INFO}
+      DEVFORGE_JWT_SECRET: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_CHANGE_ME_32chars__}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8017/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   pg_data:

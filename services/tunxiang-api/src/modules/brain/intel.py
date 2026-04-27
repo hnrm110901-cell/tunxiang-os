@@ -2,12 +2,11 @@
 
 Sprint 9+ 实现：IntelReportEngine, CompetitorMonitorService
 """
+
 import os
 import sys
 
-_TX_INTEL_SRC = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "../../../../tx-intel/src")
-)
+_TX_INTEL_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../tx-intel/src"))
 if _TX_INTEL_SRC not in sys.path:
     sys.path.insert(0, _TX_INTEL_SRC)
 

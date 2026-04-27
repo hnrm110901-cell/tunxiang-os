@@ -56,9 +56,7 @@ async def _post_callback_wf(url: str, tenant_id: str, business_id: str) -> None:
 
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 
-VALID_BUSINESS_TYPES = frozenset(
-    ["purchase_order", "discount", "menu_change", "hr_request", "expense", "leave"]
-)
+VALID_BUSINESS_TYPES = frozenset(["purchase_order", "discount", "menu_change", "hr_request", "expense", "leave"])
 
 STATUS_PENDING = "pending"
 STATUS_APPROVED = "approved"
@@ -146,9 +144,7 @@ def _eval_condition(condition: dict[str, Any] | None, ctx: dict[str, Any]) -> bo
     return ops.get(op, False)
 
 
-def _eval_template_conditions(
-    conditions: dict[str, Any], ctx: dict[str, Any]
-) -> bool:
+def _eval_template_conditions(conditions: dict[str, Any], ctx: dict[str, Any]) -> bool:
     """
     评估模板级 conditions 是否匹配 context_data。
 
@@ -163,9 +159,7 @@ def _eval_template_conditions(
     return True
 
 
-def _get_applicable_steps(
-    steps: list[dict[str, Any]], ctx: dict[str, Any]
-) -> list[dict[str, Any]]:
+def _get_applicable_steps(steps: list[dict[str, Any]], ctx: dict[str, Any]) -> list[dict[str, Any]]:
     """返回在当前 context 下生效的步骤（按 step 升序）。"""
     result = []
     for step in sorted(steps, key=lambda s: s.get("step", 0)):
@@ -261,10 +255,7 @@ async def _find_approvers_by_role(
         )
     else:
         rows = await db.execute(
-            text(
-                "SELECT id FROM employees "
-                "WHERE tenant_id = :tid AND role = :role AND is_deleted = FALSE"
-            ),
+            text("SELECT id FROM employees WHERE tenant_id = :tid AND role = :role AND is_deleted = FALSE"),
             {"tid": tenant_id, "role": role},
         )
     return [str(r[0]) for r in rows.fetchall()]
@@ -292,32 +283,38 @@ async def _dispatch_on_approved(
     if business_type == "purchase_order":
         await _post_callback_wf(
             f"{_SUPPLY_URL}/api/v1/purchase-orders/{business_id}/confirm",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "discount":
         await _post_callback_wf(
             f"{_TRADE_URL}/api/v1/discounts/{business_id}/approve",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "menu_change":
         await _post_callback_wf(
             f"{_MENU_URL}/api/v1/menu-changes/{business_id}/apply",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "hr_request":
         await _post_callback_wf(
             f"{_ORG_URL}/api/v1/hr-requests/{business_id}/confirm",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "expense":
         await _post_callback_wf(
             f"{_FINANCE_URL}/api/v1/expenses/{business_id}/approve",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
     elif business_type == "leave":
         await _post_callback_wf(
             f"{_ORG_URL}/api/v1/leave-requests/{business_id}/approve-callback",
-            tenant_id, business_id,
+            tenant_id,
+            business_id,
         )
 
 
@@ -371,10 +368,7 @@ class ApprovalEngine:
             新建的审批实例 dict
         """
         if business_type not in VALID_BUSINESS_TYPES:
-            raise ValueError(
-                f"不支持的业务类型: {business_type}，"
-                f"支持: {', '.join(sorted(VALID_BUSINESS_TYPES))}"
-            )
+            raise ValueError(f"不支持的业务类型: {business_type}，支持: {', '.join(sorted(VALID_BUSINESS_TYPES))}")
 
         # 1. 匹配模板
         template = await _find_template(tenant_id, business_type, context_data, db)
@@ -424,17 +418,12 @@ class ApprovalEngine:
 
         # 4. 通知第一步审批人
         first_role = first_step.get("approver_role", "store_manager")
-        approvers = await _find_approvers_by_role(
-            role=first_role, tenant_id=tenant_id, ctx=context_data, db=db
-        )
+        approvers = await _find_approvers_by_role(role=first_role, tenant_id=tenant_id, ctx=context_data, db=db)
         for approver_id in approvers:
             await _notify(
                 recipient_id=approver_id,
                 title=f"【待审批】{title}",
-                body=(
-                    f"您有一条新的审批待处理"
-                    f"（步骤 {first_step.get('step', 1)}：{first_role}）"
-                ),
+                body=(f"您有一条新的审批待处理（步骤 {first_step.get('step', 1)}：{first_role}）"),
                 meta={
                     "instance_id": str(instance["id"]),
                     "step": first_step.get("step", 1),
@@ -544,16 +533,12 @@ class ApprovalEngine:
             await db.commit()
 
             next_role = next_step_def.get("approver_role", "store_manager")
-            approvers = await _find_approvers_by_role(
-                role=next_role, tenant_id=tenant_id, ctx=ctx, db=db
-            )
+            approvers = await _find_approvers_by_role(role=next_role, tenant_id=tenant_id, ctx=ctx, db=db)
             for aid in approvers:
                 await _notify(
                     recipient_id=aid,
                     title=f"【待审批】{instance['title']}",
-                    body=(
-                        f"审批流转至步骤 {next_step_def.get('step')}（{next_role}），请处理"
-                    ),
+                    body=(f"审批流转至步骤 {next_step_def.get('step')}（{next_role}），请处理"),
                     meta={
                         "instance_id": instance_id,
                         "step": next_step_def.get("step"),
@@ -798,10 +783,7 @@ class ApprovalEngine:
                 await _notify(
                     recipient_id=str(row["initiator_id"]),
                     title=f"【审批超时】{row['title']}",
-                    body=(
-                        f"您发起的审批在步骤 {row['current_step']} "
-                        f"已超过 {timeout_hours} 小时未处理，已自动超时"
-                    ),
+                    body=(f"您发起的审批在步骤 {row['current_step']} 已超过 {timeout_hours} 小时未处理，已自动超时"),
                     meta={
                         "instance_id": str(row["id"]),
                         "step": row["current_step"],

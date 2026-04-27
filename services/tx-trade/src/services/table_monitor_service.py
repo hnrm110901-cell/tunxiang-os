@@ -8,6 +8,7 @@
 USAGE:
     from .services.table_monitor_service import TableMonitorService
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -29,6 +30,7 @@ DEFAULT_STANDARD_MINUTES = 25
 
 # ─── Pydantic 响应模型 ───
 
+
 class PendingDish(BaseModel):
     name: str
     status: str  # pending / cooking
@@ -36,10 +38,10 @@ class PendingDish(BaseModel):
 
 
 class TableStatus(BaseModel):
-    table_id: str       # 等同于 table_number，前端唯一标识
+    table_id: str  # 等同于 table_number，前端唯一标识
     table_no: str
-    zone: str           # "包厢" | "大厅"
-    status: str         # idle | ordering | cooking | ready | rush | overtime
+    zone: str  # "包厢" | "大厅"
+    status: str  # idle | ordering | cooking | ready | rush | overtime
     dish_total: int
     dish_done: int
     elapsed_minutes: int
@@ -84,6 +86,7 @@ class ZoneSummary(BaseModel):
 
 # ─── 区域推断 ───
 
+
 def _infer_zone(table_no: str) -> str:
     """根据桌号推断区域：以 P/VIP/包 开头 → 包厢，否则 → 大厅"""
     upper = table_no.upper().strip()
@@ -123,8 +126,8 @@ def _ensure_utc(dt: datetime) -> datetime:
 
 # ─── TableMonitorService ───
 
-class TableMonitorService:
 
+class TableMonitorService:
     @staticmethod
     async def get_store_overview(
         store_id: str,
@@ -232,9 +235,7 @@ class TableMonitorService:
 
         result: list[TableStatus] = []
         for entry in table_map.values():
-            elapsed = int(
-                (now - _ensure_utc(entry["order_created_at"])).total_seconds() // 60
-            )
+            elapsed = int((now - _ensure_utc(entry["order_created_at"])).total_seconds() // 60)
             is_overtime = elapsed > DEFAULT_STANDARD_MINUTES
             tasks: list[KDSTask] = entry["tasks"]
             table_status = _infer_table_status(
@@ -257,19 +258,21 @@ class TableMonitorService:
             ]
 
             tno = entry["table_no"]
-            result.append(TableStatus(
-                table_id=tno,   # 用 table_number 作为唯一标识
-                table_no=tno,
-                zone=_infer_zone(tno),
-                status=table_status,
-                dish_total=entry["dish_total"],
-                dish_done=entry["dish_done"],
-                elapsed_minutes=elapsed,
-                standard_minutes=DEFAULT_STANDARD_MINUTES,
-                is_overtime=is_overtime,
-                rush_count=entry["rush_count"],
-                pending_dishes=pending_dishes,
-            ))
+            result.append(
+                TableStatus(
+                    table_id=tno,  # 用 table_number 作为唯一标识
+                    table_no=tno,
+                    zone=_infer_zone(tno),
+                    status=table_status,
+                    dish_total=entry["dish_total"],
+                    dish_done=entry["dish_done"],
+                    elapsed_minutes=elapsed,
+                    standard_minutes=DEFAULT_STANDARD_MINUTES,
+                    is_overtime=is_overtime,
+                    rush_count=entry["rush_count"],
+                    pending_dishes=pending_dishes,
+                )
+            )
 
         logger.info("table_monitor.overview", store_id=store_id, table_count=len(result))
         return result
@@ -348,20 +351,20 @@ class TableMonitorService:
 
             task_elapsed = 0
             if task.started_at:
-                task_elapsed = int(
-                    (now - _ensure_utc(task.started_at)).total_seconds() // 60
-                )
+                task_elapsed = int((now - _ensure_utc(task.started_at)).total_seconds() // 60)
 
-            dishes.append(DishItem(
-                task_id=str(task.id),
-                name=item_name,
-                qty=qty,
-                status=task.status,
-                dept=str(task.dept_id) if task.dept_id else "未知档口",
-                started_at=task.started_at.isoformat() if task.started_at else None,
-                rush_count=task.rush_count,
-                elapsed_minutes=task_elapsed,
-            ))
+            dishes.append(
+                DishItem(
+                    task_id=str(task.id),
+                    name=item_name,
+                    qty=qty,
+                    status=task.status,
+                    dept=str(task.dept_id) if task.dept_id else "未知档口",
+                    started_at=task.started_at.isoformat() if task.started_at else None,
+                    rush_count=task.rush_count,
+                    elapsed_minutes=task_elapsed,
+                )
+            )
 
         table_status = _infer_table_status(dish_total, dish_done, is_overtime, total_rush, active_tasks)
 
@@ -412,10 +415,7 @@ class TableMonitorService:
 
         result: dict[str, ZoneSummary] = {}
         for zone, z in zones.items():
-            avg_elapsed = (
-                round(z["total_elapsed"] / z["table_count"], 1)
-                if z["table_count"] > 0 else 0.0
-            )
+            avg_elapsed = round(z["total_elapsed"] / z["table_count"], 1) if z["table_count"] > 0 else 0.0
             result[zone] = ZoneSummary(
                 zone=zone,
                 table_count=z["table_count"],

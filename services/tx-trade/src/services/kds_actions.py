@@ -16,6 +16,7 @@
 1. 通过 WebSocket 推送提醒到对应档口的 KDS 屏幕
 2. 发送厨打单到该档口打印机
 """
+
 import asyncio
 import os
 import uuid
@@ -39,8 +40,8 @@ logger = structlog.get_logger()
 MAC_STATION_URL = os.getenv("MAC_STATION_URL", "http://localhost:8000")
 
 # 催菜限流配置
-RUSH_RATE_LIMIT_MAX = 2         # 每个滑动窗口内最大催菜次数
-RUSH_RATE_LIMIT_WINDOW_MIN = 30 # 滑动窗口时长（分钟）
+RUSH_RATE_LIMIT_MAX = 2  # 每个滑动窗口内最大催菜次数
+RUSH_RATE_LIMIT_WINDOW_MIN = 30  # 滑动窗口时长（分钟）
 
 # ─── 任务状态常量 ───
 
@@ -94,12 +95,14 @@ def _add_timeline_event(
 ) -> None:
     """向任务时间线追加事件"""
     task = _get_task(task_id)
-    task["timeline"].append({
-        "event": event_type,
-        "operator_id": operator_id,
-        "detail": detail,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    task["timeline"].append(
+        {
+            "event": event_type,
+            "operator_id": operator_id,
+            "detail": detail,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 async def _push_to_kds_station(station_id: str, message: dict) -> bool:
@@ -235,8 +238,7 @@ async def _fetch_task_from_db(
         tid = uuid.UUID(tenant_id)
         task_uuid = uuid.UUID(task_id)
     except ValueError as exc:
-        logger.warning("kds_actions.fetch_task.invalid_uuid", error=str(exc),
-                       task_id=task_id, tenant_id=tenant_id)
+        logger.warning("kds_actions.fetch_task.invalid_uuid", error=str(exc), task_id=task_id, tenant_id=tenant_id)
         return None
 
     stmt = select(KDSTask).where(
@@ -291,14 +293,11 @@ async def _find_active_tasks_for_dish(
 
     # 通过order_item表关联查找（order_item_id → order_id+dish_id）
     # 此处简化：查tenant+status，实际应通过order_item_id关联
-    stmt = (
-        select(KDSTask)
-        .where(
-            and_(
-                KDSTask.tenant_id == tid,
-                KDSTask.status.in_([STATUS_PENDING, STATUS_COOKING]),
-                KDSTask.is_deleted == False,  # noqa: E712
-            )
+    stmt = select(KDSTask).where(
+        and_(
+            KDSTask.tenant_id == tid,
+            KDSTask.status.in_([STATUS_PENDING, STATUS_COOKING]),
+            KDSTask.is_deleted == False,  # noqa: E712
         )
     )
     rows = (await db.execute(stmt)).scalars().all()
@@ -440,12 +439,15 @@ async def start_cooking(
     # ── 推送状态变更到 KDS ──
     dept_id = str(db_task.dept_id) if db_task.dept_id else task.get("dept_id")
     if dept_id:
-        await _push_to_kds_station(dept_id, {
-            "type": "status_change",
-            "ticket_id": task_id,
-            "new_status": STATUS_COOKING,
-            "operator_id": operator_id,
-        })
+        await _push_to_kds_station(
+            dept_id,
+            {
+                "type": "status_change",
+                "ticket_id": task_id,
+                "new_status": STATUS_COOKING,
+                "operator_id": operator_id,
+            },
+        )
 
     log.info("kds_actions.start_cooking.ok")
     return {"ok": True, "data": {"task_id": task_id, "status": STATUS_COOKING}}
@@ -497,13 +499,16 @@ async def finish_cooking(
     # ── 推送状态变更到 KDS ──
     dept_id = str(db_task.dept_id) if db_task.dept_id else task.get("dept_id")
     if dept_id:
-        await _push_to_kds_station(dept_id, {
-            "type": "status_change",
-            "ticket_id": task_id,
-            "new_status": STATUS_DONE,
-            "operator_id": operator_id,
-            "duration_sec": duration_sec,
-        })
+        await _push_to_kds_station(
+            dept_id,
+            {
+                "type": "status_change",
+                "ticket_id": task_id,
+                "new_status": STATUS_DONE,
+                "operator_id": operator_id,
+                "duration_sec": duration_sec,
+            },
+        )
 
     # ── 回调堂食会话：更新出菜时间戳，推进状态到 dining ──
     dining_session_id = db_task.dining_session_id
@@ -513,7 +518,9 @@ async def finish_cooking(
 
         async def _notify_session() -> None:
             from shared.ontology.src.database import async_session_factory
+
             from .dining_session_service import DiningSessionService
+
             async with async_session_factory() as notify_db:
                 try:
                     svc = DiningSessionService(notify_db, tenant_id_str)
@@ -571,9 +578,7 @@ async def request_rush(
                 )
                 return {
                     "ok": False,
-                    "error": (
-                        f"催菜限流：{window}分钟内最多催{max_count}次，请稍后再试"
-                    ),
+                    "error": (f"催菜限流：{window}分钟内最多催{max_count}次，请稍后再试"),
                 }
 
     # ── 标记urgent + 更新限流计数 ──
@@ -597,7 +602,8 @@ async def request_rush(
             mem_task["last_rush_at"] = now_iso
             if task_id_str:
                 _add_timeline_event(
-                    task_id_str, "rush",
+                    task_id_str,
+                    "rush",
                     detail=f"催菜: order={order_id}, dish={dish_id}",
                 )
 
@@ -623,19 +629,23 @@ async def request_rush(
 
     # ── WebSocket 推送催单到 KDS ──
     if dept_id:
-        await _push_to_kds_station(dept_id, {
-            "type": "rush_order",
-            "order_id": order_id,
-            "dish_id": dish_id,
-            "dish_name": ctx["dish_name"],
-            "table_number": ctx["table_number"],
-            "alert": True,
-            "sound": "rush",
-        })
+        await _push_to_kds_station(
+            dept_id,
+            {
+                "type": "rush_order",
+                "order_id": order_id,
+                "dish_id": dish_id,
+                "dish_name": ctx["dish_name"],
+                "table_number": ctx["table_number"],
+                "alert": True,
+                "sound": "rush",
+            },
+        )
 
     # ── 发送催单厨打单到档口打印机 ──
     if ctx["dish_name"]:
         from .kitchen_print_service import print_rush_ticket
+
         await print_rush_ticket(
             dept_name=ctx["dept_name"],
             table_number=ctx["table_number"],
@@ -711,7 +721,8 @@ async def confirm_rush(
         _task_store[task_id]["promised_at"] = promised_at.isoformat()
         _task_store[task_id]["priority"] = "rush"
     _add_timeline_event(
-        task_id, "rush_confirmed",
+        task_id,
+        "rush_confirmed",
         operator_id=operator_id,
         detail=f"承诺{promised_minutes}分钟内完成，promised_at={promised_at.isoformat()}",
     )
@@ -719,13 +730,16 @@ async def confirm_rush(
     # ── 推送承诺时间到 KDS / web-crew ──
     dept_id = str(db_task.dept_id) if db_task.dept_id else None
     if dept_id:
-        await _push_to_kds_station(dept_id, {
-            "type": "rush_confirmed",
-            "task_id": task_id,
-            "operator_id": operator_id,
-            "promised_at": promised_at.isoformat(),
-            "promised_minutes": promised_minutes,
-        })
+        await _push_to_kds_station(
+            dept_id,
+            {
+                "type": "rush_confirmed",
+                "task_id": task_id,
+                "operator_id": operator_id,
+                "promised_at": promised_at.isoformat(),
+                "promised_minutes": promised_minutes,
+            },
+        )
 
     log.info("kds_actions.confirm_rush.ok", promised_at=promised_at.isoformat())
     return {
@@ -784,21 +798,25 @@ async def check_rush_overdue(tenant_id: str, db: AsyncSession) -> dict:
 
         # ── 推送升级告警到档口KDS ──
         if dept_id:
-            await _push_to_kds_station(dept_id, {
-                "type": "rush_overdue_alert",
-                "task_id": task_id_str,
-                "promised_at": task.promised_at.isoformat(),
-                "overdue_sec": overdue_sec,
-                "rush_count": task.rush_count,
-                "alert": True,
-                "sound": "overdue",
-            })
+            await _push_to_kds_station(
+                dept_id,
+                {
+                    "type": "rush_overdue_alert",
+                    "task_id": task_id_str,
+                    "promised_at": task.promised_at.isoformat(),
+                    "overdue_sec": overdue_sec,
+                    "rush_count": task.rush_count,
+                    "alert": True,
+                    "sound": "overdue",
+                },
+            )
 
         # ── 同步L1缓存标记 ──
         if task_id_str in _task_store:
             _task_store[task_id_str]["rush_overdue"] = True
             _add_timeline_event(
-                task_id_str, "rush_overdue_alert",
+                task_id_str,
+                "rush_overdue_alert",
                 detail=f"承诺时间到期超{overdue_sec}秒未完成",
             )
 
@@ -913,20 +931,24 @@ async def request_remake(
 
     # ── WebSocket 推送重做提醒到 KDS ──
     if dept_id:
-        await _push_to_kds_station(dept_id, {
-            "type": "remake_order",
-            "task_id": task_id,
-            "dish_name": dish_name,
-            "reason": reason,
-            "table_number": table_number,
-            "remake_count": task["remake_count"],
-            "alert": True,
-            "sound": "remake",
-        })
+        await _push_to_kds_station(
+            dept_id,
+            {
+                "type": "remake_order",
+                "task_id": task_id,
+                "dish_name": dish_name,
+                "reason": reason,
+                "table_number": table_number,
+                "remake_count": task["remake_count"],
+                "alert": True,
+                "sound": "remake",
+            },
+        )
 
     # ── 发送重做厨打单到档口打印机 ──
     if dish_name:
         from .kitchen_print_service import print_remake_ticket
+
         await print_remake_ticket(
             dept_name=dept_name,
             table_number=table_number,
@@ -969,6 +991,246 @@ async def report_shortage(task_id: str, ingredient_id: str, db: AsyncSession) ->
             "task_id": task_id,
             "ingredient_id": ingredient_id,
             "message": "缺料已上报，等待前厅处理",
+        },
+    }
+
+
+async def scan_complete_dish(
+    barcode: str,
+    scanned_by: str,
+    db: AsyncSession,
+    *,
+    tenant_id: str = "",
+) -> dict:
+    """扫码划菜 — 扫描条码确认单个菜品出品完成。
+
+    流程：
+    1. 通过 barcode 查找 order_item
+    2. 更新 order_item 的 barcode_scanned_at 和 scanned_by
+    3. 查找关联的 KDS Task，标记为 done
+    4. 记录 dish_scan_log（含出品耗时）
+    5. 检查订单是否全部完成
+
+    Args:
+        barcode: 菜品条码
+        scanned_by: 扫码人ID
+        db: 数据库会话
+        tenant_id: 租户ID
+
+    Returns:
+        {"ok": True/False, "data": {...}}
+    """
+    from ..models.dish_scan_log import DishScanLog
+
+    log = logger.bind(barcode=barcode, scanned_by=scanned_by)
+
+    if not tenant_id:
+        return {"ok": False, "error": "缺少 tenant_id"}
+
+    try:
+        tid = uuid.UUID(tenant_id)
+    except ValueError:
+        return {"ok": False, "error": f"无效的 tenant_id: {tenant_id}"}
+
+    # ── 1. 通过 barcode 查找 order_item ──
+    item_stmt = (
+        select(OrderItem)
+        .where(
+            and_(
+                OrderItem.barcode == barcode,
+                OrderItem.tenant_id == tid,
+                OrderItem.is_deleted == False,  # noqa: E712
+            )
+        )
+        .limit(1)
+    )
+    order_item = (await db.execute(item_stmt)).scalar_one_or_none()
+
+    if order_item is None:
+        log.warning("kds_actions.scan_complete.barcode_not_found")
+        return {"ok": False, "error": f"条码 {barcode} 未找到对应菜品"}
+
+    if order_item.barcode_scanned_at is not None:
+        log.warning("kds_actions.scan_complete.already_scanned")
+        return {
+            "ok": False,
+            "error": f"条码 {barcode} 已被扫描确认",
+            "data": {"scanned_at": order_item.barcode_scanned_at.isoformat()},
+        }
+
+    # ── 2. 更新 order_item 扫码状态 ──
+    now = datetime.now(timezone.utc)
+    scanned_by_uuid = None
+    if scanned_by and scanned_by != "unknown":
+        try:
+            scanned_by_uuid = uuid.UUID(scanned_by)
+        except ValueError:
+            pass
+
+    order_item.barcode_scanned_at = now
+    order_item.scanned_by = scanned_by_uuid
+
+    # ── 3. 查找并完成关联的 KDS Task ──
+    kds_stmt = select(KDSTask).where(
+        and_(
+            KDSTask.order_item_id == order_item.id,
+            KDSTask.tenant_id == tid,
+            KDSTask.status.in_([STATUS_PENDING, STATUS_COOKING]),
+            KDSTask.is_deleted == False,  # noqa: E712
+        )
+    )
+    kds_task = (await db.execute(kds_stmt)).scalar_one_or_none()
+
+    duration_sec: int | None = None
+    dept_id: str | None = None
+
+    if kds_task is not None:
+        kds_task.status = STATUS_DONE
+        kds_task.completed_at = now
+        if kds_task.started_at:
+            duration_sec = int((now - kds_task.started_at).total_seconds())
+        dept_id = str(kds_task.dept_id) if kds_task.dept_id else None
+
+        # 推送到 KDS
+        if dept_id:
+            await _push_to_kds_station(
+                dept_id,
+                {
+                    "type": "scan_complete",
+                    "barcode": barcode,
+                    "task_id": str(kds_task.id),
+                    "new_status": STATUS_DONE,
+                    "scanned_by": scanned_by,
+                },
+            )
+
+    # ── 4. 记录 dish_scan_log ──
+    # 查询订单获取 store_id 和 ordered_at
+    order_stmt = select(Order).where(
+        and_(
+            Order.id == order_item.order_id,
+            Order.tenant_id == tid,
+        )
+    )
+    order = (await db.execute(order_stmt)).scalar_one_or_none()
+
+    ordered_at = order.order_time if order else order_item.created_at
+    store_id = order.store_id if order else None
+
+    if ordered_at and now:
+        duration_sec = duration_sec or int((now - ordered_at).total_seconds())
+
+    scan_log = DishScanLog(
+        tenant_id=tid,
+        store_id=store_id or tid,  # fallback
+        order_id=order_item.order_id,
+        order_item_id=order_item.id,
+        barcode=barcode,
+        dish_id=order_item.dish_id,
+        dish_name=order_item.item_name,
+        dept_id=uuid.UUID(dept_id) if dept_id else None,
+        ordered_at=ordered_at,
+        scanned_at=now,
+        duration_seconds=duration_sec,
+        scanned_by=scanned_by_uuid,
+    )
+    db.add(scan_log)
+
+    # ── 5. 检查订单是否全部完成 ──
+    all_items_stmt = select(OrderItem).where(
+        and_(
+            OrderItem.order_id == order_item.order_id,
+            OrderItem.tenant_id == tid,
+            OrderItem.is_deleted == False,  # noqa: E712
+        )
+    )
+    all_items = (await db.execute(all_items_stmt)).scalars().all()
+    total_items = len(all_items)
+    scanned_items = sum(1 for i in all_items if i.barcode_scanned_at is not None)
+    # 当前这个也算已扫描（刚设置的还没flush）
+    order_complete = scanned_items >= total_items
+
+    await db.commit()
+
+    log.info(
+        "kds_actions.scan_complete.ok",
+        order_item_id=str(order_item.id),
+        duration_sec=duration_sec,
+        order_complete=order_complete,
+    )
+
+    return {
+        "ok": True,
+        "data": {
+            "barcode": barcode,
+            "order_item_id": str(order_item.id),
+            "dish_name": order_item.item_name,
+            "scanned_at": now.isoformat(),
+            "duration_seconds": duration_sec,
+            "order_complete": order_complete,
+            "progress": f"{scanned_items}/{total_items}",
+        },
+    }
+
+
+async def batch_scan_complete(
+    barcodes: list[str],
+    scanned_by: str,
+    db: AsyncSession,
+    *,
+    tenant_id: str = "",
+) -> dict:
+    """批量扫码划菜 — 一次确认多个菜品出品完成。
+
+    逐个调用 scan_complete_dish，汇总结果。
+
+    Args:
+        barcodes: 条码列表
+        scanned_by: 扫码人ID
+        db: 数据库会话
+        tenant_id: 租户ID
+
+    Returns:
+        {"ok": True, "data": {"results": [...], "success": N, "failed": N}}
+    """
+    log = logger.bind(barcode_count=len(barcodes), scanned_by=scanned_by)
+
+    if not barcodes:
+        return {"ok": False, "error": "条码列表不能为空"}
+
+    if len(barcodes) > 50:
+        return {"ok": False, "error": "单次批量扫码最多50个"}
+
+    results: list[dict] = []
+    success_count = 0
+    failed_count = 0
+
+    for barcode in barcodes:
+        result = await scan_complete_dish(
+            barcode=barcode,
+            scanned_by=scanned_by,
+            db=db,
+            tenant_id=tenant_id,
+        )
+        results.append({"barcode": barcode, **result})
+        if result.get("ok"):
+            success_count += 1
+        else:
+            failed_count += 1
+
+    log.info(
+        "kds_actions.batch_scan_complete.done",
+        success=success_count,
+        failed=failed_count,
+    )
+
+    return {
+        "ok": True,
+        "data": {
+            "results": results,
+            "success": success_count,
+            "failed": failed_count,
+            "total": len(barcodes),
         },
     }
 

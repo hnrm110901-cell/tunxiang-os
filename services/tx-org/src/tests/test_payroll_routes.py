@@ -10,19 +10,21 @@
   POST   /api/v1/payroll/records/{id}/approve - 审批薪资单（先查状态再更新）
   POST   /api/v1/payroll/records/{id}/void    - 作废薪资单（先查状态再更新）
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 
-import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from api.payroll_routes import router as payroll_router
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
 from shared.ontology.src.database import get_db
 
 app = FastAPI()
@@ -50,6 +52,7 @@ def _make_mock_session():
 def _override_db(mock_session):
     async def _mock_get_db():
         yield mock_session
+
     return _mock_get_db
 
 
@@ -68,6 +71,7 @@ def _make_scalar_result(value):
 
 # ─── GET /configs ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_list_payroll_configs_ok(headers):
     """正常路径：返回薪资配置列表（两条记录）。"""
@@ -77,9 +81,7 @@ async def test_list_payroll_configs_ok(headers):
         {"id": CONFIG_ID, "employee_role": "cashier", "salary_type": "monthly", "base_salary_fen": 400000},
         {"id": str(uuid4()), "employee_role": "chef", "salary_type": "monthly", "base_salary_fen": 500000},
     ]
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), _make_mappings_result(rows)]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), _make_mappings_result(rows)])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -101,9 +103,7 @@ async def test_list_payroll_configs_filter_by_role(headers):
     mock_session = _make_mock_session()
 
     rows = [{"id": CONFIG_ID, "employee_role": "waiter", "salary_type": "hourly"}]
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), _make_mappings_result(rows)]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), _make_mappings_result(rows)])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -121,6 +121,7 @@ async def test_list_payroll_configs_filter_by_role(headers):
 
 
 # ─── POST /configs ─────────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_create_payroll_config_ok(headers):
@@ -181,6 +182,7 @@ async def test_create_payroll_config_missing_required(headers):
 
 # ─── PUT /configs/{id} ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_update_payroll_config_ok(headers):
     """正常更新薪资配置，返回 updated=True。"""
@@ -234,21 +236,26 @@ async def test_update_payroll_config_not_found(headers):
 
 # ─── GET /records ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_list_payroll_records_ok(headers):
     """正常路径：返回薪资单列表，包含分页信息。"""
     mock_session = _make_mock_session()
 
     count_result = _make_scalar_result(1)
-    rows = [{
-        "id": RECORD_ID, "store_id": STORE_ID, "employee_id": EMP_ID,
-        "gross_pay_fen": 450000, "net_pay_fen": 440000, "status": "draft",
-    }]
+    rows = [
+        {
+            "id": RECORD_ID,
+            "store_id": STORE_ID,
+            "employee_id": EMP_ID,
+            "gross_pay_fen": 450000,
+            "net_pay_fen": 440000,
+            "status": "draft",
+        }
+    ]
     list_result = _make_mappings_result(rows)
 
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), count_result, list_result]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), count_result, list_result])
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
     try:
@@ -266,6 +273,7 @@ async def test_list_payroll_records_ok(headers):
 
 
 # ─── POST /records ─────────────────────────────────────────────────────────────
+
 
 @pytest.mark.anyio
 async def test_create_payroll_record_ok(headers):
@@ -333,6 +341,7 @@ async def test_create_payroll_record_missing_required(headers):
 
 # ─── POST /records/{id}/approve ────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_approve_payroll_record_ok(headers):
     """正常审批薪资单：先查 status=draft，再更新 → approved。"""
@@ -340,17 +349,15 @@ async def test_approve_payroll_record_ok(headers):
 
     # 1. RLS；2. SELECT 查状态；3. UPDATE RETURNING
     select_result = MagicMock()
-    select_result.mappings.return_value.first.return_value = {
-        "id": RECORD_ID, "status": "draft"
-    }
+    select_result.mappings.return_value.first.return_value = {"id": RECORD_ID, "status": "draft"}
     update_result = MagicMock()
     update_result.mappings.return_value.first.return_value = {
-        "id": RECORD_ID, "status": "approved",
-        "approved_by": "hr-manager-001", "approved_at": "2026-04-04T10:00:00Z",
+        "id": RECORD_ID,
+        "status": "approved",
+        "approved_by": "hr-manager-001",
+        "approved_at": "2026-04-04T10:00:00Z",
     }
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), select_result, update_result]
-    )
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), select_result, update_result])
     mock_session.commit = AsyncMock()
 
     app.dependency_overrides[get_db] = _override_db(mock_session)
@@ -398,22 +405,17 @@ async def test_approve_payroll_record_not_found(headers):
 
 # ─── POST /records/{id}/void ───────────────────────────────────────────────────
 
+
 @pytest.mark.anyio
 async def test_void_payroll_record_ok(headers):
     """正常作废薪资单：先查状态，再更新 → voided。"""
     mock_session = _make_mock_session()
 
     select_result = MagicMock()
-    select_result.mappings.return_value.first.return_value = {
-        "id": RECORD_ID, "status": "approved"
-    }
+    select_result.mappings.return_value.first.return_value = {"id": RECORD_ID, "status": "approved"}
     update_result = MagicMock()
-    update_result.mappings.return_value.first.return_value = {
-        "id": RECORD_ID, "status": "voided"
-    }
-    mock_session.execute = AsyncMock(
-        side_effect=[MagicMock(), select_result, update_result]
-    )
+    update_result.mappings.return_value.first.return_value = {"id": RECORD_ID, "status": "voided"}
+    mock_session.execute = AsyncMock(side_effect=[MagicMock(), select_result, update_result])
     mock_session.commit = AsyncMock()
 
     app.dependency_overrides[get_db] = _override_db(mock_session)

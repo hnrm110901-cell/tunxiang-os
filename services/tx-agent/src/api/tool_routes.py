@@ -7,6 +7,7 @@
   GET    /api/v1/tools/{tool_id}       — 获取工具定义详情
   POST   /api/v1/tools/{tool_id}/invoke — 调用工具（需 X-Tenant-ID）
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -18,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
-from ..services.tool_caller import ToolCallError, ToolCaller
+from ..services.tool_caller import ToolCaller, ToolCallError
 from ..services.tool_registry import ToolDefinition, ToolRegistry
 
 logger = structlog.get_logger(__name__)

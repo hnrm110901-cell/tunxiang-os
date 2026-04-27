@@ -162,36 +162,44 @@ def _mock_dish_quality(image_bytes: bytes, dish_name: str, threshold: int) -> Di
     suggestions: list[str] = []
 
     if portion < 65:
-        issues.append({
-            "type": "portion_too_small",
-            "severity": "warning",
-            "detail": f"分量评分 {portion} 低于标准，建议检查配料称重。",
-        })
+        issues.append(
+            {
+                "type": "portion_too_small",
+                "severity": "warning",
+                "detail": f"分量评分 {portion} 低于标准，建议检查配料称重。",
+            }
+        )
         suggestions.append("请确认出品份量是否符合SOP标准。")
 
     if plating < 60:
-        issues.append({
-            "type": "uneven_plating",
-            "severity": "warning",
-            "detail": f"摆盘评分 {plating}，摆盘不够整齐美观。",
-        })
+        issues.append(
+            {
+                "type": "uneven_plating",
+                "severity": "warning",
+                "detail": f"摆盘评分 {plating}，摆盘不够整齐美观。",
+            }
+        )
         suggestions.append("注意摆盘对称性和装饰点缀。")
 
     if color < 60:
-        issues.append({
-            "type": "color_abnormal",
-            "severity": "warning",
-            "detail": f"色泽评分 {color}，菜品颜色偏离标准。",
-        })
+        issues.append(
+            {
+                "type": "color_abnormal",
+                "severity": "warning",
+                "detail": f"色泽评分 {color}，菜品颜色偏离标准。",
+            }
+        )
         suggestions.append("检查烹饪火候和调味是否符合标准。")
 
     # Occasionally flag garnish issue
     if _seeded_float(seed, "garnish") < 0.15:
-        issues.append({
-            "type": "wrong_garnish",
-            "severity": "info",
-            "detail": "装饰配料可能与标准不符。",
-        })
+        issues.append(
+            {
+                "type": "wrong_garnish",
+                "severity": "info",
+                "detail": "装饰配料可能与标准不符。",
+            }
+        )
         suggestions.append("请对照标准菜品图片核对装饰。")
 
     if not suggestions:
@@ -215,19 +223,36 @@ def _mock_dish_quality(image_bytes: bytes, dish_name: str, threshold: int) -> Di
 # Zone-specific violation pools
 _ZONE_VIOLATION_POOLS: dict[str, list[str]] = {
     "kitchen": [
-        "no_mask", "no_hat", "no_gloves", "dirty_uniform", "no_uniform",
-        "floor_dirty", "raw_cooked_mix", "cluttered_workspace",
+        "no_mask",
+        "no_hat",
+        "no_gloves",
+        "dirty_uniform",
+        "no_uniform",
+        "floor_dirty",
+        "raw_cooked_mix",
+        "cluttered_workspace",
     ],
     "storage": [
-        "temp_violation", "expired_food", "improper_storage",
-        "raw_cooked_mix", "pest_detected", "floor_dirty",
+        "temp_violation",
+        "expired_food",
+        "improper_storage",
+        "raw_cooked_mix",
+        "pest_detected",
+        "floor_dirty",
     ],
     "dining": [
-        "floor_dirty", "cluttered_workspace", "pest_detected",
+        "floor_dirty",
+        "cluttered_workspace",
+        "pest_detected",
     ],
     "prep_area": [
-        "no_mask", "no_hat", "no_gloves", "dirty_uniform",
-        "raw_cooked_mix", "cluttered_workspace", "floor_dirty",
+        "no_mask",
+        "no_hat",
+        "no_gloves",
+        "dirty_uniform",
+        "raw_cooked_mix",
+        "cluttered_workspace",
+        "floor_dirty",
     ],
 }
 
@@ -244,12 +269,14 @@ def _mock_hygiene(image_bytes: bytes, zone: str) -> HygieneResult:
         # Each violation has roughly 20% chance of appearing
         if prob < 0.20:
             vdef = HYGIENE_VIOLATIONS[vtype]
-            violations.append({
-                "type": vtype,
-                "severity": vdef["severity"],
-                "location": zone,
-                "detail": vdef["description"],
-            })
+            violations.append(
+                {
+                    "type": vtype,
+                    "severity": vdef["severity"],
+                    "location": zone,
+                    "detail": vdef["description"],
+                }
+            )
 
     critical_count = sum(1 for v in violations if v["severity"] == "critical")
     warning_count = sum(1 for v in violations if v["severity"] == "warning")
@@ -274,12 +301,36 @@ def _mock_hygiene(image_bytes: bytes, zone: str) -> HygieneResult:
 
 # Common Chinese dish names for recognition mock
 _DISH_DATABASE = [
-    "红烧肉", "宫保鸡丁", "麻婆豆腐", "鱼香肉丝", "糖醋排骨",
-    "回锅肉", "水煮鱼", "剁椒鱼头", "小炒黄牛肉", "辣椒炒肉",
-    "蒜蓉西兰花", "清蒸鲈鱼", "东坡肘子", "毛氏红烧肉", "口味虾",
-    "酸菜鱼", "干锅花菜", "农家小炒肉", "蛋炒饭", "酸辣土豆丝",
-    "番茄炒蛋", "可乐鸡翅", "烤鱼", "水煮肉片", "京酱肉丝",
-    "啤酒鸭", "铁板牛肉", "松鼠桂鱼", "蒜香排骨", "香辣蟹",
+    "红烧肉",
+    "宫保鸡丁",
+    "麻婆豆腐",
+    "鱼香肉丝",
+    "糖醋排骨",
+    "回锅肉",
+    "水煮鱼",
+    "剁椒鱼头",
+    "小炒黄牛肉",
+    "辣椒炒肉",
+    "蒜蓉西兰花",
+    "清蒸鲈鱼",
+    "东坡肘子",
+    "毛氏红烧肉",
+    "口味虾",
+    "酸菜鱼",
+    "干锅花菜",
+    "农家小炒肉",
+    "蛋炒饭",
+    "酸辣土豆丝",
+    "番茄炒蛋",
+    "可乐鸡翅",
+    "烤鱼",
+    "水煮肉片",
+    "京酱肉丝",
+    "啤酒鸭",
+    "铁板牛肉",
+    "松鼠桂鱼",
+    "蒜香排骨",
+    "香辣蟹",
 ]
 
 
@@ -426,9 +477,7 @@ class VisionService:
         result.analysis_ms = int((time.monotonic() - start) * 1000)
         return result
 
-    async def check_hygiene(
-        self, image_bytes: bytes, zone: str = "kitchen"
-    ) -> HygieneResult:
+    async def check_hygiene(self, image_bytes: bytes, zone: str = "kitchen") -> HygieneResult:
         """Check hygiene compliance from camera image."""
         start = time.monotonic()
 
@@ -489,9 +538,7 @@ class VisionService:
         result.analysis_ms = int((time.monotonic() - start) * 1000)
         return result
 
-    async def count_customers(
-        self, image_bytes: bytes, zone: str = "dining"
-    ) -> CustomerCountResult:
+    async def count_customers(self, image_bytes: bytes, zone: str = "dining") -> CustomerCountResult:
         """Count customers in camera frame."""
         start = time.monotonic()
 

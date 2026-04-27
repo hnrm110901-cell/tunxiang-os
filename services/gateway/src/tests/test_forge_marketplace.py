@@ -22,6 +22,7 @@ from forge_marketplace import (
 #  Fixtures
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.fixture
 def svc() -> ForgeMarketplaceService:
     """带预置数据的服务实例"""
@@ -38,8 +39,8 @@ def empty_svc() -> ForgeMarketplaceService:
 #  1. Developer Registration & Management
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestDeveloperManagement:
 
+class TestDeveloperManagement:
     def test_register_developer_individual(self, empty_svc: ForgeMarketplaceService) -> None:
         result = empty_svc.register_developer(
             name="张三",
@@ -75,7 +76,9 @@ class TestDeveloperManagement:
     def test_register_developer_invalid_type(self, empty_svc: ForgeMarketplaceService) -> None:
         with pytest.raises(ValueError, match="无效开发者类型"):
             empty_svc.register_developer(
-                name="test", email="t@t.com", company="t",
+                name="test",
+                email="t@t.com",
+                company="t",
                 dev_type="invalid_type",
             )
 
@@ -119,8 +122,8 @@ class TestDeveloperManagement:
 #  2. App Submission & Review Workflow
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestAppLifecycle:
 
+class TestAppLifecycle:
     def test_submit_app(self, svc: ForgeMarketplaceService) -> None:
         result = svc.submit_app(
             developer_id="dev_txlabs",
@@ -289,8 +292,8 @@ class TestAppLifecycle:
 #  3. Listing, Search, Filtering
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestSearchAndFilter:
 
+class TestSearchAndFilter:
     def test_list_apps_all(self, svc: ForgeMarketplaceService) -> None:
         apps = svc.list_apps()
         assert len(apps) >= 7
@@ -347,8 +350,8 @@ class TestSearchAndFilter:
 #  4. Installation & Uninstallation
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestInstallation:
 
+class TestInstallation:
     def test_install_app(self, svc: ForgeMarketplaceService) -> None:
         result = svc.install_app("tenant_001", "app_food_safety")
         assert result["install_id"].startswith("inst_")
@@ -435,8 +438,8 @@ class TestInstallation:
 #  5. API Key Management
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestAPIKeyManagement:
 
+class TestAPIKeyManagement:
     def test_generate_api_key(self, svc: ForgeMarketplaceService) -> None:
         result = svc.generate_api_key(
             developer_id="dev_txlabs",
@@ -491,8 +494,8 @@ class TestAPIKeyManagement:
 #  6. Sandbox Lifecycle
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestSandbox:
 
+class TestSandbox:
     def test_create_sandbox(self, svc: ForgeMarketplaceService) -> None:
         result = svc.create_sandbox("dev_meituan", "app_meituan_delivery")
         assert result["sandbox_id"].startswith("sandbox_")
@@ -541,8 +544,8 @@ class TestSandbox:
 #  7. Revenue & Settlement (30% Platform Fee)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestRevenue:
 
+class TestRevenue:
     def test_install_paid_app_records_revenue(self, svc: ForgeMarketplaceService) -> None:
         """安装付费应用时应记录收入"""
         svc.install_app("tenant_rev_001", "app_meituan_delivery")
@@ -658,8 +661,8 @@ class TestRevenue:
 #  8. Marketplace Analytics
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestMarketplaceAnalytics:
 
+class TestMarketplaceAnalytics:
     def test_get_marketplace_stats(self, svc: ForgeMarketplaceService) -> None:
         stats = svc.get_marketplace_stats()
         assert stats["total_apps"] >= 7
@@ -685,9 +688,18 @@ class TestMarketplaceAnalytics:
     def test_get_trending_apps_has_required_fields(self, svc: ForgeMarketplaceService) -> None:
         trending = svc.get_trending_apps(limit=1)
         app = trending[0]
-        required_fields = {"rank", "app_id", "app_name", "developer_name", "category",
-                           "category_name", "rating", "install_count", "price_display",
-                           "trend_score"}
+        required_fields = {
+            "rank",
+            "app_id",
+            "app_name",
+            "developer_name",
+            "category",
+            "category_name",
+            "rating",
+            "install_count",
+            "price_display",
+            "trend_score",
+        }
         assert required_fields.issubset(set(app.keys()))
 
     def test_get_category_stats(self, svc: ForgeMarketplaceService) -> None:
@@ -715,8 +727,8 @@ class TestMarketplaceAnalytics:
 #  9. Full Workflow Integration Tests
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestIntegration:
 
+class TestIntegration:
     def test_full_developer_to_payout_workflow(self, empty_svc: ForgeMarketplaceService) -> None:
         """完整工作流：注册 → 提交应用 → 审核 → 发布 → 安装 → 收入 → 提现"""
         svc = empty_svc
@@ -788,11 +800,14 @@ class TestIntegration:
         svc.review_app(app_id, "admin_001", "needs_changes", "请补充截图")
 
         # 开发者更新应用
-        svc.update_app(app_id, {
-            "description": "完善后的描述，补充了截图",
-            "screenshots": ["/s1.png", "/s2.png"],
-            "version": "0.2.0",
-        })
+        svc.update_app(
+            app_id,
+            {
+                "description": "完善后的描述，补充了截图",
+                "screenshots": ["/s1.png", "/s2.png"],
+                "version": "0.2.0",
+            },
+        )
 
         # 第二次审核：通过
         review = svc.review_app(app_id, "admin_001", "approved", "OK")
@@ -839,8 +854,8 @@ class TestIntegration:
 #  10. Seed Data Validation
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class TestSeedData:
 
+class TestSeedData:
     def test_seed_developers_count(self, svc: ForgeMarketplaceService) -> None:
         assert len(svc._developers) == 7
 
@@ -890,8 +905,16 @@ class TestSeedData:
 
     def test_app_categories_complete(self) -> None:
         expected_keys = {
-            "supply_chain", "delivery", "finance", "ai_addon", "iot",
-            "analytics", "marketing", "hr", "payment", "compliance",
+            "supply_chain",
+            "delivery",
+            "finance",
+            "ai_addon",
+            "iot",
+            "analytics",
+            "marketing",
+            "hr",
+            "payment",
+            "compliance",
         }
         assert set(APP_CATEGORIES.keys()) == expected_keys
         for cat in APP_CATEGORIES.values():

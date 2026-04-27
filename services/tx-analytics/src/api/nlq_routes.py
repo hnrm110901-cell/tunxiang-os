@@ -13,6 +13,7 @@
   3. 执行查询获取数据
   4. 生成自然语言回答 + 操作建议
 """
+
 from __future__ import annotations
 
 import re
@@ -191,7 +192,6 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
         "answer_tpl": "今日客单价 {avg_price}，共 {order_count} 笔订单。",
         "chart_type": "metric",
     },
-
     # ─── 菜品类 (11-20) ─────────────────────────────────────────────
     {
         "pattern": r"最畅销|卖得最好.*菜|销量.*最高.*菜|热销",
@@ -352,7 +352,6 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
         "answer_tpl": "菜品四象限分析：明星{star}、金牛{cash_cow}、问号{question}、瘦狗{dog}。",
         "chart_type": "scatter",
     },
-
     # ─── 会员类 (21-28) ─────────────────────────────────────────────
     {
         "pattern": r"新增会员|今天.*会员|今日.*注册",
@@ -476,7 +475,6 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
         "answer_tpl": "本月优惠券核销情况：{coupon_list}。",
         "chart_type": "bar",
     },
-
     # ─── 运营类 (29-36) ─────────────────────────────────────────────
     {
         "pattern": r"翻台率|桌台.*利用|翻台.*次数",
@@ -594,7 +592,6 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
         "answer_tpl": "今日排班：{schedule_list}。",
         "chart_type": "table",
     },
-
     # ─── 异常/预警类 (37-42) ────────────────────────────────────────
     {
         "pattern": r"异常|预警|问题|告警|警报",
@@ -658,7 +655,6 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
         "answer_tpl": "近期舆情摘要：{opinion_summary}。",
         "chart_type": None,
     },
-
     # ─── 财务类 (43-47) ─────────────────────────────────────────────
     {
         "pattern": r"毛利|利润率|今天.*赚",
@@ -717,7 +713,6 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
         "answer_tpl": "能耗概览：{energy_summary}。",
         "chart_type": "bar",
     },
-
     # ─── Agent/综合类 (48-50) ───────────────────────────────────────
     {
         "pattern": r"Agent.*行动|待办.*任务|智能.*建议|AI.*建议",
@@ -746,15 +741,13 @@ INTENT_TEMPLATES: list[dict[str, Any]] = [
 ]
 
 # 编译正则（只做一次）
-_COMPILED_TEMPLATES = [
-    {**tpl, "_re": re.compile(tpl["pattern"], re.IGNORECASE)}
-    for tpl in INTENT_TEMPLATES
-]
+_COMPILED_TEMPLATES = [{**tpl, "_re": re.compile(tpl["pattern"], re.IGNORECASE)} for tpl in INTENT_TEMPLATES]
 
 
 # ═══════════════════════════════════════════════════════════════════
 # 工具函数
 # ═══════════════════════════════════════════════════════════════════
+
 
 def _fen_to_yuan(fen: int) -> str:
     """分转元，带千分位符"""
@@ -883,8 +876,13 @@ def _format_answer(
 
     # 根据不同意图做格式化
     try:
-        if intent in ("revenue_today", "revenue_yesterday", "revenue_this_week",
-                       "revenue_this_month", "avg_daily_revenue"):
+        if intent in (
+            "revenue_today",
+            "revenue_yesterday",
+            "revenue_this_week",
+            "revenue_this_month",
+            "avg_daily_revenue",
+        ):
             fen = int(row.get("total_fen", 0) or row.get("avg_fen", 0))
             count = row.get("order_count", "")
             return answer_tpl.format(
@@ -914,18 +912,22 @@ def _format_answer(
             )
 
         if intent in ("top_store", "bottom_store"):
-            items = [f"{r['store_name']}({_fen_to_yuan(int(r['total_fen']))})"
-                     for r in rows[:5]]
+            items = [f"{r['store_name']}({_fen_to_yuan(int(r['total_fen']))})" for r in rows[:5]]
             key = "top_list" if intent == "top_store" else "bottom_list"
             return answer_tpl.format(**{key: "、".join(items)})
 
         if intent == "revenue_trend":
-            items = [f"{r['biz_date']}:{_fen_to_yuan(int(r['total_fen']))}"
-                     for r in rows]
+            items = [f"{r['biz_date']}:{_fen_to_yuan(int(r['total_fen']))}" for r in rows]
             return answer_tpl.format(trend_data="、".join(items))
 
-        if intent in ("top_dishes", "worst_dishes", "most_profitable_dish",
-                       "combo_sales", "dish_return_ranking", "new_dish_performance"):
+        if intent in (
+            "top_dishes",
+            "worst_dishes",
+            "most_profitable_dish",
+            "combo_sales",
+            "dish_return_ranking",
+            "new_dish_performance",
+        ):
             items = []
             for r in rows[:10]:
                 name = r.get("dish_name", "")
@@ -937,16 +939,14 @@ def _format_answer(
             )
 
         if intent == "low_margin_dishes":
-            items = [f"{r['dish_name']}({r['margin_rate']:.0%})"
-                     for r in rows[:10]]
+            items = [f"{r['dish_name']}({r['margin_rate']:.0%})" for r in rows[:10]]
             return answer_tpl.format(
                 dish_list="、".join(items),
                 count=len(rows),
             )
 
         if intent == "dish_category_breakdown":
-            items = [f"{r['category']}({_fen_to_yuan(int(r['total_fen']))})"
-                     for r in rows]
+            items = [f"{r['category']}({_fen_to_yuan(int(r['total_fen']))})" for r in rows]
             return answer_tpl.format(category_list="、".join(items))
 
         if intent == "new_members_today":
@@ -955,13 +955,13 @@ def _format_answer(
         if intent == "repurchase_rate":
             repeat = int(row.get("repeat_count", 0))
             total = int(row.get("total_count", 0))
-            rate = f"{repeat/total:.1%}" if total > 0 else "N/A"
+            rate = f"{repeat / total:.1%}" if total > 0 else "N/A"
             return answer_tpl.format(rate=rate, repeat=repeat, total=total)
 
         if intent == "member_revenue_share":
             m_fen = int(row.get("member_fen", 0))
             t_fen = int(row.get("total_fen", 0))
-            share = f"{m_fen/t_fen:.1%}" if t_fen > 0 else "N/A"
+            share = f"{m_fen / t_fen:.1%}" if t_fen > 0 else "N/A"
             return answer_tpl.format(
                 share=share,
                 member_rev=_fen_to_yuan(m_fen),
@@ -971,7 +971,7 @@ def _format_answer(
         if intent == "gross_margin":
             rev = int(row.get("revenue_fen", 0))
             cost = int(row.get("cost_fen", 0))
-            margin = f"{(rev-cost)/rev:.1%}" if rev > 0 else "N/A"
+            margin = f"{(rev - cost) / rev:.1%}" if rev > 0 else "N/A"
             return answer_tpl.format(
                 revenue=_fen_to_yuan(rev),
                 cost=_fen_to_yuan(cost),
@@ -1007,54 +1007,68 @@ def _generate_actions(
     actions: list[dict[str, str]] = []
 
     if intent in ("inventory_alert", "expiry_alert"):
-        actions.append({
-            "action_id": "create_purchase_order",
-            "label": "一键生成采购单",
-            "description": "根据预警食材自动创建采购订单",
-            "endpoint": "/api/v1/supply/purchase-orders/auto-generate",
-        })
+        actions.append(
+            {
+                "action_id": "create_purchase_order",
+                "label": "一键生成采购单",
+                "description": "根据预警食材自动创建采购订单",
+                "endpoint": "/api/v1/supply/purchase-orders/auto-generate",
+            }
+        )
     if intent in ("discount_anomaly", "discount_total"):
-        actions.append({
-            "action_id": "review_discounts",
-            "label": "查看折扣明细",
-            "description": "跳转折扣守护面板查看详情",
-            "endpoint": "/api/v1/brain/discount/mv-insight",
-        })
+        actions.append(
+            {
+                "action_id": "review_discounts",
+                "label": "查看折扣明细",
+                "description": "跳转折扣守护面板查看详情",
+                "endpoint": "/api/v1/brain/discount/mv-insight",
+            }
+        )
     if intent in ("churned_members",):
-        actions.append({
-            "action_id": "launch_recall_campaign",
-            "label": "启动会员召回",
-            "description": "创建沉睡会员召回营销活动",
-            "endpoint": "/api/v1/brain/crm/campaign",
-        })
+        actions.append(
+            {
+                "action_id": "launch_recall_campaign",
+                "label": "启动会员召回",
+                "description": "创建沉睡会员召回营销活动",
+                "endpoint": "/api/v1/brain/crm/campaign",
+            }
+        )
     if intent in ("worst_dishes", "low_margin_dishes"):
-        actions.append({
-            "action_id": "optimize_menu",
-            "label": "优化菜单",
-            "description": "调用智能排菜Agent优化菜品结构",
-            "endpoint": "/api/v1/brain/menu/optimize",
-        })
+        actions.append(
+            {
+                "action_id": "optimize_menu",
+                "label": "优化菜单",
+                "description": "调用智能排菜Agent优化菜品结构",
+                "endpoint": "/api/v1/brain/menu/optimize",
+            }
+        )
     if intent == "anomalies_today":
-        actions.append({
-            "action_id": "view_anomaly_detail",
-            "label": "查看异常详情",
-            "description": "进入异常叙事面板查看详情",
-            "endpoint": "/api/v1/analytics/narrative/anomaly",
-        })
+        actions.append(
+            {
+                "action_id": "view_anomaly_detail",
+                "label": "查看异常详情",
+                "description": "进入异常叙事面板查看详情",
+                "endpoint": "/api/v1/analytics/narrative/anomaly",
+            }
+        )
     if intent == "daily_report":
-        actions.append({
-            "action_id": "push_daily_report",
-            "label": "推送日报到企微",
-            "description": "将日报推送到企业微信群",
-            "endpoint": "/api/v1/analytics/narrative/daily-report",
-        })
+        actions.append(
+            {
+                "action_id": "push_daily_report",
+                "label": "推送日报到企微",
+                "description": "将日报推送到企业微信群",
+                "endpoint": "/api/v1/analytics/narrative/daily-report",
+            }
+        )
     if intent in ("birthday_members",):
-        actions.append({
-            "action_id": "send_birthday_coupon",
-            "label": "发送生日券",
-            "description": "为即将过生日的会员发送生日优惠券",
-            "endpoint": "/api/v1/member/coupons/batch-send",
-        })
+        actions.append(
+            {
+                "action_id": "send_birthday_coupon",
+                "label": "发送生日券",
+                "description": "为即将过生日的会员发送生日优惠券",
+                "endpoint": "/api/v1/member/coupons/batch-send",
+            }
+        )
 
     return actions
 
@@ -1073,36 +1087,44 @@ def _get_suggestions_by_time() -> list[dict[str, str]]:
 
     if hour < 11:
         # 早间
-        base.extend([
-            {"id": "s5", "text": "昨天营业额和前天对比如何", "category": "revenue"},
-            {"id": "s6", "text": "今天哪些食材临期需要处理", "category": "anomaly"},
-            {"id": "s7", "text": "今天谁排班了", "category": "ops"},
-            {"id": "s8", "text": "生成昨日经营日报", "category": "comprehensive"},
-        ])
+        base.extend(
+            [
+                {"id": "s5", "text": "昨天营业额和前天对比如何", "category": "revenue"},
+                {"id": "s6", "text": "今天哪些食材临期需要处理", "category": "anomaly"},
+                {"id": "s7", "text": "今天谁排班了", "category": "ops"},
+                {"id": "s8", "text": "生成昨日经营日报", "category": "comprehensive"},
+            ]
+        )
     elif hour < 14:
         # 午市
-        base.extend([
-            {"id": "s5", "text": "午市客单价是多少", "category": "revenue"},
-            {"id": "s6", "text": "出餐速度怎么样", "category": "ops"},
-            {"id": "s7", "text": "哪些菜品卖得最好", "category": "dish"},
-            {"id": "s8", "text": "翻台率怎么样", "category": "ops"},
-        ])
+        base.extend(
+            [
+                {"id": "s5", "text": "午市客单价是多少", "category": "revenue"},
+                {"id": "s6", "text": "出餐速度怎么样", "category": "ops"},
+                {"id": "s7", "text": "哪些菜品卖得最好", "category": "dish"},
+                {"id": "s8", "text": "翻台率怎么样", "category": "ops"},
+            ]
+        )
     elif hour < 17:
         # 下午
-        base.extend([
-            {"id": "s5", "text": "库存有预警吗", "category": "anomaly"},
-            {"id": "s6", "text": "毛利率低于30%的菜品", "category": "dish"},
-            {"id": "s7", "text": "本周营收趋势", "category": "revenue"},
-            {"id": "s8", "text": "沉睡会员有多少", "category": "member"},
-        ])
+        base.extend(
+            [
+                {"id": "s5", "text": "库存有预警吗", "category": "anomaly"},
+                {"id": "s6", "text": "毛利率低于30%的菜品", "category": "dish"},
+                {"id": "s7", "text": "本周营收趋势", "category": "revenue"},
+                {"id": "s8", "text": "沉睡会员有多少", "category": "member"},
+            ]
+        )
     else:
         # 晚市+打烊
-        base.extend([
-            {"id": "s5", "text": "今天营业额目标完成了吗", "category": "revenue"},
-            {"id": "s6", "text": "今天折扣打了多少", "category": "ops"},
-            {"id": "s7", "text": "今天废单情况如何", "category": "ops"},
-            {"id": "s8", "text": "生成今日经营日报", "category": "comprehensive"},
-        ])
+        base.extend(
+            [
+                {"id": "s5", "text": "今天营业额目标完成了吗", "category": "revenue"},
+                {"id": "s6", "text": "今天折扣打了多少", "category": "ops"},
+                {"id": "s7", "text": "今天废单情况如何", "category": "ops"},
+                {"id": "s8", "text": "生成今日经营日报", "category": "comprehensive"},
+            ]
+        )
 
     return base
 
@@ -1110,6 +1132,7 @@ def _get_suggestions_by_time() -> list[dict[str, str]]:
 # ═══════════════════════════════════════════════════════════════════
 # Pydantic Models
 # ═══════════════════════════════════════════════════════════════════
+
 
 class NLQAskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500, description="自然语言问题")
@@ -1133,6 +1156,7 @@ class NLQExecuteActionRequest(BaseModel):
 # 数据库依赖
 # ═══════════════════════════════════════════════════════════════════
 
+
 async def _get_db_with_tenant(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
 ) -> AsyncSession:
@@ -1143,6 +1167,7 @@ async def _get_db_with_tenant(
 # ═══════════════════════════════════════════════════════════════════
 # 端点1: POST /api/v1/nlq/ask — 核心问答
 # ═══════════════════════════════════════════════════════════════════
+
 
 @router.post("/ask")
 async def nlq_ask(
@@ -1177,8 +1202,7 @@ async def nlq_ask(
         log.info("nlq.claude_fallback")
         claude_result = await _call_claude_for_intent(question, x_tenant_id)
         # 持久化消息到 nlq_messages
-        await _save_message(db, x_tenant_id, session_id, question,
-                            claude_result["intent"], claude_result["answer"])
+        await _save_message(db, x_tenant_id, session_id, question, claude_result["intent"], claude_result["answer"])
         return {
             "ok": True,
             "data": {
@@ -1257,6 +1281,7 @@ async def nlq_ask(
 # 端点2: GET /api/v1/nlq/suggestions — 推荐问题
 # ═══════════════════════════════════════════════════════════════════
 
+
 @router.get("/suggestions")
 async def get_suggestions(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
@@ -1270,6 +1295,7 @@ async def get_suggestions(
 # 端点3: GET /api/v1/nlq/history — 历史问答
 # ═══════════════════════════════════════════════════════════════════
 
+
 @router.get("/history")
 async def get_query_history(
     limit: int = Query(20, ge=1, le=100),
@@ -1279,11 +1305,7 @@ async def get_query_history(
 ) -> dict:
     """问答历史 — 从 nlq_messages 表读取"""
     try:
-        sql = (
-            "SELECT id, session_id, role, content, intent, created_at"
-            " FROM nlq_messages"
-            " WHERE tenant_id = :tenant_id"
-        )
+        sql = "SELECT id, session_id, role, content, intent, created_at FROM nlq_messages WHERE tenant_id = :tenant_id"
         params: dict[str, Any] = {"tenant_id": x_tenant_id}
         if session_id:
             sql += " AND session_id = :session_id"
@@ -1309,6 +1331,7 @@ async def get_query_history(
 # ═══════════════════════════════════════════════════════════════════
 # 端点4: POST /api/v1/nlq/execute-action — 执行建议操作
 # ═══════════════════════════════════════════════════════════════════
+
 
 @router.post("/execute-action")
 async def execute_action(
@@ -1405,6 +1428,7 @@ async def execute_action(
 # 保留旧端点（向后兼容）
 # ═══════════════════════════════════════════════════════════════════
 
+
 @router.post("/query")
 async def nlq_query_compat(
     body: NLQAskRequest,
@@ -1418,6 +1442,7 @@ async def nlq_query_compat(
 # ═══════════════════════════════════════════════════════════════════
 # 持久化辅助
 # ═══════════════════════════════════════════════════════════════════
+
 
 async def _save_message(
     db: AsyncSession,

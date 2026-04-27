@@ -7,6 +7,7 @@ GET  /api/v1/reports/{report_id}/export     — 导出报表
 POST /api/v1/reports/schedule               — 创建定时报表
 GET  /api/v1/reports/schedules              — 定时列表
 """
+
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -37,8 +38,10 @@ router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 # ─── 请求/响应模型 ───
 
+
 class ExecuteRequest(BaseModel):
     """报表执行请求"""
+
     params: dict[str, Any] = Field(default_factory=dict, description="查询参数")
     page: int = Field(default=1, ge=1, description="页码")
     page_size: int = Field(default=100, ge=1, le=1000, description="每页条数")
@@ -48,6 +51,7 @@ class ExecuteRequest(BaseModel):
 
 class ScheduleRequest(BaseModel):
     """定时报表请求"""
+
     report_id: str
     cron_expression: str = Field(..., description="cron表达式，如 '0 8 * * *'")
     recipients: list[str] = Field(..., description="接收人列表")
@@ -58,6 +62,7 @@ class ScheduleRequest(BaseModel):
 
 # ─── 辅助函数 ───
 
+
 def _require_tenant(tenant_id: Optional[str]) -> str:
     """校验 tenant_id 必填"""
     if not tenant_id:
@@ -67,9 +72,12 @@ def _require_tenant(tenant_id: Optional[str]) -> str:
 
 # ─── 路由 ───
 
+
 @router.get("")
 async def api_list_reports(
-    category: Optional[str] = Query(None, description="按分类过滤: revenue/dish/audit/margin/commission/finance/member/supply/operation"),
+    category: Optional[str] = Query(
+        None, description="按分类过滤: revenue/dish/audit/margin/commission/finance/member/supply/operation"
+    ),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
 ):
     """报表目录 — 列出所有可用报表"""

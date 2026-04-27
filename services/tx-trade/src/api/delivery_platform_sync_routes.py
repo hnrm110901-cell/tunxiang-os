@@ -18,6 +18,7 @@
   - delivery_soldout_sync_log    估清同步日志
   - delivery_orders / aggregator_orders 用于对账查询
 """
+
 from __future__ import annotations
 
 import json
@@ -81,6 +82,7 @@ def _now() -> datetime:
 
 class MenuSyncItem(BaseModel):
     """单个菜品同步信息"""
+
     dish_id: str = Field(min_length=1, max_length=100)
     dish_name: str = Field(min_length=1, max_length=200)
     price_fen: int = Field(ge=0, description="价格（分）")
@@ -91,6 +93,7 @@ class MenuSyncItem(BaseModel):
 
 class MenuSyncRequest(BaseModel):
     """菜单同步请求体"""
+
     store_id: str = Field(min_length=1, max_length=100)
     items: list[MenuSyncItem] = Field(min_length=1, max_length=500)
     sync_mode: str = Field(default="incremental", pattern="^(full|incremental)$")
@@ -98,6 +101,7 @@ class MenuSyncRequest(BaseModel):
 
 class SoldoutSyncRequest(BaseModel):
     """估清同步请求体"""
+
     store_id: str = Field(min_length=1, max_length=100)
     soldout_items: list[dict] = Field(
         min_length=1,
@@ -227,15 +231,17 @@ async def get_menu_sync_status(
 
     # 未同步过的平台也列出
     for pid in SUPPORTED_PLATFORMS - seen_platforms:
-        platforms_status.append({
-            "platform": pid,
-            "platform_label": PLATFORM_LABELS[pid],
-            "status": "never_synced",
-            "items_count": 0,
-            "sync_mode": None,
-            "created_at": None,
-            "completed_at": None,
-        })
+        platforms_status.append(
+            {
+                "platform": pid,
+                "platform_label": PLATFORM_LABELS[pid],
+                "status": "never_synced",
+                "items_count": 0,
+                "sync_mode": None,
+                "created_at": None,
+                "completed_at": None,
+            }
+        )
 
     return {
         "ok": True,
@@ -296,13 +302,15 @@ async def sync_soldout_to_platforms(
             },
         )
 
-        sync_results.append({
-            "log_id": log_id,
-            "platform": platform,
-            "platform_label": PLATFORM_LABELS.get(platform, platform),
-            "status": "pending",
-            "items_count": len(body.soldout_items),
-        })
+        sync_results.append(
+            {
+                "log_id": log_id,
+                "platform": platform,
+                "platform_label": PLATFORM_LABELS.get(platform, platform),
+                "status": "pending",
+                "items_count": len(body.soldout_items),
+            }
+        )
 
     await db.commit()
 

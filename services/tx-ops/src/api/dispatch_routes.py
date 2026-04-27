@@ -10,6 +10,7 @@
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -86,8 +87,7 @@ async def handle_agent_alert(
             db=None,
         )
         # 自动发送通知(mock)
-        assignees = [{"id": role, "name": role, "role": role}
-                     for role in result.get("assignee_roles", [])]
+        assignees = [{"id": role, "name": role, "role": role} for role in result.get("assignee_roles", [])]
         if assignees:
             notify_alert = {
                 "alert_type": body.alert_type,

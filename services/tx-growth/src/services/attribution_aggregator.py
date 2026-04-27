@@ -9,6 +9,7 @@
 所有查询加 tenant_id 过滤（RLS 二次保障）。
 金额单位：元（NUMERIC(12,2)）。
 """
+
 import json
 import uuid
 from dataclasses import dataclass
@@ -36,8 +37,8 @@ class CampaignSummary:
     total_touches: int
     delivered_count: int
     clicked_count: int
-    click_rate: float           # 点击率
-    delivery_rate: float        # 送达率
+    click_rate: float  # 点击率
+    delivery_rate: float  # 送达率
     reservations_attributed: int
     orders_attributed: int
     revenue_attributed: float
@@ -102,9 +103,7 @@ class AttributionAggregator:
             CampaignSummary dataclass
         """
         # ---- 触达漏斗指标 ----
-        campaign_filter = (
-            "AND campaign_id = :campaign_id" if campaign_id else ""
-        )
+        campaign_filter = "AND campaign_id = :campaign_id" if campaign_id else ""
         touch_rows = await db.execute(
             f"""
             SELECT
@@ -146,7 +145,7 @@ class AttributionAggregator:
             WHERE ac.tenant_id  = :tenant_id
               AND ac.converted_at::date >= :period_start
               AND ac.converted_at::date <= :period_end
-              {campaign_filter.replace('campaign_id', 'te.campaign_id')}
+              {campaign_filter.replace("campaign_id", "te.campaign_id")}
             """,
             {
                 "tenant_id": tenant_id,
@@ -180,7 +179,7 @@ class AttributionAggregator:
             WHERE te.tenant_id  = :tenant_id
               AND te.sent_at::date >= :period_start
               AND te.sent_at::date <= :period_end
-              {campaign_filter.replace('campaign_id', 'te.campaign_id')}
+              {campaign_filter.replace("campaign_id", "te.campaign_id")}
             GROUP BY te.channel
             ORDER BY revenue DESC
             """,
@@ -197,9 +196,7 @@ class AttributionAggregator:
                 "touches": int(row.touches),
                 "conversions": int(row.conversions),
                 "revenue": float(row.revenue),
-                "conversion_rate": round(
-                    int(row.conversions) / max(1, int(row.touches)), 4
-                ),
+                "conversion_rate": round(int(row.conversions) / max(1, int(row.touches)), 4),
             }
             for row in seg_rows.fetchall()
         ]

@@ -18,6 +18,7 @@
   - 金额单位：分（整数）
   - 事件发射：asyncio.create_task(emit_event(...))
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -43,21 +44,25 @@ logger = structlog.get_logger(__name__)
 
 def _get_pinzhi_adapter():
     from shared.adapters.pinzhi_adapter import PinzhiPOSAdapter
+
     return PinzhiPOSAdapter
 
 
 def _get_aoqiwei_crm_adapter():
     from shared.adapters.aoqiwei.src.crm_adapter import AoqiweiCrmAdapter
+
     return AoqiweiCrmAdapter
 
 
 def _get_aoqiwei_supply_adapter():
     from shared.adapters.aoqiwei.src.adapter import AoqiweiAdapter
+
     return AoqiweiAdapter
 
 
 def _get_yiding_adapter():
     from shared.adapters.yiding.src.adapter import YiDingAdapter
+
     return YiDingAdapter
 
 
@@ -219,26 +224,30 @@ class MultiSystemSyncService:
                     row = result.fetchone()
                     if row and row.was_inserted:
                         synced += 1
-                        asyncio.create_task(emit_event(
-                            event_type=OrderEventType.CREATED,
-                            tenant_id=tenant_id,
-                            stream_id=order_id,
-                            payload={
-                                "order_id": order_id,
-                                "order_number": order_number,
-                                "total_fen": total_fen,
-                                "order_status": order_status,
-                                "source_system": "pinzhi",
-                            },
-                            store_id=store_id,
-                            source_service="tx-ops",
-                        ))
+                        asyncio.create_task(
+                            emit_event(
+                                event_type=OrderEventType.CREATED,
+                                tenant_id=tenant_id,
+                                stream_id=order_id,
+                                payload={
+                                    "order_id": order_id,
+                                    "order_number": order_number,
+                                    "total_fen": total_fen,
+                                    "order_status": order_status,
+                                    "source_system": "pinzhi",
+                                },
+                                store_id=store_id,
+                                source_service="tx-ops",
+                            )
+                        )
                     else:
                         skipped += 1
 
                 except Exception as exc:  # noqa: BLE001  # 单条订单写入失败不阻断整批
                     errors.append(f"订单 {order_number} 写入失败: {exc}")
-                    logger.warning("sync_pinzhi_order_write_failed", order_number=order_number, error=str(exc), exc_info=True)
+                    logger.warning(
+                        "sync_pinzhi_order_write_failed", order_number=order_number, error=str(exc), exc_info=True
+                    )
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             await self._write_sync_log(conn, tenant_id, SYSTEM_PINZHI, store_id, synced, skipped, errors, duration_ms)
@@ -362,7 +371,9 @@ class MultiSystemSyncService:
 
         duration_ms = int((time.monotonic() - t0) * 1000)
         async with self._engine.begin() as conn:
-            await self._write_sync_log(conn, tenant_id, SYSTEM_AOQIWEI_CRM, store_id, synced, skipped, errors, duration_ms)
+            await self._write_sync_log(
+                conn, tenant_id, SYSTEM_AOQIWEI_CRM, store_id, synced, skipped, errors, duration_ms
+            )
 
         logger.info(
             "sync_aoqiwei_members_done",
@@ -446,25 +457,29 @@ class MultiSystemSyncService:
                         },
                     )
                     synced += 1
-                    asyncio.create_task(emit_event(
-                        event_type=InventoryEventType.ADJUSTED,
-                        tenant_id=tenant_id,
-                        stream_id=ingredient_id,
-                        payload={
-                            "ingredient_id": ingredient_id,
-                            "ingredient_code": good_code,
-                            "ingredient_name": good_name,
-                            "stock_qty": stock_qty,
-                            "unit_price_fen": unit_price_fen,
-                            "source_system": "aoqiwei",
-                        },
-                        store_id=store_id,
-                        source_service="tx-ops",
-                    ))
+                    asyncio.create_task(
+                        emit_event(
+                            event_type=InventoryEventType.ADJUSTED,
+                            tenant_id=tenant_id,
+                            stream_id=ingredient_id,
+                            payload={
+                                "ingredient_id": ingredient_id,
+                                "ingredient_code": good_code,
+                                "ingredient_name": good_name,
+                                "stock_qty": stock_qty,
+                                "unit_price_fen": unit_price_fen,
+                                "source_system": "aoqiwei",
+                            },
+                            store_id=store_id,
+                            source_service="tx-ops",
+                        )
+                    )
 
                 except Exception as exc:  # noqa: BLE001
                     errors.append(f"食材 {good_code} 写入失败: {exc}")
-                    logger.warning("sync_aoqiwei_inventory_write_failed", good_code=good_code, error=str(exc), exc_info=True)
+                    logger.warning(
+                        "sync_aoqiwei_inventory_write_failed", good_code=good_code, error=str(exc), exc_info=True
+                    )
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             await self._write_sync_log(conn, tenant_id, SYSTEM_AOQIWEI_SUPPLY, store_id, synced, 0, errors, duration_ms)
@@ -555,29 +570,35 @@ class MultiSystemSyncService:
                         },
                     )
                     synced += 1
-                    confirm_items.append({
-                        "resv_order": resv_order_no,
-                        "status": 1,
-                        "order_type": resv_dict.get("order_type", 1),
-                    })
-                    asyncio.create_task(emit_event(
-                        event_type=ReservationEventType.CREATED,
-                        tenant_id=tenant_id,
-                        stream_id=resv_id,
-                        payload={
-                            "reservation_id": resv_id,
-                            "reservation_no": resv_order_no,
-                            "guest_name": resv_dict.get("guest_name", ""),
-                            "party_size": resv_dict.get("party_size", 1),
-                            "source_system": "yiding",
-                        },
-                        store_id=store_id,
-                        source_service="tx-ops",
-                    ))
+                    confirm_items.append(
+                        {
+                            "resv_order": resv_order_no,
+                            "status": 1,
+                            "order_type": resv_dict.get("order_type", 1),
+                        }
+                    )
+                    asyncio.create_task(
+                        emit_event(
+                            event_type=ReservationEventType.CREATED,
+                            tenant_id=tenant_id,
+                            stream_id=resv_id,
+                            payload={
+                                "reservation_id": resv_id,
+                                "reservation_no": resv_order_no,
+                                "guest_name": resv_dict.get("guest_name", ""),
+                                "party_size": resv_dict.get("party_size", 1),
+                                "source_system": "yiding",
+                            },
+                            store_id=store_id,
+                            source_service="tx-ops",
+                        )
+                    )
 
                 except Exception as exc:  # noqa: BLE001
                     errors.append(f"预订 {resv_order_no} 写入失败: {exc}")
-                    logger.warning("sync_yiding_reservation_write_failed", resv_order=resv_order_no, error=str(exc), exc_info=True)
+                    logger.warning(
+                        "sync_yiding_reservation_write_failed", resv_order=resv_order_no, error=str(exc), exc_info=True
+                    )
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             await self._write_sync_log(conn, tenant_id, SYSTEM_YIDING, store_id, synced, 0, errors, duration_ms)
@@ -633,9 +654,7 @@ class MultiSystemSyncService:
 
         for store_id in store_ids:
             if SYSTEM_PINZHI in target_systems:
-                tasks[f"{SYSTEM_PINZHI}:{store_id}"] = asyncio.create_task(
-                    self.sync_pinzhi_orders(tenant_id, store_id)
-                )
+                tasks[f"{SYSTEM_PINZHI}:{store_id}"] = asyncio.create_task(self.sync_pinzhi_orders(tenant_id, store_id))
             if SYSTEM_AOQIWEI_CRM in target_systems:
                 tasks[f"{SYSTEM_AOQIWEI_CRM}:{store_id}"] = asyncio.create_task(
                     self.sync_aoqiwei_members(tenant_id, store_id)

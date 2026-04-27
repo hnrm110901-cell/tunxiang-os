@@ -8,6 +8,7 @@
     注册模型 → 创建训练轮次 → 门店加入 → 本地训练 → 提交梯度
     → 差分隐私加噪 → FedAvg 聚合 → 分发新模型 → 效果追踪
 """
+
 import math
 import random
 import time
@@ -24,8 +25,12 @@ FEDERATED_MODELS: dict[str, dict[str, Any]] = {
     "discount_anomaly": {
         "description": "折扣异常检测模型 — 识别异常打折行为",
         "input_features": [
-            "discount_rate", "order_amount", "time_of_day",
-            "waiter_id", "table_type", "payment_method",
+            "discount_rate",
+            "order_amount",
+            "time_of_day",
+            "waiter_id",
+            "table_type",
+            "payment_method",
         ],
         "output": "anomaly_score (0-1)",
         "default_epsilon": 1.0,
@@ -33,8 +38,12 @@ FEDERATED_MODELS: dict[str, dict[str, Any]] = {
     "dish_time_prediction": {
         "description": "出餐时间预测模型 — 预估菜品出餐时间",
         "input_features": [
-            "dish_id", "order_count", "kitchen_load",
-            "time_of_day", "day_of_week", "staff_count",
+            "dish_id",
+            "order_count",
+            "kitchen_load",
+            "time_of_day",
+            "day_of_week",
+            "staff_count",
         ],
         "output": "predicted_minutes",
         "default_epsilon": 2.0,
@@ -42,8 +51,12 @@ FEDERATED_MODELS: dict[str, dict[str, Any]] = {
     "traffic_forecast": {
         "description": "客流量预测模型 — 预测门店客流",
         "input_features": [
-            "day_of_week", "weather", "temperature",
-            "holiday_flag", "nearby_events", "historical_avg",
+            "day_of_week",
+            "weather",
+            "temperature",
+            "holiday_flag",
+            "nearby_events",
+            "historical_avg",
         ],
         "output": "predicted_customers",
         "default_epsilon": 2.0,
@@ -51,8 +64,12 @@ FEDERATED_MODELS: dict[str, dict[str, Any]] = {
     "waste_prediction": {
         "description": "损耗预测模型 — 预测食材损耗量",
         "input_features": [
-            "ingredient_id", "stock_quantity", "daily_usage",
-            "storage_temp", "days_since_intake", "season",
+            "ingredient_id",
+            "stock_quantity",
+            "daily_usage",
+            "storage_temp",
+            "days_since_intake",
+            "season",
         ],
         "output": "predicted_waste_kg",
         "default_epsilon": 1.5,
@@ -60,8 +77,12 @@ FEDERATED_MODELS: dict[str, dict[str, Any]] = {
     "price_optimization": {
         "description": "定价优化模型 — 最优菜品定价",
         "input_features": [
-            "dish_id", "cost_price", "competitor_price",
-            "demand_elasticity", "time_slot", "customer_segment",
+            "dish_id",
+            "cost_price",
+            "competitor_price",
+            "demand_elasticity",
+            "time_slot",
+            "customer_segment",
         ],
         "output": "optimal_price_fen",
         "default_epsilon": 1.0,
@@ -69,8 +90,12 @@ FEDERATED_MODELS: dict[str, dict[str, Any]] = {
     "customer_churn": {
         "description": "客户流失预测模型 — 识别即将流失的会员",
         "input_features": [
-            "days_since_last_visit", "visit_frequency", "avg_spend",
-            "rfm_segment", "complaint_count", "loyalty_points",
+            "days_since_last_visit",
+            "visit_frequency",
+            "avg_spend",
+            "rfm_segment",
+            "complaint_count",
+            "loyalty_points",
         ],
         "output": "churn_probability (0-1)",
         "default_epsilon": 0.5,
@@ -458,9 +483,7 @@ class FederatedLearningService:
         weight_count = self._global_models[model_id]["weight_count"]
 
         # ─── FedAvg: 按样本数加权平均 ───
-        total_samples = sum(
-            u["sample_count"] for u in round_info["updates"].values()
-        )
+        total_samples = sum(u["sample_count"] for u in round_info["updates"].values())
 
         if total_samples == 0:
             return {"ok": False, "error": "所有参与者样本数为 0"}
@@ -475,10 +498,7 @@ class FederatedLearningService:
 
         # 计算与旧全局模型的差异
         old_weights = self._global_models[model_id]["weights"]
-        weight_delta = sum(
-            abs(aggregated_weights[i] - old_weights[i])
-            for i in range(weight_count)
-        ) / weight_count
+        weight_delta = sum(abs(aggregated_weights[i] - old_weights[i]) for i in range(weight_count)) / weight_count
 
         # 聚合指标（各门店指标的加权平均）
         all_metric_keys: set[str] = set()
@@ -684,9 +704,7 @@ class FederatedLearningService:
         violations: list[str] = []
         for mid, spent in model_budgets.items():
             if spent >= self._max_privacy_budget:
-                violations.append(
-                    f"模型 {mid}: 已消耗 {spent:.2f} >= 上限 {self._max_privacy_budget}"
-                )
+                violations.append(f"模型 {mid}: 已消耗 {spent:.2f} >= 上限 {self._max_privacy_budget}")
 
         compliant = len(violations) == 0
         total_spent = sum(model_budgets.values())
@@ -695,9 +713,7 @@ class FederatedLearningService:
             "store_id": store_id,
             "compliant": compliant,
             "total_epsilon_spent": round(total_spent, 4),
-            "model_budgets": {
-                mid: round(spent, 4) for mid, spent in model_budgets.items()
-            },
+            "model_budgets": {mid: round(spent, 4) for mid, spent in model_budgets.items()},
             "violations": violations,
             "max_budget_per_model": self._max_privacy_budget,
         }
@@ -856,9 +872,7 @@ class FederatedLearningService:
         entry = {
             "metrics": metrics,
             "reported_at": time.time(),
-            "version": self._store_model_versions.get(
-                (store_id, model_id), "unknown"
-            ),
+            "version": self._store_model_versions.get((store_id, model_id), "unknown"),
         }
         self._performance_reports[report_key].append(entry)
 
@@ -911,9 +925,7 @@ class FederatedLearningService:
         per_store: dict[str, dict[str, float]] = {}
 
         for key in all_keys:
-            values = [
-                m[key] for m in store_metrics.values() if key in m
-            ]
+            values = [m[key] for m in store_metrics.values() if key in m]
             if values:
                 aggregated[key] = round(sum(values) / len(values), 6)
 
@@ -958,9 +970,7 @@ class FederatedLearningService:
         latest_report = reports[-1]
 
         comparison: dict[str, dict[str, Any]] = {}
-        all_keys = set(first_report["metrics"].keys()) | set(
-            latest_report["metrics"].keys()
-        )
+        all_keys = set(first_report["metrics"].keys()) | set(latest_report["metrics"].keys())
 
         for key in all_keys:
             local_val = first_report["metrics"].get(key, 0.0)
@@ -976,13 +986,11 @@ class FederatedLearningService:
 
         # 判断联邦模型是否优于本地
         improvements = sum(
-            1 for v in comparison.values()
+            1
+            for v in comparison.values()
             if v["delta"] > 0 and "loss" not in v  # loss 越低越好
         )
-        degradations = sum(
-            1 for v in comparison.values()
-            if v["delta"] < 0 and "loss" not in v
-        )
+        degradations = sum(1 for v in comparison.values() if v["delta"] < 0 and "loss" not in v)
         # 对 loss 类指标，delta < 0 才是改善
         for key, v in comparison.items():
             if "loss" in key:

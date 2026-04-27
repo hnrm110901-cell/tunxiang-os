@@ -45,6 +45,7 @@ S3失败（触发补偿）：
 Saga记录：
   T25: 每次step变更都有flush调用（不污染外部事务）
 """
+
 import os
 import sys
 import uuid
@@ -61,6 +62,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../.."))
 # ─────────────────────────────────────────────────────────────────────────────
 # 辅助工具
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _uid() -> uuid.UUID:
     return uuid.uuid4()
@@ -94,6 +96,7 @@ def _make_refund_result() -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # Mock DB构建器
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _make_db(
     order_status: str = "open",
@@ -170,6 +173,7 @@ from services.payment_saga_service import (
 # 辅助：构造 PaymentSagaService，注入 mock _validate_order / _complete_order
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_service(
     gw=None,
     order_exists: bool = True,
@@ -220,6 +224,7 @@ def _make_service(
 # T01 — 正常路径：S1→S2→S3 全成功 → status=done
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T01_happy_path_done():
     """正常路径：全流程成功返回 done"""
@@ -247,6 +252,7 @@ async def test_T01_happy_path_done():
 # T02 — 现金支付全流程成功
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T02_cash_payment_done():
     """现金支付（无SQB调用）全流程成功"""
@@ -268,6 +274,7 @@ async def test_T02_cash_payment_done():
 # T03 — 幂等键命中 done 状态 → 直接返回
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T03_idempotency_done_hit():
     """幂等键命中已完成Saga → 直接返回done，不重复扣款"""
@@ -283,12 +290,14 @@ async def test_T03_idempotency_done_hit():
         },
     )
     # 覆盖 _find_by_idempotency_key 直接返回已有记录
-    svc._find_by_idempotency_key = AsyncMock(return_value={
-        "saga_id": _uid(),
-        "step": SagaStep.DONE,
-        "payment_id": existing_payment_id,
-        "compensation_reason": None,
-    })
+    svc._find_by_idempotency_key = AsyncMock(
+        return_value={
+            "saga_id": _uid(),
+            "step": SagaStep.DONE,
+            "payment_id": existing_payment_id,
+            "compensation_reason": None,
+        }
+    )
 
     result = await svc.execute(
         order_id=_uid(),
@@ -306,17 +315,20 @@ async def test_T03_idempotency_done_hit():
 # T04 — 失败后相同幂等键重试 → 正常走新支付流程
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T04_idempotency_failed_allows_retry():
     """失败状态的幂等键 → 直接返回failed（客户端可换新key重试）"""
     gw = _make_gateway()
     svc, _ = _make_service(gw=gw)
-    svc._find_by_idempotency_key = AsyncMock(return_value={
-        "saga_id": _uid(),
-        "step": SagaStep.FAILED,
-        "payment_id": None,
-        "compensation_reason": "SQB超时",
-    })
+    svc._find_by_idempotency_key = AsyncMock(
+        return_value={
+            "saga_id": _uid(),
+            "step": SagaStep.FAILED,
+            "payment_id": None,
+            "compensation_reason": "SQB超时",
+        }
+    )
 
     result = await svc.execute(
         order_id=_uid(),
@@ -333,6 +345,7 @@ async def test_T04_idempotency_failed_allows_retry():
 # ─────────────────────────────────────────────────────────────────────────────
 # T05 — S1失败：订单不存在
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T05_s1_order_not_found():
@@ -352,6 +365,7 @@ async def test_T05_s1_order_not_found():
 # T06 — S1失败：订单已结账
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T06_s1_order_already_completed():
     """S1: 订单已结账 → status=failed，不补偿"""
@@ -370,6 +384,7 @@ async def test_T06_s1_order_already_completed():
 # T07 — S1失败：订单已取消
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T07_s1_order_cancelled():
     """S1: 订单已取消 → status=failed，不补偿"""
@@ -386,6 +401,7 @@ async def test_T07_s1_order_cancelled():
 # ─────────────────────────────────────────────────────────────────────────────
 # T08 — S2失败：支付网关 RuntimeError
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T08_s2_gateway_runtime_error():
@@ -405,6 +421,7 @@ async def test_T08_s2_gateway_runtime_error():
 # T09 — S2失败：支付网关 ValueError（无效支付方式）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T09_s2_gateway_value_error():
     """S2: 无效支付方式 → status=failed，不退款"""
@@ -421,6 +438,7 @@ async def test_T09_s2_gateway_value_error():
 # ─────────────────────────────────────────────────────────────────────────────
 # T10 — S3失败（SQLAlchemyError）→ 退款成功 → status=compensated
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T10_s3_db_timeout_compensated():
@@ -452,6 +470,7 @@ async def test_T10_s3_db_timeout_compensated():
 # T11 — S3失败（RuntimeError）→ 退款成功 → status=compensated
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T11_s3_runtime_error_compensated():
     """S3: RuntimeError → 退款成功 → status=compensated"""
@@ -474,6 +493,7 @@ async def test_T11_s3_runtime_error_compensated():
 # T12 — S3失败（ValueError）→ 退款成功 → status=compensated
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T12_s3_value_error_compensated():
     """S3: ValueError（订单状态冲突）→ 退款成功 → status=compensated"""
@@ -492,6 +512,7 @@ async def test_T12_s3_value_error_compensated():
 # ─────────────────────────────────────────────────────────────────────────────
 # T13 — compensate() 成功：refund被调用，step=compensated，返回True
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T13_compensate_success():
@@ -536,6 +557,7 @@ async def test_T13_compensate_success():
 # T14 — compensate() 退款网关失败 → 返回False
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T14_compensate_refund_gateway_failure():
     """compensate(): 退款网关异常 → 返回False，step=failed"""
@@ -570,6 +592,7 @@ async def test_T14_compensate_refund_gateway_failure():
 # T15 — compensate() 无payment_id → 返回False
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T15_compensate_no_payment_id():
     """compensate(): payment_id为空 → 返回False，无退款调用"""
@@ -601,6 +624,7 @@ async def test_T15_compensate_no_payment_id():
 # ─────────────────────────────────────────────────────────────────────────────
 # T16 — 崩溃恢复：paying有payment_id → S3成功 → done
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T16_recover_paying_with_payment_id_success():
@@ -649,6 +673,7 @@ async def test_T16_recover_paying_with_payment_id_success():
 # ─────────────────────────────────────────────────────────────────────────────
 # T17 — 崩溃恢复：paying无payment_id → 标记failed
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T17_recover_paying_no_payment_id():
@@ -699,6 +724,7 @@ async def test_T17_recover_paying_no_payment_id():
 # T18 — 崩溃恢复：completing → S3重试成功 → done
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T18_recover_completing_success():
     """recover_pending_sagas: completing状态 → S3重试成功 → done"""
@@ -743,6 +769,7 @@ async def test_T18_recover_completing_success():
 # ─────────────────────────────────────────────────────────────────────────────
 # T19 — 崩溃恢复：completing S3失败 → 触发补偿
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T19_recover_completing_s3_fails_compensate():
@@ -792,6 +819,7 @@ async def test_T19_recover_completing_s3_fails_compensate():
 # T20 — 崩溃恢复：无挂起Saga → 返回0
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T20_recover_no_pending():
     """recover_pending_sagas: 无挂起Saga → 返回0"""
@@ -819,6 +847,7 @@ async def test_T20_recover_no_pending():
 # T21 — 租户隔离：不同tenant_id的幂等键互不可见
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T21_tenant_isolation_idempotency():
     """不同租户下相同幂等键独立处理"""
@@ -845,6 +874,7 @@ async def test_T21_tenant_isolation_idempotency():
 # ─────────────────────────────────────────────────────────────────────────────
 # T22 — 租户隔离：compensate对不同租户的saga_id无效
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T22_tenant_isolation_compensate():
@@ -880,18 +910,21 @@ async def test_T22_tenant_isolation_compensate():
 # T23 — 幂等：compensated状态直接返回
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T23_idempotency_compensated_state():
     """幂等键命中 compensated 状态 → 直接返回compensated"""
     existing_payment_id = _uid()
     gw = _make_gateway()
     svc, _ = _make_service(gw=gw)
-    svc._find_by_idempotency_key = AsyncMock(return_value={
-        "saga_id": _uid(),
-        "step": SagaStep.COMPENSATED,
-        "payment_id": existing_payment_id,
-        "compensation_reason": "S3超时已退款",
-    })
+    svc._find_by_idempotency_key = AsyncMock(
+        return_value={
+            "saga_id": _uid(),
+            "step": SagaStep.COMPENSATED,
+            "payment_id": existing_payment_id,
+            "compensation_reason": "S3超时已退款",
+        }
+    )
 
     result = await svc.execute(
         order_id=_uid(),
@@ -909,6 +942,7 @@ async def test_T23_idempotency_compensated_state():
 # ─────────────────────────────────────────────────────────────────────────────
 # T24 — 无幂等键：允许重复执行（两次独立支付）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_T24_no_idempotency_key_allows_duplicate():
@@ -929,6 +963,7 @@ async def test_T24_no_idempotency_key_allows_duplicate():
 # T25 — 每次step变更都flush：不污染外部事务
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_T25_flush_called_on_each_step():
     """每次 _update_step / _set_payment_id 都调用 db.flush，确保step变更即时持久化"""
@@ -939,6 +974,4 @@ async def test_T25_flush_called_on_each_step():
 
     # 正常路径：INSERT(创建) + validating→paying + set_payment_id + paying→completing + completing→done
     # 每次 _update_step 和 _set_payment_id 都会 flush
-    assert db.flush.await_count >= 4, (
-        f"期望至少4次flush（每个step变更+payment_id写入），实际: {db.flush.await_count}"
-    )
+    assert db.flush.await_count >= 4, f"期望至少4次flush（每个step变更+payment_id写入），实际: {db.flush.await_count}"

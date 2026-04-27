@@ -8,6 +8,7 @@
 
 维护视图：mv_channel_margin
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -18,7 +19,6 @@ from ..projector import ProjectorBase
 
 
 class ChannelMarginProjector(ProjectorBase):
-
     name = "channel_margin"
     event_types = {
         "channel.order_synced",
@@ -49,7 +49,10 @@ class ChannelMarginProjector(ProjectorBase):
             VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (tenant_id, store_id, stat_date, channel) DO NOTHING
             """,
-            self.tenant_id, UUID(str(store_id)), stat_date, channel,
+            self.tenant_id,
+            UUID(str(store_id)),
+            stat_date,
+            channel,
         )
 
         if event_type == "channel.order_synced":
@@ -63,8 +66,12 @@ class ChannelMarginProjector(ProjectorBase):
                     updated_at        = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3 AND channel = $6
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                amount_fen, UUID(str(event["event_id"])), channel,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                amount_fen,
+                UUID(str(event["event_id"])),
+                channel,
             )
 
         elif event_type == "channel.commission_calc":
@@ -77,8 +84,12 @@ class ChannelMarginProjector(ProjectorBase):
                     updated_at     = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3 AND channel = $6
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                commission_fen, UUID(str(event["event_id"])), channel,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                commission_fen,
+                UUID(str(event["event_id"])),
+                channel,
             )
 
         elif event_type == "channel.promotion_applied":
@@ -91,8 +102,12 @@ class ChannelMarginProjector(ProjectorBase):
                     updated_at            = NOW()
                 WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3 AND channel = $6
                 """,
-                self.tenant_id, UUID(str(store_id)), stat_date,
-                subsidy_fen, UUID(str(event["event_id"])), channel,
+                self.tenant_id,
+                UUID(str(store_id)),
+                stat_date,
+                subsidy_fen,
+                UUID(str(event["event_id"])),
+                channel,
             )
 
         # 每次更新后重算净收入和毛利率
@@ -116,5 +131,8 @@ async def _recalc_margin(conn: object, tenant_id: UUID, store_id: UUID, stat_dat
             END
         WHERE tenant_id = $1 AND store_id = $2 AND stat_date = $3 AND channel = $4
         """,
-        tenant_id, store_id, stat_date, channel,
+        tenant_id,
+        store_id,
+        stat_date,
+        channel,
     )

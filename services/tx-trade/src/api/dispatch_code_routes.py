@@ -20,6 +20,7 @@ router = APIRouter(tags=["dispatch-codes"])
 # 工具函数
 # ---------------------------------------------------------------------------
 
+
 def _get_tenant_id(request: Request) -> str:
     tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
@@ -31,6 +32,7 @@ def _get_tenant_id(request: Request) -> str:
 # 请求 / 响应模型
 # ---------------------------------------------------------------------------
 
+
 class GenerateReq(BaseModel):
     order_id: str = Field(..., description="订单 UUID")
     platform: str = Field(default="unknown", description="meituan / eleme / douyin / dianping")
@@ -38,7 +40,7 @@ class GenerateReq(BaseModel):
 
 class GenerateResp(BaseModel):
     code: str
-    qr_data: str       # 供前端渲染二维码的数据字符串
+    qr_data: str  # 供前端渲染二维码的数据字符串
 
 
 class ScanReq(BaseModel):
@@ -49,6 +51,7 @@ class ScanReq(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点 1: 生成出餐码
 # ---------------------------------------------------------------------------
+
 
 @router.post("/generate")
 async def api_generate(
@@ -92,6 +95,7 @@ async def api_generate(
 # 端点 2: 扫码确认出餐
 # ---------------------------------------------------------------------------
 
+
 @router.post("/scan")
 async def api_scan(
     req: ScanReq,
@@ -108,7 +112,7 @@ async def api_scan(
     # 支持 txdc:// 前缀（直接扫 QR）
     code = req.code
     if code.startswith("txdc://"):
-        code = code[len("txdc://"):]
+        code = code[len("txdc://") :]
 
     result = await DispatchCodeService.confirm_by_scan(
         code=code,
@@ -138,6 +142,7 @@ async def api_scan(
 # ---------------------------------------------------------------------------
 # 端点 3: 查询订单出餐码状态
 # ---------------------------------------------------------------------------
+
 
 @router.get("/order/{order_id}")
 async def api_get_by_order(
@@ -178,6 +183,7 @@ async def api_get_by_order(
 # ---------------------------------------------------------------------------
 # 端点 4: 待确认出餐码列表
 # ---------------------------------------------------------------------------
+
 
 @router.get("/pending/{store_id}")
 async def api_list_pending(

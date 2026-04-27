@@ -3,6 +3,7 @@
 通过 TaxBureauSDK 对接自然人电子税务局（当前 Mock，后续接入真实 API）。
 申报记录持久化至 tax_declarations 表（v256 迁移）。
 """
+
 from __future__ import annotations
 
 import json
@@ -172,9 +173,7 @@ async def generate_tax_declaration(
             {
                 "employee_id": str(r["employee_id"]),
                 "emp_name": str(r.get("emp_name") or ""),
-                "id_card_no_masked": _mask_id_card(
-                    str(r["id_card_no"]) if r.get("id_card_no") else None
-                ),
+                "id_card_no_masked": _mask_id_card(str(r["id_card_no"]) if r.get("id_card_no") else None),
                 "taxable_income_fen": gross,
                 "tax_fen": tax_fen,
                 "cumulative_income_fen": cum_inc,
@@ -358,9 +357,7 @@ async def check_filing_status(
         "declaration_id": did,
         "status": str(r["status"] or "draft"),
         "receipt_no": r["receipt_no"],
-        "submitted_at": _iso_utc(r["submitted_at"])
-        if r.get("submitted_at")
-        else None,
+        "submitted_at": _iso_utc(r["submitted_at"]) if r.get("submitted_at") else None,
     }
 
 
@@ -410,9 +407,7 @@ async def get_filing_history(
                 "employee_count": int(m["employee_count"] or 0),
                 "total_tax_fen": int(m["total_tax_fen"] or 0),
                 "status": str(m["status"] or "draft"),
-                "submitted_at": _iso_utc(m["submitted_at"])
-                if m.get("submitted_at")
-                else None,
+                "submitted_at": _iso_utc(m["submitted_at"]) if m.get("submitted_at") else None,
             }
         )
     return out

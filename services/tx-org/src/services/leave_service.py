@@ -20,13 +20,13 @@ from typing import Any, Dict, List, Optional
 # ── 假期类型 → 默认年度配额（天） ────────────────────────────────
 
 DEFAULT_ANNUAL_QUOTAS: Dict[str, float] = {
-    "annual": 5.0,        # 年假
-    "sick": 15.0,         # 病假
-    "personal": 5.0,      # 事假
-    "marriage": 3.0,      # 婚假
-    "maternity": 98.0,    # 产假
-    "paternity": 15.0,    # 陪产假
-    "bereavement": 3.0,   # 丧假
+    "annual": 5.0,  # 年假
+    "sick": 15.0,  # 病假
+    "personal": 5.0,  # 事假
+    "marriage": 3.0,  # 婚假
+    "maternity": 98.0,  # 产假
+    "paternity": 15.0,  # 陪产假
+    "bereavement": 3.0,  # 丧假
 }
 
 VALID_LEAVE_TYPES = set(DEFAULT_ANNUAL_QUOTAS.keys())

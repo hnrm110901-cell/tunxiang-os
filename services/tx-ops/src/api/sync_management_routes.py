@@ -9,9 +9,9 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需传 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Any, Dict, List, Optional
 
@@ -69,10 +69,7 @@ class TriggerSyncReq(BaseModel):
     store_ids: List[str] = Field(..., min_length=1, description="门店ID列表")
     systems: Optional[List[str]] = Field(
         None,
-        description=(
-            "要同步的系统列表，留空则同步全部。"
-            f"可选值: {sorted(_VALID_SYSTEMS)}"
-        ),
+        description=(f"要同步的系统列表，留空则同步全部。可选值: {sorted(_VALID_SYSTEMS)}"),
     )
 
 
@@ -285,17 +282,19 @@ async def list_sync_logs(
                     except (ValueError, TypeError):
                         pass
 
-                items.append({
-                    "id": str(row.id),
-                    "status": row.status,
-                    "store_id": row.store_id,
-                    "system": payload_data.get("system"),
-                    "synced": payload_data.get("synced", 0),
-                    "skipped": payload_data.get("skipped", 0),
-                    "errors": payload_data.get("errors", []),
-                    "duration_ms": payload_data.get("duration_ms"),
-                    "created_at": row.created_at.isoformat() if row.created_at else None,
-                })
+                items.append(
+                    {
+                        "id": str(row.id),
+                        "status": row.status,
+                        "store_id": row.store_id,
+                        "system": payload_data.get("system"),
+                        "synced": payload_data.get("synced", 0),
+                        "skipped": payload_data.get("skipped", 0),
+                        "errors": payload_data.get("errors", []),
+                        "duration_ms": payload_data.get("duration_ms"),
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                    }
+                )
 
     except (ValueError, RuntimeError) as exc:
         log.error("list_sync_logs_failed", error=str(exc), exc_info=True)

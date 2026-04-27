@@ -3,12 +3,14 @@
 迁移自 tunxiang V2.x narrative_engine.py
 全纯函数，无 DB 依赖。总字数硬约束 ≤ 200 字。
 """
+
 from typing import Optional
 
 BRIEF_MAX_CHARS = 200
 
 
 # ─── 纯函数1：经营概览 ───
+
 
 def build_overview(
     store_label: str,
@@ -37,6 +39,7 @@ def build_overview(
 
 
 # ─── 纯函数2：异常检测 ───
+
 
 def detect_anomalies(
     cost_metrics: dict,
@@ -87,6 +90,7 @@ def _sum_saving(decisions: list) -> float:
 
 # ─── 纯函数3：行动建议 ───
 
+
 def build_action(
     top_decisions: list,
     cost_metrics: dict,
@@ -105,6 +109,7 @@ def build_action(
 
 
 # ─── 纯函数4：组装简报 ───
+
 
 def compose_brief(
     store_label: str,
@@ -127,6 +132,6 @@ def compose_brief(
     brief = "\n".join(parts)
 
     if len(brief) > BRIEF_MAX_CHARS:
-        brief = brief[:BRIEF_MAX_CHARS - 1] + "…"
+        brief = brief[: BRIEF_MAX_CHARS - 1] + "…"
 
     return brief

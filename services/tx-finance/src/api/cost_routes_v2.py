@@ -7,6 +7,7 @@
   POST /api/v1/finance/configs                — 设置财务配置（成本比例/月租/水电）
   GET  /api/v1/finance/configs/{store_id}     — 查询门店财务配置
 """
+
 from __future__ import annotations
 
 import uuid
@@ -25,27 +26,32 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["finance-costs-v2"])
 
 # 合法的 cost_type 枚举
-_VALID_COST_TYPES = frozenset({
-    "purchase",
-    "wastage",
-    "live_seafood_death",
-    "labor",
-    "rent",
-    "utilities",
-    "other",
-})
+_VALID_COST_TYPES = frozenset(
+    {
+        "purchase",
+        "wastage",
+        "live_seafood_death",
+        "labor",
+        "rent",
+        "utilities",
+        "other",
+    }
+)
 
 # 合法的 config_type 枚举
-_VALID_CONFIG_TYPES = frozenset({
-    "labor_cost_pct",
-    "rent_monthly_fen",
-    "utilities_daily_fen",
-    "target_food_cost_pct",
-    "other_daily_opex_fen",
-})
+_VALID_CONFIG_TYPES = frozenset(
+    {
+        "labor_cost_pct",
+        "rent_monthly_fen",
+        "utilities_daily_fen",
+        "target_food_cost_pct",
+        "other_daily_opex_fen",
+    }
+)
 
 
 # ─── 请求模型 ─────────────────────────────────────────────────────────────────
+
 
 class CreateCostItemRequest(BaseModel):
     store_id: str = Field(..., description="门店ID（UUID）")
@@ -68,7 +74,10 @@ class CreateCostItemRequest(BaseModel):
 
 class SetFinanceConfigRequest(BaseModel):
     store_id: Optional[str] = Field(None, description="门店ID（NULL=集团级配置）")
-    config_type: str = Field(..., description="配置类型：labor_cost_pct/rent_monthly_fen/utilities_daily_fen/target_food_cost_pct/other_daily_opex_fen")
+    config_type: str = Field(
+        ...,
+        description="配置类型：labor_cost_pct/rent_monthly_fen/utilities_daily_fen/target_food_cost_pct/other_daily_opex_fen",
+    )
     value_fen: Optional[int] = Field(None, ge=0, description="金额类配置（分）")
     value_pct: Optional[float] = Field(None, ge=0, le=100, description="百分比类配置（如 30.0 表示 30%）")
     effective_from: Optional[str] = Field(None, description="生效起始日期 YYYY-MM-DD")
@@ -83,6 +92,7 @@ class SetFinanceConfigRequest(BaseModel):
 
 
 # ─── 依赖注入 ─────────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
@@ -102,12 +112,11 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
 
 
 # ─── POST /costs — 录入成本记录 ───────────────────────────────────────────────
+
 
 @router.post("/costs", summary="录入成本记录")
 async def create_cost_item(
@@ -135,9 +144,7 @@ async def create_cost_item(
         try:
             ref_id = str(uuid.UUID(body.reference_id))
         except ValueError as exc:
-            raise HTTPException(
-                status_code=400, detail=f"reference_id 格式错误: {body.reference_id}"
-            ) from exc
+            raise HTTPException(status_code=400, detail=f"reference_id 格式错误: {body.reference_id}") from exc
 
     result = await db.execute(
         text("""
@@ -187,6 +194,7 @@ async def create_cost_item(
 
 
 # ─── GET /costs — 查询成本明细 ────────────────────────────────────────────────
+
 
 @router.get("/costs", summary="查询成本明细")
 async def get_cost_items(
@@ -291,6 +299,7 @@ async def get_cost_items(
 
 # ─── GET /costs/summary — 成本结构汇总 ───────────────────────────────────────
 
+
 @router.get("/costs/summary", summary="成本结构汇总（饼图数据）")
 async def get_cost_summary(
     store_id: str = Query(..., description="门店ID"),
@@ -359,6 +368,7 @@ async def get_cost_summary(
 
 
 # ─── POST /configs — 设置财务配置 ─────────────────────────────────────────────
+
 
 @router.post("/configs", summary="设置财务配置")
 async def set_finance_config(
@@ -444,6 +454,7 @@ async def set_finance_config(
 
 
 # ─── GET /configs/{store_id} — 查询财务配置 ──────────────────────────────────
+
 
 @router.get("/configs/{store_id}", summary="查询门店财务配置")
 async def get_finance_configs(

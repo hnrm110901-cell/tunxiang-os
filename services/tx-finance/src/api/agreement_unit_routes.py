@@ -15,9 +15,10 @@
   POST   /api/v1/agreement-units/{unit_id}/prepaid/refund     — 预付退款
   GET    /api/v1/agreement-units/{unit_id}/prepaid/balance    — 预付余额
 """
+
 import uuid
-from datetime import datetime, date
-from typing import Optional, List
+from datetime import date, datetime
+from typing import List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/agreement-units", tags=["协议单位"])
 
 
 # ─── 工具函数 ──────────────────────────────────────────────────────────────────
+
 
 def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
@@ -54,10 +56,11 @@ def _serialize_row(row: dict) -> dict:
     return result
 
 
-def _format_voucher(unit_name: str, txn_type: str, amount_fen: int,
-                    operator: str, notes: str, txn_id: str, created_at: str) -> str:
+def _format_voucher(
+    unit_name: str, txn_type: str, amount_fen: int, operator: str, notes: str, txn_id: str, created_at: str
+) -> str:
     """生成凭证文本（前端可打印）。"""
-    type_label = {'charge': '手动挂账', 'repay': '还款', 'manual_charge': '手动挂账'}.get(txn_type, txn_type)
+    type_label = {"charge": "手动挂账", "repay": "还款", "manual_charge": "手动挂账"}.get(txn_type, txn_type)
     amount_yuan = f"¥{amount_fen / 100:.2f}"
     lines = [
         "━━━━━━━━━━━━━━━━━━━━",
@@ -80,6 +83,7 @@ def _format_voucher(unit_name: str, txn_type: str, amount_fen: int,
 
 # ─── 依赖注入 ──────────────────────────────────────────────────────────────────
 
+
 async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
     async for session in get_db_with_tenant(x_tenant_id):
         yield session
@@ -89,6 +93,7 @@ async def _get_tenant_db(x_tenant_id: str = Header(..., alias="X-Tenant-ID")):
 
 
 # ─── 请求模型 ──────────────────────────────────────────────────────────────────
+
 
 class UnitCreate(BaseModel):
     name: str = Field(..., max_length=100)
@@ -144,6 +149,7 @@ class PrepaidRefundRequest(BaseModel):
 
 
 # ─── GET /agreement-units — 列表 ──────────────────────────────────────────────
+
 
 @router.get("", summary="协议单位列表")
 async def list_units(
@@ -220,6 +226,7 @@ async def list_units(
 
 # ─── POST /agreement-units — 新建 ─────────────────────────────────────────────
 
+
 @router.post("", summary="新建协议单位")
 async def create_unit(
     body: UnitCreate,
@@ -232,8 +239,7 @@ async def create_unit(
 
     valid_cycles = {None, "monthly", "weekly", "custom"}
     if body.settlement_cycle not in valid_cycles:
-        raise HTTPException(status_code=400,
-                            detail="settlement_cycle 必须是: monthly/weekly/custom")
+        raise HTTPException(status_code=400, detail="settlement_cycle 必须是: monthly/weekly/custom")
 
     try:
         async with db.begin():
@@ -291,6 +297,7 @@ async def create_unit(
 
 # ─── GET /report/aging — 账龄分析 ────────────────────────────────────────────
 # 注：静态路由必须在 {unit_id} 动态路由之前注册
+
 
 @router.get("/report/aging", summary="账龄分析报表")
 async def aging_report(
@@ -361,6 +368,7 @@ async def aging_report(
 
 # ─── GET /report/monthly — 月度对账单 ────────────────────────────────────────
 
+
 @router.get("/report/monthly", summary="月度对账单")
 async def monthly_statement(
     unit_id: str = Query(..., description="协议单位ID"),
@@ -403,8 +411,7 @@ async def monthly_statement(
         )
         transactions = [_serialize_row(dict(row)) for row in txns_result.mappings().all()]
 
-        total_charged = sum(t["amount_fen"] for t in transactions
-                            if t["type"] in ("charge", "manual_charge"))
+        total_charged = sum(t["amount_fen"] for t in transactions if t["type"] in ("charge", "manual_charge"))
         total_repaid = sum(abs(t["amount_fen"]) for t in transactions if t["type"] == "repay")
     except HTTPException:
         raise
@@ -432,6 +439,7 @@ async def monthly_statement(
 
 
 # ─── GET /{unit_id} — 单位详情 ────────────────────────────────────────────────
+
 
 @router.get("/{unit_id}", summary="协议单位详情（含账户余额）")
 async def get_unit(
@@ -472,6 +480,7 @@ async def get_unit(
 
 
 # ─── PUT /{unit_id} — 更新 ───────────────────────────────────────────────────
+
 
 @router.put("/{unit_id}", summary="更新协议单位信息")
 async def update_unit(
@@ -536,6 +545,7 @@ async def update_unit(
 
 # ─── POST /{unit_id}/suspend — 暂停/启用 ──────────────────────────────────────
 
+
 @router.post("/{unit_id}/suspend", summary="暂停或启用协议单位")
 async def toggle_suspend(
     unit_id: str = Path(...),
@@ -585,6 +595,7 @@ async def toggle_suspend(
 
 
 # ─── GET /{unit_id}/transactions — 流水 ──────────────────────────────────────
+
 
 @router.get("/{unit_id}/transactions", summary="挂账/还款流水（分页）")
 async def list_transactions(
@@ -662,6 +673,7 @@ async def list_transactions(
 
 # ─── POST /{unit_id}/charge — 手动挂账 ───────────────────────────────────────
 
+
 @router.post("/{unit_id}/charge", summary="手动挂账")
 async def manual_charge(
     unit_id: str = Path(...),
@@ -696,17 +708,14 @@ async def manual_charge(
         raise HTTPException(status_code=404, detail=f"协议单位不存在: {unit_id}")
 
     if unit["status"] != "active":
-        raise HTTPException(status_code=409,
-                            detail=f"协议单位状态 {unit['status']} 不允许挂账")
+        raise HTTPException(status_code=409, detail=f"协议单位状态 {unit['status']} 不允许挂账")
 
     # 授信额度检查
     available_credit = unit["credit_limit_fen"] - unit["credit_used_fen"]
     if body.amount_fen > available_credit:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"超出授信额度：可用 {available_credit} 分，本次需 {body.amount_fen} 分"
-            ),
+            detail=(f"超出授信额度：可用 {available_credit} 分，本次需 {body.amount_fen} 分"),
         )
 
     new_credit_used = unit["credit_used_fen"] + body.amount_fen
@@ -765,8 +774,7 @@ async def manual_charge(
     txn_id = str(txn_row["id"])
     created_at_str = txn_row["created_at"].isoformat() if txn_row["created_at"] else ""
 
-    logger.info("agreement_unit_charged", unit_id=unit_id, txn_id=txn_id,
-                amount_fen=body.amount_fen)
+    logger.info("agreement_unit_charged", unit_id=unit_id, txn_id=txn_id, amount_fen=body.amount_fen)
 
     response: dict = {
         "ok": True,
@@ -796,6 +804,7 @@ async def manual_charge(
 
 
 # ─── POST /{unit_id}/repay — 还款 ────────────────────────────────────────────
+
 
 @router.post("/{unit_id}/repay", summary="还款（普通/指定/批量）")
 async def repay(
@@ -904,7 +913,7 @@ async def repay(
                     "tenant_id": str(tid),
                     "unit_id": str(uid),
                     "account_id": account_id,
-                    "amount_fen": -pay_amount,   # 还款金额存为负数
+                    "amount_fen": -pay_amount,  # 还款金额存为负数
                     "operator_id": str(op_id),
                     "repay_method": body.repay_method,
                     "notes": body.notes,
@@ -937,8 +946,7 @@ async def repay(
     txn_id = str(txn_row["id"])
     created_at_str = txn_row["created_at"].isoformat() if txn_row["created_at"] else ""
 
-    logger.info("agreement_unit_repaid", unit_id=unit_id, txn_id=txn_id,
-                pay_amount=pay_amount, mode=body.repay_mode)
+    logger.info("agreement_unit_repaid", unit_id=unit_id, txn_id=txn_id, pay_amount=pay_amount, mode=body.repay_mode)
 
     response: dict = {
         "ok": True,
@@ -968,6 +976,7 @@ async def repay(
 
 
 # ─── POST /{unit_id}/prepaid/recharge — 预付充值 ─────────────────────────────
+
 
 @router.post("/{unit_id}/prepaid/recharge", summary="预付充值")
 async def prepaid_recharge(
@@ -1059,6 +1068,7 @@ async def prepaid_recharge(
 
 
 # ─── POST /{unit_id}/prepaid/refund — 预付退款 ───────────────────────────────
+
 
 @router.post("/{unit_id}/prepaid/refund", summary="预付退款")
 async def prepaid_refund(
@@ -1157,6 +1167,7 @@ async def prepaid_refund(
 
 
 # ─── GET /{unit_id}/prepaid/balance — 预付余额 ───────────────────────────────
+
 
 @router.get("/{unit_id}/prepaid/balance", summary="预付余额")
 async def prepaid_balance(

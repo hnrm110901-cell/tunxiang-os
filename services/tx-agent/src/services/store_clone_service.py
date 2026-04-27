@@ -9,6 +9,7 @@
 6. business_hours  — 营业时间、休息日
 7. thresholds      — 毛利底线、折扣阈值、临期预警天数
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -106,16 +107,10 @@ class StoreCloneService:
         cls._progress_cache[task_id] = progress
 
         # 写入 store_clone_tasks 表
-        await cls._create_task_record(
-            db, task_id, tenant_id, source_store_id, target_store_id, items, operator_id
-        )
+        await cls._create_task_record(db, task_id, tenant_id, source_store_id, target_store_id, items, operator_id)
 
         # 异步执行（不阻塞 API 响应）
-        asyncio.create_task(
-            cls._execute_clone(
-                db, task_id, tenant_id, source_store_id, target_store_id, items
-            )
-        )
+        asyncio.create_task(cls._execute_clone(db, task_id, tenant_id, source_store_id, target_store_id, items))
 
         logger.info(
             "store_clone_started",
@@ -145,13 +140,13 @@ class StoreCloneService:
         errors: list[str] = []
 
         clone_handlers = {
-            CloneItemType.MENU_CONFIG:     cls._clone_menu_config,
-            CloneItemType.PRICING:         cls._clone_pricing,
-            CloneItemType.ROLES:           cls._clone_roles,
+            CloneItemType.MENU_CONFIG: cls._clone_menu_config,
+            CloneItemType.PRICING: cls._clone_pricing,
+            CloneItemType.ROLES: cls._clone_roles,
             CloneItemType.PRINT_TEMPLATES: cls._clone_print_templates,
-            CloneItemType.KDS_ROUTES:      cls._clone_kds_routes,
-            CloneItemType.BUSINESS_HOURS:  cls._clone_business_hours,
-            CloneItemType.THRESHOLDS:      cls._clone_thresholds,
+            CloneItemType.KDS_ROUTES: cls._clone_kds_routes,
+            CloneItemType.BUSINESS_HOURS: cls._clone_business_hours,
+            CloneItemType.THRESHOLDS: cls._clone_thresholds,
         }
 
         for item_type in items:
@@ -186,9 +181,7 @@ class StoreCloneService:
     # ── 各类克隆逻辑（使用 INSERT ... SELECT 模式）────────────────────────────
 
     @classmethod
-    async def _clone_menu_config(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_menu_config(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆菜品分类和菜品（不克隆库存）"""
         # 菜品分类
         await db.execute(
@@ -207,9 +200,7 @@ class StoreCloneService:
         await db.flush()
 
     @classmethod
-    async def _clone_pricing(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_pricing(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆折扣规则"""
         await db.execute(
             text("""
@@ -228,9 +219,7 @@ class StoreCloneService:
         await db.flush()
 
     @classmethod
-    async def _clone_roles(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_roles(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆角色权限配置"""
         await db.execute(
             text("""
@@ -249,9 +238,7 @@ class StoreCloneService:
         await db.flush()
 
     @classmethod
-    async def _clone_print_templates(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_print_templates(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆小票/厨房单模板"""
         await db.execute(
             text("""
@@ -270,9 +257,7 @@ class StoreCloneService:
         await db.flush()
 
     @classmethod
-    async def _clone_kds_routes(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_kds_routes(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆 KDS 路由规则"""
         await db.execute(
             text("""
@@ -290,9 +275,7 @@ class StoreCloneService:
         await db.flush()
 
     @classmethod
-    async def _clone_business_hours(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_business_hours(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆营业时间配置"""
         await db.execute(
             text("""
@@ -309,9 +292,7 @@ class StoreCloneService:
         await db.flush()
 
     @classmethod
-    async def _clone_thresholds(
-        cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID
-    ) -> None:
+    async def _clone_thresholds(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆毛利底线、折扣阈值等经营阈值"""
         await db.execute(
             text("""

@@ -11,12 +11,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.database import get_db
-
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
@@ -30,6 +24,11 @@ from services.payroll_engine import (
     derive_hourly_rate,
     summarize_payroll,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/org", tags=["payslips"])
 
@@ -38,9 +37,7 @@ router = APIRouter(prefix="/api/v1/org", tags=["payslips"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     return tid
@@ -113,12 +110,18 @@ def _build_payslip(employee: dict, month: str) -> dict:
 
     # 社保公积金（简化：按基本工资比例估算）
     social_insurance = int(base_salary * 0.105)  # 个人 10.5%
-    housing_fund = int(base_salary * 0.07)       # 个人 7%
+    housing_fund = int(base_salary * 0.07)  # 个人 7%
 
     # 个税
     gross_yuan = (
-        base_salary + position_allowance + meal_allowance + transport_allowance
-        + perf_bonus + overtime_pay + seniority_sub + full_attend
+        base_salary
+        + position_allowance
+        + meal_allowance
+        + transport_allowance
+        + perf_bonus
+        + overtime_pay
+        + seniority_sub
+        + full_attend
     ) / 100
     tax_yuan = compute_monthly_tax(
         current_month_taxable_income_yuan=gross_yuan,
@@ -205,9 +208,7 @@ async def generate_payslips(
         if mon < 1 or mon > 12:
             raise ValueError
     except (ValueError, IndexError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid month format: {req.month}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid month format: {req.month}") from exc
 
     payslips: list[dict] = []
     errors: list[dict] = []
@@ -261,13 +262,15 @@ async def generate_payslips(
             await db.rollback()
             raise HTTPException(status_code=500, detail="DB error saving payslips") from exc
 
-    return _ok({
-        "store_id": req.store_id,
-        "month": req.month,
-        "generated": len(payslips),
-        "errors": errors,
-        "payslips": payslips,
-    })
+    return _ok(
+        {
+            "store_id": req.store_id,
+            "month": req.month,
+            "generated": len(payslips),
+            "errors": errors,
+            "payslips": payslips,
+        }
+    )
 
 
 @router.get("/payslips")
@@ -325,12 +328,14 @@ async def list_payslips(
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="DB error listing payslips") from exc
 
-    return _ok({
-        "items": items,
-        "total": total,
-        "page": page,
-        "size": effective_size,
-    })
+    return _ok(
+        {
+            "items": items,
+            "total": total,
+            "page": page,
+            "size": effective_size,
+        }
+    )
 
 
 @router.get("/payslips/{pid}")

@@ -13,6 +13,7 @@ GET  /api/v1/analytics/daily-brief/history       — 历史日报列表
   - TOP5 热销 / TOP5 滞销
   - 推荐明日行动
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/api/v1/analytics/daily-brief", tags=["daily-brief"])
 
 # ─── 依赖项 ──────────────────────────────────────────────────────────
 
+
 async def _get_db_with_tenant(
     x_tenant_id: str = Header("default", alias="X-Tenant-ID"),
 ) -> AsyncSession:
@@ -42,6 +44,7 @@ async def _get_db_with_tenant(
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────
+
 
 class ScheduleRequest(BaseModel):
     store_ids: list[str] = Field(default_factory=list, description="门店ID列表，空=全部门店")
@@ -52,8 +55,12 @@ class ScheduleRequest(BaseModel):
 
 # ─── 日报数据聚合（DB查询，失败时降级为mock） ─────────────────────────
 
+
 async def _fetch_revenue_metrics(
-    db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    target_date: date,
 ) -> dict[str, Any]:
     """营收/客流/客单价/毛利率，以及 vs 昨日 / vs 上周同日"""
     yesterday = target_date - timedelta(days=1)
@@ -63,7 +70,8 @@ async def _fetch_revenue_metrics(
         start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
         end = start + timedelta(days=1)
         try:
-            r = await db.execute(text("""
+            r = await db.execute(
+                text("""
                 SELECT
                     COALESCE(SUM(total_amount), 0) AS revenue,
                     COUNT(*) AS order_count,
@@ -72,7 +80,9 @@ async def _fetch_revenue_metrics(
                 WHERE tenant_id = :tid AND store_id = :sid
                   AND status = 'completed'
                   AND created_at >= :start AND created_at < :end
-            """), {"tid": tenant_id, "sid": store_id, "start": start, "end": end})
+            """),
+                {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
+            )
             row = r.fetchone()
             revenue = float(row[0] or 0)
             count = int(row[1] or 0)
@@ -85,12 +95,15 @@ async def _fetch_revenue_metrics(
         margin_rate = 0.0
         if revenue > 0:
             try:
-                cr = await db.execute(text("""
+                cr = await db.execute(
+                    text("""
                     SELECT COALESCE(SUM(amount), 0)
                     FROM cost_records
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND recorded_at >= :start AND recorded_at < :end
-                """), {"tid": tenant_id, "sid": store_id, "start": start, "end": end})
+                """),
+                    {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
+                )
                 cost = float(cr.scalar() or 0)
                 margin_rate = round((revenue - cost) / revenue, 4) if revenue > 0 else 0
             except (SQLAlchemyError, ConnectionError):
@@ -124,7 +137,10 @@ async def _fetch_revenue_metrics(
 
 
 async def _fetch_anomaly_summary(
-    db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    target_date: date,
 ) -> list[dict[str, Any]]:
     """异常摘要：折扣异常/退单/缺货/差评"""
     start = datetime(target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc)
@@ -132,25 +148,33 @@ async def _fetch_anomaly_summary(
     anomalies: list[dict[str, Any]] = []
     try:
         # 退单数量
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT COUNT(*) FROM orders
             WHERE tenant_id = :tid AND store_id = :sid
               AND status = 'refunded'
               AND created_at >= :start AND created_at < :end
-        """), {"tid": tenant_id, "sid": store_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
+        )
         refund_count = int(r.scalar() or 0)
         if refund_count > 0:
             anomalies.append({"type": "refund", "description": f"今日退单{refund_count}笔", "count": refund_count})
 
         # 折扣异常（从 agent_decision_logs 获取）
-        r2 = await db.execute(text("""
+        r2 = await db.execute(
+            text("""
             SELECT COUNT(*) FROM agent_decision_logs
             WHERE tenant_id = :tid AND decision_type = 'discount_anomaly'
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
-        """), {"tid": tenant_id, "d": target_date.isoformat()})
+        """),
+            {"tid": tenant_id, "d": target_date.isoformat()},
+        )
         discount_anomaly = int(r2.scalar() or 0)
         if discount_anomaly > 0:
-            anomalies.append({"type": "discount_anomaly", "description": f"折扣异常{discount_anomaly}次", "count": discount_anomaly})
+            anomalies.append(
+                {"type": "discount_anomaly", "description": f"折扣异常{discount_anomaly}次", "count": discount_anomaly}
+            )
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_anomaly_query_fail", error=str(exc))
 
@@ -158,18 +182,23 @@ async def _fetch_anomaly_summary(
 
 
 async def _fetch_agent_summary(
-    db: AsyncSession, tenant_id: str, target_date: date,
+    db: AsyncSession,
+    tenant_id: str,
+    target_date: date,
 ) -> list[dict[str, Any]]:
     """Agent 决策摘要：今日 Agent 做了什么"""
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT agent_id, action, reasoning, confidence, status
             FROM agent_decision_logs
             WHERE tenant_id = :tid
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
             ORDER BY created_at DESC
             LIMIT 10
-        """), {"tid": tenant_id, "d": target_date.isoformat()})
+        """),
+            {"tid": tenant_id, "d": target_date.isoformat()},
+        )
         rows = r.fetchall()
         return [
             {
@@ -187,7 +216,10 @@ async def _fetch_agent_summary(
 
 
 async def _fetch_dish_rankings(
-    db: AsyncSession, tenant_id: str, store_id: str, target_date: date,
+    db: AsyncSession,
+    tenant_id: str,
+    store_id: str,
+    target_date: date,
 ) -> dict[str, list[dict[str, Any]]]:
     """TOP5 热销 / TOP5 滞销"""
     start = datetime(target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc)
@@ -195,7 +227,8 @@ async def _fetch_dish_rankings(
     top5: list[dict[str, Any]] = []
     bottom5: list[dict[str, Any]] = []
     try:
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT oi.dish_name, SUM(oi.quantity) AS qty, SUM(oi.subtotal) AS revenue
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
@@ -204,7 +237,9 @@ async def _fetch_dish_rankings(
               AND o.created_at >= :start AND o.created_at < :end
             GROUP BY oi.dish_name
             ORDER BY qty DESC
-        """), {"tid": tenant_id, "sid": store_id, "start": start, "end": end})
+        """),
+            {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
+        )
         rows = r.fetchall()
         for i, row in enumerate(rows[:5]):
             top5.append({"rank": i + 1, "dish_name": row[0], "quantity": int(row[1]), "revenue": float(row[2] or 0)})
@@ -217,7 +252,9 @@ async def _fetch_dish_rankings(
 
 
 def _generate_recommendations(
-    revenue_metrics: dict, anomalies: list, dish_rankings: dict,
+    revenue_metrics: dict,
+    anomalies: list,
+    dish_rankings: dict,
 ) -> list[str]:
     """基于日报数据生成明日行动建议"""
     actions: list[str] = []
@@ -271,6 +308,7 @@ def _degraded_daily_brief(store_id: str, target_date: date) -> dict[str, Any]:
 
 # ─── 路由 ─────────────────────────────────────────────────────────────
 
+
 @router.get("/history")
 async def get_brief_history(
     store_id: str | None = Query(None, description="门店ID，空=全部"),
@@ -292,13 +330,16 @@ async def get_brief_history(
 
         params["limit"] = size
         params["offset"] = (page - 1) * size
-        r = await db.execute(text(f"""
+        r = await db.execute(
+            text(f"""
             SELECT id::text, store_id, brief_date, content_json, sent_at, created_at
             FROM daily_briefs
             {conditions}
             ORDER BY brief_date DESC
             LIMIT :limit OFFSET :offset
-        """), params)
+        """),
+            params,
+        )
         rows = r.fetchall()
         items = [
             {
@@ -327,10 +368,13 @@ async def get_group_brief(
 
     try:
         # 获取所有门店
-        r = await db.execute(text("""
+        r = await db.execute(
+            text("""
             SELECT id::text, name FROM stores
             WHERE tenant_id = :tid AND is_deleted = FALSE
-        """), {"tid": x_tenant_id})
+        """),
+            {"tid": x_tenant_id},
+        )
         stores = r.fetchall()
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("group_brief_stores_query_fail", error=str(exc))
@@ -370,7 +414,9 @@ async def get_group_brief(
         if mr > 0:
             margin_sum += mr
             store_count_with_margin += 1
-        store_briefs.append({"store_id": sid, "store_name": sname, "revenue": rev, "order_count": orders, "margin_rate": mr})
+        store_briefs.append(
+            {"store_id": sid, "store_name": sname, "revenue": rev, "order_count": orders, "margin_rate": mr}
+        )
 
     avg_ticket = round(total_revenue / total_orders, 2) if total_orders > 0 else 0
     avg_margin = round(margin_sum / store_count_with_margin, 4) if store_count_with_margin > 0 else 0
@@ -399,15 +445,18 @@ async def configure_schedule(
     """配置自动推送（每日 06:00）"""
     config_id = str(uuid.uuid4())
     try:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO daily_briefs (id, tenant_id, store_id, brief_date, content_json, created_at)
             VALUES (:id, :tid, :sid, CURRENT_DATE, :config, NOW())
-        """), {
-            "id": config_id,
-            "tid": x_tenant_id,
-            "sid": ",".join(body.store_ids) if body.store_ids else "__ALL__",
-            "config": f'{{"schedule": true, "push_time": "{body.push_time}", "channels": {body.channels}, "enabled": {str(body.enabled).lower()}}}',
-        })
+        """),
+            {
+                "id": config_id,
+                "tid": x_tenant_id,
+                "sid": ",".join(body.store_ids) if body.store_ids else "__ALL__",
+                "config": f'{{"schedule": true, "push_time": "{body.push_time}", "channels": {body.channels}, "enabled": {str(body.enabled).lower()}}}',
+            },
+        )
         await db.commit()
     except (SQLAlchemyError, ConnectionError) as exc:
         logger.warning("daily_brief_schedule_save_fail", error=str(exc))
@@ -456,18 +505,22 @@ async def get_store_daily_brief(
         # 持久化到 daily_briefs 表
         try:
             import json
-            await db.execute(text("""
+
+            await db.execute(
+                text("""
                 INSERT INTO daily_briefs (id, tenant_id, store_id, brief_date, content_json, created_at)
                 VALUES (:id, :tid, :sid, :d, :content, NOW())
                 ON CONFLICT (tenant_id, store_id, brief_date) DO UPDATE
                 SET content_json = :content, updated_at = NOW()
-            """), {
-                "id": str(uuid.uuid4()),
-                "tid": x_tenant_id,
-                "sid": store_id,
-                "d": d.isoformat(),
-                "content": json.dumps(brief, ensure_ascii=False, default=str),
-            })
+            """),
+                {
+                    "id": str(uuid.uuid4()),
+                    "tid": x_tenant_id,
+                    "sid": store_id,
+                    "d": d.isoformat(),
+                    "content": json.dumps(brief, ensure_ascii=False, default=str),
+                },
+            )
             await db.commit()
         except (SQLAlchemyError, ConnectionError) as persist_exc:
             logger.warning("daily_brief_persist_fail", error=str(persist_exc))

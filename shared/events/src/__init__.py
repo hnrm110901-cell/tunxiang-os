@@ -8,47 +8,48 @@
 
 旧接口（Redis Streams）保留兼容，新代码统一使用 emit_event。
 """
+
+from .consumer import EventConsumer
+from .emitter import emit_event, emits
 from .event_base import TxEvent
 from .event_types import (
+    ALL_EVENT_ENUMS,
+    DOMAIN_STREAM_MAP,
     # 核心业务域（七条因果链）
     AgentEventType,
     ChannelEventType,
+    DeliveryTempEventType,
     DiscountEventType,
+    EnergyEventType,
     InventoryEventType,
     KdsEventType,
     MemberEventType,
+    OpinionEventType,
     OrderEventType,
     PaymentEventType,
     RecipeEventType,
     ReservationEventType,
     ReviewEventType,
-    OpinionEventType,
     SafetyEventType,
     SettlementEventType,
-    EnergyEventType,
     # 工具函数
     resolve_stream_key,
     resolve_stream_type,
-    DOMAIN_STREAM_MAP,
-    ALL_EVENT_ENUMS,
 )
-from .publisher import EventPublisher
-from .consumer import EventConsumer
-from .pg_notify import PgNotifier, PgListener
-from .pg_event_store import PgEventStore
-from .emitter import emit_event, emits
-from .projector import ProjectorBase
 from .middleware import (
+    DeduplicationMiddleware,
     EventMiddleware,
     LoggingMiddleware,
     TenantIsolationMiddleware,
-    DeduplicationMiddleware,
 )
+from .pg_event_store import PgEventStore
+from .pg_notify import PgListener, PgNotifier
+from .projector import ProjectorBase
+from .publisher import EventPublisher
 
 __all__ = [
     # ── 事件基础 ──
     "TxEvent",
-
     # ── 事件类型（10大域 + 系统域）──
     "OrderEventType",
     "DiscountEventType",
@@ -60,6 +61,7 @@ __all__ = [
     "SettlementEventType",
     "SafetyEventType",
     "EnergyEventType",
+    "DeliveryTempEventType",
     "ReviewEventType",
     "OpinionEventType",
     "RecipeEventType",
@@ -69,21 +71,17 @@ __all__ = [
     "resolve_stream_key",
     "resolve_stream_type",
     "DOMAIN_STREAM_MAP",
-
     # ── 核心基础设施 ──
-    "PgEventStore",        # PostgreSQL 持久化事件存储
-    "emit_event",          # 平行事件发射器（Redis + PG）
-    "emits",               # 装饰器版发射器
-    "ProjectorBase",       # 投影器基类
-
+    "PgEventStore",  # PostgreSQL 持久化事件存储
+    "emit_event",  # 平行事件发射器（Redis + PG）
+    "emits",  # 装饰器版发射器
+    "ProjectorBase",  # 投影器基类
     # ── Redis Stream（保留兼容）──
     "EventPublisher",
     "EventConsumer",
-
     # ── PG NOTIFY ──
     "PgNotifier",
     "PgListener",
-
     # ── 中间件 ──
     "EventMiddleware",
     "LoggingMiddleware",

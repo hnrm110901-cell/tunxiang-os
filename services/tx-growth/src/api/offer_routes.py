@@ -11,13 +11,14 @@
 v144 表：offers / offer_redemptions
 RLS 通过 set_config('app.tenant_id') 激活
 """
+
 import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -134,6 +135,7 @@ _SEGMENT_OFFER_MAP: dict[str, list[dict]] = {
 # 统一响应
 # ---------------------------------------------------------------------------
 
+
 def ok_response(data: Any) -> dict:
     return {"ok": True, "data": data}
 
@@ -145,6 +147,7 @@ def error_response(code: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 # 内部工具
 # ---------------------------------------------------------------------------
+
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
     await db.execute(
@@ -192,6 +195,7 @@ def _row_to_offer(row) -> dict:
 # 请求模型
 # ---------------------------------------------------------------------------
 
+
 class CreateOfferRequest(BaseModel):
     name: str
     offer_type: str
@@ -238,6 +242,7 @@ class MarginCheckRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 端点
 # ---------------------------------------------------------------------------
+
 
 @router.post("")
 async def create_offer(
@@ -298,14 +303,16 @@ async def create_offer(
             offer_type=req.offer_type,
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "offer_id": str(new_id),
-            "name": req.name,
-            "offer_type": req.offer_type,
-            "goal": type_defaults.get("goal", "general"),
-            "status": "active",
-            "margin_floor": req.margin_floor,
-        })
+        return ok_response(
+            {
+                "offer_id": str(new_id),
+                "name": req.name,
+                "offer_type": req.offer_type,
+                "goal": type_defaults.get("goal", "general"),
+                "status": "active",
+                "margin_floor": req.margin_floor,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -446,12 +453,14 @@ async def recommend_offer(
                 }
                 for r in rows
             ]
-            return ok_response({
-                "segment_id": segment_id,
-                "recommendations": recommendations,
-                "total": len(recommendations),
-                "source": "db",
-            })
+            return ok_response(
+                {
+                    "segment_id": segment_id,
+                    "recommendations": recommendations,
+                    "total": len(recommendations),
+                    "source": "db",
+                }
+            )
 
         # DB 无数据：返回内置参考模板（标注为 template，不影响真实数据）
         template_recommendations = _SEGMENT_OFFER_MAP.get(segment_id)
@@ -466,13 +475,15 @@ async def recommend_offer(
                 },
             ]
         fallback = [dict(item, source="template") for item in template_recommendations]
-        return ok_response({
-            "segment_id": segment_id,
-            "recommendations": fallback,
-            "total": len(fallback),
-            "source": "template",
-            "_note": "当前租户尚未配置针对此人群的优惠，以下为参考模板，请先通过 POST /api/v1/offers 创建优惠",
-        })
+        return ok_response(
+            {
+                "segment_id": segment_id,
+                "recommendations": fallback,
+                "total": len(fallback),
+                "source": "template",
+                "_note": "当前租户尚未配置针对此人群的优惠，以下为参考模板，请先通过 POST /api/v1/offers 创建优惠",
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -480,23 +491,28 @@ async def recommend_offer(
         if _is_table_missing(exc):
             logger.warning("offer.table_not_ready", error=str(exc))
             # 表未就绪时降级返回模板推荐
-            template_recommendations = _SEGMENT_OFFER_MAP.get(segment_id, [
-                {
-                    "offer_type": "new_dish_trial",
-                    "name": "新品尝鲜券-满80减15（参考模板）",
-                    "discount_rules": {"type": "threshold", "threshold_fen": 8000, "reduce_fen": 1500},
-                    "reason": "新品试吃提升菜品覆盖面",
-                    "expected_roi": 2.5,
-                },
-            ])
+            template_recommendations = _SEGMENT_OFFER_MAP.get(
+                segment_id,
+                [
+                    {
+                        "offer_type": "new_dish_trial",
+                        "name": "新品尝鲜券-满80减15（参考模板）",
+                        "discount_rules": {"type": "threshold", "threshold_fen": 8000, "reduce_fen": 1500},
+                        "reason": "新品试吃提升菜品覆盖面",
+                        "expected_roi": 2.5,
+                    },
+                ],
+            )
             fallback = [dict(item, source="template") for item in template_recommendations]
-            return ok_response({
-                "segment_id": segment_id,
-                "recommendations": fallback,
-                "total": len(fallback),
-                "source": "template",
-                "_note": "TABLE_NOT_READY",
-            })
+            return ok_response(
+                {
+                    "segment_id": segment_id,
+                    "recommendations": fallback,
+                    "total": len(fallback),
+                    "source": "template",
+                    "_note": "TABLE_NOT_READY",
+                }
+            )
         logger.error("offer.recommend_error", error=str(exc), exc_info=True)
         return error_response("DB_ERROR", "查询推荐优惠失败")
 
@@ -592,14 +608,17 @@ async def check_eligibility(
         if user_redemption_count >= offer.max_per_user:
             return ok_response({"eligible": False, "reason": "已达使用上限"})
 
-        return ok_response({
-            "eligible": True,
-            "offer_id": req.offer_id,
-            "user_id": uid,
-            "discount_rules": offer.discount_rules if isinstance(offer.discount_rules, dict)
-                              else json.loads(offer.discount_rules or "{}"),
-            "validity_days": offer.validity_days,
-        })
+        return ok_response(
+            {
+                "eligible": True,
+                "offer_id": req.offer_id,
+                "user_id": uid,
+                "discount_rules": offer.discount_rules
+                if isinstance(offer.discount_rules, dict)
+                else json.loads(offer.discount_rules or "{}"),
+                "validity_days": offer.validity_days,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -671,21 +690,23 @@ async def get_offer_analytics(
         revenue_per_redemption = total_revenue_fen // max(1, redeemed) if total_revenue_fen else 0
         profit_contribution_fen = total_revenue_fen - actual_discount_fen
 
-        return ok_response({
-            "offer_id": offer_id,
-            "offer_name": offer.name,
-            "offer_type": offer.offer_type,
-            "issued_count": issued,
-            "redeemed_count": redeemed,
-            "redemption_rate": round(redemption_rate, 4),
-            "total_discount_fen": actual_discount_fen or offer.total_discount_fen,
-            "total_discount_yuan": round((actual_discount_fen or offer.total_discount_fen) / 100, 2),
-            "total_revenue_fen": total_revenue_fen,
-            "total_revenue_yuan": round(total_revenue_fen / 100, 2),
-            "revenue_per_redemption_fen": revenue_per_redemption,
-            "profit_contribution_fen": profit_contribution_fen,
-            "profit_contribution_yuan": round(profit_contribution_fen / 100, 2),
-        })
+        return ok_response(
+            {
+                "offer_id": offer_id,
+                "offer_name": offer.name,
+                "offer_type": offer.offer_type,
+                "issued_count": issued,
+                "redeemed_count": redeemed,
+                "redemption_rate": round(redemption_rate, 4),
+                "total_discount_fen": actual_discount_fen or offer.total_discount_fen,
+                "total_discount_yuan": round((actual_discount_fen or offer.total_discount_fen) / 100, 2),
+                "total_revenue_fen": total_revenue_fen,
+                "total_revenue_yuan": round(total_revenue_fen / 100, 2),
+                "revenue_per_redemption_fen": revenue_per_redemption,
+                "profit_contribution_fen": profit_contribution_fen,
+                "profit_contribution_yuan": round(profit_contribution_fen / 100, 2),
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -727,6 +748,7 @@ async def calculate_offer_cost(
             return error_response("NOT_FOUND", f"优惠不存在: {offer_id}")
 
         import json as _json
+
         rules = row.discount_rules if isinstance(row.discount_rules, dict) else _json.loads(row.discount_rules or "{}")
         rule_type = rules.get("type", "")
 
@@ -748,22 +770,23 @@ async def calculate_offer_cost(
         # 假设每次核销带来增量收入为客单价的1.5倍（含复购效应）
         projected_revenue_lift_fen = int(avg_order_fen * 1.5 * estimated_redemption_count)
         projected_roi = (
-            round(projected_revenue_lift_fen / max(1, projected_cost_fen), 2)
-            if projected_cost_fen > 0 else 0.0
+            round(projected_revenue_lift_fen / max(1, projected_cost_fen), 2) if projected_cost_fen > 0 else 0.0
         )
 
         logger.info("offer.cost_calculated", offer_id=offer_id, tenant_id=x_tenant_id)
-        return ok_response({
-            "offer_id": offer_id,
-            "estimated_redemption_count": estimated_redemption_count,
-            "per_discount_fen": per_discount_fen,
-            "per_discount_yuan": round(per_discount_fen / 100, 2),
-            "projected_cost_fen": projected_cost_fen,
-            "projected_cost_yuan": round(projected_cost_fen / 100, 2),
-            "projected_revenue_lift_fen": projected_revenue_lift_fen,
-            "projected_revenue_lift_yuan": round(projected_revenue_lift_fen / 100, 2),
-            "projected_roi": projected_roi,
-        })
+        return ok_response(
+            {
+                "offer_id": offer_id,
+                "estimated_redemption_count": estimated_redemption_count,
+                "per_discount_fen": per_discount_fen,
+                "per_discount_yuan": round(per_discount_fen / 100, 2),
+                "projected_cost_fen": projected_cost_fen,
+                "projected_cost_yuan": round(projected_cost_fen / 100, 2),
+                "projected_revenue_lift_fen": projected_revenue_lift_fen,
+                "projected_revenue_lift_yuan": round(projected_revenue_lift_fen / 100, 2),
+                "projected_roi": projected_roi,
+            }
+        )
 
     except ValueError as exc:
         return error_response("INVALID_PARAM", f"参数格式错误: {exc}")
@@ -777,7 +800,7 @@ async def calculate_offer_cost(
 
 class MarginCheckRequest(BaseModel):
     offer_id: str
-    order_data: dict   # {"total_fen": 15000, "cost_fen": 6000, "discount_fen": 2000}
+    order_data: dict  # {"total_fen": 15000, "cost_fen": 6000, "discount_fen": 2000}
 
 
 @router.post("/check-margin")
@@ -816,12 +839,14 @@ async def check_margin_compliance(
 
         revenue_after_discount = total_fen - discount_fen
         if revenue_after_discount <= 0:
-            return ok_response({
-                "compliant": False,
-                "reason": "优惠后收入为零或负数",
-                "margin_rate": 0.0,
-                "margin_floor": margin_floor,
-            })
+            return ok_response(
+                {
+                    "compliant": False,
+                    "reason": "优惠后收入为零或负数",
+                    "margin_rate": 0.0,
+                    "margin_floor": margin_floor,
+                }
+            )
 
         margin_rate = (revenue_after_discount - cost_fen) / revenue_after_discount
         compliant = margin_rate >= margin_floor
@@ -833,15 +858,17 @@ async def check_margin_compliance(
             margin_rate=round(margin_rate, 4),
             tenant_id=x_tenant_id,
         )
-        return ok_response({
-            "compliant": compliant,
-            "margin_rate": round(margin_rate, 4),
-            "margin_floor": margin_floor,
-            "revenue_after_discount_fen": revenue_after_discount,
-            "cost_fen": cost_fen,
-            "profit_fen": revenue_after_discount - cost_fen,
-            "reason": "" if compliant else f"毛利率 {margin_rate:.1%} 低于底线 {margin_floor:.1%}",
-        })
+        return ok_response(
+            {
+                "compliant": compliant,
+                "margin_rate": round(margin_rate, 4),
+                "margin_floor": margin_floor,
+                "revenue_after_discount_fen": revenue_after_discount,
+                "cost_fen": cost_fen,
+                "profit_fen": revenue_after_discount - cost_fen,
+                "reason": "" if compliant else f"毛利率 {margin_rate:.1%} 低于底线 {margin_floor:.1%}",
+            }
+        )
 
     except (KeyError, TypeError) as exc:
         return error_response("INVALID_PARAM", f"order_data 格式错误: {exc}")

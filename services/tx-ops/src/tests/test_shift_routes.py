@@ -15,19 +15,20 @@
   - 不连接真实 PostgreSQL
   - AsyncSession 以 AsyncMock 替代
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..api.shift_routes import router as shift_router
 from shared.ontology.src.database import get_db
+
+from ..api.shift_routes import router as shift_router
 
 # ── 最小化 FastAPI 应用 ────────────────────────────────────────────────────────
 
@@ -117,8 +118,10 @@ def _set_config_result() -> MagicMock:
 
 def _override_get_db(mock_db: AsyncMock):
     """替换 get_db 依赖，注入 mock AsyncSession。"""
+
     async def _dep():
         yield mock_db
+
     return _dep
 
 
@@ -139,10 +142,12 @@ class TestStartShift:
         #   call 1 — INSERT RETURNING
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),
-            _mappings_result(row),
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),
+                _mappings_result(row),
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -227,12 +232,14 @@ class TestHandover:
 
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),   # call 0: set_config
-            check_result,           # call 1: SELECT check
-            _mappings_result(row),  # call 2: UPDATE RETURNING
-            MagicMock(),            # call 3: DELETE checklist
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),  # call 0: set_config
+                check_result,  # call 1: SELECT check
+                _mappings_result(row),  # call 2: UPDATE RETURNING
+                MagicMock(),  # call 3: DELETE checklist
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -260,10 +267,12 @@ class TestHandover:
         """SELECT 返回空 → 404。"""
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),    # call 0: set_config
-            _empty_check_result(),   # call 1: SELECT check → first()=None
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),  # call 0: set_config
+                _empty_check_result(),  # call 1: SELECT check → first()=None
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -301,11 +310,13 @@ class TestConfirmHandover:
 
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),   # call 0: set_config
-            check_result,           # call 1: SELECT check
-            _mappings_result(row),  # call 2: UPDATE RETURNING
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),  # call 0: set_config
+                check_result,  # call 1: SELECT check
+                _mappings_result(row),  # call 2: UPDATE RETURNING
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -342,11 +353,13 @@ class TestConfirmHandover:
 
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),
-            check_result,
-            _mappings_result(row),
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),
+                check_result,
+                _mappings_result(row),
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -390,10 +403,12 @@ class TestListShifts:
 
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),
-            list_result,
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),
+                list_result,
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -468,11 +483,13 @@ class TestGetSummary:
 
         db = AsyncMock()
         db.commit = AsyncMock()
-        db.execute = AsyncMock(side_effect=[
-            _set_config_result(),   # call 0: set_config
-            shift_result,           # call 1: SELECT shift
-            checklist_result,       # call 2: SELECT checklist
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _set_config_result(),  # call 0: set_config
+                shift_result,  # call 1: SELECT shift
+                checklist_result,  # call 2: SELECT checklist
+            ]
+        )
 
         app.dependency_overrides[get_db] = _override_get_db(db)
         try:
@@ -491,7 +508,7 @@ class TestGetSummary:
 
         # 核心字段断言
         assert "cash_balanced" in data
-        assert data["cash_balanced"] is True   # cash_diff_fen == 0
+        assert data["cash_balanced"] is True  # cash_diff_fen == 0
         assert data["device_total"] == 2
         assert data["device_failed"] == 1
         assert len(data["failed_devices"]) == 1

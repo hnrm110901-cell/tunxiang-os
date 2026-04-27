@@ -9,11 +9,11 @@
 
 from __future__ import annotations
 
-import structlog
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 from uuid import UUID, uuid4
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -664,6 +664,7 @@ class FundSettlementService:
 
 
 # ─── 内部工具函数 ──────────────────────────────────────────────────────
+
 
 def _calculate_split(
     total_amount_fen: int,

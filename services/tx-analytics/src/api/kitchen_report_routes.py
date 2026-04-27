@@ -22,6 +22,7 @@ GET /api/v1/reports/kitchen/daily-summary      厨房综合日报
               status, operated_by, tenant_id, store_id)
   所有查询均包含 tenant_id + store_id 过滤。
 """
+
 from __future__ import annotations
 
 import csv
@@ -44,6 +45,7 @@ router = APIRouter(prefix="/api/v1/reports/kitchen", tags=["kitchen-reports"])
 # ──────────────────────────────────────────────
 # 公共辅助
 # ──────────────────────────────────────────────
+
 
 def _require_store(store_id: Optional[str]) -> str:
     if not store_id:
@@ -92,6 +94,7 @@ def _csv_response(rows: list[dict], filename: str) -> StreamingResponse:
 # ──────────────────────────────────────────────
 # 1. 制作超时报表
 # ──────────────────────────────────────────────
+
 
 @router.get("/overtime")
 async def api_kitchen_overtime(
@@ -214,6 +217,7 @@ async def api_kitchen_overtime(
 # 2. 厨师业绩报表
 # ──────────────────────────────────────────────
 
+
 @router.get("/chef-performance")
 async def api_chef_performance(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -317,6 +321,7 @@ async def api_chef_performance(
 # 3. 档口效率报表
 # ──────────────────────────────────────────────
 
+
 @router.get("/station-efficiency")
 async def api_station_efficiency(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -395,6 +400,7 @@ async def api_station_efficiency(
 # ──────────────────────────────────────────────
 # 4. 菜品制作时长分析
 # ──────────────────────────────────────────────
+
 
 @router.get("/dish-duration")
 async def api_dish_duration(
@@ -475,6 +481,7 @@ async def api_dish_duration(
 # 5. 蒸制统计
 # ──────────────────────────────────────────────
 
+
 @router.get("/steaming-stats")
 async def api_steaming_stats(
     store_id: Optional[str] = Query(None, description="门店ID"),
@@ -537,6 +544,7 @@ async def api_steaming_stats(
 # ──────────────────────────────────────────────
 # 6. 厨房高峰时段
 # ──────────────────────────────────────────────
+
 
 @router.get("/peak-analysis")
 async def api_kitchen_peak_analysis(
@@ -616,6 +624,7 @@ async def api_kitchen_peak_analysis(
 # ──────────────────────────────────────────────
 # 7. 厨房损耗（废单/退菜）
 # ──────────────────────────────────────────────
+
 
 @router.get("/waste-stats")
 async def api_kitchen_waste_stats(
@@ -718,6 +727,7 @@ async def api_kitchen_waste_stats(
 # ──────────────────────────────────────────────
 # 8. 厨房综合日报
 # ──────────────────────────────────────────────
+
 
 @router.get("/daily-summary")
 async def api_kitchen_daily_summary(

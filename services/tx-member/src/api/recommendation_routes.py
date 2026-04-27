@@ -8,8 +8,9 @@
 
 对标：Olo Guest Intelligence 交叉推荐（篮子提升 10%）
 """
+
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 import structlog
@@ -264,7 +265,7 @@ async def recommend_at_order_time(
                 candidates.values(),
                 key=lambda x: x["score"],
                 reverse=True,
-            )[:req.limit]
+            )[: req.limit]
 
             # 写入推荐日志
             for item in sorted_candidates:
@@ -416,15 +417,17 @@ async def recommend_upsell(
                     did = str(r.dish_id)
                     if did not in current_dish_ids and len(upsell_items) < limit:
                         name_prefix = customer_name[:1] + ("先生" if len(customer_name) <= 3 else "")
-                        upsell_items.append({
-                            "dish_id": did,
-                            "dish_name": r.dish_name,
-                            "price_fen": r.price_fen,
-                            "category": r.category,
-                            "reason": f"{name_prefix}您之前点过{r.freq}次{r.dish_name}，要不要再来一份？",
-                            "reason_type": "history_favorite",
-                            "score": min(r.freq / 5.0, 1.0),
-                        })
+                        upsell_items.append(
+                            {
+                                "dish_id": did,
+                                "dish_name": r.dish_name,
+                                "price_fen": r.price_fen,
+                                "category": r.category,
+                                "reason": f"{name_prefix}您之前点过{r.freq}次{r.dish_name}，要不要再来一份？",
+                                "reason_type": "history_favorite",
+                                "score": min(r.freq / 5.0, 1.0),
+                            }
+                        )
 
             # 策略2：补充缺失品类（甜品/饮品）
             complement_categories = {"甜品", "饮品", "小吃"} - current_categories
@@ -446,15 +449,17 @@ async def recommend_upsell(
                     for r in cat_result.fetchall():
                         did = str(r.dish_id)
                         if did not in current_dish_ids and len(upsell_items) < limit:
-                            upsell_items.append({
-                                "dish_id": did,
-                                "dish_name": r.dish_name,
-                                "price_fen": r.price_fen,
-                                "category": r.category,
-                                "reason": f"搭配一份{r.dish_name}，用餐体验更佳",
-                                "reason_type": "category_complement",
-                                "score": 0.6,
-                            })
+                            upsell_items.append(
+                                {
+                                    "dish_id": did,
+                                    "dish_name": r.dish_name,
+                                    "price_fen": r.price_fen,
+                                    "category": r.category,
+                                    "reason": f"搭配一份{r.dish_name}，用餐体验更佳",
+                                    "reason_type": "category_complement",
+                                    "score": 0.6,
+                                }
+                            )
 
             # 写推荐日志
             for item in upsell_items:
@@ -613,15 +618,17 @@ async def recommend_return_visit(
                 for r in explore_result.fetchall():
                     did = str(r.dish_id)
                     if did not in tried_ids and len(recommendations) < limit:
-                        recommendations.append({
-                            "dish_id": did,
-                            "dish_name": r.dish_name,
-                            "price_fen": r.price_fen,
-                            "category": r.category,
-                            "reason": f"您喜欢{cat}类菜品，这道{r.dish_name}很受欢迎，推荐尝试",
-                            "reason_type": "explore",
-                            "score": 0.75,
-                        })
+                        recommendations.append(
+                            {
+                                "dish_id": did,
+                                "dish_name": r.dish_name,
+                                "price_fen": r.price_fen,
+                                "category": r.category,
+                                "reason": f"您喜欢{cat}类菜品，这道{r.dish_name}很受欢迎，推荐尝试",
+                                "reason_type": "explore",
+                                "score": 0.75,
+                            }
+                        )
 
             # 策略2：经典回购菜品（上次点过且复购率高）
             if len(recommendations) < limit:
@@ -648,15 +655,17 @@ async def recommend_return_visit(
                     did = str(r.dish_id)
                     existing_ids = {rec["dish_id"] for rec in recommendations}
                     if did not in existing_ids and len(recommendations) < limit:
-                        recommendations.append({
-                            "dish_id": did,
-                            "dish_name": r.dish_name,
-                            "price_fen": r.price_fen,
-                            "category": r.category,
-                            "reason": f"您已回购{r.buy_count}次的{r.dish_name}，经典不错过",
-                            "reason_type": "repurchase",
-                            "score": min(r.buy_count / 5.0, 1.0),
-                        })
+                        recommendations.append(
+                            {
+                                "dish_id": did,
+                                "dish_name": r.dish_name,
+                                "price_fen": r.price_fen,
+                                "category": r.category,
+                                "reason": f"您已回购{r.buy_count}次的{r.dish_name}，经典不错过",
+                                "reason_type": "repurchase",
+                                "score": min(r.buy_count / 5.0, 1.0),
+                            }
+                        )
 
             # RFM 高价值客户(S1/S2) 推荐更高客单价菜品
             if rfm_level in ("S1", "S2") and len(recommendations) < limit:
@@ -677,15 +686,17 @@ async def recommend_return_visit(
                     did = str(r.dish_id)
                     existing_ids = {rec["dish_id"] for rec in recommendations}
                     if did not in existing_ids and len(recommendations) < limit:
-                        recommendations.append({
-                            "dish_id": did,
-                            "dish_name": r.dish_name,
-                            "price_fen": r.price_fen,
-                            "category": r.category,
-                            "reason": "尊享推荐，为您甄选高品质菜品",
-                            "reason_type": "premium",
-                            "score": 0.65,
-                        })
+                        recommendations.append(
+                            {
+                                "dish_id": did,
+                                "dish_name": r.dish_name,
+                                "price_fen": r.price_fen,
+                                "category": r.category,
+                                "reason": "尊享推荐，为您甄选高品质菜品",
+                                "reason_type": "premium",
+                                "score": 0.65,
+                            }
+                        )
 
             # 写推荐日志
             for item in recommendations:
@@ -875,7 +886,9 @@ async def get_recommendation_metrics(
                         "accepted_count": overview.accepted_count if overview else 0,
                         "unique_customers": overview.unique_customers if overview else 0,
                         "active_days": overview.active_days if overview else 0,
-                        "acceptance_rate_pct": float(overview.acceptance_rate_pct) if overview and overview.acceptance_rate_pct else 0.0,
+                        "acceptance_rate_pct": float(overview.acceptance_rate_pct)
+                        if overview and overview.acceptance_rate_pct
+                        else 0.0,
                     },
                     "by_scene": by_scene,
                     "by_reason_type": by_reason,

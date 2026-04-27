@@ -1,4 +1,5 @@
 """分账通道回调 — 共享密钥 HMAC 验签（无 DB / 无 shared 依赖，便于单测）。"""
+
 from __future__ import annotations
 
 import hashlib

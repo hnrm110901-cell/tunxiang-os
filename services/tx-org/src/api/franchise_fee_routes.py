@@ -25,12 +25,12 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 所有接口需 X-Tenant-ID header。
 """
+
 from __future__ import annotations
 
-import asyncio
 import uuid
-from datetime import date, datetime, timezone
-from typing import Any, List, Optional
+from datetime import date
+from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Path, Query
@@ -283,9 +283,7 @@ async def list_fee_bills(
             _err(400, "无效的 date_to")
         where += " AND b.due_date <= :date_to"
 
-    count_res = await db.execute(
-        text(f"SELECT COUNT(*) FROM franchise_fee_bills b {where}"), params
-    )
+    count_res = await db.execute(text(f"SELECT COUNT(*) FROM franchise_fee_bills b {where}"), params)
     total = count_res.scalar() or 0
 
     params["limit"] = size
@@ -366,13 +364,11 @@ async def list_overdue_bills(
 
     if bill_type:
         if bill_type not in VALID_BILL_TYPES:
-            _err(400, f"无效的 bill_type")
+            _err(400, "无效的 bill_type")
         where += " AND b.bill_type = :bill_type"
         params["bill_type"] = bill_type
 
-    count_res = await db.execute(
-        text(f"SELECT COUNT(*) FROM franchise_fee_bills b {where}"), params
-    )
+    count_res = await db.execute(text(f"SELECT COUNT(*) FROM franchise_fee_bills b {where}"), params)
     total = count_res.scalar() or 0
 
     params["limit"] = size
@@ -736,7 +732,7 @@ async def list_billing_rules(
 
     if fee_type:
         if fee_type not in VALID_BILL_TYPES:
-            _err(400, f"无效的 fee_type")
+            _err(400, "无效的 fee_type")
         where += " AND r.fee_type = :fee_type"
         params["fee_type"] = fee_type
 
@@ -744,9 +740,7 @@ async def list_billing_rules(
         where += " AND r.status = :status"
         params["status"] = status
 
-    count_res = await db.execute(
-        text(f"SELECT COUNT(*) FROM franchise_billing_rules r {where}"), params
-    )
+    count_res = await db.execute(text(f"SELECT COUNT(*) FROM franchise_billing_rules r {where}"), params)
     total = count_res.scalar() or 0
 
     params["limit"] = size
@@ -819,6 +813,7 @@ async def trigger_billing_rule(
 
     # 确定账期和到期日
     from datetime import datetime as dt
+
     now = dt.now()
     period_str = billing_period or now.strftime("%Y-%m")
     try:
@@ -828,6 +823,7 @@ async def trigger_billing_rule(
 
     billing_day = rule_row[6]
     import calendar
+
     max_day = calendar.monthrange(period_date.year, period_date.month)[1]
     actual_day = min(billing_day, max_day)
     due_date = date(period_date.year, period_date.month, actual_day)
@@ -934,7 +930,7 @@ async def get_fee_report_summary(
 
     if bill_type:
         if bill_type not in VALID_BILL_TYPES:
-            _err(400, f"无效的 bill_type")
+            _err(400, "无效的 bill_type")
         where += " AND b.bill_type = :bill_type"
         params["bill_type"] = bill_type
 
@@ -1037,7 +1033,7 @@ async def get_fee_report_by_franchise(
 
     if bill_type:
         if bill_type not in VALID_BILL_TYPES:
-            _err(400, f"无效的 bill_type")
+            _err(400, "无效的 bill_type")
         where += " AND b.bill_type = :bill_type"
         params["bill_type"] = bill_type
 

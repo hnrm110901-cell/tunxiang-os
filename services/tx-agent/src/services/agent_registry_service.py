@@ -3,6 +3,7 @@
 提供 Agent 模板的 CRUD、版本发布/回滚、部署灰度管理能力。
 所有查询强制 tenant_id 过滤（RLS 兜底）。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,9 +15,9 @@ import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..models.agent_deployment import AgentDeployment
 from ..models.agent_template import AgentTemplate
 from ..models.agent_version import AgentVersion
-from ..models.agent_deployment import AgentDeployment
 
 logger = structlog.get_logger(__name__)
 
@@ -95,7 +96,9 @@ class AgentRegistryService:
     # ══════════════════════════════════════════════════════════════════════════
 
     async def create_template(
-        self, tenant_id: str, data: CreateTemplateRequest,
+        self,
+        tenant_id: str,
+        data: CreateTemplateRequest,
     ) -> AgentTemplate:
         """创建 Agent 模板。校验 name 在 tenant 内唯一，默认 status=draft。"""
         tid = UUID(tenant_id)
@@ -133,7 +136,10 @@ class AgentRegistryService:
         return template
 
     async def update_template(
-        self, tenant_id: str, template_id: UUID, data: UpdateTemplateRequest,
+        self,
+        tenant_id: str,
+        template_id: UUID,
+        data: UpdateTemplateRequest,
     ) -> AgentTemplate:
         """更新 Agent 模板（仅更新非 None 字段）。"""
         template = await self._get_template_or_raise(tenant_id, template_id)
@@ -147,7 +153,9 @@ class AgentRegistryService:
         return template
 
     async def get_template(
-        self, tenant_id: str, template_id: UUID,
+        self,
+        tenant_id: str,
+        template_id: UUID,
     ) -> AgentTemplate | None:
         """获取单个模板，不存在返回 None。"""
         tid = UUID(tenant_id)
@@ -199,7 +207,9 @@ class AgentRegistryService:
         return items, total
 
     async def activate_template(
-        self, tenant_id: str, template_id: UUID,
+        self,
+        tenant_id: str,
+        template_id: UUID,
     ) -> AgentTemplate:
         """激活模板（draft -> active）。"""
         template = await self._get_template_or_raise(tenant_id, template_id)
@@ -211,7 +221,9 @@ class AgentRegistryService:
         return template
 
     async def deprecate_template(
-        self, tenant_id: str, template_id: UUID,
+        self,
+        tenant_id: str,
+        template_id: UUID,
     ) -> AgentTemplate:
         """废弃模板（active -> deprecated）。"""
         template = await self._get_template_or_raise(tenant_id, template_id)
@@ -227,7 +239,10 @@ class AgentRegistryService:
     # ══════════════════════════════════════════════════════════════════════════
 
     async def create_version(
-        self, tenant_id: str, template_id: UUID, data: CreateVersionRequest,
+        self,
+        tenant_id: str,
+        template_id: UUID,
+        data: CreateVersionRequest,
     ) -> AgentVersion:
         """创建新版本。"""
         # 确保模板存在
@@ -267,7 +282,10 @@ class AgentRegistryService:
         return version
 
     async def publish_version(
-        self, tenant_id: str, version_id: UUID, published_by: str,
+        self,
+        tenant_id: str,
+        version_id: UUID,
+        published_by: str,
     ) -> AgentVersion:
         """发布版本（设 is_active=True，同模板下其他版本 is_active=False）。"""
         tid = UUID(tenant_id)
@@ -310,7 +328,9 @@ class AgentRegistryService:
         return version
 
     async def list_versions(
-        self, tenant_id: str, template_id: UUID,
+        self,
+        tenant_id: str,
+        template_id: UUID,
     ) -> list[AgentVersion]:
         """列出某模板的所有版本（按创建时间降序）。"""
         tid = UUID(tenant_id)
@@ -326,7 +346,10 @@ class AgentRegistryService:
         return list(result.scalars().all())
 
     async def rollback_version(
-        self, tenant_id: str, template_id: UUID, target_version_id: UUID,
+        self,
+        tenant_id: str,
+        template_id: UUID,
+        target_version_id: UUID,
     ) -> AgentVersion:
         """回滚到指定版本（本质上是发布目标版本）。"""
         tid = UUID(tenant_id)
@@ -351,7 +374,9 @@ class AgentRegistryService:
     # ══════════════════════════════════════════════════════════════════════════
 
     async def deploy(
-        self, tenant_id: str, data: CreateDeploymentRequest,
+        self,
+        tenant_id: str,
+        data: CreateDeploymentRequest,
     ) -> AgentDeployment:
         """部署 Agent 到指定范围。"""
         tid = UUID(tenant_id)
@@ -395,7 +420,10 @@ class AgentRegistryService:
         return deployment
 
     async def update_deployment(
-        self, tenant_id: str, deployment_id: UUID, data: UpdateDeploymentRequest,
+        self,
+        tenant_id: str,
+        deployment_id: UUID,
+        data: UpdateDeploymentRequest,
     ) -> AgentDeployment:
         """更新部署（灰度比例/启用状态/白名单）。"""
         deployment = await self._get_deployment_or_raise(tenant_id, deployment_id)
@@ -430,14 +458,14 @@ class AgentRegistryService:
             conditions.append(AgentDeployment.scope_id == scope_id)
 
         result = await self.db.execute(
-            select(AgentDeployment)
-            .where(*conditions)
-            .order_by(AgentDeployment.deployed_at.desc())
+            select(AgentDeployment).where(*conditions).order_by(AgentDeployment.deployed_at.desc())
         )
         return list(result.scalars().all())
 
     async def get_active_agents_for_store(
-        self, tenant_id: str, store_id: UUID,
+        self,
+        tenant_id: str,
+        store_id: UUID,
     ) -> list[dict[str, Any]]:
         """获取某门店当前激活的所有 Agent（考虑灰度比例）。
 
@@ -478,15 +506,17 @@ class AgentRegistryService:
             # 合并配置：模板默认配置 + 部署覆盖配置
             merged_config = {**(template.config_json or {}), **(deployment.config_overrides or {})}
 
-            agents.append({
-                "template_name": template.name,
-                "display_name": template.display_name,
-                "version_tag": version.version_tag,
-                "config": merged_config,
-                "allowed_actions": deployment.allowed_actions,
-                "priority": template.priority,
-                "run_location": template.run_location,
-            })
+            agents.append(
+                {
+                    "template_name": template.name,
+                    "display_name": template.display_name,
+                    "version_tag": version.version_tag,
+                    "config": merged_config,
+                    "allowed_actions": deployment.allowed_actions,
+                    "priority": template.priority,
+                    "run_location": template.run_location,
+                }
+            )
 
         logger.info(
             "active_agents_for_store",
@@ -496,7 +526,9 @@ class AgentRegistryService:
         return agents
 
     async def undeploy(
-        self, tenant_id: str, deployment_id: UUID,
+        self,
+        tenant_id: str,
+        deployment_id: UUID,
     ) -> None:
         """取消部署（软删除）。"""
         deployment = await self._get_deployment_or_raise(tenant_id, deployment_id)
@@ -509,7 +541,9 @@ class AgentRegistryService:
     # ══════════════════════════════════════════════════════════════════════════
 
     async def _get_template_or_raise(
-        self, tenant_id: str, template_id: UUID,
+        self,
+        tenant_id: str,
+        template_id: UUID,
     ) -> AgentTemplate:
         """获取模板，不存在则抛 ValueError。"""
         template = await self.get_template(tenant_id, template_id)
@@ -518,7 +552,9 @@ class AgentRegistryService:
         return template
 
     async def _get_deployment_or_raise(
-        self, tenant_id: str, deployment_id: UUID,
+        self,
+        tenant_id: str,
+        deployment_id: UUID,
     ) -> AgentDeployment:
         """获取部署，不存在则抛 ValueError。"""
         tid = UUID(tenant_id)

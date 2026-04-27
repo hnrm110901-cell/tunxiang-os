@@ -1,0 +1,27 @@
+{
+  "metrics": {
+    "http_req_duration": {
+      "avg": 45.23,
+      "min": 8.12,
+      "med": 38.56,
+      "max": 380.45,
+      "p(90)": 120.34,
+      "p(95)": 155.67,
+      "p(99)": 188.92
+    },
+    "http_reqs": {
+      "count": 24680,
+      "rate": 205.67
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "_meta": {
+    "generated_at": "2026-04-26T03:30:00Z",
+    "k6_version": "0.49.0",
+    "note": "Baseline result — replace with real k6 run output"
+  }
+}

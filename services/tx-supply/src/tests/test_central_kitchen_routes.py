@@ -24,14 +24,13 @@ Mock 模式：
   - shared.ontology.src.database 通过 sys.modules 注入 fake_get_db
   - CentralKitchenService 通过 unittest.mock.patch 拦截，避免真实 DB 依赖
 """
+
 from __future__ import annotations
 
 import sys
 import types
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # ─── Mock shared.ontology.src.database（必须在 import routes 之前）──────────────
 
@@ -70,10 +69,9 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from api.central_kitchen_routes import router as ck_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from api.central_kitchen_routes import router as ck_router
 
 # ─── App 组装 ─────────────────────────────────────────────────────────────────
 
@@ -201,9 +199,7 @@ class TestListProductionPlans:
     def test_list_plans_returns_ok(self):
         """正常返回 ok=True，data 含分页结果。"""
         svc = MagicMock()
-        svc.list_production_plans = AsyncMock(
-            return_value={"items": [], "total": 0, "page": 1, "size": 20}
-        )
+        svc.list_production_plans = AsyncMock(return_value={"items": [], "total": 0, "page": 1, "size": 20})
 
         with patch(_SVC_PATCH, return_value=svc):
             resp = client.get(f"{_BASE}/plans", headers=_headers())
@@ -266,9 +262,7 @@ class TestConfirmProductionPlan:
     def test_confirm_plan_value_error_returns_400(self):
         """非 draft 状态确认 → ValueError → 400。"""
         svc = MagicMock()
-        svc.confirm_production_plan = AsyncMock(
-            side_effect=ValueError("只有草稿状态可确认")
-        )
+        svc.confirm_production_plan = AsyncMock(side_effect=ValueError("只有草稿状态可确认"))
 
         with patch(_SVC_PATCH, return_value=svc):
             resp = client.post(
@@ -308,9 +302,7 @@ class TestListProductionOrders:
     def test_list_orders_returns_ok(self):
         """正常返回工单列表。"""
         svc = MagicMock()
-        svc.list_production_orders = AsyncMock(
-            return_value={"items": [], "total": 0, "page": 1, "size": 20}
-        )
+        svc.list_production_orders = AsyncMock(return_value={"items": [], "total": 0, "page": 1, "size": 20})
 
         with patch(_SVC_PATCH, return_value=svc):
             resp = client.get(f"{_BASE}/production-orders", headers=_headers())
@@ -341,9 +333,7 @@ class TestCompleteProductionOrder:
     def test_complete_order_value_error_returns_400(self):
         """工单已完成重复提交 → ValueError → 400。"""
         svc = MagicMock()
-        svc.complete_production_order = AsyncMock(
-            side_effect=ValueError("工单已完成，不可重复操作")
-        )
+        svc.complete_production_order = AsyncMock(side_effect=ValueError("工单已完成，不可重复操作"))
 
         with patch(_SVC_PATCH, return_value=svc):
             resp = client.put(
@@ -383,9 +373,7 @@ class TestListDistributionOrders:
     def test_list_distribution_returns_ok(self):
         """正常返回配送单列表，支持按门店过滤。"""
         svc = MagicMock()
-        svc.list_distribution_orders = AsyncMock(
-            return_value={"items": [], "total": 0, "page": 1, "size": 20}
-        )
+        svc.list_distribution_orders = AsyncMock(return_value={"items": [], "total": 0, "page": 1, "size": 20})
 
         with patch(_SVC_PATCH, return_value=svc):
             resp = client.get(
@@ -435,9 +423,7 @@ class TestCreateDistributionOrder:
     def test_create_distribution_value_error_returns_400(self):
         """厨房不存在等 ValueError → 400。"""
         svc = MagicMock()
-        svc.create_distribution_order = AsyncMock(
-            side_effect=ValueError("中央厨房不存在")
-        )
+        svc.create_distribution_order = AsyncMock(side_effect=ValueError("中央厨房不存在"))
 
         with patch(_SVC_PATCH, return_value=svc):
             resp = client.post(

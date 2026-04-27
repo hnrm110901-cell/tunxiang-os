@@ -9,6 +9,7 @@
   6. 下发记录（版本下发进度追踪）
   7. 租户隔离（不同 tenant_id 数据互不可见）
 """
+
 import uuid
 
 import pytest
@@ -169,9 +170,7 @@ class TestPublishToStores:
         """首次下发后，版本状态从 draft 变 published"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
         assert v["status"] == "draft"
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         updated = await MenuVersionService.get_version(v["id"], TENANT)
         assert updated["status"] == "published"
         assert updated["published_at"] is not None
@@ -191,17 +190,13 @@ class TestPublishToStores:
         """空门店列表抛出异常"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
         with pytest.raises(ValueError, match="store_ids"):
-            await MenuVersionService.publish_to_stores(
-                version_id=v["id"], store_ids=[], tenant_id=TENANT
-            )
+            await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[], tenant_id=TENANT)
 
     @pytest.mark.asyncio
     async def test_confirm_applied(self):
         """门店确认应用后，record status 变 applied"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        records = await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        records = await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         record_id = records[0]["id"]
         applied = await MenuVersionService.confirm_applied(record_id=record_id, tenant_id=TENANT)
         assert applied["status"] == "applied"
@@ -294,9 +289,7 @@ class TestStoreOverride:
     async def test_add_dishes_override(self):
         """门店新增本店独有菜品"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         record = await MenuVersionService.apply_store_override(
             store_id=STORE_A,
             overrides={
@@ -311,9 +304,7 @@ class TestStoreOverride:
     async def test_remove_dishes_override(self):
         """门店停售菜品"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         record = await MenuVersionService.apply_store_override(
             store_id=STORE_A,
             overrides={"remove_dishes": ["d2", "d3"]},
@@ -326,9 +317,7 @@ class TestStoreOverride:
     async def test_price_override(self):
         """门店价格覆盖"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         record = await MenuVersionService.apply_store_override(
             store_id=STORE_A,
             overrides={"price_overrides": {"d1": 9800}},
@@ -340,9 +329,7 @@ class TestStoreOverride:
     async def test_override_merges_price(self):
         """多次微调价格覆盖：新的优先"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         await MenuVersionService.apply_store_override(
             store_id=STORE_A,
             overrides={"price_overrides": {"d1": 9800, "d2": 4500}},
@@ -372,9 +359,7 @@ class TestStoreOverride:
         """微调不改变版本快照本身"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
         original_snapshot = list(v["dishes_snapshot"])
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         await MenuVersionService.apply_store_override(
             store_id=STORE_A,
             overrides={"price_overrides": {"d1": 99999}},
@@ -394,14 +379,10 @@ class TestVersionRollback:
     async def test_rollback_to_previous_version(self):
         """回滚门店到上一个已发布版本"""
         v1 = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v1["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v1["id"], store_ids=[STORE_A], tenant_id=TENANT)
         # 发布新版本
         v2 = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v2["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v2["id"], store_ids=[STORE_A], tenant_id=TENANT)
         # 回滚到 v1
         rollback_record = await MenuVersionService.rollback_store(
             store_id=STORE_A,
@@ -416,9 +397,7 @@ class TestVersionRollback:
     @pytest.mark.asyncio
     async def test_rollback_to_draft_version_raises(self):
         """不能回滚到 draft 版本"""
-        v_draft = await MenuVersionService.create_version(
-            brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT
-        )
+        v_draft = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
         with pytest.raises(ValueError, match="已发布版本"):
             await MenuVersionService.rollback_store(
                 store_id=STORE_A,
@@ -447,12 +426,8 @@ class TestDispatchStatus:
     async def test_dispatch_status_all_pending(self):
         """下发后全部 pending"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=ALL_STORES[:5], tenant_id=TENANT
-        )
-        status = await MenuDispatchService.get_dispatch_status(
-            version_id=v["id"], tenant_id=TENANT
-        )
+        await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=ALL_STORES[:5], tenant_id=TENANT)
+        status = await MenuDispatchService.get_dispatch_status(version_id=v["id"], tenant_id=TENANT)
         assert status["total"] == 5
         assert status["pending"] == 5
         assert status["applied"] == 0
@@ -470,9 +445,7 @@ class TestDispatchStatus:
         await MenuVersionService.confirm_applied(record_id=records[0]["id"], tenant_id=TENANT)
         await MenuVersionService.confirm_applied(record_id=records[1]["id"], tenant_id=TENANT)
 
-        status = await MenuDispatchService.get_dispatch_status(
-            version_id=v["id"], tenant_id=TENANT
-        )
+        status = await MenuDispatchService.get_dispatch_status(version_id=v["id"], tenant_id=TENANT)
         assert status["total"] == 4
         assert status["applied"] == 2
         assert status["pending"] == 2
@@ -482,9 +455,7 @@ class TestDispatchStatus:
     async def test_mark_dispatch_failed(self):
         """标记下发失败"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        records = await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        records = await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         record_id = records[0]["id"]
         failed = await MenuDispatchService.mark_dispatch_failed(
             record_id=record_id, tenant_id=TENANT, reason="门店网络超时"
@@ -496,14 +467,10 @@ class TestDispatchStatus:
     async def test_get_store_current_version(self):
         """查询门店当前版本"""
         v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        records = await MenuVersionService.publish_to_stores(
-            version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT
-        )
+        records = await MenuVersionService.publish_to_stores(version_id=v["id"], store_ids=[STORE_A], tenant_id=TENANT)
         await MenuVersionService.confirm_applied(record_id=records[0]["id"], tenant_id=TENANT)
 
-        result = await MenuVersionService.get_store_current_version(
-            store_id=STORE_A, tenant_id=TENANT
-        )
+        result = await MenuVersionService.get_store_current_version(store_id=STORE_A, tenant_id=TENANT)
         assert result is not None
         assert result["version"]["id"] == v["id"]
         assert result["dispatch_record"]["status"] == "applied"
@@ -533,12 +500,8 @@ class TestTenantIsolation:
         other_tenant = str(uuid.uuid4())
         other_brand = str(uuid.uuid4())
 
-        v_mine = await MenuVersionService.create_version(
-            brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT
-        )
-        await MenuVersionService.create_version(
-            brand_id=other_brand, tenant_id=other_tenant, dishes_snapshot=SNAPSHOT
-        )
+        v_mine = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
+        await MenuVersionService.create_version(brand_id=other_brand, tenant_id=other_tenant, dishes_snapshot=SNAPSHOT)
 
         # 用 other_tenant 查不到 v_mine
         result = await MenuVersionService.get_version(v_mine["id"], other_tenant)
@@ -552,9 +515,7 @@ class TestTenantIsolation:
 
         await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
         await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
-        await MenuVersionService.create_version(
-            brand_id=other_brand, tenant_id=other_tenant, dishes_snapshot=SNAPSHOT
-        )
+        await MenuVersionService.create_version(brand_id=other_brand, tenant_id=other_tenant, dishes_snapshot=SNAPSHOT)
 
         mine = await MenuVersionService.list_versions(tenant_id=TENANT)
         theirs = await MenuVersionService.list_versions(tenant_id=other_tenant)
@@ -565,9 +526,7 @@ class TestTenantIsolation:
     async def test_publish_cross_tenant_raises(self):
         """跨租户下发版本抛出异常"""
         other_tenant = str(uuid.uuid4())
-        v = await MenuVersionService.create_version(
-            brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT
-        )
+        v = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
         with pytest.raises(ValueError, match="版本不存在"):
             await MenuVersionService.publish_to_stores(
                 version_id=v["id"],
@@ -581,17 +540,11 @@ class TestTenantIsolation:
         other_tenant = str(uuid.uuid4())
         other_brand = str(uuid.uuid4())
 
-        v_mine = await MenuVersionService.create_version(
-            brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT
-        )
-        await MenuVersionService.publish_to_stores(
-            version_id=v_mine["id"], store_ids=ALL_STORES[:3], tenant_id=TENANT
-        )
+        v_mine = await MenuVersionService.create_version(brand_id=BRAND, tenant_id=TENANT, dishes_snapshot=SNAPSHOT)
+        await MenuVersionService.publish_to_stores(version_id=v_mine["id"], store_ids=ALL_STORES[:3], tenant_id=TENANT)
 
         # 其他租户查询同一 version_id，看不到记录
-        status = await MenuDispatchService.get_dispatch_status(
-            version_id=v_mine["id"], tenant_id=other_tenant
-        )
+        status = await MenuDispatchService.get_dispatch_status(version_id=v_mine["id"], tenant_id=other_tenant)
         assert status["total"] == 0
 
     @pytest.mark.asyncio
@@ -604,6 +557,4 @@ class TestTenantIsolation:
             await MenuVersionService.list_versions(tenant_id="")
 
         with pytest.raises(ValueError, match="tenant_id"):
-            await MenuDispatchService.get_dispatch_status(
-                version_id=str(uuid.uuid4()), tenant_id=""
-            )
+            await MenuDispatchService.get_dispatch_status(version_id=str(uuid.uuid4()), tenant_id="")

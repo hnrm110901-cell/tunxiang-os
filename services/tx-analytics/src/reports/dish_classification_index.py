@@ -62,9 +62,17 @@ ORDER BY total_revenue_fen DESC
 
 DIMENSIONS = ["store_name", "category_name"]
 METRICS = [
-    "dish_count", "total_qty", "total_revenue_fen", "total_cost_fen",
-    "total_margin_fen", "margin_rate",
-    "revenue_share_pct", "qty_share_pct", "avg_price_fen",
-    "return_qty", "gift_qty", "revenue_rank",
+    "dish_count",
+    "total_qty",
+    "total_revenue_fen",
+    "total_cost_fen",
+    "total_margin_fen",
+    "margin_rate",
+    "revenue_share_pct",
+    "qty_share_pct",
+    "avg_price_fen",
+    "return_qty",
+    "gift_qty",
+    "revenue_rank",
 ]
 FILTERS = ["start_date", "end_date", "store_id"]

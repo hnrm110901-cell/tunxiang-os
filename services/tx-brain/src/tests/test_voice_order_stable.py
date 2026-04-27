@@ -13,19 +13,20 @@ Y-A14 语音点餐稳定性测试
   5. test_cache_warm                    — 预热缓存
   6. test_fuzzy_match_dish              — 模糊匹配菜品
 """
+
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import io
 import os
 import sys
 import types
-import asyncio
-import hashlib
 
 # ─── sys.path 准备 ────────────────────────────────────────────────────────────
 _TESTS_DIR = os.path.dirname(__file__)
-_SRC_DIR   = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
-_ROOT_DIR  = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+_SRC_DIR = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
 
 for _p in [_SRC_DIR, _ROOT_DIR]:
     if _p not in sys.path:
@@ -40,8 +41,8 @@ def _ensure_pkg(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_pkg("src",          _SRC_DIR)
-_ensure_pkg("src.api",      os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
 _ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
 
 # ─── structlog mock ───────────────────────────────────────────────────────────
@@ -57,13 +58,12 @@ _structlog.stdlib = types.SimpleNamespace(BoundLogger=object)  # type: ignore[at
 sys.modules.setdefault("structlog", _structlog)
 
 # ─── 正式 import ──────────────────────────────────────────────────────────────
-import pytest  # noqa: E402
-from unittest.mock import AsyncMock, patch  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-
 # 重置单例缓存，防止跨测试污染
 import importlib
+from unittest.mock import patch  # noqa: E402
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 _cache_mod = importlib.import_module("src.voice_command_cache")
 _cache_mod._cache = None  # type: ignore[attr-defined]
@@ -82,15 +82,27 @@ client = TestClient(app)
 
 # ─── 辅助工具 ─────────────────────────────────────────────────────────────────
 
+
 def _wav_bytes() -> bytes:
     """最小合法 WAV 文件内容（44 bytes header）"""
     import struct
+
     data_size = 4
     header = struct.pack(
         "<4sI4s4sIHHIIHH4sI",
-        b"RIFF", 36 + data_size, b"WAVE",
-        b"fmt ", 16, 1, 1, 16000, 32000, 2, 16,
-        b"data", data_size,
+        b"RIFF",
+        36 + data_size,
+        b"WAVE",
+        b"fmt ",
+        16,
+        1,
+        1,
+        16000,
+        32000,
+        2,
+        16,
+        b"data",
+        data_size,
     )
     return header + b"\x00" * data_size
 
@@ -103,7 +115,6 @@ def _audio_hash(audio_bytes: bytes) -> str:
 
 
 class TestTranscribeStable:
-
     def test_transcribe_cache_hit(self) -> None:
         """1. 缓存命中：第二次相同音频直接从缓存返回，跳过 AI 调用
 
@@ -160,13 +171,15 @@ class TestTranscribeStable:
 
 
 class TestParseOrder:
-
     def test_parse_order_returns_cart_items(self) -> None:
         """3. 解析返回购物车格式 {cart_items: [...], item_count: N}"""
-        resp = client.post("/api/v1/brain/voice/parse-order", json={
-            "text": "来三份宫保鸡丁",
-            "store_id": "store_001",
-        })
+        resp = client.post(
+            "/api/v1/brain/voice/parse-order",
+            json={
+                "text": "来三份宫保鸡丁",
+                "store_id": "store_001",
+            },
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["ok"] is True
@@ -182,15 +195,17 @@ class TestParseOrder:
 
     def test_parse_order_empty_text_returns_400(self) -> None:
         """空文本 → 400"""
-        resp = client.post("/api/v1/brain/voice/parse-order", json={
-            "text": "   ",
-            "store_id": "store_001",
-        })
+        resp = client.post(
+            "/api/v1/brain/voice/parse-order",
+            json={
+                "text": "   ",
+                "store_id": "store_001",
+            },
+        )
         assert resp.status_code == 400
 
 
 class TestMetrics:
-
     def test_metrics_records_calls(self) -> None:
         """4. metrics 端点聚合：每次调用后 total_calls 递增"""
         # 清空历史数据
@@ -220,7 +235,6 @@ class TestMetrics:
 
 
 class TestCacheWarm:
-
     def test_cache_warm(self) -> None:
         """5. 预热缓存：POST /cache/warm 返回预热数量"""
         catalog = [
@@ -248,10 +262,9 @@ class TestCacheWarm:
 
 
 class TestFuzzyMatch:
-
     def test_fuzzy_match_dish(self) -> None:
         """6. 模糊匹配：'酸菜鱼' 匹配 '酸菜鱼片' 且相似度 >= 0.6"""
-        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")
+        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")  # noqa: S108 — test-only path
         catalog = [
             {"dish_id": "D001", "name": "酸菜鱼片"},
             {"dish_id": "D002", "name": "宫保鸡丁"},
@@ -265,7 +278,7 @@ class TestFuzzyMatch:
 
     def test_fuzzy_match_no_match_returns_none(self) -> None:
         """完全不相关的文本 → 返回 None"""
-        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")
+        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")  # noqa: S108 — test-only path
         catalog = [
             {"dish_id": "D001", "name": "酸菜鱼"},
             {"dish_id": "D002", "name": "宫保鸡丁"},
@@ -275,6 +288,6 @@ class TestFuzzyMatch:
 
     def test_fuzzy_match_empty_inputs(self) -> None:
         """空输入 → 返回 None"""
-        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")
+        cache = VoiceCommandCache(cache_path="/tmp/txos_voice_cache_test.json")  # noqa: S108 — test-only path
         assert cache.fuzzy_match_dish("", []) is None
         assert cache.fuzzy_match_dish("酸菜鱼", []) is None

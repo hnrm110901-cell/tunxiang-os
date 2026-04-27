@@ -8,11 +8,9 @@ Y-H1
 所有查询强制传入 tenant_id，配合 RLS NULLIF 策略实现多租户隔离。
 strategy_config 字段统一存储品牌策略（JSONB），禁止使用内存 dict。
 """
+
 from __future__ import annotations
 
-import json
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
@@ -22,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
 from ..services import brand_management_service as svc
 
 logger = structlog.get_logger(__name__)
@@ -58,7 +57,7 @@ def _generate_brand_code(name: str) -> str:
     if ascii_code:
         return ascii_code[:4]
     # 汉字 fallback：取前3字
-    cjk = [ch for ch in name if '\u4e00' <= ch <= '\u9fff']
+    cjk = [ch for ch in name if "\u4e00" <= ch <= "\u9fff"]
     return "".join(cjk[:3]).upper() if cjk else name[:4].upper()
 
 
@@ -254,8 +253,10 @@ async def update_brand_strategy(
         brand_id=brand_id,
         config_keys=list(req.strategy_config.keys()),
     )
-    return _ok({
-        "brand_id": brand_id,
-        "strategy_config": req.strategy_config,
-        "updated": True,
-    })
+    return _ok(
+        {
+            "brand_id": brand_id,
+            "strategy_config": req.strategy_config,
+            "updated": True,
+        }
+    )

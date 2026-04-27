@@ -1,4 +1,5 @@
 """营销方案引擎测试 — 覆盖 7 种方案 + 互斥 + 执行顺序 + API"""
+
 import os
 import sys
 
@@ -36,6 +37,7 @@ ITEMS = [
 # 1. 特价优惠
 # ---------------------------------------------------------------------------
 
+
 class TestSpecialPrice:
     def test_basic(self):
         rules = {"dish_prices": {"d1": 6800}}
@@ -54,6 +56,7 @@ class TestSpecialPrice:
 # ---------------------------------------------------------------------------
 # 2. 买赠优惠
 # ---------------------------------------------------------------------------
+
 
 class TestBuyGift:
     def test_buy2_gift1(self):
@@ -85,6 +88,7 @@ class TestBuyGift:
 # 3. 加价换购
 # ---------------------------------------------------------------------------
 
+
 class TestAddOn:
     def test_eligible(self):
         rules = {
@@ -112,6 +116,7 @@ class TestAddOn:
 # 4. 再买优惠
 # ---------------------------------------------------------------------------
 
+
 class TestRebuy:
     def test_second_half_price(self):
         rules = {"dish_id": "d2", "nth": 2, "discount_rate": 50}
@@ -124,6 +129,7 @@ class TestRebuy:
 # ---------------------------------------------------------------------------
 # 5. 会员优惠
 # ---------------------------------------------------------------------------
+
 
 class TestMemberDiscount:
     def test_gold(self):
@@ -143,6 +149,7 @@ class TestMemberDiscount:
 # 6. 订单折扣
 # ---------------------------------------------------------------------------
 
+
 class TestOrderDiscount:
     def test_88_off(self):
         r = calculate_order_discount(21800, {"discount_rate": 88})
@@ -154,6 +161,7 @@ class TestOrderDiscount:
 # ---------------------------------------------------------------------------
 # 7. 满减优惠
 # ---------------------------------------------------------------------------
+
 
 class TestThreshold:
     def test_multi_tier(self):
@@ -179,23 +187,33 @@ class TestThreshold:
 # 互斥规则
 # ---------------------------------------------------------------------------
 
+
 class TestExclusion:
     def test_exclusive(self):
-        assert check_exclusion(
-            "special_price", "order_discount",
-            [("special_price", "order_discount")],
-        ) is True
+        assert (
+            check_exclusion(
+                "special_price",
+                "order_discount",
+                [("special_price", "order_discount")],
+            )
+            is True
+        )
 
     def test_not_exclusive(self):
-        assert check_exclusion(
-            "special_price", "threshold",
-            [("special_price", "order_discount")],
-        ) is False
+        assert (
+            check_exclusion(
+                "special_price",
+                "threshold",
+                [("special_price", "order_discount")],
+            )
+            is False
+        )
 
 
 # ---------------------------------------------------------------------------
 # 执行顺序引擎
 # ---------------------------------------------------------------------------
+
 
 class TestApplySchemesInOrder:
     def test_priority_order(self):
@@ -245,6 +263,7 @@ class TestApplySchemesInOrder:
 # ---------------------------------------------------------------------------
 # API 端点测试
 # ---------------------------------------------------------------------------
+
 
 class TestMarketingAPI:
     def test_calculate(self):

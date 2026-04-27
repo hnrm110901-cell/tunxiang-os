@@ -1,4 +1,5 @@
 """知识图谱 + 自然语言查询 完整测试"""
+
 import pytest
 
 from ..services.knowledge_graph import (
@@ -121,12 +122,21 @@ class TestKnowledgeIngestion:
     def test_ingest_store_data(self, kg: KnowledgeGraphService) -> None:
         data = {
             "store": {
-                "id": "s1", "name": "测试店", "city": "长沙",
-                "brand": "尝在一起", "business_type": "海鲜酒楼",
+                "id": "s1",
+                "name": "测试店",
+                "city": "长沙",
+                "brand": "尝在一起",
+                "business_type": "海鲜酒楼",
             },
             "dishes": [
-                {"id": "d1", "name": "剁椒鱼头", "category": "热菜", "price": 128, "cost": 42,
-                 "ingredients": [{"id": "i1", "name": "鳙鱼头"}]},
+                {
+                    "id": "d1",
+                    "name": "剁椒鱼头",
+                    "category": "热菜",
+                    "price": 128,
+                    "cost": 42,
+                    "ingredients": [{"id": "i1", "name": "鳙鱼头"}],
+                },
                 {"id": "d2", "name": "清蒸鲈鱼", "category": "热菜", "price": 98, "cost": 35},
             ],
             "metrics": [
@@ -534,9 +544,7 @@ class TestBenchmark:
         assert "avg" in benchmark
 
     def test_compare_to_benchmark(self, seeded_kg: KnowledgeGraphService) -> None:
-        result = seeded_kg.compare_to_benchmark(
-            "store_bj_guomao", ["turnover_rate", "revenue"]
-        )
+        result = seeded_kg.compare_to_benchmark("store_bj_guomao", ["turnover_rate", "revenue"])
         assert result["ok"] is True
         comparisons = result["comparisons"]
         assert "turnover_rate" in comparisons

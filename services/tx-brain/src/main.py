@@ -5,6 +5,7 @@
 - CFO Dashboard
 - Evolution 2030
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -17,17 +18,21 @@ from fastapi.responses import JSONResponse
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
 try:
-    from shared.feature_flags import is_enabled, FlagContext
+    from shared.feature_flags import is_enabled
     from shared.feature_flags.flag_names import AgentFlags
+
     _FLAG_SDK_AVAILABLE = True
 except ImportError:
     _FLAG_SDK_AVAILABLE = False
-    def is_enabled(flag, context=None): return True  # noqa: E731
+
+    def is_enabled(flag, context=None):
+        return True  # noqa: E731
+
 
 from .api.brain_routes import router as brain_router
+from .api.content_hub_routes import router as content_hub_router  # AI营销内容中枢（v207）
 from .api.voice_api import router as voice_router
 from .api.voice_order_stable_routes import router as voice_stable_router
-from .api.content_hub_routes import router as content_hub_router  # AI营销内容中枢（v207）
 from .services.cfo_dashboard import CFODashboardService
 from .services.evolution_2030 import Evolution2030Service
 from .services.voice_orchestrator import VoiceOrchestrator
@@ -46,24 +51,33 @@ evolution_2030 = Evolution2030Service()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup & shutdown."""
-    logger.info("tx_brain_starting", services=[
-        "voice_orchestrator",
-        "voice_session_mgr",
-        "cfo_dashboard",
-        "evolution_2030",
-        "discount_guardian",
-        "member_insight",
-    ])
+    logger.info(
+        "tx_brain_starting",
+        services=[
+            "voice_orchestrator",
+            "voice_session_mgr",
+            "cfo_dashboard",
+            "evolution_2030",
+            "discount_guardian",
+            "member_insight",
+        ],
+    )
 
     # ── Feature Flag 启动检查 ────────────────────────────────────────
     # AgentFlags.FINANCE_PNL_SUMMARY: P&L AI摘要功能
     # Flag关闭时：ModelRouter应使用轻量模型或返回占位结果，避免不必要的LLM调用
     if is_enabled(AgentFlags.FINANCE_PNL_SUMMARY):
-        logger.info("feature_flag_enabled", flag=AgentFlags.FINANCE_PNL_SUMMARY,
-                    note="P&L AI摘要已激活，ModelRouter将使用完整推理链路")
+        logger.info(
+            "feature_flag_enabled",
+            flag=AgentFlags.FINANCE_PNL_SUMMARY,
+            note="P&L AI摘要已激活，ModelRouter将使用完整推理链路",
+        )
     else:
-        logger.info("feature_flag_disabled", flag=AgentFlags.FINANCE_PNL_SUMMARY,
-                    note="P&L AI摘要已关闭，ModelRouter降级为轻量模型或占位结果")
+        logger.info(
+            "feature_flag_disabled",
+            flag=AgentFlags.FINANCE_PNL_SUMMARY,
+            note="P&L AI摘要已关闭，ModelRouter降级为轻量模型或占位结果",
+        )
 
     yield
     logger.info("tx_brain_shutting_down")
@@ -78,10 +92,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_client import Counter, Histogram
-llm_requests_total = Counter('llm_api_requests_total', 'Total LLM API requests', ['model', 'status'])
-llm_request_duration = Histogram('llm_request_duration_seconds', 'LLM API request duration')
+from prometheus_fastapi_instrumentator import Instrumentator
+
+llm_requests_total = Counter("llm_api_requests_total", "Total LLM API requests", ["model", "status"])
+llm_request_duration = Histogram("llm_request_duration_seconds", "LLM API request duration")
 Instrumentator().instrument(app).expose(app)
 
 # CORS
@@ -98,10 +113,11 @@ app.add_middleware(
 app.include_router(voice_router)
 app.include_router(brain_router)
 app.include_router(voice_stable_router)
-app.include_router(content_hub_router)   # /api/v1/brain/content/* — AIGC 营销内容生成（v207）
+app.include_router(content_hub_router)  # /api/v1/brain/content/* — AIGC 营销内容生成（v207）
 
 
 # ─── Health & Info ───────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
@@ -153,6 +169,7 @@ async def brain_info() -> dict[str, Any]:
 
 
 # ─── Global Error Handler ───────────────────────────────────────
+
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:

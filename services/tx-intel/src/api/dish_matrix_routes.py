@@ -12,6 +12,7 @@
 
 如果无法查询真实数据，返回带 _is_mock: true 的演示数据。
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/intel", tags=["dish-matrix"])
 
 
 # ─── 依赖项 ───────────────────────────────────────────────────────────────────
+
 
 async def get_db() -> AsyncSession:  # type: ignore[return]
     raise NotImplementedError("请在应用启动时注入 DB session factory")
@@ -51,6 +53,7 @@ async def _set_rls(db: AsyncSession, tenant_id: uuid.UUID) -> None:
 
 
 # ─── 四象限分类逻辑 ───────────────────────────────────────────────────────────
+
 
 def _classify_quadrant(
     sales_count: int,
@@ -84,33 +87,40 @@ def _build_recommendations(dishes: list[dict[str, Any]]) -> list[dict[str, Any]]
     for d in dishes:
         q = d["quadrant"]
         if q == "dog":
-            recs.append({
-                "dish_name": d["dish_name"],
-                "current_quadrant": q,
-                "quadrant_label": _quadrant_label(q),
-                "action": "考虑下架或重新定价，销量和毛利均不理想",
-                "priority": "high",
-            })
+            recs.append(
+                {
+                    "dish_name": d["dish_name"],
+                    "current_quadrant": q,
+                    "quadrant_label": _quadrant_label(q),
+                    "action": "考虑下架或重新定价，销量和毛利均不理想",
+                    "priority": "high",
+                }
+            )
         elif q == "question_mark":
-            recs.append({
-                "dish_name": d["dish_name"],
-                "current_quadrant": q,
-                "quadrant_label": _quadrant_label(q),
-                "action": "加强堂食推荐和套餐捆绑，提升曝光度，毛利空间充足",
-                "priority": "medium",
-            })
+            recs.append(
+                {
+                    "dish_name": d["dish_name"],
+                    "current_quadrant": q,
+                    "quadrant_label": _quadrant_label(q),
+                    "action": "加强堂食推荐和套餐捆绑，提升曝光度，毛利空间充足",
+                    "priority": "medium",
+                }
+            )
         elif q == "cash_cow":
-            recs.append({
-                "dish_name": d["dish_name"],
-                "current_quadrant": q,
-                "quadrant_label": _quadrant_label(q),
-                "action": "持续保量，优化食材采购成本，维持稳定出品",
-                "priority": "low",
-            })
+            recs.append(
+                {
+                    "dish_name": d["dish_name"],
+                    "current_quadrant": q,
+                    "quadrant_label": _quadrant_label(q),
+                    "action": "持续保量，优化食材采购成本，维持稳定出品",
+                    "priority": "low",
+                }
+            )
     return recs
 
 
 # ─── mock 数据 ────────────────────────────────────────────────────────────────
+
 
 def _mock_matrix_data() -> dict[str, Any]:
     dishes = [
@@ -125,11 +135,13 @@ def _mock_matrix_data() -> dict[str, Any]:
     ]
     quadrants: dict[str, list] = {"star": [], "cash_cow": [], "question_mark": [], "dog": []}
     for d in dishes:
-        quadrants[d["quadrant"]].append({
-            "dish_name": d["dish_name"],
-            "sales_count": d["sales_count"],
-            "gross_margin_pct": d["gross_margin_pct"],
-        })
+        quadrants[d["quadrant"]].append(
+            {
+                "dish_name": d["dish_name"],
+                "sales_count": d["sales_count"],
+                "gross_margin_pct": d["gross_margin_pct"],
+            }
+        )
     recs = _build_recommendations(dishes)
     return {
         "quadrants": quadrants,
@@ -145,6 +157,7 @@ def _mock_matrix_data() -> dict[str, Any]:
 
 
 # ─── 真实数据查询 ──────────────────────────────────────────────────────────────
+
 
 async def _query_dish_matrix(
     db: AsyncSession,
@@ -207,16 +220,16 @@ async def _query_dish_matrix(
     classified = []
     quadrants: dict[str, list] = {"star": [], "cash_cow": [], "question_mark": [], "dog": []}
     for d in all_dishes:
-        q = _classify_quadrant(
-            d["sales_count"], d["gross_margin_pct"], sales_median, margin_median
-        )
+        q = _classify_quadrant(d["sales_count"], d["gross_margin_pct"], sales_median, margin_median)
         d["quadrant"] = q
         classified.append(d)
-        quadrants[q].append({
-            "dish_name": d["dish_name"],
-            "sales_count": d["sales_count"],
-            "gross_margin_pct": round(d["gross_margin_pct"], 4),
-        })
+        quadrants[q].append(
+            {
+                "dish_name": d["dish_name"],
+                "sales_count": d["sales_count"],
+                "gross_margin_pct": round(d["gross_margin_pct"], 4),
+            }
+        )
 
     return {
         "quadrants": quadrants,
@@ -232,6 +245,7 @@ async def _query_dish_matrix(
 
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/dish-matrix")
 async def get_dish_matrix(

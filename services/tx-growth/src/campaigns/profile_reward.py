@@ -2,6 +2,7 @@
 
 典型场景: 填写生日/手机号/性别等信息后获得积分/优惠券奖励
 """
+
 from typing import Any
 
 import structlog

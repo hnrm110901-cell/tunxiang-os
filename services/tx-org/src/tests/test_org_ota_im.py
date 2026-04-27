@@ -75,7 +75,8 @@ if "sqlalchemy" not in sys.modules:
     sys.modules["sqlalchemy.ext"] = _sa_ext
     sys.modules["sqlalchemy.ext.asyncio"] = _sa_ext_async
 else:
-    from sqlalchemy.exc import IntegrityError as _IntegrityError, SQLAlchemyError as _SQLAlchemyError
+    from sqlalchemy.exc import IntegrityError as _IntegrityError
+    from sqlalchemy.exc import SQLAlchemyError as _SQLAlchemyError
 
 # ──────────────────────────────────────────────────────────────────────────────
 # shared.ontology.src.database 存根
@@ -101,11 +102,11 @@ sys.modules["shared.ontology.src.database"] = _db_mod
 # 导入被测路由
 # ──────────────────────────────────────────────────────────────────────────────
 import pytest
+from api.im_sync_routes import router as im_router
+from api.ota_routes import router as ota_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from api.ota_routes import router as ota_router
-from api.im_sync_routes import router as im_router
 from shared.ontology.src.database import get_db
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -124,6 +125,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 def _override_db(mock_session):
     async def _inner():
         yield mock_session
+
     return _inner
 
 
@@ -153,9 +155,7 @@ async def test_ota_create_version_ok():
     mock_db.commit = AsyncMock()
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/org/ota/versions",
                 headers=HEADERS,
@@ -184,9 +184,7 @@ async def test_ota_create_version_invalid_target_type():
     mock_db = AsyncMock()
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/org/ota/versions",
                 headers=HEADERS,
@@ -214,9 +212,7 @@ async def test_ota_create_version_integrity_error():
     mock_db.rollback = AsyncMock()
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/org/ota/versions",
                 headers=HEADERS,
@@ -239,9 +235,7 @@ async def test_ota_create_version_missing_tenant():
     mock_db = AsyncMock()
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.post(
                 "/api/v1/org/ota/versions",
                 json={
@@ -281,9 +275,7 @@ async def test_ota_list_versions_ok():
 
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/org/ota/versions",
                 headers=HEADERS,
@@ -320,9 +312,7 @@ async def test_ota_get_latest_version_has_update():
 
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/org/ota/versions/latest",
                 headers=HEADERS,
@@ -347,9 +337,7 @@ async def test_ota_get_latest_version_no_update():
 
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/org/ota/versions/latest",
                 headers=HEADERS,
@@ -377,9 +365,7 @@ async def test_ota_deactivate_version_ok():
 
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.patch(
                 f"/api/v1/org/ota/versions/{version_id}/deactivate",
                 headers=HEADERS,
@@ -400,9 +386,7 @@ async def test_ota_deactivate_version_invalid_uuid():
     mock_db = AsyncMock()
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.patch(
                 "/api/v1/org/ota/versions/not-a-uuid/deactivate",
                 headers=HEADERS,
@@ -425,9 +409,7 @@ async def test_ota_stats_ok():
 
     app_ota.dependency_overrides[get_db] = _override_db(mock_db)
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app_ota), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app_ota), base_url="http://test") as ac:
             resp = await ac.get(
                 "/api/v1/org/ota/stats",
                 headers=HEADERS,
@@ -450,9 +432,7 @@ async def test_ota_stats_ok():
 @pytest.mark.anyio
 async def test_im_sync_status():
     """[11] GET /status — IM 绑定状态概览，返回固定 Mock 数据。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_im), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_im), base_url="http://test") as ac:
         resp = await ac.get("/api/v1/org/im-sync/status")
 
     assert resp.status_code == 200
@@ -471,9 +451,7 @@ async def test_im_sync_status():
 @pytest.mark.anyio
 async def test_im_sync_preview():
     """[12] POST /preview — IM 同步差异预览，返回 to_bind / to_create / to_deactivate。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_im), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_im), base_url="http://test") as ac:
         resp = await ac.post(
             "/api/v1/org/im-sync/preview",
             json={
@@ -501,9 +479,7 @@ async def test_im_sync_preview():
 @pytest.mark.anyio
 async def test_im_sync_apply():
     """[13] POST /apply — 应用 IM 同步结果，返回执行统计。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_im), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_im), base_url="http://test") as ac:
         resp = await ac.post(
             "/api/v1/org/im-sync/apply",
             json={
@@ -529,9 +505,7 @@ async def test_im_sync_apply():
 async def test_im_sync_send_message_ok():
     """[14] POST /send-message — 向多个用户发送 IM 消息，返回发送数量。"""
     user_ids = ["uid-001", "uid-002", "uid-003"]
-    async with AsyncClient(
-        transport=ASGITransport(app=app_im), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_im), base_url="http://test") as ac:
         resp = await ac.post(
             "/api/v1/org/im-sync/send-message",
             json={
@@ -552,9 +526,7 @@ async def test_im_sync_send_message_ok():
 @pytest.mark.anyio
 async def test_im_sync_send_message_empty_user_ids():
     """[15] POST /send-message — user_ids 为空列表 → sent=0, failed=0。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app_im), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_im), base_url="http://test") as ac:
         resp = await ac.post(
             "/api/v1/org/im-sync/send-message",
             json={

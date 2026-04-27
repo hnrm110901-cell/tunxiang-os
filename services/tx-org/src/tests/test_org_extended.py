@@ -24,6 +24,7 @@
     cd /Users/lichun/tunxiang-os
     pytest services/tx-org/src/tests/test_org_extended.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -47,9 +48,7 @@ sys.path.insert(0, _ROOT)
 # ── structlog 存根 ─────────────────────────────────────────────────────────────
 if "structlog" not in sys.modules:
     _slog = types.ModuleType("structlog")
-    _slog.get_logger = lambda *a, **k: MagicMock(
-        info=MagicMock(), error=MagicMock(), warning=MagicMock()
-    )
+    _slog.get_logger = lambda *a, **k: MagicMock(info=MagicMock(), error=MagicMock(), warning=MagicMock())
     _slog.stdlib = types.SimpleNamespace(BoundLogger=object)
     sys.modules["structlog"] = _slog
 
@@ -86,11 +85,11 @@ sys.modules["shared.ontology.src.database"] = _db_mod
 # 路由导入
 # ──────────────────────────────────────────────────────────────────────────────
 import pytest
+from api.job_grade_routes import router as job_grade_router
+from api.schedule_routes import router as schedule_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from api.schedule_routes import router as schedule_router
-from api.job_grade_routes import router as job_grade_router
 from shared.ontology.src.database import get_db
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -107,6 +106,7 @@ HEADERS = {"X-Tenant-ID": TENANT_ID}
 # ──────────────────────────────────────────────────────────────────────────────
 # DB mock 工厂
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _mock_db(
     mapping_first=None,
@@ -138,9 +138,7 @@ def _mock_db(
     set_cfg_result = MagicMock()
     biz_result = _make_result()
 
-    session.execute = AsyncMock(
-        side_effect=[set_cfg_result, biz_result, biz_result, biz_result, biz_result]
-    )
+    session.execute = AsyncMock(side_effect=[set_cfg_result, biz_result, biz_result, biz_result, biz_result])
     return session
 
 
@@ -164,9 +162,7 @@ class TestScheduleRoutes:
     async def test_get_week_schedule_empty(self):
         """DB 无排班记录时，week 端点应返回 ok=True，employees=[]。"""
         db = _mock_db(fetchall_rows=[])
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.get(
                 "/api/v1/schedules/week",
                 params={"store_id": STORE_ID, "week_start": "2026-04-07"},
@@ -186,9 +182,7 @@ class TestScheduleRoutes:
     async def test_get_week_schedule_missing_tenant(self):
         """不提供 X-Tenant-ID 时，应返回 400。"""
         db = _mock_db()
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.get(
                 "/api/v1/schedules/week",
                 params={"store_id": STORE_ID, "week_start": "2026-04-07"},
@@ -216,9 +210,7 @@ class TestScheduleRoutes:
 
         db = _mock_db(mapping_first=fake_row)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/schedules",
                 json={
@@ -242,9 +234,7 @@ class TestScheduleRoutes:
     async def test_update_schedule_not_found(self):
         """PUT 更新不存在的排班 ID，DB RETURNING 返回 None，应返回 404。"""
         db = _mock_db(mapping_first=None)
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.put(
                 f"/api/v1/schedules/{SCHEDULE_ID}",
                 json={"status": "confirmed"},
@@ -269,9 +259,7 @@ class TestScheduleRoutes:
         }[k]
 
         db = _mock_db(mapping_first=fake_row)
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.delete(
                 f"/api/v1/schedules/{SCHEDULE_ID}",
                 headers=HEADERS,
@@ -316,9 +304,7 @@ class TestJobGradeRoutes:
 
         db.execute = AsyncMock(side_effect=[set_cfg, count_result, list_result])
 
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.get("/api/v1/job-grades", headers=HEADERS)
 
         assert resp.status_code == 200
@@ -344,9 +330,7 @@ class TestJobGradeRoutes:
 
         db.execute = AsyncMock(side_effect=[set_cfg, insert_result])
 
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/job-grades",
                 json={
@@ -376,9 +360,7 @@ class TestJobGradeRoutes:
 
         db.execute = AsyncMock(side_effect=[set_cfg, detail_result])
 
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.get(
                 f"/api/v1/job-grades/{GRADE_ID}",
                 headers=HEADERS,
@@ -401,9 +383,7 @@ class TestJobGradeRoutes:
         set_cfg = MagicMock()
         db.execute = AsyncMock(side_effect=[set_cfg, fake_check])
 
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.put(
                 f"/api/v1/job-grades/{GRADE_ID}",
                 json={},  # 空 body，所有字段 None
@@ -429,9 +409,7 @@ class TestJobGradeRoutes:
 
         db.execute = AsyncMock(side_effect=[set_cfg, emp_check_result])
 
-        async with AsyncClient(
-            transport=ASGITransport(app=self._app(db)), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=self._app(db)), base_url="http://test") as client:
             resp = await client.delete(
                 f"/api/v1/job-grades/{GRADE_ID}",
                 headers=HEADERS,

@@ -10,6 +10,7 @@
 运行：
     pytest services/tx-agent/src/tests/test_edge_inference.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -38,8 +39,8 @@ def client() -> EdgeInferenceClient:
 
 # ─── 1. Bridge 在线 — 调用成功 ───────────────────────────────────────────────
 
-class TestBridgeOnline:
 
+class TestBridgeOnline:
     @pytest.mark.asyncio
     @respx.mock
     async def test_predict_dish_time_success(self, client: EdgeInferenceClient) -> None:
@@ -49,9 +50,7 @@ class TestBridgeOnline:
             "confidence": 0.85,
             "model": "dish_time_v1",
         }
-        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(
-            return_value=httpx.Response(200, json=mock_response)
-        )
+        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(return_value=httpx.Response(200, json=mock_response))
 
         result = await client.predict_dish_time(
             dish_id="dish_001",
@@ -74,9 +73,7 @@ class TestBridgeOnline:
             "risk_level": "high",
             "reason": "discount_rate_too_high",
         }
-        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            return_value=httpx.Response(200, json=mock_response)
-        )
+        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(return_value=httpx.Response(200, json=mock_response))
 
         result = await client.predict_discount_risk(
             discount_rate=0.35,
@@ -97,9 +94,7 @@ class TestBridgeOnline:
             "predicted_covers": 45,
             "confidence": 0.78,
         }
-        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            return_value=httpx.Response(200, json=mock_response)
-        )
+        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(return_value=httpx.Response(200, json=mock_response))
 
         result = await client.predict_traffic(
             store_id="store_001",
@@ -115,9 +110,7 @@ class TestBridgeOnline:
     @respx.mock
     async def test_is_available_online(self, client: EdgeInferenceClient) -> None:
         """bridge 在线时 is_available 返回 True"""
-        respx.get(f"{BRIDGE_URL}/health").mock(
-            return_value=httpx.Response(200, json={"ok": True, "models_loaded": []})
-        )
+        respx.get(f"{BRIDGE_URL}/health").mock(return_value=httpx.Response(200, json={"ok": True, "models_loaded": []}))
 
         result = await client.is_available()
         assert result is True
@@ -125,15 +118,13 @@ class TestBridgeOnline:
 
 # ─── 2. Bridge 离线 — Graceful Fallback ──────────────────────────────────────
 
-class TestBridgeOffline:
 
+class TestBridgeOffline:
     @pytest.mark.asyncio
     @respx.mock
     async def test_dish_time_fallback_on_connect_error(self, client: EdgeInferenceClient) -> None:
         """bridge 离线时 predict_dish_time fallback，不抛异常"""
-        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(side_effect=httpx.ConnectError("Connection refused"))
 
         result = await client.predict_dish_time(
             dish_id="dish_001",
@@ -151,9 +142,7 @@ class TestBridgeOffline:
     @respx.mock
     async def test_discount_risk_fallback_on_connect_error(self, client: EdgeInferenceClient) -> None:
         """bridge 离线时 predict_discount_risk fallback，不抛异常"""
-        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(side_effect=httpx.ConnectError("Connection refused"))
 
         result = await client.predict_discount_risk(
             discount_rate=0.35,
@@ -170,9 +159,7 @@ class TestBridgeOffline:
     @respx.mock
     async def test_traffic_fallback_on_connect_error(self, client: EdgeInferenceClient) -> None:
         """bridge 离线时 predict_traffic fallback，不抛异常"""
-        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(side_effect=httpx.ConnectError("Connection refused"))
 
         result = await client.predict_traffic(
             store_id="store_001",
@@ -188,9 +175,7 @@ class TestBridgeOffline:
     @respx.mock
     async def test_is_available_offline(self, client: EdgeInferenceClient) -> None:
         """bridge 离线时 is_available 返回 False"""
-        respx.get(f"{BRIDGE_URL}/health").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.get(f"{BRIDGE_URL}/health").mock(side_effect=httpx.ConnectError("Connection refused"))
 
         result = await client.is_available()
         assert result is False
@@ -198,15 +183,13 @@ class TestBridgeOffline:
 
 # ─── 3. 超时 — Fallback ───────────────────────────────────────────────────────
 
-class TestTimeout:
 
+class TestTimeout:
     @pytest.mark.asyncio
     @respx.mock
     async def test_dish_time_fallback_on_timeout(self, client: EdgeInferenceClient) -> None:
         """请求超时时 predict_dish_time fallback，不抛异常"""
-        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(
-            side_effect=httpx.TimeoutException("Request timed out")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(side_effect=httpx.TimeoutException("Request timed out"))
 
         result = await client.predict_dish_time(
             dish_id="dish_001",
@@ -222,9 +205,7 @@ class TestTimeout:
     @respx.mock
     async def test_discount_risk_fallback_on_timeout(self, client: EdgeInferenceClient) -> None:
         """请求超时时 predict_discount_risk fallback，不抛异常"""
-        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            side_effect=httpx.TimeoutException("Request timed out")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(side_effect=httpx.TimeoutException("Request timed out"))
 
         result = await client.predict_discount_risk(
             discount_rate=0.50,
@@ -239,9 +220,7 @@ class TestTimeout:
     @respx.mock
     async def test_traffic_fallback_on_timeout(self, client: EdgeInferenceClient) -> None:
         """请求超时时 predict_traffic fallback，不抛异常"""
-        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            side_effect=httpx.TimeoutException("Request timed out")
-        )
+        respx.post(f"{BRIDGE_URL}/predict/traffic").mock(side_effect=httpx.TimeoutException("Request timed out"))
 
         result = await client.predict_traffic(
             store_id="store_001",
@@ -256,9 +235,7 @@ class TestTimeout:
     @respx.mock
     async def test_is_available_timeout(self, client: EdgeInferenceClient) -> None:
         """健康检查超时时 is_available 返回 False"""
-        respx.get(f"{BRIDGE_URL}/health").mock(
-            side_effect=httpx.TimeoutException("Request timed out")
-        )
+        respx.get(f"{BRIDGE_URL}/health").mock(side_effect=httpx.TimeoutException("Request timed out"))
 
         result = await client.is_available()
         assert result is False
@@ -266,18 +243,21 @@ class TestTimeout:
 
 # ─── 4. 预测结果格式验证 ──────────────────────────────────────────────────────
 
-class TestResultFormat:
 
+class TestResultFormat:
     @pytest.mark.asyncio
     @respx.mock
     async def test_dish_time_required_fields(self, client: EdgeInferenceClient) -> None:
         """dish_time 结果包含所有必要字段"""
         respx.post(f"{BRIDGE_URL}/predict/dish-time").mock(
-            return_value=httpx.Response(200, json={
-                "predicted_seconds": 300,
-                "confidence": 0.80,
-                "model": "dish_time_v1",
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "predicted_seconds": 300,
+                    "confidence": 0.80,
+                    "model": "dish_time_v1",
+                },
+            )
         )
 
         result = await client.predict_dish_time("d1", 11, "weekday", 2)
@@ -292,11 +272,14 @@ class TestResultFormat:
     async def test_discount_risk_required_fields(self, client: EdgeInferenceClient) -> None:
         """discount_risk 结果包含所有必要字段"""
         respx.post(f"{BRIDGE_URL}/predict/discount-risk").mock(
-            return_value=httpx.Response(200, json={
-                "risk_score": 0.30,
-                "risk_level": "medium",
-                "reason": "discount_rate_near_limit",
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "risk_score": 0.30,
+                    "risk_level": "medium",
+                    "reason": "discount_rate_near_limit",
+                },
+            )
         )
 
         result = await client.predict_discount_risk(0.25, 150.0, "silver")
@@ -311,10 +294,13 @@ class TestResultFormat:
     async def test_traffic_required_fields(self, client: EdgeInferenceClient) -> None:
         """traffic 结果包含所有必要字段"""
         respx.post(f"{BRIDGE_URL}/predict/traffic").mock(
-            return_value=httpx.Response(200, json={
-                "predicted_covers": 32,
-                "confidence": 0.75,
-            })
+            return_value=httpx.Response(
+                200,
+                json={
+                    "predicted_covers": 32,
+                    "confidence": 0.75,
+                },
+            )
         )
 
         result = await client.predict_traffic("store_002", "2026-04-05", 14)
@@ -357,8 +343,8 @@ class TestResultFormat:
 
 # ─── 5. Fallback 逻辑正确性验证 ──────────────────────────────────────────────
 
-class TestFallbackLogic:
 
+class TestFallbackLogic:
     def test_discount_risk_platinum_allows_higher_discount(self, client: EdgeInferenceClient) -> None:
         """铂金会员允许更高折扣，相同折扣率风险分更低"""
         gold_result = client._fallback_discount_risk(0.35, 200.0, "gold")

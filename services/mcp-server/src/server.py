@@ -64,7 +64,7 @@ def _init_agents() -> None:
     _ensure_agent_path()
 
     try:
-        from agents.event_bus import EventBus, create_default_event_bus
+        from agents.event_bus import EventBus, create_default_event_bus  # noqa: F401 — EventBus 供下游 DI
         from agents.master import MasterAgent
         from agents.planner import DailyPlannerAgent
         from agents.skills.discount_guard import DiscountGuardAgent
@@ -119,6 +119,7 @@ def _init_agents() -> None:
 # Result serialisation helpers
 # ---------------------------------------------------------------------------
 
+
 def _serialise_result(obj: Any) -> str:
     """Convert an AgentResult (or any object) to a JSON string."""
     if obj is None:
@@ -133,20 +134,24 @@ def _serialise_result(obj: Any) -> str:
 
 def _stub_result(agent_id: str, action: str, arguments: dict) -> str:
     """Return a stub response when agents are not available."""
-    return json.dumps({
-        "success": True,
-        "action": action,
-        "agent_id": agent_id,
-        "data": {"stub": True, "message": f"Stub response for {agent_id}.{action}"},
-        "reasoning": "Agent runtime not available - returning stub",
-        "confidence": 0.0,
-        "input_params": arguments,
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "success": True,
+            "action": action,
+            "agent_id": agent_id,
+            "data": {"stub": True, "message": f"Stub response for {agent_id}.{action}"},
+            "reasoning": "Agent runtime not available - returning stub",
+            "confidence": 0.0,
+            "input_params": arguments,
+        },
+        ensure_ascii=False,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Tool execution router
 # ---------------------------------------------------------------------------
+
 
 async def _execute_payment_tool(action: str, arguments: dict) -> str:
     """Route payment_nexus tool calls to tx-pay service via HTTP."""
@@ -182,13 +187,16 @@ async def _execute_payment_tool(action: str, arguments: dict) -> str:
                 resp = await client.post(url, json=call_args, headers=headers)
         return resp.text
     except httpx.ConnectError:
-        return json.dumps({
-            "success": False,
-            "error": "tx-pay service unreachable",
-            "stub": True,
-            "action": action,
-            "agent_id": "payment_nexus",
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "success": False,
+                "error": "tx-pay service unreachable",
+                "stub": True,
+                "action": action,
+                "agent_id": "payment_nexus",
+            },
+            ensure_ascii=False,
+        )
     except httpx.TimeoutException:
         return json.dumps({"error": "tx-pay 服务超时", "action": action})
 
@@ -210,15 +218,11 @@ async def _execute_tool(tool_name: str, arguments: dict) -> str:
             return _stub_result(agent_id, action, arguments)
 
         if action == "dispatch":
-            result = await _master.dispatch(
-                arguments["agent_id"], arguments["action"], arguments.get("params", {})
-            )
+            result = await _master.dispatch(arguments["agent_id"], arguments["action"], arguments.get("params", {}))
             return _serialise_result(result)
 
         if action == "route_intent":
-            result = await _master.route_intent(
-                arguments["intent"], arguments.get("params", {})
-            )
+            result = await _master.route_intent(arguments["intent"], arguments.get("params", {}))
             return _serialise_result(result)
 
         if action == "multi_agent_execute":
@@ -253,6 +257,7 @@ async def _execute_tool(tool_name: str, arguments: dict) -> str:
 
         if action == "publish_event":
             from agents.event_bus import AgentEvent
+
             event = AgentEvent(
                 event_type=arguments["event_type"],
                 source_agent=arguments["source_agent"],
@@ -265,15 +270,20 @@ async def _execute_tool(tool_name: str, arguments: dict) -> str:
         if action == "get_event_chain":
             events = await _event_bus.get_event_chain(arguments["correlation_id"])
             return json.dumps(
-                [asdict(e) for e in events], ensure_ascii=False, default=str,
+                [asdict(e) for e in events],
+                ensure_ascii=False,
+                default=str,
             )
 
         if action == "get_stream":
             events = _event_bus.get_stream(
-                arguments["event_type"], arguments.get("limit", 100),
+                arguments["event_type"],
+                arguments.get("limit", 100),
             )
             return json.dumps(
-                [asdict(e) for e in events], ensure_ascii=False, default=str,
+                [asdict(e) for e in events],
+                ensure_ascii=False,
+                default=str,
             )
 
         if action == "register_handler":
@@ -333,17 +343,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         result_text = await _execute_tool(name, arguments)
     except (ValueError, KeyError, TypeError, RuntimeError, OSError) as exc:
         logger.error("tool_error", tool=name, error=str(exc))
-        result_text = json.dumps({
-            "error": str(exc),
-            "tool": name,
-            "success": False,
-        }, ensure_ascii=False)
+        result_text = json.dumps(
+            {
+                "error": str(exc),
+                "tool": name,
+                "success": False,
+            },
+            ensure_ascii=False,
+        )
     return [TextContent(type="text", text=result_text)]
 
 
 # ---------------------------------------------------------------------------
 # Entry points
 # ---------------------------------------------------------------------------
+
 
 async def main() -> None:
     """Run the MCP server over stdio."""

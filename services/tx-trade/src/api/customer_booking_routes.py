@@ -12,6 +12,7 @@ Routes:
   POST /api/v1/queue/{id}/cancel              -> 取消排队
   GET  /api/v1/queue/estimate                 -> 预估等待时间
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["customer-booking"])
 
 # ─── 通用辅助 ───
+
 
 def _ok(data: object) -> dict:
     return {"ok": True, "data": data, "error": None}
@@ -52,6 +54,7 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
 # 预约可用时段
 # ═══════════════════════════════════════════════════════════
 
+
 @router.get("/api/v1/trade/booking/available-slots")
 async def get_available_slots(
     request: Request,
@@ -68,7 +71,7 @@ async def get_available_slots(
     slots = []
     now = datetime.now(timezone.utc)
     today_str = now.strftime("%Y-%m-%d")
-    is_today = (date == today_str)
+    is_today = date == today_str
 
     for h in range(11, 21):
         for m in (0, 30):
@@ -78,9 +81,7 @@ async def get_available_slots(
             if is_today and (h < now.hour or (h == now.hour and m <= now.minute)):
                 status = "unavailable"
             # 模拟部分满位（固定规则而非随机，便于测试）
-            elif h == 12 and m == 0:
-                status = "full"
-            elif h == 18 and m == 30:
+            elif h == 12 and m == 0 or h == 18 and m == 30:
                 status = "full"
             slots.append({"time": time_str, "status": status})
 
@@ -91,13 +92,14 @@ async def get_available_slots(
 # 预约 CRUD
 # ═══════════════════════════════════════════════════════════
 
+
 class CreateBookingReq(BaseModel):
     store_id: str
     customer_name: str
     customer_phone: str
     party_size: int = 2
-    booking_date: str           # YYYY-MM-DD
-    booking_time: str           # HH:MM
+    booking_date: str  # YYYY-MM-DD
+    booking_time: str  # HH:MM
     table_type: Optional[str] = None
     special_request: Optional[str] = None
     source: str = "miniapp"
@@ -142,23 +144,28 @@ async def create_booking(
         rec = row.mappings().one()
         logger.info(
             "booking_created id=%s store=%s date=%s slot=%s",
-            rec["id"], req.store_id, req.booking_date, req.booking_time,
+            rec["id"],
+            req.store_id,
+            req.booking_date,
+            req.booking_time,
         )
-        return _ok({
-            "id": str(rec["id"]),
-            "tenant_id": tenant_id,
-            "store_id": req.store_id,
-            "customer_name": req.customer_name,
-            "customer_phone": req.customer_phone,
-            "party_size": req.party_size,
-            "booking_date": req.booking_date,
-            "booking_time": req.booking_time,
-            "table_type": req.table_type,
-            "special_request": req.special_request,
-            "status": rec["status"],
-            "source": req.source,
-            "created_at": rec["created_at"].isoformat(),
-        })
+        return _ok(
+            {
+                "id": str(rec["id"]),
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "customer_name": req.customer_name,
+                "customer_phone": req.customer_phone,
+                "party_size": req.party_size,
+                "booking_date": req.booking_date,
+                "booking_time": req.booking_time,
+                "table_type": req.table_type,
+                "special_request": req.special_request,
+                "status": rec["status"],
+                "source": req.source,
+                "created_at": rec["created_at"].isoformat(),
+            }
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("create_booking_error store=%s error=%s", req.store_id, str(exc))
@@ -255,6 +262,7 @@ async def cancel_booking(
 # 排队
 # ═══════════════════════════════════════════════════════════
 
+
 @router.get("/api/v1/queue/summary")
 async def queue_summary(request: Request, store_id: str = Query(...)):
     """排队概况（静态 Mock，实际应从 queue_tickets 聚合）"""
@@ -272,7 +280,7 @@ class TakeQueueReq(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     party_size: int = 2
-    guest_range: str = ""       # "1-2" / "3-4" / "5+"
+    guest_range: str = ""  # "1-2" / "3-4" / "5+"
     queue_type: str = "normal"
 
 
@@ -340,21 +348,23 @@ async def take_queue(
         ahead = max(0, (waiting_row.scalar() or 1) - 1)
 
         logger.info("queue_take store=%s ticket=%s", req.store_id, ticket_no)
-        return _ok({
-            "id": str(rec["id"]),
-            "tenant_id": tenant_id,
-            "store_id": req.store_id,
-            "ticketNo": ticket_no,
-            "customer_name": req.customer_name,
-            "customer_phone": req.customer_phone,
-            "party_size": req.party_size,
-            "queue_type": req.queue_type,
-            "status": rec["status"],
-            "ahead": ahead,
-            "estimateMin": ahead * 6,
-            "createdAt": rec["created_at"].strftime("%H:%M"),
-            "created_at": rec["created_at"].isoformat(),
-        })
+        return _ok(
+            {
+                "id": str(rec["id"]),
+                "tenant_id": tenant_id,
+                "store_id": req.store_id,
+                "ticketNo": ticket_no,
+                "customer_name": req.customer_name,
+                "customer_phone": req.customer_phone,
+                "party_size": req.party_size,
+                "queue_type": req.queue_type,
+                "status": rec["status"],
+                "ahead": ahead,
+                "estimateMin": ahead * 6,
+                "createdAt": rec["created_at"].strftime("%H:%M"),
+                "created_at": rec["created_at"].isoformat(),
+            }
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("take_queue_error store=%s error=%s", req.store_id, str(exc))
@@ -411,24 +421,26 @@ async def my_ticket(
         )
         ahead = ahead_row.scalar() or 0
 
-        return _ok({
-            "id": str(rec["id"]),
-            "store_id": str(rec["store_id"]),
-            "ticketNo": rec["ticket_no"],
-            "customer_name": rec["customer_name"],
-            "customer_phone": rec["customer_phone"],
-            "party_size": rec["party_size"],
-            "queue_type": rec["queue_type"],
-            "status": rec["status"],
-            "ahead": ahead,
-            "estimateMin": ahead * 6,
-            "called_at": rec["called_at"].isoformat() if rec["called_at"] else None,
-            "seated_at": rec["seated_at"].isoformat() if rec["seated_at"] else None,
-            "cancelled_at": rec["cancelled_at"].isoformat() if rec["cancelled_at"] else None,
-            "wait_minutes": rec["wait_minutes"],
-            "createdAt": rec["created_at"].strftime("%H:%M"),
-            "created_at": rec["created_at"].isoformat(),
-        })
+        return _ok(
+            {
+                "id": str(rec["id"]),
+                "store_id": str(rec["store_id"]),
+                "ticketNo": rec["ticket_no"],
+                "customer_name": rec["customer_name"],
+                "customer_phone": rec["customer_phone"],
+                "party_size": rec["party_size"],
+                "queue_type": rec["queue_type"],
+                "status": rec["status"],
+                "ahead": ahead,
+                "estimateMin": ahead * 6,
+                "called_at": rec["called_at"].isoformat() if rec["called_at"] else None,
+                "seated_at": rec["seated_at"].isoformat() if rec["seated_at"] else None,
+                "cancelled_at": rec["cancelled_at"].isoformat() if rec["cancelled_at"] else None,
+                "wait_minutes": rec["wait_minutes"],
+                "createdAt": rec["created_at"].strftime("%H:%M"),
+                "created_at": rec["created_at"].isoformat(),
+            }
+        )
     except SQLAlchemyError as exc:
         logger.error("my_ticket_error tid=%s error=%s", ticket_id, str(exc))
         return _err_resp("查询排队票失败")
@@ -478,7 +490,9 @@ async def queue_estimate(
     """预估等待时间"""
     _get_tenant_id(request)
     # 静态估算（不依赖 DB），与 queue_summary 保持一致
-    return _ok({
-        "waiting": 0,
-        "estimate_min": 0,
-    })
+    return _ok(
+        {
+            "waiting": 0,
+            "estimate_min": 0,
+        }
+    )

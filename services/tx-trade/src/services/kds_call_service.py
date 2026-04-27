@@ -14,6 +14,7 @@
 --   ALTER TABLE kds_tasks ADD CONSTRAINT kds_tasks_status_check
 --     CHECK (status IN ('pending','cooking','calling','done','cancelled'));
 """
+
 import os
 import uuid
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ STATUS_DONE = "done"
 
 # ─── 响应数据结构 ───
 
+
 @dataclass
 class CallingStats:
     calling_count: int
@@ -48,6 +50,7 @@ class CallingStats:
 
 
 # ─── 内部 WebSocket 推送 ───
+
 
 async def _broadcast(event_type: str, payload: dict) -> None:
     """广播 WebSocket 事件到 Mac mini KDS 推送服务。
@@ -73,6 +76,7 @@ async def _broadcast(event_type: str, payload: dict) -> None:
 
 # ─── 查询辅助 ───
 
+
 async def _get_task(
     task_id: str,
     tenant_id: str,
@@ -96,6 +100,7 @@ async def _get_task(
 
 
 # ─── 服务类 ───
+
 
 class KdsCallService:
     """等叫（calling）状态管理服务。
@@ -133,10 +138,7 @@ class KdsCallService:
             raise LookupError(f"任务 {task_id} 不存在")
 
         if task.status != STATUS_COOKING:
-            raise RuntimeError(
-                f"状态流转不合法：当前状态 '{task.status}'，"
-                f"只有 cooking 状态可以转为 calling"
-            )
+            raise RuntimeError(f"状态流转不合法：当前状态 '{task.status}'，只有 cooking 状态可以转为 calling")
 
         now = datetime.now(timezone.utc)
         task.status = STATUS_CALLING
@@ -146,12 +148,15 @@ class KdsCallService:
         await db.flush()
         log.info("kds_call_service.mark_calling.ok", call_count=task.call_count)  # type: ignore[attr-defined]
 
-        await _broadcast("task_called", {
-            "task_id": task_id,
-            "tenant_id": tenant_id,
-            "dept_id": str(task.dept_id) if task.dept_id else None,
-            "called_at": now.isoformat(),
-        })
+        await _broadcast(
+            "task_called",
+            {
+                "task_id": task_id,
+                "tenant_id": tenant_id,
+                "dept_id": str(task.dept_id) if task.dept_id else None,
+                "called_at": now.isoformat(),
+            },
+        )
 
         return task
 
@@ -184,10 +189,7 @@ class KdsCallService:
             raise LookupError(f"任务 {task_id} 不存在")
 
         if task.status != STATUS_CALLING:
-            raise RuntimeError(
-                f"状态流转不合法：当前状态 '{task.status}'，"
-                f"只有 calling 状态可以转为 done（确认上桌）"
-            )
+            raise RuntimeError(f"状态流转不合法：当前状态 '{task.status}'，只有 calling 状态可以转为 done（确认上桌）")
 
         now = datetime.now(timezone.utc)
         task.status = STATUS_DONE
@@ -197,12 +199,15 @@ class KdsCallService:
         await db.flush()
         log.info("kds_call_service.confirm_served.ok")
 
-        await _broadcast("task_served", {
-            "task_id": task_id,
-            "tenant_id": tenant_id,
-            "dept_id": str(task.dept_id) if task.dept_id else None,
-            "served_at": now.isoformat(),
-        })
+        await _broadcast(
+            "task_served",
+            {
+                "task_id": task_id,
+                "tenant_id": tenant_id,
+                "dept_id": str(task.dept_id) if task.dept_id else None,
+                "served_at": now.isoformat(),
+            },
+        )
 
         return task
 
@@ -249,9 +254,9 @@ class KdsCallService:
 
         result = await db.execute(stmt)
         tasks = list(result.scalars().all())
-        logger.bind(
-            store_id=store_id, tenant_id=tenant_id, count=len(tasks)
-        ).debug("kds_call_service.get_calling_tasks")
+        logger.bind(store_id=store_id, tenant_id=tenant_id, count=len(tasks)).debug(
+            "kds_call_service.get_calling_tasks"
+        )
         return tasks
 
     @classmethod

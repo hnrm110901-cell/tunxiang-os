@@ -6,6 +6,7 @@ ROUTER REGISTRATION:
 
 所有接口需要 X-Tenant-ID header。
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 

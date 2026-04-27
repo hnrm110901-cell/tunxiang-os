@@ -12,6 +12,7 @@ touch → open → click → reserve → visit → order → repeat
 
 金额单位：分(fen)
 """
+
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -82,11 +83,7 @@ class ROIAttributionService:
         now = datetime.now(timezone.utc)
 
         customer_id_raw = touch_data["customer_id"]
-        customer_uuid = (
-            customer_id_raw
-            if isinstance(customer_id_raw, uuid.UUID)
-            else uuid.UUID(str(customer_id_raw))
-        )
+        customer_uuid = customer_id_raw if isinstance(customer_id_raw, uuid.UUID) else uuid.UUID(str(customer_id_raw))
 
         touched_at_raw = touch_data.get("touched_at")
         touched_at: datetime
@@ -218,24 +215,14 @@ class ROIAttributionService:
         if model == "last_touch":
             # 最近一次触达
             selected_touch = touches[-1]
-            await self._mark_touch_converted(
-                db, selected_touch, order_id, order_amount_fen, order_time
-            )
-            await self._update_summary(
-                db, tenant_id, selected_touch, order_amount_fen,
-                order_time.date(), model
-            )
+            await self._mark_touch_converted(db, selected_touch, order_id, order_amount_fen, order_time)
+            await self._update_summary(db, tenant_id, selected_touch, order_amount_fen, order_time.date(), model)
 
         elif model == "first_touch":
             # 最早一次触达
             selected_touch = touches[0]
-            await self._mark_touch_converted(
-                db, selected_touch, order_id, order_amount_fen, order_time
-            )
-            await self._update_summary(
-                db, tenant_id, selected_touch, order_amount_fen,
-                order_time.date(), model
-            )
+            await self._mark_touch_converted(db, selected_touch, order_id, order_amount_fen, order_time)
+            await self._update_summary(db, tenant_id, selected_touch, order_amount_fen, order_time.date(), model)
 
         elif model == "linear":
             # 所有触点均分收入
@@ -245,13 +232,8 @@ class ROIAttributionService:
             for i, touch in enumerate(touches):
                 # 最后一条多分余数，避免精度丢失
                 amount = share_fen + (remainder if i == len(touches) - 1 else 0)
-                await self._mark_touch_converted(
-                    db, touch, order_id, amount, order_time
-                )
-                await self._update_summary(
-                    db, tenant_id, touch, amount,
-                    order_time.date(), model
-                )
+                await self._mark_touch_converted(db, touch, order_id, amount, order_time)
+                await self._update_summary(db, tenant_id, touch, amount, order_time.date(), model)
             # 返回最后一个触点作为代表
             selected_touch = touches[-1]
 
@@ -273,6 +255,7 @@ class ROIAttributionService:
         if ab_test_id is not None:
             try:
                 from services.ab_test_service import ABTestService
+
                 ab_svc = ABTestService()
                 await ab_svc.record_conversion(
                     test_id=ab_test_id,
@@ -369,16 +352,8 @@ class ROIAttributionService:
         else:
             new_converted = summary.converted_customers + 1
             new_revenue = summary.attributed_revenue_fen + revenue_fen
-            new_rate = (
-                round(new_converted / summary.unique_customers, 4)
-                if summary.unique_customers > 0
-                else 0.0
-            )
-            new_roi = (
-                round((new_revenue - summary.cost_fen) / summary.cost_fen, 4)
-                if summary.cost_fen > 0
-                else 0.0
-            )
+            new_rate = round(new_converted / summary.unique_customers, 4) if summary.unique_customers > 0 else 0.0
+            new_roi = round((new_revenue - summary.cost_fen) / summary.cost_fen, 4) if summary.cost_fen > 0 else 0.0
             await db.execute(
                 update(AttributionSummary)
                 .where(AttributionSummary.id == summary.id)
@@ -429,12 +404,9 @@ class ROIAttributionService:
             and_(
                 MarketingTouch.tenant_id == tenant_id,
                 MarketingTouch.source_id == campaign_id,
-                MarketingTouch.touched_at >= datetime.combine(
-                    start_date, datetime.min.time(), tzinfo=timezone.utc
-                ),
-                MarketingTouch.touched_at <= datetime.combine(
-                    end_date, datetime.max.time().replace(microsecond=0), tzinfo=timezone.utc
-                ),
+                MarketingTouch.touched_at >= datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc),
+                MarketingTouch.touched_at
+                <= datetime.combine(end_date, datetime.max.time().replace(microsecond=0), tzinfo=timezone.utc),
             )
         )
         result = await db.execute(stmt)
@@ -463,9 +435,7 @@ class ROIAttributionService:
         unique_customers = len({t.customer_id for t in touches})
         converted = [t for t in touches if t.is_converted]
         converted_customers = len({t.customer_id for t in converted})
-        attributed_revenue_fen = sum(
-            t.order_amount_fen or 0 for t in converted
-        )
+        attributed_revenue_fen = sum(t.order_amount_fen or 0 for t in converted)
 
         # 活动优惠成本：从汇总表取最新 cost_fen（由业务层写入）
         cost_stmt = select(func.sum(AttributionSummary.cost_fen)).where(
@@ -480,17 +450,9 @@ class ROIAttributionService:
         cost_result = await db.execute(cost_stmt)
         cost_fen: int = cost_result.scalar_one_or_none() or 0
 
-        conversion_rate = round(
-            converted_customers / unique_customers, 4
-        ) if unique_customers > 0 else 0.0
-        roi = round(
-            (attributed_revenue_fen - cost_fen) / cost_fen, 4
-        ) if cost_fen > 0 else 0.0
-        cac_fen = (
-            cost_fen // converted_customers
-            if converted_customers > 0
-            else 0
-        )
+        conversion_rate = round(converted_customers / unique_customers, 4) if unique_customers > 0 else 0.0
+        roi = round((attributed_revenue_fen - cost_fen) / cost_fen, 4) if cost_fen > 0 else 0.0
+        cac_fen = cost_fen // converted_customers if converted_customers > 0 else 0
 
         # 渠道分布
         channel_dist: dict[str, int] = defaultdict(int)
@@ -581,15 +543,17 @@ class ROIAttributionService:
             unique = len(stats["customers"])
             converted = stats["converted"]
             rate = round(converted / unique, 4) if unique > 0 else 0.0
-            funnel.append({
-                "channel": ch,
-                "touches": stats["touches"],
-                "unique_customers": unique,
-                "converted": converted,
-                "conversion_rate": rate,
-                "revenue_fen": stats["revenue_fen"],
-                "revenue_yuan": round(stats["revenue_fen"] / 100, 2),
-            })
+            funnel.append(
+                {
+                    "channel": ch,
+                    "touches": stats["touches"],
+                    "unique_customers": unique,
+                    "converted": converted,
+                    "conversion_rate": rate,
+                    "revenue_fen": stats["revenue_fen"],
+                    "revenue_yuan": round(stats["revenue_fen"] / 100, 2),
+                }
+            )
             if rate < min_rate:
                 min_rate = rate
                 bottleneck_channel = ch
@@ -607,9 +571,7 @@ class ROIAttributionService:
         cost_result = await db.execute(cost_stmt)
         cost_fen: int = cost_result.scalar_one_or_none() or 0
 
-        roi = round(
-            (total_revenue - cost_fen) / cost_fen, 4
-        ) if cost_fen > 0 else 0.0
+        roi = round((total_revenue - cost_fen) / cost_fen, 4) if cost_fen > 0 else 0.0
 
         return {
             "journey_id": journey_id,
@@ -654,10 +616,10 @@ class ROIAttributionService:
 
         # 日期解析（默认近30天）
         today = datetime.now(timezone.utc).date()
-        start_date: date = date.fromisoformat(start_str) if start_str else (
-            date(today.year, today.month, 1)
-            if today.day > 30
-            else date.fromordinal(today.toordinal() - 29)
+        start_date: date = (
+            date.fromisoformat(start_str)
+            if start_str
+            else (date(today.year, today.month, 1) if today.day > 30 else date.fromordinal(today.toordinal() - 29))
         )
         end_date: date = date.fromisoformat(end_str) if end_str else today
 
@@ -667,13 +629,9 @@ class ROIAttributionService:
         # 全量触点统计
         total_stmt = select(
             func.count(MarketingTouch.id).label("total_touches"),
-            func.count(MarketingTouch.id).filter(
-                MarketingTouch.is_converted.is_(True)
-            ).label("total_converted"),
+            func.count(MarketingTouch.id).filter(MarketingTouch.is_converted.is_(True)).label("total_converted"),
             func.coalesce(
-                func.sum(MarketingTouch.order_amount_fen).filter(
-                    MarketingTouch.is_converted.is_(True)
-                ), 0
+                func.sum(MarketingTouch.order_amount_fen).filter(MarketingTouch.is_converted.is_(True)), 0
             ).label("total_revenue"),
         ).where(
             and_(
@@ -701,32 +659,34 @@ class ROIAttributionService:
         avg_roi: float = round(roi_result.scalar_one_or_none() or 0.0, 4)
 
         # 渠道转化率对比
-        channel_stmt = select(
-            MarketingTouch.channel,
-            func.count(MarketingTouch.id).label("touches"),
-            func.count(MarketingTouch.id).filter(
-                MarketingTouch.is_converted.is_(True)
-            ).label("converted"),
-        ).where(
-            and_(
-                MarketingTouch.tenant_id == tenant_id,
-                MarketingTouch.touched_at >= start_dt,
-                MarketingTouch.touched_at <= end_dt,
+        channel_stmt = (
+            select(
+                MarketingTouch.channel,
+                func.count(MarketingTouch.id).label("touches"),
+                func.count(MarketingTouch.id).filter(MarketingTouch.is_converted.is_(True)).label("converted"),
             )
-        ).group_by(MarketingTouch.channel)
+            .where(
+                and_(
+                    MarketingTouch.tenant_id == tenant_id,
+                    MarketingTouch.touched_at >= start_dt,
+                    MarketingTouch.touched_at <= end_dt,
+                )
+            )
+            .group_by(MarketingTouch.channel)
+        )
         channel_result = await db.execute(channel_stmt)
         channel_breakdown: list[dict] = []
         for ch_row in channel_result.all():
             ch_touches = ch_row.touches or 0
             ch_converted = ch_row.converted or 0
-            channel_breakdown.append({
-                "channel": ch_row.channel,
-                "touches": ch_touches,
-                "converted": ch_converted,
-                "conversion_rate": round(
-                    ch_converted / ch_touches, 4
-                ) if ch_touches > 0 else 0.0,
-            })
+            channel_breakdown.append(
+                {
+                    "channel": ch_row.channel,
+                    "touches": ch_touches,
+                    "converted": ch_converted,
+                    "conversion_rate": round(ch_converted / ch_touches, 4) if ch_touches > 0 else 0.0,
+                }
+            )
 
         # ROI 最高的 5 个活动（来自汇总表）
         top_stmt = (
@@ -801,9 +761,7 @@ class ROIAttributionService:
             "total_converted": total_converted,
             "total_revenue_fen": total_revenue,
             "total_revenue_yuan": round(total_revenue / 100, 2),
-            "overall_conversion_rate": round(
-                total_converted / total_touches, 4
-            ) if total_touches > 0 else 0.0,
+            "overall_conversion_rate": round(total_converted / total_touches, 4) if total_touches > 0 else 0.0,
             "avg_roi": avg_roi,
             "top_campaigns": top_campaigns,
             "channel_breakdown": channel_breakdown,
@@ -833,12 +791,16 @@ class ROIAttributionService:
               rates:  ["100%", "35.0%", "34.3%", "70.8%"]
             }
         """
-        stmt = select(MarketingTouch).where(
-            and_(
-                MarketingTouch.tenant_id == tenant_id,
-                MarketingTouch.source_id == source_id,
+        stmt = (
+            select(MarketingTouch)
+            .where(
+                and_(
+                    MarketingTouch.tenant_id == tenant_id,
+                    MarketingTouch.source_id == source_id,
+                )
             )
-        ).order_by(MarketingTouch.touched_at.asc())
+            .order_by(MarketingTouch.touched_at.asc())
+        )
         result = await db.execute(stmt)
         touches: list[MarketingTouch] = list(result.scalars().all())
 
@@ -948,9 +910,7 @@ class ROIAttributionService:
                 "total_touches": int(r.total_touches or 0),
                 "unique_customers": int(r.unique_customers or 0),
                 "converted_customers": int(r.converted_customers or 0),
-                "conversion_rate": round(
-                    int(r.converted_customers or 0) / int(r.unique_customers or 1), 4
-                ),
+                "conversion_rate": round(int(r.converted_customers or 0) / int(r.unique_customers or 1), 4),
                 "attributed_revenue_fen": int(r.total_revenue or 0),
                 "attributed_revenue_yuan": round((r.total_revenue or 0) / 100, 2),
                 "cost_fen": int(r.total_cost or 0),

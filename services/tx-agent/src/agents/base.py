@@ -6,6 +6,7 @@
 3. 每个决策必须留痕（AgentDecisionLog）
 4. 支持双层推理：边缘(Core ML) + 云端(Claude API)
 """
+
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -23,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class AgentResult:
     """Agent 执行结果"""
+
     success: bool
     action: str
     data: dict = field(default_factory=dict)
@@ -43,6 +45,7 @@ class AgentResult:
 @dataclass
 class ActionConfig:
     """Per-action session policy declaration"""
+
     requires_human_confirm: bool = False
     max_retries: int = 0
     risk_level: str = "low"  # low/medium/high/critical
@@ -78,7 +81,7 @@ class SkillAgent(ABC):
     ):
         self.tenant_id = tenant_id
         self.store_id = store_id
-        self._db = db            # AsyncSession，可选
+        self._db = db  # AsyncSession，可选
         self._router = model_router  # ModelRouter，可选
 
     async def run(self, action: str, params: dict[str, Any]) -> AgentResult:
@@ -113,6 +116,7 @@ class SkillAgent(ABC):
 
         # 三条硬约束校验（Sprint D1 / PR G：引入 scope 声明 + 显式豁免 + N/A 标记）
         from .constraints import ConstraintChecker
+
         checker = ConstraintChecker()
 
         # 显式豁免：Skill 类级 constraint_scope=set() 表示不适用任何约束
@@ -170,6 +174,7 @@ class SkillAgent(ABC):
         if self._db is not None:
             try:
                 from ..models.session_event import SessionEvent
+
                 session_id = params.get("_session_id")
                 if session_id:
                     event = SessionEvent(

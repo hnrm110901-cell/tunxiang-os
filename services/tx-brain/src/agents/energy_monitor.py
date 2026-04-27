@@ -11,6 +11,7 @@ mv_energy_efficiency 字段：
   energy_revenue_ratio, anomaly_count,
   off_hours_anomalies, last_event_id, updated_at
 """
+
 from __future__ import annotations
 
 import json
@@ -26,9 +27,9 @@ logger = structlog.get_logger()
 client = anthropic.AsyncAnthropic()  # 从环境变量 ANTHROPIC_API_KEY 读取
 
 # 能耗效率评级阈值
-RATIO_EXCELLENT = 0.05   # ≤5% — 优秀
-RATIO_GOOD = 0.08        # ≤8% — 良好
-RATIO_WARNING = 0.12     # ≤12% — 警告；>12% — 超标
+RATIO_EXCELLENT = 0.05  # ≤5% — 优秀
+RATIO_GOOD = 0.08  # ≤8% — 良好
+RATIO_WARNING = 0.12  # ≤12% — 警告；>12% — 超标
 
 
 class EnergyMonitorAgent:
@@ -183,9 +184,7 @@ class EnergyMonitorAgent:
                         tenant_id=tenant_id,
                         store_id=store_id,
                     )
-                    return await self.analyze(
-                        {"tenant_id": tenant_id, "store_id": store_id}
-                    )
+                    return await self.analyze({"tenant_id": tenant_id, "store_id": store_id})
 
                 return {
                     "inference_layer": "mv_fast_path",
@@ -200,9 +199,7 @@ class EnergyMonitorAgent:
                 store_id=store_id,
                 error=str(exc),
             )
-            return await self.analyze(
-                {"tenant_id": tenant_id, "store_id": store_id}
-            )
+            return await self.analyze({"tenant_id": tenant_id, "store_id": store_id})
 
     # ─── 内部辅助方法 ──────────────────────────────────────────────────────────
 
@@ -234,11 +231,7 @@ class EnergyMonitorAgent:
             except (json.JSONDecodeError, ValueError):
                 off_hours = []
 
-        off_hours_lines = (
-            "\n".join(f"  - {a}" for a in off_hours[:5])
-            if off_hours
-            else "  无非营业时段异常"
-        )
+        off_hours_lines = "\n".join(f"  - {a}" for a in off_hours[:5]) if off_hours else "  无非营业时段异常"
 
         return f"""门店能耗分析请求：
 

@@ -6,6 +6,7 @@
 - Mock 模式（不依赖真实 Redis，用内存队列）
 - Redis 不可用时自动降级（不影响主业务流程）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -105,9 +106,7 @@ class EventPublisher:
     # 内部实现
     # ------------------------------------------------------------------
 
-    async def _publish_with_retry(
-        self, stream_key: str, event: TxEvent
-    ) -> str | None:
+    async def _publish_with_retry(self, stream_key: str, event: TxEvent) -> str | None:
         """带指数退避重试的发布。"""
         fields = event.to_stream_fields()
 

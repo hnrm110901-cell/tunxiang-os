@@ -13,6 +13,7 @@
 - 角色批量变更：影响员工数 >= 10
 - 食材价格调整：变动幅度 >= 20%
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -38,8 +39,10 @@ logger = structlog.get_logger()
 
 # ── ORM Model ────────────────────────────────────────────────────────────────
 
+
 class OperationPlanModel(TenantBase):
     """operation_plans 表 ORM 映射（TenantBase 已包含 id/tenant_id/created_at/updated_at/is_deleted）"""
+
     __tablename__ = "operation_plans"
 
     operation_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -72,26 +75,28 @@ class RiskLevel(str, Enum):
 @dataclass
 class ImpactAnalysis:
     """操作影响分析"""
+
     affected_stores: int = 0
     affected_employees: int = 0
     affected_members: int = 0
-    financial_impact_fen: int = 0      # 预估财务影响（分）
+    financial_impact_fen: int = 0  # 预估财务影响（分）
     risk_level: RiskLevel = RiskLevel.LOW
-    impact_summary: str = ""           # AI生成的影响摘要
+    impact_summary: str = ""  # AI生成的影响摘要
     warnings: list[str] = field(default_factory=list)  # 需特别注意的风险点
-    reversible: bool = True            # 操作是否可逆
+    reversible: bool = True  # 操作是否可逆
 
 
 @dataclass
 class OperationPlan:
     """待确认的操作计划"""
+
     plan_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tenant_id: str = ""
-    operation_type: str = ""           # 操作类型标识
+    operation_type: str = ""  # 操作类型标识
     operation_params: dict = field(default_factory=dict)
     impact: ImpactAnalysis = field(default_factory=ImpactAnalysis)
     status: OperationStatus = OperationStatus.PENDING_CONFIRM
-    operator_id: str = ""              # 发起人
+    operator_id: str = ""  # 发起人
     confirmed_by: Optional[str] = None
     confirmed_at: Optional[datetime] = None
     executed_at: Optional[datetime] = None
@@ -200,6 +205,7 @@ class OperationPlanner:
         import asyncio
 
         from .plan_notifier import OperationPlanNotifier
+
         asyncio.create_task(OperationPlanNotifier.notify(plan))
 
         return plan

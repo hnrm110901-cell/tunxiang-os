@@ -10,6 +10,7 @@
 7. 时段冲突检测
 8. 美团排队同步
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -48,6 +49,7 @@ STORE = "store-xujihaixian-wanbao"
 # ═══════════════════════════════════════════════════════════
 # 1. 预订完整生命周期
 # ═══════════════════════════════════════════════════════════
+
 
 class TestReservationLifecycle:
     """场景：徐记海鲜万博店，张先生预订明天晚上6点8人包间"""
@@ -138,6 +140,7 @@ class TestReservationLifecycle:
 # 2. 排队等位时间预估
 # ═══════════════════════════════════════════════════════════
 
+
 class TestQueueEstimation:
     """场景：周六晚高峰，已有3组在等位B桌(5-8人)，预估6人桌等位时间"""
 
@@ -145,11 +148,13 @@ class TestQueueEstimation:
         svc = QueueService(tenant_id=TENANT, store_id=STORE)
 
         # 先取3个6人桌号
-        for i, (name, phone) in enumerate([
-            ("赵一", "13800000001"),
-            ("钱二", "13800000002"),
-            ("孙三", "13800000003"),
-        ]):
+        for i, (name, phone) in enumerate(
+            [
+                ("赵一", "13800000001"),
+                ("钱二", "13800000002"),
+                ("孙三", "13800000003"),
+            ]
+        ):
             result = svc.take_number(
                 store_id=STORE,
                 customer_name=name,
@@ -157,7 +162,7 @@ class TestQueueEstimation:
                 party_size=6,
                 source="walk_in",
             )
-            assert result["queue_number"] == f"B{i+1:03d}"
+            assert result["queue_number"] == f"B{i + 1:03d}"
 
         # 预估第4组6人的等位时间
         estimate = svc.estimate_wait_time(store_id=STORE, party_size=6)
@@ -192,6 +197,7 @@ class TestQueueEstimation:
 # ═══════════════════════════════════════════════════════════
 # 3. 排队+预订联动（VIP优先排队）
 # ═══════════════════════════════════════════════════════════
+
 
 class TestQueueReservationLink:
     """场景：VIP客户有预订，到店后桌台未就绪，自动加入优先排队"""
@@ -246,6 +252,7 @@ class TestQueueReservationLink:
 # ═══════════════════════════════════════════════════════════
 # 4. 宴会完整生命周期
 # ═══════════════════════════════════════════════════════════
+
 
 class TestBanquetFullLifecycle:
     """场景：徐记海鲜承接王先生的婚宴，20桌，预算40万"""
@@ -387,7 +394,7 @@ class TestBanquetFullLifecycle:
             contract_id=contract_id,
             satisfaction_score=9,
             feedback_text="非常满意！菜品精致，服务周到，特别感谢宴会经理小张的贴心安排。"
-                          "佛跳墙是亮点，宾客都赞不绝口。",
+            "佛跳墙是亮点，宾客都赞不绝口。",
         )
         assert feedback["satisfaction_level"] == "excellent"
 
@@ -405,6 +412,7 @@ class TestBanquetFullLifecycle:
 # 5. 80%最低计费规则
 # ═══════════════════════════════════════════════════════════
 
+
 class TestMinBillingRule:
     """场景：合同20桌婚宴，实际只来了15桌，按80%(16桌)计费"""
 
@@ -413,9 +421,13 @@ class TestMinBillingRule:
 
         # 快速走完到合同阶段
         lead = svc.create_lead(
-            store_id=STORE, customer_name="刘总", phone="13700001111",
-            event_type="wedding", estimated_tables=20,
-            estimated_budget_fen=30000000, event_date="2026-06-01",
+            store_id=STORE,
+            customer_name="刘总",
+            phone="13700001111",
+            event_type="wedding",
+            estimated_tables=20,
+            estimated_budget_fen=30000000,
+            event_date="2026-06-01",
         )
         lead_id = lead["lead_id"]
         svc.update_lead_stage(lead_id, "consultation")
@@ -434,9 +446,12 @@ class TestMinBillingRule:
         svc.collect_deposit(contract_id, contract["deposit_required_fen"], "wechat")
 
         # 确认菜单
-        svc.confirm_menu(contract_id, [
-            {"name": "标准婚宴菜品", "price_fen": 98800, "quantity": 200},
-        ])
+        svc.confirm_menu(
+            contract_id,
+            [
+                {"name": "标准婚宴菜品", "price_fen": 98800, "quantity": 200},
+            ],
+        )
 
         # 生成清单 & 执行
         svc.generate_prep_checklist(contract_id)
@@ -465,6 +480,7 @@ class TestMinBillingRule:
 # 6. 爽约处理
 # ═══════════════════════════════════════════════════════════
 
+
 class TestNoShow:
     """场景：顾客预订后未到店，标记爽约并记录"""
 
@@ -474,8 +490,13 @@ class TestNoShow:
 
         # 创建并确认预订
         r = svc.create_reservation(
-            store_id=STORE, customer_name="赵大", phone="13600001111",
-            type="regular", date=tomorrow, time="19:00", party_size=3,
+            store_id=STORE,
+            customer_name="赵大",
+            phone="13600001111",
+            type="regular",
+            date=tomorrow,
+            time="19:00",
+            party_size=3,
         )
         reservation_id = r["reservation_id"]
         svc.confirm_reservation(reservation_id)
@@ -487,8 +508,13 @@ class TestNoShow:
 
         # 再创建一次预订并爽约 — 累计计数
         r2 = svc.create_reservation(
-            store_id=STORE, customer_name="赵大", phone="13600001111",
-            type="regular", date=tomorrow, time="12:00", party_size=2,
+            store_id=STORE,
+            customer_name="赵大",
+            phone="13600001111",
+            type="regular",
+            date=tomorrow,
+            time="12:00",
+            party_size=2,
         )
         svc.confirm_reservation(r2["reservation_id"])
         ns2 = svc.mark_no_show(r2["reservation_id"])
@@ -500,8 +526,13 @@ class TestNoShow:
         tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
 
         r = svc.create_reservation(
-            store_id=STORE, customer_name="钱二", phone="13600002222",
-            type="regular", date=tomorrow, time="19:00", party_size=2,
+            store_id=STORE,
+            customer_name="钱二",
+            phone="13600002222",
+            type="regular",
+            date=tomorrow,
+            time="19:00",
+            party_size=2,
         )
         # pending → no_show 不允许
         with pytest.raises(ValueError, match="transition to 'no_show' not allowed"):
@@ -512,6 +543,7 @@ class TestNoShow:
 # 7. 时段冲突检测
 # ═══════════════════════════════════════════════════════════
 
+
 class TestTimeSlotConflict:
     """场景：竹韵阁包间已有18:00预订，检测18:30是否冲突"""
 
@@ -521,18 +553,28 @@ class TestTimeSlotConflict:
 
         # 第一个预订占用竹韵阁 18:00-20:00
         r1 = svc.create_reservation(
-            store_id=STORE, customer_name="孙经理", phone="13700003333",
-            type="private_room", date=tomorrow, time="18:00",
-            party_size=10, room_name="竹韵阁",
+            store_id=STORE,
+            customer_name="孙经理",
+            phone="13700003333",
+            type="private_room",
+            date=tomorrow,
+            time="18:00",
+            party_size=10,
+            room_name="竹韵阁",
         )
         assert r1["table_or_room"] == "竹韵阁"
 
         # 尝试在同一包间 18:30 创建预订 — 应冲突
         with pytest.raises(ValueError, match="Time slot conflict"):
             svc.create_reservation(
-                store_id=STORE, customer_name="周总", phone="13700004444",
-                type="private_room", date=tomorrow, time="18:30",
-                party_size=12, room_name="竹韵阁",
+                store_id=STORE,
+                customer_name="周总",
+                phone="13700004444",
+                type="private_room",
+                date=tomorrow,
+                time="18:30",
+                party_size=12,
+                room_name="竹韵阁",
             )
 
     def test_different_room_no_conflict(self):
@@ -542,16 +584,26 @@ class TestTimeSlotConflict:
 
         # 竹韵阁 18:00
         svc.create_reservation(
-            store_id=STORE, customer_name="孙经理", phone="13700003333",
-            type="private_room", date=tomorrow, time="18:00",
-            party_size=10, room_name="竹韵阁",
+            store_id=STORE,
+            customer_name="孙经理",
+            phone="13700003333",
+            type="private_room",
+            date=tomorrow,
+            time="18:00",
+            party_size=10,
+            room_name="竹韵阁",
         )
 
         # 菊香苑 18:00 — 不冲突
         r2 = svc.create_reservation(
-            store_id=STORE, customer_name="周总", phone="13700004444",
-            type="private_room", date=tomorrow, time="18:00",
-            party_size=12, room_name="菊香苑",
+            store_id=STORE,
+            customer_name="周总",
+            phone="13700004444",
+            type="private_room",
+            date=tomorrow,
+            time="18:00",
+            party_size=12,
+            room_name="菊香苑",
         )
         assert r2["table_or_room"] == "菊香苑"
 
@@ -562,16 +614,26 @@ class TestTimeSlotConflict:
 
         # 竹韵阁 12:00-14:00
         svc.create_reservation(
-            store_id=STORE, customer_name="午餐客", phone="13700005555",
-            type="private_room", date=tomorrow, time="12:00",
-            party_size=8, room_name="竹韵阁",
+            store_id=STORE,
+            customer_name="午餐客",
+            phone="13700005555",
+            type="private_room",
+            date=tomorrow,
+            time="12:00",
+            party_size=8,
+            room_name="竹韵阁",
         )
 
         # 竹韵阁 18:00 — 不冲突
         r2 = svc.create_reservation(
-            store_id=STORE, customer_name="晚餐客", phone="13700006666",
-            type="private_room", date=tomorrow, time="18:00",
-            party_size=10, room_name="竹韵阁",
+            store_id=STORE,
+            customer_name="晚餐客",
+            phone="13700006666",
+            type="private_room",
+            date=tomorrow,
+            time="18:00",
+            party_size=10,
+            room_name="竹韵阁",
         )
         assert r2["table_or_room"] == "竹韵阁"
 
@@ -580,6 +642,7 @@ class TestTimeSlotConflict:
 # 8. 美团排队同步
 # ═══════════════════════════════════════════════════════════
 
+
 class TestMeituanSync:
     """场景：导入美团线上排队数据"""
 
@@ -587,12 +650,27 @@ class TestMeituanSync:
         svc = QueueService(tenant_id=TENANT, store_id=STORE)
 
         meituan_data = [
-            {"customer_name": "美团客A", "phone": "15000001111", "party_size": 4,
-             "meituan_queue_no": "MT001", "taken_at": "2026-03-27T12:00:00"},
-            {"customer_name": "美团客B", "phone": "15000002222", "party_size": 6,
-             "meituan_queue_no": "MT002", "taken_at": "2026-03-27T12:05:00"},
-            {"customer_name": "美团客C", "phone": "15000003333", "party_size": 10,
-             "meituan_queue_no": "MT003", "taken_at": "2026-03-27T12:10:00"},
+            {
+                "customer_name": "美团客A",
+                "phone": "15000001111",
+                "party_size": 4,
+                "meituan_queue_no": "MT001",
+                "taken_at": "2026-03-27T12:00:00",
+            },
+            {
+                "customer_name": "美团客B",
+                "phone": "15000002222",
+                "party_size": 6,
+                "meituan_queue_no": "MT002",
+                "taken_at": "2026-03-27T12:05:00",
+            },
+            {
+                "customer_name": "美团客C",
+                "phone": "15000003333",
+                "party_size": 10,
+                "meituan_queue_no": "MT003",
+                "taken_at": "2026-03-27T12:10:00",
+            },
         ]
 
         result = svc.sync_meituan_queue(store_id=STORE, meituan_data=meituan_data)
@@ -613,9 +691,12 @@ class TestMeituanSync:
         """美团排队在看板上按桌型分组显示"""
         svc = QueueService(tenant_id=TENANT, store_id=STORE)
 
-        svc.sync_meituan_queue(STORE, [
-            {"customer_name": "美团客", "phone": "15000009999", "party_size": 6},
-        ])
+        svc.sync_meituan_queue(
+            STORE,
+            [
+                {"customer_name": "美团客", "phone": "15000009999", "party_size": 6},
+            ],
+        )
 
         board = svc.get_queue_board(STORE)
         b_group = [g for g in board["groups"] if g["prefix"] == "B"][0]
@@ -625,6 +706,7 @@ class TestMeituanSync:
 # ═══════════════════════════════════════════════════════════
 # 9. 排队完整流程（叫号→到店→入座→过号）
 # ═══════════════════════════════════════════════════════════
+
 
 class TestQueueFullFlow:
     """排队各状态转换的完整测试"""
@@ -684,6 +766,7 @@ class TestQueueFullFlow:
 # 10. 预订取消与退款
 # ═══════════════════════════════════════════════════════════
 
+
 class TestReservationCancel:
     """预订取消各种场景"""
 
@@ -692,8 +775,13 @@ class TestReservationCancel:
         tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
 
         r = svc.create_reservation(
-            store_id=STORE, customer_name="吴六", phone="13600007777",
-            type="regular", date=tomorrow, time="19:00", party_size=4,
+            store_id=STORE,
+            customer_name="吴六",
+            phone="13600007777",
+            type="regular",
+            date=tomorrow,
+            time="19:00",
+            party_size=4,
         )
         svc.confirm_reservation(r["reservation_id"])
 
@@ -711,8 +799,13 @@ class TestReservationCancel:
         tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
 
         r = svc.create_reservation(
-            store_id=STORE, customer_name="郑七", phone="13600008888",
-            type="regular", date=tomorrow, time="12:00", party_size=2,
+            store_id=STORE,
+            customer_name="郑七",
+            phone="13600008888",
+            type="regular",
+            date=tomorrow,
+            time="12:00",
+            party_size=2,
         )
         svc.confirm_reservation(r["reservation_id"])
 
@@ -728,6 +821,7 @@ class TestReservationCancel:
 # ═══════════════════════════════════════════════════════════
 # 11. 宴会阶段转换验证
 # ═══════════════════════════════════════════════════════════
+
 
 class TestBanquetStageTransition:
     """验证宴会13阶段状态机的合法转换"""
@@ -767,6 +861,7 @@ class TestBanquetStageTransition:
 # ═══════════════════════════════════════════════════════════
 # 12. 排队看板与历史
 # ═══════════════════════════════════════════════════════════
+
 
 class TestQueueBoardAndHistory:
     """排队看板和历史记录验证"""
@@ -820,6 +915,7 @@ class TestQueueBoardAndHistory:
 # 13. 预订时段查询
 # ═══════════════════════════════════════════════════════════
 
+
 class TestTimeSlots:
     """时段查询"""
 
@@ -845,6 +941,7 @@ class TestTimeSlots:
 # ═══════════════════════════════════════════════════════════
 # 14. 预订统计
 # ═══════════════════════════════════════════════════════════
+
 
 class TestReservationStats:
     """预订统计"""

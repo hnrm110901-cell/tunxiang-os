@@ -15,6 +15,7 @@
 
 Mock 模式：云端不可达时命令结果本地缓存。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -92,9 +93,7 @@ class RemoteCommandService:
         cloud_api_url: str | None = None,
         device_id: str | None = None,
     ) -> None:
-        self._cloud_api_url = cloud_api_url or os.getenv(
-            "CLOUD_API_URL", "http://localhost:8000"
-        )
+        self._cloud_api_url = cloud_api_url or os.getenv("CLOUD_API_URL", "http://localhost:8000")
         self._device_id = device_id or os.getenv("DEVICE_ID", "")
         self._tenant_id = os.getenv("TENANT_ID", "default_tenant")
         self._store_id = os.getenv("STORE_ID", "default_store")
@@ -284,9 +283,7 @@ class RemoteCommandService:
             return []
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code != 404:
-                logger.warning(
-                    "remote_cmd_poll_error", status=exc.response.status_code
-                )
+                logger.warning("remote_cmd_poll_error", status=exc.response.status_code)
             return []
 
     async def report_results(self) -> int:
@@ -405,8 +402,9 @@ class RemoteCommandService:
 
     async def _handle_sync_now(self, params: dict[str, Any]) -> dict[str, Any]:
         """立即触发同步。"""
-        from services.offline_cache import get_offline_cache
         from config import get_config
+
+        from services.offline_cache import get_offline_cache
 
         cache = get_offline_cache()
         cfg = get_config()
@@ -419,7 +417,6 @@ class RemoteCommandService:
 
     async def _handle_collect_logs(self, params: dict[str, Any]) -> dict[str, Any]:
         """收集并上传日志到云端。"""
-        import glob
         from pathlib import Path
 
         log_dir = params.get("log_dir", "/var/log/tunxiang")

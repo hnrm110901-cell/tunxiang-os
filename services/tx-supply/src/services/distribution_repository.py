@@ -9,6 +9,7 @@
 路线优化（Haversine 贪心算法）作为纯函数保留在本模块，不依赖 IO。
 所有写方法调用 _set_tenant() 设置 RLS context。
 """
+
 import json
 import math
 import uuid
@@ -30,11 +31,7 @@ def _haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> f
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlng = math.radians(lng2 - lng1)
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
-        * math.sin(dlng / 2) ** 2
-    )
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
     return round(R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)), 2)
 
 
@@ -65,13 +62,15 @@ def _greedy_route(
         )
         dist = _haversine_distance(current_lat, current_lng, nearest["lat"], nearest["lng"])
         cumulative_km += dist
-        route.append({
-            "store_id": nearest["store_id"],
-            "store_name": nearest.get("store_name", ""),
-            "distance_km": dist,
-            "cumulative_km": round(cumulative_km, 2),
-            "sequence": seq,
-        })
+        route.append(
+            {
+                "store_id": nearest["store_id"],
+                "store_name": nearest.get("store_name", ""),
+                "distance_km": dist,
+                "cumulative_km": round(cumulative_km, 2),
+                "sequence": seq,
+            }
+        )
         current_lat, current_lng = nearest["lat"], nearest["lng"]
         unvisited.remove(nearest)
         seq += 1
@@ -207,14 +206,16 @@ class DistributionRepository:
         for so in store_orders:
             items = so.get("items", [])
             total_items += len(items)
-            store_deliveries.append({
-                "delivery_id": str(uuid.uuid4()),
-                "store_id": so["store_id"],
-                "items": [{"status": "pending", **item} for item in items],
-                "status": "pending",
-                "scheduled_at": None,
-                "delivered_at": None,
-            })
+            store_deliveries.append(
+                {
+                    "delivery_id": str(uuid.uuid4()),
+                    "store_id": so["store_id"],
+                    "items": [{"status": "pending", **item} for item in items],
+                    "status": "pending",
+                    "scheduled_at": None,
+                    "delivered_at": None,
+                }
+            )
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
@@ -237,9 +238,14 @@ class DistributionRepository:
             },
         )
         await self.db.flush()
-        log.info("distribution_plan_created", plan_id=str(plan_id),
-                 warehouse_id=warehouse_id, store_count=len(store_orders),
-                 total_items=total_items, tenant_id=self.tenant_id)
+        log.info(
+            "distribution_plan_created",
+            plan_id=str(plan_id),
+            warehouse_id=warehouse_id,
+            store_count=len(store_orders),
+            total_items=total_items,
+            tenant_id=self.tenant_id,
+        )
         return await self._get_plan_or_raise(str(plan_id))
 
     async def get_plan(self, plan_id: str) -> Optional[dict]:
@@ -320,12 +326,14 @@ class DistributionRepository:
         stores_for_route = []
         for sid in store_ids:
             geo = geo_map.get(sid)
-            stores_for_route.append({
-                "store_id": sid,
-                "lat": float(geo.lat) if geo else wh_lat,
-                "lng": float(geo.lng) if geo else wh_lng,
-                "store_name": geo.store_name if geo else "",
-            })
+            stores_for_route.append(
+                {
+                    "store_id": sid,
+                    "lat": float(geo.lat) if geo else wh_lat,
+                    "lng": float(geo.lng) if geo else wh_lng,
+                    "store_name": geo.store_name if geo else "",
+                }
+            )
 
         route, total_km, estimated_min = _greedy_route(wh_lat, wh_lng, stores_for_route)
 
@@ -340,9 +348,14 @@ class DistributionRepository:
         )
         await self.db.flush()
 
-        log.info("route_optimized", plan_id=plan_id,
-                 total_distance_km=total_km, store_count=len(route),
-                 estimated_min=estimated_min, tenant_id=self.tenant_id)
+        log.info(
+            "route_optimized",
+            plan_id=plan_id,
+            total_distance_km=total_km,
+            store_count=len(route),
+            estimated_min=estimated_min,
+            tenant_id=self.tenant_id,
+        )
         return {
             "plan_id": plan_id,
             "optimized": True,
@@ -407,11 +420,11 @@ class DistributionRepository:
                 "vehicle_no": driver_row.vehicle_no,
                 "vehicle_type": driver_row.vehicle_type,
             }
-            if driver_row else None
+            if driver_row
+            else None
         )
 
-        log.info("delivery_dispatched", plan_id=plan_id,
-                 driver_id=driver_id, tenant_id=self.tenant_id)
+        log.info("delivery_dispatched", plan_id=plan_id, driver_id=driver_id, tenant_id=self.tenant_id)
         return {
             "plan_id": plan_id,
             "driver_id": driver_id,
@@ -435,9 +448,7 @@ class DistributionRepository:
         plan = await self._get_plan_or_raise(plan_id)
 
         if plan["status"] not in ("dispatched", "in_transit"):
-            raise ValueError(
-                f"只有 dispatched/in_transit 状态可以签收，当前: {plan['status']}"
-            )
+            raise ValueError(f"只有 dispatched/in_transit 状态可以签收，当前: {plan['status']}")
 
         store_deliveries = plan["store_deliveries"]
         target = next((sd for sd in store_deliveries if sd["store_id"] == store_id), None)
@@ -463,9 +474,7 @@ class DistributionRepository:
                     confirmed_items.append(item)
                 else:
                     item["status"] = "delivered"
-                    item["received_quantity"] = received.get(
-                        "received_quantity", item.get("quantity", 0)
-                    )
+                    item["received_quantity"] = received.get("received_quantity", item.get("quantity", 0))
                     confirmed_items.append(item)
             else:
                 item["status"] = "delivered"
@@ -475,11 +484,7 @@ class DistributionRepository:
         target["delivered_at"] = now.isoformat()
 
         # 若所有门店都已签收，计划完结
-        new_status = (
-            "delivered"
-            if all(sd.get("status") == "delivered" for sd in store_deliveries)
-            else "in_transit"
-        )
+        new_status = "delivered" if all(sd.get("status") == "delivered" for sd in store_deliveries) else "in_transit"
         completed_at = now if new_status == "delivered" else None
 
         await self.db.execute(
@@ -502,9 +507,15 @@ class DistributionRepository:
         )
         await self.db.flush()
 
-        log.info("delivery_confirmed", plan_id=plan_id, store_id=store_id,
-                 confirmed_count=len(confirmed_items), rejected_count=len(rejected_items),
-                 plan_status=new_status, tenant_id=self.tenant_id)
+        log.info(
+            "delivery_confirmed",
+            plan_id=plan_id,
+            store_id=store_id,
+            confirmed_count=len(confirmed_items),
+            rejected_count=len(rejected_items),
+            plan_status=new_status,
+            tenant_id=self.tenant_id,
+        )
         return {
             "plan_id": plan_id,
             "store_id": store_id,
@@ -570,9 +581,14 @@ class DistributionRepository:
         total = summary["total_plans"]
         completion_rate = round(summary["delivered"] / total, 4) if total > 0 else 0.0
 
-        log.info("distribution_dashboard_fetched", warehouse_id=warehouse_id,
-                 total_plans=total, active=len(active_deliveries),
-                 completion_rate=completion_rate, tenant_id=self.tenant_id)
+        log.info(
+            "distribution_dashboard_fetched",
+            warehouse_id=warehouse_id,
+            total_plans=total,
+            active=len(active_deliveries),
+            completion_rate=completion_rate,
+            tenant_id=self.tenant_id,
+        )
         return {
             "warehouse_id": warehouse_id,
             "summary": summary,

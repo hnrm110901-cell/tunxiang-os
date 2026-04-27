@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
 import structlog
@@ -21,6 +20,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # 纯函数
 # ---------------------------------------------------------------------------
+
 
 def calculate_online_rate(devices: list[dict]) -> float:
     """计算设备在线率百分比。
@@ -67,6 +67,7 @@ def classify_alert_severity(alert_type: str, confidence: float) -> str:
 # ---------------------------------------------------------------------------
 # 业务服务
 # ---------------------------------------------------------------------------
+
 
 async def register_device(
     tenant_id: str,
@@ -189,8 +190,10 @@ async def record_ai_alert(
 
     logger.info(
         "ai_alert_recorded",
-        tenant_id=tenant_id, alert_id=alert_id,
-        alert_type=alert_type, severity=severity,
+        tenant_id=tenant_id,
+        alert_id=alert_id,
+        alert_type=alert_type,
+        severity=severity,
     )
     return {
         "id": alert_id,
