@@ -73,6 +73,22 @@ class AgentFlags:
     # L3全自治级别 —— 最高风险，需三级审批
     L3_AUTONOMY = "agent.l3_autonomy.enable"
 
+    # Sprint D2: Agent 决策写入 ROI 四字段
+    # （触发规划文档决策点 #1，需创始人签字后再开启）
+    ROI_WRITEBACK = "agent.roi.writeback"
+
+    # Sprint D4a: 成本根因 Skill Agent 启用开关
+    COST_ROOT_CAUSE_ENABLE = "agent.cost_root_cause.enable"
+
+    # Sprint D3a: RFM 触达 Skill Agent 启用开关（目标复购率 +5pp）
+    RFM_OUTREACH_ENABLE = "agent.rfm_outreach.enable"
+
+    # Sprint D4b: 薪资异常 Skill Agent 启用开关（加班/薪资环比稽核）
+    SALARY_ANOMALY_ENABLE = "agent.salary_anomaly.enable"
+
+    # Sprint D4c: 预算预测 Skill Agent 启用开关（月度预测 + 偏差识别）
+    BUDGET_FORECAST_ENABLE = "agent.budget_forecast.enable"
+
 
 class TradeFlags:
     """交易履约域 Flag 名称。"""
@@ -91,6 +107,10 @@ class TradeFlags:
 
     # 分账引擎
     SPLIT_PAYMENT = "trade.split_payment.enable"
+
+    # Sprint A4（Tier1）：RBAC 严格模式开关。on=敏感路由要求显式授权，off=legacy 行为。
+    # 联动 tx-trade/src/security/rbac.py require_role/require_mfa 装饰器链路。
+    RBAC_STRICT = "trade.rbac.strict"
 
 
 class OrgFlags:
@@ -160,6 +180,31 @@ class EdgeFlags:
 
     # Edge节点自动更新
     AUTO_UPDATE = "edge.mac_station.auto_update.enable"
+
+    # Sprint A2（Tier1）：Saga 本地 SQLite 缓冲 4h。
+    # off=legacy 直写云端（无缓冲），on=断网时 enqueue 到 /var/tunxiang/saga_buffer.db
+    # 5%→50%→100% 灰度，dead_letter 需人工确认不自动删除。
+    PAYMENT_SAGA_BUFFER = "edge.payment.saga_buffer"
+
+    # Sprint A3（Tier1）：离线订单号 UUID v7 前端生成。
+    # off=legacy 服务端生成 order_id（TX+时间+uuid4.hex[:4]）
+    # on=前端生成 `{device_id}:{ms_epoch}:{counter}` + UUID v7 payload
+    # 5%→50%→100% 灰度，与 A2 saga_buffer idempotency_key 契约共享（settle:{order_id}）
+    OFFLINE_ORDER_ID_BRIDGE = "edge.offline.order_id_bridge"
+
+    # Sprint C3（Tier1）：KDS delta 同步接口启用开关。
+    # off=保留全量轮询（legacy /api/v1/kds/tasks + WebSocket）
+    # on=web-kds 走 /api/v1/kds/orders/delta 增量轮询 + device heartbeat
+    #    共享 A3 device_id 格式；sync-engine Phase 1 依赖 edge_device_registry
+    # 5%→50%→100% 灰度，4h E2E 零卡顿 / 60s 断网恢复全同步为门禁
+    KDS_DELTA_SYNC = "edge.kds.delta_sync"
+
+    # Sprint C3 §19（Tier1）：mark_offline_if_stale 60s 周期调度。
+    # off=不启动调度任务（DEMO 演示拔 KDS 网线 11min 后 health_status 永远停留 healthy）
+    # on=tx-trade lifespan 启动 60s 周期 task → 跨租户调用
+    #    DeviceRegistryService.mark_offline_if_stale_global，超 600s 心跳标 offline
+    # 默认 off：先在 DEMO 环境验证后再灰度，避免误标 offline 干扰真实运维
+    MARK_OFFLINE_SCHEDULER = "edge.kds.mark_offline_scheduler"
 
 
 class SupplyFlags:

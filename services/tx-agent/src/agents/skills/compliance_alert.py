@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any, Optional
 
 import structlog
+from constraints.decorator import with_constraint_check
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
@@ -381,6 +382,9 @@ class ComplianceAlertAgent(SkillAgent):
             return str(self.store_id).strip()
         return None
 
+    # Sprint D1：硬阻断装饰器 — Skill 类级 constraint_scope=set() 已声明豁免，
+    # 装饰器仅作为 CI 覆盖标记；run_checks 因 payload 中无 price/safety/serve 字段全部 skipped
+    @with_constraint_check(skill_name="compliance_alert")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch: dict[str, Any] = {
             "scan_all": self._scan_all,

@@ -2,9 +2,15 @@
  * tx-trade API 客户端
  * 收银全流程：开单→加菜→结算→支付→打印
  *
- * 超时分级（Sprint A1 修复 P1-3）：
- *   - TIMEOUT_SETTLE(8s)：结算/支付/退款/打印 等写操作（P99 约 1.8s，留足冗余）
+ * 超时分级（Sprint A1）：
+ *   - TIMEOUT_SETTLE_SOFT(3s)：UI 提示 + 软 abort + 自动重试 1 次（网络抖动自愈）
+ *   - TIMEOUT_SETTLE_HARD(8s)：硬失败，降级到 ErrorBoundary（收银员扫桌重试）
+ *   - TIMEOUT_SETTLE(8s)：兼容旧调用点，等价 HARD（P99 约 1.8s，留足冗余）
  *   - TIMEOUT_QUERY(3s)：查询类读操作
+ *
+ * 幂等性（Sprint A1 R2）：
+ *   - 每次请求自动生成 X-Idempotency-Key（crypto.randomUUID 优先）
+ *   - 软超时重试时复用同一 idempotency_key，防止 saga 双扣费
  *
  * 离线处理（Sprint A1 修复 P0-1）：
  *   - txFetchTrade 离线时返回 {ok:false, error.code:'OFFLINE_QUEUED'}（不 throw）
@@ -15,8 +21,25 @@ import { isEnabled } from '../config/featureFlags';
 const BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
-export const TIMEOUT_SETTLE = 8000;
+export const TIMEOUT_SETTLE_SOFT = 3000;
+export const TIMEOUT_SETTLE_HARD = 8000;
+export const TIMEOUT_SETTLE = TIMEOUT_SETTLE_HARD;
 export const TIMEOUT_QUERY = 3000;
+
+/**
+ * 专门用于双级超时触达硬上限后抛出的错误。ErrorBoundary 捕获后可据此定位
+ * timeout_reason=fetch_timeout / recovery_action=abort。
+ */
+export class TxTimeoutError extends Error {
+  readonly timeoutMs: number;
+  readonly attempts: number;
+  constructor(message: string, timeoutMs: number, attempts: number) {
+    super(message);
+    this.name = 'TxTimeoutError';
+    this.timeoutMs = timeoutMs;
+    this.attempts = attempts;
+  }
+}
 
 export type TradeErrorCode =
   | 'NET_TIMEOUT'
@@ -66,8 +89,128 @@ function buildAbortSignal(timeoutMs: number, external?: AbortSignal | null): { s
 }
 
 export interface TxFetchTradeOptions extends RequestInit {
-  /** 覆盖默认超时（毫秒）。未指定时默认用 TIMEOUT_QUERY(3s)。结算/支付应显式传 TIMEOUT_SETTLE。 */
+  /**
+   * 硬超时（毫秒）。未指定时默认用 TIMEOUT_QUERY(3s)。
+   * 结算/支付应显式传 TIMEOUT_SETTLE_HARD（=8s）。
+   */
   timeoutMs?: number;
+  /**
+   * 软超时（毫秒）。>0 时启用双级超时：
+   *   - 达到 softTimeoutMs → 软 abort 并自动重试 1 次（同一 idempotency_key）
+   *   - 达到 timeoutMs（硬） → 硬失败，返回 NET_TIMEOUT
+   * 默认不启用（= 单级超时）。Sprint A1 结算/支付推荐设为 TIMEOUT_SETTLE_SOFT(3s)。
+   */
+  softTimeoutMs?: number;
+  /** 自定义幂等键。未传时自动生成 UUID v4，保证同一次逻辑操作一致。 */
+  idempotencyKey?: string;
+}
+
+function _generateIdempotencyKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  // 退化方案（旧浏览器）：时间戳 + 16 位随机
+  const rand = Math.random().toString(16).slice(2, 18);
+  return `idem-${Date.now().toString(16)}-${rand}`;
+}
+
+// ─── Sprint A3 离线订单号（UUID v7 + 人读前缀） ────────────────────────────
+//
+// 契约与后端 services/tx-trade/src/services/offline_order_id.py 一致：
+//   order_id = `${device_id}:${ms_epoch}:${counter}`
+//   idempotency_key = `settle:${order_id}`
+//
+// UUID v7 按 RFC 9562 手工构造：48-bit ms_epoch + 4-bit ver + 12-bit randA
+// + 2-bit var + 62-bit randB。采用 crypto.getRandomValues（CSPRNG）。
+
+let _offlineCounter = 0;
+let _lastOfflineMs = 0;
+
+function _deviceId(): string {
+  // 优先读 POS 壳层注入的 device_id；浏览器环境退化到 localStorage UUID
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bridge = (globalThis as any).TXBridge;
+  if (bridge && typeof bridge.getDeviceInfo === 'function') {
+    try {
+      const info = JSON.parse(bridge.getDeviceInfo() || '{}');
+      if (info && typeof info.device_id === 'string' && info.device_id) {
+        return info.device_id;
+      }
+    } catch {
+      // TXBridge.getDeviceInfo 返回非 JSON — 退化到 localStorage
+    }
+  }
+  const LS_KEY = 'tx.device_id';
+  try {
+    const cached = localStorage.getItem(LS_KEY);
+    if (cached) return cached;
+    const fresh = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem(LS_KEY, fresh);
+    return fresh;
+  } catch {
+    // SSR / 隐身模式无 localStorage
+    return `web-ephemeral-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
+function _uuidV7(msEpoch: number): string {
+  const bytes = new Uint8Array(16);
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.getRandomValues === 'function') {
+    c.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  // 48-bit unix_ts_ms, big-endian
+  bytes[0] = (msEpoch / 2 ** 40) & 0xff;
+  bytes[1] = (msEpoch / 2 ** 32) & 0xff;
+  bytes[2] = (msEpoch >>> 24) & 0xff;
+  bytes[3] = (msEpoch >>> 16) & 0xff;
+  bytes[4] = (msEpoch >>> 8) & 0xff;
+  bytes[5] = msEpoch & 0xff;
+  // version = 7 (high nibble of byte 6)
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  // variant = 10xx (high 2 bits of byte 8)
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * 生成离线订单号（Sprint A3）。
+ *
+ * - order_id = `${device_id}:${ms_epoch}:${counter}`（人读，收银员肉眼识别）
+ * - uuid_v7 作为随机 payload（客户端不拼入 order_id，服务端用作 cloud_order_id 候选）
+ * - 同毫秒多次调用 counter++，跨毫秒 counter 重置
+ * - 仅在 `edge.offline.order_id_bridge` flag on 时使用
+ *
+ * 契约：与后端 services/tx-trade/src/services/offline_order_id.py 完全对齐。
+ */
+export function generateOfflineOrderId(deviceId?: string): {
+  orderId: string;
+  uuidV7: string;
+  deviceId: string;
+  msEpoch: number;
+  counter: number;
+} {
+  const did = deviceId || _deviceId();
+  const msEpoch = Date.now();
+  if (msEpoch === _lastOfflineMs) {
+    _offlineCounter += 1;
+  } else {
+    _offlineCounter = 1;
+    _lastOfflineMs = msEpoch;
+  }
+  const counter = _offlineCounter;
+  const uuidV7 = _uuidV7(msEpoch);
+  const orderId = `${did}:${msEpoch}:${counter}`;
+  return { orderId, uuidV7, deviceId: did, msEpoch, counter };
+}
+
+/** 测试辅助：重置离线 counter 状态（不是公开契约）。 */
+export function _resetOfflineOrderIdCounterForTest(): void {
+  _offlineCounter = 0;
+  _lastOfflineMs = 0;
 }
 
 export async function txFetchTrade<T>(path: string, options: TxFetchTradeOptions = {}): Promise<TradeApiResult<T>> {
@@ -82,72 +225,113 @@ export async function txFetchTrade<T>(path: string, options: TxFetchTradeOptions
     };
   }
 
-  const headers: Record<string, string> = {
+  // 幂等键：调用方传入则复用，否则单次调用自动生成（重试时沿用，防 saga 双扣费）
+  const idempotencyKey = options.idempotencyKey ?? _generateIdempotencyKey();
+
+  const baseHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Request-Id': requestId,
+    'X-Idempotency-Key': idempotencyKey,
     ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
 
   const explicitTimeout = typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined;
-  const timeoutMs = hardening ? (explicitTimeout ?? TIMEOUT_QUERY) : 30_000;
-  const { signal, cleanup } = buildAbortSignal(timeoutMs, options.signal);
+  const hardTimeoutMs = hardening ? (explicitTimeout ?? TIMEOUT_QUERY) : 30_000;
+  const softTimeoutMs =
+    hardening && typeof options.softTimeoutMs === 'number' && options.softTimeoutMs > 0
+      ? Math.min(options.softTimeoutMs, hardTimeoutMs)
+      : undefined;
 
-  try {
-    const resp = await fetch(`${BASE}${path}`, { ...options, headers, signal });
-    const status = resp.status;
-
-    let parsed: { ok?: boolean; data?: T; error?: { code?: string; message?: string } } = {};
+  // 单次 fetch 执行（用于软/硬两轮复用）
+  const doAttempt = async (attemptTimeoutMs: number): Promise<TradeApiResult<T> | { _retry: true }> => {
+    const { signal, cleanup } = buildAbortSignal(attemptTimeoutMs, options.signal);
     try {
-      parsed = await resp.json();
-    } catch {
-      parsed = {};
-    }
+      const resp = await fetch(`${BASE}${path}`, { ...options, headers: baseHeaders, signal });
+      const status = resp.status;
 
-    if (status >= 500) {
+      let parsed: { ok?: boolean; data?: T; error?: { code?: string; message?: string } } = {};
+      try {
+        parsed = await resp.json();
+      } catch {
+        parsed = {};
+      }
+
+      if (status >= 500) {
+        return {
+          ok: false,
+          request_id: requestId,
+          error: { code: 'SERVER_5XX', status, message: parsed.error?.message || '服务器繁忙' },
+        };
+      }
+      if (status >= 400) {
+        return {
+          ok: false,
+          request_id: requestId,
+          error: {
+            code: 'BUSINESS_REJECT',
+            status,
+            message: parsed.error?.message || '请求被拒绝',
+          },
+        };
+      }
+      if (parsed.ok === false) {
+        return {
+          ok: false,
+          request_id: requestId,
+          error: { code: 'BUSINESS_REJECT', status, message: parsed.error?.message || '业务校验失败' },
+        };
+      }
+      return { ok: true, data: parsed.data as T, request_id: requestId };
+    } catch (err) {
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      if (isAbort) {
+        // 本轮超时：由外层决定是重试（软）还是返回（硬）
+        return { _retry: true };
+      }
+      const msg = err instanceof Error ? err.message : 'network error';
       return {
         ok: false,
         request_id: requestId,
-        error: { code: 'SERVER_5XX', status, message: parsed.error?.message || '服务器繁忙' },
+        error: { code: 'NET_FAILURE', message: msg, cause: err },
       };
+    } finally {
+      cleanup();
     }
-    if (status >= 400) {
+  };
+
+  // 双级超时：软 abort → 重试 1 次（同一 idempotency_key）→ 硬失败
+  if (softTimeoutMs !== undefined) {
+    const softResult = await doAttempt(softTimeoutMs);
+    if (!('_retry' in softResult)) return softResult;
+    // 软 abort：重试 1 次，剩余预算 = hard - soft
+    const hardBudget = Math.max(hardTimeoutMs - softTimeoutMs, 0);
+    if (hardBudget === 0) {
       return {
         ok: false,
         request_id: requestId,
-        error: {
-          code: 'BUSINESS_REJECT',
-          status,
-          message: parsed.error?.message || '请求被拒绝',
-        },
+        error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: hardTimeoutMs },
       };
     }
-    if (parsed.ok === false) {
-      return {
-        ok: false,
-        request_id: requestId,
-        error: { code: 'BUSINESS_REJECT', status, message: parsed.error?.message || '业务校验失败' },
-      };
-    }
-    return { ok: true, data: parsed.data as T, request_id: requestId };
-  } catch (err) {
-    const isAbort = err instanceof DOMException && err.name === 'AbortError';
-    if (isAbort) {
-      return {
-        ok: false,
-        request_id: requestId,
-        error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: timeoutMs },
-      };
-    }
-    const msg = err instanceof Error ? err.message : 'network error';
+    const retryResult = await doAttempt(hardBudget);
+    if (!('_retry' in retryResult)) return retryResult;
     return {
       ok: false,
       request_id: requestId,
-      error: { code: 'NET_FAILURE', message: msg, cause: err },
+      error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: hardTimeoutMs },
     };
-  } finally {
-    cleanup();
   }
+
+  // 单级超时（兼容旧调用点）
+  const result = await doAttempt(hardTimeoutMs);
+  if ('_retry' in result) {
+    return {
+      ok: false,
+      request_id: requestId,
+      error: { code: 'NET_TIMEOUT', message: '网络超时', timeout_ms: hardTimeoutMs },
+    };
+  }
+  return result;
 }
 
 async function txFetch<T>(path: string, options: TxFetchTradeOptions = {}): Promise<T> {
@@ -332,7 +516,12 @@ export async function removeItem(orderId: string, itemId: string): Promise<void>
 }
 
 export async function settleOrder(orderId: string): Promise<{ order_no: string; final_amount_fen: number }> {
-  return txFetch(`/api/v1/trade/orders/${orderId}/settle`, { method: 'POST', timeoutMs: TIMEOUT_SETTLE });
+  return txFetch(`/api/v1/trade/orders/${orderId}/settle`, {
+    method: 'POST',
+    timeoutMs: TIMEOUT_SETTLE_HARD,
+    softTimeoutMs: TIMEOUT_SETTLE_SOFT,
+    idempotencyKey: `settle:${orderId}`,
+  });
 }
 
 /**
@@ -376,7 +565,9 @@ export async function createPayment(
 ): Promise<{ payment_id: string; payment_no: string }> {
   return txFetch(`/api/v1/trade/orders/${orderId}/payments`, {
     method: 'POST',
-    timeoutMs: TIMEOUT_SETTLE,
+    timeoutMs: TIMEOUT_SETTLE_HARD,
+    softTimeoutMs: TIMEOUT_SETTLE_SOFT,
+    idempotencyKey: `payment:${orderId}:${method}`,
     body: JSON.stringify({ method, amount_fen: amountFen, trade_no: tradeNo }),
   });
 }
@@ -444,4 +635,142 @@ export async function dispatchAgent(agentId: string, action: string, params: Rec
 
 export async function listAgents(): Promise<Array<{ agent_id: string; agent_name: string; priority: string }>> {
   return txFetch('/api/v1/agent/agents');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  POS 崩溃遥测上报（A1 安全修复 — 不再读 localStorage tenant_id）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// 漏洞背景（已修复）：
+//   旧版 reportCrashToTelemetry 直接读 localStorage.getItem('tenant_id') 作为
+//   X-Tenant-ID Header。任何 XSS / 恶意员工修改 localStorage 即可伪造跨租户
+//   crash 写入，用作探测竞争对手 saga_id/order_no。
+//
+// 修复策略（前端 + 后端联防）：
+//   1. 前端：tenant_id 仅从 JWT payload 解码（base64url decode），不再读 localStorage
+//   2. JWT 不存在或不可解析 → 拒绝上报（收敛攻击面，不再回退 localStorage）
+//   3. 后端：telemetry_routes.py 已加 JWT user.tenant_id 与 X-Tenant-ID Header
+//      强一致性校验，不一致返回 403 TENANT_MISMATCH（独立审计 deny 事件）。
+// ─────────────────────────────────────────────────────────────────────────
+
+// JWT 存储键（与 api/index.ts 的 STORE_TOKEN_KEY 同值；此处用 module-private 常量避免重复 export）
+const _STORE_TOKEN_KEY = 'tx_store_token';
+
+interface JwtPayload {
+  tenant_id?: string;
+  user_id?: string;
+  sub?: string;
+  exp?: number;
+  [k: string]: unknown;
+}
+
+/**
+ * 解析 JWT payload 中的 tenant_id（仅做客户端预读，最终以服务端校验为准）。
+ * - 仅做 base64url 解码 + JSON.parse，不验签（验签发生在 gateway 端）
+ * - 任意异常返回 null（调用方应据此拒绝上报）
+ */
+export function decodeTenantIdFromJwt(token: string | null | undefined): string | null {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    // base64url → base64
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '==='.slice((b64.length + 3) % 4);
+    const json = typeof atob === 'function' ? atob(padded) : '';
+    if (!json) return null;
+    const payload = JSON.parse(json) as JwtPayload;
+    const t = payload.tenant_id;
+    if (typeof t !== 'string' || !t.trim()) return null;
+    return t.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 崩溃上报载荷（与 services/tx-ops PosCrashReport schema 对齐）。
+ * 与 components/ErrorBoundary.tsx 的 ErrorReport 兼容。
+ */
+export interface CrashReportPayload {
+  error: { name: string; message: string; stack?: string };
+  componentStack?: string;
+  occurredAt?: string;
+  boundary_level?: 'root' | 'cashier' | 'unknown';
+  severity?: 'fatal' | 'warn' | 'info';
+  saga_id?: string;
+  order_no?: string;
+  timeout_reason?: 'fetch_timeout' | 'saga_timeout' | 'gateway_timeout' | 'rls_deny' | 'disk_io_error' | 'unknown';
+  recovery_action?: 'reset' | 'redirect_tables' | 'retry' | 'abort';
+}
+
+/**
+ * 上报 POS 前端崩溃到 tx-ops 遥测端点。
+ *
+ * 安全契约（A1 修复）：
+ *   - tenant_id 仅来自 JWT payload，绝不读 localStorage.getItem('tenant_id')
+ *   - 无 JWT 或 JWT 不含 tenant_id → 静默 abort（收敛攻击面）
+ *   - 设置 Authorization: Bearer 由后端二次校验（gateway/AuthMiddleware）
+ *
+ * 此函数失败时绝不抛异常，避免阻塞 UI 降级路径。
+ */
+export function reportCrashToTelemetry(report: CrashReportPayload): void {
+  try {
+    let token: string | null = null;
+    try {
+      token = typeof localStorage !== 'undefined' ? localStorage.getItem(_STORE_TOKEN_KEY) : null;
+    } catch {
+      // SSR / 隐身模式 / 沙箱化 iframe → 无 localStorage
+      token = null;
+    }
+
+    const tenantId = decodeTenantIdFromJwt(token);
+    if (!tenantId || !token) {
+      // 无可信 tenant_id 来源（未登录 / JWT 损坏 / localStorage 不可用）
+      // 拒绝上报：宁可丢一条遥测，也不允许跨租户写入。
+      return;
+    }
+
+    const base = import.meta.env.VITE_API_BASE_URL || '';
+    let deviceId: string;
+    try {
+      const w = window as unknown as { TXBridge?: { getDeviceInfo?: () => string } };
+      deviceId = w.TXBridge?.getDeviceInfo?.() || navigator.userAgent;
+    } catch {
+      deviceId = 'unknown-device';
+    }
+
+    let storeId: string | undefined;
+    try {
+      storeId = (typeof localStorage !== 'undefined' && localStorage.getItem('store_id')) || undefined;
+    } catch {
+      storeId = undefined;
+    }
+
+    const route = (typeof window !== 'undefined' && window.location?.pathname) || '/';
+
+    void fetch(`${base}/api/v1/telemetry/pos-crash`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenantId,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        device_id: deviceId,
+        route,
+        error_stack: report.error.stack ?? `${report.error.name}: ${report.error.message}`,
+        store_id: storeId,
+        boundary_level: report.boundary_level,
+        severity: report.severity,
+        saga_id: report.saga_id,
+        order_no: report.order_no,
+        timeout_reason: report.timeout_reason,
+        recovery_action: report.recovery_action,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // 遥测绝不阻塞 UI
+  }
 }

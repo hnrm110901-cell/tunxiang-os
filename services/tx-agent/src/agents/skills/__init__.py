@@ -11,6 +11,9 @@ from .banquet_growth import BanquetGrowthAgent
 
 # 专项运营Agent (Phase 6)
 from .billing_anomaly import BillingAnomalyAgent
+
+# Sprint D4c：预算预测 Skill（Sonnet 4.7 + Prompt Cache）
+from .budget_forecast import BudgetForecastAgent
 from .cashier_audit import CashierAuditAgent
 from .closing_agent import ClosingAgent
 
@@ -21,6 +24,9 @@ from .competitor_watch import CompetitorWatchAgent
 from .compliance_alert import ComplianceAlertAgent
 from .content_generation import ContentGenerationAgent
 from .cost_diagnosis import CostDiagnosisAgent
+
+# Sprint D4a：成本根因 Skill（Sonnet 4.7 + Prompt Cache）
+from .cost_root_cause import CostRootCauseAgent
 from .discount_guard import DiscountGuardAgent
 from .dormant_recall import DormantRecallAgent
 
@@ -55,7 +61,13 @@ from .queue_seating import QueueSeatingAgent
 from .referral_growth import ReferralGrowthAgent
 from .review_insight import ReviewInsightAgent
 from .review_summary import ReviewSummaryAgent
+
+# Sprint D3a：RFM 触达 Skill（Haiku 4.5 + Prompt Cache）
+from .rfm_outreach import RfmOutreachAgent
 from .salary_advisor import SalaryAdvisorAgent
+
+# Sprint D4b：薪资异常 Skill（Sonnet 4.7 + Prompt Cache）
+from .salary_anomaly import SalaryAnomalyAgent
 from .seasonal_campaign import SeasonalCampaignAgent
 from .serve_dispatch import ServeDispatchAgent
 from .smart_customer_service import SmartCustomerServiceAgent
@@ -151,6 +163,14 @@ ALL_SKILL_AGENTS = [
     GrowthCoachAgent,
     SmartCustomerServiceAgent,
     CashierAuditAgent,
+    # Sprint D4a：成本根因（Sonnet 4.7 + Prompt Cache）
+    CostRootCauseAgent,
+    # Sprint D3a：RFM 触达（Haiku 4.5 + Prompt Cache）
+    RfmOutreachAgent,
+    # Sprint D4b：薪资异常（Sonnet 4.7 + Prompt Cache）
+    SalaryAnomalyAgent,
+    # Sprint D4c：预算预测（Sonnet 4.7 + Prompt Cache）
+    BudgetForecastAgent,
 ]
 
 

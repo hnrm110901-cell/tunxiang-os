@@ -20,6 +20,7 @@ from typing import Any
 
 import httpx
 import structlog
+from constraints.decorator import with_constraint_check
 from sqlalchemy import text
 
 from ..base import ActionConfig, AgentResult, SkillAgent
@@ -98,6 +99,10 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         }
         return configs.get(action, ActionConfig())
 
+    # Sprint D1：硬阻断装饰器 — 折扣检测的 price/cost/discount 字段已在
+    # _detect_anomaly 与 _get_daily_discount_health 的 result.data 中填入，
+    # 三条约束（毛利底线优先）在 happy path 数据齐备时自动触发；缺数据自动 skipped
+    @with_constraint_check(skill_name="discount_guard")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "detect_discount_anomaly": self._detect_anomaly,

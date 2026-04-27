@@ -1,0 +1,71 @@
+name: Nightly KDS 4h Zero-Jank E2E
+
+# Sprint C / C4 — 后厨 KDS 4 小时零卡顿 nightly 回归。
+#
+# 触发：
+#   - schedule: 每日北京时间 02:00（UTC 18:00）跑 4h
+#   - workflow_dispatch: 手动触发，可调整 duration（默认 4h，最短 60s 用于自检）
+#
+# 这是 §22 "断网恢复 4 小时无数据丢失" 验收门槛的 nightly 三连绿之一。
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # UTC 18:00 = 北京时间 02:00
+  workflow_dispatch:
+    inputs:
+      duration_ms:
+        description: '运行时长（毫秒，默认 14400000 = 4h）'
+        default: '14400000'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  kds-4h:
+    name: KDS 4h zero-jank marathon
+    runs-on: ubuntu-latest
+    # nightly 4h + ~30 min buffer（启动/收尾/上传 artifacts）
+    timeout-minutes: 270
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter web-kds exec playwright install --with-deps chromium
+
+      - name: Run KDS zero-jank E2E
+        env:
+          KDS_E2E_DURATION_MS: >-
+            ${{ github.event_name == 'schedule' && '14400000' || inputs.duration_ms }}
+        run: pnpm --filter web-kds run e2e
+        timeout-minutes: 260
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kds-e2e-report-${{ github.run_id }}
+          path: apps/web-kds/playwright-report/
+          retention-days: 14
+
+      - name: Upload trace + screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kds-e2e-trace-${{ github.run_id }}
+          path: apps/web-kds/test-results/
+          retention-days: 14

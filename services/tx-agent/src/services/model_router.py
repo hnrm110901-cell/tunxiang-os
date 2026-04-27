@@ -64,6 +64,12 @@ class ModelSelectionStrategy:
         "cost_analysis": "claude-sonnet-4-6",
         "patrol_report": "claude-haiku-4-5-20251001",
         "dashboard_brief": "claude-sonnet-4-6",
+        # Sprint D4a/b/c：Sonnet 4.7 + Prompt Cache（成本根因/薪资异常/预算预测）
+        "cost_root_cause": "claude-sonnet-4-7-20250929",
+        "salary_anomaly": "claude-sonnet-4-7-20250929",
+        "budget_forecast": "claude-sonnet-4-7-20250929",
+        # Sprint D3a：Haiku 4.5 + Prompt Cache（RFM 触达文案，高频轻量场景）
+        "rfm_outreach": "claude-haiku-4-5-20251001",
         "default": "claude-sonnet-4-6",
     }
 
@@ -123,6 +129,8 @@ class CostTracker:
         "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
         "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
         "claude-opus-4-6": {"input": 15.00, "output": 75.00},
+        # Sprint D4 — Sonnet 4.7（沿用 Sonnet 4.x 定价）
+        "claude-sonnet-4-7-20250929": {"input": 3.00, "output": 15.00},
     }
 
     def calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
@@ -848,11 +856,20 @@ class ModelRouter:
         self,
         model: str,
         messages: list[dict[str, str]],
-        system: Optional[str],
+        system: Any,  # str | list[dict] | None —— list[dict] 支持 Prompt Cache（cache_control）
         max_tokens: int,
         timeout_s: int,
+        temperature: Optional[float] = None,
+        extra_headers: Optional[dict[str, str]] = None,
     ) -> Any:
-        """实际发起 Anthropic SDK 调用，带超时控制。"""
+        """实际发起 Anthropic SDK 调用，带超时控制。
+
+        system 参数支持两种形态：
+          - str：普通系统提示（向后兼容）
+          - list[dict]：结构化系统提示数组，每个块可带 cache_control
+            形如 [{"type": "text", "text": "...", "cache_control": {"type": "ephemeral"}}]
+            用于启用 Prompt Cache，降低重复调用的 input token 成本。
+        """
         kwargs: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
@@ -860,11 +877,228 @@ class ModelRouter:
         }
         if system:
             kwargs["system"] = system
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if extra_headers:
+            kwargs["extra_headers"] = extra_headers
 
         return await asyncio.wait_for(
             self._client.messages.create(**kwargs),
             timeout=timeout_s,
         )
+
+    async def complete_with_cache(
+        self,
+        tenant_id: str,
+        task_type: str,
+        system_blocks: list[dict[str, Any]],
+        messages: list[dict[str, str]],
+        max_tokens: int = 2048,
+        temperature: float = 0.3,
+        timeout_s: int = DEFAULT_TIMEOUT_S,
+        urgency: str = "normal",
+        request_id: Optional[str] = None,
+        db: Any = None,
+        extra_headers: Optional[dict[str, str]] = None,
+    ) -> tuple[str, dict[str, int]]:
+        """Sprint D4 —— 带 Prompt Cache 的 Claude API 调用。
+
+        与 complete() 的差异：
+          1. system 必须为 list[dict]（含 cache_control 块），系统提示 + schema 放 cache 层
+          2. 返回 (text, usage) 元组 —— usage 含 cache_read_input_tokens / cache_creation_input_tokens
+             便于调用方断言 cache 命中率（目标 ≥75%）
+
+        使用示例：
+            text, usage = await router.complete_with_cache(
+                tenant_id="...",
+                task_type="cost_root_cause",
+                system_blocks=[
+                    {"type": "text", "text": SYSTEM_PROMPT + SCHEMA,
+                     "cache_control": {"type": "ephemeral"}},
+                ],
+                messages=[{"role": "user", "content": "店A 4月成本上升..."}],
+            )
+            cache_ratio = usage["cache_read_input_tokens"] / max(usage["input_tokens"], 1)
+            assert cache_ratio >= 0.75
+
+        Args:
+            tenant_id:     租户 UUID
+            task_type:     任务类型（决定模型选择），建议 "cost_root_cause" / "salary_anomaly" / "budget_forecast"
+            system_blocks: 结构化系统提示数组，至少一个块带 cache_control
+            messages:      用户消息（不 cache，短小易变）
+            max_tokens:    最大输出 token 数（默认 2048）
+            temperature:   采样温度（默认 0.3，推理类任务）
+            timeout_s:     请求超时
+            urgency:       "fast" / "normal" / "quality"
+            request_id:    幂等 ID
+            db:            AsyncSession，传入则记录成本
+            extra_headers: 额外 HTTP header（SDK ≥0.25 默认已启用 prompt-caching，通常无需传入）
+
+        Returns:
+            (response_text, usage_dict)
+            usage_dict 键：input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens
+        """
+        if not isinstance(system_blocks, list) or not system_blocks:
+            raise ValueError("complete_with_cache: system_blocks 必须为非空 list[dict]")
+
+        # 至少要有一个 cache_control 块，否则 cache 无意义
+        has_cache_block = any(
+            isinstance(b, dict) and b.get("cache_control") for b in system_blocks
+        )
+        if not has_cache_block:
+            raise ValueError(
+                "complete_with_cache: 至少一个 system_block 需带 cache_control={'type':'ephemeral'}"
+            )
+
+        model = self._strategy.select_model(task_type, urgency)
+        req_id = request_id or str(uuid.uuid4())
+
+        logger.info(
+            "model_router_cache_call_start",
+            tenant_id=tenant_id,
+            task_type=task_type,
+            model=model,
+            urgency=urgency,
+            request_id=req_id,
+            system_blocks_count=len(system_blocks),
+        )
+
+        estimated_cost_fen = self._cost_tracker.estimate_cost_fen(task_type, messages, self._strategy)
+        await self._check_tenant_budget(tenant_id, estimated_cost_fen)
+
+        start_ms = time.monotonic()
+        last_exc: Optional[Exception] = None
+
+        for attempt in range(self.MAX_RETRIES):
+            if attempt > 0:
+                delay = self.RETRY_DELAYS[attempt - 1]
+                logger.info(
+                    "model_router_cache_retry",
+                    attempt=attempt + 1,
+                    delay_s=delay,
+                    model=model,
+                    request_id=req_id,
+                )
+                await asyncio.sleep(delay)
+
+            try:
+                response = await self._circuit.call(
+                    self._call_api(
+                        model=model,
+                        messages=messages,
+                        system=system_blocks,
+                        max_tokens=max_tokens,
+                        timeout_s=timeout_s,
+                        temperature=temperature,
+                        extra_headers=extra_headers,
+                    )
+                )
+
+                duration_ms = int((time.monotonic() - start_ms) * 1000)
+                usage_obj = response.usage
+                input_tokens = int(getattr(usage_obj, "input_tokens", 0))
+                output_tokens = int(getattr(usage_obj, "output_tokens", 0))
+                cache_read = int(getattr(usage_obj, "cache_read_input_tokens", 0) or 0)
+                cache_create = int(getattr(usage_obj, "cache_creation_input_tokens", 0) or 0)
+
+                # 成本计算：cache_read tokens 官方优惠 90%，cache_write tokens 额外 25%
+                # 先按标准公式记账，优惠空间在月度预算上自然体现
+                cost_usd = self._cost_tracker.calculate_cost(model, input_tokens + cache_read, output_tokens)
+
+                # Prompt Cache 命中率
+                total_input = input_tokens + cache_read
+                cache_hit_ratio = cache_read / total_input if total_input > 0 else 0.0
+
+                logger.info(
+                    "model_router_cache_call_success",
+                    tenant_id=tenant_id,
+                    task_type=task_type,
+                    model=model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cache_read_input_tokens=cache_read,
+                    cache_creation_input_tokens=cache_create,
+                    cache_hit_ratio=round(cache_hit_ratio, 4),
+                    cost_usd=cost_usd,
+                    duration_ms=duration_ms,
+                    request_id=req_id,
+                )
+
+                # 低命中率告警（对齐 sprint plan 风险登记 #6：cache_read_tokens<60% 告警）
+                if total_input >= 1024 and cache_hit_ratio < 0.60:
+                    logger.warning(
+                        "prompt_cache_low_hit_ratio",
+                        tenant_id=tenant_id,
+                        task_type=task_type,
+                        cache_hit_ratio=round(cache_hit_ratio, 4),
+                        threshold=0.60,
+                        request_id=req_id,
+                    )
+
+                if db is not None:
+                    record = ModelCallRecord(
+                        tenant_id=tenant_id,
+                        task_type=task_type,
+                        model=model,
+                        input_tokens=input_tokens + cache_read,
+                        output_tokens=output_tokens,
+                        cost_usd=cost_usd,
+                        duration_ms=duration_ms,
+                        success=True,
+                        error_type=None,
+                        request_id=req_id,
+                    )
+                    await self._cost_tracker.record_call(record, db)
+
+                text = response.content[0].text if response.content else ""
+                usage_dict = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cache_read_input_tokens": cache_read,
+                    "cache_creation_input_tokens": cache_create,
+                    "cache_hit_ratio": round(cache_hit_ratio, 4),
+                }
+                return text, usage_dict
+
+            except CircuitOpenError:
+                raise
+            except APIStatusError as exc:
+                last_exc = exc
+                if exc.status_code < 500 and exc.status_code != 429:
+                    logger.error(
+                        "model_router_cache_client_error",
+                        status_code=exc.status_code,
+                        model=model,
+                        request_id=req_id,
+                    )
+                    break
+                logger.warning(
+                    "model_router_cache_server_error",
+                    attempt=attempt + 1,
+                    status_code=exc.status_code,
+                    request_id=req_id,
+                )
+            except (APIConnectionError, APITimeoutError) as exc:
+                last_exc = exc
+                logger.warning(
+                    "model_router_cache_network_error",
+                    attempt=attempt + 1,
+                    error=type(exc).__name__,
+                    request_id=req_id,
+                )
+
+        # 所有重试耗尽
+        logger.error(
+            "model_router_cache_call_failed",
+            tenant_id=tenant_id,
+            task_type=task_type,
+            model=model,
+            attempts=self.MAX_RETRIES,
+            request_id=req_id,
+        )
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("model_router.complete_with_cache: all retries exhausted")
 
     async def stream_complete(
         self,

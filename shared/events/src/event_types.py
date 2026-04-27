@@ -92,6 +92,10 @@ class ChannelEventType(str, Enum):
     SETTLEMENT = "channel.settlement"  # 渠道结算
     PROMOTION_APPLIED = "channel.promotion_applied"  # 平台活动补贴
     CHARGEBACK = "channel.chargeback"  # 渠道拒付
+    # 异议工作流（Sprint E4 / v277 channel_disputes）
+    DISPUTE_OPENED = "channel.dispute_opened"  # 异议打开（pending）
+    DISPUTE_AUTO_ACCEPTED = "channel.dispute_auto_accepted"  # 自动接受（≤ 阈值）
+    DISPUTE_RESOLVED = "channel.dispute_resolved"  # 人工裁决（accept/reject/escalate）
 
 
 class ReservationEventType(str, Enum):
@@ -302,6 +306,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "price": "tx_price_events",
     # DevForge 内部研运平台域（v371 新增）
     "devforge_application": "tx_devforge_application_events",
+    # 实验框架域（Sprint G）
+    "experiment": "tx_experiment_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -349,6 +355,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "price": "price",
     # DevForge 内部研运平台域（v371 新增）
     "devforge_application": "devforge_application",
+    # 实验框架域（Sprint G）
+    "experiment": "experiment",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -536,6 +544,19 @@ class DevForgeApplicationEventType(str, Enum):
     DELETED = "devforge_application.deleted"
 
 
+class ExperimentEventType(str, Enum):
+    """实验框架事件 — Sprint G
+
+    EXPOSED: subject 第一次进入某实验时写入（idempotent，同 subject 重复请求不重复发射）
+    CIRCUIT_BREAKER_TRIPPED: 监控指标跌幅超阈值触发熔断（强制 control 分桶 + 写 flag 文件）
+    CIRCUIT_BREAKER_RESET: 管理员手动重置熔断（重新允许变体分桶）
+    """
+
+    EXPOSED = "experiment.exposed"
+    CIRCUIT_BREAKER_TRIPPED = "experiment.circuit_breaker_tripped"
+    CIRCUIT_BREAKER_RESET = "experiment.circuit_breaker_reset"
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -597,4 +618,6 @@ ALL_EVENT_ENUMS = (
     PriceEventType,
     # DevForge 内部研运平台域（v371 新增）
     DevForgeApplicationEventType,
+    # 实验框架域（Sprint G）
+    ExperimentEventType,
 )

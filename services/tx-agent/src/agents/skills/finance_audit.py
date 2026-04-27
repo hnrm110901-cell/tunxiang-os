@@ -10,6 +10,7 @@ import statistics
 from typing import Any, Optional
 
 import structlog
+from constraints.decorator import with_constraint_check
 
 from ..base import ActionConfig, AgentResult, SkillAgent
 
@@ -152,6 +153,9 @@ class FinanceAuditAgent(SkillAgent):
         }
         return configs.get(action, ActionConfig())
 
+    # Sprint D1：硬阻断装饰器 — flag_discount_anomaly / cost_analysis 等
+    # 决策携带 price/cost 字段时毛利底线生效，否则三约束 skipped 不阻断
+    @with_constraint_check(skill_name="finance_audit")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "detect_revenue_anomaly": self._detect_revenue_anomaly,

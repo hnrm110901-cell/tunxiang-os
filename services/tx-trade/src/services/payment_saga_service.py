@@ -93,8 +93,21 @@ class PaymentSagaService:
         amount_fen: int,
         auth_code: Optional[str] = None,
         idempotency_key: Optional[str] = None,
+        offline_order_id: Optional[str] = None,
     ) -> dict:
         """执行完整支付Saga。
+
+        Args:
+            order_id:          云端订单 UUID
+            method:            支付方式
+            amount_fen:        金额（分）
+            auth_code:         B扫C 付款码（可选）
+            idempotency_key:   幂等键（A1/A2 契约 `settle:{order_id}`）
+            offline_order_id:  Sprint A3：前端离线生成的人读订单号
+                               （格式 `{device_id}:{ms_epoch}:{counter}`）。
+                               若非空，saga 成功后由调用方写入
+                               offline_order_mapping（本服务不直接触表，
+                               避免跨职责）。此参数仅透传供上层记录/日志。
 
         Returns:
             {
@@ -103,6 +116,7 @@ class PaymentSagaService:
                 "payment_no": str | None,
                 "status": "done" | "compensated" | "failed",
                 "error": str | None,
+                "offline_order_id": str | None,
             }
         """
         # ── 幂等检查：相同 idempotency_key 直接返回已有结果 ──────────────
@@ -120,6 +134,7 @@ class PaymentSagaService:
                         "payment_no": None,
                         "status": "done",
                         "error": None,
+                        "offline_order_id": offline_order_id,
                     }
                 if step in (SagaStep.COMPENSATED, SagaStep.FAILED):
                     return {
@@ -128,6 +143,7 @@ class PaymentSagaService:
                         "payment_no": None,
                         "status": step,
                         "error": existing.get("compensation_reason"),
+                        "offline_order_id": offline_order_id,
                     }
                 # 进行中状态：继续走下面的流程（罕见，一般不会重入）
 
@@ -180,6 +196,7 @@ class PaymentSagaService:
                 "payment_no": None,
                 "status": SagaStep.FAILED,
                 "error": str(exc),
+                "offline_order_id": offline_order_id,
             }
 
         # ── S2: 执行支付（有副作用） ──────────────────────────────────────
@@ -205,6 +222,7 @@ class PaymentSagaService:
                 "payment_no": None,
                 "status": SagaStep.FAILED,
                 "error": str(exc),
+                "offline_order_id": offline_order_id,
             }
 
         # 记录payment_id
@@ -230,6 +248,7 @@ class PaymentSagaService:
                 "payment_no": payment_no,
                 "status": status,
                 "error": str(exc),
+                "offline_order_id": offline_order_id,
             }
 
         # ── 成功 ─────────────────────────────────────────────────────────
@@ -253,6 +272,7 @@ class PaymentSagaService:
             "payment_no": payment_no,
             "status": SagaStep.DONE,
             "error": None,
+            "offline_order_id": offline_order_id,
         }
 
     # ─────────────────────────────────────────────────────────────────

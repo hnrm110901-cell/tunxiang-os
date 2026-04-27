@@ -151,4 +151,41 @@ describe('featureFlags — Sprint A1 P1-4 远程下发', () => {
       'trade.pos.not.registered',
     );
   });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  Sprint A1 Tier1 — 徐记海鲜灰度自动回退
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  it('test_xujihaixian_gray_rollout_error_rate_over_01pct_auto_off', async () => {
+    // 徐记 pilot 5%（1 号店）灰度，错误率 > 0.1% 时后端自动下发 flag=false
+    // 前端下一轮 fetchFlagsFromRemote 拿到 false，setFlagOverride 即使 true 也胜出（运维应急开关）
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            flags: {
+              // 三个 A1 flag 全部联动 off
+              'trade.pos.settle.hardening.enable': false,
+              'trade.pos.toast.enable': false,
+              'trade.pos.errorBoundary.enable': false,
+            },
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    await fetchFlagsFromRemote({
+      fetchFn: mockFetch as unknown as typeof fetch,
+      baseUrl: 'http://test',
+    });
+    // 远程下发 false 生效（灰度回退）
+    expect(isEnabled('trade.pos.settle.hardening.enable')).toBe(false);
+    expect(isEnabled('trade.pos.toast.enable')).toBe(false);
+    expect(isEnabled('trade.pos.errorBoundary.enable')).toBe(false);
+
+    // 运维可通过 override 紧急打回（比如误触发回退时）
+    setFlagOverride('trade.pos.errorBoundary.enable', true);
+    expect(isEnabled('trade.pos.errorBoundary.enable')).toBe(true);
+  });
 });

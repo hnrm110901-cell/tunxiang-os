@@ -91,3 +91,117 @@ flags:
         - dimension: edge_node_group
           values: []
     tags: [edge, mac-station, auto-update, launchd]
+
+  - identifier: edge_payment_saga_buffer
+    name: edge.payment.saga_buffer
+    description: >
+      Sprint A2 Saga 本地 SQLite 缓冲启用开关（Tier1）。
+      on=断网 4h 期间将结算请求 enqueue 到 /var/tunxiang/saga_buffer.db，
+      恢复联网后 SagaFlusher 补发到 tx-trade /api/v1/settle/retry；
+      off=legacy 直写（无缓冲，断网即失败）。
+      契约：与 A1 idempotency_key=settle:{orderId} 共享，防双扣费。
+      4h TTL 超期标 dead_letter 等人工介入，不自动删除。
+      磁盘满降级到内存队列（A1 R1 disk_io_error）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, a2, sprint-q2-2026, tier1, saga, offline]
+
+  - identifier: edge_offline_order_id_bridge
+    name: edge.offline.order_id_bridge
+    description: >
+      Sprint A3 离线订单号 UUID v7 前端生成（Tier1）。
+      on=前端（商米 POS / iPad / 浏览器）离线时生成 order_id
+         = `{device_id}:{ms_epoch}:{counter}` 字符串 + UUID v7 payload，
+         请求头携带 X-Offline-Order-Id + X-Idempotency-Key=settle:{order_id}；
+         服务端恢复同步后写入 offline_order_mapping，cloud_order_id 由云端生成。
+      off=legacy 服务端生成 order_id（TX+时间+uuid4.hex[:4]，无离线能力）。
+      契约：与 A1 tradeApi.ts 的 idempotency_key=settle:{orderId} 共享，
+            与 A2 SagaBuffer 的 idempotency_key PK 去重兼容。
+      补发 20 次仍失败 → offline_order_mapping.state=dead_letter，
+      不自动删除，等店长在"离线订单异常"面板人工确认。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, a3, sprint-q2-2026, tier1, offline, uuid-v7]
+
+  - identifier: edge_kds_delta_sync
+    name: edge.kds.delta_sync
+    description: >
+      Sprint C3 KDS delta 同步接口启用开关（Tier1）。
+      on=web-kds 通过 GET /api/v1/kds/orders/delta 增量轮询 + POST /api/v1/kds/device/heartbeat 心跳；
+         sync-engine Phase 1 基于 edge_device_registry 决定 device_kind=kds 是否需要 push delta。
+      off=legacy 行为（全量轮询 /api/v1/kds/tasks + WebSocket /api/v1/kds/ws），
+         不写 edge_device_registry 心跳。
+      契约：与 A3 device_id（`{prefix}-{store}-{counter}`）共享；
+            与 sync-engine Phase 1 的 device_kind 六枚举（pos/kds/crew_phone/tv_menu/reception/mac_mini）统一。
+      门禁：4h E2E 零卡顿 / 断网 60s 恢复后 ≤500 单全同步 / P99<100ms。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, c3, sprint-q2-2026, tier1, kds, delta-sync]
+
+  - identifier: edge_kds_mark_offline_scheduler
+    name: edge.kds.mark_offline_scheduler
+    description: >
+      Sprint C3 §19 KDS 离线扫描周期调度（Tier1）。
+      on=tx-trade lifespan 启动 60s 周期 task →
+         DeviceRegistryService.mark_offline_if_stale_global 跨租户扫描
+         edge_device_registry，超 600s 心跳的设备 health_status → offline。
+      off=不启动调度任务（DEMO 演示拔 KDS 网线 11min 后 health_status
+         永远停留 healthy，运维面板假象一切正常）。
+      默认 off：DEMO 环境先开启验证 → 灰度 5% 门店 → 再全量。
+      与 edge.kds.delta_sync 配合：delta_sync on 才有 heartbeat 数据，
+      mark_offline_scheduler 才有意义。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    rollout: [5, 50, 100]
+    targeting_rules:
+      pilot:
+        - dimension: edge_node_group
+          values: [mac_mini_m4_pilot]
+      prod:
+        - dimension: store_id
+          values: []  # 5% 灰度门店审批后填入
+    tags: [edge, c3, sprint-q2-2026, tier1, kds, scheduler, offline-detection]

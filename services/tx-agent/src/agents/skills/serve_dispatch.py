@@ -10,6 +10,8 @@
 import statistics
 from typing import Any
 
+from constraints.decorator import with_constraint_check
+
 from ..base import AgentResult, SkillAgent
 from ..context import ConstraintContext
 from ..memory_bus import Finding, MemoryBus
@@ -36,6 +38,9 @@ class ServeDispatchAgent(SkillAgent):
             "balance_workload",
         ]
 
+    # Sprint D1：硬阻断装饰器 — predict_serve_time 已填 estimated_serve_minutes，
+    # 客户体验约束（30 分钟上限）在出餐预测超阈值时硬阻断决策
+    @with_constraint_check(skill_name="serve_dispatch")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "predict_serve_time": self._predict_serve,

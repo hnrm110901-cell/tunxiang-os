@@ -40,6 +40,7 @@ export async function txFetch<T>(path: string, options?: RequestInit): Promise<T
 export * from './kdsOpsApi';
 export * from './shortageApi';
 export * from './kdsRulesApi';
+export * from './kdsDeltaApi';
 
 // ─── WebSocket 连接 ───
 

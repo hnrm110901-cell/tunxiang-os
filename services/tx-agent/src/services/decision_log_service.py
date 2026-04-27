@@ -4,7 +4,8 @@
 留痕失败只 warn，绝不阻断主业务流程。
 """
 
-from typing import Optional
+from decimal import Decimal
+from typing import Any, Optional
 from uuid import UUID
 
 import structlog
@@ -13,6 +14,70 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.decision_log import AgentDecisionLog
 
 logger = structlog.get_logger()
+
+
+# Sprint D2（v264）：ROI writeback flag 名称。
+# 独立常量避免在主业务链路里 import shared.feature_flags，保持留痕子系统轻量。
+# 真实评估时通过 shared.feature_flags.is_enabled 读取。
+_ROI_WRITEBACK_FLAG = "agent.roi.writeback"
+
+
+def _roi_writeback_enabled() -> bool:
+    """评估 ROI writeback flag。
+
+    懒加载 feature_flags 客户端 — 在测试环境/早期启动阶段 feature_flags
+    可能未就绪；此处 import 失败即视为 flag off，确保留痕链路永远能降级。
+    """
+    try:
+        from shared.feature_flags import is_enabled  # type: ignore[import-not-found]
+    except ImportError:
+        return False
+    try:
+        return bool(is_enabled(_ROI_WRITEBACK_FLAG))
+    except (AttributeError, KeyError, ValueError) as exc:
+        logger.debug("roi_writeback_flag_eval_failed", error=str(exc))
+        return False
+
+
+def _apply_roi_fields(
+    record: AgentDecisionLog,
+    roi: Optional[dict[str, Any]],
+) -> None:
+    """按 flag 守护写入 ROI 四字段。
+
+    Args:
+        record: 即将 add 到 session 的 AgentDecisionLog 实例。
+        roi:    上游计算出的 ROI dict，形如：
+                {
+                    "saved_labor_hours": 0.5,          # float / Decimal / None
+                    "prevented_loss_fen": 12000,       # int / None
+                    "improved_kpi": {"metric": "gross_margin", "delta_pct": 1.8},
+                    "roi_evidence": {"source": "discount_guard_v2", ...},
+                }
+
+    Rule:
+        - flag off  → 全部字段保持 None（向前兼容）
+        - flag on + roi=None → 全部字段保持 None（无计算数据）
+        - flag on + roi dict → 按字段校验后写入（未提供的字段保持 None）
+    """
+    if not roi or not _roi_writeback_enabled():
+        return
+
+    saved = roi.get("saved_labor_hours")
+    if isinstance(saved, (int, float, Decimal)):
+        record.saved_labor_hours = Decimal(str(saved))
+
+    prevented = roi.get("prevented_loss_fen")
+    if isinstance(prevented, int) and not isinstance(prevented, bool):
+        record.prevented_loss_fen = prevented
+
+    kpi = roi.get("improved_kpi")
+    if isinstance(kpi, dict):
+        record.improved_kpi = kpi
+
+    evidence = roi.get("roi_evidence")
+    if isinstance(evidence, dict):
+        record.roi_evidence = evidence
 
 
 class DecisionLogService:
@@ -27,6 +92,7 @@ class DecisionLogService:
         trigger_summary: str,
         plan_steps: list,
         orchestrator_result: object,
+        roi: Optional[dict[str, Any]] = None,
     ) -> None:
         """记录 Orchestrator 的多 Agent 编排决策。
 
@@ -38,6 +104,10 @@ class DecisionLogService:
             trigger_summary: 触发原因一句话摘要。
             plan_steps: ExecutionPlan.steps 列表（ExecutionStep 实例）。
             orchestrator_result: OrchestratorResult 实例。
+            roi: Sprint D2 ROI 四字段 dict（可选）。仅当 flag
+                 `agent.roi.writeback` 开启时写入；关闭时四字段保持 NULL。
+                 形如：{saved_labor_hours, prevented_loss_fen,
+                        improved_kpi, roi_evidence}。
         """
         try:
             steps_snapshot = [
@@ -67,6 +137,8 @@ class DecisionLogService:
                 confidence=orchestrator_result.confidence,  # type: ignore[attr-defined]
                 plan_id=plan_id,
             )
+            # Sprint D2: flag on 时才注入 ROI；flag off 时四字段保持 NULL
+            _apply_roi_fields(record, roi)
             db.add(record)
             await db.flush()
             logger.info(
@@ -94,6 +166,7 @@ class DecisionLogService:
         result: object,
         plan_id: Optional[str] = None,
         store_id: Optional[str] = None,
+        roi: Optional[dict[str, Any]] = None,
     ) -> None:
         """记录单个 Skill Agent 的执行决策。
 
@@ -106,6 +179,9 @@ class DecisionLogService:
             result: AgentResult 实例。
             plan_id: 关联 ExecutionPlan.plan_id，可为 None。
             store_id: 门店 UUID 字符串，可为 None。
+            roi: Sprint D2 ROI 四字段 dict（可选）。仅当 flag
+                 `agent.roi.writeback` 开启时写入；若未提供或 flag off，
+                 四字段保持 NULL，行为与 v264 前完全一致。
         """
         try:
             result_data: dict = getattr(result, "data", None) or {}
@@ -140,6 +216,14 @@ class DecisionLogService:
                 improved_kpi=improved_kpi,
                 roi_evidence=roi_evidence,
             )
+            # Sprint D2: ROI writeback（flag off 时零影响）
+            # 若调用方未显式传 roi，则尝试从 result.data["roi"] 拾取
+            effective_roi = roi
+            if effective_roi is None and isinstance(result_data, dict):
+                candidate = result_data.get("roi")
+                if isinstance(candidate, dict):
+                    effective_roi = candidate
+            _apply_roi_fields(record, effective_roi)
             db.add(record)
             await db.flush()
             logger.info(

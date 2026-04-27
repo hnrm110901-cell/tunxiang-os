@@ -144,9 +144,29 @@ async def lifespan(app: FastAPI):
     # 必须在 init_db / scheduler 之前 — fail-loud，让 k8s readiness probe 失败。
     assert_no_dev_bypass_in_production()
 
+    # ── §19 A4 (b)：lifespan shutdown 跟踪后台任务，避免审计日志在 SIGTERM 时丢失 ──
+    # background_tasks 集合用于跟踪所有 fire-and-forget 后台 task（典型如 write_audit）
+    # shutdown 时 await asyncio.gather(...) 5s 超时排空，避免部署窗口最后一笔审计被取消。
+    app.state.background_tasks = set()
+
+    def _register_background_task(task: asyncio.Task) -> asyncio.Task:
+        """注册后台 task 到 app.state.background_tasks 并自动 done 后清理。
+
+        路由层应通过此 helper 创建 fire-and-forget task：
+            task = asyncio.create_task(write_audit(...))
+            app.state.register_background_task(task)
+        """
+        app.state.background_tasks.add(task)
+        task.add_done_callback(app.state.background_tasks.discard)
+        return task
+
+    app.state.register_background_task = _register_background_task
+
     await init_db()
-    asyncio.create_task(start_daily_scheduler(async_session_factory))
-    asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+    _register_background_task(asyncio.create_task(start_daily_scheduler(async_session_factory)))
+    _register_background_task(
+        asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
+    )
 
     # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
     # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
@@ -179,7 +199,70 @@ async def lifespan(app: FastAPI):
     except ImportError:
         pass  # feature_flags SDK不可用，外卖自动接单状态由环境变量控制
 
-    yield
+    # ── C3 §19：mark_offline_if_stale 60s 周期调度（受 EdgeFlags.MARK_OFFLINE_SCHEDULER 控制）──
+    mark_offline_task: asyncio.Task | None = None
+    try:
+        from shared.feature_flags import is_enabled as _ff_is_enabled
+        from shared.feature_flags.flag_names import EdgeFlags as _EdgeFlags
+
+        if _ff_is_enabled(_EdgeFlags.MARK_OFFLINE_SCHEDULER):
+            import structlog as _structlog
+
+            _structlog.get_logger(__name__).info(
+                "mark_offline_scheduler_enabled",
+                flag=_EdgeFlags.MARK_OFFLINE_SCHEDULER,
+            )
+            from .services.mark_offline_scheduler import mark_offline_scheduler_loop
+
+            mark_offline_task = asyncio.create_task(
+                mark_offline_scheduler_loop(async_session_factory, interval_sec=60),
+                name="mark_offline_scheduler",
+            )
+        else:
+            import structlog as _structlog
+
+            _structlog.get_logger(__name__).info(
+                "mark_offline_scheduler_disabled",
+                reason="feature_flag_disabled",
+                flag=_EdgeFlags.MARK_OFFLINE_SCHEDULER,
+            )
+    except ImportError:
+        # feature_flags SDK 不可用：保守默认关闭（不启动 task）
+        import structlog as _structlog
+
+        _structlog.get_logger(__name__).warning(
+            "mark_offline_scheduler_skipped_feature_flags_unavailable",
+        )
+
+    try:
+        yield
+    finally:
+        # graceful shutdown：cancel + await，避免事件循环退出时 task 仍在 sleep
+        if mark_offline_task is not None and not mark_offline_task.done():
+            mark_offline_task.cancel()
+            try:
+                await mark_offline_task
+            except asyncio.CancelledError:
+                pass
+
+        # ── §19 A4 (b)：gather in-flight 后台任务，5s 超时（避免无限挂起） ──
+        # Uvicorn SIGTERM 时若不显式排空 background_tasks，asyncio.create_task
+        # 注入的最后一笔审计写入（如删单 write_audit）会被 cancel → 30s 部署窗口丢日志。
+        # gather 收集仍在运行的 task；超时后 SIGKILL 兜底，至少给业务 5s 完成 in-flight。
+        bg_tasks = getattr(app.state, "background_tasks", None)
+        if bg_tasks:
+            pending = [t for t in list(bg_tasks) if not t.done()]
+            if pending:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=5.0,
+                    )
+                except asyncio.TimeoutError:
+                    # 5s 内未完成的任务 cancel 释放（避免事件循环退出时报 warning）
+                    for t in pending:
+                        if not t.done():
+                            t.cancel()
 
     # ── Graceful shutdown ─────────────────────────────────────────────
     # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
@@ -449,6 +532,16 @@ app.include_router(training_mode_router)
 from .api.kiosk_routes import router as kiosk_router
 
 app.include_router(kiosk_router)
+
+# ── Sprint E1：渠道 canonical 订单（外卖统一抽象层，纯加法不影响适配器）──
+from .api.channel_canonical_routes import router as channel_canonical_router
+
+app.include_router(channel_canonical_router)
+
+# ── Sprint E4：渠道异议工作流（auto_accept + 人工裁决）──
+from .api.channel_dispute_routes import router as channel_dispute_router
+
+app.include_router(channel_dispute_router)
 
 
 # ── Sprint E 路由自动挂载（PR #91 #92 #93 #94 合入后自动生效）──

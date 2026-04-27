@@ -9,6 +9,7 @@
 from typing import Any
 
 import structlog
+from constraints.decorator import with_constraint_check
 
 from ..base import ActionConfig, AgentResult, SkillAgent
 
@@ -150,6 +151,9 @@ class MemberInsightAgent(SkillAgent):
         }
         return configs.get(action, ActionConfig())
 
+    # Sprint D1：硬阻断装饰器 — trigger_journey/process_bad_review 涉及发券/补偿，
+    # 触达决策的优惠金额冲击毛利底线时硬阻断
+    @with_constraint_check(skill_name="member_insight")
     async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "analyze_rfm": self._analyze_rfm,

@@ -19,10 +19,17 @@ R-补1-1（§19 独立审查发现）：
   - 历史 write_audit 只覆盖 allow 路径，cashier 被 403 拒绝时数据库无任何记录
   - 现新增 audit_deny() 专门记录拒绝路径；require_role_audited 装饰器在拒绝前调用
   - severity 值域 info/warn/error/critical（SIEM 标准 4 级），不与 result 重叠
+
+§19 A4 (b) lifespan shutdown 防丢日志：
+  - schedule_audit(app, ...) 在路由层创建 fire-and-forget task 并注册到
+    app.state.background_tasks（由 main.py lifespan startup 注入）
+  - lifespan shutdown 时 await asyncio.gather(*background_tasks) 排空，
+    避免 SIGTERM 部署窗口最后一笔审计被 cancel
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from typing import Any, Mapping
@@ -228,6 +235,31 @@ async def _target_in_caller_tenant(
         # 至少一张表 SELECT 成功但没找到 → 不在 caller 租户
         return False
     return None  # 全部表 SELECT 都失败 → fail-open
+
+
+def _register_audit_task(app: Any, task: asyncio.Task) -> asyncio.Task:
+    """把审计写入 task 注册到 app.state.background_tasks（lifespan shutdown 排空）。"""
+    bg_set = None
+    try:
+        bg_set = getattr(app.state, "background_tasks", None)
+    except AttributeError:
+        bg_set = None
+
+    if bg_set is not None:
+        bg_set.add(task)
+        task.add_done_callback(bg_set.discard)
+    return task
+
+
+def schedule_audit(app: Any, **kwargs: Any) -> asyncio.Task:
+    """fire-and-forget 调度 write_audit 并注册到 app.state.background_tasks。"""
+    db = kwargs.pop("db", None)
+    if db is None:
+        raise ValueError("schedule_audit requires keyword 'db' (AsyncSession)")
+    task = asyncio.create_task(write_audit(db, **kwargs))
+    if app is not None:
+        _register_audit_task(app, task)
+    return task
 
 
 async def write_audit(

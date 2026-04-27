@@ -9,6 +9,8 @@ const PALETTE: Record<ToastItem['type'], { bg: string; fg: string; icon: string 
   success: { bg: '#16a34a', fg: '#ffffff', icon: '✓' },
   error: { bg: '#dc2626', fg: '#ffffff', icon: '✕' },
   info: { bg: '#2563eb', fg: '#ffffff', icon: 'i' },
+  // Sprint A1 新增：warning（琥珀色，打印机纸张不足/厨房出餐超时等非阻断提醒）
+  warning: { bg: '#d97706', fg: '#ffffff', icon: '!' },
   offline: { bg: '#6b7280', fg: '#ffffff', icon: '⟳' },
 };
 

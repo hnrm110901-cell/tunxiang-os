@@ -46,6 +46,27 @@ struct TrafficResponse: Content {
     let confidence: Double
 }
 
+// POST /predict/dish-price (D3c — 菜品动态定价)
+struct DishPriceRequest: Content {
+    let dish_id: String
+    let store_id: String
+    let tenant_id: String
+    let base_price_fen: Int
+    let cost_fen: Int
+    let time_of_day: String       // "lunch_peak" | "dinner_peak" | "off_peak"
+    let traffic_forecast: String  // "high" | "medium" | "low"
+    let inventory_status: String  // "near_expiry" | "normal" | "low_stock"
+}
+
+struct DishPriceResponse: Content {
+    let recommended_price_fen: Int
+    let confidence: Double
+    let reasoning_signals: [String: String]
+    let model_version: String
+    let computed_at_ms: Int64
+    let floor_protected: Bool
+}
+
 // GET /health
 struct HealthResponse: Content {
     let ok: Bool
@@ -191,6 +212,59 @@ func registerRoutes(_ app: Application) {
         let result = TrafficResponse(
             predicted_covers: prediction.predictedCovers,
             confidence: prediction.confidence
+        )
+
+        let data = try JSONEncoder().encode(result)
+        return Response(status: .ok, body: .init(data: data))
+    }
+
+    // MARK: POST /predict/dish-price (D3c)
+
+    app.post("predict", "dish-price") { req async throws -> Response in
+        let body: DishPriceRequest
+        do {
+            body = try req.content.decode(DishPriceRequest.self)
+        } catch {
+            let errResp = ErrorResponse(ok: false, error: "invalid_request: \(error.localizedDescription)")
+            return try Response(status: .badRequest, body: .init(data: JSONEncoder().encode(errResp)))
+        }
+
+        guard body.base_price_fen > 0 else {
+            let errResp = ErrorResponse(ok: false, error: "base_price_fen must be > 0")
+            return try Response(status: .badRequest, body: .init(data: JSONEncoder().encode(errResp)))
+        }
+
+        guard body.cost_fen >= 0 else {
+            let errResp = ErrorResponse(ok: false, error: "cost_fen must be >= 0")
+            return try Response(status: .badRequest, body: .init(data: JSONEncoder().encode(errResp)))
+        }
+
+        // 防御：cost > base 不可能合理出菜，拒绝
+        guard body.cost_fen < body.base_price_fen else {
+            let errResp = ErrorResponse(ok: false, error: "cost_fen must be < base_price_fen")
+            return try Response(status: .badRequest, body: .init(data: JSONEncoder().encode(errResp)))
+        }
+
+        let features = DishPriceFeatures(
+            dishId: body.dish_id,
+            storeId: body.store_id,
+            tenantId: body.tenant_id,
+            basePriceFen: body.base_price_fen,
+            costFen: body.cost_fen,
+            timeOfDay: body.time_of_day,
+            trafficForecast: body.traffic_forecast,
+            inventoryStatus: body.inventory_status
+        )
+
+        let prediction = manager.predictDishPrice(features: features)
+
+        let result = DishPriceResponse(
+            recommended_price_fen: prediction.recommendedPriceFen,
+            confidence: prediction.confidence,
+            reasoning_signals: prediction.reasoningSignals,
+            model_version: prediction.modelVersion,
+            computed_at_ms: prediction.computedAtMs,
+            floor_protected: prediction.floorProtected
         )
 
         let data = try JSONEncoder().encode(result)

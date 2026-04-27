@@ -168,3 +168,36 @@ flags:
         - dimension: store_id
           values: []
     tags: [trade, pos, ui, error-boundary, sprint-a1, tier1]
+
+  # ──────────────────────────────────────────────────────────────
+  # Sprint A4（2026-04-24）RBAC 装饰器 + trade_audit_logs 严格模式
+  # 灰度路径：pilot 5% → pilot 50% → prod 100%，回滚阈值错误率 > 0.1%
+  # 默认 off（§14 / §21 要求新 flag 默认禁用，灰度由门禁脚本驱动开）
+  # ──────────────────────────────────────────────────────────────
+  - identifier: trade_rbac_strict
+    name: trade.rbac.strict
+    description: >
+      A4 RBAC 严格模式开关（Sprint A4，Tier1）。
+      on：所有 tx-trade 支付/退款/折扣/改价/删单等敏感路由要求显式 require_role 授权，
+          隐式权限（如服务员习惯性撤单、收银员大额减免无 MFA）被 403 拒绝并审计 deny。
+      off：保留 legacy 行为（等价于 TX_AUTH_ENABLED=false 的 dev bypass），
+          用于 pilot 过渡期、问题回滚或演示环境。
+      联动：require_mfa 装饰器在 flag on 下对 >30% 减免 / 退款强制 MFA。
+      审计：无论 on/off，write_audit 均写入 trade_audit_logs（v261 + v267 扩列）。
+      回滚：关闭 flag 后装饰器退化为 no-op，不改变原接口响应形状。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: store_id
+          values: []
+      prod:
+        - dimension: store_id
+          values: []
+    rollout: [5, 50, 100]
+    tags: [trade, rbac, audit, sprint-a4, tier1]

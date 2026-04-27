@@ -29,8 +29,10 @@ except ImportError:
         return True  # noqa: E731
 
 
+from .api.activity_roi_routes import router as activity_roi_router  # D3b 活动 ROI 预测
 from .api.brain_routes import router as brain_router
 from .api.content_hub_routes import router as content_hub_router  # AI营销内容中枢（v207）
+from .api.dish_pricing_routes import router as dish_pricing_router  # D3c — 菜品动态定价
 from .api.voice_api import router as voice_router
 from .api.voice_order_stable_routes import router as voice_stable_router
 from .services.cfo_dashboard import CFODashboardService
@@ -114,6 +116,8 @@ app.include_router(voice_router)
 app.include_router(brain_router)
 app.include_router(voice_stable_router)
 app.include_router(content_hub_router)  # /api/v1/brain/content/* — AIGC 营销内容生成（v207）
+app.include_router(activity_roi_router)  # /api/v1/agents/activity-roi/* — 活动 ROI 预测（D3b）
+app.include_router(dish_pricing_router)  # /api/v1/agents/dish-pricing/* — 菜品动态定价（D3c）
 
 
 # ── Sprint G 路由自动挂载（PR #97 A/B 实验框架 合入后自动生效）──

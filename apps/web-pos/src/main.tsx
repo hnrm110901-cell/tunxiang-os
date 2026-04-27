@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom/client';
 import '@tx/tokens/tokens.css';
 import { injectTokens } from './design-system';
 import App from './App';
-import { ErrorBoundary, reportCrashToTelemetry } from './components/ErrorBoundary';
+import { ErrorBoundary } from './components/ErrorBoundary';
+// A1 安全修复：reportCrashToTelemetry 改从 api/tradeApi 导入（JWT-derived tenant_id，
+// 不再读 localStorage 'tenant_id'）。ErrorBoundary.tsx 中的旧版函数已弃用。
+import { reportCrashToTelemetry } from './api/tradeApi';
 import { rootFallback, navigateToTables } from './components/RootFallback';
 import { ToastContainer } from './components/ToastContainer';
 import { isEnabled, initFeatureFlags, subscribe } from './config/featureFlags';

@@ -16,5 +16,23 @@
     "listen": "0.0.0.0:18008",
     "upstream": "tx-agent:8008",
     "enabled": true
+  },
+  {
+    "name": "pg_proxy",
+    "listen": "0.0.0.0:9001",
+    "upstream": "postgres:5432",
+    "enabled": true
+  },
+  {
+    "name": "redis_proxy",
+    "listen": "0.0.0.0:9002",
+    "upstream": "redis:6379",
+    "enabled": true
+  },
+  {
+    "name": "coreml_proxy",
+    "listen": "0.0.0.0:9003",
+    "upstream": "host.docker.internal:8100",
+    "enabled": true
   }
 ]

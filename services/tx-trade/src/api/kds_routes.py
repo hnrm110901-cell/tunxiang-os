@@ -1,18 +1,31 @@
 """KDS 出餐调度 API — 分单/队列/操作/超时预警
 
 所有接口需要 X-Tenant-ID header。
+
+Sprint C3 扩展（Tier1）：
+  - GET /api/v1/kds/orders/delta       — 增量订单同步（cursor + limit）
+  - POST /api/v1/kds/device/heartbeat  — 设备心跳 + edge_device_registry upsert
+  两接口要求 RBAC require_role（A4 基建）。
 """
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..security.rbac import UserContext, require_role
 from ..services.cooking_scheduler import calculate_cooking_order, get_dept_load
 from ..services.cooking_timeout import check_timeouts, get_timeout_config
+from ..services.device_registry_service import (
+    ALLOWED_DEVICE_KINDS,
+    DeviceRegistryService,
+    HealthStatus,
+)
 from ..services.kds_actions import (
     batch_scan_complete,
     check_rush_overdue,
@@ -25,6 +38,7 @@ from ..services.kds_actions import (
     scan_complete_dish,
     start_cooking,
 )
+from ..services.kds_delta_service import KDSDeltaService
 from ..services.kds_dispatch import (
     dispatch_order_to_kds,
     get_dept_queue,
@@ -462,3 +476,159 @@ async def api_timeout_config(
     """获取超时配置"""
     config = await get_timeout_config(store_id, db)
     return {"ok": True, "data": config}
+
+
+# ─── Sprint C3: KDS delta + device heartbeat ─────────────────────────────────
+
+
+class DeviceHeartbeatReq(BaseModel):
+    """KDS / POS / 其他终端心跳请求体。
+
+    device_kind 枚举：pos / kds / crew_phone / tv_menu / reception / mac_mini
+    （与 v271 edge_device_registry CHECK 约束一致）
+    """
+
+    device_id: str = Field(..., min_length=1, max_length=64)
+    device_kind: str = Field(..., min_length=1, max_length=16)
+    store_id: str = Field(..., min_length=1)
+    device_label: Optional[str] = Field(None, max_length=64)
+    os_version: Optional[str] = Field(None, max_length=32)
+    app_version: Optional[str] = Field(None, max_length=32)
+    buffer_backlog: int = Field(0, ge=0)
+    health_status: str = Field(HealthStatus.HEALTHY.value, max_length=16)
+
+
+@router.get("/orders/delta")
+async def api_kds_orders_delta(
+    request: Request,
+    store_id: str = Query(..., description="门店 UUID"),
+    cursor: Optional[str] = Query(None, description="ISO8601 起点，首次不传"),
+    device_id: Optional[str] = Query(None, description="设备 ID（审计用）"),
+    device_kind: Optional[str] = Query(
+        None,
+        description="终端类型；kds=剔除客户手机号/金额等敏感字段",
+    ),
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "kds", "store_manager", "admin")),
+):
+    """Sprint C3 — KDS 订单增量同步。
+
+    返回 cursor 之后 status ∈ (pending/confirmed/preparing/ready) 的订单，
+    按 updated_at 升序。response:
+        {
+          "ok": true,
+          "data": {
+            "orders": [...],
+            "next_cursor": "2026-04-24T18:00:12Z",
+            "server_time": "2026-04-24T18:00:20Z",
+            "poll_interval_ms": 5000
+          }
+        }
+    """
+    # 三方租户一致性校验（与 A3 offline_sync 一致模式）
+    tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
+    if user.tenant_id and user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="USER_TENANT_MISMATCH")
+
+    if device_kind is not None and device_kind not in ALLOWED_DEVICE_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_DEVICE_KIND",
+                "message": f"device_kind must be one of {sorted(ALLOWED_DEVICE_KINDS)}",
+            },
+        )
+
+    svc = KDSDeltaService(db=db, tenant_id=tenant_id)
+    try:
+        result = await svc.get_orders_delta(
+            store_id=store_id,
+            cursor=cursor,
+            device_kind=device_kind,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError:
+        # 交由全局 exception handler 记录；给客户端统一 500 结构
+        raise HTTPException(status_code=500, detail="DB_ERROR")
+
+    # datetime → ISO8601 字符串，便于前端直接赋给下一轮 cursor
+    def _iso(dt: Optional[datetime]) -> Optional[str]:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    # 将 orders 里 updated_at 字段也序列化（前端兼容）
+    serialized_orders = []
+    for o in result["orders"]:
+        copy = dict(o)
+        if isinstance(copy.get("updated_at"), datetime):
+            copy["updated_at"] = _iso(copy["updated_at"])
+        serialized_orders.append(copy)
+
+    return {
+        "ok": True,
+        "data": {
+            "orders": serialized_orders,
+            "next_cursor": _iso(result["next_cursor"]),
+            "server_time": _iso(result["server_time"]),
+            # 建议 KDS 轮询 5s；断网恢复可临时缩短
+            "poll_interval_ms": 5000,
+            "device_id": device_id,
+            "device_kind": device_kind,
+        },
+    }
+
+
+@router.post("/device/heartbeat")
+async def api_kds_device_heartbeat(
+    body: DeviceHeartbeatReq,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role("cashier", "kds", "store_manager", "admin")),
+):
+    """Sprint C3 — 设备心跳：upsert edge_device_registry，更新 last_seen_at。
+
+    KDS 默认 30s 一次心跳；POS / crew_phone 遵循各自节奏。
+    返回 server_time 供客户端校准时钟 + 建议 poll_interval_ms。
+    """
+    tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
+    if user.tenant_id and user.tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="USER_TENANT_MISMATCH")
+
+    svc = DeviceRegistryService(db=db, tenant_id=tenant_id)
+    try:
+        await svc.heartbeat(
+            device_id=body.device_id,
+            device_kind=body.device_kind,
+            store_id=body.store_id,
+            device_label=body.device_label,
+            os_version=body.os_version,
+            app_version=body.app_version,
+            buffer_backlog=body.buffer_backlog,
+            health_status=body.health_status,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="DB_ERROR")
+
+    now = datetime.now(timezone.utc)
+    return {
+        "ok": True,
+        "data": {
+            "device_id": body.device_id,
+            "device_kind": body.device_kind,
+            "server_time": now.isoformat().replace("+00:00", "Z"),
+            # 建议各终端类型的默认心跳间隔（ms）
+            "poll_interval_ms": 30000 if body.device_kind == "kds" else 60000,
+        },
+    }

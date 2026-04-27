@@ -198,3 +198,81 @@ flags:
         - dimension: role_code
           values: [L3]
     tags: [agent, l3, autonomy, critical-risk]
+
+  - identifier: agent_cost_root_cause_enable
+    name: agent.cost_root_cause.enable
+    description: >
+      D4a 成本根因 Skill Agent 启用开关。
+      基于 Claude Sonnet 4.7 + Prompt Cache，定位成本异动根因并给出降本建议。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d4a, sprint-q2-2026]
+
+  - identifier: agent_salary_anomaly_enable
+    name: agent.salary_anomaly.enable
+    description: >
+      D4b 薪资异常 Skill Agent 启用开关。
+      基于 Claude Sonnet 4.7 + Prompt Cache，识别加班时长异常与薪资环比异常，
+      拦截错发工资并给出复核建议（Level 1，建议级）。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d4b, sprint-q2-2026]
+
+  - identifier: agent_budget_forecast_enable
+    name: agent.budget_forecast.enable
+    description: >
+      D4c 预算预测 Skill Agent 启用开关。
+      基于 Claude Sonnet 4.7 + Prompt Cache，预测下月各成本科目预算
+      并识别实际 vs 预算偏差超阈值（±5/10/15% 分档），给出根因
+      + 责任角色 + 可验证 KPI（Level 1，建议级）。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d4c, sprint-q2-2026]
+
+  - identifier: agent_rfm_outreach_enable
+    name: agent.rfm_outreach.enable
+    description: >
+      D3a RFM 触达 Skill Agent 启用开关，目标复购率 +5pp。
+      基于 Claude Haiku 4.5 + Prompt Cache，为不同 RFM 分层客户群生成多版本触达文案
+      + 推送时段建议，并从业务目标推导分群筛选条件。
+      默认关闭；合并后由运维按环境逐步开启（dev → test → pilot → prod）。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      pilot: false
+      prod: false
+    tags: [agent, d3a, sprint-q2-2026, growth]
+
+  - identifier: agent_roi_writeback
+    name: agent.roi.writeback
+    description: >
+      Sprint D2：Agent 决策写入 ROI 四字段（saved_labor_hours / prevented_loss_fen
+      / improved_kpi / roi_evidence）到 agent_decision_logs 表。
+      开启后各 Skill Agent 可按自身算法计算并回写 ROI 证据；
+      关闭时四字段保持 NULL，向前兼容旧代码。
+      注意：本 flag 触发规划文档 §4 决策点 #1（核心留痕变更），
+      需创始人签字后再由运维在指定环境开启，PR 合并不得自动打开。
+    defaultValue: false
+    environments:
+      dev: false
+      test: false
+      uat: false
+      pilot: false
+      prod: false
+    tags: [agent, roi, decision-log, writeback, founder-signoff-required]
