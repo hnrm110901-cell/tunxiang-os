@@ -2793,32 +2793,51 @@ async def hub_search_knowledge(db: AsyncSession, query: str, top_k: int) -> dict
 
 
 async def hub_list_tenancy(db: AsyncSession) -> dict[str, Any]:
-    """租户列表+统计"""
-    # TODO: 从 platform_tenants 聚合
-    return {
-        "tenants": [
-            {"id": "t001", "name": "徐记海鲜", "plan": "pro", "stores": 23, "status": "active", "data_size_gb": 12.5, "rls_policy_count": 48},
-            {"id": "t002", "name": "尝在一起", "plan": "standard", "stores": 8, "status": "active", "data_size_gb": 3.2, "rls_policy_count": 48},
-            {"id": "t003", "name": "最黔线", "plan": "standard", "stores": 5, "status": "active", "data_size_gb": 1.8, "rls_policy_count": 48},
-            {"id": "t004", "name": "尚宫厨", "plan": "lite", "stores": 3, "status": "trial", "data_size_gb": 0.6, "rls_policy_count": 48},
-            {"id": "t005", "name": "费大厨", "plan": "pro", "stores": 15, "status": "active", "data_size_gb": 8.1, "rls_policy_count": 48},
-        ],
-        "summary": {
-            "total_tenants": 10,
-            "active_tenants": 8,
-            "trial_tenants": 2,
-            "total_stores": 85,
-            "total_data_gb": 42.3,
-        },
-    }
+    """租户列表+统计 — 从 platform_tenants 聚合"""
+    try:
+        sql = text(
+            """
+            SELECT pt.tenant_id::text AS id,
+                   pt.name,
+                   pt.plan_template AS plan,
+                   COALESCE(sc.cnt, 0)::int AS stores,
+                   pt.status
+            FROM platform_tenants pt
+            LEFT JOIN (
+              SELECT tenant_id, COUNT(*)::int AS cnt
+              FROM stores WHERE NOT COALESCE(is_deleted, false)
+              GROUP BY tenant_id
+            ) sc ON sc.tenant_id = pt.tenant_id
+            WHERE NOT COALESCE(pt.is_deleted, false)
+            ORDER BY pt.name
+            """
+        )
+        rows = await db.execute(sql)
+        tenants = [_row_to_dict(r) for r in rows.fetchall()]
+        total = len(tenants)
+        active = sum(1 for t in tenants if t.get("status") == "active")
+        trial = sum(1 for t in tenants if t.get("status") == "trial")
+        total_stores = sum(t.get("stores", 0) for t in tenants)
+        return {
+            "tenants": tenants,
+            "summary": {
+                "total_tenants": total,
+                "active_tenants": active,
+                "trial_tenants": trial,
+                "total_stores": total_stores,
+                "total_data_gb": 0,
+            },
+        }
+    except (SQLAlchemyError, OperationalError) as exc:
+        log.warning("hub_list_tenancy.db_error", error=str(exc))
+        return {"tenants": [], "summary": {"total_tenants": 0, "active_tenants": 0, "trial_tenants": 0, "total_stores": 0, "total_data_gb": 0}}
 
 
 # ─── Wave 3: Workbench ───
 
 
 async def hub_workbench_execute(db: AsyncSession, command: str) -> dict[str, Any]:
-    """执行命令（安全沙箱）"""
-    # TODO: 接入安全沙箱执行引擎
+    """执行命令（安全沙箱） — 降级使用 mock 返回（沙箱引擎待接入）"""
     cmd_lower = command.strip().lower()
 
     if cmd_lower.startswith("select") or cmd_lower.startswith("show"):
@@ -2923,8 +2942,7 @@ _MOCK_JOURNEYS: list[dict[str, Any]] = [
 
 
 async def hub_list_journeys(db: AsyncSession) -> list[dict[str, Any]]:
-    """Journey 模板列表"""
-    # TODO: 从 hub_journeys 表读取
+    """Journey 模板列表 — 降级使用内存 mock（hub_journeys 表待创建）"""
     return [
         {k: v for k, v in j.items() if k not in ("nodes", "edges")}
         for j in _MOCK_JOURNEYS
@@ -2932,8 +2950,7 @@ async def hub_list_journeys(db: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def hub_get_journey(db: AsyncSession, journey_id: str) -> Optional[dict[str, Any]]:
-    """Journey 详情（含节点+连线）"""
-    # TODO: 从 hub_journeys + hub_journey_nodes + hub_journey_edges 表读取
+    """Journey 详情（含节点+连线） — 降级使用内存 mock"""
     for j in _MOCK_JOURNEYS:
         if j["id"] == journey_id:
             return j
@@ -2943,8 +2960,7 @@ async def hub_get_journey(db: AsyncSession, journey_id: str) -> Optional[dict[st
 async def hub_save_journey(
     db: AsyncSession, journey_id: str, data: dict[str, Any],
 ) -> dict[str, Any]:
-    """保存 Journey"""
-    # TODO: UPSERT hub_journeys + hub_journey_nodes + hub_journey_edges
+    """保存 Journey — 降级使用 mock 返回（hub_journeys 表待创建）"""
     return {
         "journey_id": journey_id,
         "name": data["name"],
@@ -2957,8 +2973,7 @@ async def hub_save_journey(
 async def hub_run_journey(
     db: AsyncSession, journey_id: str, customer_id: str,
 ) -> Optional[dict[str, Any]]:
-    """为客户启动 Journey"""
-    # TODO: INSERT hub_journey_instances
+    """为客户启动 Journey — 降级使用 mock 返回（hub_journey_instances 表待创建）"""
     journey = await hub_get_journey(db, journey_id)
     if not journey:
         return None
@@ -2977,8 +2992,7 @@ async def hub_run_journey(
 async def hub_list_journey_instances(
     db: AsyncSession, journey_id: str,
 ) -> Optional[list[dict[str, Any]]]:
-    """Journey 运行实例列表"""
-    # TODO: 从 hub_journey_instances 表读取
+    """Journey 运行实例列表 — 降级使用内存 mock"""
     journey = await hub_get_journey(db, journey_id)
     if not journey:
         return None

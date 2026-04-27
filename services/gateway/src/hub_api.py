@@ -282,11 +282,11 @@ async def today_dashboard(db: AsyncSession = Depends(get_db_no_rls)):
 
 
 @router.get("/stream")
-async def global_stream():
+async def global_stream(db: AsyncSession = Depends(get_db_no_rls)):
     """全局事件流（SSE）— edge/service/ticket/agent/adapter 事件"""
     logger.info("hub.stream.connect")
     return StreamingResponse(
-        hub_service.hub_stream_events(),
+        hub_service.hub_stream_events(db),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -414,18 +414,18 @@ async def get_service(name: str):
 
 
 @router.get("/services/{name}/slos")
-async def service_slos(name: str):
+async def service_slos(name: str, db: AsyncSession = Depends(get_db_no_rls)):
     """服务 SLO 列表"""
-    data = await hub_service.hub_service_slos(name)
+    data = await hub_service.hub_service_slos(db, name)
     if data is None:
         raise HTTPException(status_code=404, detail=f"服务 {name} 不存在")
     return {"ok": True, "data": data}
 
 
 @router.get("/services/{name}/timeline")
-async def service_timeline(name: str):
+async def service_timeline(name: str, db: AsyncSession = Depends(get_db_no_rls)):
     """服务事件时间线"""
-    data = await hub_service.hub_service_timeline(name)
+    data = await hub_service.hub_service_timeline(db, name)
     if data is None:
         raise HTTPException(status_code=404, detail=f"服务 {name} 不存在")
     return {"ok": True, "data": data}
