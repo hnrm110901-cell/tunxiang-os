@@ -19,9 +19,6 @@
     "react-router-dom": "^6.26.0",
     "zustand": "^4.5.0",
     "@tanstack/react-query": "^5.50.0",
-    "@tunxiang/design-tokens": "workspace:*",
-    "@tunxiang/api-client": "workspace:*",
-    "@tunxiang/ui": "workspace:*",
     "antd": "^5.20.0"
   },
   "devDependencies": {
