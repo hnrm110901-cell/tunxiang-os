@@ -35,7 +35,7 @@ docker run -p 8017:8017 -e DATABASE_URL=... tunxiang/tx-devforge:dev
 ## 数据库迁移
 
 迁移脚本归口在 `shared/db-migrations/versions/`。本服务的首个版本为
-`v366_devforge_application`。在仓库根目录运行：
+`v371_devforge_application`。在仓库根目录运行：
 
 ```bash
 cd shared/db-migrations

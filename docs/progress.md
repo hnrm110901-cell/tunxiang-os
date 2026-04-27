@@ -14,7 +14,7 @@
 ### 完成状态
 - [x] [docs/devforge-platform-plan.md](docs/devforge-platform-plan.md) — 15 模块全量计划（MVP 8 周 → V3 持续，估 24 周）
 - [x] [services/tx-devforge/](services/tx-devforge) — 后端骨架 19 文件，py_compile 全过；模型 + Repository + Pydantic schema + TenantMiddleware（双层 RLS 防御）+ structlog + Prometheus
-- [x] [shared/db-migrations/versions/v366_devforge_application.py](shared/db-migrations/versions/v366_devforge_application.py) — 4 条独立 RLS 策略 + FORCE ROW LEVEL SECURITY + 禁止 NULL 绕过
+- [x] [shared/db-migrations/versions/v371_devforge_application.py](shared/db-migrations/versions/v371_devforge_application.py) — 4 条独立 RLS 策略 + FORCE ROW LEVEL SECURITY + 禁止 NULL 绕过
 - [x] [apps/web-devforge/](apps/web-devforge) — 前端骨架 41 文件，AntD v5 暗色主题 + 15 模块路由 + EnvSwitcher prod 红框 + ⌘K + 应用中心(02)真实 API；`tsc --noEmit` + `vite build` 双过
 - [x] [scripts/forge_register_resources.py](scripts/forge_register_resources.py) — 扫描 57 条资源（21 backend / 18 frontend / 4 edge / 13 adapter / 1 data_asset），Owner 96.5% 命中
 - [x] [services/gateway/src/proxy.py](services/gateway/src/proxy.py) — `DOMAIN_ROUTES` 字典加 `devforge` 一行（路径前缀模式，与 13 下游服务一致）
@@ -29,14 +29,14 @@
 - **资源发现 = 一次性脚本 + Day-2 push**：先生成 JSON 让创始人审核，再真实入库
 
 ### 已知风险
-- v366 迁移**未实际执行**，需先在 dev 环境跑 `alembic upgrade head` 验证 RLS 策略生效（Tier 2，无业务影响）
+- v371 迁移**未实际执行**，需先在 dev 环境跑 `alembic upgrade head` 验证 RLS 策略生效（Tier 2，无业务影响）
 - TenantMiddleware 仅校验 X-Tenant-ID 存在，**未对接 JWT 鉴权**（与现有 gateway 鉴权链路一致，待统一改造）
 - helm chart 缺失（与 tx-pay/tx-civic/tx-expense 同样缺，需 Day-3+ 统一治理）
 - `forge_register_resources.py` 报告仓内迁移文件 **409 个**，与 CLAUDE.md "229" 严重对不上（旧 0001_ 与新 vNNN_ 双格式并存），需后续核查并更新 CLAUDE.md
 - 前端 13 个占位页未实装；新建应用 Modal 表单未接 createApplication；全局搜索仅搜菜单未接后端
 
 ### 下一步
-1. dev 环境 apply v366 迁移，跑 `forge_register_resources.py --push --tenant-id <demo>` 把 57 条资源真实入库
+1. dev 环境 apply v371 迁移，跑 `forge_register_resources.py --push --tenant-id <demo>` 把 57 条资源真实入库
 2. 后端 Application Repository 补单元测试（Tier 2：CRUD + 跨租户隔离 + 软删 + 唯一约束冲突）
 3. 前端"应用中心"对接真实数据，详情页"概览"+"依赖拓扑"两 Tab 实装
 4. 起 04 流水线模块的 schema 设计草稿（v232 迁移）

@@ -1,9 +1,9 @@
-"""v366: devforge_applications — 内部研发运维平台应用目录基础表
+"""v371: devforge_applications — 内部研发运维平台应用目录基础表
 
 为 tx-devforge 微服务建立 5 类资源（backend_service/frontend_app/edge_image/
 adapter/data_asset）的统一应用目录，所有后续 CMDB/CI/CD/巡检功能都以此表为根。
 
-Revision ID: v366_devforge_application
+Revision ID: v371_devforge_application
 Revises: v365_forge_ecosystem_metrics
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision: str = "v366_devforge_application"
+revision: str = "v371_devforge_application"
 down_revision: Union[str, None] = "v365_forge_ecosystem_metrics"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

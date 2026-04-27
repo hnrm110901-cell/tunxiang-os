@@ -22,7 +22,7 @@
 |---|---|---|
 | 微服务数 | 18 | 21（含 gateway / 14 tx-* 主域 / tx-pay / tx-expense / tx-predict / tx-forge / tx-devforge / mcp-server / tunxiang-api）|
 | 客户端数 | 18 | 18（13 web/h5 + 2 miniapp + 2 android + 1 ios + 1 windows-pos） |
-| 迁移数 | 256 | 实测 409 个版本文件（含旧 `0001_*.py` + 新 `vNNN_*.py` 双格式，head=`v365_forge_ecosystem_metrics`，本计划新表从 **v366** 起接续，避开 v230 多版本占用冲突） |
+| 迁移数 | 256 | 实测 409 个版本文件（含旧 `0001_*.py` + 新 `vNNN_*.py` 双格式；merge main 后 v366-v370 被 supplier_price/warehouse/delivery_temp/delivery_proof/stocktake_loss 占用，本计划新表从 **v371** 起接续） |
 | 适配器数 | 15 | 13 类（pinzhi/aoqiwei/keruyun/yiding/weishenghuo/meituan-saas/douyin/eleme/xiaohongshu/tiancai-shanglong/nuonuo/erp/logistics） |
 
 ---
@@ -107,28 +107,28 @@ services/tx-devforge/                            # FastAPI :8017（8015/8016 被
   alembic/                                       # 新增迁移 v230-v245
 ```
 
-### 新增数据库迁移（v366-v381，共 ~16 版）
+### 新增数据库迁移（v371-v386，共 ~16 版）
 
-> 原计划 v230-v245，因 v230 已被 `agent_registry_tables` + `rls_nullif_backfill` 占用，统一改从 head=v365 之后的 v366 起接续。
+> 原计划 v230-v245，v230 被 `agent_registry_tables` + `rls_nullif_backfill` 双占；后顺延 v366-v381，又因 main merge 时 v366-v370 被 supplier_price/warehouse/delivery_temp/delivery_proof/stocktake_loss 占用，统一从 **v371 起接续**。
 
 | 版本 | 表 | 说明 |
 |---|---|---|
-| v366 | `devforge_applications` | 5 类资源统一目录（已交付） |
-| v367 | `devforge_component_relations` | 依赖拓扑边 |
-| v368 | `devforge_pipelines` + `devforge_pipeline_runs` | 流水线 |
-| v369 | `devforge_artifacts` + `devforge_artifact_promotions` | 制品库 |
-| v370 | `devforge_environments` + `devforge_deployment_orders` | 部署工单 |
-| v371 | `devforge_releases` + `devforge_release_segments` + `devforge_release_gates` | 灰度发布 |
-| v372 | `devforge_config_items` + `devforge_config_revisions` | 配置中心 |
-| v373 | `devforge_secret_refs` | 密钥引用（不存明文） |
-| v374 | `devforge_feature_flags` + `devforge_flag_assignments` | 特性开关 |
-| v375 | `devforge_slos` + `devforge_error_budgets` | SLO |
-| v376 | `devforge_edge_devices` + `devforge_ota_bundles` + `devforge_ota_tasks` | 边缘 |
-| v377 | `devforge_migration_meta` | 迁移图谱 |
-| v378 | `devforge_integration_instances` + `devforge_callback_logs` | 集成中心 |
-| v379 | `devforge_audit_logs`（WORM 表） | 审计 |
-| v380 | `devforge_kill_switches` | 紧急关停 |
-| v381 | `devforge_iam_*`（user/role/policy/token） | RBAC |
+| v371 | `devforge_applications` | 5 类资源统一目录（**已交付**） |
+| v372 | `devforge_component_relations` | 依赖拓扑边 |
+| v373 | `devforge_pipelines` + `devforge_pipeline_runs` | 流水线 |
+| v374 | `devforge_artifacts` + `devforge_artifact_promotions` | 制品库 |
+| v375 | `devforge_environments` + `devforge_deployment_orders` | 部署工单 |
+| v376 | `devforge_releases` + `devforge_release_segments` + `devforge_release_gates` | 灰度发布 |
+| v377 | `devforge_config_items` + `devforge_config_revisions` | 配置中心 |
+| v378 | `devforge_secret_refs` | 密钥引用（不存明文） |
+| v379 | `devforge_feature_flags` + `devforge_flag_assignments` | 特性开关 |
+| v380 | `devforge_slos` + `devforge_error_budgets` | SLO |
+| v381 | `devforge_edge_devices` + `devforge_ota_bundles` + `devforge_ota_tasks` | 边缘 |
+| v382 | `devforge_migration_meta` | 迁移图谱 |
+| v383 | `devforge_integration_instances` + `devforge_callback_logs` | 集成中心 |
+| v384 | `devforge_audit_logs`（WORM 表） | 审计 |
+| v385 | `devforge_kill_switches` | 紧急关停 |
+| v386 | `devforge_iam_*`（user/role/policy/token） | RBAC |
 
 **所有表强制 `tenant_id` + RLS**（CLAUDE.md 第十四条）。审计表用 `INSERT-only` 触发器禁止 UPDATE/DELETE 实现 WORM。
 
@@ -360,7 +360,7 @@ class TestReleaseGateTier1:
 1. ✅ 本计划落档为 `docs/devforge-platform-plan.md`
 2. 创建 `services/tx-devforge` 骨架（FastAPI + 端口 8017 + 接入 gateway 路由代理）
 3. 创建 `apps/web-devforge` 骨架（Vite + AntD + AppLayout + EnvSwitcher + 15 模块路由占位）
-4. 起草 v366 迁移：`devforge_application` 表 + RLS 策略（v230 已被占用，新表从 v366 起接续）
+4. 起草 v371 迁移：`devforge_application` 表 + RLS 策略（v230 已被占用，新表从 v366 起接续）
 5. 写 `scripts/forge_register_resources.py`：一次性扫描全仓 5 类资源入库
 6. 在 gateway 注册 tx-devforge `:8017` 反向代理
 7. 在 `progress.md` 加一条 Tier 标注：本计划属 Tier 2 起步，08/07/11/14 模块为 Tier 1

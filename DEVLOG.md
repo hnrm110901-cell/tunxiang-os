@@ -32,7 +32,7 @@ PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 
 ### 今日完成
 - [docs] 落档 [docs/devforge-platform-plan.md](docs/devforge-platform-plan.md)：15 模块 × 5 类资源 × 4 阶段(MVP/V1/V2/V3) 全量开发计划
 - [tx-devforge] 后端骨架：19 文件（main.py + 5 routes + Application 模型 + Repository + TenantMiddleware + structlog + Prometheus + 3 个具体异常处理器）
-- [shared/db-migrations] v366_devforge_application：表 + 4 条独立 RLS 策略（SELECT/INSERT/UPDATE/DELETE）+ FORCE ROW LEVEL SECURITY；链入 head=v365_forge_ecosystem_metrics
+- [shared/db-migrations] v371_devforge_application：表 + 4 条独立 RLS 策略（SELECT/INSERT/UPDATE/DELETE）+ FORCE ROW LEVEL SECURITY；链入 head=v365_forge_ecosystem_metrics
 - [apps/web-devforge] 前端骨架：41 文件，AntD v5 暗色主题 + 15 模块路由 + AppLayout(240+56px) + EnvSwitcher(prod 二次确认+红框) + ⌘K GlobalSearch + 应用中心(02)真实 API 接入 + 13 占位页
 - [scripts] forge_register_resources.py：扫出 57 条资源（21 backend / 18 frontend / 4 edge / 13 adapter / 1 data_asset），Owner 推断 96.5%，--dry-run/--push/--type 三种模式
 - [services/gateway] 路由注册 devforge → DOMAIN_ROUTES 字典加一行（路径前缀模式，与 13 个下游服务一致）
@@ -45,7 +45,7 @@ PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 
 - **适配器数**：CLAUDE.md 写 10，实测 **13**
 
 ### 数据变化
-- 迁移版本：v365 → v366_devforge_application（已添加，待执行；原起草为 v230_*，独立验证发现 v230 已被 agent_registry 与 rls_nullif 双占，避免 alembic 多 head 已重命名）
+- 迁移版本：v365 → v371_devforge_application（已添加，待执行；原起草为 v230_*，独立验证发现 v230 已被 agent_registry 与 rls_nullif 双占，避免 alembic 多 head 已重命名）
 - 新增 API 端点：5 个（GET/POST/PATCH/DELETE applications + health）
 - 新增代码：~4500 行（后端 ~1200 + 前端 ~2200 + 脚本 ~830 + 配置 ~270）
 - 新前端应用：1 个（apps/web-devforge，端口 5182）
@@ -58,15 +58,79 @@ PR #120 开启后立即收到 CodeRabbit 10 条 + Codex 2 条评审。Fix-First 
 - gateway / web-devforge 之间的端到端 token 鉴权（目前仅 X-Tenant-ID 透传）
 - 13 个前端占位页待实装；新建应用 Modal 表单待接 createApplication
 - CODEOWNERS 文件未建（脚本 0 命中），建议 Day-2 由 devforge 后台落地一份
-- forge_register_resources.py --push 待真实跑（需先执行 v366 迁移）
+- forge_register_resources.py --push 待真实跑（需先执行 v371 迁移）
 
 ### 明日计划
-- 把 v366 迁移 apply 到 dev 环境，跑 `--push` 把 57 条资源真实入库
+- 把 v371 迁移 apply 到 dev 环境，跑 `--push` 把 57 条资源真实入库
 - 后端补 Application 列表的过滤/排序/分页参数 + Repository 单元测试
 - 前端"应用中心"页对接真实数据，添加资源详情 8 Tab 中的"概览"和"依赖拓扑"（拓扑数据先用 metadata_json 占位）
 - 起 06 流水线模块的数据库 schema 设计（v232 迁移草稿）
 
 ---
+## 2026-04-27 屯象Hub v2.0 — 三浪全量交付（Wave 1+2+3）
+
+### 今日完成
+
+#### Wave 1 · 救命（核心框架 + 实时流）
+- [web-hub] 核心布局重构: 侧边栏菜单 → 顶部5工作模式导航（Today/Stream/Workspaces/Playbooks/Cmd-K）
+- [web-hub] App.tsx 完全重写（570行）: 双栏布局 + v1兼容路由重定向
+- [web-hub] 类型系统 src/types/hub.ts: WorkMode/Workspace/Object/HealthScore/StreamEvent 全部v2类型
+- [web-hub] Zustand Store src/store/hubStore.ts: 导航/面板/Stream连接全局状态
+- [web-hub] CmdK 命令面板（410行）: ⌘K快捷键、搜索过滤、键盘导航、20+预置命令
+- [web-hub] ObjectPage 八Tab框架（356行）: Overview/Timeline/Traces/Cost/Logs/Related/Actions/Playbooks
+- [web-hub] CopilotDrawer AI抽屉（488行）: ⌘/快捷键、SSE流式对话、上下文感知
+- [web-hub] ListPanel 通用列表面板（274行）: 搜索+筛选chips+虚拟滚动
+- [web-hub] EdgesWorkspace（605行）: 87节点看板 + SVG拓扑图 + Wake/Reboot/Push
+- [web-hub] ServicesWorkspace（481行）: 17微服务 + SVG Service Map + SLO错误预算
+- [web-hub] TodayPage（230行）: 今日KPI卡片 + 待办 + 告警 + 续约
+- [web-hub] StreamPage（212行）: SSE实时事件流 + 分类过滤 + 暂停/继续
+- [gateway] Wave1 API 16个新端点: today/stream(SSE)/edges(7)/services(4)/copilot/customers扩展(2)
+
+#### Wave 2 · 扩域（8个Workspace全覆盖）
+- [web-hub] CustomersWorkspace（580行）: 健康分5维SVG雷达图 + Playbook引擎 + ARR拆解
+- [web-hub] IncidentsWorkspace（700行）: 6阶段状态流转 + 指挥链三角色 + Postmortem生成 + 精确到秒时间线
+- [web-hub] MigrationsWorkspace（550行）: 五段式管线(映射→回放→追平→双跑→切流) + SLI指标
+- [web-hub] AdaptersWorkspace（600行）: 15适配器 + CSS Grid热力矩阵 + 字段映射可视化
+- [web-hub] StoresWorkspace（500行）: 15门店 + 设备网格(Mac mini/POS/KDS/打印机) + 远程巡店
+- [web-hub] AgentsWorkspace（600行）: 9 Agent + Trace瀑布图 + Action沙箱 + 三条约束统计
+- [web-hub] PlaybooksPage（450行）: 6剧本卡片网格 + 执行历史 + SLI趋势柱状图
+- [gateway] Wave2 API 29个新端点: customers(5)/incidents(6)/migrations(7)/adapters(5)/playbooks(4)/stores扩展
+
+#### Wave 3 · 平台化（Settings + Workbench + Journey）
+- [web-hub] SettingsPage（680行）: 6子模块（Flags灰度/Releases GitOps/Billing账单/Security审计/Knowledge RAG/Tenancy租户）
+- [web-hub] WorkbenchPage（1001行）: Stripe风格SRE终端 + Tab补全 + 命令历史 + 表格/JSON输出
+- [web-hub] JourneyPage（500行）: SVG流程编排器 + 4种节点 + 拖拽平移 + 配置面板 + 3个预置旅程
+- [gateway] Wave3 API 16个新端点: settings(10)/workbench(1)/journey(5)
+
+### 数据变化
+- 前端代码: 2,826行(v1) → 14,620行(v2), +417%
+- 后端API: 14端点(v1) → 73端点(v2), +421%
+- 后端代码: ~500行(v1) → 3,423行(v2), +585%
+- 新增文件: 18个前端 + 2个后端修改
+- 8/8 Workspace 全部实现完整 Object Page 八Tab
+
+### 架构升级对照
+| 维度 | v1.0 | v2.0 |
+|------|------|------|
+| 主入口 | 侧边栏12菜单 | Cmd-K + Workspace |
+| 数据流 | useEffect轮询 | SSE + 物化视图 |
+| 详情页 | 列表跳详情 | Object Page 八Tab |
+| AI | 监控Agent | Copilot抽屉(问答+上下文) |
+| 客户成功 | "健康分88" | 5维雷达图+Playbook+Journey |
+| 故障管理 | 工单+优先级 | Incident全生命周期+Postmortem |
+| 配置 | 表单提交 | Settings六模块+Workbench Shell |
+| 迁移 | 模板列表 | 五段式管线+SLI |
+
+### 遗留项
+- [ ] Copilot v2 Action-capable（沙箱执行73个Action）
+- [ ] 决策可解释AB实验
+- [ ] Voice-ready（P3，Web Speech API）
+- [ ] 所有Mock数据接入真实DB（73个 # TODO 标注）
+
+### 明日计划
+- 启动 Vite dev server 进行视觉走查
+- Mock数据逐步替换为真实DB查询
+- Copilot接入tx-brain Claude API
 
 ## 2026-04-25 Sprint P — 私域增长6大模块(对标iCC Grow)
 
