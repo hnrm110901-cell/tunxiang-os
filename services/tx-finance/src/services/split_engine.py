@@ -335,6 +335,247 @@ class SplitEngine:
         )
         return result.rowcount
 
+    # ══════════════════════════════════════════════════════
+    # Task 2.2: 分账异常处理 — 重试/回退/差错账
+    # ══════════════════════════════════════════════════════
+
+    async def retry_failed_records(self, record_ids: List[str]) -> int:
+        """将 cancelled 记录重新置为 pending，支持人工或自动重试。
+
+        幂等：只处理 status = 'cancelled' 的行。
+        重试次数通过 retry_count 字段跟踪（首次重试 INSERT 时已默认 0）。
+        """
+        await self._set_tenant()
+        if not record_ids:
+            return 0
+        uuids = [uuid.UUID(r) for r in record_ids]
+        result = await self.db.execute(
+            text("""
+                UPDATE profit_split_records
+                SET status = 'pending',
+                    retry_count = COALESCE(retry_count, 0) + 1,
+                    last_retry_at = NOW()
+                WHERE tenant_id = :tid
+                  AND id = ANY(:ids)
+                  AND status = 'cancelled'
+                  AND COALESCE(retry_count, 0) < 3
+            """),
+            {"tid": self._tid, "ids": uuids},
+        )
+        await self.db.flush()
+        skipped = len(record_ids) - result.rowcount
+        log.info(
+            "split_records_retried",
+            retried=result.rowcount,
+            skipped=skipped,
+            reason_skipped="not_cancelled_or_max_retries",
+            tenant_id=self.tenant_id,
+        )
+        return result.rowcount
+
+    async def reverse_settled_record(
+        self,
+        original_record_id: str,
+        reason: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """对已结算的分账记录创建回退（新负向流水，保留审计链）。
+
+        不修改原始记录 — 插入一条新的 split_amount_fen 为负数的记录，
+        状态直接为 'reversed'。用于退款触发分账回退。
+        """
+        await self._set_tenant()
+        orig_uuid = uuid.UUID(original_record_id)
+
+        # 查询原始记录
+        orig = await self.db.execute(
+            text("""
+                SELECT order_id, store_id, channel, rule_id,
+                       recipient_type, recipient_id,
+                       gross_amount_fen, split_amount_fen, status
+                FROM profit_split_records
+                WHERE id = :id AND tenant_id = :tid AND status = 'settled'
+            """),
+            {"id": orig_uuid, "tid": self._tid},
+        )
+        row = orig.fetchone()
+        if not row:
+            log.warning(
+                "split_reversal_skipped",
+                reason="original_not_found_or_not_settled",
+                record_id=original_record_id,
+            )
+            return None
+
+        reversal_id = uuid.uuid4()
+        await self.db.execute(
+            text("""
+                INSERT INTO profit_split_records
+                    (id, tenant_id, order_id, store_id, channel,
+                     rule_id, recipient_type, recipient_id,
+                     gross_amount_fen, split_amount_fen, status,
+                     reversal_of, reversal_reason)
+                VALUES
+                    (:id, :tid, :oid, :sid, :channel,
+                     :rule_id, :rtype, :rid,
+                     :gross, :split, 'reversed',
+                     :orig_id, :reason)
+            """),
+            {
+                "id": reversal_id,
+                "tid": self._tid,
+                "oid": row.order_id,
+                "sid": row.store_id,
+                "channel": row.channel,
+                "rule_id": row.rule_id,
+                "rtype": row.recipient_type,
+                "rid": row.recipient_id,
+                "gross": row.gross_amount_fen,
+                "split": -row.split_amount_fen,  # 负数回退
+                "orig_id": orig_uuid,
+                "reason": reason or "退款回退",
+            },
+        )
+        await self.db.flush()
+        log.info(
+            "split_reversal_created",
+            original_record_id=original_record_id,
+            reversal_id=str(reversal_id),
+            amount_fen=row.split_amount_fen,
+            reason=reason,
+            tenant_id=self.tenant_id,
+        )
+        return {
+            "reversal_id": str(reversal_id),
+            "original_record_id": original_record_id,
+            "reversed_amount_fen": row.split_amount_fen,
+            "reason": reason,
+        }
+
+    async def mark_discrepancy(
+        self,
+        record_id: str,
+        note: str = "",
+    ) -> bool:
+        """将分账记录标记为差错（争议/对账不平/人工调账前状态）。
+
+        差错记录不参与结算汇总的 settled/cancelled 分组（status = 'discrepancy'）。
+        """
+        await self._set_tenant()
+        rec_uuid = uuid.UUID(record_id)
+        result = await self.db.execute(
+            text("""
+                UPDATE profit_split_records
+                SET status = 'discrepancy',
+                    discrepancy_note = :note,
+                    discrepancy_at = NOW()
+                WHERE id = :id
+                  AND tenant_id = :tid
+                  AND status IN ('settled', 'pending')
+            """),
+            {"id": rec_uuid, "tid": self._tid, "note": note or ""},
+        )
+        await self.db.flush()
+        if result.rowcount > 0:
+            log.info(
+                "split_discrepancy_marked",
+                record_id=record_id,
+                note=note,
+                tenant_id=self.tenant_id,
+            )
+            return True
+        return False
+
+    async def list_discrepancies(
+        self,
+        page: int = 1,
+        size: int = 20,
+    ) -> Dict[str, Any]:
+        """查询差错账列表"""
+        await self._set_tenant()
+        where = "WHERE tenant_id = :tid AND status = 'discrepancy'"
+        params: Dict[str, Any] = {"tid": self._tid}
+
+        count_result = await self.db.execute(
+            text(f"SELECT COUNT(*) FROM profit_split_records {where}"), params
+        )
+        total = count_result.scalar() or 0
+
+        params["limit"] = size
+        params["offset"] = (page - 1) * size
+        result = await self.db.execute(
+            text(f"""
+                SELECT id, order_id, store_id, rule_id,
+                       recipient_type, recipient_id,
+                       split_amount_fen, status,
+                       discrepancy_note, discrepancy_at, created_at
+                FROM profit_split_records
+                {where}
+                ORDER BY discrepancy_at DESC NULLS LAST
+                LIMIT :limit OFFSET :offset
+            """),
+            params,
+        )
+        items = [
+            {
+                "record_id": str(r.id),
+                "order_id": str(r.order_id),
+                "store_id": str(r.store_id),
+                "rule_id": str(r.rule_id) if r.rule_id else None,
+                "recipient_type": r.recipient_type,
+                "recipient_id": str(r.recipient_id) if r.recipient_id else None,
+                "split_amount_fen": r.split_amount_fen,
+                "status": r.status,
+                "discrepancy_note": r.discrepancy_note,
+                "discrepancy_at": r.discrepancy_at.isoformat() if r.discrepancy_at else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in result.fetchall()
+        ]
+        return {"items": items, "total": total}
+
+    async def resolve_discrepancy(
+        self,
+        record_id: str,
+        resolution: str,  # 'settled' | 'cancelled' | 'reversed'
+        note: str = "",
+    ) -> bool:
+        """解决差错：将 discrepancy 记录转为 settled/cancelled/reversed。
+
+        resolution 必须是三种合法终态之一。
+        """
+        if resolution not in ("settled", "cancelled", "reversed"):
+            raise ValueError(f"非法的差错解决方案: {resolution}")
+
+        await self._set_tenant()
+        rec_uuid = uuid.UUID(record_id)
+        result = await self.db.execute(
+            text("""
+                UPDATE profit_split_records
+                SET status = :new_status,
+                    discrepancy_resolution = :note,
+                    discrepancy_resolved_at = NOW()
+                WHERE id = :id
+                  AND tenant_id = :tid
+                  AND status = 'discrepancy'
+            """),
+            {
+                "new_status": resolution,
+                "note": note or f"差错已解决 -> {resolution}",
+                "id": rec_uuid,
+                "tid": self._tid,
+            },
+        )
+        await self.db.flush()
+        if result.rowcount > 0:
+            log.info(
+                "split_discrepancy_resolved",
+                record_id=record_id,
+                resolution=resolution,
+                tenant_id=self.tenant_id,
+            )
+            return True
+        return False
+
     async def apply_channel_notification(
         self,
         items: List[Dict[str, Any]],
