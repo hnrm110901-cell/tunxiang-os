@@ -28,6 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import TradeEventType, UniversalPublisher
 
+from .saga_buffer_service import SagaBufferService
+
 logger = structlog.get_logger(__name__)
 
 
@@ -76,11 +78,13 @@ class PaymentSagaService:
         tenant_id: uuid.UUID,
         payment_gateway,  # PaymentGateway instance
         order_service=None,  # OrderService instance（可选，供complete_order用）
+        saga_buffer: SagaBufferService | None = None,  # Sprint A2: 本地 SQLite 降级缓冲
     ) -> None:
         self._db = db
         self._tenant_id = tenant_id
         self._gw = payment_gateway
         self._order_service = order_service
+        self._saga_buffer = saga_buffer
 
     # ─────────────────────────────────────────────────────────────────
     # 主入口
@@ -179,7 +183,19 @@ class PaymentSagaService:
             await self._db.flush()
         except SQLAlchemyError as exc:
             logger.error("saga_insert_failed", order_id=str(order_id), error=str(exc))
-            raise
+            if self._saga_buffer is not None:
+                logger.info("saga_fallback_to_buffer", saga_id=str(saga_id), step=SagaStep.VALIDATING)
+                await self._saga_buffer.upsert_saga(
+                    saga_id=str(saga_id),
+                    tenant_id=str(self._tenant_id),
+                    order_id=str(order_id),
+                    step=SagaStep.VALIDATING,
+                    payment_method=method,
+                    payment_amount_fen=amount_fen,
+                    idempotency_key=idempotency_key,
+                )
+            else:
+                raise
 
         payment_id: Optional[str] = None
         payment_no: Optional[str] = None
@@ -198,6 +214,10 @@ class PaymentSagaService:
                 "error": str(exc),
                 "offline_order_id": offline_order_id,
             }
+        except SQLAlchemyError as exc:
+            log.warning("saga_s1_pg_unreachable", error=str(exc))
+            # PG 不可达时跳过验证，乐观继续（订单在断网前已是有效状态）。
+            # 实际验证在 PG 恢复后由 recover_pending_sagas 重新执行。
 
         # ── S2: 执行支付（有副作用） ──────────────────────────────────────
         await self._update_step(saga_id, SagaStep.PAYING)
@@ -365,23 +385,47 @@ class PaymentSagaService:
 
         挂起定义：step IN ('paying','completing') 且 updated_at < now()-5min
 
+        同时扫描 PG payment_sagas 表和本地 SQLite buffer（Sprint A2），
+        优先恢复 buffer 中的记录（将它们重写到 PG）。
+
         Returns:
             恢复处理的Saga数量。
         """
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=_PENDING_TIMEOUT_MINUTES)
 
-        result = await self._db.execute(
-            text(
-                "SELECT saga_id, step, payment_id, order_id, "
-                "       payment_amount_fen, payment_method "
-                "FROM payment_sagas "
-                "WHERE tenant_id = :tenant_id "
-                "  AND step IN ('paying', 'completing') "
-                "  AND updated_at < :cutoff"
-            ),
-            {"tenant_id": self._tenant_id, "cutoff": cutoff},
-        )
-        rows = result.mappings().all()
+        # ── 扫描 PG ─────────────────────────────────────────────────────
+        try:
+            result = await self._db.execute(
+                text(
+                    "SELECT saga_id, step, payment_id, order_id, "
+                    "       payment_amount_fen, payment_method "
+                    "FROM payment_sagas "
+                    "WHERE tenant_id = :tenant_id "
+                    "  AND step IN ('paying', 'completing') "
+                    "  AND updated_at < :cutoff"
+                ),
+                {"tenant_id": self._tenant_id, "cutoff": cutoff},
+            )
+            pg_rows = result.mappings().all()
+        except SQLAlchemyError as exc:
+            logger.warning("saga_recovery_pg_scan_failed", error=str(exc))
+            pg_rows = []
+        rows: list[dict] = [dict(r) for r in pg_rows]
+
+        # ── 同时扫描本地 buffer（Sprint A2） ────────────────────────────
+        if self._saga_buffer is not None:
+            try:
+                buf_rows = await self._saga_buffer.list_pending(
+                    older_than_seconds=_PENDING_TIMEOUT_MINUTES * 60,
+                )
+                if buf_rows:
+                    logger.info("saga_recovery_buffer_found", count=len(buf_rows))
+                    for br in buf_rows:
+                        # 检查是否已存在于 PG rows 中（避免重复恢复）
+                        if not any(str(r.get("saga_id")) == br["saga_id"] for r in rows):
+                            rows.append(br)
+            except Exception as exc:  # noqa: BLE001 — buffer 故障不阻塞 PG 恢复
+                logger.error("saga_recovery_buffer_scan_failed", error=str(exc))
 
         if not rows:
             logger.info("saga_recovery_no_pending")
@@ -511,7 +555,7 @@ class PaymentSagaService:
         step: str,
         compensation_reason: Optional[str] = None,
     ) -> None:
-        """更新Saga步骤，立即flush。"""
+        """更新Saga步骤，立即flush。PG 失败时降级到本地 buffer。"""
         params: dict = {
             "step": step,
             "saga_id": saga_id,
@@ -522,45 +566,84 @@ class PaymentSagaService:
             params["compensation_reason"] = compensation_reason
             extra_set = ", compensation_reason = :compensation_reason"
 
-        await self._db.execute(
-            text(
-                f"UPDATE payment_sagas "
-                f"SET step = :step, updated_at = NOW(){extra_set} "
-                f"WHERE saga_id = :saga_id AND tenant_id = :tenant_id"
-            ),
-            params,
-        )
-        await self._db.flush()
+        try:
+            await self._db.execute(
+                text(
+                    f"UPDATE payment_sagas "
+                    f"SET step = :step, updated_at = NOW(){extra_set} "
+                    f"WHERE saga_id = :saga_id AND tenant_id = :tenant_id"
+                ),
+                params,
+            )
+            await self._db.flush()
+        except SQLAlchemyError as exc:
+            logger.error("saga_update_step_pg_failed", saga_id=str(saga_id), step=step, error=str(exc))
+            if self._saga_buffer is not None:
+                logger.info("saga_update_step_fallback_buffer", saga_id=str(saga_id), step=step)
+                await self._saga_buffer.upsert_saga(
+                    saga_id=str(saga_id),
+                    tenant_id=str(self._tenant_id),
+                    step=step,
+                    compensation_reason=compensation_reason,
+                )
+            else:
+                raise
         logger.debug("saga_step_updated", saga_id=str(saga_id), step=step)
 
     async def _set_payment_id(self, saga_id: uuid.UUID, payment_id: uuid.UUID) -> None:
-        """将payment_id写入Saga记录。"""
-        await self._db.execute(
-            text(
-                "UPDATE payment_sagas "
-                "SET payment_id = :payment_id, updated_at = NOW() "
-                "WHERE saga_id = :saga_id AND tenant_id = :tenant_id"
-            ),
-            {
-                "payment_id": payment_id,
-                "saga_id": saga_id,
-                "tenant_id": self._tenant_id,
-            },
-        )
-        await self._db.flush()
+        """将payment_id写入Saga记录。PG 失败时降级到本地 buffer。"""
+        try:
+            await self._db.execute(
+                text(
+                    "UPDATE payment_sagas "
+                    "SET payment_id = :payment_id, updated_at = NOW() "
+                    "WHERE saga_id = :saga_id AND tenant_id = :tenant_id"
+                ),
+                {
+                    "payment_id": payment_id,
+                    "saga_id": saga_id,
+                    "tenant_id": self._tenant_id,
+                },
+            )
+            await self._db.flush()
+        except SQLAlchemyError as exc:
+            logger.error("saga_set_payment_id_pg_failed", saga_id=str(saga_id), error=str(exc))
+            if self._saga_buffer is not None:
+                logger.info("saga_set_payment_id_fallback_buffer", saga_id=str(saga_id), payment_id=str(payment_id))
+                # 从 buffer 读取当前步骤，保持 step 不变
+                current = await self._saga_buffer.get_saga(str(saga_id))
+                await self._saga_buffer.upsert_saga(
+                    saga_id=str(saga_id),
+                    tenant_id=str(self._tenant_id),
+                    step=current["step"] if current else SagaStep.PAYING,
+                    payment_id=str(payment_id),
+                )
+            else:
+                raise
 
     async def _find_by_idempotency_key(self, idempotency_key: str) -> Optional[dict]:
-        """按幂等键查找已有Saga。"""
-        result = await self._db.execute(
-            text(
-                "SELECT saga_id, step, payment_id, compensation_reason "
-                "FROM payment_sagas "
-                "WHERE tenant_id = :tenant_id "
-                "  AND idempotency_key = :idempotency_key "
-                "ORDER BY created_at DESC "
-                "LIMIT 1"
-            ),
-            {"tenant_id": self._tenant_id, "idempotency_key": idempotency_key},
-        )
-        row = result.mappings().first()
-        return dict(row) if row else None
+        """按幂等键查找已有Saga（PG 失败时降级到本地 buffer）。"""
+        try:
+            result = await self._db.execute(
+                text(
+                    "SELECT saga_id, step, payment_id, compensation_reason "
+                    "FROM payment_sagas "
+                    "WHERE tenant_id = :tenant_id "
+                    "  AND idempotency_key = :idempotency_key "
+                    "ORDER BY created_at DESC "
+                    "LIMIT 1"
+                ),
+                {"tenant_id": self._tenant_id, "idempotency_key": idempotency_key},
+            )
+            row = result.mappings().first()
+            if row:
+                return dict(row)
+        except SQLAlchemyError as exc:
+            logger.warning("saga_find_idempotency_pg_failed", error=str(exc))
+
+        # PG 未命中或失败时，查本地 buffer
+        if self._saga_buffer is not None:
+            buf_row = await self._saga_buffer.find_by_idempotency_key(idempotency_key)
+            if buf_row:
+                return buf_row
+        return None

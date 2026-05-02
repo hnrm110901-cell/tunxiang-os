@@ -12,6 +12,7 @@
   - checkout_with_discounts → 调用折扣引擎计算叠加优惠，写 checkout_discount_log
 """
 
+import asyncio
 from typing import List, Optional
 from uuid import UUID
 
@@ -24,11 +25,16 @@ from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
+from ..security.rbac import (
+    UserContext,
+    require_role_audited,
+)
 from ..services.cashier_engine import CashierEngine
 from ..services.daily_settlement import DailySettlementService
 from ..services.payment_gateway import PaymentGateway
 from ..services.payment_saga_service import PaymentSagaService
 from ..services.permission_client import CashierPermissionClient
+from ..services.trade_audit_log import schedule_audit
 from .discount_engine_routes import (
     DiscountInput,
     _build_steps,
@@ -365,6 +371,7 @@ async def checkout_payment(
     req: PayCheckoutRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role_audited("payment.create", "cashier", "store_manager", "admin")),
 ):
     """收银台支付 — Saga补偿事务保障原子性（P0安全）
 
@@ -418,6 +425,17 @@ async def checkout_payment(
             },
         )
 
+    # 审计留痕：支付成功
+    asyncio.create_task(schedule_audit(
+        tenant_id=tenant_id,
+        user_id=str(user.user_id),
+        action="payment.create",
+        resource_type="order",
+        resource_id=order_id,
+        detail={"method": req.method, "amount_fen": req.amount_fen, "status": "done"},
+        severity="info",
+    ))
+
     return _ok(result)
 
 
@@ -431,12 +449,13 @@ async def cancel_order(
     request: Request,
     x_employee_id: Optional[str] = Header(None, alias="X-Employee-ID"),
     db: AsyncSession = Depends(get_db),
+    user: UserContext = Depends(require_role_audited("void.order", "store_manager", "admin")),
 ):
-    """取消订单 — 需退单权限（Level 7+）"""
+    """取消订单 — 需退单权限（store_manager+）"""
     tenant_id = _get_tenant_id(request)
     engine = CashierEngine(db, tenant_id)
 
-    # 权限校验
+    # 原有 PermissionClient 权限校验（向下兼容）
     operator_id = req.employee_id or x_employee_id
     if operator_id:
         perm_client = CashierPermissionClient(db, tenant_id)
@@ -454,6 +473,16 @@ async def cancel_order(
 
     try:
         result = await engine.cancel_order(order_id=order_id, reason=req.reason)
+        # 审计留痕：取消订单
+        asyncio.create_task(schedule_audit(
+            tenant_id=tenant_id,
+            user_id=str(user.user_id),
+            action="void.order",
+            resource_type="order",
+            resource_id=order_id,
+            detail={"reason": req.reason},
+            severity="warn",
+        ))
         return _ok(result)
     except ValueError as e:
         _err(str(e))

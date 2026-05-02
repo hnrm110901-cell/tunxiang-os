@@ -8,3 +8,5 @@ httpx>=0.25.0
 # ── Phase 2: 订单完整性校验 ──
 cryptography>=42.0.0  # HMAC-SHA256（shared/utils/data_integrity.py，间接依赖）
 prometheus-fastapi-instrumentator>=6.1.0
+# ── Sprint A2: Saga 本地 SQLite 缓冲（Tier 1 断网 4h 零丢失） ──
+aiosqlite>=0.20.0
