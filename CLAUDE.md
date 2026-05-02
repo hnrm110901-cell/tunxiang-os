@@ -73,11 +73,11 @@ iPad（可选）： 纯显示和触控，不连任何外设
 ## 四、五层架构
 
 ```
-L4  多形态前端层    安卓POS / Windows POS / 安卓KDS / 员工PWA / iPad(可选) / 小程序 / 总部Web / 企业微信
-L3  Agent OS 层     Master Agent 编排 + 9个 Skill Agent（边缘+云端双层推理）
-L2  业务中台层      14 个微服务 × 9 大产品域 = 360+ 路由模块
+L4  多形态前端层    安卓POS / Windows POS / 安卓KDS / 员工PWA / iPad(可选) / 小程序 / 总部Web / 企业微信 / H5自助点餐
+L3  Agent OS 层     Master Agent 编排 + 63个 Skill Agent（边缘+云端双层推理）
+L2  业务中台层      21 个微服务 × 10 大产品域 = 360+ 路由模块
 L1  Ontology 层     6大实体 + 4层治理 + 3条硬约束 + PostgreSQL RLS
-L0  设备适配层      安卓POS外设接口 + Mac mini智能后台 + 旧系统Adapter（可插拔）
+L0  设备适配层      安卓POS原生UI+外设接口 / 安卓WebView壳层 / Mac mini智能后台 / 旧系统Adapter（可插拔）
 ```
 
 ---
@@ -99,63 +99,81 @@ tunxiang-os/
     h5-self-order/              # React — H5 自助点餐（多渠道）
     miniapp-customer/           # 微信小程序 — 顾客端 v1（8 主包 + 7 分包）
     miniapp-customer-v2/        # 微信小程序 — 顾客端 v2
-    android-pos/                # Kotlin — 安卓 POS 壳层（WebView + TXBridge + 商米SDK）
-    android-shell/              # Kotlin — 安卓壳层新版
+    android-shell/              # Kotlin — 唯一 POS 壳层（WebView + TXBridge + 离线 Room DB + SyncWorker）
     ios-shell/                  # Swift — iOS 壳层（WKWebView）
     windows-pos-shell/          # Electron — Windows POS 壳层（WebView2）
-  services/                     # 14 个业务微服务 + 2 个支撑服务（FastAPI + SQLAlchemy 2.0 + asyncpg）
+  services/                     # 16 个业务微服务 + 5 个支撑服务（FastAPI + SQLAlchemy 2.0 + asyncpg）
     gateway/           :8000    # API Gateway + 域路由代理 + 租户管理
-    tx-trade/          :8001    # 交易履约（90 路由文件：收银/桌台/KDS/预订/宴席/外卖）
-    tx-menu/           :8002    # 菜品菜单（20 路由文件：菜品/发布/定价/套餐/做法）
-    tx-member/         :8003    # 会员 CDP（33 路由文件：会员/营销/优惠券/礼品卡）
-    tx-growth/         :8004    # 增长营销（18 路由文件：客户增长/复购驱动）
-    tx-ops/            :8005    # 运营流程（15 路由文件：日清日结 E1-E8）
-    tx-supply/         :8006    # 供应链（35 路由文件：库存/BOM/采购/食安/活鲜）
-    tx-finance/        :8007    # 财务结算（20 路由文件：成本/P&L/预算/发票/月报）
-    tx-agent/          :8008    # Agent OS（Master + 9 Skill Agent + 73 Actions）
-    tx-analytics/      :8009    # 经营分析（28 路由文件：驾驶舱/健康度/叙事/报表）
-    tx-brain/          :8010    # AI 智能决策中枢（Claude API）
-    tx-intel/          :8011    # 商业智能（12 路由文件）
-    tx-org/            :8012    # 组织人事（45 路由文件：员工/排班/角色/绩效/薪资）
-    tx-civic/          :8014    # 城市监管平台（9 路由文件：食安追溯/明厨亮灶/环保/消防/证照/上报/合规评分）
+    tx-trade/          :8001    # 交易履约（120+ 服务文件：收银/桌台/KDS/预订/宴席/外卖/渠道对账/发票）
+    tx-menu/           :8002    # 菜品菜单（菜单/BOM/发布/定价/套餐/做法/做法定价）
+    tx-member/         :8003    # 会员 CDP（会员/储值/营销/优惠券/礼品卡/积分）
+    tx-growth/         :8004    # 增长营销（客户增长/复购驱动/活动ROI/挽留召回）
+    tx-ops/            :8005    # 运营流程（日清日结/食安/能耗/巡店）
+    tx-supply/         :8006    # 供应链（库存/BOM/采购/食安/活鲜/供应商）
+    tx-finance/        :8007    # 财务结算（成本/P&L/预算/发票/月报/费用管理）
+    tx-agent/          :8008    # Agent OS（Master + 63 Skill Agent + 约束检查 + 决策留痕）
+    tx-analytics/      :8009    # 经营分析（驾驶舱/健康度/叙事/报表/对标分析）
+    tx-brain/          :8010    # AI 智能决策中枢（定价/库存/折扣/能耗/会员/活动ROI/语音）
+    tx-intel/          :8011    # 商业智能
+    tx-org/            :8012    # 组织人事（员工/排班/角色/绩效/薪资/考勤）
+    tx-civic/          :8014    # 城市监管平台（食安追溯/明厨亮灶/环保/消防/证照/上报/合规评分）
+    tx-pay/            :8013    # 统一支付网关（聚合支付/微信V3/退款/对账）
+    tx-predict/        :8015    # 预测引擎（客流量/需求/流失/营收/天气）
+    tx-expense/        :8016    # 费用审批（报销/备用金/预支）
+    tx-devforge/       :8017    # 开发者平台
+    tx-forge/          :8018    # Forge 插件市场
     mcp-server/                 # MCP Protocol Server（对接 Claude Code）
     tunxiang-api/               # 遗留 API 兼容层
   edge/                         # Mac mini M4 边缘智能后台
-    mac-station/                # FastAPI — 门店本地 API + PostgreSQL 副本
-    coreml-bridge/              # Swift — Core ML HTTP 桥接（port 8100）
+    mac-station/                # FastAPI — 门店本地 API + PostgreSQL 副本 + 离线缓冲 + 语音/视觉服务
+    coreml-bridge/              # Swift — Core ML HTTP 桥接（port 8100，Swift Package 结构）
     sync-engine/                # Python — 本地PG ↔ 云端PG 增量同步（300秒/轮）
     mac-mini/                   # Python — Mac mini 工具集（离线缓冲/打印队列）
   shared/
-    ontology/                   # Ontology 实体定义（Pydantic models）
-    db-migrations/              # Alembic 迁移（229 个版本，v001-v229）
+    ontology/                   # Ontology 实体定义（6大实体 + 扩展模块 + SQLAlchemy TenantBase）
+    db-migrations/              # Alembic 迁移（489 个版本，v001-v383）
       # v147: 统一事件存储表（events + projector_checkpoints）
       # v148: 8个物化视图（mv_discount_health/mv_channel_margin/mv_inventory_bom
       #        mv_member_clv/mv_store_pnl/mv_daily_settlement/mv_safety_compliance/mv_energy_efficiency）
-    adapters/                   # 10 个旧系统 Adapter（品智/奥琦玮/天财/美团/饿了么/抖音等）
+    adapters/                   # 12+ 个旧系统 Adapter（品智/奥琦玮/天财商龙/客如云/微生活/意丁/美团/饿了么/抖音/小红书/ERP金蝶用友/物流）
     events/                     # 统一事件总线（Event Sourcing + CQRS，v147/v148）
       src/
         pg_event_store.py       #   PostgreSQL append-only 事件存储写入器
         emitter.py              #   平行事件发射器（Redis Stream + PG 双写）
         projector.py            #   投影器基类（事件流 → 物化视图）
-        event_types.py          #   10大域事件类型（订单/折扣/支付/会员/库存/渠道/宴会/结算/食安/能耗）
-    hardware/                   # 硬件接口（商米SDK/电子秤/打印机/钱箱/扫码枪）
-    vector_store/               # 向量存储（嵌入/相似度搜索）
-    security/                   # 安全模块（加密/认证）
+        event_types.py          #   14个域事件类型（订单/折扣/支付/会员/库存/渠道/宴会/结算/食安/能耗/KDS/Agent/舆情/成本卡）
+        projectors/             #   10个投影器（含 public_opinion 舆情投影器）
+    hardware/                   # 硬件接口抽象层（device_registry + protocol_support）
+    integrations/               # 外部系统集成（微信支付/企微/钉钉/抖音营销/美团营销/小红书/短信/签章/税局/cos_upload）
+    security/                   # 安全模块（字段加密/掩码/XSS防护/SQL注入防护/数据校验）
     feature_flags/              # 特性开关系统
     skill_registry/             # Agent Skill 注册表
+    ai_providers/               # AI 提供商路由（AB测试/域增强/安全/迁移/注册表）
+    knowledge_store/            # 知识库（向量存储/图检索/混合搜索/RAG/社区检测/去重）
+    prompt_cache/               # Prompt 缓存（构建器/调用器/指标）
+    vector_store/               # 向量存储（嵌入/相似度搜索）
+    config_templates/           # 配置模板系统
+    ab_testing/                 # AB测试（分配/断路器/统计）
     api-types/                  # 跨服务 API 类型定义（TypeScript）
+    service_utils/              # 服务工具（auto_mount）
+    i18n/                       # 国际化（zh_CN/en_US/ja_JP/ko_KR）
+    test_infra/                 # 测试基础设施（fixtures/toxiproxy）
   infra/
-    docker/                     # Docker Compose（dev/prod/staging/gray/demo）
-    helm/                       # Kubernetes Helm Chart（11 个）
-    nginx/                      # Nginx 反代 + SSL + WebSocket
-    tailscale/                  # Tailscale 网络配置
+    docker/                     # Docker Compose（dev/prod/staging/gray/demo/czyz/sgc/zqx/toxiproxy）
+    helm/                       # Kubernetes Helm Chart（14 个服务）
+    k8s/                        # K8s 配置（namespaces/network-policy/rbac/quotas/secrets）
+    nginx/                      # Nginx 反代 + SSL + WebSocket + TLS强化
+    tailscale/                  # Tailscale 网络配置（setup-mac-mini）
     jumpserver/                 # 堡垒机配置
     dns/                        # DNS 配置脚本
-  gitops/                       # GitOps 部署配置（dev/test/uat/pilot/prod）
-  flags/                        # 特性开关（trade/member/org/growth/agents/edge）
-  scripts/                      # 自动化脚本（34+ 个）
-  docs/                         # 67 份详细设计文档
-  DEVLOG.md                     # 每日开发进度日志（日更）
+    monitoring/                 # 监控（Prometheus + Grafana）
+    performance/                # 性能测试（k6 脚本）
+    nightly/                    # 夜间 E2E 结果
+  gitops/                       # GitOps 部署配置（dev/test/uat/pilot/prod + edge）
+  flags/                        # 特性开关（trade/member/org/growth/agents/edge/supply）
+  scripts/                      # 自动化脚本（56 个）
+  docs/                         # 113 份详细设计文档
+  DEVLOG.md                     # 每日开发进度日志（日更，~500K）
 ```
 
 ---
@@ -195,17 +213,24 @@ is_deleted   BOOLEAN DEFAULT FALSE
 
 ## 七、安卓 POS 壳层规范（android-shell）
 
+### 架构决策（2026-04 架构收拢）
+- **android-pos（Kotlin Compose 原生 UI）已移除** — 14 个 Compose UI 文件全部删除
+- **android-shell 作为唯一 POS 壳层**，加载 React SPA（WebView + TXBridge）
+- **android-pos 的离线数据层已吸收到 android-shell**：Room DB（6 实体 + 4 DAO）+ Retrofit API Client + Repository 模式 + SyncManager + WorkManager SyncWorker
+
 ### 架构
 商米 WebView 加载 React Web App，外设调用通过 JS Bridge 桥接。
+离线优先：数据写本地 Room → 在线时 SyncWorker FIFO 推送到云端。
 
 ### JS Bridge 接口定义
-React Web App 通过 `window.TXBridge.*` 调用安卓原生能力：
+React Web App 通过 `window.TXBridge.*` 调用安卓原生能力（15 个方法）：
 
 ```kotlin
 // android-shell 暴露给 Web 的接口
 interface TXBridge {
     // 打印
     fun print(content: String)          // ESC/POS 打印（小票/厨房单）
+    fun printText(text: String, fontSize: Int = 24, bold: Boolean = false)
     fun openCashBox()                   // 弹出钱箱
 
     // 称重
@@ -221,6 +246,18 @@ interface TXBridge {
 
     // 与 Mac mini 通信
     fun getMacMiniUrl(): String         // 返回局域网内 Mac mini 地址
+
+    // 认证（2026-04 新增）
+    fun saveAuth(token: String, tenantId: String, storeId: String, cashierId: String, cashierName: String)
+    fun getAuthInfo(): String           // 返回 JSON {authenticated, storeId, tenantId, cashierId, cashierName}
+    fun clearAuth()
+
+    // 同步控制（2026-04 新增）
+    fun getSyncStatus(): String         // 返回 JSON {isOnline: bool}
+    fun syncNow()                       // 触发立即同步
+
+    // 心跳（2026-04 新增，供 React 定时调用）
+    fun reportHeartbeat()
 }
 ```
 
@@ -242,6 +279,8 @@ const printReceipt = (orderData: OrderData) => {
 - **所有外设调用只在 android-shell 层处理**
 - **React Web App 通过 TXBridge 接口抽象外设**，不直接依赖任何外设 SDK
 - **iPad 环境没有 TXBridge**，外设指令通过 HTTP 发送到安卓 POS 主机执行
+- **android-shell 不写业务逻辑**，只做桥接 + 本地数据缓存 + 离线同步
+- **离线数据层规范**：Repository 模式在线优先（try API → 成功写入 Room → 失败存本地 + enqueue sync），SyncWorker 每 15 分钟轮询 + 网络恢复时立即触发
 - 锁定商米 T2/V2 两款主力机型，减少适配成本
 
 ---

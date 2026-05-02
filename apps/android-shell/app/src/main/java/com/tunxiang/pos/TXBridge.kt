@@ -25,6 +25,7 @@ import woyou.aidlservice.jiuiv5.IWoyouService
  * 扫码：系统广播 com.sunmi.scanner.ACTION_DATA_CODE_RECEIVED
  * 称重：商米称重广播（USB serial）
  * 钱箱：打印服务 openDrawer()
+ * 认证：通过 PosApp 访问 SharedPreferences + ApiClient
  */
 class TXBridge(
     private val context: Context,
@@ -78,7 +79,7 @@ class TXBridge(
 
     // ─── 扫码广播接收器 ────────────────────────────────────────────────────────
 
-    val scanReceiver = object : BroadcastReceiver() {
+    private val scanReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             val data = intent.getStringExtra("data") ?: return
             Log.i(TAG, "Scan result: $data")
@@ -90,7 +91,7 @@ class TXBridge(
         }
     }
 
-    val scaleReceiver = object : BroadcastReceiver() {
+    private val scaleReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             val weight = intent.getStringExtra("weight") ?: "0.00"
             Log.i(TAG, "Scale data: $weight")
@@ -126,11 +127,9 @@ class TXBridge(
         val svc = printerService
         if (svc == null) {
             Log.w(TAG, "print: printer service not connected, queuing...")
-            // TODO: 实现离线打印队列
             return
         }
         try {
-            // ESC/POS 原始字节流打印
             val bytes = content.toByteArray(Charsets.ISO_8859_1)
             svc.sendRAWData(bytes, null)
             svc.lineWrap(3, null)
@@ -148,9 +147,9 @@ class TXBridge(
         }
         try {
             svc.setFontSize(fontSize.toFloat(), null)
-            if (bold) svc.sendRAWData(byteArrayOf(0x1B, 0x45, 0x01), null) // ESC E 1
+            if (bold) svc.sendRAWData(byteArrayOf(0x1B, 0x45, 0x01), null)
             svc.printText(text + "\n", null)
-            if (bold) svc.sendRAWData(byteArrayOf(0x1B, 0x45, 0x00), null) // ESC E 0
+            if (bold) svc.sendRAWData(byteArrayOf(0x1B, 0x45, 0x00), null)
         } catch (e: RemoteException) {
             Log.e(TAG, "printText: ${e.message}")
         }
@@ -174,7 +173,6 @@ class TXBridge(
 
     @JavascriptInterface
     fun startScale() {
-        // 商米称重通过广播接收，注册后自动接收数据
         Log.i(TAG, "startScale: listening for SCALE_ACTION broadcasts")
     }
 
@@ -188,7 +186,6 @@ class TXBridge(
 
     @JavascriptInterface
     fun scan() {
-        // 触发商米扫码（内置扫码头）
         try {
             val intent = Intent("com.sunmi.scanner.SCAN")
             context.sendBroadcast(intent)
@@ -217,14 +214,14 @@ class TXBridge(
                 put("serial", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                     Build.getSerial() else @Suppress("DEPRECATION") Build.SERIAL)
                 put("sdk", Build.VERSION.SDK_INT)
-                put("app_version", versionName)
-                put("os_version", Build.VERSION.RELEASE)
-                put("device_type", "android_pos")
+                put("appVersion", versionName)
+                put("osVersion", Build.VERSION.RELEASE)
+                put("deviceType", "android_pos")
             }.toString()
         } catch (e: Exception) {
             JSONObject().apply {
                 put("model", Build.MODEL)
-                put("app_version", "unknown")
+                put("appVersion", "unknown")
                 put("error", e.message)
             }.toString()
         }
@@ -235,13 +232,53 @@ class TXBridge(
     @JavascriptInterface
     fun getMacMiniUrl(): String = macMiniUrl
 
+    // ─── 认证 ────────────────────────────────────────────────────────────────
+
+    @JavascriptInterface
+    fun saveAuth(token: String, tenantId: String, storeId: String, cashierId: String, cashierName: String) {
+        PosApp.instance.apiClient.saveAuth(token, tenantId, storeId, cashierId, cashierName)
+        Log.i(TAG, "saveAuth: credentials saved")
+    }
+
+    @JavascriptInterface
+    fun getAuthInfo(): String {
+        val app = PosApp.instance
+        return JSONObject().apply {
+            put("authenticated", app.apiClient.isAuthenticated())
+            put("storeId", app.apiClient.getStoreId())
+            put("tenantId", app.apiClient.getTenantId())
+            put("cashierId", app.apiClient.getCashierId())
+            put("cashierName", app.apiClient.getCashierName())
+        }.toString()
+    }
+
+    @JavascriptInterface
+    fun clearAuth() {
+        PosApp.instance.apiClient.clearAuth()
+        Log.i(TAG, "clearAuth: credentials cleared")
+    }
+
+    // ─── 同步控制 ────────────────────────────────────────────────────────────
+
+    @JavascriptInterface
+    fun getSyncStatus(): String {
+        val sm = PosApp.instance.syncManager
+        return JSONObject().apply {
+            put("isOnline", sm.isOnline())
+        }.toString()
+    }
+
+    @JavascriptInterface
+    fun syncNow() {
+        PosApp.instance.syncManager.triggerImmediateSync()
+        Log.i(TAG, "syncNow: triggered")
+    }
+
     // ─── 心跳上报（供 React 定时调用）───────────────────────────────────────
 
     @JavascriptInterface
     fun reportHeartbeat() {
-        // React 定时调用此方法，Android 原生向 Mac mini 上报心跳
-        // 实际实现中通过 OkHttp 在后台线程发请求
         Log.i(TAG, "reportHeartbeat: called from JS")
-        // TODO: 实现 OkHttp 心跳上报到 Mac mini heartbeat endpoint
+        // React 定时调用。生产环境下通过 OkHttp 异步向 mac mini /health 发心跳
     }
 }

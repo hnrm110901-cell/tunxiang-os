@@ -1,21 +1,78 @@
-## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
+## 2026-05-02 Part 2: Sprint A+B+C+Security 并行交付 — 4 路 Agent 完成
 
 ### 今日完成
-- [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞
-- [6 service main.py auto-mount 块] tx-trade (E1-E4 4 routes) / tx-member (D3a+D3b) / tx-menu (D3c) / tx-finance (D4a+D4c) / tx-org (D4b, pkg=None) / tx-brain (G)
-- [13 auto_mount 单元测试] MountResult 契约 4 / auto_mount 行为 7（skip/mount/error/strict/missing_attr/mixed/pkg）/ mount_report 2
-- [19 service 契约测试] 6 service 都接入 + 11 route 名全覆盖 + pkg 参数风格 + api_dir + /health 顺序 + shared 模块契约
+- **[Sprint A] 收银链路稳定性** [Tier1]
+  - [web-pos] PosErrorBoundary 组件：类式错误边界，中文 fallback UI，重试按钮
+  - [web-pos] useTimeout hook：安全定时器，自动清理防止卸载后泄漏
+  - [web-pos] App.tsx 包裹 ErrorBoundary + ToastContainer
+  - [tx-trade] SagaBufferService（aiosqlite）：4h TTL，upsert/get/find_by_idempotency_key/list_pending
+  - [tx-trade] payment_saga_service.py：7 处修改，SQLAlchemyError 时 fallback 写入 SagaBuffer
+  - [tx-trade] OfflineOrderStore：pending/synced/dead_letter 三状态，5 次 retry，4h TTL，8 CRUD
+  - [tx-trade] offline_sync_api.py：6 端点（enqueue/list pending/list dead letters/batch sync/retry/stats）
+  - [tx-trade] cashier_api.py：require_role_audited("payment.create") + ("void.order") + schedule_audit()
+- **[Sprint B] 合规红线补齐** [Tier1]
+  - [migration v384] overtime_compliance：schedule_compliance_blocks + monthly_overtime_summary 表
+  - [tx-org] OvertimeComplianceService：32h 预警，36h 自动拦截，HRD/CEO 豁免
+  - [tx-org] overtime_compliance_api.py：POST /check，POST /override，GET /blocks
+  - [migration v385] invoice_compliance：invoice_xml_archive + invoice_ocr_jobs 表
+  - [tx-finance] InvoiceComplianceService：XSD 校验，金税四期提交，OCR 工单
+  - [tx-finance] invoice_compliance_api.py：POST /validate，POST /submit，POST /ocr
+  - [migration v386] civic_trace_submissions 表
+  - [tx-civic] TraceSubmissionService：ingredient_batch/waste_disposal/inspection_report
+  - [tx-civic] trace_submission_routes.py：POST /submit，GET /status/{id}，GET /pending
+  - [migration v387] employee_labor_contracts 表
+  - [tx-org] ContractComplianceService：临期合同检测、合规率统计
+  - [tx-org] contract_compliance_api.py：GET /{employee_id}，GET /expiring，POST /{contract_id}/remind
+- **[Sprint C] KDS 本地强化** [Tier1]
+  - [sync-engine] kds_routes.py：GET /kds/orders/delta (cursor 分页)，POST /kds/device/heartbeat (UPSERT)
+  - [sync-engine] api_main.py：注册 kds_router prefix=/api/v1
+  - [web-kds] Playwright E2E：offline-4h.spec.ts — 4 条 Tier 1 用例（IndexedDB CRUD + 离线恢复 10 单 + LRU 120 单逐出 + 内存压力）
+- **[Security] 竞态条件修复**
+  - [tx-trade] stored_value_routes.py consume：原子 `UPDATE ... WHERE (balance_fen - frozen_fen) >= :amt RETURNING ...` 消除 TOCTOU
+  - S1-S4 (python-jose→PyJWT, cryptography≥42.0.0, coupon_service 原子 SQL, enterprise_account 原子 SQL) 已验证前期已修复
+- **[文档]** DEVLOG.md / progress.md 更新 + CLAUDE.md 同步
 
 ### 数据变化
-- 新增共享模块：1 个（shared/service_utils/）
-- 新增测试：32 个（13 + 19）
-- 修改 6 个 service main.py（各 ~15 行末尾补）
+- 迁移版本：v383 → v387（v384/v385/v386/v387）
+- 新增 Python 服务文件：12 个（5 service/API pairs + 2 migration services）
+- 新增 TypeScript 文件：4 个（ErrorBoundary / useTimeout / 2 KDS）
+- 新增 Playwright 测试：4 条 Tier 1 用例（offline-4h.spec.ts）
+- 修改 TXBridge.kt：scan/scale 广播接收器容错加固 + 日志增强
+- 修改 TXBridge.ts：新增 BluetoothDevice/BluetoothRemoteGATTService 类型桩，BLE initAvailable 延迟检测
 
 ### 遗留问题
-- 11 routes 硬编码在 main.py；未来可改配置驱动
-- pkg=None vs __package__ 两种风格；tx-org 特殊
-- auto-mount 失败 WARNING 非 ERROR；仰赖日志告警
-- pre-existing F401 feature_flags warning 非本 PR
+- android-shell 离线数据层需要集成测试（Room DAO + SyncWorker）
+- 加班 36h 拦截需在排班审批流程中联调验证
+- 金税四期提交依赖税务局端 Sandbox 环境测试
+- KDS delta API 需在商米 D2 平板上实际验收
+
+### 明日计划
+- 合入当前所有改动到 main
+- 考虑启动 Sprint F（演示体验完整化：adapter scorecards / toxiproxy CI / merchant playbooks）
+- 或 Sprint D（AI 管理层标准化）
+
+---
+
+## 2026-05-02 POS 架构收拢：android-pos Compose UI 移除，android-shell 唯一壳层
+
+### 今日完成
+- [android-shell] 创建离线数据层：Room DB（6 实体 + 4 DAO）+ Retrofit API Client + 4 Repository（Order/Sync/Dish/Table）+ SyncManager + SyncWorker
+- [android-shell] 增强 TXBridge.kt：新增 7 个 @JavascriptInterface 方法（saveAuth/getAuthInfo/clearAuth/getSyncStatus/syncNow/reportHeartbeat）
+- [web-pos] 更新 TXBridge.ts TypeScript 接口：从 8 个方法扩展到 15 个，与 Kotlin 实现完全对齐
+- [android-pos] 删除 14 个 Compose UI 文件（Screen/Component/Theme/NavGraph）
+- [android-shell/AndroidManifest] 修复：移除 scanReceiver 静态声明（已通过 registerReceiver() 编程注册）
+- [CLAUDE.md] 更新项目结构（android-pos 移除）+ Section 7 文档（架构收拢说明 + 完整 TXBridge 接口定义 + 离线数据层规范）
+
+### 数据变化
+- 新增 Kotlin 文件：12 个（data model/dao/database/api/repository/sync）
+- 新增 TypeScript 类型：7 个 JS Bridge 接口方法
+- 删除 Compose UI 文件：14 个
+- 修改 CLAUDE.md：Section 5 项目结构 + Section 7 壳层规范
+
+### 遗留问题
+- android-shell 离线数据层需要集成测试（Room DAO + SyncWorker）
+- TXBridge 打印 AIDL 在商米 T2/V2 上需实际验收
+- android-shell 尚未配置 CI 构建
 
 ### 明日计划
 - PR 合入后服务重启验证 `[auto-mount] mounted` 日志

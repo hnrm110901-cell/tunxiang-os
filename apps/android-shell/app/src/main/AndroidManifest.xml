@@ -1,22 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 网络 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.CAMERA" /> <!-- 扫码 -->
+
+    <!-- 扫码 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- 商米称重广播 -->
+    <uses-permission android:name="com.sunmi.scale.permission.DATA" />
+
+    <!-- 商米扫码广播 -->
+    <uses-permission android:name="com.sunmi.scanner.permission.SCAN" />
+
+    <!-- POS 值守常亮 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
+        android:name=".PosApp"
         android:allowBackup="false"
         android:label="屯象POS"
         android:supportsRtl="true"
         android:theme="@style/Theme.TunxiangPOS"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        tools:targetApi="34">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -24,5 +41,16 @@
             </intent-filter>
         </activity>
 
+        <!-- WorkManager 手动初始化（PosApp 中控制） -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>
