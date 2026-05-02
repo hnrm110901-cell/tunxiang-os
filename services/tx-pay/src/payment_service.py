@@ -174,11 +174,11 @@ class PaymentNexusService:
 
         from .events import emit_payment_refunded
 
-        # 查询原支付记录
+        # 查询原支付记录（FOR UPDATE 防止并发退款 TOCTOU）
         row = await self._db.execute(
             text(
                 """SELECT method, amount_fen, trade_no, tenant_id, store_id
-                   FROM payments WHERE payment_no = :pid"""
+                   FROM payments WHERE payment_no = :pid FOR UPDATE"""
             ),
             {"pid": payment_id},
         )

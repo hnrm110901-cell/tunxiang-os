@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -82,7 +83,7 @@ class DeliveryKDSBridge:
                     "oid": order_id,
                     "dept": uuid.UUID(dept_id) if dept_id else None,
                     "platform": platform,
-                    "items": str(dept_items),
+                    "items": json.dumps(dept_items, ensure_ascii=False),
                     "mode": push_mode,
                     "now": now,
                 },
