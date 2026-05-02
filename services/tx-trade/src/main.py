@@ -234,10 +234,43 @@ async def lifespan(app: FastAPI):
             "mark_offline_scheduler_skipped_feature_flags_unavailable",
         )
 
+    # ── Task 1.2: 支付事件消费者 — 消费 tx-pay 的 payment.confirmed/payment.refunded ──
+    # 在 tx-trade 中启动 EventConsumer，订阅 Redis Stream 上的支付事件，
+    # 更新 orders 和 payments 表状态（关闭 P0-02 风险）。
+    payment_event_consumer_task: asyncio.Task | None = None
+    try:
+        from .services.payment_event_consumer import (
+            create_payment_event_consumer,
+            start_payment_event_consumer,
+        )
+
+        _payment_consumer = create_payment_event_consumer(async_session_factory)
+        payment_event_consumer_task = await start_payment_event_consumer(
+            _payment_consumer, async_session_factory
+        )
+        _register_background_task(payment_event_consumer_task)
+        import structlog as _structlog
+
+        _structlog.get_logger(__name__).info("payment_event_consumer_started")
+    except Exception:
+        import structlog as _structlog
+
+        _structlog.get_logger(__name__).warning(
+            "payment_event_consumer_start_failed",
+            exc_info=True,
+        )
+
     try:
         yield
     finally:
         # graceful shutdown：cancel + await，避免事件循环退出时 task 仍在 sleep
+        if payment_event_consumer_task is not None and not payment_event_consumer_task.done():
+            payment_event_consumer_task.cancel()
+            try:
+                await payment_event_consumer_task
+            except asyncio.CancelledError:
+                pass
+
         if mark_offline_task is not None and not mark_offline_task.done():
             mark_offline_task.cancel()
             try:
