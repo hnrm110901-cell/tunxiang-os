@@ -14,9 +14,11 @@ interface BluetoothRemoteGATTServer { connected: boolean; connect(): Promise<Blu
 interface BluetoothRemoteGATTService { getCharacteristic(uuid: string): Promise<BluetoothRemoteGATTCharacteristic>; }
 interface BluetoothRemoteGATTCharacteristic { writeValue(value: BufferSource): Promise<void>; writeValueWithResponse(value: BufferSource): Promise<void>; }
 
-/** 安卓 Kotlin 层注入的原生接口 */
+/** 安卓 Kotlin 层注入的原生接口（对应 TXBridge.kt） */
 interface NativeTXBridge {
+  // 硬件
   print(content: string): void;
+  printText(text: string, fontSize?: number, bold?: boolean): void;
   openCashBox(): void;
   startScale(): void;
   onScaleData(callback: string): void;
@@ -24,6 +26,18 @@ interface NativeTXBridge {
   onScanResult(callback: string): void;
   getDeviceInfo(): string;
   getMacMiniUrl(): string;
+
+  // 认证
+  saveAuth(token: string, tenantId: string, storeId: string, cashierId: string, cashierName: string): void;
+  getAuthInfo(): string;
+  clearAuth(): void;
+
+  // 同步
+  getSyncStatus(): string;
+  syncNow(): void;
+
+  // 心跳
+  reportHeartbeat(): void;
 }
 
 declare global {

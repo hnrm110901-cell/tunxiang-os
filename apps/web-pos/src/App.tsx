@@ -40,6 +40,8 @@ import FoodCourtPage from './pages/FoodCourtPage';  // TC-P2-12 智慧商街档�
 import { OmniChannelOrders } from './pages/OmniChannelOrders';  // 外卖聚合接单
 import { TrainingModePage } from './pages/TrainingModePage';
 import { TrainingModeBanner } from './components/TrainingModeBanner';
+import { PosErrorBoundary } from './components/PosErrorBoundary';
+import { ToastContainer } from './components/ToastContainer';
 import { TrainingModeWatermark } from './components/TrainingModeWatermark';
 import { useTrainingMode } from './hooks/useTrainingMode';
 import { FastFoodPage } from './pages/fastfood/FastFoodPage';
@@ -200,7 +202,10 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AppLayout />
+      <PosErrorBoundary context={{ app: 'web-pos' }}>
+        <AppLayout />
+      </PosErrorBoundary>
+      <ToastContainer />
     </BrowserRouter>
   );
 }
