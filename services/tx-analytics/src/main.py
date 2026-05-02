@@ -13,6 +13,7 @@ from .etl.scheduler import get_etl_scheduler
 logger = structlog.get_logger()
 
 from .api.ai_evidence_chain_routes import router as ai_evidence_chain_router  # May W2: B-04
+from .api.alert_routes import router as alert_router  # BI-2.2: 预警闭环引擎（8端点）
 from .api.anomaly_routes import router as anomaly_router
 from .api.banquet_analytics_routes import router as banquet_analytics_router  # S7 宴会分析报表（8端点）
 from .api.booking_report_routes import router as booking_report_router  # 预定报表（4端点）
@@ -40,9 +41,12 @@ from .api.nlq_routes import router as nlq_router
 from .api.private_domain_routes import router as private_domain_router
 from .api.ceo_cockpit_routes import router as ceo_cockpit_router  # G6: CEO今日经营驾驶舱（7端点）
 from .api.cost_root_cause_routes import router as cost_root_cause_router  # v379: 成本根因分析Agent（4端点）
+from .api.olap_routes import router as olap_router  # BI-1.1: OLAP多维分析引擎（5端点）
+from .api.self_service_routes import router as self_service_router  # BI-1.2: 自助取数（8端点）
 from .api.report_builder_routes import router as report_builder_router  # S5: 报表配置化引擎（12端点）
 from .api.report_config_routes import router as report_config_router
 from .api.report_routes import router as report_router
+from .api.report_sku_routes import router as report_sku_router  # BI-1.5: 固定报表SKU（7端点）
 from .api.reports_router import router as p0_reports_router
 from .api.seed_loader import load_p0_seeds
 from .api.special_ops_report_routes import router as special_ops_report_router  # 特殊操作报表（14端点）
@@ -113,6 +117,10 @@ app.include_router(banquet_analytics_router)  # S7 宴会分析报表：8端点
 app.include_router(report_builder_router)  # S5 报表配置化引擎：12端点
 app.include_router(ceo_cockpit_router)  # G6 CEO今日经营驾驶舱：7端点
 app.include_router(cost_root_cause_router)  # v379 成本根因分析Agent：4端点
+app.include_router(olap_router)  # BI-1.1: OLAP多维分析引擎：5端点
+app.include_router(self_service_router)  # BI-1.2: 自助取数（8端点）
+app.include_router(report_sku_router)  # BI-1.5: 固定报表SKU模板（7端点）
+app.include_router(alert_router)  # BI-2.2: 预警闭环引擎（8端点）
 
 
 @app.get("/health")
