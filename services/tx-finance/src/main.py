@@ -38,6 +38,7 @@ from .api.split_payment_routes import router as split_payment_router
 from .api.split_routes import router as split_router
 from .api.vat_ledger_routes import router as vat_ledger_router
 from .api.vat_routes import router as vat_router
+from .api.stored_value_settlement_routes import router as stored_value_settlement_router
 from .api.wine_storage_routes import router as wine_storage_router
 from .api.invoice_ocr_routes import router as invoice_ocr_router
 
@@ -73,6 +74,7 @@ app.include_router(pl_router, prefix="/api/v1/pl")
 app.include_router(invoice_router, prefix="/api/v1/invoices")
 app.include_router(settlement_router)
 app.include_router(fund_settlement_router)
+app.include_router(stored_value_settlement_router)  # /api/v1/finance/sv-settlement/*
 app.include_router(erp_router)
 app.include_router(reconciliation_router, prefix="/api/v1")
 app.include_router(revenue_aggregation_router)

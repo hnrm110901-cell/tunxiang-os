@@ -1,4 +1,4 @@
-"""分账引擎 API — 8 个端点（v100 + 通道通知）
+"""分账引擎 API — 15 个端点（v100 + 通道通知 + 异常处理）
 
 端点：
 1. POST   /api/v1/finance/splits/rules              创建/更新分润规则
@@ -8,7 +8,12 @@
 5. POST   /api/v1/finance/splits/settle             批量结算（pending→settled）
 6. GET    /api/v1/finance/splits/transactions       分润流水
 7. GET    /api/v1/finance/splits/settlement         分账汇总（按收款方）
-8. POST   /api/v1/finance/splits/channel-notify     通道异步结果（Y-B2 骨架 + 可选 HMAC）
+8. POST   /api/v1/finance/splits/channel-notify     通道异步结果
+9. POST   /api/v1/finance/splits/retry              重试失败记录（cancelled→pending）
+10.POST   /api/v1/finance/splits/reverse            创建回退记录（退款触发）
+11.POST   /api/v1/finance/splits/discrepancy        标记差错账
+12.GET    /api/v1/finance/splits/discrepancies       差错账列表
+13.POST   /api/v1/finance/splits/discrepancy/{id}/resolve  解决差错
 """
 
 from __future__ import annotations
@@ -354,3 +359,141 @@ async def get_settlement_summary(
         end_date=end_date,
     )
     return {"ok": True, "data": summary}
+
+
+# ─── 9. 重试失败记录 ────────────────────────────────────────────────────────────
+
+
+class RetryRequest(BaseModel):
+    record_ids: List[str] = Field(..., min_length=1, description="要重试的 cancelled 记录 ID 列表")
+
+
+@router.post("/retry", summary="重试失败的分账记录")
+async def retry_failed_records(
+    body: RetryRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """将 cancelled 状态的分账记录重新置为 pending（最多重试 3 次）。
+
+    适用场景：通道分账临时失败后人工/定时任务触发重试。
+    """
+    engine = SplitEngine(db, x_tenant_id)
+    count = await engine.retry_failed_records(body.record_ids)
+    await db.commit()
+    return {
+        "ok": True,
+        "data": {
+            "requested": len(body.record_ids),
+            "retried": count,
+            "skipped": len(body.record_ids) - count,
+        },
+    }
+
+
+# ─── 10. 创建回退记录 ───────────────────────────────────────────────────────────
+
+
+class ReverseRequest(BaseModel):
+    original_record_id: str = Field(..., description="已结算的原始分账记录 ID")
+    reason: str = Field("", description="回退原因（如：订单退款）")
+
+
+@router.post("/reverse", summary="创建分账回退记录（退款触发）")
+async def reverse_settled_record(
+    body: ReverseRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """对已结算的分账记录创建负向回退流水。
+
+    不修改原始记录 — 插入一条新的 split_amount_fen 为负数的记录，保留完整审计链。
+    用于退款后自动分账回退场景。
+    """
+    engine = SplitEngine(db, x_tenant_id)
+    result = await engine.reverse_settled_record(
+        body.original_record_id,
+        reason=body.reason,
+    )
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"原始记录不存在或非 settled 状态: {body.original_record_id}",
+        )
+    await db.commit()
+    return {"ok": True, "data": result}
+
+
+# ─── 11. 标记差错账 ─────────────────────────────────────────────────────────────
+
+
+class DiscrepancyRequest(BaseModel):
+    record_id: str = Field(..., description="要标记为差错的分账记录 ID")
+    note: str = Field("", description="差错说明")
+
+
+@router.post("/discrepancy", summary="标记差错账")
+async def mark_discrepancy(
+    body: DiscrepancyRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """将 settled 或 pending 状态的分账记录标记为 discrepancy（争议/对账不平）。
+
+    差错记录不参与正常结算汇总。需人工确认后通过 /discrepancy/{id}/resolve 解决。
+    """
+    engine = SplitEngine(db, x_tenant_id)
+    ok = await engine.mark_discrepancy(body.record_id, note=body.note)
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail=f"记录不存在或状态不允许标记差错: {body.record_id}",
+        )
+    await db.commit()
+    return {"ok": True, "data": {"record_id": body.record_id, "status": "discrepancy"}}
+
+
+# ─── 12. 差错账列表 ─────────────────────────────────────────────────────────────
+
+
+@router.get("/discrepancies", summary="差错账列表")
+async def list_discrepancies(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """查询所有状态为 discrepancy 的分账记录。"""
+    engine = SplitEngine(db, x_tenant_id)
+    result = await engine.list_discrepancies(page=page, size=size)
+    return {"ok": True, "data": {**result, "page": page, "size": size}}
+
+
+# ─── 13. 解决差错 ───────────────────────────────────────────────────────────────
+
+
+class ResolveDiscrepancyRequest(BaseModel):
+    resolution: str = Field(..., description="解决方案: settled/cancelled/reversed")
+    note: str = Field("", description="解决说明")
+
+
+@router.post("/discrepancy/{record_id}/resolve", summary="解决差错")
+async def resolve_discrepancy(
+    record_id: str = Path(..., description="差错记录 ID"),
+    body: ResolveDiscrepancyRequest = ...,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """将差错记录转为 settled/cancelled/reversed 终态。"""
+    engine = SplitEngine(db, x_tenant_id)
+    try:
+        ok = await engine.resolve_discrepancy(record_id, body.resolution, note=body.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail=f"记录不存在或非 discrepancy 状态: {record_id}",
+        )
+    await db.commit()
+    return {"ok": True, "data": {"record_id": record_id, "status": body.resolution}}
