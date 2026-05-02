@@ -242,6 +242,72 @@ export async function clear(): Promise<void> {
   await be.clearAll();
 }
 
+/**
+ * 清空全部缓存。同 clear()，更语义化的名称供管理员功能调用。
+ */
+export const clearAll = clear;
+
+/**
+ * 按订单状态筛选。查找最近的 N 个指定状态的订单。
+ * 使用 IDB status 索引（通过 getAll + JS 过滤，兼容 fakeIndexedDB）。
+ */
+export async function getByStatus(status: KdsOrderStatus): Promise<KdsCachedOrder[]> {
+  const be = await getBackend();
+  const all = await be.getAll();
+  return all.filter((o) => o.status === status);
+}
+
+/**
+ * 按设备筛选。查找指定设备相关的所有订单。
+ * 使用 IDB device_id 索引。
+ */
+export async function getByDevice(deviceId: string): Promise<KdsCachedOrder[]> {
+  const be = await getBackend();
+  const all = await be.getAll();
+  return all.filter((o) => o.device_id === deviceId);
+}
+
+/**
+ * 检查当前缓存存储大小（近似值，JSON.stringify 长度）。
+ * 用于断言存储上限 < 20MB。
+ *
+ * 同时尝试通过 navigator.storage.estimate() 获取浏览器级存储配额信息。
+ * 若浏览器不支持，回退为 JSON.stringify 估算值。
+ *
+ * 返回格式：
+ *   usage: 已用字节数（估算）
+ *   limit: 存储上限（IndexedDB 一般无硬限制，返回 20MB 作为推荐门槛）
+ */
+export async function checkQuota(): Promise<{ usage: number; limit: number }> {
+  const be = await getBackend();
+
+  // 估算已用字节数
+  let usageBytes = 0;
+  try {
+    const all = await be.getAll();
+    usageBytes = JSON.stringify(all).length;
+  } catch {
+    usageBytes = 0;
+  }
+
+  // 20MB 推荐上限（IndexedDB 默认无硬限制，但前端应自约束）
+  const RECOMMENDED_LIMIT = 20 * 1024 * 1024;
+
+  // 尝试获取浏览器级存储估计
+  if (typeof navigator !== 'undefined' && 'storage' in navigator && 'estimate' in navigator.storage) {
+    try {
+      const est = await navigator.storage.estimate();
+      if (est.quota != null) {
+        return { usage: usageBytes, limit: est.quota };
+      }
+    } catch {
+      // 静默回退
+    }
+  }
+
+  return { usage: usageBytes, limit: RECOMMENDED_LIMIT };
+}
+
 export async function getStats(): Promise<CacheStats> {
   const all = await getAll();
   if (all.length === 0) {

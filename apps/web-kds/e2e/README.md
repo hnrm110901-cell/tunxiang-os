@@ -11,6 +11,10 @@
 | `test_kitchen_4h_continuous_polling_no_freeze` | 后厨连续 4 小时轮询，全程无 `console.error`、长任务总占比 < 5% |
 | `test_kitchen_polling_recovery_after_60s_outage` | 后厨网络中断 60 秒后恢复，DOM 仍可访问、错误数有上限 |
 | `test_kitchen_memory_does_not_grow_past_50mb` | JS 堆内存增长 ≤ 50MB（无泄漏） |
+| `test_offline_cache_write_read` （Sprint C 新增） | 离线缓存基本 CRUD：IndexedDB 写入、按状态查询、按设备查询、清空 |
+| `test_offline_recovery_no_data_loss` （Sprint C 新增） | 离线→恢复后累计订单无丢失、无重复，数据完整性验证 |
+| `test_lru_eviction_beyond_100` （Sprint C 新增） | >100 单触发 LRU 淘汰，保留最新 100 单 |
+| `test_memory_during_offline_online_cycling` （Sprint C 新增） | 反复 online/degraded/offline 切换，JS 堆增长 ≤50MB |
 
 ---
 

@@ -28,6 +28,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getStoreToken } from './api/index';
 import { ConnectionProvider, useConnection } from './contexts/ConnectionContext';
 import { OfflineBanner } from './components/OfflineBanner';
+import { ConnectionHealth } from './components/ConnectionHealth';
 import { KdsLoginPage } from './pages/KdsLoginPage';
 import { KDSBoardPage } from './pages/KDSBoardPage';
 import { StoreSelectPage } from './pages/StoreSelectPage';
@@ -67,6 +68,7 @@ export default function App() {
   return (
     <ConnectionProvider>
       <ConnectionBannerHost />
+      <ConnectionHealth />
       <BrowserRouter>
         <Routes>
         {/* 默认跳转到门店选择页 */}

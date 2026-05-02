@@ -8,10 +8,15 @@ import {
   upsertBatch,
   getAll,
   clear,
+  clearAll,
   getStats,
+  getByStatus,
+  getByDevice,
+  checkQuota,
   __forceMemoryFallback,
   __resetDBForTest,
   type KdsCachedOrder,
+  type KdsOrderStatus,
 } from '../kdsOrdersDB';
 import {
   installFakeIndexedDB,
@@ -127,5 +132,86 @@ describe('kdsOrdersDB — IndexedDB 存储层', () => {
     expect(await getAll()).toEqual([]);
     const stats = await getStats();
     expect(stats.count).toBe(0);
+  });
+
+  // ─── C1+ 新增方法 ─────────────────────────────────────────
+
+  describe('getByStatus — 按状态筛选', () => {
+    it('返回 pending 状态的订单', async () => {
+      const now = Date.now();
+      await upsertBatch([
+        mkOrder('a', now, 'pending'),
+        mkOrder('b', now + 1, 'cooking'),
+        mkOrder('c', now + 2, 'completed'),
+        mkOrder('d', now + 3, 'pending'),
+      ]);
+      const pending = await getByStatus('pending');
+      expect(pending.length).toBe(2);
+      expect(pending.map((o) => o.order_id).sort()).toEqual(['a', 'd']);
+    });
+
+    it('没有匹配状态时返回空数组', async () => {
+      await upsertBatch([
+        mkOrder('a', 1, 'completed'),
+        mkOrder('b', 2, 'completed'),
+      ]);
+      const cancelled = await getByStatus('cancelled');
+      expect(cancelled).toEqual([]);
+    });
+  });
+
+  describe('getByDevice — 按设备筛选', () => {
+    it('返回指定设备的订单', async () => {
+      const now = Date.now();
+      await upsertBatch([
+        { ...mkOrder('a', now), device_id: 'kds-fry-01' },
+        { ...mkOrder('b', now + 1), device_id: 'kds-grill-02' },
+        { ...mkOrder('c', now + 2), device_id: 'kds-fry-01' },
+      ]);
+      const fryOrders = await getByDevice('kds-fry-01');
+      expect(fryOrders.length).toBe(2);
+      expect(fryOrders.map((o) => o.order_id).sort()).toEqual(['a', 'c']);
+    });
+  });
+
+  describe('clearAll — 清空全部缓存', () => {
+    it('clearAll 后存储为空', async () => {
+      await upsertBatch([
+        mkOrder('a', 1),
+        mkOrder('b', 2),
+        mkOrder('c', 3),
+      ]);
+      expect((await getAll()).length).toBe(3);
+      await clearAll();
+      expect(await getAll()).toEqual([]);
+    });
+
+    it('clearAll 与 clear 行为一致', async () => {
+      await upsertBatch([mkOrder('x', 1), mkOrder('y', 2)]);
+      await clearAll();
+      await clear();
+      // 两次清空后仍是空
+      expect(await getAll()).toEqual([]);
+    });
+  });
+
+  describe('checkQuota — 存储配额检查', () => {
+    it('返回 usage >= 0 且 limit > 0', async () => {
+      await upsertBatch([
+        mkOrder('q1', 1000),
+        mkOrder('q2', 2000),
+        mkOrder('q3', 3000),
+      ]);
+      const quota = await checkQuota();
+      expect(quota.usage).toBeGreaterThan(0);
+      expect(quota.limit).toBeGreaterThan(0);
+    });
+
+    it('空存储时 usage = 0', async () => {
+      await clear();
+      const quota = await checkQuota();
+      expect(quota.usage).toBe(0);
+      expect(quota.limit).toBeGreaterThan(0);
+    });
   });
 });

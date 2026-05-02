@@ -23,6 +23,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from offline_sync_service import OfflineSyncService
+from kds_routes import router as kds_router
 from sync_routes import router as sync_router
 
 logger = structlog.get_logger()
@@ -125,6 +126,7 @@ app.add_middleware(
 
 # ─── 路由注册 ──────────────────────────────────────────────────────────────
 
+app.include_router(kds_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 
 
