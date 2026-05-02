@@ -316,6 +316,132 @@ class MeituanDeliveryAdapter(DeliveryPlatformAdapter):
         }
         return self._map_order(mock_raw)
 
+    # ── Task 3.1 增强：退款同步 / 配送状态 / 对账单 / 回调验签 ──────
+
+    async def sync_refund(
+        self,
+        order_id: str,
+        refund_amount_fen: int,
+        reason: str = "",
+    ) -> dict:
+        """同步退款到美团平台（当前 Mock，接入真实 API 时切换）。
+
+        美团退款 API: ecommerce/order/cancelAfterSales
+        需要 order_id + refund_amount + reason。
+        """
+        logger.info(
+            "meituan_sync_refund",
+            order_id=order_id,
+            refund_amount_fen=refund_amount_fen,
+            reason=reason,
+        )
+        # Mock: 返回模拟成功
+        return {
+            "ok": True,
+            "order_id": order_id,
+            "refund_status": "success",
+            "refund_amount_fen": refund_amount_fen,
+            "platform_refund_id": f"mt_refund_{order_id}_{int(time.time())}",
+            "mock": True,
+        }
+
+    async def get_delivery_status(self, order_id: str) -> dict:
+        """查询美团配送状态（当前 Mock）。
+
+        美团配送状态码：
+          0=未配送, 10=已分配骑手, 20=骑手已到店, 30=骑手已取餐,
+          40=配送中, 50=已送达, 60=异常
+
+        Returns:
+            {status, rider_name, rider_phone, estimated_delivery_time, current_position}
+        """
+        logger.info("meituan_get_delivery_status", order_id=order_id)
+        now_ts = int(time.time())
+        return {
+            "order_id": order_id,
+            "delivery_status": 40,  # 配送中
+            "delivery_status_desc": "配送中",
+            "rider_name": "骑手_MT001",
+            "rider_phone": "139****0000",
+            "estimated_delivery_time": str(now_ts + 1800),
+            "current_position": {"lat": 28.1948, "lng": 112.9725},
+            "mock": True,
+        }
+
+    async def download_bill(
+        self,
+        store_id: str,
+        bill_date: str,  # YYYY-MM-DD
+    ) -> dict:
+        """下载美团对账单（当前 Mock 返回示例数据）。
+
+        美团账单 API: ecommerce/order/downloadBill
+        账单类型：订单明细 / 退款明细 / 佣金明细
+        """
+        poi_id = self._get_poi_id(store_id)
+        logger.info(
+            "meituan_download_bill",
+            store_id=store_id,
+            poi_id=poi_id,
+            bill_date=bill_date,
+        )
+        return {
+            "bill_date": bill_date,
+            "store_id": store_id,
+            "poi_id": poi_id,
+            "summary": {
+                "total_orders": 45,
+                "total_amount_fen": 125000,
+                "total_refund_fen": 8000,
+                "platform_commission_fen": 18750,
+                "net_settlement_fen": 98250,
+            },
+            "orders": [
+                {
+                    "order_id": f"mt_order_{bill_date}_001",
+                    "amount_fen": 3500,
+                    "commission_fen": 525,
+                    "status": "completed",
+                },
+            ],
+            "mock": True,
+        }
+
+    async def verify_webhook(
+        self,
+        body: bytes,
+        headers: dict,
+    ) -> dict:
+        """验证美团回调签名（当前 Mock 模式，生产需接入美团开放平台验签）。
+
+        美团开放平台使用 HMAC-SHA256，通过 app_secret 对请求体签名。
+        X-Meituan-Signature header = Base64(HMAC-SHA256(app_secret, body))
+        """
+        signature = headers.get("x-meituan-signature", "")
+        if not signature:
+            logger.warning("meituan_webhook_no_signature")
+            if os.environ.get("TX_ENV") == "production":
+                raise DeliveryPlatformError(
+                    platform="meituan",
+                    code=401,
+                    message="回调缺少签名",
+                )
+
+        # Mock: 接受任何签名
+        logger.info(
+            "meituan_webhook_verified",
+            signature=signature[:16] + "..." if len(signature) > 16 else signature,
+        )
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise DeliveryPlatformError(
+                platform="meituan",
+                code=400,
+                message=f"回调体解析失败: {exc}",
+            )
+        return payload
+
     async def close(self) -> None:
         """释放资源"""
         logger.info("meituan_delivery_adapter_closed")

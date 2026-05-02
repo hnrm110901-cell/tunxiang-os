@@ -250,9 +250,15 @@ app.include_router(bonus_router)  # 绩效奖金计算（v378表）Sprint G5
 app.include_router(lifecycle_router)  # 门店生命周期（v378表）Sprint G5
 from api.franchise_fee_routes import router as franchise_fee_router
 
+# ── Task 2.3/2.4: 门店配置模板 + 门店健康监控 ──
+from api.store_template_routes import router as store_template_router
+from api.store_health_routes import router as store_health_router
+
 app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
 app.include_router(sales_target_router)  # 销售目标管理（Sprint R1 Track C，v266表）年/月/员工目标+进度追踪
 app.include_router(task_router)  # 统一任务引擎（Sprint R1 Track B，v265表）10 类任务派单/完成/升级
+app.include_router(store_template_router)  # 门店配置模板：快照/复用/一键开店
+app.include_router(store_health_router)  # 门店健康监控：设备/打印/KDS/日结/同步
 
 
 # ── Sprint D4b 路由自动挂载（PR #87 合入后自动生效）──
