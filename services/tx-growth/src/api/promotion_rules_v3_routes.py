@@ -110,7 +110,8 @@ def _get_redis_client():
         from shared.ontology.src.config import settings
 
         return aioredis.from_url(settings.redis_url, decode_responses=True)
-    except Exception:
+    except (OSError, ValueError, ConnectionError) as exc:
+        logger.warning("redis_connection_failed", error=str(exc))
         return None
 
 

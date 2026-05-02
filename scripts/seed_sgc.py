@@ -192,6 +192,78 @@ def run():
         else:
             print("   ⚠️  banquet_deposits 表不存在，跳过宴会订金数据（请运行相关迁移后重新执行）")
 
+        # ── 7b. 宴会场地 + 线索 + 合同（Task 3.3 / P1-08 补全）────────────
+        print("7b. 宴会场地/线索/合同 (尚宫厨宴会场景)...")
+        banquet_venue_count = 0
+        if _table_exists(cur, "banquet_venues"):
+            venues = [
+                ("龙凤厅", "banquet_hall", 300, 20000, "大型宴会厅，配备 LED 屏和舞台"),
+                ("如意阁", "private_room", 50, 8000, "中型包厢，适合家庭聚会/小型宴请"),
+                ("百花厅", "banquet_hall", 150, 15000, "中型宴会厅，花园景观"),
+            ]
+            for vname, vtype, capacity, base_price, vdesc in venues:
+                vid = sid(f"sgc-venue-{vname}")
+                cur.execute("""
+                    INSERT INTO banquet_venues (id, tenant_id, store_id, name, venue_type,
+                        capacity, base_price_fen, description)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (id) DO NOTHING
+                """, (vid, TENANT_UUID, STORE_UUID, vname, vtype, capacity, base_price, vdesc))
+                banquet_venue_count += 1
+            print(f"   宴会场地: {banquet_venue_count} 条")
+        else:
+            print("   ⚠️  banquet_venues 表不存在，跳过宴会场地")
+
+        if _table_exists(cur, "banquet_leads"):
+            lead_statuses = ["new", "contacted", "quoted", "negotiating", "confirmed", "lost"]
+            for i, lst in enumerate(lead_statuses[:5]):  # 前5个状态
+                lid = sid(f"sgc-lead-{i}")
+                cur.execute("""
+                    INSERT INTO banquet_leads (id, tenant_id, store_id, customer_name,
+                        customer_phone, event_type, expected_date, expected_guests,
+                        budget_range_fen, status, source)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (id) DO NOTHING
+                """, (
+                    lid, TENANT_UUID, STORE_UUID,
+                    f"宴席客户{i+1}", f"1380000{i:04d}",
+                    "婚宴" if i % 2 == 0 else "商务宴请",
+                    f"2026-{(i+6):02d}-15",
+                    100 + i * 50,
+                    5000000 + i * 2000000,
+                    lst,
+                    "电话咨询" if i < 3 else "转介绍",
+                ))
+            print(f"   宴会线索: 5 条 (各状态1条)")
+        else:
+            print("   ⚠️  banquet_leads 表不存在，跳过宴会线索")
+
+        if _table_exists(cur, "banquet_contracts"):
+            for i in range(3):
+                cid = sid(f"sgc-contract-{i}")
+                cur.execute("""
+                    INSERT INTO banquet_contracts (id, tenant_id, store_id,
+                        contract_no, customer_name, event_type, event_date,
+                        venue_id, expected_guests, total_amount_fen,
+                        deposit_amount_fen, status)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (id) DO NOTHING
+                """, (
+                    cid, TENANT_UUID, STORE_UUID,
+                    f"BC-2026-{i:04d}",
+                    f"签约客户{i+1}",
+                    "婚宴" if i % 2 == 0 else "寿宴",
+                    f"2026-0{i+7}-{10+i*5}",
+                    sid(f"sgc-venue-龙凤厅") if i == 0 else sid(f"sgc-venue-如意阁"),
+                    150 + i * 50,
+                    8000000 + i * 3000000,
+                    2000000 + i * 500000,
+                    "signed" if i < 2 else "draft",
+                ))
+            print("   宴会合同: 3 条")
+        else:
+            print("   ⚠️  banquet_contracts 表不存在，跳过宴会合同")
+
         # ── 8. KPI 权重配置 ───────────────────────────────────────────────────
         print("8. 配置 KPI 权重...")
         kpi_weights = {

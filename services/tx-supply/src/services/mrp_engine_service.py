@@ -603,7 +603,7 @@ class MRPEngineService:
             _log.info("mrp.calculate.done", demand_lines_count=len(demand_lines))
             return demand_lines
 
-        except Exception:
+        except Exception:  # noqa: BLE001 — MRP计算事务回滚，任何异常都需回退状态
             # 计算失败，回退状态为 draft
             await db.execute(
                 text("""

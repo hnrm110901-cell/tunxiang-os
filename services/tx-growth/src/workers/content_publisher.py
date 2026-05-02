@@ -76,7 +76,7 @@ class ContentPublisher:
                     published += 1
                 else:
                     failed += 1
-            except Exception:
+            except Exception:  # noqa: BLE001 — 发布失败不应阻断其他内容批量发布
                 logger.exception("content_publish_error", content_id=cid, tenant_id=tid)
                 failed += 1
 
@@ -148,7 +148,7 @@ class ContentPublisher:
                         "message_id": send_result.get("message_id"),
                     }
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — 单渠道发送失败不影响其他渠道
                 logger.exception(
                     "channel_send_error",
                     channel=channel,

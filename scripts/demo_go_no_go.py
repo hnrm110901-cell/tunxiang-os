@@ -97,6 +97,9 @@ def check_tier1_tests(args: argparse.Namespace) -> CheckResult:
     if not tier1_files:
         # 兼容 src/tests/ 子目录结构
         tier1_files = list(REPO_ROOT.glob("services/*/src/tests/**/test_*tier1*.py"))
+    # 兼容 tests/tier1/ 根级测试目录（新增 Tier 1 测试统一收敛位置）
+    tier1_files.extend(REPO_ROOT.glob("tests/tier1/**/test_*tier1*.py"))
+    tier1_files = sorted(set(tier1_files), key=str)
     if not tier1_files:
         return CheckResult(
             checkpoint_id=1,
