@@ -77,3 +77,10 @@ markers = [
     "tier1: Tier 1 路径测试（CLAUDE.md §17）— 零容忍，必须 100% 通过",
     "toxiproxy_required: 需 toxiproxy 容器在线（Sprint F2）— CI 默认跳过，手动 dispatch 触发",
 ]
+
+[dependency-groups]
+dev = [
+    # 依赖版本锁定工具（生产构建可复现性）
+    # 使用：pip install pip-tools && ./scripts/generate_requirements_locks.sh
+    "pip-tools>=7.4.0",
+]

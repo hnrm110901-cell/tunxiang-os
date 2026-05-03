@@ -379,8 +379,45 @@ services:
           cpus: "0.25"
           memory: 256M
 
+  # ── PostgreSQL 定时备份 ──
+  # 每日 02:00 执行 pg_dump，保留最近 7 份，写入 pg_backups volume
+  # 恢复方法：见 scripts/backup/README.md
+  pg-backup:
+    image: postgres:16-alpine
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-tunxiang_os}
+      PGUSER: ${POSTGRES_USER:-tunxiang}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      BACKUP_KEEP_DAYS: "7"
+    volumes:
+      - pg_backups:/backups
+      - ./scripts/backup/pg_backup.sh:/pg_backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Starting backup scheduler (daily at 02:00)..."
+        while true; do
+          now=$(date +%H:%M)
+          if [ "$$now" = "02:00" ]; then
+            /bin/sh /pg_backup.sh
+          fi
+          sleep 60
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
 volumes:
   pg_data:
+  pg_backups:
   redis_data:
   web-hub-dist:
   web-admin-dist:
