@@ -22,6 +22,8 @@ from .growth_intel_relay import router as relay_router
 from .hub_api import router as hub_router
 from .material_routes import router as material_router
 from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
+from .middleware.api_key_middleware import ApiKeyMiddleware
+from .middleware.domain_authz_middleware import DomainAuthzMiddleware
 from .middleware.audit_middleware import AuditMiddleware
 from .personalization_middleware import PersonalizationMiddleware
 from .proxy import router as proxy_router
@@ -47,7 +49,7 @@ app = FastAPI(
 Instrumentator().instrument(app).expose(app)
 
 # 中间件：先 add 的层更靠近路由；最后 add 的层最先收到请求。
-# 目标入站链：Audit → 日志 → Auth → Tenant → Personalization（文档要求位于 Tenant 后）→ CORS → 路由
+# 目标入站链：Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → CORS → 路由
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
@@ -56,7 +58,9 @@ app.add_middleware(
 )
 app.add_middleware(PersonalizationMiddleware)
 app.add_middleware(TenantMiddleware)
+app.add_middleware(DomainAuthzMiddleware)  # 域级授权 + MFA（必须在 Auth 内侧，认证完成后执行）
 app.add_middleware(AuthMiddleware)
+app.add_middleware(ApiKeyMiddleware)  # ApiKey 必须外于 Auth（先处理 X-API-Key 再进入 JWT 校验）
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(AuditMiddleware)
 

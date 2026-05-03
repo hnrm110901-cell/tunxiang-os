@@ -1,4 +1,24 @@
-## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
+## 2026-05-03 A1 授权加固回归测试 + 基础设施安全加固
+
+### 今日完成
+- [security(gateway)] 修复 5 个安全漏洞：api_key_pending 绕过、JWT type/iss/aud 缺失校验、生产环境密钥缺失不崩溃、中间件未注册、MFA 未强制
+- [security(gateway)] 新增 DomainAuthzMiddleware（域级 RBAC + 9 条高危操作 MFA 强制）
+- [security(gateway)] 新增 25 个 A1 回归测试（T1-T8），含 5 条 MFA 路径参数化测试
+- [security(gateway)] 代码质量：修复 DB 异常捕获类型、审计约束 exc_info=True、JSONB 序列化防注入
+- [security(infra)] 修复 scripts/create-prod-env.sh 硬编码生产密码（openssl rand 随机生成）
+- [security(infra)] 移除 docker-compose.yml 全部不安全默认值（DB 密码/JWT 密钥/DATABASE_URL）
+- [security(infra)] scripts/start.sh 开发环境改用随机密码生成（替代硬编码 changeme_dev）
+
+### 数据变化
+- 迁移版本：无
+- 新增模块：2 个（domain_authz_middleware.py + test_a1_authz_regression.py）
+- 新增测试：25 个（A1 回归测试）
+- 修改 9 个文件
+
+### 遗留问题
+- infra/docker/docker-compose.czyz.yml/demo.yml/sgc.yml/zqx.yml 含各租户硬编码密码（需单独处理）
+- infra/monitoring/docker-compose.monitoring.yml 含 Grafana/Postgres 硬编码密码
+- 2 个预存 test_open_api.py 失败（webhook mock 数据 / 迁移文件路径，与本次改动无关）
 
 ### 今日完成
 - [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞

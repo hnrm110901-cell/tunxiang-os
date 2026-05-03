@@ -12,7 +12,7 @@
 """
 
 import os
-from typing import Sequence
+from typing import Optional, Sequence
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -20,6 +20,13 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 logger = structlog.get_logger(__name__)
+
+# 延迟加载 JWTService（同时兼容 package 内和测试两种导入方式）
+try:
+    from services.jwt_service import JWTService  # type: ignore[import]
+except ImportError:
+    from ..services.jwt_service import JWTService  # type: ignore[import]
+
 
 # 免认证白名单路径前缀
 AUTH_EXEMPT_PREFIXES: tuple[str, ...] = (
@@ -72,7 +79,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     TX_AUTH_ENABLED=false 时，所有请求注入 mock 用户信息直接放行。
     """
 
-    def __init__(self, app, exempt_prefixes: Sequence[str] | None = None) -> None:  # noqa: ANN001
+    def __init__(self, app, exempt_prefixes: "Optional[Sequence[str]]" = None) -> None:  # noqa: ANN001
         super().__init__(app)
         self._auth_enabled = os.getenv("TX_AUTH_ENABLED", "true").lower() != "false"
         if exempt_prefixes:
@@ -105,10 +112,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if getattr(request.state, "auth_method", None) == "api_key":
             return await call_next(request)
 
-        # 有 X-API-Key 但还没被处理（不应该发生，但防御性编程）
+        # 有 X-API-Key 但 ApiKeyMiddleware 未处理（未注册或顺序错误）
+        # 安全优先：拒绝请求而非静默放行
         if request.headers.get("X-API-Key"):
-            request.state.auth_method = "api_key_pending"
-            return await call_next(request)
+            logger.warning("api_key_unprocessed", path=path, method=request.method)
+            return _error_response(401, "INVALID_API_KEY", "X-API-Key is present but not accepted")
 
         # JWT 验证
         auth_header = request.headers.get("Authorization", "")
@@ -120,9 +128,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not token:
             return _error_response(401, "AUTH_REQUIRED", "Bearer token is empty")
 
-        # 使用 JWTService 验证
-        from ..services.jwt_service import JWTService
-
+        # 使用 JWTService 验证（模块级延迟加载，不在请求路径上执行 import）
         jwt_service = JWTService()
         payload = jwt_service.verify_access_token(token)
 

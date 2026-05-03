@@ -20,7 +20,7 @@ x-svc: &svc-defaults
       max-file: "3"
 
 x-env: &common-env
-  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://tunxiang:changeme_dev@postgres:5432/tunxiang_os}
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required — set in .env or export it}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   PYTHONPATH: /app
   PYTHONUNBUFFERED: "1"
@@ -32,7 +32,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tunxiang}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set in .env or export it}
       POSTGRES_DB: ${POSTGRES_DB:-tunxiang_os}
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -94,7 +94,8 @@ services:
       WECOM_AGENT_ID:  ${WECOM_AGENT_ID:-}
       WECOM_SECRET:    ${WECOM_SECRET:-}
       WECOM_CALLBACK_TOKEN: ${WECOM_CALLBACK_TOKEN:-}
-      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_CHANGE_ME_32chars__}
+      # 生产环境：必须在 .env 中设置 TX_JWT_SECRET_KEY（Gateway 启动会校验）
+      TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY:?TX_JWT_SECRET_KEY is required — set in .env}
       TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY:-}
       TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY:-}
       TX_INTEGRITY_SECRET: ${TX_INTEGRITY_SECRET:-}
@@ -318,10 +319,10 @@ services:
       - "${DEVFORGE_PORT:-8017}:8017"
     environment:
       <<: *common-env
-      DEVFORGE_DATABASE_URL: ${DEVFORGE_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:-changeme_dev}@postgres:5432/${POSTGRES_DB:-tunxiang_os}}
+      DEVFORGE_DATABASE_URL: ${DEVFORGE_DATABASE_URL:?DEVFORGE_DATABASE_URL is required}
       DEVFORGE_PORT: "8017"
       DEVFORGE_LOG_LEVEL: ${DEVFORGE_LOG_LEVEL:-INFO}
-      DEVFORGE_JWT_SECRET: ${TX_JWT_SECRET_KEY:-dev_jwt_secret_CHANGE_ME_32chars__}
+      DEVFORGE_JWT_SECRET: ${TX_JWT_SECRET_KEY:?TX_JWT_SECRET_KEY is required — DEVFORGE_JWT_SECRET falls back to it}
     depends_on:
       postgres:
         condition: service_healthy
