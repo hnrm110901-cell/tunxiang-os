@@ -102,9 +102,46 @@ class TestPDPAService:
     async def test_create_correction_request(self, pdpa_service):
         """创建数据更正请求"""
         import uuid
+        from types import SimpleNamespace
+
+        cid = uuid.uuid4()
+        rid = uuid.uuid4()
+        fake_row = SimpleNamespace(
+            id=rid,
+            customer_id=cid,
+            request_type="correction",
+            status="pending",
+            request_data=None,
+            response_data=None,
+            requested_by="customer",
+            notes="号码变更",
+            created_at=None,
+            updated_at=None,
+        )
+
+        empty_result = MagicMock()
+        empty_result.fetchone.return_value = None
+        empty_result.fetchall.return_value = []
+
+        row_result = MagicMock()
+        row_result.fetchone.return_value = fake_row
+        row_result.fetchall.return_value = []
+
+        # handle_data_subject_request 调用链:
+        #   1. _set_tenant → get_request → _set_tenant
+        #   2. check existing → fetchone=None
+        #   3. INSERT
+        #   4. get_request → execute (need row)
+        pdpa_service.db.execute = AsyncMock(side_effect=[
+            empty_result,  # _set_tenant
+            empty_result,  # check existing
+            empty_result,  # INSERT
+            empty_result,  # get_request._set_tenant
+            row_result,    # get_request SELECT
+        ])
 
         request = await pdpa_service.create_correction_request(
-            customer_id=str(uuid.uuid4()),
+            customer_id=str(cid),
             field_name="phone",
             current_value="+60-12345678",
             new_value="+60-87654321",

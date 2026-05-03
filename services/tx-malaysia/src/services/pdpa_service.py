@@ -301,14 +301,9 @@ class PDPAService:
             request_data=request_data,
             notes=reason,
         )
-        # correction 请求需要审批，mock 环境下可能返回 None
         if result is None:
-            result = {
-                "status": "pending",
-                "request_type": "correction",
-                "requested_by": requested_by,
-            }
-        elif result.get("status") != "pending":
+            raise RuntimeError("创建更正请求失败：数据库写入异常")
+        if result.get("status") != "pending":
             result["status"] = "pending"
         return result
 
@@ -500,6 +495,17 @@ class PDPAService:
         if not correction_fields:
             raise ValueError("更正字段不能为空")
 
+        # 允许更新的字段白名单（防止 SQL 注入）
+        allowed_fields = {
+            "primary_phone", "display_name", "gender", "birth_date",
+            "dietary_restrictions", "wechat_openid", "wechat_unionid",
+            "meituan_user_id", "meituan_openid", "douyin_openid",
+            "eleme_user_id", "wecom_external_userid",
+        }
+        unknown_fields = set(correction_fields.keys()) - allowed_fields
+        if unknown_fields:
+            raise ValueError(f"不允许更新以下字段: {unknown_fields}")
+
         cid = uuid.UUID(customer_id)
         set_clauses: list[str] = []
         params: Dict[str, Any] = {
@@ -522,13 +528,16 @@ class PDPAService:
             if value is not None and isinstance(value, str) and field in sensitive_fields:
                 try:
                     value = self._encryptor.encrypt(value)
-                except Exception as exc:
-                    log.warning(
+                except (ValueError, TypeError, RuntimeError) as exc:
+                    log.error(
                         "pdpa.correction_encrypt_failed",
                         field=field,
                         error=str(exc),
+                        exc_info=True,
                     )
-                    # 继续，写入未加密值（等保级别由调用方保证）
+                    raise RuntimeError(
+                        f"敏感字段加密失败，已中止更新: {field}"
+                    ) from exc
 
             set_clauses.append(f"{field} = :{param}")
             params[param] = value
