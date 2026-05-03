@@ -39,7 +39,7 @@ class PublishOperation(str, Enum):
 
 
 ALLOWED_PLATFORMS = frozenset(
-    {"meituan", "eleme", "douyin", "xiaohongshu", "wechat", "other"}
+    {"meituan", "eleme", "douyin", "xiaohongshu", "wechat", "grabfood", "other"}
 )
 
 
