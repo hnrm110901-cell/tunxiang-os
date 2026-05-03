@@ -11,15 +11,21 @@ Base URL: https://open.i200.cn
     WSH_APP_SECRET    — 应用密钥（仅用于获取 token，不随业务请求发送）
     WSH_TIMEOUT       — 超时秒数，默认 30
     WSH_RETRY_TIMES   — 重试次数，默认 3
+    WSH_TENANT_ID     — 屯象租户 ID（事件发射用）
 """
 
 import asyncio
+import hashlib
+import json
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 import structlog
+
+from shared.adapters.base.src.event_bus import emit_adapter_event
+from shared.events.src.event_types import AdapterEventType
 
 logger = structlog.get_logger()
 
@@ -42,6 +48,8 @@ class WeishenghuoAdapter:
         self.app_secret = config.get("app_secret", os.getenv("WSH_APP_SECRET", ""))
         self.timeout = config.get("timeout", int(os.getenv("WSH_TIMEOUT", "30")))
         self.retry_times = config.get("retry_times", int(os.getenv("WSH_RETRY_TIMES", "3")))
+        self._tenant_id = config.get("tenant_id", os.getenv("WSH_TENANT_ID", ""))
+        self._nonce_store: Set[str] = set()
 
         if not self.appid or not self.app_secret:
             logger.warning("微生活 appid/app_secret 未配置，将使用降级模式")
@@ -153,6 +161,41 @@ class WeishenghuoAdapter:
     async def __aexit__(self, *args: Any) -> None:
         await self.aclose()
 
+    # ── 幂等性保障 ──────────────────────────────────────────────────────────────
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """基于 operation + payload 生成确定性幂等键。"""
+        raw = f"{operation}:{self._tenant_id}:{json.dumps(payload, sort_keys=True)}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        self._nonce_store.add(key)
+
+    # ── 事件发射 ──────────────────────────────────────────────────────────────
+
+    async def _emit_sync_event(
+        self,
+        event_type: AdapterEventType,
+        scope: str,
+        stream_id: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """发射适配器事件（fire-and-forget，失败只记 warning）。"""
+        try:
+            await emit_adapter_event(
+                adapter_name="weishenghuo",
+                event_type=event_type,
+                tenant_id=self._tenant_id,
+                scope=scope,
+                stream_id=stream_id,
+                payload=payload,
+            )
+        except Exception:  # noqa: BLE001 — 事件发射失败不阻断主流程
+            logger.warning("weishenghuo.event_emit_failed", scope=scope, stream_id=stream_id)
+
     # ── 会员接口 ───────────────────────────────────────────────────────────────
 
     async def get_member_info(
@@ -183,7 +226,16 @@ class WeishenghuoAdapter:
 
         logger.info("获取微生活会员信息", mobile=mobile, member_id=member_id)
         try:
-            return await self._request("GET", "/member/info", params)
+            result = await self._request("GET", "/member/info", params)
+            asyncio.create_task(
+                self._emit_sync_event(
+                    event_type=AdapterEventType.MEMBER_SYNCED,
+                    scope="member_info",
+                    stream_id=f"weishenghuo:member:{member_id or mobile}",
+                    payload=result,
+                )
+            )
+            return result
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("获取微生活会员信息失败", error=str(e), exc_info=True)
             return {}
@@ -220,7 +272,16 @@ class WeishenghuoAdapter:
             updated_after=updated_after,
         )
         try:
-            return await self._request("GET", "/member/list", params)
+            result = await self._request("GET", "/member/list", params)
+            asyncio.create_task(
+                self._emit_sync_event(
+                    event_type=AdapterEventType.MEMBER_SYNCED,
+                    scope="member_list",
+                    stream_id=f"weishenghuo:member_list:{page}",
+                    payload={"page": page, "page_size": page_size, "total": result.get("total", 0)},
+                )
+            )
+            return result
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("拉取微生活会员列表失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0, "page": page, "page_size": page_size}
@@ -258,7 +319,16 @@ class WeishenghuoAdapter:
             end_date=end_date,
         )
         try:
-            return await self._request("GET", "/member/transactions", params)
+            result = await self._request("GET", "/member/transactions", params)
+            asyncio.create_task(
+                self._emit_sync_event(
+                    event_type=AdapterEventType.SYNC_FINISHED,
+                    scope="member_transactions",
+                    stream_id=f"weishenghuo:transactions:{member_id}",
+                    payload={"member_id": member_id, "start_date": start_date, "end_date": end_date},
+                )
+            )
+            return result
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询微生活会员交易记录失败", error=str(e), exc_info=True)
             return {"list": [], "total": 0, "page": page}
@@ -276,7 +346,16 @@ class WeishenghuoAdapter:
         """
         logger.info("查询微生活会员积分", member_id=member_id)
         try:
-            return await self._request("GET", "/member/points", {"member_id": member_id})
+            result = await self._request("GET", "/member/points", {"member_id": member_id})
+            asyncio.create_task(
+                self._emit_sync_event(
+                    event_type=AdapterEventType.SYNC_FINISHED,
+                    scope="member_points",
+                    stream_id=f"weishenghuo:points:{member_id}",
+                    payload={"member_id": member_id, "balance": result.get("balance", 0)},
+                )
+            )
+            return result
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询微生活会员积分失败", error=str(e), exc_info=True)
             return {"balance": 0, "history": []}
@@ -294,7 +373,16 @@ class WeishenghuoAdapter:
         """
         logger.info("查询微生活会员储值余额", member_id=member_id)
         try:
-            return await self._request("GET", "/member/stored-value", {"member_id": member_id})
+            result = await self._request("GET", "/member/stored-value", {"member_id": member_id})
+            asyncio.create_task(
+                self._emit_sync_event(
+                    event_type=AdapterEventType.SYNC_FINISHED,
+                    scope="member_stored_value",
+                    stream_id=f"weishenghuo:stored_value:{member_id}",
+                    payload={"member_id": member_id, "balance": result.get("balance", 0)},
+                )
+            )
+            return result
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("查询微生活会员储值余额失败", error=str(e), exc_info=True)
             return {"balance": 0}
@@ -309,6 +397,14 @@ class WeishenghuoAdapter:
         logger.info("获取微生活门店列表")
         try:
             result = await self._request("GET", "/shop/list", {})
+            asyncio.create_task(
+                self._emit_sync_event(
+                    event_type=AdapterEventType.SYNC_FINISHED,
+                    scope="shop_list",
+                    stream_id="weishenghuo:shop_list",
+                    payload={},
+                )
+            )
             # API 可能返回 {"list": [...]} 或直接返回列表
             if isinstance(result, list):
                 return result

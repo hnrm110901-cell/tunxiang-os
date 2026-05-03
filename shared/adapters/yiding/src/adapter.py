@@ -5,6 +5,9 @@
 实现预订数据读取、会员查询、订单列表等功能
 """
 
+import asyncio
+import hashlib
+import json
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -48,6 +51,57 @@ class YiDingAdapter:
         """关闭适配器"""
         await self.client.close()
 
+    # ─── 幂等性 ──────────────────────────────────────────────────────────
+    _tenant_id: str = ""
+    _nonce_store: set[str] = set()
+
+    def idempotency_key(self, operation: str, payload: dict) -> str:
+        """生成幂等性键值，包含租户隔离 nonce。
+
+        Args:
+            operation: 操作名称（如 "sync_tables", "confirm_orders"）
+            payload:   操作请求体
+
+        Returns:
+            MD5 哈希字符串，作为幂等性唯一标识
+        """
+        raw = f"{operation}:{self._tenant_id}:{json.dumps(payload, sort_keys=True)}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        """检查 nonce 是否已处理过相同请求"""
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        """标记请求已处理，加入 nonce 存储"""
+        self._nonce_store.add(key)
+
+    # ─── 事件发射 ────────────────────────────────────────────────────────
+
+    async def _emit_sync_event(
+        self, event_type: str, scope: str, stream_id: str, payload: dict
+    ) -> None:
+        """发射适配器同步事件到事件总线（fire-and-forget）。
+
+        底层使用 emit_event 写入 Redis Stream，
+        异常时不阻塞主流程，仅记录 warning 日志。
+        """
+        try:
+            from shared.events.src.event_types import AdapterEventType
+            from shared.adapters.base.src.event_bus import emit_adapter_event
+
+            asyncio.create_task(
+                emit_adapter_event(
+                    event_type=AdapterEventType.STATUS_PUSHED,
+                    scope=scope,
+                    stream_id=stream_id,
+                    payload=payload,
+                    tenant_id=self._tenant_id,
+                )
+            )
+        except Exception:
+            logger.warning("event_emit_failed", exc_info=True)
+
     def get_system_name(self) -> str:
         return "yiding"
 
@@ -84,6 +138,16 @@ class YiDingAdapter:
 
         self.logger.info("pending_orders_fetched", count=len(reservations), request_id=request_id)
 
+        # 事件留痕
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "orders",
+                f"yiding:pending:{self.hotel_id or 'default'}",
+                {"count": len(reservations), "request_id": request_id, "tenant_id": self._tenant_id},
+            )
+        )
+
         return reservations
 
     # ============================================
@@ -109,7 +173,19 @@ class YiDingAdapter:
         if request_id:
             body["requestId"] = request_id
 
-        return await self.client.put("resv/orders", json=body)
+        result = await self.client.put("resv/orders", json=body)
+
+        # 事件留痕
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "orders",
+                f"yiding:confirm:{self.hotel_id or 'default'}",
+                {"order_count": len(orders), "request_id": request_id, "tenant_id": self._tenant_id},
+            )
+        )
+
+        return result
 
     # ============================================
     # 2.3 检查桌位当前预订状态
@@ -347,7 +423,19 @@ class YiDingAdapter:
             tables: [{"area_code": "1", "table_code": "3", "table_name": "101",
                       "max_people_num": "10", "status": "1", "sort_id": 1}]
         """
-        return await self.client.post("sync/tables", json={"areas": areas, "tables": tables})
+        result = await self.client.post("sync/tables", json={"areas": areas, "tables": tables})
+
+        # 事件留痕
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "tables",
+                f"yiding:tables:{self.hotel_id or 'default'}",
+                {"area_count": len(areas), "table_count": len(tables), "tenant_id": self._tenant_id},
+            )
+        )
+
+        return result
 
     async def sync_dishes(
         self,
@@ -374,7 +462,24 @@ class YiDingAdapter:
         if making_method:
             body["making_method"] = making_method
 
-        return await self.client.post("sync/dishes", json=body)
+        result = await self.client.post("sync/dishes", json=body)
+
+        # 事件留痕
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "dishes",
+                f"yiding:dishes:{self.hotel_id or 'default'}",
+                {
+                    "dls_count": len(dls),
+                    "xls_count": len(xls),
+                    "cms_count": len(cms),
+                    "tenant_id": self._tenant_id,
+                },
+            )
+        )
+
+        return result
 
     async def sync_bills(
         self,

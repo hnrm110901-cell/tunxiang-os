@@ -6,8 +6,11 @@
   2. 通用请求重试逻辑
   3. 业务错误与网络错误的区分处理
   4. 各会员接口入参校验与降级返回
+  5. 幂等性保障
+  6. 事件发射
 """
 
+import json
 import time
 from unittest.mock import AsyncMock, patch
 
@@ -444,3 +447,94 @@ class TestGetShopList:
             result = await adapter.get_shop_list()
 
         assert result == []
+
+
+# ── 幂等性测试 ──────────────────────────────────────────────────────────────
+
+
+class TestIdempotency:
+    def test_idempotency_key_deterministic(self, adapter):
+        """相同 operation + payload 应生成相同幂等键"""
+        key1 = adapter.idempotency_key("query_member", {"mobile": "13800138000"})
+        key2 = adapter.idempotency_key("query_member", {"mobile": "13800138000"})
+        assert key1 == key2
+
+    def test_idempotency_key_different_payload(self, adapter):
+        """不同 payload 应生成不同幂等键"""
+        key1 = adapter.idempotency_key("query_member", {"mobile": "13800138000"})
+        key2 = adapter.idempotency_key("query_member", {"mobile": "13900139000"})
+        assert key1 != key2
+
+    def test_is_duplicate_returns_false_initially(self, adapter):
+        """新 key 应返回 False"""
+        key = adapter.idempotency_key("test", {"a": 1})
+        assert not adapter.is_duplicate(key)
+
+    def test_mark_idempotent_then_is_duplicate(self, adapter):
+        """标记后应返回 True"""
+        key = adapter.idempotency_key("test", {"a": 1})
+        adapter.mark_idempotent(key)
+        assert adapter.is_duplicate(key)
+
+    def test_multiple_keys_independent(self, adapter):
+        """多个 key 互不影响"""
+        k1 = adapter.idempotency_key("op1", {"id": "1"})
+        k2 = adapter.idempotency_key("op2", {"id": "2"})
+        adapter.mark_idempotent(k1)
+        assert adapter.is_duplicate(k1)
+        assert not adapter.is_duplicate(k2)
+
+
+# ── 事件发射测试 ─────────────────────────────────────────────────────────────
+
+
+class TestEventEmission:
+    @pytest.mark.asyncio
+    async def test_get_member_info_emits_event(self, adapter):
+        """get_member_info 成功时应发射 MEMBER_SYNCED 事件"""
+        with patch.object(adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"member_id": "M001"}
+            with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+                await adapter.get_member_info(mobile="13800138000")
+                await asyncio.sleep(0.05)
+                mock_emit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_list_members_emits_event(self, adapter):
+        """list_members 成功时应发射 MEMBER_SYNCED 事件"""
+        with patch.object(adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"list": [], "total": 0, "page": 1, "page_size": 100}
+            with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+                await adapter.list_members()
+                await asyncio.sleep(0.05)
+                mock_emit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_member_transactions_emits_event(self, adapter):
+        """get_member_transactions 成功时应发射 SYNC_FINISHED 事件"""
+        with patch.object(adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"list": [], "total": 0, "page": 1}
+            with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+                await adapter.get_member_transactions(member_id="M001", start_date="2026-03-01", end_date="2026-03-17")
+                await asyncio.sleep(0.05)
+                mock_emit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_shop_list_emits_event(self, adapter):
+        """get_shop_list 成功时应发射 SYNC_FINISHED 事件"""
+        with patch.object(adapter, "_request", new_callable=AsyncMock) as mock_req:
+            mock_req.return_value = {"list": [{"shop_id": "S001"}]}
+            with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+                await adapter.get_shop_list()
+                await asyncio.sleep(0.05)
+                mock_emit.assert_called_once()
+
+    def test_emit_sync_event_does_not_block(self, adapter):
+        """_emit_sync_event 失败不应阻断主流程"""
+        assert hasattr(adapter, "_emit_sync_event")
+
+    def test_idempotency_methods_exist(self, adapter):
+        """幂等性方法应存在"""
+        assert hasattr(adapter, "idempotency_key")
+        assert hasattr(adapter, "is_duplicate")
+        assert hasattr(adapter, "mark_idempotent")

@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tempfile
@@ -49,6 +50,7 @@ class YonyouAdapter(ERPAdapter):
     """
 
     def __init__(self) -> None:
+        super().__init__()
         self._client_id = os.environ["YONYOU_CLIENT_ID"]
         self._client_secret = os.environ["YONYOU_CLIENT_SECRET"]
         self._base_url = os.environ["YONYOU_BASE_URL"].rstrip("/")
@@ -263,6 +265,22 @@ class YonyouAdapter(ERPAdapter):
         try:
             result = await self._do_push(voucher)
             log.info("yonyou.push_voucher.ok", voucher_id=voucher.voucher_id)
+
+            # 事件留痕
+            asyncio.create_task(
+                self._emit_sync_event(
+                    "status_pushed",
+                    "finance",
+                    f"yonyou:voucher:{voucher.voucher_id}",
+                    {
+                        "source_type": voucher.source_type,
+                        "source_id": voucher.source_id,
+                        "total_fen": voucher.total_fen,
+                        "erp_voucher_id": result.erp_voucher_id,
+                    },
+                )
+            )
+
             return result
         except httpx.HTTPError as exc:
             error_msg = f"HTTP错误: {exc}"

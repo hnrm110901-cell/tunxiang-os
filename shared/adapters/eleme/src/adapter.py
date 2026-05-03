@@ -4,12 +4,18 @@
 
 底层 HTTP 调用委托给 ElemeClient，本类只做业务编排和数据映射。
 
+幂等性: idempotency_key/is_duplicate/mark_idempotent
+事件:   异步发射适配器同步事件(参考 Sprint F1 / PR F)
+
 饿了么开放平台文档: https://open.shop.ele.me
 """
 
+import asyncio
+import hashlib
+import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import structlog
 
@@ -43,11 +49,57 @@ class ElemeAdapter:
             timeout=config.get("timeout", 30),
             retry_times=config.get("retry_times", 3),
         )
+        self._tenant_id: str = config.get("tenant_id", "")
+        self._nonce_store: Set[str] = set()
 
         logger.info(
             "饿了么适配器初始化",
             sandbox=config.get("sandbox", False),
         )
+
+    # ==================== 幂等性 ====================
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """基于 operation + payload 生成确定性幂等键。"""
+        raw = f"{operation}:{self._tenant_id}:{json.dumps(payload, sort_keys=True)}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        self._nonce_store.add(key)
+
+    # ==================== 事件发射 ====================
+
+    async def _emit_sync_event(
+        self, event_type: str, scope: str, stream_id: str, payload: dict
+    ) -> None:
+        """发射适配器同步事件（fire-and-forget，失败只记 warning）。
+
+        Args:
+            event_type: 事件类型短名（如 status_pushed / sync_finished）
+            scope:      同步范围（orders / menu / members / status_push）
+            stream_id:  聚合根 ID
+            payload:    业务数据
+        """
+        try:
+            from shared.events.src.event_types import AdapterEventType
+            from shared.adapters.base.src.event_bus import emit_adapter_event
+
+            evt = getattr(AdapterEventType, event_type.upper(), AdapterEventType.STATUS_PUSHED)
+            asyncio.create_task(
+                emit_adapter_event(
+                    adapter_name="eleme",
+                    event_type=evt,
+                    scope=scope,
+                    stream_id=stream_id,
+                    payload=payload,
+                    tenant_id=self._tenant_id,
+                )
+            )
+        except Exception:  # noqa: BLE001 — 事件发射失败不阻断主流程
+            logger.warning("eleme.event_emit_failed", exc_info=True)
 
     # ==================== 订单管理接口 ====================
 
@@ -85,7 +137,16 @@ class ElemeAdapter:
 
         logger.info("饿了么查询订单列表", page=page, page_size=page_size)
         response = await self.client.request("GET", "/orders", data=data)
-        return response.get("data", {})
+        result = response.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "orders",
+                f"eleme:orders:{start_time or ''}:{end_time or ''}",
+                {"page": page, "page_size": page_size},
+            )
+        )
+        return result
 
     async def get_order_detail(self, order_id: str) -> Dict[str, Any]:
         """
@@ -98,7 +159,16 @@ class ElemeAdapter:
             订单详情
         """
         logger.info("饿了么查询订单详情", order_id=order_id)
-        return await self.client.query_order(order_id)
+        result = await self.client.query_order(order_id)
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "order_detail",
+                f"eleme:order:{order_id}",
+                {"order_id": order_id},
+            )
+        )
+        return result
 
     async def confirm_order(self, order_id: str) -> Dict[str, Any]:
         """
@@ -111,7 +181,16 @@ class ElemeAdapter:
             确认结果
         """
         logger.info("饿了么确认订单", order_id=order_id)
-        return await self.client.confirm_order(order_id)
+        result = await self.client.confirm_order(order_id)
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "order_confirm",
+                f"eleme:order:confirm:{order_id}",
+                {"order_id": order_id},
+            )
+        )
+        return result
 
     async def cancel_order(
         self,
@@ -131,7 +210,16 @@ class ElemeAdapter:
             取消结果
         """
         logger.info("饿了么取消订单", order_id=order_id, reason=reason)
-        return await self.client.cancel_order(order_id, reason_code, reason)
+        result = await self.client.cancel_order(order_id, reason_code, reason)
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "order_cancel",
+                f"eleme:order:cancel:{order_id}",
+                {"order_id": order_id, "reason_code": reason_code},
+            )
+        )
+        return result
 
     async def query_refund(self, order_id: str) -> Dict[str, Any]:
         """
@@ -145,7 +233,16 @@ class ElemeAdapter:
         """
         logger.info("饿了么查询退款", order_id=order_id)
         response = await self.client.request("GET", "/order/refund", data={"order_id": order_id})
-        return response.get("data", {})
+        result = response.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "order_refund",
+                f"eleme:refund:{order_id}",
+                {"order_id": order_id},
+            )
+        )
+        return result
 
     # ==================== 商品管理接口 ====================
 
@@ -172,7 +269,16 @@ class ElemeAdapter:
 
         logger.info("饿了么查询商品", page=page)
         response = await self.client.request("GET", "/foods", data=data)
-        return response.get("data", [])
+        result = response.get("data", [])
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "menu",
+                f"eleme:foods:list",
+                {"page": page, "category_id": category_id},
+            )
+        )
+        return result
 
     async def update_food_stock(
         self,
@@ -190,7 +296,16 @@ class ElemeAdapter:
             更新结果
         """
         logger.info("饿了么更新库存", food_id=food_id, stock=stock)
-        return await self.client.update_food(food_id, {"stock": stock})
+        result = await self.client.update_food(food_id, {"stock": stock})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "menu_stock",
+                f"eleme:food:stock:{food_id}",
+                {"food_id": food_id, "stock": stock},
+            )
+        )
+        return result
 
     async def sold_out_food(self, food_id: str) -> Dict[str, Any]:
         """
@@ -204,7 +319,16 @@ class ElemeAdapter:
         """
         logger.info("饿了么商品售罄", food_id=food_id)
         response = await self.client.request("POST", "/food/soldout", data={"food_id": food_id})
-        return response.get("data", {})
+        result = response.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "menu_soldout",
+                f"eleme:food:soldout:{food_id}",
+                {"food_id": food_id},
+            )
+        )
+        return result
 
     async def on_sale_food(self, food_id: str) -> Dict[str, Any]:
         """
@@ -218,7 +342,16 @@ class ElemeAdapter:
         """
         logger.info("饿了么商品上架", food_id=food_id)
         response = await self.client.request("POST", "/food/onsale", data={"food_id": food_id})
-        return response.get("data", {})
+        result = response.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "menu_onsale",
+                f"eleme:food:onsale:{food_id}",
+                {"food_id": food_id},
+            )
+        )
+        return result
 
     # ==================== 门店管理接口 ====================
 
@@ -238,7 +371,16 @@ class ElemeAdapter:
 
         logger.info("饿了么查询门店信息", shop_id=shop_id)
         response = await self.client.request("GET", "/shop/info", data=data)
-        return response.get("data", {})
+        result = response.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "shop_info",
+                f"eleme:shop:{shop_id or 'default'}",
+                {"shop_id": shop_id},
+            )
+        )
+        return result
 
     async def update_shop_status(
         self,
@@ -261,7 +403,16 @@ class ElemeAdapter:
 
         logger.info("饿了么更新门店状态", status=status, shop_id=shop_id)
         response = await self.client.request("POST", "/shop/status", data=data)
-        return response.get("data", {})
+        result = response.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "shop_status",
+                f"eleme:shop:status:{shop_id or 'default'}",
+                {"status": status, "shop_id": shop_id},
+            )
+        )
+        return result
 
     # ==================== 配送管理接口 ====================
 
@@ -276,7 +427,16 @@ class ElemeAdapter:
             配送信息（骑手位置、状态、预计到达时间等）
         """
         logger.info("饿了么查询配送状态", order_id=order_id)
-        return await self.client.query_delivery_status(order_id)
+        result = await self.client.query_delivery_status(order_id)
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "delivery_status",
+                f"eleme:delivery:{order_id}",
+                {"order_id": order_id},
+            )
+        )
+        return result
 
     # ==================== 标准化数据总线接口 ====================
 

@@ -11,13 +11,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import uuid
 from abc import ABC, abstractmethod
 from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any
 
+import structlog
 from pydantic import BaseModel, Field, model_validator
+
+logger = structlog.get_logger(__name__)
+
 
 # ─── 枚举 ───────────────────────────────────────────────────────────────────
 
@@ -139,7 +146,67 @@ class ERPAdapter(ABC):
     2. 通过环境变量获取密钥（不硬编码）
     3. 推送失败时抛出具体异常（httpx.HTTPError / ValueError 等），
        不吞掉异常，由调用方（VoucherGenerator.push_to_erp）决策是否入队
+
+    ─── 幂等性 ───────────────────────────────────────────────────────────
+    ``idempotency_key()`` / ``is_duplicate()`` / ``mark_idempotent()``
+    三个方法为 push_voucher 等写操作提供去重能力。子类在调用外部 API
+    前用 ID 检查，避免网络重试导致重复入账。
+
+    ─── 事件发射 ─────────────────────────────────────────────────────────
+    ``_emit_sync_event()`` 在关键操作成功后发射 ``STATUS_PUSHED`` 事件
+    到 tx_adapter_events 流，供 Agent / Grafana 消费。
     """
+
+    # ─── 幂等性 ──────────────────────────────────────────────────────────
+    _tenant_id: str = ""
+    _nonce_store: set[str] = set()
+
+    def idempotency_key(self, operation: str, payload: dict) -> str:
+        """生成幂等性键值。
+
+        Args:
+            operation: 操作名称（如 "push_voucher", "sync_chart_of_accounts"）
+            payload:   操作请求体（dict）
+
+        Returns:
+            MD5 哈希字符串
+        """
+        raw = f"{operation}:{self._tenant_id}:{json.dumps(payload, sort_keys=True)}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        """检查是否已处理过相同请求"""
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        """标记请求已处理"""
+        self._nonce_store.add(key)
+
+    # ─── 事件发射 ────────────────────────────────────────────────────────
+
+    async def _emit_sync_event(
+        self, event_type: str, scope: str, stream_id: str, payload: dict
+    ) -> None:
+        """发射适配器同步事件到事件总线（fire-and-forget）。
+
+        使用 emit_event 写入 Redis Stream 和 PG events 表。
+        异常时不阻塞主流程，仅记录 warning 日志。
+        """
+        try:
+            from shared.events.src.event_types import AdapterEventType
+            from shared.adapters.base.src.event_bus import emit_adapter_event
+
+            asyncio.create_task(
+                emit_adapter_event(
+                    event_type=AdapterEventType.STATUS_PUSHED,
+                    scope=scope,
+                    stream_id=stream_id,
+                    payload=payload,
+                    tenant_id=self._tenant_id,
+                )
+            )
+        except Exception:
+            logger.warning("event_emit_failed", exc_info=True)
 
     @abstractmethod
     async def push_voucher(self, voucher: ERPVoucher) -> ERPPushResult:

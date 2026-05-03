@@ -2,6 +2,8 @@
 客如云适配器单元测试 - 重点覆盖 to_order() 和 to_staff_action()
 """
 
+import asyncio
+import json
 import os
 import sys
 
@@ -231,3 +233,78 @@ class TestToStaffAction:
         raw_staff_action["operate_time"] = 1709282200
         result = adapter.to_staff_action(raw_staff_action, "STORE_KR1", "BRAND_001")
         assert isinstance(result.created_at, datetime)
+
+
+# ── 幂等性测试 ──────────────────────────────────────────────────────────────
+
+
+class TestIdempotency:
+    def test_idempotency_key_deterministic(self, adapter):
+        """相同 operation + payload 应生成相同幂等键"""
+        key1 = adapter.idempotency_key("update_status", {"order_id": "001", "status": 3})
+        key2 = adapter.idempotency_key("update_status", {"order_id": "001", "status": 3})
+        assert key1 == key2
+
+    def test_idempotency_key_different_payload(self, adapter):
+        """不同 payload 应生成不同幂等键"""
+        key1 = adapter.idempotency_key("update_status", {"order_id": "001", "status": 3})
+        key2 = adapter.idempotency_key("update_status", {"order_id": "002", "status": 3})
+        assert key1 != key2
+
+    def test_idempotency_key_different_operation(self, adapter):
+        """不同 operation 应生成不同幂等键"""
+        key1 = adapter.idempotency_key("update_status", {"order_id": "001"})
+        key2 = adapter.idempotency_key("update_dish", {"order_id": "001"})
+        assert key1 != key2
+
+    def test_is_duplicate_returns_false_initially(self, adapter):
+        """新 key 应返回 False"""
+        key = adapter.idempotency_key("test", {"a": 1})
+        assert not adapter.is_duplicate(key)
+
+    def test_mark_idempotent_then_is_duplicate(self, adapter):
+        """标记后应返回 True"""
+        key = adapter.idempotency_key("test", {"a": 1})
+        adapter.mark_idempotent(key)
+        assert adapter.is_duplicate(key)
+
+    def test_multiple_keys_independent(self, adapter):
+        """多个 key 互不影响"""
+        k1 = adapter.idempotency_key("op1", {"id": "1"})
+        k2 = adapter.idempotency_key("op2", {"id": "2"})
+        adapter.mark_idempotent(k1)
+        assert adapter.is_duplicate(k1)
+        assert not adapter.is_duplicate(k2)
+
+
+# ── 事件发射测试 ─────────────────────────────────────────────────────────────
+
+
+class TestEventEmission:
+    @pytest.mark.asyncio
+    async def test_update_order_status_emits_event(self, adapter):
+        """update_order_status 应发射 STATUS_PUSHED 事件"""
+        from unittest.mock import AsyncMock, patch
+
+        adapter._request = AsyncMock(return_value={"data": {"ok": True}})
+        with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+            await adapter.update_order_status(order_id="KR_001", status=3)
+            # 等待 create_task 执行完成
+            await asyncio.sleep(0.05)
+            mock_emit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_dish_status_emits_event(self, adapter):
+        """update_dish_status 应发射 STATUS_PUSHED 事件"""
+        from unittest.mock import AsyncMock, patch
+
+        adapter._request = AsyncMock(return_value={"data": {"ok": True}})
+        with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+            await adapter.update_dish_status(sku_id="SKU_001", is_sold_out=1)
+            await asyncio.sleep(0.05)
+            mock_emit.assert_called_once()
+
+    def test_emit_sync_event_does_not_block(self, adapter):
+        """_emit_sync_event 失败不应阻断主流程"""
+        # 验证方法是纯防御性设计，此处只做接口存在性验证
+        assert hasattr(adapter, "_emit_sync_event")

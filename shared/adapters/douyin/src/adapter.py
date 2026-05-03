@@ -3,9 +3,15 @@
 提供团购券管理、订单查询、门店信息、结算单等功能
 
 底层 HTTP 调用委托给 DouyinClient，本类只做业务编排。
+
+幂等性: idempotency_key/is_duplicate/mark_idempotent
+事件:   异步发射适配器同步事件(参考 Sprint F1 / PR F)
 """
 
-from typing import Any, Dict
+import asyncio
+import hashlib
+import json
+from typing import Any, Dict, Set
 
 import structlog
 
@@ -37,11 +43,57 @@ class DouyinAdapter:
             timeout=config.get("timeout", 30),
             retry_times=config.get("retry_times", 3),
         )
+        self._tenant_id: str = config.get("tenant_id", "")
+        self._nonce_store: Set[str] = set()
 
         logger.info(
             "抖音生活服务适配器初始化",
             sandbox=config.get("sandbox", False),
         )
+
+    # ==================== 幂等性 ====================
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """基于 operation + payload 生成确定性幂等键。"""
+        raw = f"{operation}:{self._tenant_id}:{json.dumps(payload, sort_keys=True)}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        self._nonce_store.add(key)
+
+    # ==================== 事件发射 ====================
+
+    async def _emit_sync_event(
+        self, event_type: str, scope: str, stream_id: str, payload: dict
+    ) -> None:
+        """发射适配器同步事件（fire-and-forget，失败只记 warning）。
+
+        Args:
+            event_type: 事件类型短名（如 status_pushed / sync_finished）
+            scope:      同步范围（orders / menu / members / status_push）
+            stream_id:  聚合根 ID
+            payload:    业务数据
+        """
+        try:
+            from shared.events.src.event_types import AdapterEventType
+            from shared.adapters.base.src.event_bus import emit_adapter_event
+
+            evt = getattr(AdapterEventType, event_type.upper(), AdapterEventType.STATUS_PUSHED)
+            asyncio.create_task(
+                emit_adapter_event(
+                    adapter_name="douyin",
+                    event_type=evt,
+                    scope=scope,
+                    stream_id=stream_id,
+                    payload=payload,
+                    tenant_id=self._tenant_id,
+                )
+            )
+        except Exception:  # noqa: BLE001 — 事件发射失败不阻断主流程
+            logger.warning("douyin.event_emit_failed", exc_info=True)
 
     # ==================== 团购券接口 ====================
 
@@ -57,7 +109,16 @@ class DouyinAdapter:
             "/api/apps/trade/v2/coupon/query_list/",
             data={"page": page, "page_size": page_size},
         )
-        return result.get("data", {})
+        data = result.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "coupon_query",
+                f"douyin:coupon:list",
+                {"page": page, "page_size": page_size},
+            )
+        )
+        return data
 
     async def get_coupon_detail(self, coupon_id: str) -> Dict[str, Any]:
         """查询团购券详情"""
@@ -67,7 +128,16 @@ class DouyinAdapter:
             "/api/apps/trade/v2/coupon/query_detail/",
             data={"coupon_id": coupon_id},
         )
-        return result.get("data", {})
+        data = result.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "coupon_detail",
+                f"douyin:coupon:{coupon_id}",
+                {"coupon_id": coupon_id},
+            )
+        )
+        return data
 
     async def verify_coupon(self, code: str, shop_id: str) -> Dict[str, Any]:
         """
@@ -78,10 +148,19 @@ class DouyinAdapter:
             shop_id: 抖音门店 ID
         """
         logger.info("核销团购券", shop_id=shop_id)
-        return await self.client.verify_certificate(
+        data = await self.client.verify_certificate(
             encrypted_code=code,
             shop_id=shop_id,
         )
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "coupon_verify",
+                f"douyin:coupon:verify:{shop_id}",
+                {"code": code, "shop_id": shop_id},
+            )
+        )
+        return data
 
     # ==================== 订单接口 ====================
 
@@ -112,12 +191,30 @@ class DouyinAdapter:
                 "page_size": page_size,
             },
         )
-        return result.get("data", {})
+        data = result.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "orders",
+                f"douyin:orders:{start_time}:{end_time}",
+                {"start_time": start_time, "end_time": end_time, "page": page},
+            )
+        )
+        return data
 
     async def get_order_detail(self, order_id: str) -> Dict[str, Any]:
         """查询团购订单详情"""
         logger.info("查询团购订单详情", order_id=order_id)
-        return await self.client.query_order(order_id)
+        data = await self.client.query_order(order_id)
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "order_detail",
+                f"douyin:order:{order_id}",
+                {"order_id": order_id},
+            )
+        )
+        return data
 
     # ==================== 门店接口 ====================
 
@@ -129,7 +226,16 @@ class DouyinAdapter:
             "/api/apps/trade/v2/shop/query/",
             data={"shop_id": shop_id},
         )
-        return result.get("data", {})
+        data = result.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "shop_info",
+                f"douyin:shop:{shop_id}",
+                {"shop_id": shop_id},
+            )
+        )
+        return data
 
     # ==================== 结算接口 ====================
 
@@ -151,7 +257,16 @@ class DouyinAdapter:
             "/api/apps/trade/v2/settlement/query_list/",
             data={"start_date": start_date, "end_date": end_date},
         )
-        return result.get("data", {})
+        data = result.get("data", {})
+        asyncio.create_task(
+            self._emit_sync_event(
+                "sync_finished",
+                "settlement",
+                f"douyin:settlement:{start_date}:{end_date}",
+                {"start_date": start_date, "end_date": end_date},
+            )
+        )
+        return data
 
     # ==================== 资源管理 ====================
 

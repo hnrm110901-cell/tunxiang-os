@@ -1,17 +1,40 @@
 """
-客如云餐饮管理系统API适配器
+客如云餐饮管理系统API适配器（Keruyun POS）
 提供订单管理、菜品管理、会员管理、报表等功能
 """
 
+import asyncio
 import hashlib
+import json
+import os
+import sys
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 import structlog
 
+from shared.adapters.base.src.event_bus import emit_adapter_event
+from shared.events.src.event_types import AdapterEventType
+
 logger = structlog.get_logger()
+
+# ── 解决 schemas.restaurant_standard_schema 的导入路径 ────────────────
+_src_dir = os.path.dirname(__file__)
+_repo_root = os.path.abspath(os.path.join(_src_dir, "../../../../.."))
+_gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
+if _gateway_src not in sys.path:
+    sys.path.insert(0, _gateway_src)
+
+from schemas.restaurant_standard_schema import (
+    DishCategory,
+    OrderItemSchema,
+    OrderSchema,
+    OrderStatus,
+    OrderType,
+    StaffAction,
+)
 
 
 class KeruyunAdapter:
@@ -37,6 +60,8 @@ class KeruyunAdapter:
         self.store_id = config.get("store_id")
         self.timeout = config.get("timeout", 30)
         self.retry_times = config.get("retry_times", 3)
+        self._tenant_id = config.get("tenant_id", "")
+        self._nonce_store: Set[str] = set()
 
         if not self.client_id or not self.client_secret:
             raise ValueError("client_id和client_secret不能为空")
@@ -118,6 +143,41 @@ class KeruyunAdapter:
             message = response.get("message", "未知错误")
             raise Exception(f"客如云API错误 [{code}]: {message}")
 
+    # ==================== 幂等性保障 ====================
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """基于 operation + payload 生成确定性幂等键。"""
+        raw = f"{operation}:{self._tenant_id}:{json.dumps(payload, sort_keys=True)}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        self._nonce_store.add(key)
+
+    # ==================== 事件发射 ====================
+
+    async def _emit_sync_event(
+        self,
+        event_type: AdapterEventType,
+        scope: str,
+        stream_id: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """发射适配器事件（fire-and-forget，失败只记 warning）。"""
+        try:
+            await emit_adapter_event(
+                adapter_name="keruyun",
+                event_type=event_type,
+                tenant_id=self._tenant_id,
+                scope=scope,
+                stream_id=stream_id,
+                payload=payload,
+            )
+        except Exception:  # noqa: BLE001 — 事件发射失败不阻断主流程
+            logger.warning("keruyun.event_emit_failed", scope=scope, stream_id=stream_id)
+
     # ==================== 订单管理接口 ====================
 
     async def query_order(
@@ -151,6 +211,14 @@ class KeruyunAdapter:
         data = {"store_id": self.store_id, "order_id": order_id, "status": status}
         logger.info("更新订单状态", order_id=order_id, status=status)
         response = await self._request("POST", "/api/v2/order/update_status", data=data)
+        asyncio.create_task(
+            self._emit_sync_event(
+                event_type=AdapterEventType.STATUS_PUSHED,
+                scope="order_status",
+                stream_id=f"keruyun:order:{order_id}",
+                payload={"order_id": order_id, "status": status},
+            )
+        )
         return response.get("data", {})
 
     # ==================== 菜品管理接口 ====================
@@ -176,6 +244,14 @@ class KeruyunAdapter:
         data = {"store_id": self.store_id, "sku_id": sku_id, "is_sold_out": is_sold_out}
         logger.info("更新菜品状态", sku_id=sku_id, is_sold_out=is_sold_out)
         response = await self._request("POST", "/api/v2/dish/update_status", data=data)
+        asyncio.create_task(
+            self._emit_sync_event(
+                event_type=AdapterEventType.STATUS_PUSHED,
+                scope="dish_status",
+                stream_id=f"keruyun:dish:{sku_id}",
+                payload={"sku_id": sku_id, "is_sold_out": is_sold_out},
+            )
+        )
         return response.get("data", {})
 
     # ==================== 会员管理接口 ====================
@@ -229,23 +305,6 @@ class KeruyunAdapter:
           create_time (ISO datetime), member_id, waiter_id, note,
           items (list): item_id, sku_id, sku_name, qty, unit_price
         """
-        import os as _os
-        import sys
-
-        _src_dir = _os.path.dirname(__file__)
-        _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
-        _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
-        if _gateway_src not in sys.path:
-            sys.path.insert(0, _gateway_src)
-
-        from schemas.restaurant_standard_schema import (
-            DishCategory,
-            OrderItemSchema,
-            OrderSchema,
-            OrderStatus,
-            OrderType,
-        )
-
         # 状态映射（客如云：1=待确认, 2=服务中, 3=已结账, 4=已取消）
         _STATUS_MAP = {
             1: OrderStatus.PENDING,
@@ -312,17 +371,6 @@ class KeruyunAdapter:
         原始字段参考（POS 操作日志）：
           action_type, staff_id, amount, reason, approved_by, operate_time
         """
-        import os as _os
-        import sys
-
-        _src_dir = _os.path.dirname(__file__)
-        _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
-        _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
-        if _gateway_src not in sys.path:
-            sys.path.insert(0, _gateway_src)
-
-        from schemas.restaurant_standard_schema import StaffAction
-
         action_time_raw = raw.get("operate_time", raw.get("create_time", ""))
         try:
             if isinstance(action_time_raw, (int, float)) and action_time_raw > 1e9:

@@ -114,7 +114,7 @@ class ElemeWebhookHandler:
             try:
                 await handler(data)
                 return {"success": True, "event_type": event_type}
-            except Exception as e:  # Webhook处理兜底：不能因handler异常导致回调失败
+            except (ValueError, TypeError, KeyError, RuntimeError) as e:
                 logger.error(
                     "饿了么Webhook处理异常",
                     event_type=event_type,

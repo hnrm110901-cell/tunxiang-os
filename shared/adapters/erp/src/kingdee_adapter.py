@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -61,6 +62,7 @@ class KingdeeAdapter(ERPAdapter):
     """
 
     def __init__(self) -> None:
+        super().__init__()
         self._app_id = os.environ["KINGDEE_APP_ID"]
         self._app_secret = os.environ["KINGDEE_APP_SECRET"]
         self._base_url = os.environ["KINGDEE_BASE_URL"].rstrip("/")
@@ -178,6 +180,22 @@ class KingdeeAdapter(ERPAdapter):
             voucher_id=voucher.voucher_id,
             erp_voucher_id=erp_voucher_id,
         )
+
+        # 事件留痕
+        asyncio.create_task(
+            self._emit_sync_event(
+                "status_pushed",
+                "finance",
+                f"kingdee:voucher:{voucher.voucher_id}",
+                {
+                    "source_type": voucher.source_type,
+                    "source_id": voucher.source_id,
+                    "total_fen": voucher.total_fen,
+                    "erp_voucher_id": erp_voucher_id,
+                },
+            )
+        )
+
         return ERPPushResult(
             voucher_id=voucher.voucher_id,
             erp_voucher_id=erp_voucher_id or None,
@@ -210,6 +228,17 @@ class KingdeeAdapter(ERPAdapter):
                     )
                 )
             log.info("kingdee.sync_chart_of_accounts.ok", count=len(accounts))
+
+            # 事件留痕
+            asyncio.create_task(
+                self._emit_sync_event(
+                    "status_pushed",
+                    "finance",
+                    f"kingdee:chart_of_accounts:{self._entity_id or 'default'}",
+                    {"count": len(accounts), "source": "kingdee"},
+                )
+            )
+
             return accounts
         except httpx.HTTPError as exc:
             log.warning(
