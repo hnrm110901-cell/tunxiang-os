@@ -9,6 +9,9 @@
  *   5. 今日活动 (max 3 cards)
  *   6. 热销菜品 (top 8, 2-col grid)
  *   7. CartBar fixed at bottom
+ *
+ * 商户品牌定制：使用 useMerchantTheme 读取品牌色/banner/Logo/功能开关。
+ * 使用 CSS 变量（--tx-*）注入品牌色，所有颜色引用优先使用 CSS 变量。
  */
 
 import React, { useCallback, useEffect, useState } from 'react'
@@ -24,19 +27,22 @@ import {
 import { useCartStore } from '../../store/useCartStore'
 import { useStoreInfo } from '../../store/useStoreInfo'
 import { useUserStore } from '../../store/useUserStore'
-import { getDishes } from '../../api/menu'
+import { useMerchantTheme } from '../../store/useMerchantTheme'
+import { getDishes, getRecommendations } from '../../api/menu'
 import { getActivities } from '../../api/growth'
 import { CartBar } from '../../components/CartBar'
 import { AiRecommend } from '../../components/AiRecommend'
-import { DishCard } from '../../components/DishCard'
+import { DishCard, type DishCardStyleConfig } from '../../components/DishCard'
 import { ReorderBanner } from '../../components/ReorderBanner'
+import { VideoPlayer } from '../../components/VideoPlayer'
+import type { LiveStreamInfo } from '../../components/VideoPlayer'
 import { getPersonalizedLayout, type PersonalizedLayout } from '../../engine/personalization'
-import type { Dish } from '../../api/menu'
+import type { Dish, AiRecommendationItem } from '../../api/menu'
 import type { Activity } from '../../api/growth'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface MockDish {
+interface CardDish {
   id: string
   name: string
   price_fen: number
@@ -46,13 +52,7 @@ interface MockDish {
   sold_out?: boolean
 }
 
-// ─── Mock / static data ───────────────────────────────────────────────────────
-
-const BANNERS = [
-  { id: '1', title: '春季新品上线', subtitle: '限时特惠，先到先得', color: '#1A3A4A' },
-  { id: '2', title: '满100减20', subtitle: '本周五六日全天有效', color: '#1A2A3A' },
-  { id: '3', title: '会员双倍积分', subtitle: '消费即可累积，随时兑换', color: '#2A1A3A' },
-]
+// ─── Quick entries (static, not themed) ───────────────────────────────────────
 
 const QUICK_ENTRIES = [
   { id: 'scan',     icon: '📱', label: '扫码点餐', tabPath: '/pages/menu/index' },
@@ -61,14 +61,6 @@ const QUICK_ENTRIES = [
   { id: 'chef',     icon: '👨‍🍳', label: '大厨到家', navPath: '/subpackages/special/chef-at-home/index' },
   { id: 'corp',     icon: '🏢', label: '企业团餐', navPath: '/subpackages/special/corporate/index' },
   { id: 'banquet',  icon: '🎊', label: '宴会',     navPath: '/subpackages/special/banquet/index' },
-]
-
-const AI_MOCK: MockDish[] = [
-  { id: 'ai1', name: '招牌红烧肉',  price_fen: 6800,  tag: 'hot',       description: '入口即化，经典传承' },
-  { id: 'ai2', name: '清蒸鲈鱼',   price_fen: 8800,  tag: 'recommend', description: '鲜嫩爽滑，当日新鲜' },
-  { id: 'ai3', name: '夫妻肺片',   price_fen: 3800,  tag: 'hot',       description: '麻辣鲜香，下饭神器' },
-  { id: 'ai4', name: '口水鸡',     price_fen: 4200,  tag: 'new',       description: '藤椒风味，嫩滑爽口' },
-  { id: 'ai5', name: '松茸炖鸡汤', price_fen: 9800,  tag: 'recommend', description: '滋补养生，汤醇味美' },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,7 +77,7 @@ function activityEmoji(type: Activity['type']): string {
   return m[type] ?? '🎉'
 }
 
-function dishToCard(d: Dish): MockDish {
+function dishToCard(d: Dish): CardDish {
   return {
     id:          d.dishId,
     name:        d.name,
@@ -97,31 +89,14 @@ function dishToCard(d: Dish): MockDish {
   }
 }
 
-// ─── Inline style constants ───────────────────────────────────────────────────
-
-const C = {
-  bg:       '#0B1A20',
-  card:     '#132029',
-  primary:  '#FF6B35',
-  text1:    '#E8F4F8',
-  text2:    '#9EB5C0',
-}
-
-// ─── Skeleton strip ───────────────────────────────────────────────────────────
-
-function SkeletonBox({ w, h, radius = '16rpx' }: { w: string; h: string; radius?: string }) {
-  return (
-    <View
-      style={{
-        width: w,
-        height: h,
-        borderRadius: radius,
-        background: C.card,
-        opacity: 0.7,
-        flexShrink: 0,
-      }}
-    />
-  )
+function recToCard(r: AiRecommendationItem): CardDish {
+  return {
+    id:          r.dish_id,
+    name:        r.name,
+    price_fen:   r.price_fen,
+    image_url:   r.image_url,
+    description: r.reason,
+  }
 }
 
 // ─── Page component ───────────────────────────────────────────────────────────
@@ -130,12 +105,28 @@ export default function IndexPage() {
   const storeId   = useStoreInfo((s) => s.storeId)
   const storeName = useStoreInfo((s) => s.storeName)
   const tableNo   = useStoreInfo((s) => s.tableNo)
+  const memberId  = useUserStore((s) => s.isLoggedIn ? s.userId : undefined)
   const { addItem, removeItem, items, totalFen, totalCount } = useCartStore()
+  const theme = useMerchantTheme((s) => s.theme)
+  const themeLoaded = useMerchantTheme((s) => s.loaded)
+  const features = theme.features
 
-  const [hotDishes,  setHotDishes]  = useState<MockDish[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState<string | null>(null)
+  const [hotDishes,      setHotDishes]      = useState<CardDish[]>([])
+  const [activities,     setActivities]     = useState<Activity[]>([])
+  const [recommendations, setRecommendations] = useState<AiRecommendationItem[]>([])
+  const [recLoading,     setRecLoading]     = useState(true)
+  const [loading,        setLoading]        = useState(true)
+  const [error,          setError]          = useState<string | null>(null)
+  const [liveStream,     setLiveStream]     = useState<LiveStreamInfo | null>(null)
+
+  const dishCardStyle: DishCardStyleConfig = {
+    variant: theme.dish_card.variant,
+    show_tag: theme.dish_card.show_tag,
+    show_description: theme.dish_card.show_description,
+    price_color: theme.dish_card.price_color,
+    background_color: theme.dish_card.background_color,
+    border_radius: theme.dish_card.border_radius,
+  }
 
   // ── 千人千面布局引擎 ───────────────────────────────────────────────────────
   const { memberLevel, pointsBalance, nickname } = useUserStore()
@@ -156,8 +147,10 @@ export default function IndexPage() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setRecLoading(true)
     setError(null)
 
+    // 热销菜品
     const dishProm = storeId
       ? getDishes(storeId).then((ds) =>
           ds
@@ -166,35 +159,64 @@ export default function IndexPage() {
             .slice(0, 8)
             .map(dishToCard),
         )
-      : Promise.resolve([] as MockDish[])
+      : Promise.resolve([] as CardDish[])
 
+    // 今日活动
     const actProm = getActivities().then((acts) =>
       acts.filter((a) => a.isActive).slice(0, 3),
     )
 
-    Promise.all([dishProm, actProm])
-      .then(([dishes, acts]) => {
+    // AI推荐（如果功能开启）
+    const recProm = (features.ai_recommend && storeId)
+      ? getRecommendations(storeId, memberId, 6)
+          .then((res) => res.recommendations)
+          .catch(() => [])
+      : Promise.resolve([] as AiRecommendationItem[])
+
+    // 直播状态（VC-1.2 TODO: 从 store/merchant API 获取实时直播信息）
+    const liveProm = Promise.resolve(null as LiveStreamInfo | null)
+
+    Promise.all([dishProm, actProm, recProm, liveProm])
+      .then(([dishes, acts, recs, live]) => {
         if (cancelled) return
         setHotDishes(dishes)
         setActivities(acts)
+        setRecommendations(recs)
+        setLiveStream(live)
       })
       .catch((err) => {
         if (cancelled) return
         console.error('[IndexPage] load error', err)
         setError('加载失败，请下拉刷新重试')
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+          setRecLoading(false)
+        }
+      })
 
     return () => { cancelled = true }
-  }, [storeId])
+  }, [storeId, memberId, features.ai_recommend])
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
   const getQty = useCallback(
     (id: string) => items.find((i) => i.dishId === id)?.quantity ?? 0,
     [items],
   )
+  // AI推荐区域：添加/移除（AiRecommend 组件用 dish_id 标识）
+  const handleRecAdd = useCallback(
+    (dishId: string) => {
+      const item = recommendations.find((r) => r.dish_id === dishId)
+      if (item) {
+        addItem({ dishId: item.dish_id, name: item.name, price_fen: item.price_fen })
+      }
+    },
+    [recommendations, addItem],
+  )
+
   const handleAdd = useCallback(
-    (d: MockDish) => addItem({ dishId: d.id, name: d.name, price_fen: d.price_fen }),
+    (d: CardDish) => addItem({ dishId: d.id, name: d.name, price_fen: d.price_fen }),
     [addItem],
   )
   const handleRemove = useCallback((id: string) => removeItem(id), [removeItem])
@@ -219,7 +241,7 @@ export default function IndexPage() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <View style={{ minHeight: '100vh', background: C.bg }}>
+    <View style={{ minHeight: '100vh', background: 'var(--tx-page-bg, #0B1A20)' }}>
       <ScrollView
         scrollY
         style={{ minHeight: '100vh' }}
@@ -235,7 +257,7 @@ export default function IndexPage() {
             padding: '48rpx 32rpx 20rpx',
           }}
         >
-          <Text style={{ color: C.text1, fontSize: '36rpx', fontWeight: '700' }}>
+          <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '36rpx', fontWeight: '700' }}>
             {storeName || '屯象餐厅'}
           </Text>
           <View
@@ -245,7 +267,7 @@ export default function IndexPage() {
               padding: '8rpx 22rpx',
             }}
           >
-            <Text style={{ color: C.primary, fontSize: '26rpx' }}>
+            <Text style={{ color: 'var(--tx-brand, #FF6B35)', fontSize: '26rpx' }}>
               {tableNo ? `${tableNo}号桌` : '请扫码入座'}
             </Text>
           </View>
@@ -261,7 +283,7 @@ export default function IndexPage() {
               height: '320rpx',
               borderRadius: '20rpx',
               margin: '0 32rpx 32rpx',
-              background: C.card,
+              background: 'var(--tx-card-bg, #132029)',
             }}
           />
         ) : (
@@ -277,14 +299,14 @@ export default function IndexPage() {
             circular
             indicatorDots
             indicatorColor="rgba(255,255,255,0.3)"
-            indicatorActiveColor={C.primary}
+            indicatorActiveColor={'var(--tx-brand, #FF6B35)'}
           >
-            {BANNERS.map((b) => (
+            {theme.banner_slides.map((b) => (
               <SwiperItem key={b.id}>
                 <View
                   style={{
                     height: '320rpx',
-                    background: b.color,
+                    background: b.background_color,
                     borderRadius: '20rpx',
                     display: 'flex',
                     flexDirection: 'column',
@@ -295,7 +317,7 @@ export default function IndexPage() {
                 >
                   <Text
                     style={{
-                      color: C.text1,
+                      color: 'var(--tx-text-primary, #E8F4F8)',
                       fontSize: '40rpx',
                       fontWeight: '700',
                       lineHeight: '56rpx',
@@ -303,7 +325,7 @@ export default function IndexPage() {
                   >
                     {b.title}
                   </Text>
-                  <Text style={{ color: C.text2, fontSize: '26rpx', marginTop: '12rpx' }}>
+                  <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '26rpx', marginTop: '12rpx' }}>
                     {b.subtitle}
                   </Text>
                 </View>
@@ -314,7 +336,7 @@ export default function IndexPage() {
 
         {/* ─── Quick entry 2×3 ─── */}
         <View style={{ padding: '0 32rpx 12rpx' }}>
-          <Text style={{ color: C.text1, fontSize: '32rpx', fontWeight: '700', marginBottom: '20rpx', display: 'block' }}>
+          <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '32rpx', fontWeight: '700', marginBottom: '20rpx', display: 'block' }}>
             快捷入口
           </Text>
           <View
@@ -328,7 +350,7 @@ export default function IndexPage() {
               <View
                 key={e.id}
                 style={{
-                  background: C.card,
+                  background: 'var(--tx-card-bg, #132029)',
                   borderRadius: '20rpx',
                   display: 'flex',
                   flexDirection: 'column',
@@ -340,33 +362,52 @@ export default function IndexPage() {
                 onClick={() => goEntry(e)}
               >
                 <Text style={{ fontSize: '44rpx', lineHeight: '1' }}>{e.icon}</Text>
-                <Text style={{ color: C.text2, fontSize: '24rpx' }}>{e.label}</Text>
+                <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '24rpx' }}>{e.label}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* ─── AI 推荐 ─── */}
-        <View style={{ padding: '28rpx 32rpx 12rpx' }}>
-          <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: '16rpx', gap: '12rpx' }}>
-            <Text style={{ color: C.text1, fontSize: '32rpx', fontWeight: '700' }}>AI 智能推荐</Text>
-            <View
-              style={{
-                background: 'rgba(24,95,165,0.2)',
-                borderRadius: '8rpx',
-                padding: '4rpx 14rpx',
-              }}
-            >
-              <Text style={{ color: '#5FA8E8', fontSize: '20rpx', fontWeight: '600' }}>AI</Text>
-            </View>
-          </View>
+        {/* ─── 视频/直播（VC-1.2） ─── */}
+        <View style={{ padding: '0 32rpx' }}>
+          <VideoPlayer
+            videos={[]}
+            dishName={storeName}
+            liveStream={liveStream ?? undefined}
+            onEnterLiveStream={(ls) => {
+              Taro.navigateTo({
+                url: `/subpackages/live-stream/room/index?room_id=${ls.room_id}`,
+              }).catch(() =>
+                Taro.showToast({ title: '直播功能开发中', icon: 'none' }),
+              )
+            }}
+          />
         </View>
-        <AiRecommend
-          dishes={AI_MOCK}
-          onAdd={handleAdd}
-          onRemove={handleRemove}
-          getQuantity={getQty}
-        />
+
+        {/* ─── AI 推荐 ─── */}
+        {features.ai_recommend && (
+          <>
+            <View style={{ padding: '28rpx 32rpx 12rpx' }}>
+              <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: '16rpx', gap: '12rpx' }}>
+                <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '32rpx', fontWeight: '700' }}>AI 智能推荐</Text>
+                <View
+                  style={{
+                    background: 'rgba(24,95,165,0.2)',
+                    borderRadius: '8rpx',
+                    padding: '4rpx 14rpx',
+                  }}
+                >
+                  <Text style={{ color: '#5FA8E8', fontSize: '20rpx', fontWeight: '600' }}>AI</Text>
+                </View>
+              </View>
+            </View>
+            <AiRecommend
+              recommendations={recommendations}
+              onAdd={handleRecAdd}
+              loading={recLoading}
+            />
+          </>
+        )}
 
         {/* ─── 今日活动 ─── */}
         {(loading || activities.length > 0) && (
@@ -380,9 +421,9 @@ export default function IndexPage() {
                 padding: '20rpx 32rpx 16rpx',
               }}
             >
-              <Text style={{ color: C.text1, fontSize: '32rpx', fontWeight: '700' }}>今日活动</Text>
+              <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '32rpx', fontWeight: '700' }}>今日活动</Text>
               <Text
-                style={{ color: C.primary, fontSize: '26rpx' }}
+                style={{ color: 'var(--tx-brand, #FF6B35)', fontSize: '26rpx' }}
                 onClick={() => Taro.showToast({ title: '更多活动开发中', icon: 'none' })}
               >
                 更多
@@ -397,7 +438,7 @@ export default function IndexPage() {
                         display: 'inline-block',
                         width: '360rpx',
                         height: '260rpx',
-                        background: C.card,
+                        background: 'var(--tx-card-bg, #132029)',
                         borderRadius: '20rpx',
                         marginRight: '20rpx',
                         verticalAlign: 'top',
@@ -411,7 +452,7 @@ export default function IndexPage() {
                         display: 'inline-flex',
                         flexDirection: 'column',
                         width: '360rpx',
-                        background: C.card,
+                        background: 'var(--tx-card-bg, #132029)',
                         borderRadius: '20rpx',
                         marginRight: '20rpx',
                         overflow: 'hidden',
@@ -451,16 +492,16 @@ export default function IndexPage() {
                               marginBottom: '8rpx',
                             }}
                           >
-                            <Text style={{ color: C.primary, fontSize: '20rpx' }}>{act.badgeText}</Text>
+                            <Text style={{ color: 'var(--tx-brand, #FF6B35)', fontSize: '20rpx' }}>{act.badgeText}</Text>
                           </View>
                         )}
                         <Text
-                          style={{ color: C.text1, fontSize: '28rpx', fontWeight: '600', display: 'block' }}
+                          style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '28rpx', fontWeight: '600', display: 'block' }}
                           numberOfLines={1}
                         >
                           {act.name}
                         </Text>
-                        <Text style={{ color: C.text2, fontSize: '22rpx', marginTop: '6rpx', display: 'block' }}>
+                        <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '22rpx', marginTop: '6rpx', display: 'block' }}>
                           至 {act.validUntil.slice(0, 10)}
                         </Text>
                       </View>
@@ -501,9 +542,9 @@ export default function IndexPage() {
               padding: '0 32rpx 20rpx',
             }}
           >
-            <Text style={{ color: C.text1, fontSize: '32rpx', fontWeight: '700' }}>热销推荐</Text>
+            <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '32rpx', fontWeight: '700' }}>热销推荐</Text>
             <Text
-              style={{ color: C.primary, fontSize: '26rpx' }}
+              style={{ color: 'var(--tx-brand, #FF6B35)', fontSize: '26rpx' }}
               onClick={() => Taro.switchTab({ url: '/pages/menu/index' })}
             >
               查看全部
@@ -520,7 +561,7 @@ export default function IndexPage() {
               }}
             >
               {[1, 2, 3, 4].map((i) => (
-                <View key={i} style={{ height: '260rpx', background: C.card, borderRadius: '16rpx' }} />
+                <View key={i} style={{ height: '260rpx', background: 'var(--tx-card-bg, #132029)', borderRadius: '16rpx' }} />
               ))}
             </View>
           ) : hotDishes.length > 0 ? (
@@ -559,7 +600,7 @@ export default function IndexPage() {
                 }}
               >
                 <Text style={{ fontSize: '64rpx' }}>🍽</Text>
-                <Text style={{ color: C.text2, fontSize: '28rpx' }}>暂无热销菜品</Text>
+                <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '28rpx' }}>暂无热销菜品</Text>
               </View>
             )
           )}

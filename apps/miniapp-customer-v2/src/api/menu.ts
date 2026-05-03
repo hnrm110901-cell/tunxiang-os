@@ -86,6 +86,66 @@ export interface DishSearchResult {
   total: number
 }
 
+// ─── 商户主题 ──────────────────────────────────────────────────────────────
+
+export interface DishCardStyleConfig {
+  variant: 'default' | 'elegant' | 'compact' | 'large-image'
+  show_tag: boolean
+  show_description: boolean
+  price_color: string
+  background_color: string
+  border_radius: string
+}
+
+export interface BannerSlide {
+  id: string
+  image_url?: string
+  title: string
+  subtitle?: string
+  link?: string
+  background_color: string
+}
+
+export interface FeatureToggles {
+  ai_recommend: boolean
+  reorder_banner: boolean
+  quick_entries: boolean
+  today_activities: boolean
+  hot_dishes: boolean
+  ai_chat_assistant: boolean
+}
+
+export interface MerchantTheme {
+  merchant_code: string
+  merchant_name: string
+  brand_color: string
+  brand_color_dark: string
+  logo_url?: string
+  banner_slides: BannerSlide[]
+  nav_bar_color: string
+  nav_bar_text_color: string
+  page_background: string
+  card_background: string
+  text_primary: string
+  text_secondary: string
+  dish_card: DishCardStyleConfig
+  features: FeatureToggles
+}
+
+// ─── AI推荐 ────────────────────────────────────────────────────────────────
+
+export interface AiRecommendationItem {
+  dish_id: string
+  name: string
+  reason: string
+  image_url?: string
+  price_fen: number
+}
+
+export interface AiRecommendationsResponse {
+  recommendations: AiRecommendationItem[]
+}
+
 // ---------------------------------------------------------------------------
 // API functions
 // ---------------------------------------------------------------------------
@@ -125,6 +185,26 @@ export async function searchDishes(storeId: string, keyword: string): Promise<Di
 export async function getDishSpecs(dishId: string): Promise<DishSpecGroup[]> {
   return txRequest<DishSpecGroup[]>(
     `${BASE}/menu/dishes/${encodeURIComponent(dishId)}/specs`,
+  )
+}
+
+/** Get merchant theme configuration by merchant code */
+export async function getMerchantTheme(merchantCode: string): Promise<MerchantTheme> {
+  return txRequest<MerchantTheme>(
+    `${BASE}/menu/merchant-theme/${encodeURIComponent(merchantCode)}`,
+  )
+}
+
+/** Get AI dish recommendations for a member at a store */
+export async function getRecommendations(
+  storeId: string,
+  memberId?: string,
+  limit: number = 6,
+): Promise<AiRecommendationsResponse> {
+  return txRequest<AiRecommendationsResponse>(
+    `${BASE}/menu/recommendations`,
+    'POST',
+    { store_id: storeId, member_id: memberId || null, limit },
   )
 }
 

@@ -1,8 +1,9 @@
 """菜单展示 API — 为前端 DishCard/CategoryNav/SpecSheet 组件提供数据
 
-GET  /api/v1/menu/display          — 按分类返回完整菜单（POS/H5/Crew/TV 通用）
-GET  /api/v1/menu/dishes/{id}/spec-sheet — 菜品规格组（直接对接 SpecSheet 组件）
-POST /api/v1/menu/dishes/batch-soldout   — 批量沽清/恢复
+GET  /api/v1/menu/display                     — 按分类返回完整菜单（POS/H5/Crew/TV 通用）
+GET  /api/v1/menu/dishes/{id}/spec-sheet       — 菜品规格组（直接对接 SpecSheet 组件）
+POST /api/v1/menu/dishes/batch-soldout         — 批量沽清/恢复
+GET  /api/v1/menu/merchant-theme/{merchant_code} — 商户主题配置（品牌色/Logo/banner/样式/功能开关）
 
 所有操作带 X-Tenant-ID 多租户隔离。
 """
@@ -12,7 +13,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -385,3 +386,199 @@ async def batch_soldout(
         await db.rollback()
         log.error("batch_soldout.db_error", error=str(exc))
         raise HTTPException(status_code=500, detail="数据库操作失败")
+
+
+# ─── 商户主题配置 ─────────────────────────────────────────────────
+
+
+class DishCardStyleConfig(BaseModel):
+    """菜品卡片样式"""
+
+    variant: str = Field("default", description="default|elegant|compact|large-image")
+    show_tag: bool = True
+    show_description: bool = True
+    price_color: str = "#FF6B35"
+    background_color: str = "#132029"
+    border_radius: str = "16rpx"
+
+
+class BannerSlide(BaseModel):
+    """Banner 轮播项"""
+
+    id: str
+    image_url: Optional[str] = None
+    title: str
+    subtitle: Optional[str] = None
+    link: Optional[str] = None
+    background_color: str = "#1A3A4A"
+
+
+class FeatureToggles(BaseModel):
+    """功能开关"""
+
+    ai_recommend: bool = Field(True, description="AI推荐模块")
+    reorder_banner: bool = Field(True, description="智能复购提醒")
+    quick_entries: bool = Field(True, description="快捷入口区域")
+    today_activities: bool = Field(True, description="今日活动")
+    hot_dishes: bool = Field(True, description="热销推荐")
+    ai_chat_assistant: bool = Field(True, description="AI点餐助手")
+
+
+class MerchantThemeConfig(BaseModel):
+    """商户主题配置"""
+
+    merchant_code: str
+    merchant_name: str
+    # 品牌色
+    brand_color: str = "#FF6B35"
+    brand_color_dark: str = "#E55A2B"
+    # Logo & Banner
+    logo_url: Optional[str] = None
+    banner_slides: list[BannerSlide] = Field(default_factory=list)
+    # 导航栏
+    nav_bar_color: str = "#0B1A20"
+    nav_bar_text_color: str = "#E8F4F8"
+    # 背景色
+    page_background: str = "#0B1A20"
+    card_background: str = "#132029"
+    text_primary: str = "#E8F4F8"
+    text_secondary: str = "#9EB5C0"
+    # 菜品卡样式
+    dish_card: DishCardStyleConfig = Field(default_factory=DishCardStyleConfig)
+    # 功能开关
+    features: FeatureToggles = Field(default_factory=FeatureToggles)
+
+
+# ─── 默认/预置主题 ───────────────────────────────────────────────
+
+
+_DEFAULT_THEME = MerchantThemeConfig(
+    merchant_code="default",
+    merchant_name="屯象OS",
+    brand_color="#FF6B35",
+    brand_color_dark="#E55A2B",
+    banner_slides=[
+        BannerSlide(id="1", title="春季新品上线", subtitle="限时特惠，先到先得", background_color="#1A3A4A"),
+        BannerSlide(id="2", title="满100减20", subtitle="本周五六日全天有效", background_color="#1A2A3A"),
+        BannerSlide(id="3", title="会员双倍积分", subtitle="消费即可累积，随时兑换", background_color="#2A1A3A"),
+    ],
+)
+
+_PRESET_THEMES: dict[str, MerchantThemeConfig] = {
+    "xuji": MerchantThemeConfig(
+        merchant_code="xuji",
+        merchant_name="徐记海鲜",
+        brand_color="#C43A31",
+        brand_color_dark="#A32D25",
+        logo_url="https://cdn.tunxiangos.com/themes/xuji/logo.png",
+        banner_slides=[
+            BannerSlide(id="1", image_url="https://cdn.tunxiangos.com/themes/xuji/banner1.png", title="徐记海鲜·鲜味直达", subtitle="每日渔船直供，现杀现做", background_color="#2A1515"),
+            BannerSlide(id="2", title="会员专享", subtitle="充值满赠，积分兑换专属好礼", background_color="#1A2020"),
+            BannerSlide(id="3", title="宴席预订", subtitle="婚宴/商务宴/生日宴，尊享专属包间", background_color="#202020"),
+        ],
+        dish_card=DishCardStyleConfig(
+            variant="elegant",
+            show_tag=True,
+            show_description=True,
+            price_color="#C43A31",
+            background_color="#1A2020",
+            border_radius="20rpx",
+        ),
+        features=FeatureToggles(
+            ai_recommend=True,
+            reorder_banner=True,
+            ai_chat_assistant=True,
+        ),
+    ),
+    "zuiqianxian": MerchantThemeConfig(
+        merchant_code="zuiqianxian",
+        merchant_name="最黔线",
+        brand_color="#D4A843",
+        brand_color_dark="#B8922E",
+        logo_url="https://cdn.tunxiangos.com/themes/zuiqianxian/logo.png",
+        banner_slides=[
+            BannerSlide(id="1", title="贵州风味·地道黔菜", subtitle="酸辣鲜香，开胃下饭", background_color="#2A2515"),
+            BannerSlide(id="2", title="新菜品鉴", subtitle="主厨精选，限时尝鲜价", background_color="#1A2020"),
+        ],
+        dish_card=DishCardStyleConfig(
+            variant="default",
+            show_tag=True,
+            show_description=True,
+            price_color="#D4A843",
+            background_color="#1A1A15",
+            border_radius="16rpx",
+        ),
+        features=FeatureToggles(
+            ai_recommend=True,
+            reorder_banner=False,
+            ai_chat_assistant=True,
+        ),
+    ),
+    "shangshangongchu": MerchantThemeConfig(
+        merchant_code="shangshangongchu",
+        merchant_name="尚宫厨",
+        brand_color="#8B4513",
+        brand_color_dark="#6B3410",
+        logo_url="https://cdn.tunxiangos.com/themes/shangshangongchu/logo.png",
+        banner_slides=[
+            BannerSlide(id="1", title="宫廷秘制·匠心出品", subtitle="传承经典，品味非凡", background_color="#1A1510"),
+            BannerSlide(id="2", title="商务宴请首选", subtitle="雅致包间，尊享服务", background_color="#201510"),
+        ],
+        dish_card=DishCardStyleConfig(
+            variant="elegant",
+            show_tag=True,
+            show_description=True,
+            price_color="#8B4513",
+            background_color="#1A1510",
+            border_radius="24rpx",
+        ),
+        features=FeatureToggles(
+            ai_recommend=True,
+            reorder_banner=False,
+            ai_chat_assistant=False,
+        ),
+    ),
+}
+
+
+def _get_merchant_theme(merchant_code: str) -> MerchantThemeConfig:
+    """获取商户主题配置，未配置时返回默认主题降级。"""
+    return _PRESET_THEMES.get(merchant_code, _DEFAULT_THEME)
+
+
+# ─── 商户主题端点 ────────────────────────────────────────────────
+
+
+@router.get("/merchant-theme/{merchant_code}")
+async def get_merchant_theme(
+    merchant_code: str,
+) -> dict:
+    """获取商户主题配置
+
+    返回商户品牌色、Logo、Banner、菜品卡样式、功能开关等主题配置。
+    如果商户未配置主题，使用默认主题降级。
+
+    Args:
+        merchant_code: 商户编码（如 xuji, zuiqianxian, shangshangongchu）
+
+    Returns:
+        {
+          "ok": true,
+          "data": {
+            "merchant_code": "...",
+            "merchant_name": "...",
+            "brand_color": "#FF6B35",
+            "brand_color_dark": "#E55A2B",
+            ...
+          }
+        }
+    """
+    log.info("merchant_theme.fetch", merchant_code=merchant_code)
+
+    try:
+        theme = _get_merchant_theme(merchant_code)
+        return {"ok": True, "data": theme.model_dump()}
+    except Exception as exc:
+        log.error("merchant_theme.fetch_failed", merchant_code=merchant_code, error=str(exc), exc_info=True)
+        # 降级返回默认主题
+        return {"ok": True, "data": _DEFAULT_THEME.model_dump()}

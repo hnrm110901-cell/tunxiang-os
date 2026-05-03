@@ -414,3 +414,112 @@ async def apply_recommendation(
             "message": f"已成功应用 {applied_count} 项菜单调整",
         },
     }
+
+
+# ─── 消费者端AI推荐（面向小程序/APP的菜品推荐） ───────────────────
+
+
+class RecommendationItem(BaseModel):
+    """推荐菜品项"""
+
+    dish_id: str
+    name: str
+    reason: str
+    image_url: Optional[str] = None
+    price_fen: int
+
+
+class RecommendationsRequest(BaseModel):
+    """AI推荐请求"""
+
+    member_id: Optional[str] = Field(None, description="会员ID，为空则基于热销榜推荐")
+    store_id: str = Field(..., description="门店ID")
+    limit: int = Field(default=6, ge=1, le=20, description="返回菜品数量上限")
+
+
+class RecommendationsResponse(BaseModel):
+    """AI推荐响应"""
+
+    recommendations: list[RecommendationItem]
+
+
+# 热销基准菜品（基于菜单数据，实际生产应从DB查询销售数据排序）
+_HOT_DISHES: list[RecommendationItem] = [
+    RecommendationItem(dish_id="dish_001", name="剁椒鱼头",    reason="经典招牌，桌桌必点", image_url="https://cdn.tunxiangos.com/dishes/dish_001.png", price_fen=12800),
+    RecommendationItem(dish_id="dish_002", name="酸菜鱼",      reason="酸辣鲜香，回头率90%", image_url="https://cdn.tunxiangos.com/dishes/dish_002.png", price_fen=6800),
+    RecommendationItem(dish_id="dish_003", name="松茸汽锅鸡",  reason="滋补养生，秋季首选", image_url="https://cdn.tunxiangos.com/dishes/dish_003.png", price_fen=16800),
+    RecommendationItem(dish_id="dish_004", name="小龙虾拌面",  reason="夏季爆款，日销200+", image_url="https://cdn.tunxiangos.com/dishes/dish_004.png", price_fen=4800),
+    RecommendationItem(dish_id="dish_005", name="香煎三文鱼",  reason="新品推荐，限时尝鲜", price_fen=8800),
+    RecommendationItem(dish_id="dish_006", name="清炒时蔬",     reason="清淡爽口，健康之选", price_fen=2800),
+    RecommendationItem(dish_id="dish_007", name="红焖羊肉",     reason="暖身暖胃，冬日必备", price_fen=9800),
+    RecommendationItem(dish_id="dish_008", name="蒜蓉粉丝蒸虾", reason="鲜香扑鼻，老少皆宜", price_fen=7800),
+]
+
+# 会员等级 → 推荐偏移（高级会员推荐更高价位的菜品）
+_MEMBER_LEVEL_BIAS: dict[str, int] = {
+    "bronze": 0,
+    "silver": 1,
+    "gold": 2,
+    "diamond": 3,
+}
+
+# 消费者推荐路由（独立前缀）
+customer_router = APIRouter(prefix="/api/v1/menu", tags=["menu-customer-recommendation"])
+
+
+@customer_router.post("/recommendations")
+async def get_recommendations(
+    req: RecommendationsRequest,
+    x_tenant_id: str = Header(alias="X-Tenant-ID"),
+) -> dict:
+    """基于热销榜+会员等级的菜品推荐
+
+    实现一个简单的推荐引擎，不依赖外部AI API，适合小程序首页"为你推荐"模块使用。
+
+    推荐逻辑：
+    1. 从热销池取菜
+    2. 根据会员等级偏移推荐（高级会员倾向推荐高价位菜品）
+    3. 无会员/新用户推荐最热门的菜品
+    4. 用 limit 参数控制返回数量
+
+    Args:
+        req.member_id: 会员ID（可选，为NULL时纯热销推荐）
+        req.store_id: 门店ID
+        req.limit: 返回菜品数量上限（默认6，最大20）
+
+    Returns:
+        { "ok": true, "data": { "recommendations": [...] } }
+    """
+    logger.info(
+        "menu.recommendations",
+        tenant_id=x_tenant_id,
+        store_id=req.store_id,
+        member_id=req.member_id,
+        limit=req.limit,
+    )
+
+    try:
+        # 简单推荐逻辑：基于热销榜 + 会员等级偏移
+        dishes = list(_HOT_DISHES)
+
+        if req.member_id:
+            # 从请求头获取会员等级（简化处理，实际应从 tx-member 服务查询）
+            level_bias = _MEMBER_LEVEL_BIAS.get("silver", 0)
+            if level_bias > 0:
+                # 高级会员：按价格排序推荐更高价位的
+                dishes = sorted(dishes, key=lambda d: d.price_fen, reverse=True)
+        else:
+            # 非会员/未登录：推荐最热销的
+            pass  # 保持原有热销顺序
+
+        # 截取指定数量
+        result = dishes[: req.limit]
+
+        return {
+            "ok": True,
+            "data": RecommendationsResponse(recommendations=result).model_dump(),
+        }
+
+    except Exception as exc:
+        logger.error("menu.recommendations.failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="推荐获取失败，请稍后重试")

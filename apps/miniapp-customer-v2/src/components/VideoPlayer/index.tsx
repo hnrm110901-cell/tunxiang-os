@@ -38,16 +38,27 @@ export interface DishVideo {
 interface VideoPlayerProps {
   videos: DishVideo[]
   dishName?: string
-  /** 是否有进行中的直播 */
+  /** 是否有进行中的直播 (VC-1.2) */
   liveStream?: {
     room_id: string
     title: string
     viewer_count: number
+    /** 直播商品列表 */
+    products?: Array<{
+      product_id: string
+      name: string
+      price_fen: number
+      image_url?: string
+    }>
   }
   onVideoTap?: (video: DishVideo) => void
+  /** 进入直播间回调 (VC-1.2) */
+  onEnterLiveStream?: (liveStream: NonNullable<VideoPlayerProps['liveStream']>) => void
 }
 
-export function VideoPlayer({ videos, dishName, liveStream, onVideoTap }: VideoPlayerProps) {
+export type LiveStreamInfo = NonNullable<VideoPlayerProps['liveStream']>
+
+export function VideoPlayer({ videos, dishName, liveStream, onVideoTap, onEnterLiveStream }: VideoPlayerProps) {
   const [playing, setPlaying] = useState<string | null>(null)
 
   const formatDuration = (s: number) => {
@@ -90,10 +101,21 @@ export function VideoPlayer({ videos, dishName, liveStream, onVideoTap }: VideoP
         )}
       </View>
 
-      {/* 直播入口 */}
+      {/* 直播入口 — VC-1.2 视频号直播组件 */}
       {liveStream && (
         <View
-          onClick={() => Taro.showToast({ title: '直播功能开发中', icon: 'none' })}
+          onClick={() => {
+            if (onEnterLiveStream) {
+              onEnterLiveStream(liveStream)
+            } else {
+              // 默认行为：跳转到视频号直播间
+              Taro.navigateTo({
+                url: `/subpackages/live-stream/room/index?room_id=${liveStream.room_id}`,
+              }).catch(() =>
+                Taro.showToast({ title: '直播功能开发中', icon: 'none' }),
+              )
+            }
+          }}
           style={{
             padding: '20rpx', borderRadius: '16rpx', marginBottom: '16rpx',
             background: 'linear-gradient(135deg, #3A1010 0%, #1A2020 100%)',

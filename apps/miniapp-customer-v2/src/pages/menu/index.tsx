@@ -34,18 +34,6 @@ import { DishCard } from '../../components/DishCard'
 import { AiChatAssistant } from '../../components/AiChatAssistant'
 import type { MenuCategory, Dish } from '../../api/menu'
 
-// ─── Inline colours ───────────────────────────────────────────────────────────
-
-const C = {
-  bg:      '#0B1A20',
-  card:    '#132029',
-  nav:     '#0D2030',
-  primary: '#FF6B35',
-  text1:   '#E8F4F8',
-  text2:   '#9EB5C0',
-  divider: 'rgba(255,255,255,0.06)',
-}
-
 // ─── Skeleton row ─────────────────────────────────────────────────────────────
 
 function SkeletonDishRow() {
@@ -57,16 +45,16 @@ function SkeletonDishRow() {
         alignItems: 'center',
         padding: '20rpx',
         marginBottom: '16rpx',
-        background: C.card,
+        background: 'var(--tx-card-bg, #132029)',
         borderRadius: '16rpx',
         gap: '20rpx',
       }}
     >
-      <View style={{ width: '160rpx', height: '160rpx', borderRadius: '12rpx', background: C.bg, flexShrink: 0 }} />
+      <View style={{ width: '160rpx', height: '160rpx', borderRadius: '12rpx', background: 'var(--tx-page-bg, #0B1A20)', flexShrink: 0 }} />
       <View style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12rpx' }}>
-        <View style={{ height: '32rpx', borderRadius: '8rpx', background: C.bg, width: '60%' }} />
-        <View style={{ height: '24rpx', borderRadius: '8rpx', background: C.bg, width: '80%' }} />
-        <View style={{ height: '28rpx', borderRadius: '8rpx', background: C.bg, width: '40%' }} />
+        <View style={{ height: '32rpx', borderRadius: '8rpx', background: 'var(--tx-page-bg, #0B1A20)', width: '60%' }} />
+        <View style={{ height: '24rpx', borderRadius: '8rpx', background: 'var(--tx-page-bg, #0B1A20)', width: '80%' }} />
+        <View style={{ height: '28rpx', borderRadius: '8rpx', background: 'var(--tx-page-bg, #0B1A20)', width: '40%' }} />
       </View>
     </View>
   )
@@ -83,7 +71,7 @@ function SkeletonCat() {
           style={{
             height: '64rpx',
             borderRadius: '12rpx',
-            background: C.bg,
+            background: 'var(--tx-page-bg, #0B1A20)',
             marginBottom: '4rpx',
           }}
         />
@@ -154,7 +142,7 @@ function DishCustomizeSheet({ dish, visible, onClose, onConfirm }: DishCustomize
             margin: '0 auto 28rpx',
           }}
         />
-        <Text style={{ color: C.text1, fontSize: '34rpx', fontWeight: '700', display: 'block', marginBottom: '24rpx' }}>
+        <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '34rpx', fontWeight: '700', display: 'block', marginBottom: '24rpx' }}>
           {dish.name}
         </Text>
 
@@ -162,7 +150,7 @@ function DishCustomizeSheet({ dish, visible, onClose, onConfirm }: DishCustomize
           dish.specGroups.map((group) => (
             <View key={group.groupId} style={{ marginBottom: '28rpx' }}>
               <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '12rpx', marginBottom: '16rpx' }}>
-                <Text style={{ color: C.text1, fontSize: '28rpx', fontWeight: '600' }}>{group.groupName}</Text>
+                <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '28rpx', fontWeight: '600' }}>{group.groupName}</Text>
                 {group.required && (
                   <View
                     style={{
@@ -171,7 +159,7 @@ function DishCustomizeSheet({ dish, visible, onClose, onConfirm }: DishCustomize
                       padding: '2rpx 10rpx',
                     }}
                   >
-                    <Text style={{ color: C.primary, fontSize: '20rpx' }}>必选</Text>
+                    <Text style={{ color: 'var(--tx-brand, #FF6B35)', fontSize: '20rpx' }}>必选</Text>
                   </View>
                 )}
               </View>
@@ -182,16 +170,16 @@ function DishCustomizeSheet({ dish, visible, onClose, onConfirm }: DishCustomize
                     <View
                       key={spec.specId}
                       style={{
-                        background: selected ? C.primary : C.bg,
+                        background: selected ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-page-bg, #0B1A20)',
                         borderRadius: '12rpx',
                         padding: '12rpx 24rpx',
-                        border: selected ? 'none' : `2rpx solid ${C.divider}`,
+                        border: selected ? 'none' : `2rpx solid ${'rgba(255,255,255,0.06)'}`,
                       }}
                       onClick={() =>
                         setSelections((prev) => ({ ...prev, [group.groupId]: spec.specId }))
                       }
                     >
-                      <Text style={{ color: selected ? '#fff' : C.text2, fontSize: '26rpx' }}>
+                      <Text style={{ color: selected ? '#fff' : 'var(--tx-text-secondary, #9EB5C0)', fontSize: '26rpx' }}>
                         {spec.specName}
                         {spec.priceFen > 0
                           ? ` +¥${(spec.priceFen / 100).toFixed(0)}`
@@ -204,14 +192,14 @@ function DishCustomizeSheet({ dish, visible, onClose, onConfirm }: DishCustomize
             </View>
           ))
         ) : (
-          <Text style={{ color: C.text2, fontSize: '26rpx', display: 'block', marginBottom: '24rpx' }}>
+          <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '26rpx', display: 'block', marginBottom: '24rpx' }}>
             该菜品无需选规格，直接加入购物车
           </Text>
         )}
 
         <View
           style={{
-            background: canConfirm ? C.primary : '#3A4A50',
+            background: canConfirm ? 'var(--tx-brand, #FF6B35)' : '#3A4A50',
             borderRadius: '16rpx',
             height: '88rpx',
             display: 'flex',
@@ -343,20 +331,20 @@ export default function MenuPage() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <View style={{ height: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <View style={{ height: '100vh', background: 'var(--tx-page-bg, #0B1A20)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ─── Search bar ─── */}
       <View
         style={{
           padding: '16rpx 32rpx',
-          background: C.bg,
+          background: 'var(--tx-page-bg, #0B1A20)',
           flexShrink: 0,
         }}
         onClick={handleSearchTap}
       >
         <View
           style={{
-            background: C.card,
+            background: 'var(--tx-card-bg, #132029)',
             borderRadius: '48rpx',
             height: '72rpx',
             display: 'flex',
@@ -366,8 +354,8 @@ export default function MenuPage() {
             gap: '12rpx',
           }}
         >
-          <Text style={{ fontSize: '28rpx', color: C.text2 }}>🔍</Text>
-          <Text style={{ color: C.text2, fontSize: '28rpx' }}>搜索菜品…</Text>
+          <Text style={{ fontSize: '28rpx', color: 'var(--tx-text-secondary, #9EB5C0)' }}>🔍</Text>
+          <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '28rpx' }}>搜索菜品…</Text>
         </View>
       </View>
 
@@ -379,7 +367,7 @@ export default function MenuPage() {
           scrollY
           style={{
             width: '120rpx',
-            background: C.nav,
+            background: 'var(--tx-page-bg, #0D2030)',
             flexShrink: 0,
             height: '100%',
           }}
@@ -395,15 +383,15 @@ export default function MenuPage() {
                   style={{
                     padding: '24rpx 8rpx',
                     textAlign: 'center',
-                    background: isActive ? C.bg : 'transparent',
-                    borderLeft: isActive ? `4rpx solid ${C.primary}` : '4rpx solid transparent',
+                    background: isActive ? 'var(--tx-page-bg, #0B1A20)' : 'transparent',
+                    borderLeft: isActive ? `4rpx solid ${'var(--tx-brand, #FF6B35)'}` : '4rpx solid transparent',
                     transition: 'all 0.2s',
                   }}
                   onClick={() => handleCategorySelect(cat.categoryId)}
                 >
                   <Text
                     style={{
-                      color: isActive ? C.primary : C.text2,
+                      color: isActive ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-text-secondary, #9EB5C0)',
                       fontSize: '24rpx',
                       fontWeight: isActive ? '600' : '400',
                       lineHeight: '36rpx',
@@ -421,7 +409,7 @@ export default function MenuPage() {
         {/* Right dish list */}
         <ScrollView
           scrollY
-          style={{ flex: 1, background: C.bg, height: '100%' }}
+          style={{ flex: 1, background: 'var(--tx-page-bg, #0B1A20)', height: '100%' }}
           scrollIntoView={rightScrollId.current}
           onScroll={() => { rightScrollId.current = '' }}
         >
@@ -446,7 +434,7 @@ export default function MenuPage() {
               <Text style={{ color: '#E8A0A0', fontSize: '28rpx' }}>{error}</Text>
               <View
                 style={{
-                  background: C.primary,
+                  background: 'var(--tx-brand, #FF6B35)',
                   borderRadius: '12rpx',
                   padding: '12rpx 32rpx',
                   marginTop: '8rpx',
@@ -483,14 +471,14 @@ export default function MenuPage() {
                       style={{
                         position: 'sticky',
                         top: 0,
-                        background: C.bg,
+                        background: 'var(--tx-page-bg, #0B1A20)',
                         zIndex: 10,
                         padding: '20rpx 4rpx 12rpx',
-                        borderBottom: `1rpx solid ${C.divider}`,
+                        borderBottom: `1rpx solid ${'rgba(255,255,255,0.06)'}`,
                         marginBottom: '12rpx',
                       }}
                     >
-                      <Text style={{ color: C.text1, fontSize: '28rpx', fontWeight: '700' }}>
+                      <Text style={{ color: 'var(--tx-text-primary, #E8F4F8)', fontSize: '28rpx', fontWeight: '700' }}>
                         {cat.name}
                       </Text>
                     </View>
@@ -536,7 +524,7 @@ export default function MenuPage() {
                   }}
                 >
                   <Text style={{ fontSize: '80rpx' }}>🍽</Text>
-                  <Text style={{ color: C.text2, fontSize: '28rpx' }}>暂无菜品</Text>
+                  <Text style={{ color: 'var(--tx-text-secondary, #9EB5C0)', fontSize: '28rpx' }}>暂无菜品</Text>
                 </View>
               )}
             </View>
