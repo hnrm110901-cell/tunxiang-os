@@ -384,9 +384,12 @@ def check_security_audit(args: argparse.Namespace) -> CheckResult:
         )
 
     try:
+        # 透传 DATABASE_URL 给审计脚本，使其连接到同一 DB
+        audit_env = {**os.environ, "DATABASE_URL": args.database_url} if args.database_url else None
         result = subprocess.run(  # noqa: S603
             [sys.executable, str(audit_script), "--json"],  # noqa: S603
             cwd=REPO_ROOT, capture_output=True, text=True, timeout=120,
+            env=audit_env,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return CheckResult(

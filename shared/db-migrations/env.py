@@ -1,45 +1,23 @@
-"""Alembic env.py — 支持 asyncpg 运行时 + psycopg2 迁移"""
+"""Alembic env.py — 临时 Python 3.9 兼容版（仅用于 upgrade/downgrade，不支持 autogenerate）
+
+原始文件已备份到 env.py.bak。此文件跳过 ORM 模型导入（需要 Python 3.10+），
+仅保留运行迁移所需的最小逻辑。
+"""
 
 import os
-
-# tx-trade domain models (also inherit TenantBase, must be imported for autogenerate)
-# Directory is "tx-trade" (hyphen), so we add it to sys.path for import resolution.
-import sys as _sys
 from logging.config import fileConfig
-from pathlib import Path as _Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-from shared.ontology.src.base import TenantBase
-
-# Import all models so TenantBase.metadata discovers them for autogenerate
-from shared.ontology.src.entities import *  # noqa: F401, F403
-
-_tx_trade_src = str(_Path(__file__).resolve().parent.parent.parent / "services" / "tx-trade" / "src")
-if _tx_trade_src not in _sys.path:
-    _sys.path.insert(0, _tx_trade_src)
-
-try:
-    from models.delivery_order import DeliveryOrder  # noqa: F401
-    from models.payment import Payment, Refund  # noqa: F401
-    from models.production_dept import DishDeptMapping, ProductionDept  # noqa: F401
-    from models.queue import QueueCounter, QueueEntry  # noqa: F401
-    from models.receipt import ReceiptLog, ReceiptTemplate  # noqa: F401
-    from models.reservation import NoShowRecord, Reservation  # noqa: F401
-    from models.settlement import Settlement, ShiftHandover  # noqa: F401
-    from models.tables import Table  # noqa: F401
-except ImportError:
-    pass  # Models not available; autogenerate will miss tx-trade tables
+from sqlalchemy import MetaData, engine_from_config, pool
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = TenantBase.metadata
+# upgrade/downgrade 不需要 ORM metadata；autogenerate 不可用（需 Python 3.10+）
+target_metadata = MetaData()
 
-# 运行时用 asyncpg，迁移用 psycopg2（同步）
 db_url = os.getenv(
     "DATABASE_URL",
     config.get_main_option("sqlalchemy.url", "postgresql://tunxiang:changeme_dev@localhost/tunxiang_os"),
@@ -61,7 +39,10 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata, compare_type=True, transaction_per_migration=True
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            transaction_per_migration=True,
         )
         with context.begin_transaction():
             context.run_migrations()
