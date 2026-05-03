@@ -275,7 +275,8 @@ class VATService:
         """Validate Vietnamese tax ID (Mã số thuế).
 
         Vietnamese tax IDs are either 10 digits or 13 digits (10-digit + 3-digit suffix).
-        The 10-digit form uses a checksum algorithm (weighted sum mod 11).
+        Validation is format-only (10 or 13 chars, all digits); the Vietnamese tax
+        authority does not publish a public checksum algorithm.
 
         Args:
             ma_so_thue: Vietnamese tax ID string.
@@ -294,44 +295,16 @@ class VATService:
         if not ma_so_thue or not isinstance(ma_so_thue, str):
             return False
 
-        # Trim whitespace
         tax_id = ma_so_thue.strip()
 
-        # Allow 10-digit or 13-digit (10 + hyphen + 3 suffix) format
+        # 10-digit format
+        if len(tax_id) == 10 and tax_id.isdigit():
+            return True
+
+        # 13-digit format: 10 digits + "-" + 3-digit suffix
         if len(tax_id) == 14 and tax_id[10] == "-":
-            # 13-digit format: 10 digits + "-" + 3-digit suffix
             base_part = tax_id[:10]
             suffix_part = tax_id[11:]
-            if not (base_part.isdigit() and suffix_part.isdigit()):
-                return False
-            # Validate the base 10-digit part
-            return VATService._validate_10_digit_tax_id(base_part)
-
-        if len(tax_id) == 10 and tax_id.isdigit():
-            return VATService._validate_10_digit_tax_id(tax_id)
+            return base_part.isdigit() and suffix_part.isdigit()
 
         return False
-
-    @staticmethod
-    def _validate_10_digit_tax_id(digits: str) -> bool:
-        """Validate a 10-digit Vietnamese tax ID using checksum.
-
-        Algorithm:
-          Weighted sum = d1*31 + d2*29 + d3*23 + d4*19 + d5*17
-                       + d6*13 + d7*7 + d8*5 + d9*3
-          Checksum = weighted_sum mod 11
-          Valid if checksum == d10 (where d10 is the 10th digit)
-
-        Reference: Vietnamese Ministry of Finance tax ID validation.
-        """
-        weights = [31, 29, 23, 19, 17, 13, 7, 5, 3]
-
-        try:
-            weighted_sum = sum(
-                int(digits[i]) * weights[i] for i in range(9)
-            )
-            checksum = weighted_sum % 11
-            expected_tenth = checksum if checksum < 10 else 0
-            return expected_tenth == int(digits[9])
-        except (IndexError, ValueError):
-            return False

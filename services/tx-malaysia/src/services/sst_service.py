@@ -124,7 +124,7 @@ class SSTService:
             elif category == SSTCategory.SPECIFIC:
                 specific_8_fen += sst_amount
             elif category == SSTCategory.EXEMPT:
-                exempt_fen += amount_fen
+                exempt_fen += sst_amount
 
         total_sst_fen = standard_6_fen + specific_8_fen
 
