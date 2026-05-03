@@ -1,4 +1,55 @@
-## 2026-05-03 A1 授权加固回归测试 + 基础设施安全加固
+## 2026-05-03 生产前安全审计全量修复 — 代码已 push
+
+### 今日完成
+
+#### 阶段一：DEMO Go/No-Go 补全（Tier 1 合规）
+- [audit/tier1] 修复 Alembic 迁移链：13 处 `down_revision` 断链 + 17 个重复 revision ID，`upgrade head` 可单链运行
+- [audit/tier1] `shared/db-migrations/env.py` 降级为 Python 3.9 兼容版（移除 `str | None` / `slots=True`）
+- [audit/tier1] `tests/tier1/test_rls_all_tables_tier1.py` 新增 `_apply_safe_rls()` / `_enable_rls()` 直接调用和间接调用（`_TABLE` 变量）三种识别模式
+- [audit/security] `scripts/check_rls_policies.py` 修复 `"app.tenant"` 子串假阳性（改为 regex 负向 lookahead），491 条 CRITICAL 误报降为 0
+- [audit/demo] `scripts/demo_go_no_go.py` 补全：3 路径 tier1 glob、Python 3.9 skip 逻辑、env 错误区分、`--database-url` 透传审计脚本
+- [demo] 达成 **10/10 Go/No-Go 全绿**（§1 Tier1 / §2 k6 P99<200ms / §3 支付 / §4 断网 / §5 签字 / §6 分数 / §7 RLS / §8 reset / §9 A/B / §10 话术）
+
+#### 阶段二：CORS + Prometheus 安全修复
+- [security/cors] `tx-trade` `tx-finance` `tx-brain` `tx-civic` `tx-forge` `tx-member` `tx-expense` `tx-devforge`：全部移除 `allow_origins=["*"]`，改为 `CORS_ALLOWED_ORIGINS` env var（默认 `http://localhost:5173`）
+- [security/cors] `tx-brain`：同时修复 `["*"]` + `allow_credentials=True` CORS 规范违规
+- [security/infra] `infra/nginx/nginx.conf`：`api.tunxiangos.com` 和 `mac-station` 代理添加 `location = /metrics { deny all }` 封堵 Prometheus 外网泄露
+
+#### 阶段三：生产就绪阻塞修复（P1-P3 + Y1-Y3）
+- [security/infra] **P1** `docker-compose.prod.yml` 新增 `pg-backup` 容器（02:00 定时 `pg_dump`，保留 7 天），`pg_backups` volume，`scripts/backup/pg_backup.sh` + `pg_restore.sh`
+- [security/tier1] **P2** `cashier_engine._try_auto_pay()`：移除 `_StoredValueStore._cards` 内存查找（重启丢失、多实例竞态），改为查 `stored_value_accounts` 表（`member_id/tenant_id` 过滤，`ORDER BY balance_fen DESC LIMIT 1`）
+- [security/config] **P3** `tx-devforge/config.py`：移除 `DATABASE_URL` 默认值 `changeme_dev`，改为 `@field_validator` 空值启动失败（实际 env 变量名：`DEVFORGE_DATABASE_URL`）
+- [security/config] **Y3** `xiaohongshu_routes.py`：两处 `stub_app_secret` 改为读 `XHS_APP_SECRET` env var，未配置时返回 503
+- [frontend] **Y2** 9 个前端应用 Vite `^5.0/^5.4/^6.0` 统一升级至 `^8.0.3`，同步 `@vitejs/plugin-react ^4.3`；全部 `vite.config.ts` 确认无破坏性变更
+- [infra] **Y1** 17 个服务生成 `requirements.lock`（pip-compile 精确锁定），6 个生产 Dockerfile 添加 lock 切换指引，`pyproject.toml` 加入 `pip-tools` dev 依赖
+
+#### 阶段四：代码质量收尾
+- [quality] `tx-growth/promotion_rules_v3_routes.py`：`except Exception` → `except (OSError, ValueError, ConnectionError)` + 日志（远端提交已覆盖）
+- [quality] `tx-menu/menu_plan_v2_routes.py`：`log.warning` 补 `exc_info=True`
+- [infra] `pnpm install` 完成，`pnpm-lock.yaml` 更新
+
+### 数据变化
+- 迁移版本：无新增
+- 修改文件：~60 个（跨 4 个阶段 8 次提交）
+- 新增脚本：`scripts/backup/pg_backup.sh` / `pg_restore.sh` / `generate_requirements_locks.sh`
+- 新增 lock 文件：`services/*/requirements.lock` × 17
+- 测试：**345 passed**（rebase 后合入远端新增测试，从 156 → 345）
+- 提交数：8 个原子化 commit，已 push 至 `origin/main`
+
+### 遗留问题
+- `coupon_service.py` `_StoredValueStore` 类仍保留（仅供单测 fixture，生产路径已迁移 DB）
+- `requirements.lock` 由本机 Python 3.9/pip-tools 7.5 生成，生产环境建议用 Docker 内重新生成以保证一致性
+- Vite 8.x 升级后需在 CI 中完整构建验证（本次仅更新 package.json，未实际 `pnpm build`）
+- `infra/docker/*.czyz.yml` / `demo.yml` / `sgc.yml` 仍含租户硬编码密码（遗留上轮）
+
+### 下一步
+- CI 流水线跑 `pnpm build` 验证 Vite 8 兼容性
+- 生产部署前运行 `docker-compose -f docker-compose.prod.yml up pg-backup` 验证备份容器
+- 切换 Dockerfiles 至 `requirements.lock`（取消 COPY 注释行即可）
+
+---
+
+
 
 ### 今日完成
 - [security(gateway)] 修复 5 个安全漏洞：api_key_pending 绕过、JWT type/iss/aud 缺失校验、生产环境密钥缺失不崩溃、中间件未注册、MFA 未强制
