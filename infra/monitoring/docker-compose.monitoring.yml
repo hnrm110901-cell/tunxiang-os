@@ -27,8 +27,8 @@ services:
     container_name: tunxiang-grafana
     restart: unless-stopped
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=tunxiang2024  # 开发环境用，生产请改为Secret管理
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin123}  # 开发环境用，生产请改为Secret管理
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=http://localhost:3000
       - GF_FEATURE_TOGGLES_ENABLE=ngalert
@@ -62,7 +62,7 @@ services:
     container_name: tunxiang-postgres-exporter
     restart: unless-stopped
     environment:
-      - DATA_SOURCE_NAME=postgresql://tunxiang:password@postgres:5432/tunxiang?sslmode=disable
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-tunxiang}?sslmode=disable
     ports:
       - "9187:9187"
     networks:

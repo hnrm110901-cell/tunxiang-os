@@ -16,7 +16,7 @@ x-py-common: &py-common
   networks:
     - txos-zqx
   environment: &common-env
-    DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_zqx_2024@postgres:5532/tunxiang_zqx
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD}@postgres:5532/${POSTGRES_DB:-tunxiang_zqx}
     REDIS_URL: redis://redis:6380/0
     TX_ENV: demo
     TX_AUTH_ENABLED: "false"
@@ -39,16 +39,16 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: tunxiang
-      POSTGRES_PASSWORD: tunxiang_zqx_2024
-      POSTGRES_DB: tunxiang_zqx
+      POSTGRES_USER: ${POSTGRES_USER:-tunxiang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-tunxiang_zqx}
     ports:
-      - "5532:5432"
+      - "${POSTGRES_PORT:-5532}:5432"
     volumes:
       - zqx_pg_data:/var/lib/postgresql/data
       - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_zqx"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tunxiang} -d ${POSTGRES_DB:-tunxiang_zqx}"]
       interval: 5s
       timeout: 3s
       retries: 10

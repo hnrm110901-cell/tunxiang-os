@@ -2,11 +2,17 @@
 """
 Demo seed data for 屯象OS — 模拟徐记海鲜门店业务场景
 Run: python3 scripts/seed_demo_data.py
+
+安全说明：从 DATABASE_URL 环境变量读取，不硬编码密码。
 """
+import os
 import psycopg2
 import uuid
 
-DB_URL = "postgresql://tunxiang:changeme_dev@localhost:5432/tunxiang_dev"
+DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://tunxiang:changeme@localhost:5432/tunxiang_dev",
+)
 TENANT_ID = "10000000-0000-0000-0000-000000000001"
 STORE_ID   = "20000000-0000-0000-0000-000000000001"
 
