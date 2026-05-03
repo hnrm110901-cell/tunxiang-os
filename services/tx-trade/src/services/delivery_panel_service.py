@@ -36,6 +36,7 @@ from .delivery_adapters import (
     BaseDeliveryAdapter,
     DouyinAdapter,
     ElemeAdapter,
+    GrabFoodAdapter,
     MeituanAdapter,
 )
 from .delivery_adapters import (
@@ -49,6 +50,7 @@ _PLATFORM_NAMES: dict[str, str] = {
     "meituan": "美团外卖",
     "eleme": "饿了么",
     "douyin": "抖音外卖",
+    "grabfood": "GrabFood",
 }
 
 # Mac mini 地址（用于推送 KDS 通知）
@@ -82,8 +84,8 @@ class DuplicateOrderError(ValueError):
 
 
 def _make_order_no(platform: str) -> str:
-    """生成内部流水号，格式：MT/EL/DY + YYYYMMDDHHMMSS + 6位随机"""
-    prefix_map = {"meituan": "MT", "eleme": "EL", "douyin": "DY"}
+    """生成内部流水号，格式：MT/EL/DY/GF + YYYYMMDDHHMMSS + 6位随机"""
+    prefix_map = {"meituan": "MT", "eleme": "EL", "douyin": "DY", "grabfood": "GF"}
     prefix = prefix_map.get(platform, "OT")
     now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     suffix = uuid.uuid4().hex[:6].upper()
@@ -101,6 +103,7 @@ def _get_adapter(
         "meituan": MeituanAdapter,
         "eleme": ElemeAdapter,
         "douyin": DouyinAdapter,
+        "grabfood": GrabFoodAdapter,
     }
     cls = adapter_map.get(platform)
     if cls is None:

@@ -3,11 +3,13 @@ import { zh } from './zh';
 import { en } from './en';
 import { ja } from './ja';
 import { ko } from './ko';
+import { id } from './id';
+import { vi } from './vi';
 
-export type Lang = 'zh' | 'en' | 'ja' | 'ko';
+export type Lang = 'zh' | 'en' | 'ja' | 'ko' | 'id' | 'vi';
 type Translations = typeof zh;
 
-const dictMap = { zh, en, ja, ko } as Record<Lang, Record<keyof Translations, string>>;
+const dictMap = { zh, en, ja, ko, id, vi } as Record<Lang, Record<keyof Translations, string>>;
 
 interface LangContextValue {
   lang: Lang;

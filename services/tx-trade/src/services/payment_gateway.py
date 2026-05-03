@@ -50,6 +50,10 @@ class PaymentGateway:
         "unionpay": {"name": "银联", "need_trade_no": True, "fee_rate_permil": 5},
         "member_balance": {"name": "会员余额", "need_trade_no": False, "fee_rate_permil": 0},
         "credit_account": {"name": "挂账", "need_trade_no": False, "fee_rate_permil": 0},
+        # Malaysia payment methods (Sprint 1.4)
+        "tng_ewallet": {"name": "Touch 'n Go eWallet", "need_trade_no": True, "fee_rate_permil": 10},
+        "grabpay": {"name": "GrabPay", "need_trade_no": True, "fee_rate_permil": 15},
+        "boost": {"name": "Boost", "need_trade_no": True, "fee_rate_permil": 12},
     }
 
     def __init__(
@@ -665,5 +669,9 @@ class PaymentGateway:
             "unionpay": "银联卡",
             "member_balance": "会员消费",
             "credit_account": "挂账",
+            # Malaysia e-wallets (Sprint 1.4)
+            "tng_ewallet": "电子钱包",
+            "grabpay": "电子钱包",
+            "boost": "电子钱包",
         }
         return mapping.get(method, "other")

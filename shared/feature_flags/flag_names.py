@@ -220,6 +220,56 @@ class SupplyFlags:
     SMART_REORDER = "supply.intel.smart_reorder.enable"
 
 
+class VietnamFlags:
+    """Vietnam market (Phase 3, Sprint 3.5) Flag 名称。"""
+
+    # 越南市场全局开关
+    VIETNAM_ENABLED = "market.vietnam.enabled"
+
+    # VAT 8%/10% 计算引擎
+    VAT_CALCULATION = "market.vietnam.vat.enabled"
+
+    # 越南 e-Invoice（配合 VAT）
+    EINVOICE_INVOICE = "market.vietnam.einvoice"
+
+    # MoMo 电子钱包支付
+    PAYMENT_MOMO = "market.vietnam.payment.momo"
+
+    # ZaloPay 支付
+    PAYMENT_ZALOPAY = "market.vietnam.payment.zalopay"
+
+    # GrabFood 越南外卖
+    DELIVERY_GRABFOOD = "market.vietnam.delivery.grabfood"
+
+    # ShopeeFood 越南外卖
+    DELIVERY_SHOPEEFOOD = "market.vietnam.delivery.shopeefood"
+
+
+class IndonesiaFlags:
+    """Indonesia market (Phase 3, Sprint 3.4) Flag 名称。"""
+
+    # 印度尼西亚市场全局开关
+    INDONESIA_ENABLED = "market.indonesia.enabled"
+
+    # PPN 11% 计算引擎（替代中国 VAT）
+    PPN_CALCULATION = "market.indonesia.ppn.enabled"
+
+    # e-Faktur 电子发票（配合 DJP）
+    EINVOICE_EFAKTUR = "market.indonesia.einvoice.efaktur"
+
+    # GoPay 电子钱包支付
+    PAYMENT_GOPAY = "market.indonesia.payment.gopay"
+
+    # DANA 电子钱包支付
+    PAYMENT_DANA = "market.indonesia.payment.dana"
+
+    # GoFood 外卖平台
+    DELIVERY_GOFOOD = "market.indonesia.delivery.gofood"
+
+    # ShopeeFood 印尼外卖
+    DELIVERY_SHOPEEFOOD = "market.indonesia.delivery.shopeefood"
+
+
 class KnowledgeFlags:
     """知识库域 Flag 名称。"""
 

@@ -1,0 +1,107 @@
+"""Tiếng Việt (Vietnam)"""
+
+LANG_CODE = "vi_VN"
+LANG_NAME = "Tiếng Việt"
+
+# ── Danh mục món ăn ────────────────────────────────────────
+CATEGORIES = {
+    "hot_dish": "Món Nóng",
+    "cold_dish": "Món Nguội",
+    "seafood": "Hải Sản",
+    "soup": "Canh / Súp",
+    "staple": "Cơm / Mì",
+    "drink": "Đồ Uống",
+    "dessert": "Tráng Miệng",
+    "snack": "Khai Vị",
+    "bbq": "Nướng",
+    "hotpot": "Lẩu",
+}
+
+# ── Văn bản giao diện ─────────────────────────────────────
+UI = {
+    "checkout": "Thanh Toán",
+    "order": "Gọi Món",
+    "rush_order": "Giục Món",
+    "return_dish": "Trả Món",
+    "add_dish": "Thêm Món",
+    "table_number": "Bàn Số",
+    "guest_count": "Số Khách",
+    "total": "Tổng Cộng",
+    "discount": "Giảm Giá",
+    "pay": "Thanh Toán",
+    "cash": "Tiền Mặt",
+    "wechat_pay": "WeChat Pay",
+    "alipay": "Alipay",
+    "card": "Thẻ",
+    "receipt": "Hóa Đơn",
+    "print_receipt": "In Hóa Đơn",
+    "confirm": "Xác Nhận",
+    "cancel": "Hủy",
+    "back": "Quay Lại",
+    "search": "Tìm Kiếm",
+    "voice_order": "Gọi Món Bằng Giọng Nói",
+    "scan_order": "Quét Mã QR",
+    "member": "Thành Viên",
+    "member_price": "Giá Thành Viên",
+    "original_price": "Giá Gốc",
+    "sold_out": "Hết Hàng",
+    "popular": "Phổ Biến",
+    "new": "Mới",
+    "spicy": "Cay",
+    "recommend": "Đề Xuất",
+    "quantity": "Số Lượng",
+    "remark": "Ghi Chú",
+    "no_spicy": "Không Cay",
+    "mild_spicy": "Hơi Cay",
+    "medium_spicy": "Cay Vừa",
+    "extra_spicy": "Cay Đặc Biệt",
+    "order_success": "Đặt Món Thành Công",
+    "order_failed": "Đặt Món Thất Bại",
+    "waiting": "Đang Chờ",
+    "preparing": "Đang Chế Biến",
+    "ready": "Đã Xong",
+    "served": "Đã Dọn",
+}
+
+# ── Tên món ăn phổ biến ────────────────────────────────────
+DISH_NAMES = {
+    "steamed_fish_head_chopped_chili": "Đầu Cá Hấp Ớt Băm",
+    "braised_pork": "Thịt Kho Tàu",
+    "kung_pao_chicken": "Gà Xào Kung Pao",
+    "mapo_tofu": "Đậu Phụ Mapo",
+    "boiled_fish": "Cá Luộc Tứ Xuyên",
+    "steamed_bass": "Cá Vược Hấp Xì Dầu",
+    "stir_fried_vegetables": "Rau Xào Thập Cẩm",
+    "egg_fried_rice": "Cơm Rang Trứng",
+    "tomato_egg": "Cà Chua Xào Trứng",
+    "cold_cucumber": "Dưa Chuột Trộn",
+    "hot_and_sour_soup": "Canh Chua Cay",
+    "wonton_soup": "Súp Hoành Thánh",
+    "steamed_rice": "Cơm Trắng",
+    "beer": "Bia",
+    "cola": "Coca-Cola",
+    "plum_juice": "Nước Mận",
+    "herbal_tea": "Trà Thảo Mộc",
+}
+
+# ── Mẫu hóa đơn ────────────────────────────────────────────
+RECEIPT = {
+    "header": "Hóa Đơn Thanh Toán",
+    "store_name": "Cửa Hàng",
+    "order_no": "Mã Đơn Hàng",
+    "table_no": "Bàn Số",
+    "cashier": "Thu Ngân",
+    "time": "Thời Gian",
+    "item": "Món",
+    "qty": "SL",
+    "price": "Đơn Giá",
+    "subtotal": "Tạm Tính",
+    "total": "Tổng Cộng",
+    "discount": "Giảm Giá",
+    "payable": "Phải Trả",
+    "paid": "Đã TT",
+    "change": "Tiền Thừa",
+    "payment_method": "Hình Thức TT",
+    "footer": "Cảm ơn quý khách, hẹn gặp lại!",
+    "vat_note": "Vui lòng liên hệ quầy lễ tân nếu cần hóa đơn VAT",
+}

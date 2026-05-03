@@ -31,6 +31,7 @@ import {
   getChannelColor,
   type KDSRuleConfig,
 } from '../api/kdsRulesApi';
+import { DeliveryOrderBadge } from '../components/DeliveryOrderBadge';
 
 
 // ─── CSS Variables ──────────────────────────────────────
@@ -82,6 +83,10 @@ interface DemoTicket {
   isReturn?: boolean;
   /** 客位数 */
   guestSeat?: number;
+  /** 配送平台（外卖订单专用） */
+  platform?: 'grabfood' | 'foodpanda' | 'shopeefood';
+  /** 订单类型（dine-in / delivery） */
+  orderType?: 'dine-in' | 'delivery';
 }
 
 /** Grouped dish entry for by-dish view */
@@ -190,6 +195,14 @@ function buildMockTickets(): DemoTicket[] {
     makeTicket({ createdAtOffsetMin: 1, status: 'pending', priority: 'normal', tableNo: '自取003',
       items: [{ name: '番茄炒蛋', qty: 2, notes: '' }, { name: '土豆丝', qty: 1, notes: '' }],
       channel: 'pickup' }),
+    // MY 外卖平台工单
+    makeTicket({ createdAtOffsetMin: 2, status: 'pending', priority: 'normal', tableNo: '外卖005',
+      items: [{ name: '炒粿条', qty: 2, notes: '加辣' }, { name: '沙爹串', qty: 5, notes: '' }],
+      channel: 'takeout', orderType: 'delivery', platform: 'grabfood' }),
+    makeTicket({ createdAtOffsetMin: 8, status: 'cooking', priority: 'normal', tableNo: '外卖006',
+      items: [{ name: '海南鸡饭', qty: 1, notes: '' }, { name: '叻沙', qty: 1, notes: '不要太辣' }],
+      channel: 'takeout', orderType: 'delivery', platform: 'foodpanda',
+      startedAt: Date.now() - 4 * 60 * 1000 }),
   ];
 }
 
@@ -258,6 +271,7 @@ export function KDSBoardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('scroll');
   const [groupMode, setGroupMode] = useState<GroupMode>('by-table');
   const [currentPage, setCurrentPage] = useState(0);
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'dine-in' | 'delivery'>('all');
 
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -485,9 +499,17 @@ export function KDSBoardPage() {
     }
   }, [isDemo, isReadOnly, warnReadOnly]);
 
+  // ─── 按订单类型筛选 ────────────────────────────────
+
+  const filteredTickets = tickets.filter((t) => {
+    if (deliveryFilter === 'dine-in') return t.channel === 'dine_in' || !t.channel;
+    if (deliveryFilter === 'delivery') return t.channel === 'takeout' || t.channel === 'pickup' || t.orderType === 'delivery';
+    return true;
+  });
+
   // ─── 统计 ────────────────────────────────────────
 
-  const activeTickets = tickets.filter((t) => t.status !== 'done');
+  const activeTickets = filteredTickets.filter((t) => t.status !== 'done');
   const pendingCount = activeTickets.filter((t) => t.status === 'pending').length;
   const cookingCount = activeTickets.filter((t) => t.status === 'cooking').length;
   const overtimeCount = activeTickets.filter(
@@ -625,6 +647,25 @@ export function KDSBoardPage() {
             />
           </div>
 
+          {/* 订单类型筛选 */}
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 2 }}>
+            <ToggleButton
+              active={deliveryFilter === 'all'}
+              label="全部"
+              onClick={() => setDeliveryFilter('all')}
+            />
+            <ToggleButton
+              active={deliveryFilter === 'dine-in'}
+              label="堂食"
+              onClick={() => setDeliveryFilter('dine-in')}
+            />
+            <ToggleButton
+              active={deliveryFilter === 'delivery'}
+              label="外卖"
+              onClick={() => setDeliveryFilter('delivery')}
+            />
+          </div>
+
           {/* 视图切换按钮组 */}
           <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 2 }}>
             <ToggleButton
@@ -729,17 +770,26 @@ export function KDSBoardPage() {
               </div>
             ) : (
               pagedTickets.map((ticket) => (
-                <OrderTicketCard
-                  key={ticket.id}
-                  ticket={toTicketData(ticket)}
-                  kds
-                  now={now}
-                  swipeable
-                  onSwipeComplete={() => handleComplete(ticket.id)}
-                  isFlashing={ticket.priority === 'rush'}
-                  onStart={() => handleStart(ticket.id)}
-                  onComplete={() => handleComplete(ticket.id)}
-                />
+                <div key={ticket.id}>
+                  {(ticket.orderType === 'delivery' || ticket.channel === 'takeout' || ticket.channel === 'pickup') && (
+                    <div style={{ marginBottom: 4, paddingLeft: 4 }}>
+                      <DeliveryOrderBadge
+                        platform={ticket.platform}
+                        orderType={ticket.orderType || (ticket.channel === 'takeout' || ticket.channel === 'pickup' ? 'delivery' : 'dine-in')}
+                      />
+                    </div>
+                  )}
+                  <OrderTicketCard
+                    ticket={toTicketData(ticket)}
+                    kds
+                    now={now}
+                    swipeable
+                    onSwipeComplete={() => handleComplete(ticket.id)}
+                    isFlashing={ticket.priority === 'rush'}
+                    onStart={() => handleStart(ticket.id)}
+                    onComplete={() => handleComplete(ticket.id)}
+                  />
+                </div>
               ))
             )}
           </div>
@@ -804,6 +854,14 @@ export function KDSBoardPage() {
           ) : (
             activeTickets.map((ticket) => (
               <div key={ticket.id} style={{ width: 260, flexShrink: 0 }}>
+                {(ticket.orderType === 'delivery' || ticket.channel === 'takeout' || ticket.channel === 'pickup') && (
+                  <div style={{ marginBottom: 4 }}>
+                    <DeliveryOrderBadge
+                      platform={ticket.platform}
+                      orderType={ticket.orderType || (ticket.channel === 'takeout' || ticket.channel === 'pickup' ? 'delivery' : 'dine-in')}
+                    />
+                  </div>
+                )}
                 <OrderTicketCard
                   ticket={toTicketData(ticket)}
                   kds

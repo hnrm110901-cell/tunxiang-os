@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useRef, useState } from 'react';
 import {
+  Alert,
   Button,
   Col,
   DatePicker,
@@ -28,15 +29,45 @@ import {
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  PlusOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { StatisticCard } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
+import { useLang } from '../../i18n/LangContext';
 
 const { Title, Text } = Typography;
 // TabPane removed (not used)
+
+// ── MY 模式检测 ──────────────────────────────────────────────────────────────
+
+function useIsMY(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('country') === 'MY') return true;
+  try {
+    const raw = localStorage.getItem('tx_user');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.country_code === 'MY' || parsed.store_country === 'MY') return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+// ── SST 类型（MY 模式）───────────────────────────────────────────────────────
+
+interface SSTRecord {
+  id: string;
+  period_month: string;
+  category: 'standard' | 'specific' | 'exempt';
+  rate: number;
+  taxable_amount_fen: number;
+  sst_amount_fen: number;
+  status: 'draft' | 'submitted' | 'paid';
+  filing_date: string | null;
+}
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -676,15 +707,114 @@ const PlAccountsTab: React.FC = () => {
   );
 };
 
+// ── SST Tab (MY 模式) ────────────────────────────────────────────────────────
+
+const SSTLedgerTab: React.FC<{ isMY: boolean }> = ({ isMY }) => {
+  const [periodMonth, setPeriodMonth] = useState<string>(dayjs().format('YYYY-MM'));
+  const [records] = useState<SSTRecord[]>([]);
+  const { t } = useLang();
+
+  if (!isMY) return null;
+
+  const columns: ProColumns<SSTRecord>[] = [
+    {
+      title: t('sst.period'),
+      dataIndex: 'period_month',
+      width: 120,
+    },
+    {
+      title: t('sst.rate6'),
+      dataIndex: 'rate',
+      width: 140,
+      render: (_, r) => {
+        const rateLabels: Record<string, string> = {
+          '0.06': t('sst.rate6'),
+          '0.08': t('sst.rate8'),
+          '0': t('sst.rate0'),
+        };
+        return <Tag color="blue">{rateLabels[String(r.rate)] ?? `${(r.rate * 100).toFixed(0)}%`}</Tag>;
+      },
+    },
+    {
+      title: t('sst.totalSales'),
+      dataIndex: 'taxable_amount_fen',
+      search: false,
+      render: (_, r) => `RM${fenToYuan(r.taxable_amount_fen)}`,
+    },
+    {
+      title: t('sst.sstPayable'),
+      dataIndex: 'sst_amount_fen',
+      search: false,
+      render: (_, r) => <Text strong>RM${fenToYuan(r.sst_amount_fen)}</Text>,
+    },
+    {
+      title: t('sst.status'),
+      dataIndex: 'status',
+      width: 100,
+      render: (_, r) => (
+        <Tag color={r.status === 'paid' ? 'green' : r.status === 'submitted' ? 'blue' : 'orange'}>
+          {t(`sst.${r.status}`)}
+        </Tag>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Row gutter={16} style={{ marginBottom: 20 }}>
+        <Col span={24}>
+          <Alert
+            type="info"
+            message={t('sst.title')}
+            description={`SST ${t('sst.rate6')} / ${t('sst.rate8')} / ${t('sst.rate0')} — ${t('sst.period')}: ${periodMonth}`}
+            showIcon
+            style={{ background: '#F0F5FF', border: '1px solid #D6E4FF' }}
+          />
+        </Col>
+      </Row>
+      {records.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-4, #999)' }}>
+          <Text type="secondary">{t('common.noData')}</Text>
+          <div style={{ marginTop: 8 }}>
+            <Button type="primary" ghost icon={<PlusOutlined />}>
+              {t('sst.title')}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <ProTable<SSTRecord>
+          rowKey="id"
+          columns={columns}
+          dataSource={records}
+          search={false}
+          pagination={false}
+          toolBarRender={() => [
+            <DatePicker.MonthPicker
+              key="month"
+              value={dayjs(periodMonth, 'YYYY-MM')}
+              onChange={(v) => v && setPeriodMonth(v.format('YYYY-MM'))}
+              format="YYYY-MM"
+              allowClear={false}
+            />,
+          ]}
+        />
+      )}
+    </div>
+  );
+};
+
 // ── 主页面 ─────────────────────────────────────────────────────────────────────
 
 const TaxManagePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('output');
+  const isMY = useIsMY();
+  const { t } = useLang();
 
   const tabs = [
-    { key: 'output', label: '销项台账', children: <OutputLedgerTab /> },
-    { key: 'input', label: '进项台账', children: <InputLedgerTab /> },
-    { key: 'pl_accounts', label: '科目映射', children: <PlAccountsTab /> },
+    { key: 'output', label: isMY ? 'Output Ledger' : '销项台账', children: <OutputLedgerTab /> },
+    { key: 'input', label: isMY ? 'Input Ledger' : '进项台账', children: <InputLedgerTab /> },
+    ...(isMY ? [{ key: 'sst', label: 'SST Declaration', children: <SSTLedgerTab isMY={isMY} /> }] : []),
+    { key: 'pl_accounts', label: isMY ? 'P&L Mapping' : '科目映射', children: <PlAccountsTab /> },
   ];
 
   return (
@@ -692,9 +822,18 @@ const TaxManagePage: React.FC = () => {
       <Row align="middle" style={{ marginBottom: 20 }}>
         <Col flex="auto">
           <Title level={3} style={{ margin: 0, color: '#1E2A3A' }}>
-            税务管理
+            {isMY ? 'Tax Management' : '税务管理'}
+            {isMY && (
+              <Tag color="purple" style={{ marginLeft: 8, fontSize: 11, verticalAlign: 'middle' }}>
+                SST
+              </Tag>
+            )}
           </Title>
-          <Text type="secondary">增值税销项/进项台账 · P&amp;L 科目映射</Text>
+          <Text type="secondary">
+            {isMY
+              ? 'SST Output/Input Ledger · P&amp;L Account Mapping'
+              : '增值税销项/进项台账 · P&amp;L 科目映射'}
+          </Text>
         </Col>
       </Row>
 

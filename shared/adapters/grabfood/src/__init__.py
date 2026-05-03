@@ -1,0 +1,1 @@
+"""GrabFood adapter sub-package."""

@@ -7,8 +7,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import enUS from 'antd/locale/en_US';
 import { txAdminTheme } from '@tx/tokens';
 import { getToken, clearAuth, isTokenExpired } from './api/client';
+import { LangProvider, useLang } from './i18n/LangContext';
 import { ShellHQ } from './shell/ShellHQ';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -212,22 +214,33 @@ import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMat
 // (duplicate import removed - AgentKPIDashboard already imported above)
 
 function App() {
+  return (
+    <LangProvider>
+      <AppContent />
+    </LangProvider>
+  );
+}
+
+function AppContent() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const restore = useAuthStore((s) => s.restore);
   const logout = useAuthStore((s) => s.logout);
+  const { lang } = useLang();
 
   useEffect(() => { restore(); }, [restore]);
 
+  const antLocale = lang === 'en' ? enUS : lang === 'ms' ? enUS : zhCN;
+
   if (!isAuthenticated) {
     return (
-      <ConfigProvider theme={txAdminTheme} locale={zhCN}>
+      <ConfigProvider theme={txAdminTheme} locale={antLocale}>
         <LoginPage onLogin={() => {}} />
       </ConfigProvider>
     );
   }
 
   return (
-    <ConfigProvider theme={txAdminTheme} locale={zhCN}>
+    <ConfigProvider theme={txAdminTheme} locale={antLocale}>
     <BrowserRouter>
       <ShellHQ onLogout={logout}>
         <Routes>

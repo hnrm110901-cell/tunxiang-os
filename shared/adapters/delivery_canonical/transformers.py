@@ -679,6 +679,170 @@ class WechatTransformer(CanonicalTransformer):
 
 
 # ─────────────────────────────────────────────────────────────
+# GrabFood (马来西亚)
+# ─────────────────────────────────────────────────────────────
+
+
+class GrabFoodTransformer(CanonicalTransformer):
+    """GrabFood Malaysia transformer
+
+    GrabFood is Grab's food delivery platform operating in Malaysia,
+    Singapore, Thailand, Vietnam, Indonesia, and the Philippines.
+
+    Reference payload (GrabFood Webhook / Order Detail API v1):
+      {
+        "orderID": "GF-ORDER-001",
+        "merchantID": "MERCHANT-001",
+        "orderState": "OrderState.Pending",
+        "itemInfo": [
+          {
+            "itemCode": "SKU001",
+            "itemName": "Nasi Lemak",
+            "quantity": 2,
+            "unitPrice": 8.50,
+            "currency": "MYR"
+          }
+        ],
+        "paymentAmount": 20.50,
+        "currencyCode": "MYR",
+        "dineType": "Delivery",
+        "createTime": "2026-05-03T12:00:00+08:00",
+        "estimatedPickupTime": "2026-05-03T12:30:00+08:00",
+        "recipientInfo": {
+          "name": "Ali Bin Ahmad",
+          "phone": "60123456789",
+          "address": "12, Jalan SS2/72, Petaling Jaya"
+        }
+      }
+
+    Note:
+      - All amounts are in MYR (float) and converted to fen (int).
+      - currency is always MYR for GrabFood Malaysia.
+      - dineType values: "Delivery" or "PickUp".
+    """
+
+    platform = "grabfood"
+    version = 1
+
+    # GrabFood OrderState enum → canonical status
+    STATUS_MAP = {
+        "OrderState.Pending": "pending",
+        "OrderState.Accepted": "accepted",
+        "OrderState.Preparing": "preparing",
+        "OrderState.ReadyForPickup": "preparing",
+        "OrderState.PickedUp": "delivering",
+        "OrderState.Delivered": "delivered",
+        "OrderState.Completed": "completed",
+        "OrderState.Cancelled": "cancelled",
+        "OrderState.Rejected": "cancelled",
+        "OrderState.Refunded": "refunded",
+    }
+
+    DINE_TYPE_MAP = {
+        "Delivery": "delivery",
+        "PickUp": "pickup",
+    }
+
+    def supports(self, raw: dict[str, Any]) -> bool:
+        return "orderID" in raw and "merchantID" in raw and "itemInfo" in raw
+
+    def transform(
+        self, raw: dict[str, Any], tenant_id: str
+    ) -> CanonicalDeliveryOrder:
+        order_id = str(raw.get("orderID") or "").strip()
+        if not order_id:
+            raise TransformationError("grabfood: orderID is required")
+
+        placed_at = _parse_ts(
+            raw.get("createTime") or raw.get("create_time")
+        )
+        if placed_at is None:
+            raise TransformationError("grabfood: createTime is required or unparseable")
+
+        status_raw = str(raw.get("orderState") or "")
+        canonical_status = self.STATUS_MAP.get(status_raw, "pending")
+
+        dine_type_raw = str(raw.get("dineType") or "Delivery")
+        order_type = self.DINE_TYPE_MAP.get(dine_type_raw, "delivery")
+
+        # GrabFood amounts are in MYR (float) → convert to fen
+        payment_amount = raw.get("paymentAmount") or 0
+        total_fen = int(round(float(payment_amount) * 100))
+
+        recipient = raw.get("recipientInfo") or {}
+        phone = recipient.get("phone")
+        # Normalise Malaysian phone: strip leading "0" or "+60" for display
+        if phone:
+            phone = str(phone).strip()
+
+        order = CanonicalDeliveryOrder(
+            tenant_id=tenant_id,
+            platform="grabfood",
+            platform_order_id=order_id,
+            platform_sub_type=(
+                "grabfood_delivery" if order_type == "delivery"
+                else "grabfood_pickup"
+            ),
+            placed_at=placed_at,
+            order_type=order_type,
+            status=canonical_status,
+            platform_status_raw=status_raw,
+            customer_name=recipient.get("name"),
+            customer_phone_masked=mask_phone(phone),
+            customer_address=recipient.get("address"),
+            customer_address_hash=hash_address(recipient.get("address")),
+            gross_amount_fen=total_fen,
+            paid_amount_fen=total_fen,
+            expected_delivery_at=_parse_ts(
+                raw.get("estimatedPickupTime") or raw.get("estimated_pickup_time")
+            ),
+            raw_payload=raw,
+            payload_sha256=compute_payload_sha256(raw),
+            platform_metadata={
+                "merchantID": raw.get("merchantID"),
+                "dineType": dine_type_raw,
+                "currencyCode": raw.get("currencyCode", "MYR"),
+            },
+            canonical_version=self.version,
+        )
+
+        # Parse items
+        items_raw = raw.get("itemInfo") or raw.get("items") or []
+        for idx, item in enumerate(items_raw, start=1):
+            try:
+                unit_price_myr = item.get("unitPrice") or 0
+                unit_price_fen = int(round(float(unit_price_myr) * 100))
+                qty = int(item.get("quantity") or 1)
+                subtotal = unit_price_fen * qty
+                order.items.append(
+                    CanonicalDeliveryItem(
+                        platform_sku_id=str(
+                            item.get("itemCode") or ""
+                        ) or None,
+                        dish_name_platform=str(
+                            item.get("itemName") or ""
+                        ),
+                        quantity=qty,
+                        unit_price_fen=unit_price_fen,
+                        subtotal_fen=subtotal,
+                        line_no=idx,
+                    )
+                )
+            except (ValueError, TypeError, TransformationError) as exc:
+                order.add_transformation_error(
+                    f"itemInfo[{idx}]", item, f"Item parse failed: {exc}"
+                )
+
+        if status_raw not in self.STATUS_MAP:
+            order.add_transformation_error(
+                "orderState", status_raw,
+                f"Unknown GrabFood orderState {status_raw!r}, downgraded to pending",
+            )
+
+        return order
+
+
+# ─────────────────────────────────────────────────────────────
 # 默认注册
 # ─────────────────────────────────────────────────────────────
 
@@ -687,3 +851,4 @@ register_transformer(ElemeTransformer())
 register_transformer(DouyinTransformer())
 register_transformer(XiaohongshuTransformer())
 register_transformer(WechatTransformer())
+register_transformer(GrabFoodTransformer())

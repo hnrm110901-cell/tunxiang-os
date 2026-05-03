@@ -1,0 +1,1 @@
+"""MoMo adapter sub-package."""

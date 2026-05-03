@@ -3,6 +3,7 @@
  * Logo + Command Palette 触发器(⌘K) + 通知 + 用户 + 登出
  */
 import { useState } from 'react';
+import { useLang } from '../i18n/LangContext';
 
 interface TopbarHQProps {
   onToggleAgent: () => void;
@@ -13,6 +14,7 @@ interface TopbarHQProps {
 
 export function TopbarHQ({ onToggleAgent, userName, userRole, onLogout }: TopbarHQProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const { t } = useLang();
 
   // First character of user name for avatar
   const avatarChar = userName ? userName[0] : '?';
@@ -31,7 +33,7 @@ export function TopbarHQ({ onToggleAgent, userName, userRole, onLogout }: Topbar
           fontSize: 14, fontWeight: 'bold', color: '#fff',
         }}>TX</div>
         <span style={{ fontFamily: 'var(--font-title)', fontWeight: 700, fontSize: 13 }}>屯象OS</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>v3.0</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{t('common.version')}</span>
       </div>
 
       {/* Command Palette 触发器 */}
@@ -41,7 +43,7 @@ export function TopbarHQ({ onToggleAgent, userName, userRole, onLogout }: Topbar
         display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
       }}>
         <span style={{ fontSize: 14 }}>&#x1F50D;</span>
-        <span style={{ fontSize: 12, color: 'var(--text-4)', flex: 1 }}>搜索菜品、订单、功能...</span>
+        <span style={{ fontSize: 12, color: 'var(--text-4)', flex: 1 }}>{t('common.search')}</span>
         <kbd style={{
           padding: '2px 6px', borderRadius: 4, background: 'var(--bg-2)',
           fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)',
@@ -60,7 +62,7 @@ export function TopbarHQ({ onToggleAgent, userName, userRole, onLogout }: Topbar
         background: 'transparent', fontSize: 16,
       }}>&#x1F916;</button>
 
-      <button title="通知" style={{
+      <button title={t('common.notification')} style={{
         width: 32, height: 32, border: 'none', borderRadius: 8, cursor: 'pointer',
         background: 'transparent', fontSize: 16, position: 'relative',
       }}>
@@ -129,7 +131,7 @@ export function TopbarHQ({ onToggleAgent, userName, userRole, onLogout }: Topbar
                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 <span style={{ fontSize: 14 }}>&#x2190;</span>
-                退出登录
+                {t('common.logout')}
               </button>
             </div>
           </>
