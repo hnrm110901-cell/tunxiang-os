@@ -1,0 +1,102 @@
+alembic==1.16.5
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+annotated-doc==0.0.4
+    # via fastapi
+annotated-types==0.7.0
+    # via pydantic
+anyio==4.12.1
+    # via
+    #   httpx
+    #   starlette
+    #   watchfiles
+async-timeout==5.0.1
+    # via asyncpg
+asyncpg==0.31.0
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+certifi==2026.4.22
+    # via
+    #   httpcore
+    #   httpx
+click==8.1.8
+    # via uvicorn
+exceptiongroup==1.3.1
+    # via anyio
+fastapi==0.128.8
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+greenlet==3.2.5
+    # via sqlalchemy
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
+httpcore==1.0.9
+    # via httpx
+httptools==0.7.1
+    # via uvicorn
+httpx==0.28.1
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+idna==3.13
+    # via
+    #   anyio
+    #   httpx
+mako==1.3.12
+    # via alembic
+markupsafe==3.0.3
+    # via mako
+prometheus-client==0.25.0
+    # via prometheus-fastapi-instrumentator
+prometheus-fastapi-instrumentator==7.1.0
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+pydantic==2.13.3
+    # via
+    #   -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+    #   fastapi
+    #   pydantic-settings
+pydantic-core==2.46.3
+    # via pydantic
+pydantic-settings==2.11.0
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+python-dotenv==1.2.1
+    # via
+    #   pydantic-settings
+    #   uvicorn
+pyyaml==6.0.3
+    # via uvicorn
+sqlalchemy[asyncio]==2.0.49
+    # via
+    #   -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+    #   alembic
+starlette==0.49.3
+    # via
+    #   fastapi
+    #   prometheus-fastapi-instrumentator
+structlog==25.5.0
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+tomli==2.4.1
+    # via alembic
+typing-extensions==4.15.0
+    # via
+    #   alembic
+    #   anyio
+    #   exceptiongroup
+    #   fastapi
+    #   pydantic
+    #   pydantic-core
+    #   sqlalchemy
+    #   starlette
+    #   structlog
+    #   typing-inspection
+    #   uvicorn
+typing-inspection==0.4.2
+    # via
+    #   fastapi
+    #   pydantic
+    #   pydantic-settings
+uvicorn[standard]==0.39.0
+    # via -r /Users/lichun/tunxiang-os/services/tx-devforge/requirements.txt
+uvloop==0.22.1
+    # via uvicorn
+watchfiles==1.1.1
+    # via uvicorn
+websockets==15.0.1
+    # via uvicorn

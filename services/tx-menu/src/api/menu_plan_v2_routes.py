@@ -700,7 +700,7 @@ async def _execute_push_task(
                 text("SELECT set_config('app.tenant_id', :tid, true)"),
                 {"tid": str(tid)},
             )
-        except Exception:  # noqa: BLE001 — set_config 可能因连接/权限问题抛多种异常
+        except Exception:
             log.warning("push_task.set_tenant_failed", task_id=str(task_id), exc_info=True)
 
         success = 0
