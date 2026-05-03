@@ -51,8 +51,8 @@ class TestRegionalForecasting:
         assert ov["currency"]["code"] == "VND"
         assert "vat_standard" in ov["tax_rates"]
 
-    def test_get_market_overview_default(self, service):
-        """未知市场回退到 MY"""
+    def test_get_market_overview_unlisted(self, service):
+        """未列出的市场返回默认配置参数 (fallback to MY)"""
         ov = service.get_market_overview("SG")
         assert ov["country_code"] == "SG"
         assert ov["timezone"] == "Asia/Kuala_Lumpur"

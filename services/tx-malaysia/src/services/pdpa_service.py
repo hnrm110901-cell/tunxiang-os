@@ -234,6 +234,20 @@ class PDPAService:
             create_access_request 只创建请求（pending 状态）不触发自动处理。
         """
         await self._set_tenant()
+
+        # 检查是否存在进行中的 access 请求
+        existing = await self.db.execute(
+            text("""
+                SELECT id FROM pdpa_requests
+                WHERE tenant_id = :tid AND customer_id = :cid
+                  AND request_type = 'access'
+                  AND status IN ('pending', 'processing')
+            """),
+            {"tid": self._tid, "cid": uuid.UUID(customer_id)},
+        )
+        if existing.fetchone():
+            raise ValueError("该客户已有进行中的 access 申请，请等待处理完成")
+
         request_id = uuid.uuid4()
         now = datetime.now(timezone.utc)
 

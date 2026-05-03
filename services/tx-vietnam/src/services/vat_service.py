@@ -301,7 +301,7 @@ class VATService:
         if len(tax_id) == 10 and tax_id.isdigit():
             return True
 
-        # 13-digit format: 10 digits + "-" + 3-digit suffix
+        # 14-char format: 10 digits + "-" + 3-digit suffix
         if len(tax_id) == 14 and tax_id[10] == "-":
             base_part = tax_id[:10]
             suffix_part = tax_id[11:]

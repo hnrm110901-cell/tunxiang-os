@@ -60,14 +60,14 @@ class TestMyInvoisAdapter:
         with patch.object(adapter._client, "post") as mock_post, patch.object(
             adapter._client, "get"
         ) as mock_get, patch.object(adapter._client, "request") as mock_request:
-            mock_post.return_value = MagicMock(
+            mock_post.return_value = AsyncMock(
                 status_code=200,
                 json=lambda: {
                     "access_token": "mock-token",
                     "expires_in": 3600,
                 },
             )
-            mock_request.return_value = MagicMock(
+            mock_request.return_value = AsyncMock(
                 status_code=200,
                 json=lambda: {"acceptedDocuments": [{"uuid": "doc-uuid-123"}], "rejectedDocuments": []},
             )

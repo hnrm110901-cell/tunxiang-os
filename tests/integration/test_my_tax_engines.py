@@ -241,8 +241,8 @@ class TestVATEngine:
         """10 位 MST 税号"""
         assert vat_mod.VATService.validate_tax_id("0100109106") is True
 
-    def test_vietnam_tax_id_13_digit(self, vat_mod):
-        """13 位 MST 税号 (10 + 后缀)"""
+    def test_vietnam_tax_id_14_char(self, vat_mod):
+        """14 字符 MST 税号 (10位 + '-' + 3位后缀)"""
         assert vat_mod.VATService.validate_tax_id("0100109106-001") is True
 
     def test_vietnam_tax_id_invalid(self, vat_mod):
