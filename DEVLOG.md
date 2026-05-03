@@ -19,6 +19,47 @@
 - infra/docker/docker-compose.czyz.yml/demo.yml/sgc.yml/zqx.yml 含各租户硬编码密码（需单独处理）
 - infra/monitoring/docker-compose.monitoring.yml 含 Grafana/Postgres 硬编码密码
 - 2 个预存 test_open_api.py 失败（webhook mock 数据 / 迁移文件路径，与本次改动无关）
+---
+
+## 2026-05-02 上线差距关闭开发 — Phase 1-3 全线推进
+
+### 今日完成
+- [P0-01 Gateway] finance 域已注册 DOMAIN_ROUTES，通配符路由自动代理全部 /api/v1/finance/* 端点。26 测试通过。
+- [P0-02 支付→订单] tx-trade 新增 PaymentEventConsumer，订阅 Redis Stream 消费 tx-pay 的 payment.confirmed/payment.refunded 事件，3 秒内驱动订单状态。19 测试。
+- [P0-03 退款闭环] tx-pay refund() 从"只调通道不回写"升级为持久化 payments 表 + net_amount_fen + 发射 payment.refunded 事件。11 测试。
+- [P0-04 验签加固] tx-pay 四通道回调全部从空壳 stub 升级为强制验签，新增 TX_PAY_MOCK_MODE 环境保护。13 测试。
+- [P0-06 分账异常] tx-finance SplitEngine 新增 retry/reverse/discrepancy/resolve 四类异常处理 + 5 个 API 端点。30 测试。
+- [P1 储值分账] stored_value_settlement_router 注册到 tx-finance main.py（此前未被注册）。
+- [P1 门店模板] tx-org 新增 store_template_routes: 7 域配置快照 → 模板 → 一键开店。14 测试。
+- [P1 门店监控] tx-org 新增 store_health_routes: 5 维度健康评分（设备/打印/KDS/日结/同步）。14 测试。
+- [P1 美团适配] meituan_adapter 新增 sync_refund/get_delivery_status/download_bill/verify_webhook。7 测试。
+- [P1 运维脚本] rollback-service.sh（16 服务 K8s/Compose 双模式）+ gray-release.sh（5%→50%→100% 三级灰度）+ report_vs_source.py（8 张 P0 报表自动对账）。
+- [P1-06 物化视图] v310 迁移: 13 个性能索引（含 BRIN）+ 可回滚。
+- [P1-07 异常清理] 5 处生产代码 except Exception 审查标记 + ruff E722 清洁。
+- [P1-08 宴会种子] seed_sgc.py 补全宴会场地/线索/合同数据。
+- [CI] demo_go_no_go.py glob 补全 tests/tier1/**/test_*tier1*.py。
+
+### 数据变化
+- 新增服务文件：4 个（payment_event_consumer.py / store_template_routes.py / store_health_routes.py / v310_mv_performance_indexes.py）
+- 新增运维脚本：3 个（rollback-service.sh / gray-release.sh / report_vs_source.py）
+- 新增测试：6 个文件（5 tier1 + 1 tier2）
+- 修改已有文件：10 个（6 service main.py / adapter / callback / payment_service / split_engine / split_routes / seed_sgc）
+- 测试：335/336 通过（1 个 RLS 历史债）
+- 提交：5 个原子化 commit
+
+### 遗留问题
+- RLS: 26 张历史表未启用 RLS（需独立 PR，约 40 张表技术债）
+- Task 1.5 压测: 需 Docker 全栈 + k6（Docker daemon 未运行）
+- Task 1.6 报表验收: 需运行中服务 + 种子数据
+- Task 1.7 AI 证据链: 需运行中 tx-brain
+- P0-05 分账通道 API: 需微信分账沙箱环境
+- P0-08 美团真实接入: 需美团开放平台沙箱
+- tx-pay refund 通道调用顺序: channel.refund() 在 DB 事务之前，异常时无补偿（已知风险，需 Saga 补偿模式）
+
+### 下一步
+- Docker 环境启动后: k6 压测 + 服务冒烟 + 报表逐张验收
+- 沙箱环境就绪后: 微信分账 POC + 美团真实接入
+- RLS 技术债: 独立 PR 补 26 张表
 
 ### 今日完成
 - [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞

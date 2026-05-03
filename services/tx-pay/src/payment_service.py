@@ -169,10 +169,17 @@ class PaymentNexusService:
         reason: str = "",
         refund_id: Optional[str] = None,
     ) -> RefundResult:
-        """退款"""
-        # 查询原支付记录
+        """退款 — 依次：验存在/验额度 → 调渠道 → 持久化 → 更新net_amount → 发射事件"""
+        import uuid as _uuid
+
+        from .events import emit_payment_refunded
+
+        # 查询原支付记录（FOR UPDATE 防止并发退款 TOCTOU）
         row = await self._db.execute(
-            text("SELECT method, amount_fen, trade_no, tenant_id, store_id FROM payments WHERE payment_no = :pid"),
+            text(
+                """SELECT method, amount_fen, trade_no, tenant_id, store_id
+                   FROM payments WHERE payment_no = :pid FOR UPDATE"""
+            ),
             {"pid": payment_id},
         )
         r = row.fetchone()
@@ -189,12 +196,45 @@ class PaymentNexusService:
             str(store_id),
             PayMethod(method),
         )
+        _refund_id = refund_id or str(_uuid.uuid4())
         result = await channel.refund(
             payment_id=payment_id,
             refund_amount_fen=refund_amount_fen,
             reason=reason,
-            refund_id=refund_id,
+            refund_id=_refund_id,
         )
+
+        # 持久化退款记录到 payments 表（记录退款流水 + 更新净额）
+        if result.status == "success":
+            await self._db.execute(
+                text(
+                    """UPDATE payments
+                       SET status = CASE
+                             WHEN :refund_fen >= amount_fen THEN 'refunded'
+                             ELSE 'partial_refund'
+                           END,
+                           net_amount_fen = COALESCE(net_amount_fen, amount_fen) - :refund_fen
+                       WHERE payment_no = :pid"""
+                ),
+                {
+                    "refund_fen": refund_amount_fen,
+                    "pid": payment_id,
+                },
+            )
+            # 发射退款事件
+            await emit_payment_refunded(
+                payment_id=payment_id,
+                refund_id=_refund_id,
+                amount_fen=refund_amount_fen,
+                tenant_id=str(tenant_id) if tenant_id else "",
+            )
+            logger.info(
+                "refund_persisted_and_event_emitted",
+                payment_id=payment_id,
+                refund_id=_refund_id,
+                refund_amount_fen=refund_amount_fen,
+                method=method,
+            )
 
         await self._db.commit()
         return result
