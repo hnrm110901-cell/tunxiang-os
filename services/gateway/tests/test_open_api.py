@@ -519,6 +519,7 @@ async def test_webhook_dispatch_sends_hmac_signature() -> None:
             rows = []
             for wh in webhooks_list:
                 r = MagicMock()
+                r.keys = MagicMock(return_value=list(wh.keys()))
                 r.__getitem__ = MagicMock(side_effect=lambda k, _wh=wh: _wh[k])
                 rows.append(r)
             mock_res.mappings.return_value.fetchall.return_value = rows
@@ -631,7 +632,7 @@ def test_request_log_schema_no_sensitive_fields() -> None:
     # 从migration文件中验证字段定义
     migration_path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "..", "..",
+        "..", "..", "..",
         "shared", "db-migrations", "versions", "v069_open_api_platform.py"
     )
     migration_path = os.path.normpath(migration_path)
