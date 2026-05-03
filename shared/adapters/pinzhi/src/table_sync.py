@@ -10,6 +10,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -155,7 +156,7 @@ class PinzhiTableSync:
                     {**row, "config": __import__("json").dumps(row["config"])},
                 )
                 upserted += 1
-            except Exception as exc:  # noqa: BLE001 — 单行失败不阻断整批
+            except SQLAlchemyError as exc:
                 logger.error(
                     "table_upsert_failed",
                     table_no=row.get("table_no"),

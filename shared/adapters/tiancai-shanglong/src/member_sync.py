@@ -30,6 +30,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
+
+from adapter import TiancaiAPIError
 
 logger = structlog.get_logger(__name__)
 
@@ -88,7 +91,7 @@ class TiancaiMemberSync:
                         "pageSize": _MAX_PAGE_SIZE,
                     },
                 )
-            except Exception as exc:
+            except (RuntimeError, TiancaiAPIError) as exc:
                 logger.warning(
                     "tiancai_member_fetch_failed",
                     page=page,
@@ -260,7 +263,7 @@ class TiancaiMemberSync:
                             m,
                         )
                         result.auto_migrated += 1
-                    except Exception as exc:  # noqa: BLE001
+                    except SQLAlchemyError as exc:
                         result.errors.append(
                             {
                                 "phone": m.get("phone"),
@@ -271,7 +274,7 @@ class TiancaiMemberSync:
 
                 await db.commit()
 
-        except Exception as exc:  # noqa: BLE001
+        except (ImportError, SQLAlchemyError) as exc:
             logger.error("tiancai_member_upsert_failed", error=str(exc), exc_info=True)
             result.errors.append({"db_error": str(exc)})
 
@@ -319,7 +322,7 @@ class TiancaiMemberSync:
                 count=len(pending),
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except (ImportError, SQLAlchemyError) as exc:
             logger.error(
                 "tiancai_member_pending_write_failed",
                 error=str(exc),

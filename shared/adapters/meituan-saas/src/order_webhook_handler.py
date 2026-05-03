@@ -20,6 +20,7 @@
 import uuid
 from typing import Any, Optional
 
+import httpx
 import structlog
 
 logger = structlog.get_logger()
@@ -165,7 +166,7 @@ class MeituanOrderWebhookHandler:
                     "meituan_auto_accept_unavailable",
                     reason="DeliveryOpsService import failed — fallback to manual",
                 )
-            except Exception as exc:  # noqa: BLE001 — 自动接单失败不阻断主流程
+            except (RuntimeError, ValueError, httpx.HTTPError) as exc:
                 log.error(
                     "meituan_auto_accept_error",
                     error=str(exc),

@@ -5,7 +5,7 @@ API适配器基础类
 
 import os
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Set
 
 import httpx
 import structlog
@@ -42,6 +42,7 @@ class BaseAdapter(ABC):
         self.timeout = config.get("timeout", int(os.getenv("ADAPTER_DEFAULT_TIMEOUT", "30")))
         self.retry_times = config.get("retry_times", int(os.getenv("ADAPTER_DEFAULT_RETRY_TIMES", "3")))
         self.client = httpx.AsyncClient(timeout=self.timeout)
+        self._idempotency_store: Set[str] = set()
 
     @abstractmethod
     async def authenticate(self) -> Dict[str, str]:
@@ -179,6 +180,31 @@ class BaseAdapter(ABC):
             标准 StaffAction 实例
         """
         pass
+
+    @abstractmethod
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """
+        生成幂等性密钥
+
+        基于操作名 + 请求载荷内容生成唯一标识，用于去重。
+        子类应实现为: hashlib.md5(json.dumps({operation, 关键字段}, sort_keys=True)).hexdigest()
+
+        Args:
+            operation: 操作名称（如 "pos_upload_order", "create_delivery"）
+            payload: 请求载荷
+
+        Returns:
+            幂等性密钥字符串
+        """
+        pass
+
+    def is_duplicate(self, key: str) -> bool:
+        """检查是否已处理过该幂等密钥"""
+        return key in self._idempotency_store
+
+    def mark_idempotent(self, key: str) -> None:
+        """标记幂等密钥为已处理"""
+        self._idempotency_store.add(key)
 
     async def close(self):
         """关闭HTTP客户端"""

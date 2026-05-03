@@ -26,6 +26,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
+
+from adapter import TiancaiAPIError
 
 logger = structlog.get_logger(__name__)
 
@@ -84,7 +87,7 @@ class TiancaiMenuSync:
                         "pageSize": _MAX_PAGE_SIZE,
                     },
                 )
-            except Exception as exc:
+            except (RuntimeError, TiancaiAPIError) as exc:
                 logger.warning(
                     "tiancai_menu_fetch_failed",
                     page=page,
@@ -232,7 +235,7 @@ class TiancaiMenuSync:
                             d,
                         )
                         result.total_upserted += 1
-                    except Exception as exc:  # noqa: BLE001
+                    except SQLAlchemyError as exc:
                         result.errors.append(
                             {
                                 "dish_code": d.get("dish_code"),
@@ -243,6 +246,6 @@ class TiancaiMenuSync:
 
                 await db.commit()
 
-        except Exception as exc:  # noqa: BLE001 — DB 不可用时整体标记失败
+        except (ImportError, SQLAlchemyError) as exc:
             logger.error("tiancai_menu_upsert_failed", error=str(exc), exc_info=True)
             result.errors.append({"db_error": str(exc)})

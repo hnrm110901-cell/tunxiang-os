@@ -4,17 +4,31 @@
 """
 
 import asyncio
+import hashlib
+import json
 import os
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 import structlog
 
+from shared.adapters.base.src.event_bus import emit_adapter_event
+from shared.events.src.event_types import AdapterEventType
+
 from .signature import generate_sign
 
 logger = structlog.get_logger()
+
+
+class PinzhiAPIError(Exception):
+    """品智 API 错误基类"""
+
+    def __init__(self, code: int, message: str):
+        self.code = code
+        self.message = message
+        super().__init__(f"[pinzhi] {code}: {message}")
 
 
 class PinzhiAdapter:
@@ -36,6 +50,7 @@ class PinzhiAdapter:
         self.token = config.get("token")
         self.timeout = config.get("timeout", 30)
         self.retry_times = config.get("retry_times", 3)
+        self.tenant_id = config.get("tenant_id")
 
         if not self.base_url:
             raise ValueError("base_url不能为空")
@@ -48,6 +63,9 @@ class PinzhiAdapter:
             timeout=self.timeout,
             follow_redirects=True,
         )
+
+        # 幂等性保障
+        self._nonce_store: Set[str] = set()
 
         logger.info("品智适配器初始化", base_url=self.base_url)
 
@@ -96,7 +114,7 @@ class PinzhiAdapter:
                     attempt=attempt + 1,
                 )
                 if attempt == self.retry_times - 1:
-                    raise Exception(f"HTTP请求失败: {e.response.status_code}")
+                    raise PinzhiAPIError(code=e.response.status_code, message=str(e))
                 await asyncio.sleep(0.5 * (2**attempt))
 
             except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError, ValueError) as e:
@@ -140,13 +158,26 @@ class PinzhiAdapter:
         success = response.get("success")
         if success is not None and success != 0:
             msg = response.get("msg", "未知错误")
-            raise Exception(f"品智API错误 [{success}]: {msg}")
+            raise PinzhiAPIError(code=success, message=msg)
 
         # 有些接口使用errcode字段
         errcode = response.get("errcode")
         if errcode is not None and errcode != 0:
             errmsg = response.get("errmsg", "未知错误")
-            raise Exception(f"品智API错误 [{errcode}]: {errmsg}")
+            raise PinzhiAPIError(code=errcode, message=errmsg)
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """生成幂等性密钥"""
+        raw = json.dumps({operation: payload}, sort_keys=True)
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        """检查是否已处理过该幂等密钥"""
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        """标记幂等密钥为已处理"""
+        self._nonce_store.add(key)
 
     # ==================== 基础数据接口 ====================
 
@@ -183,6 +214,25 @@ class PinzhiAdapter:
         response = await self._request("GET", "/pinzhi/reportcategory.do", params=params)
         return response.get("data", [])
 
+    async def _emit_sync_event(
+        self,
+        event_type: AdapterEventType,
+        scope: str,
+        stream_id: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """发射适配器同步事件（fire-and-forget，不阻塞主业务）"""
+        if not self.tenant_id:
+            return
+        await emit_adapter_event(
+            adapter_name="pinzhi",
+            event_type=event_type,
+            tenant_id=self.tenant_id,
+            scope=scope,
+            stream_id=stream_id,
+            payload=payload or {},
+        )
+
     async def get_dishes(self, updatetime: int = 0) -> List[Dict[str, Any]]:
         """
         查询菜品信息
@@ -210,7 +260,16 @@ class PinzhiAdapter:
                     response = await self._request("GET", path, params=params)
                 else:
                     response = await self._request("POST", path, data=params)
-                return response.get("data", [])
+                dishes = response.get("data", [])
+                asyncio.create_task(
+                    self._emit_sync_event(
+                        AdapterEventType.MENU_SYNCED,
+                        scope="menu",
+                        stream_id="pinzhi:menu",
+                        payload={"count": len(dishes), "updatetime": updatetime},
+                    )
+                )
+                return dishes
             except (httpx.HTTPError, RuntimeError, ValueError) as e:
                 logger.warning("查询菜品失败", method=method, path=path, error=str(e))
         return []
@@ -333,7 +392,16 @@ class PinzhiAdapter:
         )
 
         response = await self._request("POST", "/pinzhi/orderNew.do", data=params)
-        return response.get("res", [])
+        orders = response.get("res", [])
+        asyncio.create_task(
+            self._emit_sync_event(
+                AdapterEventType.ORDER_INGESTED,
+                scope="orders",
+                stream_id=f"pinzhi:orders:{ognid or 'all'}",
+                payload={"count": len(orders), "business_date": biz_date},
+            )
+        )
+        return orders
 
     async def query_order_summary(self, ognid: str, business_date: str) -> Dict[str, Any]:
         """
@@ -606,7 +674,7 @@ class PinzhiAdapter:
                         "required": required,
                     }
                 )
-            except Exception as e:  # 诊断工具：必须捕获所有异常以报告接口状态
+            except (httpx.HTTPError, RuntimeError, ValueError, PinzhiAPIError) as e:  # 诊断工具报告接口状态
                 logger.debug("run_all_checks接口失败", name=name, error=str(e), exc_info=True)
                 results.append(
                     {

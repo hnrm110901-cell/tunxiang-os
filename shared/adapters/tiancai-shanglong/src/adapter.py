@@ -20,11 +20,12 @@ Base URL:   https://cysms.wuuxiang.com
 """
 
 import asyncio
+import hashlib
 import os
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 import structlog
@@ -34,6 +35,15 @@ logger = structlog.get_logger()
 _AUTH_PATH = "/api/auth/accesstoken"
 _SERIAL_PATH = "/api/datatransfer/getserialdata"
 _MAX_PAGE_SIZE = 500
+
+
+class TiancaiAPIError(Exception):
+    """天财商龙 API 业务错误（统一异常类型，替代裸 raise Exception）"""
+
+    def __init__(self, message: str, code: str = "-1", raw: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.raw = raw or {}
 
 
 class TiancaiShanglongAdapter:
@@ -46,6 +56,7 @@ class TiancaiShanglongAdapter:
         accessid   : Terminal authorization ID（用于获取 token + 请求 Header）
         center_id  : 集团 ID（接口参数 centerId）
         shop_id    : 门店 ID（接口参数 shopId）
+        tenant_id  : 屯象租户 ID（用于事件发射）
         timeout    : HTTP 超时秒数（默认 30）
         retry_times: 重试次数（默认 3）
     """
@@ -59,6 +70,8 @@ class TiancaiShanglongAdapter:
         self.timeout = config.get("timeout", int(os.getenv("TIANCAI_TIMEOUT", "30")))
         self.retry_times = config.get("retry_times", int(os.getenv("TIANCAI_RETRY_TIMES", "3")))
 
+        self.tenant_id = config.get("tenant_id", os.getenv("TUNXIANG_TENANT_ID", ""))
+
         if not self.appid or not self.accessid:
             logger.warning("天财商龙 appid/accessid 未配置，将使用降级模式")
 
@@ -66,12 +79,56 @@ class TiancaiShanglongAdapter:
         self._access_token: str = ""
         self._token_expires_at: float = 0.0  # unix timestamp
 
+        # 幂等性（内存去重，生产环境建议换 Redis）
+        self._nonce_store: Set[str] = set()
+
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
             follow_redirects=True,
         )
         logger.info("天财商龙适配器初始化", base_url=self.base_url, shop_id=self.shop_id)
+
+    # ── 幂等性 ─────────────────────────────────────────────────────────────
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """基于 operation + payload 内容生成确定性幂等键。"""
+        raw = hashlib.md5(
+            f"{operation}{hashlib.md5(str(payload).encode()).hexdigest()}".encode()
+        )
+        return raw.hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        self._nonce_store.add(key)
+
+    # ── 事件发射 ───────────────────────────────────────────────────────────
+
+    async def _emit_sync_event(
+        self,
+        event_type: Any,
+        scope: str,
+        stream_id: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """发射适配器同步事件（fire-and-forget，失败只记 warning）。"""
+        try:
+            from shared.events.src.emitter import emit_adapter_event  # noqa: PLC0415
+            from shared.events.src.event_types import AdapterEventType  # noqa: PLC0415, F811
+
+            await emit_adapter_event(
+                adapter_name="tiancai-shanglong",
+                event_type=event_type,
+                tenant_id=self.tenant_id,
+                scope=scope,
+                stream_id=stream_id,
+                payload=payload,
+                store_id=self.shop_id,
+            )
+        except Exception:  # noqa: BLE001 — 事件发射失败不阻断主流程
+            logger.warning("tiancai_event_emit_failed", scope=scope, stream_id=stream_id)
 
     # ── Token 管理 ────────────────────────────────────────────────────────────
 
@@ -94,7 +151,11 @@ class TiancaiShanglongAdapter:
         resp.raise_for_status()
         data = resp.json()
         if str(data.get("code", "-1")) != "0":
-            raise Exception(f"天财商龙获取token失败: {data.get('msg', '未知错误')}")
+            raise TiancaiAPIError(
+                data.get("msg", "天财商龙获取 token 失败"),
+                code=str(data.get("code", "-1")),
+                raw=data,
+            )
 
         self._access_token = data["access_token"]
         expires_in = int(data.get("expires_in", 1200))
@@ -145,11 +206,15 @@ class TiancaiShanglongAdapter:
 
                 if str(result.get("code", "-1")) != "0":
                     msg = result.get("msg", "未知错误")
-                    raise Exception(f"天财商龙业务错误: {msg}")
+                    raise TiancaiAPIError(
+                        f"天财商龙业务错误: {msg}",
+                        code=str(result.get("code", "-1")),
+                        raw=result,
+                    )
 
                 return result.get("data", result)
 
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.DecodingError) as e:
+            except httpx.HTTPError as e:
                 last_exc = e
                 logger.warning(
                     "天财商龙请求失败，准备重试",
@@ -290,6 +355,17 @@ class TiancaiShanglongAdapter:
             total=len(all_orders),
             pages=page,
         )
+
+        # 非阻塞发射同步事件
+        asyncio.create_task(
+            self._emit_sync_event(
+                "ORDER_INGESTED",
+                scope="orders",
+                stream_id=f"tiancai:orders:{date_str}",
+                payload={"count": len(all_orders), "date": date_str, "store_id": self.shop_id},
+            )
+        )
+
         return all_orders
 
     # ── 标准数据总线：字段映射 ────────────────────────────────────────────────

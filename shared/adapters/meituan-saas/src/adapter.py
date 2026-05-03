@@ -5,13 +5,17 @@
 v2: 注入 MeituanClient 替换 mock，真实 API 调用。
 """
 
+import asyncio
 import hashlib
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 import structlog
+
+from shared.adapters.base.src.event_bus import emit_adapter_event
+from shared.events.src.event_types import AdapterEventType
 
 from .client import MeituanAPIError, MeituanClient
 
@@ -74,6 +78,7 @@ class MeituanSaasAdapter:
         self.poi_id = config.get("poi_id")
         self.timeout = config.get("timeout", 30)
         self.retry_times = config.get("retry_times", 3)
+        self.tenant_id = config.get("tenant_id")
 
         if not self.app_key or not self.app_secret:
             raise ValueError("app_key和app_secret不能为空")
@@ -93,6 +98,9 @@ class MeituanSaasAdapter:
 
         # 保留旧的 httpx client 用于兼容已有 _request 调用
         self.client = self.api_client._http
+
+        # 幂等性保障
+        self._nonce_store: Set[str] = set()
 
         logger.info("美团SAAS适配器初始化", base_url=self.base_url, poi_id=self.poi_id)
 
@@ -220,6 +228,42 @@ class MeituanSaasAdapter:
                 message=message,
             )
 
+    # ==================== 幂等性保障 ====================
+
+    def idempotency_key(self, operation: str, payload: Dict[str, Any]) -> str:
+        """生成幂等性密钥"""
+        raw = hashlib.md5(f"{operation}{hashlib.md5(str(payload).encode()).hexdigest()}".encode())
+        return raw.hexdigest()
+
+    def is_duplicate(self, key: str) -> bool:
+        """检查是否已处理过该幂等密钥"""
+        return key in self._nonce_store
+
+    def mark_idempotent(self, key: str) -> None:
+        """标记幂等密钥为已处理"""
+        self._nonce_store.add(key)
+
+    # ==================== 事件发射 ====================
+
+    async def _emit_sync_event(
+        self,
+        event_type: AdapterEventType,
+        scope: str,
+        stream_id: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """发射适配器同步事件"""
+        if not self.tenant_id:
+            return
+        await emit_adapter_event(
+            adapter_name="meituan-saas",
+            event_type=event_type,
+            tenant_id=self.tenant_id,
+            scope=scope,
+            stream_id=stream_id,
+            payload=payload or {},
+        )
+
     # ==================== 订单管理接口（真实API） ====================
 
     async def query_order(
@@ -241,7 +285,15 @@ class MeituanSaasAdapter:
             raise ValueError("order_id和day_seq至少提供一个")
 
         logger.info("查询订单", order_id=order_id, day_seq=day_seq)
-        return await self.api_client.query_order(order_id or day_seq or "")
+        result = await self.api_client.query_order(order_id or day_seq or "")
+        asyncio.create_task(
+            self._emit_sync_event(
+                AdapterEventType.ORDER_INGESTED,
+                scope="orders",
+                stream_id=f"meituan-saas:order:{order_id or day_seq}",
+            )
+        )
+        return result
 
     async def confirm_order(
         self,
@@ -257,7 +309,15 @@ class MeituanSaasAdapter:
             确认结果
         """
         logger.info("确认订单", order_id=order_id)
-        return await self.api_client.confirm_order(order_id)
+        result = await self.api_client.confirm_order(order_id)
+        asyncio.create_task(
+            self._emit_sync_event(
+                AdapterEventType.STATUS_PUSHED,
+                scope="orders",
+                stream_id=f"meituan-saas:confirm:{order_id}",
+            )
+        )
+        return result
 
     async def cancel_order(
         self,
@@ -405,6 +465,14 @@ class MeituanSaasAdapter:
         logger.info("更新商品库存", food_id=food_id, stock=stock)
 
         response = await self._request("POST", "/api/food/updateStock", data=data)
+        asyncio.create_task(
+            self._emit_sync_event(
+                AdapterEventType.INVENTORY_SYNCED,
+                scope="inventory",
+                stream_id=f"meituan-saas:stock:{food_id}",
+                payload={"food_id": food_id, "stock": stock},
+            )
+        )
         return response.get("data", {})
 
     async def update_food_price(

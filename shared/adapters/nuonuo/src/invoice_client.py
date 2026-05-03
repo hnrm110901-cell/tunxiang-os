@@ -8,9 +8,10 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 import structlog
 
-from .adapter import NuonuoAdapter
+from .adapter import NuonuoAdapter, NuonuoAPIError
 
 logger = structlog.get_logger()
 
@@ -71,7 +72,7 @@ class NuonuoInvoiceClient:
             serial_no = result.get("serialNo", "")
             logger.info("nuonuo.apply_invoice.ok", serial_no=serial_no)
             return NuonuoResponse(success=True, data=result)
-        except Exception as exc:  # noqa: BLE001 — 顶层兜底，记录完整错误
+        except (NuonuoAPIError, httpx.HTTPError) as exc:
             logger.error(
                 "nuonuo.apply_invoice.failed",
                 error=str(exc),
@@ -87,7 +88,7 @@ class NuonuoInvoiceClient:
             result = await adapter.query_invoice([request_id])
             logger.info("nuonuo.query_invoice.ok", request_id=request_id)
             return NuonuoResponse(success=True, data=result)
-        except Exception as exc:  # noqa: BLE001
+        except (NuonuoAPIError, httpx.HTTPError) as exc:
             logger.error(
                 "nuonuo.query_invoice.failed",
                 request_id=request_id,
@@ -125,7 +126,7 @@ class NuonuoInvoiceClient:
                 invoice_code=invoice_code,
             )
             return NuonuoResponse(success=True, data=result)
-        except Exception as exc:  # noqa: BLE001
+        except (NuonuoAPIError, httpx.HTTPError) as exc:
             logger.error(
                 "nuonuo.red_flush.failed",
                 invoice_no=invoice_no,
@@ -147,7 +148,7 @@ class NuonuoInvoiceClient:
             result = await adapter.void_invoice(invoice_id, invoice_code, invoice_no)
             logger.info("nuonuo.void_invoice.ok", invoice_no=invoice_no)
             return NuonuoResponse(success=True, data=result)
-        except Exception as exc:  # noqa: BLE001
+        except (NuonuoAPIError, httpx.HTTPError) as exc:
             logger.error(
                 "nuonuo.void_invoice.failed",
                 invoice_no=invoice_no,
@@ -162,7 +163,7 @@ class NuonuoInvoiceClient:
         try:
             pdf_url = await adapter.download_pdf(invoice_code, invoice_no)
             return NuonuoResponse(success=True, data={"pdf_url": pdf_url})
-        except Exception as exc:  # noqa: BLE001
+        except (NuonuoAPIError, httpx.HTTPError) as exc:
             logger.error(
                 "nuonuo.get_pdf_url.failed",
                 invoice_no=invoice_no,

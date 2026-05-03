@@ -16,12 +16,15 @@ import re
 import time
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 import structlog
 
 logger = structlog.get_logger()
+
+from shared.adapters.base.src.event_bus import emit_adapter_event
+from shared.events.src.event_types import AdapterEventType
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _MAX_PAGE_SIZE = 500
@@ -64,6 +67,9 @@ class AoqiweiAdapter:
             timeout=self.timeout,
             follow_redirects=True,
         )
+
+        self.tenant_id: str = config.get("tenant_id", "")  # 租户标识，用于事件追踪
+        self._nonce_store: Set[str] = set()  # 幂等性去重
 
         logger.info("奥琦玮供应链适配器初始化", base_url=self.base_url)
 
@@ -187,6 +193,32 @@ class AoqiweiAdapter:
 
     async def __aexit__(self, *args):
         await self.aclose()
+
+    # ==================== 事件发射与幂等性 ====================
+
+    async def _emit_sync_event(self, event_type: AdapterEventType, scope: str, stream_id: str, payload: Optional[Dict[str, Any]] = None) -> None:
+        """发射适配器同步事件（fire-and-forget）"""
+        if not self.tenant_id:
+            return
+        try:
+            await emit_adapter_event(
+                adapter_name="aoqiwei",
+                event_type=event_type,
+                tenant_id=self.tenant_id,
+                scope=scope,
+                stream_id=stream_id,
+                payload=payload or {},
+            )
+        except Exception:
+            logger.warning("Event emission failed", event_type=event_type.value)
+
+    def _check_idempotency(self, nonce: str) -> bool:
+        """检查请求是否已处理（幂等性保障）"""
+        return nonce in self._nonce_store
+
+    def _mark_idempotent(self, nonce: str) -> None:
+        """标记请求为已处理"""
+        self._nonce_store.add(nonce)
 
     # ==================== 签名与请求 ====================
 
@@ -314,6 +346,7 @@ class AoqiweiAdapter:
             params["goodName"] = good_name
 
         logger.info("查询货品", params=params)
+        asyncio.create_task(self._emit_sync_event(AdapterEventType.MENU_SYNCED, "goods", "aoqiwei:goods"))
         try:
             return await self._request("/rechain/stock/api/good/getList", params)
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
@@ -381,6 +414,7 @@ class AoqiweiAdapter:
             params["goodCode"] = good_code
 
         logger.info("查询库存", params=params)
+        asyncio.create_task(self._emit_sync_event(AdapterEventType.INVENTORY_SYNCED, "stock", "aoqiwei:stock"))
         try:
             result = await self._request("/rechain/stock/api/remain/getListV1", params)
             return result if isinstance(result, list) else result.get("list", [])
@@ -411,11 +445,18 @@ class AoqiweiAdapter:
 
     async def create_delivery_apply(self, apply_data: Dict[str, Any]) -> Dict[str, Any]:
         """创建配送申请单"""
-        logger.info("创建配送申请", shop_code=apply_data.get("shopCode"))
+        nonce = hashlib.md5(json.dumps(apply_data, sort_keys=True).encode()).hexdigest()
+        if self._check_idempotency(nonce):
+            logger.info("配送申请重复跳过", nonce=nonce)
+            return {"success": True, "message": "duplicate", "nonce": nonce}
+        self._mark_idempotent(nonce)
+        payload: Dict[str, Any] = {**apply_data, "nonce": nonce}
+
+        logger.info("创建配送申请", shop_code=payload.get("shopCode"))
         try:
             return await self._request(
                 "/rechain/delivery/api/applygood/put",
-                apply_data,
+                payload,
                 method="POST",
             )
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
@@ -445,11 +486,18 @@ class AoqiweiAdapter:
 
     async def confirm_delivery_in(self, dispatch_in_data: Dict[str, Any]) -> Dict[str, Any]:
         """配送入库确认（门店收货）"""
-        logger.info("配送入库确认", order_no=dispatch_in_data.get("orderNo"))
+        nonce = hashlib.md5(json.dumps(dispatch_in_data, sort_keys=True).encode()).hexdigest()
+        if self._check_idempotency(nonce):
+            logger.info("配送入库确认重复跳过", nonce=nonce)
+            return {"success": True, "message": "duplicate", "nonce": nonce}
+        self._mark_idempotent(nonce)
+        payload: Dict[str, Any] = {**dispatch_in_data, "nonce": nonce}
+
+        logger.info("配送入库确认", order_no=payload.get("orderNo"))
         try:
             return await self._request(
                 "/rechain/delivery/api/dispatchin/update",
-                dispatch_in_data,
+                payload,
                 method="POST",
             )
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
@@ -490,11 +538,18 @@ class AoqiweiAdapter:
 
     async def create_reserve_order(self, reserve_data: Dict[str, Any]) -> Dict[str, Any]:
         """创建采购订货单"""
-        logger.info("创建采购订货单", depot_code=reserve_data.get("depotCode"))
+        nonce = hashlib.md5(json.dumps(reserve_data, sort_keys=True).encode()).hexdigest()
+        if self._check_idempotency(nonce):
+            logger.info("采购订货单重复跳过", nonce=nonce)
+            return {"success": True, "message": "duplicate", "nonce": nonce}
+        self._mark_idempotent(nonce)
+        payload: Dict[str, Any] = {**reserve_data, "nonce": nonce}
+
+        logger.info("创建采购订货单", depot_code=payload.get("depotCode"))
         try:
             return await self._request(
                 "/rechain/purchase/api/reserve_order/put",
-                reserve_data,
+                payload,
                 method="POST",
             )
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
@@ -505,13 +560,22 @@ class AoqiweiAdapter:
 
     async def pos_upload_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
         """POS订单上传"""
-        logger.info("POS订单上传", order_no=order_data.get("orderNo"))
+        nonce = hashlib.md5(json.dumps(order_data, sort_keys=True).encode()).hexdigest()
+        if self._check_idempotency(nonce):
+            logger.info("POS订单重复跳过", nonce=nonce)
+            return {"success": True, "message": "duplicate", "nonce": nonce}
+        self._mark_idempotent(nonce)
+        payload: Dict[str, Any] = {**order_data, "nonce": nonce}
+
+        logger.info("POS订单上传", order_no=payload.get("orderNo"))
         try:
-            return await self._request(
+            result = await self._request(
                 "/rechain/pos/api/order/put",
-                order_data,
+                payload,
                 method="POST",
             )
+            asyncio.create_task(self._emit_sync_event(AdapterEventType.ORDER_INGESTED, "pos_order", str(payload.get("orderNo", "")), {"nonce": nonce}))
+            return result
         except (httpx.HTTPError, RuntimeError, ValueError) as e:
             logger.warning("POS订单上传失败", error=str(e), exc_info=True)
             return {"success": False, "message": str(e)}
