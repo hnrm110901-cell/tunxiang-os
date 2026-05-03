@@ -16,8 +16,11 @@ from typing import Any, Optional
 # ─────────────────────────────────────────────────────────────
 
 ALLOWED_PLATFORMS = frozenset(
-    {"meituan", "eleme", "douyin", "xiaohongshu", "wechat", "other"}
+    {"meituan", "eleme", "douyin", "xiaohongshu", "wechat", "grabfood", "other"}
 )
+# NOTE: When adding new platforms to ALLOWED_PLATFORMS, the corresponding
+# DB migration CHECK constraint on canonical_delivery_orders.platform
+# (v285) must also be updated. See shared/db-migrations/versions/v285_*.py.
 
 ALLOWED_ORDER_TYPES = frozenset(
     {"delivery", "pickup", "dine_in", "group_buy"}

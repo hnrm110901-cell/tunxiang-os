@@ -3,6 +3,7 @@
 from .base_adapter import BaseDeliveryAdapter, DeliveryOrder, DeliveryOrderItem
 from .douyin_adapter import DouyinAdapter
 from .eleme_adapter import ElemeAdapter
+from .grabfood_adapter import GrabFoodAdapter
 from .meituan_adapter import MeituanAdapter
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "MeituanAdapter",
     "ElemeAdapter",
     "DouyinAdapter",
+    "GrabFoodAdapter",
 ]

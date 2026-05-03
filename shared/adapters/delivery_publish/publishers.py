@@ -535,7 +535,125 @@ class WechatPublisher(DeliveryPublisher):
 
 
 # ─────────────────────────────────────────────────────────────
-# 默认注册 5 个 stub
+# GrabFood (马来西亚)
+# ─────────────────────────────────────────────────────────────
+
+
+class GrabFoodPublisher(DeliveryPublisher):
+    """GrabFood Publisher stub
+
+    GrabFood uses menu sync (POST /grabfood/v1/menu/sync) for full
+    menu replacement. Individual item publish/update is not supported —
+    all changes require a full menu sync.
+
+    Real implementation notes:
+      - OAuth2 client_credentials with scope "partner"
+      - POST /grabfood/v1/menu/sync — full replacement (all items required)
+      - Items not in payload are removed from GrabFood
+      - Currencies are always MYR
+      - UpdateStock is not supported individually; use full menu sync
+    """
+
+    platform = "grabfood"
+
+    async def publish(
+        self,
+        *,
+        tenant_id: str,
+        platform_shop_id: str,
+        spec: DishPublishSpec,
+    ) -> PublishResult:
+        if _should_fail(spec.dish_id):
+            return PublishResult.failure(
+                platform=self.platform,
+                operation=PublishOperation.PUBLISH,
+                error_message="grabfood stub: simulated failure",
+                error_code="MENU_SYNC_FAILED",
+            )
+        sku_id = _fake_sku_id(self.platform, spec.dish_id, platform_shop_id)
+        stock = 9999 if spec.stock is None else spec.stock
+        return PublishResult.success(
+            platform=self.platform,
+            operation=PublishOperation.PUBLISH,
+            status=PublishStatus.PUBLISHED if stock > 0 else PublishStatus.SOLD_OUT,
+            platform_sku_id=sku_id,
+            published_price_fen=spec.price_fen,
+            published_stock=stock,
+            platform_response={
+                "merchantID": platform_shop_id,
+                "itemCode": sku_id,
+                "name": spec.name,
+                "currency": "MYR",
+            },
+        )
+
+    async def update_price(
+        self,
+        *,
+        tenant_id: str,
+        platform_shop_id: str,
+        platform_sku_id: str,
+        price_fen: int,
+        original_price_fen: Optional[int] = None,
+    ) -> PublishResult:
+        return PublishResult.success(
+            platform=self.platform,
+            operation=PublishOperation.UPDATE_PRICE,
+            status=PublishStatus.PUBLISHED,
+            platform_sku_id=platform_sku_id,
+            published_price_fen=price_fen,
+            platform_response={
+                "itemCode": platform_sku_id,
+                "price": price_fen / 100,
+                "currency": "MYR",
+            },
+        )
+
+    async def update_stock(
+        self,
+        *,
+        tenant_id: str,
+        platform_shop_id: str,
+        platform_sku_id: str,
+        stock: Optional[int],
+    ) -> PublishResult:
+        confirmed = 9999 if stock is None else stock
+        status = PublishStatus.SOLD_OUT if confirmed == 0 else PublishStatus.PUBLISHED
+        return PublishResult.success(
+            platform=self.platform,
+            operation=PublishOperation.UPDATE_STOCK,
+            status=status,
+            platform_sku_id=platform_sku_id,
+            published_stock=confirmed,
+            platform_response={
+                "itemCode": platform_sku_id,
+                "stock": confirmed,
+                "note": "GrabFood uses full menu sync; individual stock updates may require sync_menu()",
+            },
+        )
+
+    async def unpublish(
+        self,
+        *,
+        tenant_id: str,
+        platform_shop_id: str,
+        platform_sku_id: str,
+    ) -> PublishResult:
+        return PublishResult.success(
+            platform=self.platform,
+            operation=PublishOperation.UNPUBLISH,
+            status=PublishStatus.UNPUBLISHED,
+            platform_sku_id=platform_sku_id,
+            platform_response={
+                "itemCode": platform_sku_id,
+                "merchantID": platform_shop_id,
+                "hidden": True,
+            },
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+# 默认注册
 # ─────────────────────────────────────────────────────────────
 
 register_publisher(MeituanPublisher())
@@ -543,3 +661,4 @@ register_publisher(ElemePublisher())
 register_publisher(DouyinPublisher())
 register_publisher(XiaohongshuPublisher())
 register_publisher(WechatPublisher())
+register_publisher(GrabFoodPublisher())

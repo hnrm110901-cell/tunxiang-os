@@ -12,6 +12,7 @@ import structlog
 from .delivery_platform_base import DeliveryPlatformAdapter
 from .douyin_adapter import DouyinDeliveryAdapter
 from .eleme_adapter import ElemeDeliveryAdapter
+from .grabfood.src.adapter import GrabFoodDeliveryAdapter
 from .meituan_adapter import MeituanDeliveryAdapter
 from .wechat_delivery_adapter import WeChatDeliveryAdapter
 
@@ -22,6 +23,7 @@ _PLATFORM_REGISTRY: Dict[str, type] = {
     "meituan": MeituanDeliveryAdapter,
     "eleme": ElemeDeliveryAdapter,
     "douyin": DouyinDeliveryAdapter,
+    "grabfood": GrabFoodDeliveryAdapter,
     "wechat": WeChatDeliveryAdapter,
 }
 

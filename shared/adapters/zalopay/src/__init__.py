@@ -1,0 +1,1 @@
+"""ZaloPay adapter sub-package."""

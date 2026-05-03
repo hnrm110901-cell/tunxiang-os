@@ -1,0 +1,1 @@
+"""ShopeeFood adapter source modules."""
