@@ -2,19 +2,20 @@
  * Icon Rail — 一级导航（56px 图标导轨）
  * 纯图标，36px 按钮，圆角 9px
  */
+import { useLang } from '../i18n/LangContext';
 
 const MODULES = [
-  { id: 'dashboard', icon: '📊', label: '驾驶舱' },
-  { id: 'trade', icon: '💰', label: '交易' },
-  { id: 'menu', icon: '🍽️', label: '菜品' },
-  { id: 'store', icon: '🏬', label: '门店' },
-  { id: 'member', icon: '👥', label: '会员' },
-  { id: 'growth', icon: '🚀', label: '增长' },
-  { id: 'ops', icon: '🎯', label: '经营' },
-  { id: 'analytics', icon: '📈', label: '分析' },
-  { id: 'finance', icon: '💹', label: '财务' },
-  { id: 'org', icon: '🏢', label: '组织' },
-  { id: 'agent', icon: '🤖', label: 'Agent' },
+  { id: 'dashboard', icon: '📊', labelKey: 'nav.dashboard' },
+  { id: 'trade', icon: '💰', labelKey: 'nav.trade' },
+  { id: 'menu', icon: '🍽️', labelKey: 'nav.menu' },
+  { id: 'store', icon: '🏬', labelKey: 'nav.store' },
+  { id: 'member', icon: '👥', labelKey: 'nav.member' },
+  { id: 'growth', icon: '🚀', labelKey: 'nav.growth' },
+  { id: 'ops', icon: '🎯', labelKey: 'nav.ops' },
+  { id: 'analytics', icon: '📈', labelKey: 'nav.analytics' },
+  { id: 'finance', icon: '💹', labelKey: 'nav.finance' },
+  { id: 'org', icon: '🏢', labelKey: 'nav.org' },
+  { id: 'agent', icon: '🤖', labelKey: 'nav.agent' },
 ];
 
 interface IconRailProps {
@@ -23,6 +24,8 @@ interface IconRailProps {
 }
 
 export function IconRail({ activeModule, onModuleChange }: IconRailProps) {
+  const { t } = useLang();
+
   return (
     <nav style={{
       width: 56, background: 'var(--bg-1, #112228)',
@@ -33,7 +36,7 @@ export function IconRail({ activeModule, onModuleChange }: IconRailProps) {
         <button
           key={m.id}
           onClick={() => onModuleChange(m.id)}
-          title={m.label}
+          title={t(m.labelKey)}
           style={{
             width: 36, height: 36, border: 'none', borderRadius: 9, cursor: 'pointer',
             fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -45,7 +48,7 @@ export function IconRail({ activeModule, onModuleChange }: IconRailProps) {
         </button>
       ))}
       <div style={{ flex: 1 }} />
-      <button title="帮助" style={{
+      <button title={t('common.help')} style={{
         width: 36, height: 36, border: 'none', borderRadius: 9, cursor: 'pointer',
         fontSize: 16, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>❓</button>

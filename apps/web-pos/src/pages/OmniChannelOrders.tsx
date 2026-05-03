@@ -9,10 +9,11 @@
  * - WebSocket实时收新订单，新单声音提示
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLang } from '../i18n/LangContext';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
-type Platform = 'meituan' | 'eleme' | 'douyin';
+type Platform = 'meituan' | 'eleme' | 'douyin' | 'grabfood' | 'foodpanda' | 'shopeefood';
 type OrderStatus = 'pending' | 'preparing' | 'done';
 
 interface OrderItem {
@@ -42,6 +43,9 @@ const PLATFORM_CONFIG: Record<Platform, { label: string; color: string; bg: stri
   meituan: { label: '美团', color: '#FF6600', bg: '#FFF0E6' },
   eleme: { label: '饿了么', color: '#0EA5E9', bg: '#E6F4FF' },
   douyin: { label: '抖音', color: '#1C1C1E', bg: '#F0F0F2' },
+  grabfood: { label: 'GrabFood', color: '#00B14F', bg: '#E8F5E9' },
+  foodpanda: { label: 'foodpanda', color: '#FF6B9D', bg: '#FCE4EC' },
+  shopeefood: { label: 'ShopeeFood', color: '#EE4D2D', bg: '#FFF3EF' },
 };
 
 const REJECT_REASONS: { code: number; label: string }[] = [
@@ -60,8 +64,9 @@ const WS_RECONNECT_INTERVAL = 5000;
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
-function formatPrice(fen: number): string {
-  return `¥${(fen / 100).toFixed(2)}`;
+function formatPrice(fen: number, currency: 'CNY' | 'MYR' = 'CNY'): string {
+  const symbol = currency === 'MYR' ? 'RM' : '¥';
+  return `${symbol}${(fen / 100).toFixed(2)}`;
 }
 
 function getElapsedSeconds(createdAt: string): number {
@@ -110,6 +115,7 @@ function playNewOrderSound() {
 // ─── 倒计时条组件 ──────────────────────────────────────────────────────────────
 
 function CountdownBar({ createdAt, onTimeout }: { createdAt: string; onTimeout: () => void }) {
+  const { t } = useLang();
   const [remaining, setRemaining] = useState(() => getRemainingSeconds(createdAt));
   const onTimeoutRef = useRef(onTimeout);
   onTimeoutRef.current = onTimeout;
@@ -137,7 +143,7 @@ function CountdownBar({ createdAt, onTimeout }: { createdAt: string; onTimeout: 
         display: 'flex', justifyContent: 'space-between',
         alignItems: 'center', marginBottom: 4,
       }}>
-        <span style={{ fontSize: 16, color: '#5F5E5A' }}>剩余接单时间</span>
+        <span style={{ fontSize: 16, color: '#5F5E5A' }}>{t('delivery.remainingTime')}</span>
         <span style={{
           fontSize: 20, fontWeight: 700, color,
           animation: remaining <= 30 ? 'pulse 1s infinite' : 'none',
@@ -188,6 +194,7 @@ function RejectReasonSheet({
   onConfirm: (code: number) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLang();
   return (
     /* 背景遮罩 */
     <div
@@ -209,7 +216,7 @@ function RejectReasonSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 style={{ margin: '0 0 20px', fontSize: 22, color: '#2C2C2A', textAlign: 'center' }}>
-          选择拒单原因
+          {t('delivery.selectRejectReason')}
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {REJECT_REASONS.map((r) => (
@@ -248,7 +255,7 @@ function RejectReasonSheet({
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          取消
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -268,6 +275,7 @@ function OrderCard({
   onReject: (orderId: string, code: number) => void;
   onTimeout: (orderId: string) => void;
 }) {
+  const { t } = useLang();
   const [showRejectSheet, setShowRejectSheet] = useState(false);
   const isPending = order.status === 'pending';
 
@@ -299,7 +307,7 @@ function OrderCard({
                 display: 'inline-block', fontSize: 11, padding: '1px 6px', borderRadius: 4,
                 background: 'rgba(15,110,86,.15)', color: '#0F6E56',
                 fontWeight: 600, marginLeft: 6,
-              }}>✓ 可准时出餐</span>
+              }}>{t('delivery.canDeliver')}</span>
             )}
           </div>
           <span style={{ fontSize: 16, color: '#B4B2A9' }}>{formatTime(order.created_at)}</span>
@@ -332,7 +340,7 @@ function OrderCard({
             padding: '6px 10px', background: '#FFF3ED', borderRadius: 8,
             fontSize: 16, color: '#FF6B35', marginBottom: 10,
           }}>
-            备注：{order.notes}
+            {t('delivery.note')}：{order.notes}
           </div>
         )}
 
@@ -342,7 +350,9 @@ function OrderCard({
           marginBottom: 12,
         }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: '#2C2C2A' }}>
-            {formatPrice(order.total_fen)}
+            {['grabfood', 'foodpanda', 'shopeefood'].includes(order.platform)
+              ? formatPrice(order.total_fen, 'MYR')
+              : formatPrice(order.total_fen)}
           </span>
         </div>
 
@@ -377,7 +387,7 @@ function OrderCard({
                 (e.currentTarget as HTMLButtonElement).style.opacity = '1';
               }}
             >
-              接单（约20分钟）
+              {t('delivery.acceptEstimate', { minutes: 20 })}
             </button>
             {/* 拒单按钮 */}
             <button
@@ -398,7 +408,7 @@ function OrderCard({
                 (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
               }}
             >
-              拒单
+              {t('delivery.reject')}
             </button>
           </div>
         )}
@@ -409,7 +419,7 @@ function OrderCard({
             textAlign: 'center', padding: '10px 0',
             fontSize: 18, color: '#BA7517', fontWeight: 600,
           }}>
-            配餐中
+            {t('delivery.preparingStatus')}
           </div>
         )}
 
@@ -419,7 +429,7 @@ function OrderCard({
             textAlign: 'center', padding: '10px 0',
             fontSize: 18, color: '#0F6E56', fontWeight: 600,
           }}>
-            已完成
+            {t('delivery.completedStatus')}
           </div>
         )}
       </div>
@@ -473,9 +483,11 @@ function ColumnHeader({
  * WebSocket实时推送，新单提示音，倒计时自动拒单
  */
 export function OmniChannelOrders() {
+  const { t } = useLang();
   const [orders, setOrders] = useState<OmniOrder[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
   const [autoAccept, setAutoAccept] = useState(false);
+  const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -604,9 +616,12 @@ export function OmniChannelOrders() {
 
   // ── 分组 ────────────────────────────────────────────────────────────────────
 
-  const pendingOrders = orders.filter((o) => o.status === 'pending');
-  const preparingOrders = orders.filter((o) => o.status === 'preparing');
-  const doneOrders = orders.filter((o) => o.status === 'done');
+  const filteredOrders = platformFilter === 'all'
+    ? orders
+    : orders.filter((o) => o.platform === platformFilter);
+  const pendingOrders = filteredOrders.filter((o) => o.status === 'pending');
+  const preparingOrders = filteredOrders.filter((o) => o.status === 'preparing');
+  const doneOrders = filteredOrders.filter((o) => o.status === 'done');
 
   // ── 渲染 ────────────────────────────────────────────────────────────────────
 
@@ -643,12 +658,34 @@ export function OmniChannelOrders() {
           position: 'sticky', top: 0, zIndex: 100,
         }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#2C2C2A' }}>
-            外卖统一接单
+            {t('delivery.title')}
           </h1>
+
+          {/* 平台筛选标签 */}
+          <div style={{ display: 'flex', gap: 6, padding: '8px 0' }}>
+            {(['all', 'meituan', 'eleme', 'douyin', 'grabfood', 'foodpanda', 'shopeefood'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPlatformFilter(p)}
+                style={{
+                  padding: '4px 12px', borderRadius: 8, border: 'none',
+                  fontSize: 14, fontWeight: platformFilter === p ? 700 : 400,
+                  background: platformFilter === p
+                    ? (p === 'all' ? '#2C2C2A' : PLATFORM_CONFIG[p as Platform].color)
+                    : '#F0EDE6',
+                  color: platformFilter === p ? '#fff' : '#5F5E5A',
+                  cursor: 'pointer', minHeight: 32,
+                  fontFamily: 'inherit',
+                }}
+              >
+                {p === 'all' ? '全部' : PLATFORM_CONFIG[p as Platform].label}
+              </button>
+            ))}
+          </div>
 
           {/* 高峰期自动接单开关 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
-            <span style={{ fontSize: 13, color: '#5F5E5A' }}>高峰期自动接单</span>
+            <span style={{ fontSize: 13, color: '#5F5E5A' }}>{t('delivery.autoAccept')}</span>
             <div
               onClick={() => setAutoAccept(!autoAccept)}
               style={{
@@ -664,7 +701,7 @@ export function OmniChannelOrders() {
                 background: '#fff', transition: 'left .2s',
               }} />
             </div>
-            {autoAccept && <span style={{ fontSize: 11, color: '#0F6E56' }}>🤖 运营指挥官代理中</span>}
+            {autoAccept && <span style={{ fontSize: 11, color: '#0F6E56' }}>{t('delivery.autoAcceptActive')}</span>}
           </div>
 
           {/* 连接状态指示器（右上角） */}
@@ -677,7 +714,7 @@ export function OmniChannelOrders() {
                 : '0 0 0 3px rgba(163,45,45,0.2)',
             }} />
             <span style={{ fontSize: 16, color: wsConnected ? '#0F6E56' : '#A32D2D' }}>
-              {wsConnected ? '实时连接' : '连接断开'}
+              {wsConnected ? t('delivery.wsConnected') : t('delivery.wsDisconnected')}
             </span>
           </div>
         </div>
@@ -692,7 +729,7 @@ export function OmniChannelOrders() {
           {/* 待接单列 */}
           <div>
             <ColumnHeader
-              title="待接单"
+              title={t('delivery.pending')}
               count={pendingOrders.length}
               color="#A32D2D"
             />
@@ -706,7 +743,7 @@ export function OmniChannelOrders() {
                   padding: 32, textAlign: 'center',
                   fontSize: 18, color: '#B4B2A9',
                 }}>
-                  暂无待接单订单
+                  {t('delivery.noOrders')}
                 </div>
               ) : (
                 pendingOrders.map((order) => (
@@ -725,7 +762,7 @@ export function OmniChannelOrders() {
           {/* 配餐中列 */}
           <div>
             <ColumnHeader
-              title="配餐中"
+              title={t('delivery.preparing')}
               count={preparingOrders.length}
               color="#BA7517"
             />
@@ -739,7 +776,7 @@ export function OmniChannelOrders() {
                   padding: 32, textAlign: 'center',
                   fontSize: 18, color: '#B4B2A9',
                 }}>
-                  暂无配餐中订单
+                  {t('delivery.noOrders')}
                 </div>
               ) : (
                 preparingOrders.map((order) => (
@@ -758,7 +795,7 @@ export function OmniChannelOrders() {
           {/* 已完成列 */}
           <div>
             <ColumnHeader
-              title="已完成"
+              title={t('delivery.completed')}
               count={doneOrders.length}
               color="#0F6E56"
             />
@@ -772,7 +809,7 @@ export function OmniChannelOrders() {
                   padding: 32, textAlign: 'center',
                   fontSize: 18, color: '#B4B2A9',
                 }}>
-                  今日暂无已完成订单
+                  {t('delivery.noOrders')}
                 </div>
               ) : (
                 doneOrders.map((order) => (
