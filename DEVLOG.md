@@ -1,3 +1,165 @@
+## 2026-05-03 Phase 1 MP-1.1 小程序多商户定制化 — 主题系统
+
+### 今日完成
+- [MP-1.1 前端主题加载] app.tsx + useMerchantTheme 在启动时通过 `getMerchantTheme()` 获取商户主题，通过 `injectThemeCSS()` 注入 CSS 变量（--tx-brand/--tx-page-bg/--tx-card-bg 等 10+ 变量）
+- [MP-1.1 首页主题化] pages/index/index.tsx 修复 22 个已删除的 `C.xxx`/`BANNERS`/`AI_MOCK` 引用，全部替换为 CSS 变量 + theme.banner_slides + recommendations 状态；AI 推荐区域受 feature toggle 控制
+- [MP-1.1 菜单页主题化] pages/menu/index.tsx 替换 7 个硬编码 C 颜色常量（bg/card/nav/primary/text1/text2/divider）为 CSS 变量
+- [MP-1.1 DishCard 主题感知] DishCard 组件新增 themeStyle prop，接受 DishCardStyleConfig，所有颜色使用 CSS 变量做回退（var(--tx-dish-price) / var(--tx-dish-card-bg) / var(--tx-dish-card-radius)）
+- [MP-1.1 后端主题 API] menu_display_routes.py 已有 MerchantThemeConfig Pydantic 模型 + GET /merchant-theme/{merchant_code} 端点 + 4 组预设主题（default/xuji/zuiqianxian/shangshangongchu）
+
+### 数据变化
+- 修改 miniapp-customer-v2：6 个（app.tsx + pages/index + pages/menu + components/DishCard + api/menu.ts + store/useMerchantTheme.ts）
+- 新增 useMerchantTheme.ts store（含 MerchantTheme 类型定义 + DEFAULT_THEME + injectThemeCSS）
+- 修改 tx-menu：1 个（menu_display_routes.py 新增 MerchantThemeConfig + 端点 + 预设主题）
+- 新增 api/menu.ts MerchantTheme 类型 + getMerchantTheme() 函数
+
+### 遗留问题
+- 50+ 子页面仍有独立 `const C` 颜色常量，未接入 CSS 变量（非 Phase 1 范围，后续逐步替换）
+- 小程序当前通过 Taro.getStorageSync('tx_merchant_code') 读取商户编码，尚未与品牌选择流程打通
+- 主题配置为硬编码预设，未做 DB 持久化（Phase 2 可加 store_themes 表）
+- AiRecommend/AiChatAssistant 等组件仍有硬编码颜色，未接入 CSS 变量
+
+### 明日计划
+- 继续 Phase 1：WP-1.2 CouponManage 前端 | MP-1.2 AI 菜品推荐 | WC-1 前端页面
+
+---
+
+### 今日完成
+- [WC-1.1 DB 持久化] 重构 WecomChannelCodeService 支持双模式（DB + 内存回退），所有路由增加 `Depends(get_db)` 依赖注入
+- [WC-1.1 ORM 模型] 新增 WecomChannelCodeOrm（映射 v384 wecom_channel_codes）+ WecomScanRecordOrm（扫码记录）
+- [WC-1.1 迁移 v388] 创建 v388_wecom_scan_records 迁移（含扫码事件追踪 + RLS 4 策略）
+- [WC-1.2 标签同步] 确认 wecom_auto_tag_service.py 已有完整实现（sync_tags_to_wecom / get_wecom_tags）
+- [WC-1.3 群发管理] 确认 wecom_scrm_agent_routes.py 已有完整 MVP 实现（群发创建/列表/统计）
+- [Python 3.9 兼容] 重构 models/__init__.py 使用 __getattr__ 懒加载 shared 依赖模型，Pydantic 模型与 ORM 模型在 Python 3.9 环境中可独立导入
+
+### 数据变化
+- 修改 tx-growth：3 个（api/wecom_channel_code_routes.py + services/wecom_channel_code_service.py + models/__init__.py）
+- 删除 tx-growth：1 个（models/wecom_channel_code_orm.py — 内联到 service）
+- 新增 shared/db-migrations：1 个（v388_wecom_scan_records.py）
+
+### 遗留问题
+- 测试需 Docker 环境（Python 3.11+），本地 Python 3.9 因 Pydantic V2 对 `| ` union 语法的限制无法运行
+- 群发任务（mass-send）仍为 MVP 内存版，后续需 DB 持久化
+- 前端页面 WecomChannel/WecomMass 尚未实现
+- wecom_scrm_agent_routes.py 中 tag_filter 调用 tx-member 的 `customers/wecom/batch_by_tags` 端点尚未实现
+
+### 明日计划
+- 继续 Phase 1：MP-1 小程序体验完善
+
+## 2026-05-03 Phase 1 WC-1 企业微信私域基建 — DB 持久化
+
+### 今日完成
+- [WC-1.1 DB 持久化] 重构 WecomChannelCodeService 支持双模式（DB + 内存回退），所有路由增加 `Depends(get_db)` 依赖注入
+- [WC-1.1 ORM 模型] 新增 WecomChannelCodeOrm（映射 v384 wecom_channel_codes）+ WecomScanRecordOrm（扫码记录）
+- [WC-1.1 迁移 v388] 创建 v388_wecom_scan_records 迁移（含扫码事件追踪 + RLS 4 策略）
+- [WC-1.2 标签同步] 确认 wecom_auto_tag_service.py 已有完整实现（sync_tags_to_wecom / get_wecom_tags）
+- [WC-1.3 群发管理] 确认 wecom_scrm_agent_routes.py 已有完整 MVP 实现（群发创建/列表/统计）
+- [Python 3.9 兼容] 重构 models/__init__.py 使用 __getattr__ 懒加载 shared 依赖模型，Pydantic 模型与 ORM 模型在 Python 3.9 环境中可独立导入
+
+### 数据变化
+- 修改 tx-growth：3 个（api/wecom_channel_code_routes.py + services/wecom_channel_code_service.py + models/__init__.py）
+- 删除 tx-growth：1 个（models/wecom_channel_code_orm.py — 内联到 service）
+- 新增 shared/db-migrations：1 个（v388_wecom_scan_records.py）
+
+### 遗留问题
+- 测试需 Docker 环境（Python 3.11+），本地 Python 3.9 因 Pydantic V2 对 `| ` union 语法的限制无法运行
+- 群发任务（mass-send）仍为 MVP 内存版，后续需 DB 持久化
+- 前端页面 WecomChannel/WecomMass 尚未实现
+- wecom_scrm_agent_routes.py 中 tag_filter 调用 tx-member 的 `customers/wecom/batch_by_tags` 端点尚未实现
+
+### 明日计划
+- 继续 Phase 1：MP-1 小程序体验完善
+
+---
+
+## 2026-05-03 Phase 1 MU-1 UnionID 全渠道打通
+
+### 今日完成
+- [MU-1.1 UnionID 单条关联] 新增 golden_id_routes.py POST /api/v1/member/golden-id/associate-unionid 端点，将 wechat_openid + unionid 写入 customers 表和 member_channel_bindings（upsert 语义）
+- [MU-1.2 profile360 暴露 unionid] 在 profile360_service.py 的 _fetch_member SQL 和 get_full_profile 输出中增加 wechat_openid / wechat_unionid 字段
+- [MU-1 测试] 8 个单元测试全部通过（Pydantic 模型校验 6 个 + profile360 字段暴露 2 个）
+
+### 数据变化
+- 修改 tx-member：2 个（api/golden_id_routes.py 新增端点 + services/profile360_service.py 字段扩展）
+- 新增 tx-member：1 个（tests/test_unionid.py）
+
+### 遗留问题
+- associate-unionid 端点的集成测试需要完整 Docker 环境（依赖 apscheduler、shared 模块），本地仅运行了 Pydantic 模型校验和 service 层单元测试
+- cross_brand_member_routes.py 已有完整的 UnionID 合并端点（merge-by-unionid / merge-all-by-unionid），无需额外改动
+- identity_resolver.py 的 backfill_union_id 和 merge_cross_brand_by_unionid 方法已完整实现，worker 配置正确
+- v385_unionid_indexes 迁移已创建，worktree 未与 main 冲突（main 只到 v383）
+
+### 明日计划
+- 继续 Phase 1：MP-1 小程序体验完善 / WC-1 企业微信私域基建
+
+---
+
+## 2026-05-03 Phase 1 微信生态基础能力增强（WP-1 微信支付能力升级）
+
+### 今日完成
+- [WP-1.1 路由注册] 将 wechat_pay_promotion_router 注册到 tx-growth/main.py（此前缺失，导致 6 个端点不可访问）
+- [WP-1.1 测试修复] 修复 test_wechat_pay_promotion_routes.py 的 sys.path 和响应断言（import 路径 + 实际字段名），15 个测试全部通过
+- [WP-1.2 商品券配置] 新增 tx-growth services/coupon_service.py（ProductCouponService：创建/列表/详情/启用停用 + 微信同步 + 14 个单元测试）
+- [WP-1 测试] 29 个测试全部通过（route 15 + service 14）+ shared SDK 8 个 = 37 个
+
+### 数据变化
+- 修改 tx-growth：2 个（main.py 注册路由 + api/wechat_pay_promotion_routes.py import 路径改为绝对）
+- 新增 tx-growth：2 个（services/coupon_service.py + tests/test_coupon_service_tx_growth.py）
+- 确认已有：4 个（shared/integrations/wechat_pay_promotion.py + tests + service + routes + v386 migration + tx-trade callback 触发）
+
+### 遗留问题
+- WP-1.2 前端 CouponManage 配置页面（apps/web-admin）尚未实现
+- WP-1.2 商家名片 gateway 代理路由 — 当前通过通用 proxy 路由处理，无需额外配置
+- v386_wechat_promotion_activities 迁移已创建但未被 service 消费（仍用内存缓存）
+- 摇优惠触发在 tx-trade 回调中传空 store_id（需从订单解析实际 store_id）
+- 商品券微信同步在 mock 模式下不真正调用微信 API，生产环境需配置 WECHAT_PAY_* 环境变量
+
+### 明日计划
+- 继续 Phase 1：MP-1 小程序体验完善 / MU-1 UnionID 全渠道打通 / WC-1 企微私域基建
+
+---
+
+## 2026-05-03 Phase 2 微信生态深度运营（VC-1 视频号小程序交易组件）
+
+### 今日完成
+- [AM-1.1 人群细分API] 新增 tx-member api/segmentation_routes.py（6个内置人群 + 自定义人群CRUD + 分页成员列表 + 刷新缓存）
+- [AM-1.4 归因分析API] 新增 tx-analytics api/attribution_routes.py（6端点：总览/活动对比/活动详情/渠道分布/趋势/转化漏斗）
+- [AM-1 测试] 新增 34 个单元测试（segmentation 18 + attribution 16）全部通过
+- [VC-1.1 event_types] shared/events/src/event_types.py 新增 CHANNELS_EC_ORDER_CREATED/PAID/REFUNDED 事件类型
+- [VC-1.1 渠道适配器] 新增 tx-trade services/channel_adapter.py（ChannelsECAdapter：状态映射/订单解析/内部订单转换/Mock模式）
+- [VC-1.1 webhook路由] 扩展 tx-trade api/webhook_routes.py（channels_ec_order_push POST端点 + SHA1验签 + 事件旁路写入）
+- [VC-1.1 Gateway路由] 新增 gateway api/channels_ec_routes.py（GET验签/POST转发/超时/连接异常处理）
+- [VC-1.2 VideoPlayer] 增强 miniapp-customer-v2 VideoPlayer/index.tsx（新增 onEnterLiveStream 回调和 LiveStreamInfo 导出类型）
+- [VC-1.2 首页直播入口] 增强 miniapp-customer-v2 pages/index/index.tsx（新增 VideoPlayer 区域 + 直播状态 + 导航跳转）
+- [数据迁移] v384(v383→wecom_channel_codes) / v385(unionid索引) / v386(promotion活动表) / v387(视频号小店同步表) 已创建
+- [测试验证] 新增 33 个测试全部通过 + 前序 48 个测试保持通过 = 81 个通过
+
+### 数据变化
+- 新增 gateway 模块：1 个（api/channels_ec_routes.py + test）
+- 新增 tx-trade 模块：2 个（services/channel_adapter.py + webhook扩展 + test）
+- 增强 event_types：3 个（新增 ChannelsEC 事件类型）
+- 新增 tx-member 模块：2 个（api/segmentation_routes.py + test）
+- 新增 tx-analytics 模块：1 个（api/attribution_routes.py + test）
+- 增强 miniapp 模块：2 个（VideoPlayer/index.tsx + pages/index/index.tsx）
+- 新增 miniapp 模块：1 个（src/api/ai-agent.ts）
+- 新增适配器模块：1 个（docs/wechat-ai-agent-adapter-plan.md）
+- 新增迁移：4 个（v384/v385/v386/v387）
+- 新增测试：115 个全部通过（WS-1 10 + WP-2 16 + WA-1 22 + VC-1 33 + AM-1 34）
+
+### 遗留问题
+- AM-1.3 营销内容生成由 ContentHub（tx-brain/services/content_hub.py）覆盖，dev plan 中的 marketing_content_gen.py 未单独创建
+- 人群细分 API 依赖 member_segments/member_segment_members 表（DB模式+RLS），需 v387 后应用
+- 归因 API 依赖 marketing_touch_log / attribution_conversions 表，确保 v088/v207 迁移已应用
+- 视频号小店直播入口依赖商户端配置，当前使用 Mock 数据待对接
+- 视频号小店回调需在微信公众平台配置 Ngrok/公网 URL 后才可端到端验证
+- 企微会话存档当前使用关键词规则引擎；Phase 3 接入 Claude API 深度分析
+- AM-1 和 VC-1 尚未开始
+
+### 明日计划
+- 继续 Phase 2 VC-1 视频号交易组件 / AM-1 AI 营销五步闭环
+
+---
+
 ## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
 
 ### 今日完成
