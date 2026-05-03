@@ -2,12 +2,12 @@
 
 语言切换器 — 根据 lang 参数加载对应语言模块。
 默认语言: zh_CN（简体中文）
-支持: zh_CN, en_US, ja_JP, ko_KR
+支持: zh_CN, en_US, ja_JP, ko_KR, vi_VN, id_ID
 """
 
 from typing import Any
 
-from . import en_US, ja_JP, ko_KR, zh_CN
+from . import en_US, id_ID, ja_JP, ko_KR, vi_VN, zh_CN
 
 # 语言注册表
 _LANGUAGES: dict[str, Any] = {
@@ -15,6 +15,8 @@ _LANGUAGES: dict[str, Any] = {
     "en_US": en_US,
     "ja_JP": ja_JP,
     "ko_KR": ko_KR,
+    "vi_VN": vi_VN,
+    "id_ID": id_ID,
 }
 
 DEFAULT_LANG = "zh_CN"
