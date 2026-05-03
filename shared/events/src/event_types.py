@@ -69,6 +69,8 @@ class MemberEventType(str, Enum):
     UPGRADED = "member.upgraded"  # 等级升级
     POINTS_CHANGED = "member.points_changed"  # 积分变动
     CHURN_PREDICTED = "member.churn_predicted"  # Agent预测流失
+    UNIONID_BACKFILLED = "member.unionid_backfilled"  # UnionID补全
+    GOLDEN_ID_MERGED_BY_UNIONID = "member.golden_id_merged_by_unionid"  # 基于UnionID的Golden ID合并
 
 
 class InventoryEventType(str, Enum):
@@ -85,7 +87,7 @@ class InventoryEventType(str, Enum):
 
 
 class ChannelEventType(str, Enum):
-    """渠道事件 — 因果链②外卖真毛利"""
+    """渠道事件 — 因果链②外卖真毛利 / VC-1 视频号交易"""
 
     ORDER_SYNCED = "channel.order_synced"  # 渠道订单同步
     COMMISSION_CALC = "channel.commission_calc"  # 佣金计算
@@ -96,6 +98,10 @@ class ChannelEventType(str, Enum):
     DISPUTE_OPENED = "channel.dispute_opened"  # 异议打开（pending）
     DISPUTE_AUTO_ACCEPTED = "channel.dispute_auto_accepted"  # 自动接受（≤ 阈值）
     DISPUTE_RESOLVED = "channel.dispute_resolved"  # 人工裁决（accept/reject/escalate）
+    # VC-1 视频号小店交易（2026-05 新增）
+    CHANNELS_EC_ORDER_CREATED = "channel.channels_ec_order_created"  # 视频号订单创建
+    CHANNELS_EC_ORDER_PAID = "channel.channels_ec_order_paid"  # 视频号订单支付
+    CHANNELS_EC_ORDER_REFUNDED = "channel.channels_ec_order_refunded"  # 视频号订单退款
 
 
 class ReservationEventType(str, Enum):

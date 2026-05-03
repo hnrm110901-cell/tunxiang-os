@@ -4,6 +4,7 @@
 所有业务接口需 X-Tenant-ID header，回调接口除外（微信服务器调用）。
 """
 
+import asyncio
 import logging
 import uuid
 from typing import Optional
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
 from shared.integrations.wechat_pay import get_wechat_pay_service
+from shared.integrations.wechat_pay_promotion import get_wechat_pay_promotion_service
 
 from ..services.wechat_pay_notify_service import apply_wechat_pay_notify_success
 
@@ -40,6 +42,37 @@ def _ok(data: object) -> dict:
 
 def _err(message: str, code: str = "PAYMENT_ERROR") -> dict:
     return {"ok": False, "data": None, "error": {"code": code, "message": message}}
+
+
+async def _trigger_shake_coupon_background(out_trade_no: str, callback_result: dict) -> None:
+    """旁路触发摇一摇优惠（后台任务，异常仅记录不抛出）。"""
+    try:
+        openid = (callback_result.get("payer") or {}).get("openid", "")
+        total_fen = (callback_result.get("amount") or {}).get("total", 0)
+        if not openid or not total_fen:
+            logger.info(
+                "shake_coupon: 跳过（无 openid 或金额）, order=%s",
+                out_trade_no,
+            )
+            return
+        svc = get_wechat_pay_promotion_service()
+        await svc.trigger_shake_coupon(
+            openid=openid,
+            store_id="",
+            amount_fen=total_fen,
+        )
+        logger.info(
+            "shake_coupon: 触发成功, order=%s openid=%s",
+            out_trade_no,
+            openid[:8] + "***",
+        )
+    except Exception as exc:
+        logger.error(
+            "shake_coupon: 触发失败不予重试, order=%s err=%s",
+            out_trade_no,
+            exc,
+            exc_info=True,
+        )
 
 
 # ─── 请求模型 ───
@@ -144,6 +177,11 @@ async def wechat_pay_callback(request: Request):
                         "code": "FAIL",
                         "message": notify_result.get("message", "notify_failed"),
                     }
+
+                # 旁路触发摇一摇优惠（不阻塞主流程）
+                asyncio.create_task(
+                    _trigger_shake_coupon_background(out_trade_no, result)
+                )
             except SQLAlchemyError as exc:
                 logger.error(
                     "wechat_pay_callback: 落库失败 order=%s err=%s",

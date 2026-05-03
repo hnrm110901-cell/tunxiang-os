@@ -385,6 +385,121 @@ async def eleme_order_push(request: Request) -> WebhookResp:
 
 
 # ══════════════════════════════════════════════════════════
+#  视频号小店订单推送 (VC-1)
+# ══════════════════════════════════════════════════════════
+
+CHANNELS_EC_APP_ID = os.environ.get("CHANNELS_EC_APP_ID", "")
+CHANNELS_EC_TOKEN = os.environ.get("CHANNELS_EC_TOKEN", "")
+
+
+def _verify_channels_ec_signature(
+    body_str: str,
+    signature: str,
+    timestamp: str,
+    nonce: str,
+) -> bool:
+    """视频号小店回调签名验证: SHA1(sorted(token, timestamp, nonce)) == signature
+
+    微信视频号小店使用与公众号/小程序相同的 SHA1 签名算法。
+    """
+    if not CHANNELS_EC_TOKEN:
+        logger.error("channels_ec_webhook_no_token_configured")
+        return False
+
+    try:
+        ts = int(timestamp)
+        if abs(int(time.time()) - ts) > _TIMESTAMP_TOLERANCE:
+            logger.warning("channels_ec_webhook_timestamp_expired", diff=abs(int(time.time()) - ts))
+            return False
+    except (ValueError, TypeError):
+        logger.warning("channels_ec_webhook_bad_timestamp", timestamp=timestamp)
+        return False
+
+    # SHA1(token, timestamp, nonce) — 与微信公众平台签名算法一致
+    sign_list = sorted([CHANNELS_EC_TOKEN, timestamp, nonce])
+    sign_str = "".join(sign_list)
+    expected = hashlib.sha1(sign_str.encode("utf-8")).hexdigest()
+
+    logger.info("channels_ec_sign_verify", expected=expected, received=signature)
+    return hmac_mod.compare_digest(expected, signature)
+
+
+@router.post("/channels-ec/callback", response_model=WebhookResp)
+async def channels_ec_order_push(request: Request) -> WebhookResp:
+    """接收视频号小店订单回调。
+
+    微信 Channels EC 通过 POST 推送订单状态变更。
+    首次配置时需要响应 GET 验签（echostr）。
+    """
+    # ── GET 验签：首次配置时的 URL 验证 ──
+    if request.method == "GET":
+        # 实际由 Gateway 层处理，此处保留逻辑一致性
+        return WebhookResp(ok=True, data={"msg": "webhook active"})
+
+    # ── POST 回调 ──
+    raw_body = (await request.body()).decode("utf-8")
+
+    signature = request.headers.get("X-Wechat-Signature", "")
+    timestamp = request.headers.get("X-Wechat-Timestamp", "")
+    nonce = request.headers.get("X-Wechat-Nonce", "")
+
+    if not _verify_channels_ec_signature(raw_body, signature, timestamp, nonce):
+        logger.warning("channels_ec_webhook_signature_invalid")
+        raise HTTPException(status_code=403, detail="签名验证失败")
+
+    try:
+        body: dict[str, Any] = await request.json()
+    except ValueError as exc:
+        logger.error("channels_ec_webhook_bad_json", error=str(exc))
+        raise HTTPException(status_code=400, detail="请求体 JSON 解析失败") from exc
+
+    event_type = body.get("event", body.get("type", "unknown"))
+    order_data = body.get("data", body.get("order_info", {}))
+
+    logger.info("channels_ec_webhook_received", event_type=event_type, order_id=order_data.get("order_id", ""))
+
+    tenant_id = _get_tenant_id(request)
+    store_id = str(order_data.get("store_id", request.headers.get("X-Store-ID", "")))
+    brand_id = request.headers.get("X-Brand-ID", "default")
+
+    # 解析订单
+    from ..services.channel_adapter import ChannelsECAdapter
+
+    parsed = ChannelsECAdapter.parse_order(order_data)
+    internal = ChannelsECAdapter.to_internal_order(parsed, tenant_id, store_id)
+
+    # 选择对应的事件类型
+    event_map: dict[str, str] = {
+        "order_create": ChannelEventType.CHANNELS_EC_ORDER_CREATED,
+        "order_pay": ChannelEventType.CHANNELS_EC_ORDER_PAID,
+        "order_refund": ChannelEventType.CHANNELS_EC_ORDER_REFUNDED,
+    }
+    channel_event = event_map.get(event_type, ChannelEventType.ORDER_SYNCED)
+
+    # ── 平行事件写入 ──
+    asyncio.create_task(
+        emit_event(
+            event_type=channel_event,
+            tenant_id=tenant_id,
+            stream_id=internal["internal_order_id"],
+            payload={
+                "channel_order_id": parsed["channel_order_id"],
+                "channel": "channels_ec",
+                "event": event_type,
+                "amount_fen": parsed["total_fen"],
+                "item_count": len(parsed["items"]),
+                "internal_order_id": internal["internal_order_id"],
+            },
+            store_id=store_id,
+            source_service="tx-trade",
+            metadata={"webhook": "channels_ec", "event_type": event_type},
+        )
+    )
+
+    return WebhookResp(ok=True, data=internal)
+
+
+# ══════════════════════════════════════════════════════════
 #  抖音订单推送
 # ══════════════════════════════════════════════════════════
 

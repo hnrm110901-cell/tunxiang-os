@@ -17,6 +17,7 @@ import os
 import time
 import uuid as _uuid_mod
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -623,6 +624,383 @@ class FeishuSDK:
 
 
 # ═══════════════════════════════════════
+# D7: 微信 AI 智能体适配 (WA-1)
+# ═══════════════════════════════════════
+
+
+class WechatAIAgentSDK:
+    """微信 AI 智能体 SDK — Function Calling 适配层 (WA-1)
+
+    为微信 AI 智能体提供 6 个核心函数，遵循 OpenAI Function Calling Schema。
+    当前 Phase 1 实现：定义 + Mock 执行。
+    Phase 2 (WA-2) 接入真实微信 AI 智能体回调路由。
+
+    所有金额单位：分 (fen)，所有时间：ISO 8601。
+    """
+
+    # ── 6 个函数的 OpenAPI Schema 定义 ──
+    # 供微信 AI 智能体拉取 Functions 列表时使用
+    FUNCTIONS: list[dict] = [
+        {
+            "name": "query_menu",
+            "description": "查询门店菜单和菜品信息。支持按菜品名称搜索或按分类浏览。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "store_id": {
+                        "type": "string",
+                        "description": "门店 ID（如未知则填 'current'）",
+                    },
+                    "dish_name": {
+                        "type": "string",
+                        "description": "菜品名称关键词（可选，用于搜索特定菜品）",
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": ["全部", "招牌", "热菜", "凉菜", "汤品", "主食", "酒水", "套餐"],
+                        "description": "菜品分类（可选，过滤菜单）",
+                    },
+                },
+                "required": ["store_id"],
+            },
+        },
+        {
+            "name": "create_order",
+            "description": "提交订单。用户说出想点的菜品后，调用此函数创建订单。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "store_id": {
+                        "type": "string",
+                        "description": "门店 ID",
+                    },
+                    "dishes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "dish_name": {
+                                    "type": "string",
+                                    "description": "菜品名称",
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "description": "数量",
+                                    "default": 1,
+                                },
+                                "spec": {
+                                    "type": "string",
+                                    "description": "规格（如: 大份/小份/微辣/中辣/特辣）",
+                                },
+                            },
+                            "required": ["dish_name"],
+                        },
+                        "description": "菜品列表",
+                    },
+                    "preference": {
+                        "type": "string",
+                        "description": "偏好说明（如: 少油、少盐、加急）",
+                    },
+                },
+                "required": ["store_id", "dishes"],
+            },
+        },
+        {
+            "name": "query_order",
+            "description": "查询订单状态。包括订单当前状态、预计出餐时间等。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "order_id": {
+                        "type": "string",
+                        "description": "订单 ID 或订单号",
+                    },
+                },
+                "required": ["order_id"],
+            },
+        },
+        {
+            "name": "query_member",
+            "description": "查询会员信息。包括等级、积分余额、储值余额。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "openid": {
+                        "type": "string",
+                        "description": "微信 OpenID（由微信智能体自动传递）",
+                    },
+                },
+                "required": ["openid"],
+            },
+        },
+        {
+            "name": "query_coupons",
+            "description": "查询用户可用的优惠券列表。包括折扣券、满减券、赠品券等。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "openid": {
+                        "type": "string",
+                        "description": "微信 OpenID",
+                    },
+                    "store_id": {
+                        "type": "string",
+                        "description": "门店 ID（可选，只查询该门店可用券）",
+                    },
+                },
+                "required": ["openid"],
+            },
+        },
+        {
+            "name": "book_table",
+            "description": "预订桌位。用户说明人数和时间后，查询可用桌位并预订。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "store_id": {
+                        "type": "string",
+                        "description": "门店 ID",
+                    },
+                    "time": {
+                        "type": "string",
+                        "description": "到店时间（ISO 8601 格式，如 '2026-06-01T18:30:00+08:00'）",
+                    },
+                    "guests": {
+                        "type": "integer",
+                        "description": "用餐人数",
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "备注（如: 靠窗、包厢、婴儿椅）",
+                    },
+                },
+                "required": ["store_id", "time", "guests"],
+            },
+        },
+    ]
+
+    def __init__(self) -> None:
+        self._agent_enabled = bool(os.getenv("WECHAT_AI_AGENT_ENABLED", ""))
+
+    # ── Function 实现 ──
+
+    async def query_menu(
+        self,
+        store_id: str,
+        dish_name: str | None = None,
+        category: str | None = None,
+    ) -> dict:
+        """查询门店菜单。"""
+        logger.info("ai_agent.query_menu", store_id=store_id, dish_name=dish_name, category=category)
+        if not self._agent_enabled:
+            return self._mock_query_menu(store_id, dish_name, category)
+        # WA-2: 调用真实服务
+        return self._mock_query_menu(store_id, dish_name, category)
+
+    async def create_order(
+        self,
+        store_id: str,
+        dishes: list[dict],
+        preference: str | None = None,
+    ) -> dict:
+        """创建订单。"""
+        logger.info("ai_agent.create_order", store_id=store_id, dish_count=len(dishes))
+        if not self._agent_enabled:
+            return self._mock_create_order(store_id, dishes, preference)
+        return self._mock_create_order(store_id, dishes, preference)
+
+    async def query_order(self, order_id: str) -> dict:
+        """查询订单状态。"""
+        logger.info("ai_agent.query_order", order_id=order_id)
+        if not self._agent_enabled:
+            return self._mock_query_order(order_id)
+        return self._mock_query_order(order_id)
+
+    async def query_member(self, openid: str) -> dict:
+        """查询会员信息。"""
+        logger.info("ai_agent.query_member", openid=openid)
+        if not self._agent_enabled:
+            return self._mock_query_member(openid)
+        return self._mock_query_member(openid)
+
+    async def query_coupons(self, openid: str, store_id: str | None = None) -> dict:
+        """查询可用优惠券。"""
+        logger.info("ai_agent.query_coupons", openid=openid, store_id=store_id)
+        if not self._agent_enabled:
+            return self._mock_query_coupons(openid, store_id)
+        return self._mock_query_coupons(openid, store_id)
+
+    async def book_table(
+        self,
+        store_id: str,
+        time: str,
+        guests: int,
+        note: str | None = None,
+    ) -> dict:
+        """预订桌位。"""
+        logger.info("ai_agent.book_table", store_id=store_id, time=time, guests=guests)
+        if not self._agent_enabled:
+            return self._mock_book_table(store_id, time, guests, note)
+        return self._mock_book_table(store_id, time, guests, note)
+
+    # ── Mock 实现（开发/演示用）──
+
+    @staticmethod
+    def _mock_query_menu(store_id: str, dish_name: str | None = None, category: str | None = None) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        dishes = [
+            {"dish_id": "dish_001", "name": "招牌水煮鱼", "category": "招牌",
+             "price_fen": 8800, "description": "鲜活草鱼，麻辣鲜香", "status": "available"},
+            {"dish_id": "dish_002", "name": "辣子鸡", "category": "热菜",
+             "price_fen": 5800, "description": "香辣酥脆", "status": "available"},
+            {"dish_id": "dish_003", "name": "蒜蓉西兰花", "category": "热菜",
+             "price_fen": 3200, "description": "清淡爽口", "status": "available"},
+            {"dish_id": "dish_004", "name": "酸菜鱼", "category": "招牌",
+             "price_fen": 6800, "description": "酸爽开胃，可选大份/小份", "status": "available"},
+            {"dish_id": "dish_005", "name": "米饭", "category": "主食",
+             "price_fen": 300, "description": "东北五常大米", "status": "available"},
+        ]
+        # 按分类过滤
+        if category and category != "全部":
+            dishes = [d for d in dishes if d["category"] == category]
+        # 按菜名搜索
+        if dish_name:
+            dishes = [d for d in dishes if dish_name in d["name"]]
+        return {
+            "ok": True,
+            "data": {"store_id": store_id, "dishes": dishes, "total": len(dishes), "queried_at": now},
+        }
+
+    @staticmethod
+    def _mock_create_order(store_id: str, dishes: list[dict], preference: str | None = None) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        order_id = f"ai_order_{_uuid_mod.uuid4().hex[:12]}"
+        total_fen = sum(
+            _mock_dish_price(d.get("dish_name", "")) * d.get("quantity", 1)
+            for d in dishes
+        )
+        return {
+            "ok": True,
+            "data": {
+                "order_id": order_id,
+                "store_id": store_id,
+                "items": dishes,
+                "total_fen": total_fen,
+                "preference": preference,
+                "status": "pending_payment",
+                "created_at": now,
+            },
+        }
+
+    @staticmethod
+    def _mock_query_order(order_id: str) -> dict:
+        return {
+            "ok": True,
+            "data": {
+                "order_id": order_id,
+                "status": "paid",
+                "total_fen": 8800,
+                "paid_fen": 8800,
+                "estimated_wait_minutes": 15,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+    @staticmethod
+    def _mock_query_member(openid: str) -> dict:
+        return {
+            "ok": True,
+            "data": {
+                "openid": openid,
+                "member_id": _uuid_mod.uuid4().hex[:16],
+                "level": "gold",
+                "level_label": "黄金会员",
+                "current_points": 2800,
+                "total_spend_fen": 256000,
+                "stored_balance_fen": 50000,
+                "registered_at": "2025-01-15T10:00:00Z",
+            },
+        }
+
+    @staticmethod
+    def _mock_query_coupons(openid: str, store_id: str | None = None) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        coupons = [
+            {
+                "coupon_id": "cpn_001",
+                "name": "满200减30",
+                "type": "discount_fen",
+                "discount_value": 3000,
+                "min_order_fen": 20000,
+                "valid_until": "2026-06-30T23:59:59+08:00",
+                "status": "available",
+            },
+            {
+                "coupon_id": "cpn_002",
+                "name": "8折优惠券",
+                "type": "discount_percent",
+                "discount_value": 20,
+                "min_order_fen": 10000,
+                "valid_until": "2026-06-15T23:59:59+08:00",
+                "status": "available",
+            },
+            {
+                "coupon_id": "cpn_003",
+                "name": "招牌水煮鱼免费券",
+                "type": "free_item",
+                "discount_value": 0,
+                "min_order_fen": 0,
+                "valid_until": "2026-05-30T23:59:59+08:00",
+                "status": "used",
+            },
+        ]
+        return {
+            "ok": True,
+            "data": {
+                "openid": openid,
+                "store_id": store_id,
+                "coupons": [c for c in coupons if c["status"] == "available"],
+                "total_available": 2,
+                "queried_at": now,
+            },
+        }
+
+    @staticmethod
+    def _mock_book_table(
+        store_id: str, time: str, guests: int, note: str | None = None,
+    ) -> dict:
+        booking_id = f"bk_{_uuid_mod.uuid4().hex[:12]}"
+        return {
+            "ok": True,
+            "data": {
+                "booking_id": booking_id,
+                "store_id": store_id,
+                "time": time,
+                "guests": guests,
+                "note": note,
+                "table_no": "A08",
+                "status": "confirmed",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+
+def _mock_dish_price(dish_name: str) -> int:
+    """根据菜品名称估算价格（Mock 用）。"""
+    price_map = {
+        "水煮鱼": 8800,
+        "酸菜鱼": 6800,
+        "辣子鸡": 5800,
+        "西兰花": 3200,
+        "米饭": 300,
+    }
+    for key, price in price_map.items():
+        if key in dish_name:
+            return price
+    return 5000
+
+
+# ═══════════════════════════════════════
 # 统一入口
 # ═══════════════════════════════════════
 
@@ -638,6 +1016,7 @@ class ExternalSDKManager:
         self.nuonuo = NuonuoInvoiceSDK()
         self.dingtalk = DingtalkSDK()
         self.feishu = FeishuSDK()
+        self.ai_agent = WechatAIAgentSDK()
 
     def get_payment_sdk(self, method: str):
         """根据支付方式返回对应 SDK"""
