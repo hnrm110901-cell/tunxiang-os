@@ -9,6 +9,12 @@
 set -e
 
 TARGET=/opt/tunxiang-os/infra/docker/.env
+TARGET_DIR=$(dirname "$TARGET")
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "ERROR: 目标目录不存在: $TARGET_DIR"
+    echo "请确保仓库已克隆到 /opt/tunxiang-os/"
+    exit 1
+fi
 
 # 生成随机密码
 POSTGRES_PASSWORD=$(openssl rand -hex 16)

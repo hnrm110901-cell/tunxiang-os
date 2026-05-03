@@ -53,8 +53,6 @@ def _make_db_mock() -> AsyncMock:
 def _configure_db_for_create_app(db: AsyncMock, app_id: str) -> None:
     """配置DB mock: create_application返回新app_id"""
     result_mock = MagicMock()
-    row_mock = MagicMock()
-    row_mock.__getitem__ = MagicMock(return_value=app_id)
     result_mock.fetchone = MagicMock(return_value=(app_id,))
     db.execute = AsyncMock(return_value=result_mock)
 
@@ -498,15 +496,10 @@ async def test_webhook_dispatch_sends_hmac_signature() -> None:
         resp.status_code = 200
         return resp
 
-    # 配置DB返回一个webhook
-    db_result = MagicMock()
-    row = MagicMock()
-    row.__iter__ = MagicMock(return_value=iter([]))
     webhooks_list = [
         {"id": webhook_id, "endpoint_url": "https://example.com/hook",
          "secret_hash": secret_hash, "retry_count": 3}
     ]
-    db_result.mappings.return_value.fetchall.return_value = [MagicMock(**wh) for wh in webhooks_list]
 
     call_idx = 0
 

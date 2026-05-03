@@ -85,6 +85,13 @@ if [ ! -f "$ENV_FILE" ]; then
         sed -i.bak "s/CHANGE_ME_USE_32_CHAR_RANDOM_STRING/${JWT_SECRET}/g" "$ENV_FILE" 2>/dev/null || \
             sed -i '' "s/CHANGE_ME_USE_32_CHAR_RANDOM_STRING/${JWT_SECRET}/g" "$ENV_FILE"
         rm -f "$ENV_FILE.bak"
+        # Validate that placeholders were actually replaced
+        if grep -q "CHANGE_ME_USE_STRONG_PASSWORD\|CHANGE_ME_REDIS_PASSWORD\|CHANGE_ME_USE_32_CHAR_RANDOM_STRING" "$ENV_FILE"; then
+            log_error "密码替换失败：.env.example 不包含预期的占位符字符串"
+            log_error "请手动替换 .env 中的 CHANGE_ME 值为真实密码"
+            rm -f "$ENV_FILE"
+            exit 1
+        fi
         log_info "已创建 .env（开发环境随机密码），请按需修改"
     else
         log_error ".env 文件不存在。请从 .env.example 复制并填入真实配置:"

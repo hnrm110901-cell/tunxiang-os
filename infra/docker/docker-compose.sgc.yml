@@ -16,8 +16,8 @@ x-py-common: &py-common
   networks:
     - txos-sgc
   environment: &common-env
-    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD}@postgres:5632/${POSTGRES_DB:-tunxiang_sgc}
-    REDIS_URL: redis://redis:6381/0
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tunxiang_sgc}
+    REDIS_URL: redis://redis:6379/0
     TX_ENV: demo
     TX_AUTH_ENABLED: "false"
     TX_RATE_LIMIT_ENABLED: "false"
@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tunxiang}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set in .env or export it}
       POSTGRES_DB: ${POSTGRES_DB:-tunxiang_sgc}
     ports:
       - "${POSTGRES_PORT:-5632}:5432"

@@ -14,7 +14,7 @@ pip install -q "fastapi>=0.104.0" "uvicorn[standard]>=0.24.0" "pydantic>=2.4.0" 
     "sqlalchemy>=2.0.0" "asyncpg>=0.29.0" "structlog>=23.1.0" "apscheduler>=3.10.0" \
     "passlib[bcrypt]>=1.7.4" "PyJWT>=2.8.0" "httpx>=0.25.0"
 
-export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://tunxiang:changeme@localhost/tunxiang_os}"
+export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://tunxiang:@localhost/tunxiang_os}"
 export JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
 export PYTHONPATH="$PROJECT_ROOT"
 

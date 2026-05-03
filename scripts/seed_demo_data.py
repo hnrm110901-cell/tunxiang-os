@@ -11,7 +11,7 @@ import uuid
 
 DB_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://tunxiang:changeme@localhost:5432/tunxiang_dev",
+    "postgresql://tunxiang:@localhost:5432/tunxiang_dev",
 )
 TENANT_ID = "10000000-0000-0000-0000-000000000001"
 STORE_ID   = "20000000-0000-0000-0000-000000000001"
@@ -24,7 +24,7 @@ def run():
     conn = psycopg2.connect(DB_URL)
     conn.autocommit = False
     cur = conn.cursor()
-    cur.execute(f"SET app.tenant_id = '{TENANT_ID}'")
+    cur.execute("SET app.tenant_id = %s", (TENANT_ID,))
 
     try:
         # ── 1. 租户 ──────────────────────────────────────────────────────
