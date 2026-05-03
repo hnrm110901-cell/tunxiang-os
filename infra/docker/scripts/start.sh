@@ -72,17 +72,20 @@ fi
 ENV_FILE="$DOCKER_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
     if [ "$ENV" = "dev" ]; then
-        log_warn ".env 文件不存在，从模板创建开发环境默认配置..."
+        log_warn ".env 文件不存在，从模板创建开发环境配置（随机密码）..."
         cp "$DOCKER_DIR/.env.example" "$ENV_FILE"
-        # 开发环境使用默认弱密码
-        sed -i.bak 's/CHANGE_ME_USE_STRONG_PASSWORD/changeme_dev/g' "$ENV_FILE" 2>/dev/null || \
-            sed -i '' 's/CHANGE_ME_USE_STRONG_PASSWORD/changeme_dev/g' "$ENV_FILE"
-        sed -i.bak 's/CHANGE_ME_REDIS_PASSWORD/changeme_dev/g' "$ENV_FILE" 2>/dev/null || \
-            sed -i '' 's/CHANGE_ME_REDIS_PASSWORD/changeme_dev/g' "$ENV_FILE"
-        sed -i.bak 's/CHANGE_ME_USE_32_CHAR_RANDOM_STRING/dev_jwt_secret_not_for_production/g' "$ENV_FILE" 2>/dev/null || \
-            sed -i '' 's/CHANGE_ME_USE_32_CHAR_RANDOM_STRING/dev_jwt_secret_not_for_production/g' "$ENV_FILE"
+        # 开发环境生成随机密码
+        DB_PASS=$(openssl rand -hex 16)
+        REDIS_PASS=$(openssl rand -hex 16)
+        JWT_SECRET=$(openssl rand -hex 32)
+        sed -i.bak "s/CHANGE_ME_USE_STRONG_PASSWORD/${DB_PASS}/g" "$ENV_FILE" 2>/dev/null || \
+            sed -i '' "s/CHANGE_ME_USE_STRONG_PASSWORD/${DB_PASS}/g" "$ENV_FILE"
+        sed -i.bak "s/CHANGE_ME_REDIS_PASSWORD/${REDIS_PASS}/g" "$ENV_FILE" 2>/dev/null || \
+            sed -i '' "s/CHANGE_ME_REDIS_PASSWORD/${REDIS_PASS}/g" "$ENV_FILE"
+        sed -i.bak "s/CHANGE_ME_USE_32_CHAR_RANDOM_STRING/${JWT_SECRET}/g" "$ENV_FILE" 2>/dev/null || \
+            sed -i '' "s/CHANGE_ME_USE_32_CHAR_RANDOM_STRING/${JWT_SECRET}/g" "$ENV_FILE"
         rm -f "$ENV_FILE.bak"
-        log_info "已创建 .env（开发环境默认值），请按需修改"
+        log_info "已创建 .env（开发环境随机密码），请按需修改"
     else
         log_error ".env 文件不存在。请从 .env.example 复制并填入真实配置:"
         log_error "  cp $DOCKER_DIR/.env.example $ENV_FILE"
