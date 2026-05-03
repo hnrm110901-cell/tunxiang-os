@@ -118,6 +118,7 @@ from .api.referral_routes import router as referral_router
 from .api.sales_crm_routes import router as sales_crm_router  # v291 销售CRM
 from .api.segmentation_routes import router as segmentation_router
 from .api.touch_attribution_routes import router as touch_attribution_router
+from .api.wechat_pay_promotion_routes import router as wechat_pay_promotion_router  # WP-1 微信支付营销
 from .api.wecom_scrm_agent_routes import router as wecom_scrm_agent_router  # P3-05 企微SCRM私域Agent
 
 _approval_service = _ApprovalService()
@@ -953,6 +954,7 @@ app.include_router(content_router)  # /api/v1/content — content_templates 表
 app.include_router(channel_router)  # /api/v1/channels — channel_configs/message_send_logs 表
 app.include_router(growth_hub_router)  # /api/v1/growth — 增长中枢V2
 app.include_router(wecom_scrm_agent_router)  # P3-05 企微SCRM私域Agent
+app.include_router(wechat_pay_promotion_router)  # WP-1 /api/v1/growth/wechat-promotion/* — 微信支付营销（摇优惠/商家名片/投放计划）
 app.include_router(ai_marketing_router)  # /api/v1/growth/ai-marketing/* — AI营销自动化（v207）（生日/沉睡/回访）
 app.include_router(promotion_rules_v2_router)  # /api/v1/promotions/* — 促销规则引擎V2（模块2.5）
 app.include_router(promotion_rules_v3_router)  # /api/v1/promotions/v3/* — 促销规则引擎V3（模块2.6）

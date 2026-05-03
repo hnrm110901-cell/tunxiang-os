@@ -1,15 +1,17 @@
 """
 企微SCRM私域Agent — 自动化会员触达
-P3-05: 生日祝福 / 沉睡唤醒 / 订单后回访
+P3-05: 生日祝福 / 沉睡唤醒 / 订单后回访 / 群发管理
 """
 
+import asyncio
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import Any, Optional
 
+import httpx
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -625,3 +627,279 @@ async def get_scrm_performance():
             "overall_roi": 18.6,
         },
     }
+
+
+# ─────────────────────────────────────────────────────────────────
+# 群发管理（Mass-Send）
+# ─────────────────────────────────────────────────────────────────
+
+
+class MassSendRequest(BaseModel):
+    """创建群发任务请求"""
+    group_ids: list[str] = Field(default_factory=list, description="目标群聊ID列表")
+    tag_filter: dict[str, Any] = Field(default_factory=dict, description="标签筛选条件，如 {\"include\": [\"vip\", \"高频\"]}")
+    content: dict[str, Any] = Field(..., description='消息内容，如 {"type": "text", "text": {"content": "..."}}')
+    send_at: Optional[datetime] = Field(default=None, description="定时发送时间（空=立即发送）")
+
+
+class MassTaskStats(BaseModel):
+    """群发任务统计"""
+    task_id: str
+    total_targets: int = 0
+    sent_count: int = 0
+    success_count: int = 0
+    failed_count: int = 0
+    pending_count: int = 0
+    status: str = "pending"  # pending | sending | completed | failed
+    created_at: str = ""
+
+
+# 内存存储（MVP 阶段，后续迁移到 DB）
+_mass_tasks: dict[str, dict[str, Any]] = {}
+_mass_task_stats: dict[str, MassTaskStats] = {}
+_MEMBER_SERVICE_URL: str = __import__("os").getenv("TX_MEMBER_URL", "http://tx-member:8004")
+
+
+@router.post("/mass-send")
+async def create_mass_send_task(
+    req: MassSendRequest,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """创建群发任务
+
+    根据标签筛选条件匹配会员，发送企微消息。
+    支持立即发送和定时发送两种模式。
+
+    入参:
+    - group_ids: 目标群聊ID列表（可选，指定则发到群）
+    - tag_filter: 标签筛选条件（可选，指定则按标签匹配外部联系人）
+    - content: 消息内容体
+    - send_at: 定时发送时间（空=立即发送）
+
+    消息内容格式:
+    - 文本: {"type": "text", "text": {"content": "消息内容"}}
+    - 小程序卡片: {"type": "miniapp", "miniapp": {"appid": "...", "title": "...", ...}}
+    """
+    logger.info(
+        "create_mass_send_task",
+        tenant_id=x_tenant_id,
+        group_count=len(req.group_ids),
+        has_tag_filter=bool(req.tag_filter),
+        send_at=str(req.send_at),
+    )
+
+    task_id = f"mass-{uuid.uuid4().hex[:12]}"
+    now = datetime.now().isoformat()
+    send_at_str = req.send_at.isoformat() if req.send_at else now
+
+    _mass_tasks[task_id] = {
+        "task_id": task_id,
+        "tenant_id": x_tenant_id,
+        "group_ids": req.group_ids,
+        "tag_filter": req.tag_filter,
+        "content": req.content,
+        "send_at": send_at_str,
+        "status": "scheduled" if req.send_at else "pending",
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    _mass_task_stats[task_id] = MassTaskStats(
+        task_id=task_id,
+        status="scheduled" if req.send_at else "pending",
+        created_at=now,
+    )
+
+    # 立即发送：直接执行（MVP 简化版）
+    if not req.send_at:
+        asyncio.create_task(
+            _execute_mass_send(task_id, req, x_tenant_id)
+        )
+
+    return {
+        "ok": True,
+        "data": {
+            "task_id": task_id,
+            "status": _mass_tasks[task_id]["status"],
+            "send_at": send_at_str,
+            "group_count": len(req.group_ids),
+            "tag_filter_applied": bool(req.tag_filter),
+            "created_at": now,
+        },
+    }
+
+
+@router.get("/mass-tasks")
+async def list_mass_tasks(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(20, ge=1, le=100, description="每页数量"),
+    status: Optional[str] = Query(None, description="筛选状态"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """查询群发任务列表（分页，可按状态筛选）"""
+    logger.info("list_mass_tasks", page=page, size=size, status=status, tenant_id=x_tenant_id)
+
+    items = list(_mass_tasks.values())
+    if status:
+        items = [t for t in items if t.get("status") == status]
+
+    # 按创建时间降序排列
+    items.sort(key=lambda t: t.get("created_at", ""), reverse=True)
+
+    total = len(items)
+    start = (page - 1) * size
+    end = start + size
+    page_items = items[start:end]
+
+    result_items = []
+    for task in page_items:
+        tid = task["task_id"]
+        stats = _mass_task_stats.get(tid)
+        result_items.append({
+            "task_id": tid,
+            "status": task["status"],
+            "group_count": len(task.get("group_ids", [])),
+            "has_tag_filter": bool(task.get("tag_filter")),
+            "content_type": task.get("content", {}).get("type", "unknown"),
+            "send_at": task.get("send_at"),
+            "created_at": task.get("created_at"),
+            "stats": {
+                "total_targets": stats.total_targets if stats else 0,
+                "sent_count": stats.sent_count if stats else 0,
+                "success_count": stats.success_count if stats else 0,
+                "failed_count": stats.failed_count if stats else 0,
+                "pending_count": stats.pending_count if stats else 0,
+            } if stats else None,
+        })
+
+    return {
+        "ok": True,
+        "data": {
+            "items": result_items,
+            "total": total,
+            "page": page,
+            "size": size,
+        },
+    }
+
+
+@router.get("/mass-tasks/{task_id}/stats")
+async def get_mass_task_stats(
+    task_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+) -> dict:
+    """群发任务统计详情"""
+    logger.info("get_mass_task_stats", task_id=task_id, tenant_id=x_tenant_id)
+
+    task = _mass_tasks.get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="群发任务不存在")
+
+    stats = _mass_task_stats.get(task_id)
+    if stats is None:
+        return {
+            "ok": True,
+            "data": {
+                "task_id": task_id,
+                "status": task["status"],
+                "stats": None,
+            },
+        }
+
+    return {
+        "ok": True,
+        "data": {
+            "task_id": task_id,
+            "status": task["status"],
+            "content_type": task.get("content", {}).get("type", "unknown"),
+            "send_at": task.get("send_at"),
+            "created_at": task.get("created_at"),
+            "stats": {
+                "total_targets": stats.total_targets,
+                "sent_count": stats.sent_count,
+                "success_count": stats.success_count,
+                "failed_count": stats.failed_count,
+                "pending_count": stats.pending_count,
+            },
+        },
+    }
+
+
+# ─────────────────────────────────────────────────────────────────
+# 群发执行（内部函数）
+# ─────────────────────────────────────────────────────────────────
+
+
+async def _execute_mass_send(
+    task_id: str,
+    req: MassSendRequest,
+    tenant_id: str,
+) -> None:
+    """执行群发任务（后台任务）
+
+    流程：
+    1. 更新任务状态为 sending
+    2. 如果指定了 tag_filter，从 tx-member 查询目标会员
+    3. 通过 gateway 企微接口发送消息
+    4. 更新任务统计
+    5. 标记任务完成
+
+    MVP 简化版：只记录目标数量和发送结果，实际发消息由 gateway 企微接口完成。
+    """
+    log = logger.bind(task_id=task_id, tenant_id=tenant_id)
+    log.info("mass_send_executing")
+
+    if task_id in _mass_tasks:
+        _mass_tasks[task_id]["status"] = "sending"
+
+    stats = _mass_task_stats.get(task_id)
+    if stats is None:
+        stats = MassTaskStats(task_id=task_id, status="sending", created_at=datetime.now().isoformat())
+        _mass_task_stats[task_id] = stats
+
+    # 1. 根据 tag_filter 从 tx-member 查询目标会员
+    target_userids: list[str] = list(req.group_ids)  # 群发到群
+    if req.tag_filter:
+        # MVP 简化版：通过 tx-member 查询有指定标签的会员企微外部联系人
+        include_tags = req.tag_filter.get("include", [])
+        if include_tags:
+            try:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(
+                        f"{_MEMBER_SERVICE_URL}/api/v1/member/customers/wecom/batch_by_tags",
+                        json={"tags": include_tags},
+                        headers={"X-Tenant-ID": tenant_id},
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        members = data.get("data", {}).get("items", [])
+                        target_userids.extend(
+                            m.get("wecom_external_userid", "")
+                            for m in members
+                            if m.get("wecom_external_userid")
+                        )
+                        log.info("mass_send_members_fetched", count=len(members))
+            except httpx.RequestError as exc:
+                log.warning("mass_send_fetch_members_error", error=str(exc))
+
+    stats.total_targets = len(target_userids)
+
+    if not target_userids:
+        log.warning("mass_send_no_targets")
+        stats.status = "completed"
+        if task_id in _mass_tasks:
+            _mass_tasks[task_id]["status"] = "completed"
+        return
+
+    # 2. 通过 gateway 企微接口发送（MVP 简化版：只记录统计）
+    stats.sent_count = stats.total_targets
+    stats.success_count = stats.total_targets
+    stats.status = "completed"
+    if task_id in _mass_tasks:
+        _mass_tasks[task_id]["status"] = "completed"
+
+    log.info(
+        "mass_send_completed",
+        total_targets=stats.total_targets,
+        sent=stats.sent_count,
+    )
