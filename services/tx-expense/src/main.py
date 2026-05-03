@@ -60,7 +60,7 @@ Instrumentator().instrument(app).expose(app)
 # CORS — 生产环境通过 CORS_ALLOW_ORIGINS 环境变量覆盖
 import os
 
-_allow_origins = os.getenv("CORS_ALLOW_ORIGINS", "*").split(",")
+_allow_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,

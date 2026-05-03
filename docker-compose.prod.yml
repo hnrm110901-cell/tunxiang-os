@@ -198,6 +198,7 @@ services:
       dockerfile: services/tx-trade/Dockerfile
     environment:
       <<: *common-env
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
     <<: *service-defaults
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -225,6 +226,7 @@ services:
       dockerfile: services/tx-member/Dockerfile
     environment:
       <<: *common-env
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL_GROUP: ${DATABASE_URL_GROUP:?DATABASE_URL_GROUP required for group queries}
     <<: *service-defaults
     healthcheck:
@@ -252,6 +254,7 @@ services:
       dockerfile: services/tx-finance/Dockerfile
     environment:
       <<: *common-env
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
     <<: *service-defaults
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
