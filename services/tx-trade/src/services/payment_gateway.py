@@ -669,5 +669,9 @@ class PaymentGateway:
             "unionpay": "银联卡",
             "member_balance": "会员消费",
             "credit_account": "挂账",
+            # Malaysia e-wallets (Sprint 1.4)
+            "tng_ewallet": "电子钱包",
+            "grabpay": "电子钱包",
+            "boost": "电子钱包",
         }
         return mapping.get(method, "other")
