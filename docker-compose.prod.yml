@@ -3,7 +3,7 @@
 
 x-common-env: &common-env
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-tunxiang_os}
-  REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
+  REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
   # 等保三级安全配置（生产环境在 /etc/txos/security.env 中配置，通过 env_file 注入）
   TX_JWT_SECRET_KEY: ${TX_JWT_SECRET_KEY}
   TX_MFA_ENCRYPT_KEY: ${TX_MFA_ENCRYPT_KEY}
@@ -148,11 +148,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -331,8 +331,8 @@ services:
       --queues=default,daily_ops,schedule,notifications
     environment:
       <<: *common-env
-      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/1
-      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/2
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
     <<: *service-defaults
     healthcheck:
       test: ["CMD-SHELL", "celery -A services.tx_ops.src.celery_tasks_sync inspect ping --timeout 5"]
@@ -362,8 +362,8 @@ services:
       --schedule=/tmp/celerybeat-schedule
     environment:
       <<: *common-env
-      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/1
-      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/2
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/2
     <<: *service-defaults
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule"]
