@@ -6,27 +6,57 @@
 3. 手动匹配（管理后台人工指定）
 
 批量解析：定时任务（nightly batch）遍历所有未匹配记录
+
+UnionID 补全（MU-1）：
+- backfill_union_id: 存量会员 WeChat UnionID 批量补全
+- 通过微信 API: GET /sns/userinfo 根据 openid 获取 union_id
 """
 
 from __future__ import annotations
 
+import asyncio
+import os
+import time
+from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import Any, Optional
 
+import httpx
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import MemberEventType
 
 logger = structlog.get_logger(__name__)
 
 # 时间关联窗口：WiFi 访问时间与订单时间的最大差距
 TIME_CORRELATION_WINDOW_HOURS = 2
 
+# 微信 API 配置（从环境变量读取）
+WECHAT_APP_ID: str = os.environ.get("WECHAT_APP_ID", "")
+WECHAT_APP_SECRET: str = os.environ.get("WECHAT_APP_SECRET", "")
+
+# Access Token 缓存（全局单例）
+_ACCESS_TOKEN_CACHE: dict[str, tuple[str, float]] = {}  # {tenant_id: (token, expires_at)}
+TOKEN_EXPIRE_BUFFER = 300  # 提前 300 秒刷新，避免边界过期
+
+# 分页大小
+BACKFILL_PAGE_SIZE = 100
+
+
+@dataclass
+class BackfillReport:
+    """UnionID 批量补全报告"""
+
+    total: int = 0  # 总待处理数
+    succeeded: int = 0  # 成功补全数
+    failed: int = 0  # 失败数
+    errors: list[dict] = field(default_factory=list)  # 错误详情 [{openid, error}]
+
 
 class IdentityResolver:
-    """多源身份解析"""
-
-    async def resolve_wifi_visit(
         self,
         tenant_id: str,
         wifi_visit_id: str,
@@ -351,6 +381,386 @@ class IdentityResolver:
             }
 
         return sources
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # UnionID 批量补全（MU-1, Task 3.1）
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_wechat_access_token_sync(app_id: str, app_secret: str, tenant_id: str) -> str:
+        """从缓存或微信 API 获取 access_token。
+
+        token 有效期 7200 秒，缓存层提前 300 秒刷新。
+        返回 None 表示获取失败。
+        """
+        # 检查缓存
+        cached = _ACCESS_TOKEN_CACHE.get(tenant_id)
+        if cached:
+            token, expires_at = cached
+            if time.time() < expires_at - TOKEN_EXPIRE_BUFFER:
+                return token
+
+        # 请求新 token
+        url = "https://api.weixin.qq.com/cgi-bin/token"
+        params = {
+            "grant_type": "client_credential",
+            "appid": app_id,
+            "secret": app_secret,
+        }
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.HTTPError as exc:
+            logger.error("wechat.token_http_error", tenant_id=tenant_id, error=str(exc))
+            raise RuntimeError(f"微信 Token 请求失败: {exc}") from exc
+
+        if "errcode" in data and data["errcode"] != 0:
+            logger.error(
+                "wechat.token_api_error",
+                tenant_id=tenant_id,
+                errcode=data.get("errcode"),
+                errmsg=data.get("errmsg"),
+            )
+            raise RuntimeError(f"微信 Token API 错误: {data.get('errmsg', 'unknown')}")
+
+        token = data.get("access_token", "")
+        expires_in = data.get("expires_in", 7200)
+        _ACCESS_TOKEN_CACHE[tenant_id] = (token, time.time() + expires_in)
+        logger.info("wechat.access_token_refreshed", tenant_id=tenant_id, expires_in=expires_in)
+        return token
+
+    @staticmethod
+    async def _fetch_union_id(access_token: str, openid: str) -> Optional[str]:
+        """通过微信 API 根据 openid 获取 union_id。
+
+        使用 httpx.AsyncClient 异步调用。
+        注意：该接口需要用户已关注公众号或已授权 scope=snsapi_userinfo。
+        对于未授权的用户返回 None（不发异常）。
+        """
+        url = "https://api.weixin.qq.com/sns/userinfo"
+        params = {
+            "access_token": access_token,
+            "openid": openid,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.HTTPError as exc:
+            logger.warning("wechat.userinfo_http_error", openid=openid[:10], error=str(exc))
+            return None
+
+        if "errcode" in data and data["errcode"] != 0:
+            # 40003=invalid openid, 42001=token expired — 不抛异常，仅记录
+            logger.warning(
+                "wechat.userinfo_api_error",
+                openid=openid[:10],
+                errcode=data.get("errcode"),
+                errmsg=data.get("errmsg"),
+            )
+            return None
+
+        union_id = data.get("unionid")
+        if not union_id:
+            logger.info(
+                "wechat.no_unionid",
+                openid=openid[:10],
+                subscribe=data.get("subscribe", 0),
+            )
+            return None
+
+        return union_id
+
+    async def backfill_union_id(self, tenant_id: str, db: AsyncSession) -> BackfillReport:
+        """存量 UnionID 批量补全。
+
+        查询所有有 wechat_openid 但 wechat_unionid 为 NULL 的会员，
+        调用微信 API 获取 union_id 并更新 Customer 表。
+
+        分页处理，每页 BACKFILL_PAGE_SIZE=100 条。
+        单条失败不影响整体（记录错误日志后继续）。
+        """
+        if not WECHAT_APP_ID or not WECHAT_APP_SECRET:
+            logger.error(
+                "backfill.missing_wechat_config",
+                tenant_id=tenant_id,
+                msg="WECHAT_APP_ID 或 WECHAT_APP_SECRET 未配置",
+            )
+            return BackfillReport(total=0, succeeded=0, failed=0, errors=[{"error": "微信配置缺失"}])
+
+        # 查询总待处理数
+        count_result = await db.execute(
+            text("""
+                SELECT COUNT(*)::int AS total
+                FROM customers
+                WHERE tenant_id = :tid
+                  AND wechat_openid IS NOT NULL
+                  AND wechat_unionid IS NULL
+                  AND is_deleted = false
+            """),
+            {"tid": tenant_id},
+        )
+        total = count_result.scalar() or 0
+        if total == 0:
+            logger.info("backfill.no_pending", tenant_id=tenant_id)
+            return BackfillReport(total=0, succeeded=0, failed=0)
+
+        logger.info("backfill.start", tenant_id=tenant_id, total=total)
+
+        report = BackfillReport(total=total)
+        page = 1
+
+        while True:
+            offset = (page - 1) * BACKFILL_PAGE_SIZE
+
+            rows = await db.execute(
+                text("""
+                    SELECT id, wechat_openid
+                    FROM customers
+                    WHERE tenant_id = :tid
+                      AND wechat_openid IS NOT NULL
+                      AND wechat_unionid IS NULL
+                      AND is_deleted = false
+                    ORDER BY id
+                    LIMIT :limit OFFSET :offset
+                """),
+                {"tid": tenant_id, "limit": BACKFILL_PAGE_SIZE, "offset": offset},
+            )
+            customers = rows.mappings().all()
+            if not customers:
+                break
+
+            # 每页获取一次 access_token（缓存命中则不实际请求微信）
+            try:
+                access_token = self._get_wechat_access_token_sync(
+                    WECHAT_APP_ID, WECHAT_APP_SECRET, tenant_id
+                )
+            except RuntimeError as exc:
+                # token 获取失败，整页跳过
+                for cust in customers:
+                    report.failed += 1
+                    report.errors.append({
+                        "openid": str(cust["wechat_openid"])[:20],
+                        "error": f"access_token获取失败: {exc}",
+                    })
+                page += 1
+                continue
+
+            for cust in customers:
+                customer_id = str(cust["id"])
+                openid = str(cust["wechat_openid"])
+
+                try:
+                    union_id = await self._fetch_union_id(access_token, openid)
+                    if union_id:
+                        await db.execute(
+                            text("""
+                                UPDATE customers
+                                SET wechat_unionid = :unionid,
+                                    updated_at = NOW()
+                                WHERE id = :cid AND tenant_id = :tid
+                            """),
+                            {"unionid": union_id, "cid": customer_id, "tid": tenant_id},
+                        )
+                        await db.commit()
+
+                        report.succeeded += 1
+
+                        # 事件总线记录
+                        asyncio.create_task(
+                            emit_event(
+                                event_type=MemberEventType.UNIONID_BACKFILLED,
+                                tenant_id=tenant_id,
+                                stream_id=customer_id,
+                                payload={
+                                    "openid": openid,
+                                    "unionid": union_id,
+                                    "source": "backfill",
+                                },
+                                source_service="tx-member",
+                            )
+                        )
+
+                        logger.info(
+                            "backfill.succeeded",
+                            tenant_id=tenant_id,
+                            customer_id=customer_id,
+                            openid=openid[:10],
+                        )
+                    else:
+                        report.failed += 1
+                        report.errors.append({
+                            "openid": openid[:20],
+                            "error": "微信API未返回union_id（可能用户未关注/未授权）",
+                        })
+                except (OSError, RuntimeError, ValueError) as exc:
+                    await db.rollback()
+                    report.failed += 1
+                    report.errors.append({"openid": openid[:20], "error": str(exc)})
+                    logger.warning(
+                        "backfill.failed",
+                        tenant_id=tenant_id,
+                        customer_id=customer_id,
+                        error=str(exc),
+                    )
+
+            page += 1
+
+        logger.info(
+            "backfill.done",
+            tenant_id=tenant_id,
+            total=report.total,
+            succeeded=report.succeeded,
+            failed=report.failed,
+        )
+        return report
+
+    async def merge_cross_brand_by_unionid(
+        self, tenant_id: str, db: AsyncSession
+    ) -> dict[str, Any]:
+        """基于 UnionID 自动合并跨品牌会员。
+
+        逻辑：
+        1. 查询有 wechat_unionid 且 is_merged=false 的 Customer 记录
+        2. 按 unionid 分组，每组内的多条记录属于同一自然人在不同品牌
+        3. 保留最早创建的记录为主记录（主记录 is_merged=false）
+        4. 其余记录设 is_merged=true, merged_into=主记录ID
+        5. 使用 golden_id_merge_logs 记录合并操作
+        """
+        # 查找所有有 unionid 的 customer（按 unionid 分组，count>1 的才需要合并）
+        rows = await db.execute(
+            text("""
+                SELECT id, wechat_unionid, created_at
+                FROM customers
+                WHERE tenant_id = :tid
+                  AND wechat_unionid IS NOT NULL
+                  AND is_merged = false
+                  AND is_deleted = false
+                ORDER BY wechat_unionid, created_at ASC
+            """),
+            {"tid": tenant_id},
+        )
+        all_customers = rows.mappings().all()
+
+        # 按 unionid 分组
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for row in all_customers:
+            unionid = row["wechat_unionid"]
+            if unionid not in groups:
+                groups[unionid] = []
+            groups[unionid].append(row)
+
+        # 筛选出需要合并的分组（同一 unionid 有 >1 条记录）
+        mergeable_groups = {uid: members for uid, members in groups.items() if len(members) > 1}
+
+        total_merged = 0
+        total_skipped = 0
+        merged_details: list[dict[str, Any]] = []
+
+        for unionid, members in mergeable_groups.items():
+            # 按 created_at 升序，第一条为主记录
+            members.sort(key=lambda m: m["created_at"] or "")
+            primary = members[0]
+            primary_id = str(primary["id"])
+
+            # 合并其他记录到主记录
+            for secondary in members[1:]:
+                secondary_id = str(secondary["id"])
+                try:
+                    await db.execute(
+                        text("""
+                            UPDATE customers
+                            SET is_merged = true,
+                                merged_into = :primary_id,
+                                updated_at = NOW()
+                            WHERE id = :secondary_id
+                              AND tenant_id = :tid
+                              AND is_deleted = false
+                        """),
+                        {
+                            "primary_id": primary_id,
+                            "secondary_id": secondary_id,
+                            "tid": tenant_id,
+                        },
+                    )
+
+                    # 写入合并日志
+                    await db.execute(
+                        text("""
+                            INSERT INTO golden_id_merge_logs
+                                (tenant_id, source_customer_id, target_customer_id,
+                                 merge_reason, merge_metadata, created_at, updated_at)
+                            VALUES
+                                (:tid, :source, :target, 'unionid_auto_merge',
+                                 :metadata::jsonb, NOW(), NOW())
+                        """),
+                        {
+                            "tid": tenant_id,
+                            "source": secondary_id,
+                            "target": primary_id,
+                            "metadata": f'{{"wechat_unionid": "{unionid}", "method": "auto"}}',
+                        },
+                    )
+
+                    await db.commit()
+
+                    total_merged += 1
+                    merged_details.append({
+                        "unionid": unionid,
+                        "primary": primary_id,
+                        "merged": secondary_id,
+                    })
+
+                    # 事件总线记录
+                    asyncio.create_task(
+                        emit_event(
+                            event_type=MemberEventType.GOLDEN_ID_MERGED_BY_UNIONID,
+                            tenant_id=tenant_id,
+                            stream_id=secondary_id,
+                            payload={
+                                "unionid": unionid,
+                                "primary_customer_id": primary_id,
+                                "secondary_customer_id": secondary_id,
+                            },
+                            source_service="tx-member",
+                        )
+                    )
+
+                    logger.info(
+                        "merge_by_unionid.executed",
+                        tenant_id=tenant_id,
+                        unionid=unionid[:10],
+                        primary=primary_id,
+                        merged=secondary_id,
+                    )
+
+                except (OSError, RuntimeError, ValueError) as exc:
+                    await db.rollback()
+                    total_skipped += 1
+                    logger.warning(
+                        "merge_by_unionid.failed",
+                        tenant_id=tenant_id,
+                        unionid=unionid[:10],
+                        secondary=secondary_id,
+                        error=str(exc),
+                    )
+
+        logger.info(
+            "merge_by_unionid.done",
+            tenant_id=tenant_id,
+            groups=len(mergeable_groups),
+            merged=total_merged,
+            skipped=total_skipped,
+        )
+        return {
+            "groups_found": len(mergeable_groups),
+            "total_merged": total_merged,
+            "total_skipped": total_skipped,
+            "details": merged_details,
+        }
 
     async def _update_wifi_match(
         self,

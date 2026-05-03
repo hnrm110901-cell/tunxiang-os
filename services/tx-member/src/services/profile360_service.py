@@ -113,6 +113,8 @@ class Profile360Service:
             "phone": _mask_phone(member.get("primary_phone")),
             "wechat_avatar_url": member.get("wechat_avatar_url"),
             "wechat_nickname": member.get("wechat_nickname"),
+            "wechat_openid": member.get("wechat_openid"),
+            "wechat_unionid": member.get("wechat_unionid"),
             "gender": member.get("gender"),
             "birthday": _safe_iso(birth),
             "birthday_coming": bd_coming,
@@ -619,7 +621,7 @@ class Profile360Service:
             result = await db.execute(
                 text(
                     "SELECT id, primary_phone, display_name, gender, birth_date,"
-                    " wechat_avatar_url, wechat_nickname, source,"
+                    " wechat_avatar_url, wechat_nickname, wechat_openid, wechat_unionid, source,"
                     " wecom_external_userid, wecom_remark,"
                     " rfm_level, r_score, f_score, m_score, risk_score,"
                     " total_order_count, total_order_amount_fen,"
@@ -968,3 +970,132 @@ class Profile360Service:
         except SQLAlchemyError as exc:
             logger.error("profile360_fetch_coupon_sends_error", error=str(exc))
             return []
+
+    # ─── UnionID 跨品牌聚合（MU-1, Task 3.4）────────────────────
+
+    async def get_unionid_aggregated_profile(
+        self,
+        tenant_id: str,
+        wechat_unionid: str,
+        db: AsyncSession,
+    ) -> Optional[dict]:
+        """按照 UnionID 聚合跨品牌消费记录。
+
+        查找同一 UnionID 在不同品牌下的所有 Customer 记录，
+        聚合它们的消费数据，返回完整跨品牌画像。
+        """
+        try:
+            # 查询该 UnionID 关联的所有 Customer 记录
+            customers_result = await db.execute(
+                text("""
+                    SELECT id, display_name, wechat_nickname, wechat_avatar_url,
+                           rfm_level, total_order_count, total_order_amount_fen,
+                           total_reservation_count, first_order_at, last_order_at,
+                           source, created_at
+                    FROM customers
+                    WHERE tenant_id = :tid
+                      AND wechat_unionid = :unionid
+                      AND is_deleted = false
+                    ORDER BY created_at ASC
+                """),
+                {"tid": tenant_id, "unionid": wechat_unionid},
+            )
+            customer_rows = customers_result.mappings().all()
+
+            if not customer_rows:
+                return None
+
+            primary_customer = customer_rows[0]
+            primary_id = str(primary_customer["id"])
+
+            # 聚合所有 customer_id 的消费记录
+            all_ids = [str(r["id"]) for r in customer_rows]
+
+            # 消费汇总
+            aggregation = await db.execute(
+                text("""
+                    SELECT
+                        COUNT(*)::int AS total_orders,
+                        COALESCE(SUM(final_amount_fen), 0) AS total_spend_fen,
+                        COALESCE(AVG(final_amount_fen), 0)::int AS avg_spend_fen,
+                        MIN(order_time) AS first_order_at,
+                        MAX(order_time) AS last_order_at
+                    FROM orders
+                    WHERE tenant_id = :tid
+                      AND customer_id = ANY(:cids::uuid[])
+                      AND status = 'completed'
+                      AND is_deleted = false
+                """),
+                {"tid": tenant_id, "cids": all_ids},
+            )
+            agg_row = aggregation.mappings().first()
+
+            # 各品牌消费详情
+            brand_detail = await db.execute(
+                text("""
+                    SELECT
+                        c.id AS customer_id,
+                        c.display_name,
+                        c.source,
+                        COUNT(o.id)::int AS order_count,
+                        COALESCE(SUM(o.final_amount_fen), 0) AS spend_fen
+                    FROM customers c
+                    LEFT JOIN orders o
+                        ON o.customer_id = c.id
+                        AND o.tenant_id = c.tenant_id
+                        AND o.status = 'completed'
+                        AND o.is_deleted = false
+                    WHERE c.tenant_id = :tid
+                      AND c.wechat_unionid = :unionid
+                      AND c.is_deleted = false
+                    GROUP BY c.id, c.display_name, c.source
+                    ORDER BY c.created_at ASC
+                """),
+                {"tid": tenant_id, "unionid": wechat_unionid},
+            )
+            brand_details = [
+                {
+                    "customer_id": str(r["customer_id"]),
+                    "display_name": r["display_name"],
+                    "source": r["source"],
+                    "order_count": r["order_count"],
+                    "spend_fen": r["spend_fen"],
+                }
+                for r in brand_detail.mappings()
+            ]
+
+            return {
+                "unionid": wechat_unionid,
+                "primary_customer_id": primary_id,
+                "primary_display_name": primary_customer["display_name"],
+                "primary_wechat_nickname": primary_customer["wechat_nickname"],
+                "primary_rfm_level": primary_customer["rfm_level"],
+                "account_count": len(customer_rows),
+                "accounts": [
+                    {
+                        "customer_id": str(r["id"]),
+                        "display_name": r["display_name"],
+                        "source": r["source"],
+                        "rfm_level": r["rfm_level"],
+                        "created_at": _safe_iso(r["created_at"]),
+                    }
+                    for r in customer_rows
+                ],
+                "aggregated_consumption": {
+                    "total_orders": agg_row["total_orders"] if agg_row else 0,
+                    "total_spend_fen": agg_row["total_spend_fen"] if agg_row else 0,
+                    "avg_spend_fen": agg_row["avg_spend_fen"] if agg_row else 0,
+                    "first_order_at": _safe_iso(agg_row["first_order_at"] if agg_row else None),
+                    "last_order_at": _safe_iso(agg_row["last_order_at"] if agg_row else None),
+                },
+                "brand_details": brand_details,
+            }
+
+        except SQLAlchemyError as exc:
+            logger.error(
+                "profile360_unionid_aggregation_error",
+                tenant_id=tenant_id,
+                unionid=wechat_unionid[:10],
+                error=str(exc),
+            )
+            return None

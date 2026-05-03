@@ -27,11 +27,15 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import MemberEventType
 
 logger = logging.getLogger(__name__)
 
@@ -261,6 +265,14 @@ class RFMOutreachService:
         # 排序：cf_score 高优先
         filtered.sort(key=lambda c: c.cf_score, reverse=True)
 
+        # ── 旁路触发标签同步到企微（不阻塞主流程） ────────────────
+        asyncio.create_task(
+            self._emit_tag_sync_events(
+                tenant_id=tenant_id,
+                candidates=filtered,
+            )
+        )
+
         model_id = "claude-haiku-4-5"
         if self.model_router and hasattr(self.model_router, "get_model"):
             try:
@@ -277,6 +289,41 @@ class RFMOutreachService:
             campaign_name=campaign_name or self._default_name(segments),
             model_id=model_id,
         )
+
+    async def _emit_tag_sync_events(
+        self,
+        tenant_id: str,
+        candidates: list[OutreachCandidate],
+    ) -> None:
+        """旁路发射会员标签变更事件，触发企微标签同步。
+
+        RFM 分层完成后，通过事件总线通知下游服务同步会员标签到企微。
+        事件由 tx-growth 的 WecomAutoTagService 消费。
+        发射失败不影响主流程（仅日志记录）。
+        """
+        for candidate in candidates:
+            try:
+                await emit_event(
+                    event_type=MemberEventType.UPGRADED,
+                    tenant_id=tenant_id,
+                    stream_id=candidate.customer_id,
+                    payload={
+                        "segment": candidate.segment,
+                        "cf_score": candidate.cf_score,
+                        "top_items": candidate.top_items,
+                        "tag": f"rfm_{candidate.segment}",
+                    },
+                    source_service="tx-member",
+                    metadata={
+                        "sync_to_wecom": True,
+                        "tag_type": "rfm_segment",
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001 — 事件发射失败不阻塞
+                logger.warning(
+                    "rfm_tag_sync_event_failed customer=%s error=%s",
+                    candidate.customer_id, exc,
+                )
 
     async def _generate_message(
         self,

@@ -829,3 +829,227 @@ async def batch_import_bindings(
             await db.rollback()
             logger.error("golden_id_batch_import_error", error=str(e), exc_info=True)
             raise HTTPException(status_code=500, detail="批量导入失败") from e
+
+
+# ── UnionID 单条关联（MU-1, Task 3.1）────────────────────────────────────────
+
+
+class AssociateUnionIDReq(BaseModel):
+    """关联微信 UnionID 到会员请求"""
+
+    customer_id: str = Field(..., description="会员 Golden ID")
+    wechat_openid: str = Field(min_length=1, max_length=128, description="微信 openid")
+    wechat_unionid: str = Field(min_length=1, max_length=128, description="微信 UnionID")
+    operator_id: Optional[str] = Field(default=None, description="操作人 ID")
+
+
+@router.post("/associate-unionid")
+async def associate_union_id(
+    req: AssociateUnionIDReq,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """将微信 UnionID + openid 关联到已有会员。
+
+    流程：
+    1. 检查 customer 是否存在
+    2. 更新 customers 表的 wechat_openid / wechat_unionid
+    3. 写入/更新 member_channel_bindings（渠道 type=wechat）
+    4. 记录变更日志
+    """
+    try:
+        tenant_uuid = uuid.UUID(x_tenant_id)
+        customer_uuid = uuid.UUID(req.customer_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+
+    async for db in get_db():
+        try:
+            await _set_tenant(db, x_tenant_id)
+
+            # 1. 检查 customer 是否存在
+            check = await db.execute(
+                text("""
+                    SELECT id, wechat_openid, wechat_unionid
+                    FROM customers
+                    WHERE tenant_id = :tid AND id = :cid
+                      AND is_deleted = false
+                    LIMIT 1
+                """),
+                {"tid": str(tenant_uuid), "cid": str(customer_uuid)},
+            )
+            customer = check.fetchone()
+            if not customer:
+                raise HTTPException(status_code=404, detail="会员不存在")
+
+            # 更新 customers 表
+            await db.execute(
+                text("""
+                    UPDATE customers
+                    SET wechat_openid = :openid,
+                        wechat_unionid = :unionid,
+                        updated_at = NOW()
+                    WHERE tenant_id = :tid AND id = :cid
+                      AND is_deleted = false
+                """),
+                {
+                    "openid": req.wechat_openid,
+                    "unionid": req.wechat_unionid,
+                    "tid": str(tenant_uuid),
+                    "cid": str(customer_uuid),
+                },
+            )
+
+            # 写入 member_channel_bindings（upsert 语义）
+            await db.execute(
+                text("""
+                    INSERT INTO member_channel_bindings
+                        (id, tenant_id, customer_id, channel_type, channel_openid,
+                         channel_unionid, binding_status, extra, created_at, updated_at)
+                    VALUES
+                        (:id, :tid, :cid, 'wechat', :openid,
+                         :unionid, 'active', :extra::jsonb, NOW(), NOW())
+                    ON CONFLICT (tenant_id, channel_type, channel_openid)
+                        WHERE binding_status = 'active'
+                    DO UPDATE SET
+                        customer_id = :cid,
+                        channel_unionid = :unionid,
+                        extra = :extra::jsonb,
+                        updated_at = NOW()
+                """),
+                {
+                    "id": str(uuid.uuid4()),
+                    "tid": str(tenant_uuid),
+                    "cid": str(customer_uuid),
+                    "openid": req.wechat_openid,
+                    "unionid": req.wechat_unionid,
+                    "extra": f'{{"operator_id": "{req.operator_id or ""}", "method": "api_associate"}}',
+                },
+            )
+
+            await db.commit()
+
+            logger.info(
+                "golden_id_unionid_associated",
+                tenant_id=x_tenant_id,
+                customer_id=req.customer_id,
+                unionid=req.wechat_unionid[:10],
+                operator_id=req.operator_id,
+            )
+
+            return {
+                "ok": True,
+                "data": {
+                    "customer_id": req.customer_id,
+                    "wechat_openid": req.wechat_openid,
+                    "wechat_unionid": req.wechat_unionid,
+                },
+                "error": {},
+            }
+
+        except HTTPException:
+            raise
+        except (SQLAlchemyError, OSError, RuntimeError) as e:
+            await db.rollback()
+            logger.error("golden_id_associate_unionid_error", error=str(e), exc_info=True)
+            raise HTTPException(status_code=500, detail="关联 UnionID 失败") from e
+
+
+# ── UnionID 批量补全（MU-1, Task 3.2）────────────────────────────────────────
+
+from services.identity_resolver import IdentityResolver
+
+# 模块级 IdentityResolver 实例（复用）
+_resolver_for_routes = IdentityResolver()
+
+# 内存中的 backfill 进度追踪（简单实现，重启丢失；生产环境应写 DB/Redis）
+_backfill_status: dict[str, dict] = {}
+
+
+@router.post("/backfill-unionid")
+async def trigger_backfill_unionid(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """触发存量 UnionID 批量补全。
+
+    异步执行，返回初始接受状态；实际补全在后台完成。
+    可通过 GET /backfill-status 查询进度。
+    """
+    try:
+        tenant_uuid = uuid.UUID(x_tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {x_tenant_id}") from e
+
+    tenant_id = str(tenant_uuid)
+
+    # 标记开始
+    _backfill_status[tenant_id] = {
+        "status": "running",
+        "started_at": None,
+        "total": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "errors": [],
+    }
+
+    async for db in get_db():
+        try:
+            await _set_tenant(db, tenant_id)
+            report = await _resolver_for_routes.backfill_union_id(tenant_id, db)
+            _backfill_status[tenant_id] = {
+                "status": "completed",
+                "total": report.total,
+                "succeeded": report.succeeded,
+                "failed": report.failed,
+                "errors": report.errors[:50],  # 只保留前 50 条错误详情
+            }
+            logger.info(
+                "backfill_unionid_trigger_done",
+                tenant_id=tenant_id,
+                total=report.total,
+                succeeded=report.succeeded,
+                failed=report.failed,
+            )
+            return {
+                "ok": True,
+                "data": {
+                    "tenant_id": tenant_id,
+                    "status": "completed",
+                    "report": {
+                        "total": report.total,
+                        "succeeded": report.succeeded,
+                        "failed": report.failed,
+                    },
+                },
+                "error": {},
+            }
+
+        except (SQLAlchemyError, OSError, RuntimeError, ValueError) as e:
+            _backfill_status[tenant_id] = {
+                "status": "failed",
+                "error": str(e),
+            }
+            logger.error("backfill_unionid_trigger_error", tenant_id=tenant_id, error=str(e), exc_info=True)
+            raise HTTPException(status_code=500, detail=f"UnionID 补全失败: {e}") from e
+
+
+@router.get("/backfill-status")
+async def get_backfill_status(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """查询 UnionID 补全进度。"""
+    try:
+        tenant_uuid = uuid.UUID(x_tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {x_tenant_id}") from e
+
+    tenant_id = str(tenant_uuid)
+    status = _backfill_status.get(tenant_id, {"status": "not_started"})
+
+    return {
+        "ok": True,
+        "data": {
+            "tenant_id": tenant_id,
+            **status,
+        },
+        "error": {},
+    }

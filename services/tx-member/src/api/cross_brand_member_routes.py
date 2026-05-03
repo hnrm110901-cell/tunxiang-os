@@ -646,3 +646,213 @@ async def transfer_points_cross_brand(
             await db.rollback()
             logger.error("cross_brand_points_transfer_error", error=str(e), exc_info=True)
             raise HTTPException(status_code=500, detail="跨品牌积分转移失败") from e
+
+
+# ── UnionID 自动合并（MU-1, Task 3.4）────────────────────────────────────────
+
+from services.identity_resolver import IdentityResolver
+
+_resolver_cross_brand = IdentityResolver()
+
+# 合并报告缓存（简单内存存储，重启丢失）
+_merge_reports: dict[str, dict] = {}
+
+
+class MergeByUnionIDReq(BaseModel):
+    unionid: str = Field(description="微信 UnionID")
+    operator_id: Optional[str] = None
+
+
+@router.post("/merge-by-unionid")
+async def merge_by_union_id(
+    req: MergeByUnionIDReq,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """基于 UnionID 自动合并跨品牌会员。
+
+    流程：
+    1. 查询同一 UnionID 在不同 brand 下的 Customer 记录
+    2. 按创建时间排序，保留最早创建的记录为主记录
+    3. 其余记录标记为 is_merged=true, merged_into=主记录ID
+    4. 写入 golden_id_merge_logs 日志
+    5. 通过事件总线记录合并操作
+    """
+    try:
+        tenant_uuid = uuid.UUID(x_tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {x_tenant_id}") from e
+
+    async for db in get_db():
+        try:
+            await _set_tenant(db, x_tenant_id)
+
+            # 查找该 UnionID 关联的所有 Customer（按 created_at 升序）
+            rows = await db.execute(
+                text("""
+                    SELECT id, created_at
+                    FROM customers
+                    WHERE tenant_id = :tid
+                      AND wechat_unionid = :unionid
+                      AND is_merged = false
+                      AND is_deleted = false
+                    ORDER BY created_at ASC
+                """),
+                {"tid": x_tenant_id, "unionid": req.unionid},
+            )
+            customers = rows.mappings().all()
+
+            if len(customers) < 2:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"UnionID {req.unionid[:10]}... 关联的会员数不足 2 条，无需合并",
+                )
+
+            primary = customers[0]
+            primary_id = str(primary["id"])
+            merged_list: list[str] = []
+
+            for secondary in customers[1:]:
+                secondary_id = str(secondary["id"])
+
+                await db.execute(
+                    text("""
+                        UPDATE customers
+                        SET is_merged = true,
+                            merged_into = :primary_id,
+                            updated_at = NOW()
+                        WHERE id = :secondary_id
+                          AND tenant_id = :tid
+                          AND is_deleted = false
+                    """),
+                    {
+                        "primary_id": primary_id,
+                        "secondary_id": secondary_id,
+                        "tid": x_tenant_id,
+                    },
+                )
+
+                # 写入合并日志
+                await db.execute(
+                    text("""
+                        INSERT INTO golden_id_merge_logs
+                            (tenant_id, source_customer_id, target_customer_id,
+                             merge_reason, merge_metadata, created_at, updated_at)
+                        VALUES
+                            (:tid, :source, :target, 'unionid_auto_merge',
+                             :metadata::jsonb, NOW(), NOW())
+                    """),
+                    {
+                        "tid": x_tenant_id,
+                        "source": secondary_id,
+                        "target": primary_id,
+                        "metadata": f'{{"wechat_unionid": "{req.unionid}", "method": "api"}}',
+                    },
+                )
+
+                merged_list.append(secondary_id)
+
+            await db.commit()
+
+            # 记录报告
+            result = {
+                "tenant_id": x_tenant_id,
+                "unionid": req.unionid,
+                "primary_customer_id": primary_id,
+                "merged_customer_ids": merged_list,
+                "total_merged": len(merged_list),
+            }
+            _merge_reports[f"{x_tenant_id}_{req.unionid}"] = result
+
+            logger.info(
+                "cross_brand_merge_by_unionid_done",
+                tenant_id=x_tenant_id,
+                unionid=req.unionid[:10],
+                primary=primary_id,
+                merged_count=len(merged_list),
+            )
+
+            return {
+                "ok": True,
+                "data": result,
+                "error": {},
+            }
+
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            await db.rollback()
+            logger.error("cross_brand_merge_by_unionid_error", error=str(e), exc_info=True)
+            raise HTTPException(status_code=500, detail="基于UnionID合并失败") from e
+
+
+@router.get("/merge-report")
+async def get_merge_report(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """返回基于 UnionID 的合并报告。
+
+    汇总展示所有已执行的 merging 操作。
+    """
+    try:
+        uuid.UUID(x_tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {x_tenant_id}") from e
+
+    # 筛选当前租户的报告
+    tenant_reports = {
+        key: val for key, val in _merge_reports.items()
+        if key.startswith(f"{x_tenant_id}_")
+    }
+
+    # 计算汇总
+    total_merged = sum(len(r["merged_customer_ids"]) for r in tenant_reports.values())
+    total_groups = len(tenant_reports)
+
+    return {
+        "ok": True,
+        "data": {
+            "tenant_id": x_tenant_id,
+            "total_merged": total_merged,
+            "total_groups": total_groups,
+            "reports": list(tenant_reports.values()),
+        },
+        "error": {},
+    }
+
+
+@router.post("/merge-by-unionid-all")
+async def merge_all_by_unionid(
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+):
+    """全量触发基于 UnionID 的跨品牌自动合并。
+
+    遍历所有有 UnionID 的 Customer 记录，按 UnionID 分组，
+    对每组内 count>1 的自动合并。
+    """
+    try:
+        tenant_uuid = uuid.UUID(x_tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {x_tenant_id}") from e
+
+    async for db in get_db():
+        try:
+            await _set_tenant(db, x_tenant_id)
+            result = await _resolver_cross_brand.merge_cross_brand_by_unionid(
+                str(tenant_uuid), db
+            )
+
+            logger.info(
+                "cross_brand_merge_all_by_unionid_done",
+                tenant_id=x_tenant_id,
+                **result,
+            )
+            return {
+                "ok": True,
+                "data": result,
+                "error": {},
+            }
+
+        except SQLAlchemyError as e:
+            await db.rollback()
+            logger.error("cross_brand_merge_all_by_unionid_error", error=str(e), exc_info=True)
+            raise HTTPException(status_code=500, detail="全量UnionID合并失败") from e
