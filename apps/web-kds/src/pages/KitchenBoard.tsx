@@ -14,6 +14,7 @@ import { pauseTicket, resumeTicket, grabTicket } from '../api/kdsOpsApi';
 import { StatusBar, OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
 import { RemakeOverlay } from '../components/RemakeOverlay';
+import { DeliveryOrderBadge } from '../components/DeliveryOrderBadge';
 import { useKDSRules } from '../hooks/useKDSRules';
 import { getTimeLevelFromRules, getChannelColor, type KDSRuleConfig } from '../api/kdsRulesApi';
 
@@ -130,6 +131,8 @@ export function KitchenBoard() {
   const [batchView, setBatchView] = useState<boolean>(false);
   // 停菜中的 ticket IDs 本地状态（实时 UI 反馈）
   const [pausedIds, setPausedIds] = useState<Set<string>>(new Set());
+  // 外卖/堂食筛选
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'dine-in' | 'delivery'>('all');
   // 当前操作员ID（实际应从登录信息获取）
   const operatorId = (window as any).__OPERATOR_ID__ as string | undefined;
 
@@ -199,7 +202,14 @@ export function KitchenBoard() {
   // 按档口过滤
   const filtered = selectedDept === 'all' ? tickets : tickets.filter(t => t.deptId === selectedDept);
 
-  const pending = sortTickets(filtered.filter(t => t.status === 'pending'));
+  // 按订单类型过滤
+  const typeFiltered = filtered.filter((t) => {
+    if (deliveryFilter === 'dine-in') return !t.orderType || t.orderType === 'dine-in';
+    if (deliveryFilter === 'delivery') return t.orderType === 'delivery';
+    return true;
+  });
+
+  const pending = sortTickets(typeFiltered.filter(t => t.status === 'pending'));
   const cooking = sortTickets(filtered.filter(t => t.status === 'cooking'));
   const done = filtered.filter(t => t.status === 'done')
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
@@ -337,6 +347,28 @@ export function KitchenBoard() {
             合并视图
           </button>
 
+          {/* 订单类型筛选 */}
+          <div style={{ display: 'flex', gap: 4, background: '#222', borderRadius: 8, padding: 2 }}>
+            {(['all', 'dine-in', 'delivery'] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setDeliveryFilter(opt)}
+                style={{
+                  padding: '6px 12px', borderRadius: 6, border: 'none',
+                  minHeight: 36,
+                  fontSize: 14,
+                  fontWeight: deliveryFilter === opt ? 700 : 400,
+                  background: deliveryFilter === opt ? '#FF6B35' : 'transparent',
+                  color: deliveryFilter === opt ? '#fff' : '#888',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {opt === 'all' ? '全部' : opt === 'dine-in' ? '堂食' : '外卖'}
+              </button>
+            ))}
+          </div>
+
           {!wsEnabled && (
             <span style={{ fontSize: 16, color: '#BA7517' }}>
               离线模式（未配置 Mac mini 地址）
@@ -389,6 +421,12 @@ export function KitchenBoard() {
           }));
           return (
             <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              {/* 外卖订单平台标识 */}
+              {t.orderType === 'delivery' && (
+                <div style={{ marginBottom: -4 }}>
+                  <DeliveryOrderBadge platform={t.platform} orderType={t.orderType} />
+                </div>
+              )}
               {/* TXKDSTicket 卡片：倒计时、超时红底、左滑完成 */}
               <TXKDSTicket
                 orderId={t.orderNo}
@@ -596,4 +634,8 @@ const MOCK_TICKETS: KDSTicket[] = [
   { id: 't7', orderNo: '007', tableNo: 'A02', items: [{ name: '酸菜鱼', qty: 1, notes: '微辣' }, { name: '辣椒炒肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(2), status: 'pending', priority: 'vip', deptId: 'hot' },
   { id: 't8', orderNo: '008', tableNo: 'B03', items: [{ name: '红烧肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(1), status: 'done', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(15), completedAt: MOCK_NOW - min(1) },
   { id: 't9', orderNo: '009', tableNo: 'C02', items: [{ name: '蒸鲈鱼', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(20), status: 'done', priority: 'normal', deptId: 'steam', startedAt: MOCK_NOW - min(18), completedAt: MOCK_NOW - min(2) },
+  // MY 外卖平台工单
+  { id: 't10', orderNo: '010', tableNo: '外卖005', items: [{ name: '炒粿条', qty: 2, notes: '加辣' }, { name: '沙爹串', qty: 5, notes: '' }], createdAt: MOCK_NOW - min(2), status: 'pending', priority: 'normal', deptId: 'hot', orderType: 'delivery', platform: 'grabfood' },
+  { id: 't11', orderNo: '011', tableNo: '外卖006', items: [{ name: '海南鸡饭', qty: 1, notes: '' }, { name: '叻沙', qty: 1, notes: '不要太辣' }], createdAt: MOCK_NOW - min(8), status: 'cooking', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(4), orderType: 'delivery', platform: 'foodpanda' },
+  { id: 't12', orderNo: '012', tableNo: '外卖007', items: [{ name: '马来西亚炒面', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(1), status: 'pending', priority: 'normal', deptId: 'hot', orderType: 'delivery', platform: 'shopeefood' },
 ];

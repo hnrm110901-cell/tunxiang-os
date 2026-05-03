@@ -1,0 +1,140 @@
+import type { zh } from './zh';
+
+export const vi: Record<keyof typeof zh, string> = {
+  // ScanEntry
+  scanTitle: 'Quét Mã Gọi Món',
+  scanHint: 'Hướng máy vào mã QR trên bàn',
+  scanPermissionDenied: 'Cần quyền camera để quét mã',
+  selectLanguage: 'Chọn Ngôn Ngữ',
+  storeInfo: 'Thông Tin Cửa Hàng',
+  tableNo: 'Bàn Số',
+  startOrder: 'Bắt Đầu Gọi Món',
+
+  // MenuBrowse
+  menuTitle: 'Thực Đơn',
+  search: 'Tìm Món',
+  voiceSearch: 'Tìm Bằng Giọng Nói',
+  recommended: 'Gợi Ý Cho Bạn',
+  signature: 'Đặc Sắc',
+  newDish: 'Món Mới',
+  seasonal: 'Giá Thị Trường',
+  soldOut: 'Hết Hàng',
+  spicy1: 'Hơi Cay',
+  spicy2: 'Cay Vừa',
+  spicy3: 'Cay Đặc Biệt',
+  addToCart: 'Thêm Vào Giỏ',
+  viewCart: 'Xem Giỏ Hàng',
+  totalItems: '{count} món',
+  aiRecommend: 'AI Gợi Ý',
+
+  // DishDetail
+  traceability: 'Truy Xuất Nguồn Gốc',
+  origin: 'Xuất Xứ',
+  supplier: 'Nhà Cung Cấp',
+  arrivalDate: 'Ngày Nhập',
+  nutrition: 'Dinh Dưỡng',
+  calories: 'Calo',
+  protein: 'Đạm',
+  fat: 'Chất Béo',
+  allergens: 'Cảnh Báo Dị Ứng',
+  customize: 'Tùy Chỉnh',
+  spicyLevel: 'Mức Cay',
+  portion: 'Khẩu Phần',
+  sideDish: 'Món Phụ',
+  cookMethod: 'Cách Chế Biến',
+
+  // Cart
+  cartTitle: 'Giỏ Hàng',
+  cartEmpty: 'Giỏ hàng trống',
+  cartEmptyHint: 'Hãy chọn món ngon nhé',
+  dealRecommend: 'Gợi Ý Thêm',
+  aaSplit: 'Chia Đều',
+  aaPeople: '{count} người',
+  aaPerPerson: 'Mỗi người',
+  remark: 'Ghi Chú',
+  remarkPlaceholder: 'Nếu có kiêng kỵ hoặc yêu cầu đặc biệt, vui lòng ghi chú...',
+  total: 'Tổng Cộng',
+  submitOrder: 'Đặt Hàng',
+
+  // Checkout
+  checkoutTitle: 'Thanh Toán',
+  payMethod: 'Phương Thức TT',
+  wechatPay: 'WeChat Pay',
+  alipay: 'Alipay',
+  unionPay: 'UnionPay',
+  coupon: 'Phiếu Giảm Giá',
+  selectCoupon: 'Chọn Phiếu Giảm',
+  noCoupon: 'Không có phiếu giảm giá',
+  memberPrice: 'Giá thành viên đã được áp dụng',
+  discount: 'Giảm Giá',
+  payNow: 'Xác Nhận Thanh Toán',
+  phoneRequired: 'Cần số điện thoại để đặt hàng',
+  phonePlaceholder: 'Nhập số điện thoại',
+  getVerifyCode: 'Nhận Mã Xác Thực',
+
+  // OrderTrack
+  trackTitle: 'Theo Dõi Đơn Hàng',
+  stepReceived: 'Đã Nhận',
+  stepCooking: 'Đang Nấu',
+  stepReady: 'Đã Xong',
+  stepPickup: 'Có Thể Lấy',
+  estimatedTime: 'Dự kiến {min} phút',
+  currentDish: 'Đang chế biến',
+  rushOrder: 'Giục Món',
+  rushCooldown: 'Chờ ({sec}s)',
+  notifyWechat: 'Thông báo WeChat',
+  notifySms: 'Thông báo SMS',
+
+  // FeedbackPage
+  feedbackTitle: 'Đánh Giá',
+  rateDish: 'Món Ăn',
+  rateService: 'Dịch Vụ',
+  rateEnvironment: 'Không Gian',
+  feedbackPlaceholder: 'Chia sẻ trải nghiệm của bạn...',
+  uploadPhoto: 'Tải Ảnh Lên',
+  submitFeedback: 'Gửi Đánh Giá',
+  feedbackReward: 'Nhận {points} điểm sau khi gửi',
+
+  // PayResult
+  payResultSuccess: 'Thanh Toán Thành Công',
+  payResultFailed: 'Thanh Toán Thất Bại',
+  payResultRetryHint: 'Vui lòng quay lại và thử lại',
+  payResultOrderNo: 'Mã Đơn Hàng',
+  payResultAmount: 'Số Tiền Đã TT',
+  payResultEstTime: 'Thời Gian Dự Kiến',
+  payResultMinutes: 'phút',
+  payResultProgress: 'Tiến Độ Món',
+  payResultViewOrder: 'Xem Đơn Hàng',
+  payResultContinue: 'Tiếp Tục Gọi Món',
+
+  // AddMorePage
+  addMoreTitle: 'Gọi Thêm',
+  addMoreExisting: 'Hiện Có',
+  addMoreDishUnit: ' món',
+  addMoreBadge: 'Mới',
+  addMoreSubmit: 'Thêm Vào Đơn',
+
+  // OrderConfirmPage
+  orderConfirmTitle: 'Xác Nhận Đơn',
+  orderConfirmItemCount: ' món',
+  orderConfirmItems: 'Món Đã Chọn',
+  orderConfirmDelete: 'Xóa',
+  orderConfirmPoints: 'Điểm Thưởng',
+  orderConfirmSubtotal: 'Tạm Tính',
+  orderConfirmDiscount: 'Giảm Giá',
+  orderConfirmPayable: 'Phải Trả',
+
+  // DemoEntry
+  demoMode: 'Chế Độ Demo',
+  demoWelcome: 'Chào Mừng',
+  demoLoadingHint: 'Đang vào thực đơn...',
+  cashPay: 'Thanh Toán Tại Quầy',
+
+  // Common
+  back: 'Quay Lại',
+  confirm: 'Xác Nhận',
+  cancel: 'Hủy',
+  loading: 'Đang tải...',
+  retry: 'Thử Lại',
+  yuan: '₫',
+};

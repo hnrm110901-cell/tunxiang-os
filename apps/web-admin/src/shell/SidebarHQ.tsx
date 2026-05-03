@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getTokenPayload } from '../api/client';
 import { MENU_CONFIGS } from '../config/menuConfigs';
+import { useLang } from '../i18n/LangContext';
 
 interface SidebarHQProps {
   activeModule: string;
@@ -17,6 +18,13 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const config = MENU_CONFIGS[activeModule] || MENU_CONFIGS.dashboard;
+  const { t } = useLang();
+
+  // translated label: use labelKey if translation exists, fallback to raw label
+  const tl = (labelKey: string, fallback: string) => {
+    const translated = t(labelKey);
+    return translated === labelKey ? fallback : translated;
+  };
 
   return (
     <aside style={{
@@ -33,7 +41,7 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
           {activeModule}
         </div>
         <input
-          placeholder="搜索菜单..."
+          placeholder={t('common.search')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -52,7 +60,7 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
               fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
               color: 'var(--text-4, #666)', padding: '8px 4px 4px',
             }}>
-              {group.label}
+              {tl(group.labelKey, group.label)}
             </div>
             {group.items
               .filter((item) => !search || item.label.includes(search))
@@ -75,7 +83,7 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 14 }}>{item.icon}</span>
-                      {item.label}
+                      {tl(item.labelKey, item.label)}
                     </span>
                     {item.count != null && (
                       <span style={{
@@ -100,7 +108,7 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)' }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, fontWeight: 600 }}>{getTokenPayload()?.merchant_name || '屯象OS'}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-4)' }}>在线</div>
+          <div style={{ fontSize: 10, color: 'var(--text-4)' }}>{t('common.online')}</div>
         </div>
         <span style={{ color: 'var(--text-4)', fontSize: 12 }}>▼</span>
       </div>

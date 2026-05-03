@@ -40,9 +40,25 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
+import { useLang } from '../../i18n/LangContext';
 
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
+
+// ── MY 模式检测 ──────────────────────────────────────────────────────────
+
+function useIsMY(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('country') === 'MY') return true;
+  try {
+    const raw = localStorage.getItem('tx_user');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.country_code === 'MY' || parsed.store_country === 'MY') return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
 
@@ -115,7 +131,7 @@ async function apiFetch<T>(
 
 // ── 状态 Tag ──────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<
+const STATUS_CONFIG_CN: Record<
   EInvoice['status'],
   { label: string; color: string; icon?: React.ReactNode }
 > = {
@@ -127,14 +143,40 @@ const STATUS_CONFIG: Record<
   red_noted:  { label: '已红冲', color: 'warning' },
 };
 
-const TYPE_CONFIG: Record<EInvoice['invoice_type'], string> = {
+const STATUS_CONFIG_MY: Record<
+  EInvoice['status'],
+  { label: string; color: string; icon?: React.ReactNode }
+> = {
+  pending:    { label: 'Pending', color: 'blue' },
+  issuing:    { label: 'Submitting', color: 'processing', icon: <SyncOutlined spin /> },
+  issued:     { label: 'Validated', color: 'success' },
+  failed:     { label: 'Rejected', color: 'error' },
+  cancelled:  { label: 'Cancelled', color: 'default' },
+  red_noted:  { label: 'Credit Note', color: 'warning' },
+};
+
+const TYPE_CONFIG_CN: Record<EInvoice['invoice_type'], string> = {
   normal:     '增值税普票',
   red_note:   '红冲票',
   correction: '更正票',
 };
 
-function StatusTag({ status }: { status: EInvoice['status'] }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, color: 'default' };
+const TYPE_CONFIG_MY: Record<EInvoice['invoice_type'], string> = {
+  normal:     'Invoice',
+  red_note:   'Credit Note',
+  correction: 'Corrective Invoice',
+};
+
+function getStatusConfig(isMY: boolean) {
+  return isMY ? STATUS_CONFIG_MY : STATUS_CONFIG_CN;
+}
+
+function getTypeConfig(isMY: boolean) {
+  return isMY ? TYPE_CONFIG_MY : TYPE_CONFIG_CN;
+}
+
+function StatusTag({ status, isMY }: { status: EInvoice['status']; isMY?: boolean }) {
+  const cfg = (isMY ? STATUS_CONFIG_MY : STATUS_CONFIG_CN)[status] ?? { label: status, color: 'default' };
   return (
     <Tag color={cfg.color} icon={cfg.icon}>
       {cfg.label}
@@ -144,17 +186,17 @@ function StatusTag({ status }: { status: EInvoice['status'] }) {
 
 // ── Tab 1：发票列表 ───────────────────────────────────────────────────────
 
-function InvoiceListTab() {
+function InvoiceListTab({ isMY }: { isMY?: boolean }) {
   const actionRef = useRef<ActionType>();
   const [redNoteTarget, setRedNoteTarget] = useState<EInvoice | null>(null);
 
   const handleReissue = async (invoice: EInvoice) => {
     try {
       await apiFetch(`/${invoice.id}/reissue`, { method: 'POST' });
-      message.success('已重新触发开票');
+      message.success(isMY ? 'Reissue triggered' : '已重新触发开票');
       actionRef.current?.reload();
     } catch (err) {
-      message.error(`重开失败：${(err as Error).message}`);
+      message.error(isMY ? `Reissue failed: ${(err as Error).message}` : `重开失败：${(err as Error).message}`);
     }
   };
 
@@ -164,91 +206,93 @@ function InvoiceListTab() {
         method: 'POST',
         body: JSON.stringify({ reason }),
       });
-      message.success('红冲申请已提交');
+      message.success(isMY ? 'Credit note submitted' : '红冲申请已提交');
       setRedNoteTarget(null);
       actionRef.current?.reload();
     } catch (err) {
-      message.error(`红冲失败：${(err as Error).message}`);
+      message.error(isMY ? `Credit note failed: ${(err as Error).message}` : `红冲失败：${(err as Error).message}`);
     }
   };
 
+  const typeConfig = getTypeConfig(!!isMY);
+
   const columns: ProColumns<EInvoice>[] = [
     {
-      title: '发票号',
+      title: isMY ? 'Invoice No.' : '发票号',
       dataIndex: 'invoice_no',
       width: 140,
       render: (_, r) => r.invoice_no ?? <Text type="secondary">—</Text>,
     },
     {
-      title: '类型',
+      title: isMY ? 'Type' : '类型',
       dataIndex: 'invoice_type',
       width: 110,
       valueType: 'select',
       valueEnum: {
-        normal:     { text: '增值税普票' },
-        red_note:   { text: '红冲票' },
-        correction: { text: '更正票' },
+        normal:     { text: typeConfig.normal },
+        red_note:   { text: typeConfig.red_note },
+        correction: { text: typeConfig.correction },
       },
       render: (_, r) => (
         <Tag color={r.invoice_type === 'red_note' ? 'volcano' : 'geekblue'}>
-          {TYPE_CONFIG[r.invoice_type]}
+          {typeConfig[r.invoice_type]}
         </Tag>
       ),
     },
     {
-      title: '购方名称',
+      title: isMY ? 'Buyer Name' : '购方名称',
       dataIndex: 'buyer_name',
       ellipsis: true,
-      render: (_, r) => r.buyer_name ?? <Text type="secondary">个人</Text>,
+      render: (_, r) => r.buyer_name ?? <Text type="secondary">{isMY ? 'Individual' : '个人'}</Text>,
     },
     {
-      title: '价税合计(元)',
+      title: isMY ? 'Total (MYR)' : '价税合计(元)',
       dataIndex: 'total_amount_fen',
       width: 120,
       search: false,
       render: (_, r) => (
-        <Text strong>¥{fenToYuan(r.total_amount_fen)}</Text>
+        <Text strong>{isMY ? `RM${fenToYuan(r.total_amount_fen)}` : `¥${fenToYuan(r.total_amount_fen)}`}</Text>
       ),
     },
     {
-      title: '税额(元)',
+      title: isMY ? 'Tax (MYR)' : '税额(元)',
       dataIndex: 'tax_amount_fen',
       width: 100,
       search: false,
-      render: (_, r) => `¥${fenToYuan(r.tax_amount_fen)}`,
+      render: (_, r) => isMY ? `RM${fenToYuan(r.tax_amount_fen)}` : `¥${fenToYuan(r.tax_amount_fen)}`,
     },
     {
-      title: '税率',
+      title: isMY ? 'Tax Rate' : '税率',
       dataIndex: 'tax_rate',
       width: 80,
       search: false,
       render: (_, r) => `${(Number(r.tax_rate) * 100).toFixed(0)}%`,
     },
     {
-      title: '状态',
+      title: isMY ? 'Status' : '状态',
       dataIndex: 'status',
       width: 110,
       valueType: 'select',
       valueEnum: Object.fromEntries(
-        Object.entries(STATUS_CONFIG).map(([k, v]) => [k, { text: v.label }])
+        Object.entries(getStatusConfig(!!isMY)).map(([k, v]) => [k, { text: v.label }])
       ),
-      render: (_, r) => <StatusTag status={r.status} />,
+      render: (_, r) => <StatusTag status={r.status} isMY={isMY} />,
     },
     {
-      title: '开票时间',
+      title: isMY ? 'Issue Time' : '开票时间',
       dataIndex: 'issue_time',
       valueType: 'dateTime',
       width: 160,
       search: false,
       render: (_, r) =>
         r.issue_time ? (
-          new Date(r.issue_time).toLocaleString('zh-CN')
+          new Date(r.issue_time).toLocaleString(isMY ? 'en-MY' : 'zh-CN')
         ) : (
           <Text type="secondary">—</Text>
         ),
     },
     {
-      title: '操作',
+      title: isMY ? 'Actions' : '操作',
       valueType: 'option',
       width: 200,
       fixed: 'right',
@@ -260,7 +304,7 @@ function InvoiceListTab() {
             target="_blank"
             rel="noreferrer"
           >
-            下载PDF
+            {isMY ? 'Download PDF' : '下载PDF'}
           </a>
         ),
         record.status === 'issued' && (
@@ -269,16 +313,16 @@ function InvoiceListTab() {
             style={{ color: '#faad14' }}
             onClick={() => setRedNoteTarget(record)}
           >
-            申请红冲
+            {isMY ? 'Credit Note' : '申请红冲'}
           </a>
         ),
         record.status === 'failed' && (
           <Popconfirm
             key="reissue"
-            title="确认重新开票？"
+            title={isMY ? 'Confirm reissue?' : '确认重新开票？'}
             onConfirm={() => handleReissue(record)}
           >
-            <a style={{ color: '#1677ff' }}>重开</a>
+            <a style={{ color: '#1677ff' }}>{isMY ? 'Reissue' : '重开'}</a>
           </Popconfirm>
         ),
       ].filter(Boolean),
@@ -287,6 +331,15 @@ function InvoiceListTab() {
 
   return (
     <>
+      {isMY && (
+        <Alert
+          type="info"
+          message="LHDN e-Invoice (MyInvois)"
+          description="This view shows e-Invoice data for Malaysia MyInvois compliance. All amounts are in MYR."
+          style={{ marginBottom: 16 }}
+          icon={<FileTextOutlined />}
+        />
+      )}
       <ProTable<EInvoice>
         actionRef={actionRef}
         rowKey="id"
@@ -317,14 +370,14 @@ function InvoiceListTab() {
             onClick={async () => {
               try {
                 await apiFetch('/sync-status', { method: 'POST' });
-                message.success('状态同步已触发（后台执行）');
+                message.success(isMY ? 'Status sync triggered' : '状态同步已触发（后台执行）');
                 setTimeout(() => actionRef.current?.reload(), 2000);
               } catch (err) {
-                message.error(`同步失败：${(err as Error).message}`);
+                message.error(isMY ? `Sync failed: ${(err as Error).message}` : `同步失败：${(err as Error).message}`);
               }
             }}
           >
-            同步状态
+            {isMY ? 'Sync Status' : '同步状态'}
           </Button>,
         ]}
         pagination={{ defaultPageSize: 20 }}
@@ -333,7 +386,9 @@ function InvoiceListTab() {
       {/* 红冲确认弹窗 */}
       {redNoteTarget && (
         <ModalForm
-          title={`申请红冲 — ${redNoteTarget.invoice_no ?? '待开发票'}`}
+          title={isMY
+            ? `Credit Note — ${redNoteTarget.invoice_no ?? 'Pending Invoice'}`
+            : `申请红冲 — ${redNoteTarget.invoice_no ?? '待开发票'}`}
           open
           onOpenChange={(open) => { if (!open) setRedNoteTarget(null); }}
           onFinish={async (values) => {
@@ -343,14 +398,16 @@ function InvoiceListTab() {
         >
           <Alert
             type="warning"
-            message="红冲操作不可撤销，将创建一张负数冲销发票"
+            message={isMY
+              ? 'This action cannot be undone. A credit note will be created.'
+              : '红冲操作不可撤销，将创建一张负数冲销发票'}
             style={{ marginBottom: 16 }}
           />
           <ProFormText
             name="reason"
-            label="红冲原因"
-            rules={[{ required: true, message: '请填写红冲原因' }]}
-            fieldProps={{ placeholder: '如：顾客要求作废、金额有误等' }}
+            label={isMY ? 'Reason' : '红冲原因'}
+            rules={[{ required: true, message: isMY ? 'Please enter a reason' : '请填写红冲原因' }]}
+            fieldProps={{ placeholder: isMY ? 'e.g. Customer request, amount error' : '如：顾客要求作废、金额有误等' }}
           />
         </ModalForm>
       )}
@@ -360,7 +417,7 @@ function InvoiceListTab() {
 
 // ── Tab 2：开票申请 ───────────────────────────────────────────────────────
 
-function InvoiceRequestTab() {
+function InvoiceRequestTab({ isMY }: { isMY?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ invoice_id: string; status: string } | null>(null);
 
@@ -379,9 +436,9 @@ function InvoiceRequestTab() {
         }),
       });
       setResult(res.data);
-      message.success('开票申请已提交，预计 5 分钟内完成');
+      message.success(isMY ? 'e-Invoice submitted, estimated 5 min' : '开票申请已提交，预计 5 分钟内完成');
     } catch (err) {
-      message.error(`开票申请失败：${(err as Error).message}`);
+      message.error(isMY ? `e-Invoice failed: ${(err as Error).message}` : `开票申请失败：${(err as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -391,53 +448,62 @@ function InvoiceRequestTab() {
     <div style={{ maxWidth: 560, paddingTop: 8 }}>
       <Alert
         type="info"
-        message="开票申请提交后，系统将异步调用诺诺开票平台完成发票开具，完成后可在「发票列表」中查看进度。"
+        message={isMY
+          ? 'After submission, the system will submit to MyInvois asynchronously. Check the e-Invoice list for progress.'
+          : '开票申请提交后，系统将异步调用诺诺开票平台完成发票开具，完成后可在「发票列表」中查看进度。'}
         style={{ marginBottom: 24 }}
       />
       <ModalForm
-        title="申请开票"
+        title={isMY ? 'New e-Invoice' : '申请开票'}
         layout="vertical"
         submitter={false}
       >
         <ProFormText
           name="order_id"
-          label="订单号（UUID）"
+          label={isMY ? 'Order ID (UUID)' : '订单号（UUID）'}
           rules={[
-            { required: true, message: '请填写订单 ID' },
+            { required: true, message: isMY ? 'Please enter order ID' : '请填写订单 ID' },
             {
               pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-              message: '请输入有效的 UUID 格式订单号',
+              message: 'Please enter a valid UUID format',
             },
           ]}
           fieldProps={{ placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' }}
         />
         <ProFormText
           name="buyer_name"
-          label="购方名称（企业/个人）"
-          fieldProps={{ placeholder: '如：北京示例科技有限公司，个人开票可留空' }}
+          label={isMY ? 'Buyer Name (Company/Individual)' : '购方名称（企业/个人）'}
+          fieldProps={{ placeholder: isMY ? 'e.g. MyCompany Sdn. Bhd.' : '如：北京示例科技有限公司，个人开票可留空' }}
         />
         <ProFormText
           name="buyer_tax_no"
-          label="购方税号"
-          fieldProps={{ placeholder: '企业税号（15/17/18/20位）' }}
+          label={isMY ? 'Buyer Tax ID (SSM/BRN)' : '购方税号'}
+          fieldProps={{ placeholder: isMY ? 'Business Registration No.' : '企业税号（15/17/18/20位）' }}
         />
         <ProFormText
           name="buyer_email"
-          label="发票接收邮箱"
-          rules={[{ type: 'email', message: '请输入有效的邮箱地址' }]}
+          label={isMY ? 'Invoice Email' : '发票接收邮箱'}
+          rules={[{ type: 'email', message: isMY ? 'Please enter a valid email' : '请输入有效的邮箱地址' }]}
           fieldProps={{ placeholder: 'invoice@example.com' }}
         />
         <ProFormSelect
           name="tax_rate"
-          label="税率"
-          rules={[{ required: true, message: '请选择税率' }]}
-          options={[
-            { label: '6%（餐饮服务）', value: 0.06 },
-            { label: '9%（部分货物）', value: 0.09 },
-            { label: '13%（一般货物）', value: 0.13 },
-            { label: '0%（免税）', value: 0.0 },
-          ]}
-          initialValue={0.06}
+          label={isMY ? 'Tax Rate (SST)' : '税率'}
+          rules={[{ required: true, message: isMY ? 'Please select tax rate' : '请选择税率' }]}
+          options={isMY
+            ? [
+                { label: 'Standard Rate (8%)', value: 0.08 },
+                { label: 'Food & Beverage (6%)', value: 0.06 },
+                { label: 'Specific Rate (5%)', value: 0.05 },
+                { label: 'Exempt (0%)', value: 0.0 },
+              ]
+            : [
+                { label: '6%（餐饮服务）', value: 0.06 },
+                { label: '9%（部分货物）', value: 0.09 },
+                { label: '13%（一般货物）', value: 0.13 },
+                { label: '0%（免税）', value: 0.0 },
+              ]}
+          initialValue={isMY ? 0.08 : 0.06}
         />
       </ModalForm>
 
@@ -452,24 +518,24 @@ function InvoiceRequestTab() {
             buyer_name: '',
             buyer_tax_no: '',
             buyer_email: '',
-            tax_rate: 0.06,
+            tax_rate: isMY ? 0.08 : 0.06,
           });
         }}
         style={{ marginTop: 8 }}
       >
-        提交开票申请
+        {isMY ? 'Submit e-Invoice' : '提交开票申请'}
       </Button>
 
       {result && (
         <Alert
           type="success"
           style={{ marginTop: 24 }}
-          message="开票申请已提交"
+          message={isMY ? 'e-Invoice Submitted' : '开票申请已提交'}
           description={
             <Space direction="vertical" size={4}>
-              <Text>发票 ID：<Text code>{result.invoice_id}</Text></Text>
-              <Text>当前状态：<StatusTag status={result.status as EInvoice['status']} /></Text>
-              <Text type="secondary">预计 5 分钟内完成，请在「发票列表」中查看进度。</Text>
+              <Text>{isMY ? 'Invoice ID: ' : '发票 ID：'}<Text code>{result.invoice_id}</Text></Text>
+              <Text>{isMY ? 'Status: ' : '当前状态：'}<StatusTag status={result.status as EInvoice['status']} isMY={isMY} /></Text>
+              <Text type="secondary">{isMY ? 'Estimated 5 min. Check the list for progress.' : '预计 5 分钟内完成，请在「发票列表」中查看进度。'}</Text>
             </Space>
           }
         />
@@ -480,10 +546,11 @@ function InvoiceRequestTab() {
 
 // ── Tab 3：税务台账 ───────────────────────────────────────────────────────
 
-function TaxLedgerTab() {
+function TaxLedgerTab({ isMY }: { isMY?: boolean }) {
   const [ledger, setLedger] = useState<TaxLedger | null>(null);
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<[string, string] | null>(null);
+  const currency = isMY ? 'RM' : '¥';
 
   const fetchLedger = async (from: string, to: string) => {
     setLoading(true);
@@ -493,17 +560,17 @@ function TaxLedgerTab() {
       );
       setLedger(res.data);
     } catch (err) {
-      message.error(`台账加载失败：${(err as Error).message}`);
+      message.error(isMY ? `Ledger load failed: ${(err as Error).message}` : `台账加载失败：${(err as Error).message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const detailColumns = [
-    { title: '税率', dataIndex: 'tax_rate', render: (v: number) => `${(v * 100).toFixed(0)}%` },
-    { title: '开票笔数', dataIndex: 'count' },
-    { title: '开票金额(元)', dataIndex: 'amount_fen', render: (v: number) => `¥${fenToYuan(v)}` },
-    { title: '税额(元)', dataIndex: 'tax_fen', render: (v: number) => `¥${fenToYuan(v)}` },
+    { title: isMY ? 'Tax Rate' : '税率', dataIndex: 'tax_rate', render: (v: number) => `${(v * 100).toFixed(0)}%` },
+    { title: isMY ? 'Invoices' : '开票笔数', dataIndex: 'count' },
+    { title: isMY ? 'Amount' : '开票金额', dataIndex: 'amount_fen', render: (v: number) => `${currency}${fenToYuan(v)}` },
+    { title: isMY ? 'Tax' : '税额', dataIndex: 'tax_fen', render: (v: number) => `${currency}${fenToYuan(v)}` },
   ];
 
   return (
@@ -521,7 +588,7 @@ function TaxLedgerTab() {
           disabled={!dateRange}
           onClick={() => dateRange && fetchLedger(dateRange[0], dateRange[1])}
         >
-          查询台账
+          {isMY ? 'Query Ledger' : '查询台账'}
         </Button>
       </Space>
 
@@ -531,9 +598,9 @@ function TaxLedgerTab() {
             <Col span={8}>
               <StatisticCard
                 statistic={{
-                  title: '开票总额',
+                  title: isMY ? 'Total Invoiced' : '开票总额',
                   value: fenToYuan(ledger.total_invoice_amount_fen),
-                  prefix: '¥',
+                  prefix: currency,
                   valueStyle: { color: '#0F6E56' },
                 }}
               />
@@ -541,9 +608,9 @@ function TaxLedgerTab() {
             <Col span={8}>
               <StatisticCard
                 statistic={{
-                  title: '销项税额',
+                  title: isMY ? 'Sales Tax' : '销项税额',
                   value: fenToYuan(ledger.sales_tax_amount_fen),
-                  prefix: '¥',
+                  prefix: currency,
                   valueStyle: { color: '#BA7517' },
                 }}
               />
@@ -551,9 +618,9 @@ function TaxLedgerTab() {
             <Col span={8}>
               <StatisticCard
                 statistic={{
-                  title: '未开票订单数',
+                  title: isMY ? 'Uninvoiced Orders' : '未开票订单数',
                   value: ledger.uninvoiced_order_count,
-                  suffix: '笔',
+                  suffix: isMY ? '' : '笔',
                   valueStyle: {
                     color: ledger.uninvoiced_order_count > 0 ? '#A32D2D' : '#0F6E56',
                   },
@@ -562,7 +629,7 @@ function TaxLedgerTab() {
             </Col>
           </Row>
 
-          <Divider orientation="left">按税率分组明细</Divider>
+          <Divider orientation="left">{isMY ? 'By Tax Rate' : '按税率分组明细'}</Divider>
           <Table
             rowKey="tax_rate"
             columns={detailColumns}
@@ -578,51 +645,61 @@ function TaxLedgerTab() {
 
 // ── 主页面 ────────────────────────────────────────────────────────────────
 
-const TAB_ITEMS = [
+const TAB_ITEMS = (isMY: boolean) => [
   {
     key: 'list',
     label: (
       <span>
         <FileTextOutlined />
-        发票列表
+        {isMY ? 'e-Invoice List' : '发票列表'}
       </span>
     ),
-    children: <InvoiceListTab />,
+    children: <InvoiceListTab isMY={isMY} />,
   },
   {
     key: 'request',
     label: (
       <span>
         <PlusOutlined />
-        开票申请
+        {isMY ? 'New e-Invoice' : '开票申请'}
       </span>
     ),
-    children: <InvoiceRequestTab />,
+    children: <InvoiceRequestTab isMY={isMY} />,
   },
   {
     key: 'ledger',
     label: (
       <span>
         <RollbackOutlined />
-        税务台账
+        {isMY ? 'Tax Ledger' : '税务台账'}
       </span>
     ),
-    children: <TaxLedgerTab />,
+    children: <TaxLedgerTab isMY={isMY} />,
   },
 ];
 
 export default function EInvoicePage() {
+  const isMY = useIsMY();
+  const { lang } = useLang();
+
   return (
     <div style={{ padding: '0 4px' }}>
       <div style={{ marginBottom: 20 }}>
         <Title level={4} style={{ margin: 0, color: '#2C2C2A' }}>
-          电子发票管理
+          {isMY ? 'e-Invoice Management' : '电子发票管理'}
+          {isMY && (
+            <Tag color="purple" style={{ marginLeft: 8, fontSize: 11, verticalAlign: 'middle' }}>
+              LHDN e-Invoice
+            </Tag>
+          )}
         </Title>
         <Text type="secondary" style={{ fontSize: 13 }}>
-          电子发票全链路 — 开票申请 / 红冲 / 重开 / 状态同步 / 税务台账
+          {isMY
+            ? 'MyInvois e-Invoice lifecycle — Submit / Validate / Credit Note / Sync / Ledger'
+            : '电子发票全链路 — 开票申请 / 红冲 / 重开 / 状态同步 / 税务台账'}
         </Text>
       </div>
-      <Tabs defaultActiveKey="list" items={TAB_ITEMS} />
+      <Tabs defaultActiveKey="list" items={TAB_ITEMS(isMY)} />
     </div>
   );
 }

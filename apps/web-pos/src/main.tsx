@@ -4,6 +4,7 @@ import '@tx/tokens/tokens.css';
 import { injectTokens } from './design-system';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LangProvider } from './i18n/LangContext';
 // A1 安全修复：reportCrashToTelemetry 改从 api/tradeApi 导入（JWT-derived tenant_id，
 // 不再读 localStorage 'tenant_id'）。ErrorBoundary.tsx 中的旧版函数已弃用。
 import { reportCrashToTelemetry } from './api/tradeApi';
@@ -31,14 +32,18 @@ function Root(): JSX.Element {
         onReset={navigateToTables}
         fallback={rootFallback}
       >
-        <App />
+        <LangProvider>
+          <App />
+        </LangProvider>
         <ToastContainer />
       </ErrorBoundary>
     );
   }
   return (
     <>
-      <App />
+      <LangProvider>
+        <App />
+      </LangProvider>
       <ToastContainer />
     </>
   );

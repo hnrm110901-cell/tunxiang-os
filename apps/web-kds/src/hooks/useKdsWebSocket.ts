@@ -35,6 +35,10 @@ export interface KDSTicket {
   deptId: string;
   startedAt?: number;
   completedAt?: number;
+  /** 订单类型：dine-in / delivery */
+  orderType?: string;
+  /** 配送平台（外卖订单专用） */
+  platform?: 'grabfood' | 'foodpanda' | 'shopeefood';
 }
 
 export interface RushAlert {
@@ -116,6 +120,8 @@ function payloadToTicket(payload: Record<string, unknown>): KDSTicket {
     status: 'pending',
     priority: (payload.priority || 'normal') as KDSTicket['priority'],
     deptId: (payload.station_id || payload.dept_id || payload.deptId || '') as string,
+    orderType: (payload.order_type || payload.orderType || 'dine-in') as string | undefined,
+    platform: (payload.platform || undefined) as 'grabfood' | 'foodpanda' | 'shopeefood' | undefined,
   };
 }
 
