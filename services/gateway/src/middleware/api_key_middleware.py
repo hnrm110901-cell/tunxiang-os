@@ -1,10 +1,14 @@
-"""API Key 认证中间件 — ISV/开发者 API 调用
+"""API Key 认证中间件 — ISV/第三方开发者 API 调用
 
 职责：
   - 从 X-API-Key header 提取 API Key
-  - 验证 Key 有效性（查询 api_applications 表）
-  - 提取 tenant_id / scopes / rate_limit 注入 request.state
+  - 验证 Key 有效性（新表 `api_keys` SHA-256 或旧表 `api_applications`）
+  - 提取 tenant_id / permissions / rate_limit 注入 request.state
   - 与 JWT 认证二选一：有 API Key 则不需要 JWT
+
+支持两种密钥格式：
+  - tx_xxx... — 新版 API 密钥（api_keys 表，SHA-256 哈希）
+  - txapp_xxx... — 旧版 ISV 应用密钥（api_applications 表，明文比对）
 
 环境变量：
   TX_AUTH_ENABLED  — 设为 "false" 时跳过验证
@@ -37,10 +41,6 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
     仅在请求携带 X-API-Key header 时激活。
     验证成功后设置 request.state.auth_method = "api_key"，
     使得后续 AuthMiddleware 跳过 JWT 验证。
-
-    当前实现：
-      - 数据库可用时：查询 api_applications 表验证
-      - 数据库不可用时：仅做格式检查 + 日志告警（降级模式）
     """
 
     def __init__(self, app) -> None:  # noqa: ANN001
@@ -50,11 +50,9 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:  # noqa: ANN001
         api_key = request.headers.get("X-API-Key")
 
-        # 没有 API Key，跳过，让 AuthMiddleware 处理 JWT
         if not api_key:
             return await call_next(request)
 
-        # 开发模式：跳过验证
         if not self._auth_enabled:
             request.state.auth_method = "api_key"
             request.state.api_key_app_id = "dev-app-mock"
@@ -64,13 +62,15 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
                 request.state.tenant_id = "a0000000-0000-0000-0000-000000000001"
             return await call_next(request)
 
-        # 格式校验：API Key 应以 txapp_ 或 txat_ 开头
-        if not api_key.startswith(("txapp_", "txat_")):
+        # 新版密钥: tx_xxx (SHA-256, api_keys 表)
+        if api_key.startswith("tx_"):
+            app_info = await self._verify_new_api_key(api_key)
+        # 旧版密钥: txapp_ / txat_ (明文, api_applications 表)
+        elif api_key.startswith(("txapp_", "txat_")):
+            app_info = await self._verify_legacy_api_key(api_key)
+        else:
             logger.warning("api_key_invalid_format", key_prefix=api_key[:10])
             return _error_response(401, "INVALID_API_KEY", "API Key format is invalid")
-
-        # 尝试查询数据库验证
-        app_info = await self._verify_api_key(api_key)
 
         if app_info is None:
             logger.warning(
@@ -80,7 +80,6 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
             )
             return _error_response(401, "INVALID_API_KEY", "API Key is invalid or revoked")
 
-        # 注入认证信息
         request.state.auth_method = "api_key"
         request.state.user_id = f"app:{app_info['app_id']}"
         request.state.tenant_id = app_info["tenant_id"]
@@ -98,12 +97,63 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-    async def _verify_api_key(self, api_key: str) -> dict | None:
-        """验证 API Key，返回应用信息或 None。
+    async def _verify_new_api_key(self, api_key: str) -> dict | None:
+        """验证新版 API Key（tx_ 前缀，SHA-256 哈希，api_keys 表）。"""
+        try:
+            from shared.ontology.src.database import async_session_factory
+        except ImportError:
+            logger.warning("api_key_db_not_available", degraded=True)
+            return None
 
-        查询 api_applications 表，校验 app_key 匹配、状态为 active。
-        数据库不可用时返回 None（拒绝请求，安全优先）。
-        """
+        try:
+            from sqlalchemy import text
+
+            from shared.apikeys.src.key_generator import hash_api_key, validate_key_format
+
+            if not validate_key_format(api_key):
+                return None
+
+            key_hash = hash_api_key(api_key)
+
+            async with async_session_factory() as session:
+                result = await session.execute(
+                    text("""
+                        SELECT id::text, tenant_id::text, name, permissions,
+                               rate_limit_rps, status
+                        FROM api_keys
+                        WHERE key_hash = :key_hash AND is_deleted = FALSE
+                        LIMIT 1
+                    """),
+                    {"key_hash": key_hash},
+                )
+                row = result.mappings().first()
+
+                if not row:
+                    return None
+
+                if row["status"] != "active":
+                    return None
+
+                # 更新 last_used_at
+                await session.execute(
+                    text("UPDATE api_keys SET last_used_at = NOW() WHERE id = :id"),
+                    {"id": row["id"]},
+                )
+                await session.commit()
+
+                return {
+                    "app_id": row["id"],
+                    "tenant_id": row["tenant_id"],
+                    "app_name": row["name"],
+                    "scopes": row["permissions"] if isinstance(row["permissions"], list) else [],
+                    "rate_limit_per_min": (row["rate_limit_rps"] or 10) * 60,
+                }
+        except Exception as exc:
+            logger.warning("api_key_verify_error", error=str(exc))
+            return None
+
+    async def _verify_legacy_api_key(self, api_key: str) -> dict | None:
+        """验证旧版 API Key（txapp_/txat_ 前缀，api_applications 表）。"""
         try:
             from shared.ontology.src.database import async_session_factory
         except ImportError:
