@@ -7,6 +7,8 @@
 - [security(gateway)] 代码质量：修复 DB 异常捕获类型、审计约束 exc_info=True、JSONB 序列化防注入
 - [security(infra)] 修复 scripts/create-prod-env.sh 硬编码生产密码（openssl rand 随机生成）
 - [security(infra)] 移除 docker-compose.yml 全部不安全默认值（DB 密码/JWT 密钥/DATABASE_URL）
+- [security(infra)] 修复 4 个租户 compose + monitoring compose 硬编码密码（环境变量注入）
+- [security(infra)] 修复 seed_demo_data.py/demo_quick_start.sh 弱密码（env var + 随机生成）
 - [security(infra)] scripts/start.sh 开发环境改用随机密码生成（替代硬编码 changeme_dev）
 
 ### 数据变化
@@ -16,9 +18,7 @@
 - 修改 9 个文件
 
 ### 遗留问题
-- infra/docker/docker-compose.czyz.yml/demo.yml/sgc.yml/zqx.yml 含各租户硬编码密码（需单独处理）
-- infra/monitoring/docker-compose.monitoring.yml 含 Grafana/Postgres 硬编码密码
-- 2 个预存 test_open_api.py 失败（webhook mock 数据 / 迁移文件路径，与本次改动无关）
+- scripts/migrate.sh/monitor.sh/refresh_mv_*.sh 等仍有 changeme 回退值（非生产，低优先级）
 
 ### 今日完成
 - [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞
