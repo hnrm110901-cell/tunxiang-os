@@ -1,5 +1,7 @@
 """tx-menu — 域B 商品菜单微服务"""
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -32,7 +34,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","), allow_methods=["*"], allow_headers=["*"])
 app.include_router(dish_router)
 app.include_router(publish_router)
 app.include_router(pricing_router)

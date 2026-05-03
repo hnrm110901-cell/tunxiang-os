@@ -105,10 +105,13 @@ class TenantNotInGroupError(Exception):
 #       group_member_profiles 和 cross_brand_transactions 两张表。
 #       切勿将此连接字符串暴露在普通品牌 API 的响应中。
 # ─────────────────────────────────────────────────────────────────
-_DATABASE_URL_GROUP: str = os.getenv(
-    "DATABASE_URL_GROUP",
-    "postgresql+asyncpg://group_service_role:changeme_dev@localhost/tunxiang_os",
-)
+_DATABASE_URL_GROUP: str | None = os.getenv("DATABASE_URL_GROUP")
+if not _DATABASE_URL_GROUP:
+    raise RuntimeError(
+        "DATABASE_URL_GROUP env var is required. "
+        "Configure a PostgreSQL role with BYPASSRLS privilege. "
+        "See .env.example for details."
+    )
 
 _group_engine = create_async_engine(
     _DATABASE_URL_GROUP,
