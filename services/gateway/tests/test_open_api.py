@@ -21,6 +21,8 @@
 18. revoke_token后verify返回None
 """
 
+from __future__ import annotations
+
 import os
 
 # ── 被测模块 ──────────────────────────────────────────────────────

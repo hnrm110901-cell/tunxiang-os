@@ -11,6 +11,7 @@
 """
 
 import os
+from typing import Optional
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -98,7 +99,7 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-    async def _verify_api_key(self, api_key: str) -> dict | None:
+    async def _verify_api_key(self, api_key: str) -> "Optional[dict]":
         """验证 API Key，返回应用信息或 None。
 
         查询 api_applications 表，校验 app_key 匹配、状态为 active。
@@ -136,9 +137,6 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
                     "scopes": row["scopes"] if isinstance(row["scopes"], list) else [],
                     "rate_limit_per_min": row["rate_limit_per_min"] or 60,
                 }
-        except ConnectionError as exc:
-            logger.warning("api_key_db_connection_error", error=str(exc))
-            return None
-        except OSError as exc:
-            logger.warning("api_key_db_os_error", error=str(exc))
+        except Exception as exc:  # noqa: BLE001 — DB 不可用时优雅降级而非 500
+            logger.warning("api_key_db_error", error=str(exc), exc_info=True)
             return None

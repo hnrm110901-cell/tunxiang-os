@@ -4,8 +4,11 @@
 所有secret/token只存PBKDF2-SHA256哈希，明文只在生成时返回一次。
 """
 
+from __future__ import annotations
+
 import hashlib
 import hmac
+import json
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -62,7 +65,7 @@ class OAuth2Service:
                 "app_key": app_key,
                 "secret_hash": secret_hash,
                 "description": description,
-                "scopes": str(scopes).replace("'", '"'),
+                "scopes": json.dumps(scopes),
                 "rate_limit_per_min": rate_limit_per_min,
                 "contact_email": contact_email,
                 "created_by": str(created_by) if created_by else None,
@@ -347,8 +350,8 @@ class OAuth2Service:
                 {"app_id": str(row["app_id"])},
             )
             await db.commit()
-        except Exception as exc:  # noqa: BLE001 — 更新失败不阻塞验证结果
-            logger.warning("token_verify_update_last_active_failed", error=str(exc))
+        except Exception:  # noqa: BLE001 — 更新失败不阻塞验证结果
+            logger.warning("token_verify_update_last_active_failed", exc_info=True)
 
         return {
             "token_id": str(row["id"]),
