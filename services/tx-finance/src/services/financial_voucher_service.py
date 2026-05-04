@@ -48,11 +48,10 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
+from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 
 # 前向引用: AccountingPeriodService (W1.4b 接入). 本 service 允许不注入,
 # 构造时传 period_service=None 即跳过账期校验 (向前兼容 / 历史回填路径).

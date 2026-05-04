@@ -36,7 +36,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore  # noqa: E402
 
-
 # ─── 真实场景 #1: 销售凭证 2 分录 (借: 应收 / 贷: 主营业务收入) ──────────
 
 

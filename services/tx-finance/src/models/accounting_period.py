@@ -33,7 +33,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from .cost_snapshot import Base
 
-
 # 状态枚举 (应用层用, DB CHECK 同步)
 STATUS_OPEN = "open"
 STATUS_CLOSED = "closed"

@@ -23,7 +23,6 @@ from __future__ import annotations
 import os
 import sys
 import uuid
-from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -34,7 +33,6 @@ from services.voucher_backfill_service import (  # type: ignore  # noqa: E402
     BackfillReport,
     VoucherBackfillService,
 )
-
 
 # ─── entries 解析: 多格式 + 边界 ────────────────────────────────────
 

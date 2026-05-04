@@ -474,7 +474,8 @@ class TestW2FRedFlushAuditFields:
     @pytest.mark.asyncio
     async def test_red_flush_audit_timestamp_recent(self):
         """red_flushed_at 应为当前 UTC 时间."""
-        from datetime import datetime as _datetime, timezone as _tz
+        from datetime import datetime as _datetime
+        from datetime import timezone as _tz
 
         svc = FinancialVoucherService()
         original = _exported_voucher()
@@ -500,7 +501,8 @@ class TestW2FRedFlushAuditFields:
         v.red_flush_of_voucher_id = uuid.uuid4()
         v.red_flush_operator_id = uuid.uuid4()
         v.red_flush_reason = "科目调整"
-        from datetime import datetime as _dt, timezone as _tz
+        from datetime import datetime as _dt
+        from datetime import timezone as _tz
         v.red_flushed_at = _dt(2027, 3, 10, 12, 0, tzinfo=_tz.utc)
 
         d = v.to_dict()

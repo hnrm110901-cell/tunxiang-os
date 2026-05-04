@@ -40,7 +40,6 @@ from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     VoucherLineInput,
 )
 
-
 # ─── 输入校验: VoucherLineInput dataclass 守 DB CHECK 前置 ────────────
 
 
@@ -394,9 +393,6 @@ class TestTenantContextAssertion:
     @pytest.mark.asyncio
     async def test_matching_tenant_passes(self):
         """payload.tenant_id == session app.tenant_id → 正常."""
-        from services.financial_voucher_service import (  # type: ignore
-            TenantContextMismatchError,
-        )
 
         svc = FinancialVoucherService()
         tenant = uuid.uuid4()

@@ -23,20 +23,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Iterable
 
 import structlog
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.accounting_period import (  # type: ignore
     STATUS_CLOSED,
-    STATUS_LOCKED,
     STATUS_OPEN,
     AccountingPeriod,
     month_range,
 )
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 

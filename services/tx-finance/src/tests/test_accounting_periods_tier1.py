@@ -44,7 +44,6 @@ from services.accounting_period_service import (  # type: ignore  # noqa: E402
     AccountingPeriodService,
 )
 
-
 # ─── 工具 ────────────────────────────────────────────────────────────
 
 

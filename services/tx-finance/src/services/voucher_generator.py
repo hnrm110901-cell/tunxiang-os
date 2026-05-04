@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import text
@@ -30,6 +30,11 @@ from shared.adapters.erp.src import (
     VoucherType,
     get_erp_adapter,
 )
+
+if TYPE_CHECKING:
+    import uuid
+
+    from ..models.voucher import FinancialVoucher
 
 log = structlog.get_logger(__name__)
 

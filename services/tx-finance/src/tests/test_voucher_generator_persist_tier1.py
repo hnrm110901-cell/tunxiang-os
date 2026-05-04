@@ -30,6 +30,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # shared.adapters.erp 走 repo root sys.path
 sys.path.insert(0, "/Users/lichun/Documents/GitHub/zhilian-os")
 
+from services.financial_voucher_service import (  # type: ignore  # noqa: E402
+    FinancialVoucherService,
+)
+from services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
+
 from shared.adapters.erp.src.base import (  # type: ignore  # noqa: E402
     ERPPushResult,
     ERPType,
@@ -38,11 +43,6 @@ from shared.adapters.erp.src.base import (  # type: ignore  # noqa: E402
     PushStatus,
     VoucherType,
 )
-from services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
-from services.financial_voucher_service import (  # type: ignore  # noqa: E402
-    FinancialVoucherService,
-)
-
 
 # ─── 构造辅助 ───────────────────────────────────────────────────────
 
@@ -405,8 +405,9 @@ class TestPersistRespectsPeriodCheck:
     async def test_persist_rejects_when_period_closed(self):
         """注入 period_service, closed 月 → persist 拒."""
         from unittest.mock import AsyncMock as AM
+
+        from models.accounting_period import STATUS_CLOSED, AccountingPeriod
         from services.accounting_period_service import AccountingPeriodService
-        from models.accounting_period import AccountingPeriod, STATUS_CLOSED
 
         period_svc = AM(spec=AccountingPeriodService)
         period_svc.is_date_writable = AM(return_value=False)

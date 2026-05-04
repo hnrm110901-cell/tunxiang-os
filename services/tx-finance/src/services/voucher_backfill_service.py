@@ -35,14 +35,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import select, text
+from models.voucher import FinancialVoucherLine  # type: ignore
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 
 log = structlog.get_logger(__name__)
 
