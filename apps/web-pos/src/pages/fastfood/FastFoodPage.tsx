@@ -20,6 +20,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDishes, fetchCategories, type DishItem } from '../../api/menuApi';
 import { txFetch } from '../../api/index';
+import { useTouchFeedback } from '../../hooks/useTouchFeedback';
+import { TxButton } from '../../components/TxButton';
+import { VoiceCommandBar, matchVoiceCommand } from '../../components/VoiceCommandBar';
 
 // ─── Design Tokens ───
 const C = {
@@ -80,6 +83,7 @@ function fmtFen(fen: number): string {
 
 export function FastFoodPage() {
   const navigate = useNavigate();
+  const tf = useTouchFeedback();
 
   const [categories, setCategories] = useState<string[]>(MOCK_CATEGORIES);
   const [dishes, setDishes] = useState<DishItem[]>(MOCK_DISHES);
@@ -453,27 +457,12 @@ export function FastFoodPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setCheckoutOpen(false)}
-                style={{
-                  flex: 1, height: 52, background: '#2A3A48', color: C.text,
-                  border: 'none', borderRadius: 10, fontSize: 16, cursor: 'pointer',
-                }}
-              >
+              <TxButton variant="secondary" size="lg" block onClick={() => setCheckoutOpen(false)}>
                 取消
-              </button>
-              <button
-                onClick={handleCheckout}
-                disabled={isSubmitting}
-                style={{
-                  flex: 2, height: 52,
-                  background: isSubmitting ? C.muted : C.accent,
-                  color: C.white, border: 'none', borderRadius: 10,
-                  fontSize: 18, fontWeight: 700,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
-              >
+              </TxButton>
+              <TxButton variant="primary" size="lg" block disabled={isSubmitting} onClick={handleCheckout} style={{ flex: 2 }}>
                 {isSubmitting ? '下单中...' : '确认下单'}
+              </TxButton>
               </button>
             </div>
           </div>
@@ -500,6 +489,16 @@ export function FastFoodPage() {
           </div>
         </div>
       )}
+
+      <VoiceCommandBar
+        context="快餐"
+        position="bottom-right"
+        onCommand={(cmd) => {
+          const action = matchVoiceCommand(cmd.text, '收银台');
+          if (action === 'quick_cash' && cart.length > 0) setCheckoutOpen(true);
+          if (action === 'view_tables') navigate('/tables');
+        }}
+      />
     </div>
   );
 }
