@@ -145,8 +145,18 @@ class DeliveryKDSBridge:
             )
         return count
 
-    async def mark_kds_ready(self, order_id: str) -> bool:
-        """KDS 出餐完成后标记，返回是否全部完成（可通知骑手）"""
+    async def mark_kds_ready(
+        self,
+        order_id: str,
+        *,
+        notify_self_dispatch: bool = True,
+    ) -> bool:
+        """KDS 出餐完成后标记，返回是否全部完成（可通知骑手）
+
+        notify_self_dispatch=True 时，全部出餐完成后会查询本订单是否绑定自营
+        delivery_dispatches 记录，若有则调用对应 provider adapter 推送 PICKUP_READY
+        到骑手 App（达达/顺丰/自有骑手）。失败不影响 KDS 标记主流程。
+        """
         result = await self._db.execute(
             text("""
                 SELECT COUNT(*) AS total,
@@ -159,9 +169,65 @@ class DeliveryKDSBridge:
             {"oid": order_id, "sid": self._store_id, "tid": self._tenant_id},
         )
         row = result.fetchone()
-        if row and row.total > 0 and row.done == row.total:
-            return True
-        return False
+        all_done = bool(row and row.total > 0 and row.done == row.total)
+
+        if all_done and notify_self_dispatch:
+            await self._notify_self_dispatch_pickup_ready(order_id)
+
+        return all_done
+
+    async def _notify_self_dispatch_pickup_ready(self, order_id: str) -> None:
+        """查询本订单绑定的自营 dispatch 并推送骑手取货事件。
+
+        为避免 KDS 主路径依赖配送商 SDK 的网络抖动，这里所有异常都被吞掉并记日志。
+        """
+        # 延迟 import 避免循环依赖（routes ← bridge ← adapters）
+        from ..repositories.delivery_dispatch_repo import DeliveryDispatchRepository
+        from ..services.delivery_dispatch_adapters import (
+            ProviderConfigSnapshot,
+            get_adapter,
+        )
+
+        try:
+            dispatch = await DeliveryDispatchRepository.get_by_order(
+                self._db, order_id, self._tenant_id
+            )
+            if dispatch is None or dispatch.kds_ready_at is not None:
+                return
+
+            await DeliveryDispatchRepository.mark_kds_ready(
+                self._db, dispatch.dispatch_no, self._tenant_id
+            )
+
+            # 用空 snapshot + DB 里实际配置（如有）— 这里走轻量路径，配置缺失时仍能 mock 推送
+            snapshot = ProviderConfigSnapshot(
+                provider=dispatch.provider,
+                tenant_id=str(self._tenant_id),
+                store_id=dispatch.store_id,
+            )
+            adapter = get_adapter(dispatch.provider, snapshot)
+            notified = await adapter.notify_pickup_ready(
+                dispatch.provider_order_id or dispatch.dispatch_no,
+                dispatch.dispatch_no,
+            )
+            if notified:
+                await DeliveryDispatchRepository.mark_rider_notified(
+                    self._db, dispatch.dispatch_no, self._tenant_id
+                )
+            logger.info(
+                "delivery_kds_bridge.pickup_ready_pushed",
+                order_id=order_id,
+                dispatch_no=dispatch.dispatch_no,
+                provider=dispatch.provider,
+                notified=notified,
+            )
+        except (RuntimeError, ValueError, OSError) as exc:
+            # KDS 主路径不能因配送推送失败而失败：只记日志
+            logger.warning(
+                "delivery_kds_bridge.pickup_ready_failed",
+                order_id=order_id,
+                error=str(exc),
+            )
 
     # ── 内部 ────────────────────────────────────────────────────────
 

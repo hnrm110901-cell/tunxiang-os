@@ -506,6 +506,12 @@ app.include_router(corporate_order_router)
 app.include_router(self_delivery_router)
 
 
+# ── v391: 配送调度持久化（达达 / 顺丰同城 / 自有骑手）──
+from .api.delivery_dispatch_routes import router as delivery_dispatch_router
+
+app.include_router(delivery_dispatch_router)
+
+
 # ── Y-A5: 外卖聚合深度（美团/饿了么/抖音聚合落库 + 异常补偿 + 对账指标）──
 from .api.aggregator_reconcile_routes import router as aggregator_reconcile_router
 from .api.delivery_aggregator_routes import router as delivery_aggregator_router
