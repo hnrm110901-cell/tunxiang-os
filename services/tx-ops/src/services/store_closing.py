@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -72,7 +72,7 @@ async def create_closing_checklist(
         "stocktake": None,
         "waste_report": None,
         "status": "pending",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
@@ -154,7 +154,7 @@ async def record_closing_stocktake(
         "item_count": len(enriched),
         "variance_count": variance_count,
         "total_variance_pct": total_variance_pct,
-        "recorded_at": datetime.utcnow().isoformat(),
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
@@ -218,7 +218,7 @@ async def record_waste_report(
         "items": enriched,
         "item_count": len(enriched),
         "total_cost_fen": total_cost_fen,
-        "recorded_at": datetime.utcnow().isoformat(),
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
@@ -270,7 +270,7 @@ async def finalize_closing(
             f"Checked {status['checked']}/{status['total']}"
         )
 
-    finalized_at = datetime.utcnow().isoformat()
+    finalized_at = datetime.now(timezone.utc).isoformat()
 
     if checklist is not None:
         checklist["status"] = "finalized"

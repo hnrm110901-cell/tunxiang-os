@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -449,7 +449,7 @@ def calc_approval_deadline(
     Returns:
         deadline datetime
     """
-    base = from_time or datetime.utcnow()
+    base = from_time or datetime.now(timezone.utc)
     return base + timedelta(hours=timeout_hours)
 
 
@@ -467,7 +467,7 @@ def is_phase_expired(
     Returns:
         True 如果已过期
     """
-    current = now or datetime.utcnow()
+    current = now or datetime.now(timezone.utc)
     return current > deadline
 
 

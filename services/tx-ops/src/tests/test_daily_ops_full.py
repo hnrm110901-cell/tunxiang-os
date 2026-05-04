@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -138,7 +138,7 @@ async def test_table_cruise_overtime_alert():
         {
             "table_id": "T01",
             "status": "occupied",
-            "occupied_since": (datetime.utcnow() - timedelta(hours=3)).isoformat(),
+            "occupied_since": (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(),
         },
     ]
 
@@ -159,7 +159,7 @@ async def test_cooking_cruise_backlog_alert():
     """E2: 出餐堆积应触发 critical 告警。"""
     from services.tx_ops.src.services.cruise_monitor import check_cooking_cruise
 
-    orders = [{"order_id": f"ord_{i}", "created_at": datetime.utcnow().isoformat()} for i in range(20)]
+    orders = [{"order_id": f"ord_{i}", "created_at": datetime.now(timezone.utc).isoformat()} for i in range(20)]
 
     alerts = await check_cooking_cruise(
         "store_001",

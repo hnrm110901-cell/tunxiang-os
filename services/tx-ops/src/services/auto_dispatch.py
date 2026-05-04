@@ -12,7 +12,7 @@ SLA 定义:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -185,7 +185,7 @@ async def process_agent_alert(
 
     # 计算 SLA 截止时间
     sla_minutes = SLA_MINUTES.get(severity, 30)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     sla_deadline = now + timedelta(minutes=sla_minutes)
 
     task_id = f"task_{store_id}_{uuid.uuid4().hex[:8]}"
@@ -346,7 +346,7 @@ async def check_sla(
     Returns:
         {"checked": int, "escalated": [task_id], "ok": [task_id]}
     """
-    now_ = now or datetime.utcnow()
+    now_ = now or datetime.now(timezone.utc)
     all_tasks = tasks if tasks is not None else _dispatch_tasks
 
     escalated_ids: List[str] = []
@@ -443,7 +443,7 @@ async def get_dispatch_dashboard(
             "summary": {"pending": int, "in_progress": int, "overdue": int, "resolved": int}
         }
     """
-    now_ = now or datetime.utcnow()
+    now_ = now or datetime.now(timezone.utc)
     all_tasks = tasks if tasks is not None else _dispatch_tasks
 
     pending: List[Dict[str, Any]] = []

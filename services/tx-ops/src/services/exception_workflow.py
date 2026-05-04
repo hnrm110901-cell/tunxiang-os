@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -89,7 +89,7 @@ async def report_exception(
         "level": initial_level,
         "level_label": ESCALATION_LEVELS.get(initial_level, ""),
         "reporter_id": reporter_id,
-        "reported_at": datetime.utcnow().isoformat(),
+        "reported_at": datetime.now(timezone.utc).isoformat(),
         "resolution": None,
         "resolved_by": None,
         "resolved_at": None,
@@ -97,7 +97,7 @@ async def report_exception(
             {
                 "action": "reported",
                 "by": reporter_id,
-                "at": datetime.utcnow().isoformat(),
+                "at": datetime.now(timezone.utc).isoformat(),
                 "note": f"异常上报: {EXCEPTION_TYPES[type_]}",
             }
         ],
@@ -166,7 +166,7 @@ async def escalate_exception(
         {
             "action": "escalated",
             "by": operator_id,
-            "at": datetime.utcnow().isoformat(),
+            "at": datetime.now(timezone.utc).isoformat(),
             "note": f"升级至 {ESCALATION_LEVELS[to_level]} (Level {to_level})",
         }
     )
@@ -235,7 +235,7 @@ async def resolve_exception(
     else:
         raise ValueError(f"Cannot resolve from status: {current_status.value}")
 
-    resolved_at = datetime.utcnow().isoformat()
+    resolved_at = datetime.now(timezone.utc).isoformat()
     exception["status"] = final_status.value
     exception["resolution"] = resolution
     exception["resolved_by"] = resolver_id

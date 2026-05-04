@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -71,7 +71,7 @@ async def generate_monthly_review(
         "staff_performance": staff_performance,
         "action_plan": action_plan,
         "status": "draft",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
@@ -135,7 +135,7 @@ async def generate_regional_review(
         "best_practices": best_practices,
         "regional_action_plan": regional_action_plan,
         "status": "draft",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
