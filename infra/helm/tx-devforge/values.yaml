@@ -1,0 +1,85 @@
+# tx-devforge — DevForge 内部研发平台（Tier 3）
+# 端口：8017（沿用，infra/compose/base.yml 已固化）
+#
+# 与 tx-forge（外部 ISV 应用市场）严格区分：
+#   - tx-devforge   = 内部研发平台（本 chart）
+#   - tx-forge      = 外部 ISV 应用市场（infra/helm/tx-forge/）
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-devforge
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8017
+  targetPort: 8017
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # DevForge 自身配置（与 base.yml 一致）
+  DEVFORGE_PORT: "8017"
+  DEVFORGE_LOG_LEVEL: INFO
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-devforge-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY,
+  #       DEVFORGE_DATABASE_URL, DEVFORGE_JWT_SECRET（fallback 自 TX_JWT_SECRET_KEY）
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8017
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8017
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：DevForge 服务 Pod 分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
