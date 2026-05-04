@@ -300,9 +300,10 @@ make migrate-up
 ## 部署
 
 ```bash
-docker-compose up -d                                      # 开发环境
-docker-compose -f docker-compose.prod.yml up -d          # 生产环境
-docker-compose -f docker-compose.gray.yml up -d          # 灰度环境
+# P0.5 后 compose 收敛到 infra/compose/，使用 base.yml + envs/<env>.yml 叠加
+docker compose -f infra/compose/base.yml -f infra/compose/envs/dev.yml up -d      # 开发环境
+docker compose -f infra/compose/base.yml -f infra/compose/envs/prod.yml up -d     # 生产环境
+docker compose -f infra/compose/base.yml -f infra/compose/envs/gray.yml up -d     # 灰度环境
 ```
 
 ---
