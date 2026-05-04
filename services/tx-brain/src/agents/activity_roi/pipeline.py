@@ -8,11 +8,12 @@
 
 from __future__ import annotations
 
-import logging
 import math
 import uuid
 from datetime import date, timedelta
 from typing import Protocol
+
+import structlog
 
 from .prophet_baseline import (
     HistoricalGmvRepository,
@@ -26,7 +27,7 @@ from .schemas import (
 )
 from .sonnet_narrator import ActivityROINarrator, ModelRouterLike
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ─── 增量模型（v1：硬编码） ──────────────────────────────────────────────────

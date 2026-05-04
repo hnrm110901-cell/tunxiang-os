@@ -12,9 +12,9 @@ POST /api/v1/agents/activity-roi/predict
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import ValidationError
 
@@ -25,7 +25,7 @@ from ..agents.activity_roi.schemas import (
     InsufficientHistoricalDataError,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/agents/activity-roi", tags=["activity-roi"])
 
@@ -83,22 +83,22 @@ async def predict_activity_roi(
     try:
         req = ActivityROIRequest.model_validate(body)
     except ValidationError as exc:
-        logger.info("activity_roi_request_invalid: tenant=%s err=%s", tenant_id, exc)
+        logger.info("activity_roi_request_invalid", tenant=tenant_id, error=str(exc))
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
 
     if str(req.tenant_id) != str(tenant_id):
         logger.warning(
-            "activity_roi_tenant_mismatch: header=%s body=%s",
-            tenant_id,
-            req.tenant_id,
+            "activity_roi_tenant_mismatch",
+            header=tenant_id,
+            body=str(req.tenant_id),
         )
         raise HTTPException(status_code=403, detail="tenant_id mismatch")
 
     try:
         return await pipeline.predict(req)
     except InsufficientHistoricalDataError as exc:
-        logger.info("activity_roi_insufficient_history: tenant=%s err=%s", tenant_id, exc)
+        logger.info("activity_roi_insufficient_history", tenant=tenant_id, error=str(exc))
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (RuntimeError, ValueError, TimeoutError) as exc:
-        logger.error("activity_roi_pipeline_failed: tenant=%s err=%s", tenant_id, exc)
+        logger.error("activity_roi_pipeline_failed", tenant=tenant_id, error=str(exc))
         raise HTTPException(status_code=500, detail="activity ROI prediction failed") from exc

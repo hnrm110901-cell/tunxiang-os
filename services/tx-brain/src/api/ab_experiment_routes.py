@@ -17,11 +17,11 @@
 """
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -38,7 +38,7 @@ from ..services.ab_experiment_service import (
     RecordEventInput,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(
     prefix="/api/v1/brain/ab",
     tags=["brain-ab-experiments"],

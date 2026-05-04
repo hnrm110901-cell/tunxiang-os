@@ -14,13 +14,13 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import Any, Protocol
 from uuid import UUID
 
+import structlog
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ─── 系统 Prompt（cacheable 静态块） ─────────────────────────────────────────
@@ -139,10 +139,10 @@ class ActivityROINarrator:
             )
         except (TimeoutError, RuntimeError, OSError) as exc:
             logger.warning(
-                "activity_roi_narrator_router_failed: %s tenant=%s req=%s",
-                type(exc).__name__,
-                tenant_id,
-                request_id,
+                "activity_roi_narrator_router_failed",
+                exc_type=type(exc).__name__,
+                tenant_id=str(tenant_id),
+                request_id=str(request_id),
             )
             return self._fallback_narrative(prediction), None
 
@@ -156,9 +156,9 @@ class ActivityROINarrator:
                 narrative_text += "\n\n风险提示：" + "；".join(parsed.caveats) + "。"
         except (ValueError, ValidationError) as exc:
             logger.warning(
-                "activity_roi_narrator_parse_failed: %s tenant=%s",
-                exc,
-                tenant_id,
+                "activity_roi_narrator_parse_failed",
+                error=str(exc),
+                tenant_id=str(tenant_id),
             )
             return self._fallback_narrative(prediction), None
 

@@ -15,11 +15,11 @@
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,7 +36,7 @@ from shared.ab_testing import (
 )
 from shared.ab_testing.assignment import NOT_ENROLLED
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────
