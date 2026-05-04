@@ -1,9 +1,9 @@
 """tx-pay — 屯象OS 支付中枢微服务
 
-端口: 8013
+端口: 8016（统一规划：8015=tx-expense / 8016=tx-pay / 8017=tx-devforge）
 职责: 统一收款/退款/对账/渠道管理/Agent支付协议
 
-启动: uvicorn services.tx-pay.src.main:app --port 8013
+启动: uvicorn services.tx-pay.src.main:app --port 8016
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     logger.info(
         "tx_pay_started",
         channels=registry.channel_names,
-        port=8013,
+        port=8016,
     )
 
     yield
