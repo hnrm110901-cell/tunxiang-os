@@ -41,12 +41,12 @@ if _SRC not in sys.path:
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from models.franchise import (  # noqa: E402
+from services.tx_org.src.models.franchise import (  # noqa: E402
     Franchisee,
     FranchiseeStatus,
     RoyaltyTier,
 )
-from services.royalty_calculator import RoyaltyCalculator  # noqa: E402
+from services.tx_org.src.services.royalty_calculator import RoyaltyCalculator  # noqa: E402
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  固定数据
