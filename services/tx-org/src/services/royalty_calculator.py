@@ -174,45 +174,42 @@ class RoyaltyCalculator:
             royalty_dec = revenue_fen_dec * base_rate
             return _quantize_fen(royalty_dec)
 
-        # 阶梯计算：所有 min_revenue 转 fen（model 字段单位为元，× 100 得分）
+        # ─── 阶梯累进算法（语义清晰版本）────────────────────────────────
+        # 构建分段边界（fen）+ 段费率：
+        #   段 0：[0, tiers[0].min_fen)     → base_rate（若 tiers[0].min > 0 才存在）
+        #   段 1..N-1：[tiers[i-1].min_fen, tiers[i].min_fen) → tiers[i-1].rate
+        #   段 N：[tiers[-1].min_fen, revenue_fen) → tiers[-1].rate（若 revenue 超末档）
+        #
+        # 修正：原算法在 revenue ≤ tiers[0].min 时错误回退到 last_tier.rate；
+        #       本版本严格按"段边界"枚举，不会越权用最后一档费率。
+
         royalty_dec: Decimal = _DEC_ZERO
-        prev_threshold_fen: Decimal = _DEC_ZERO
+
+        # 先建立"段表"：(lower_fen, upper_fen, rate)
+        # 注意：upper 用 None 占位表示"开口至 revenue"
+        segments: List[tuple[Decimal, Optional[Decimal], Decimal]] = []
+        first_min_fen = _yuan_to_fen_decimal(tiers[0].min_revenue)
+
+        if first_min_fen > _DEC_ZERO:
+            # 段 0：基础费率覆盖 [0, tiers[0].min)
+            segments.append((_DEC_ZERO, first_min_fen, base_rate))
 
         for i, tier in enumerate(tiers):
-            tier_min_fen = _yuan_to_fen_decimal(tier.min_revenue)
-            tier_rate = _to_decimal_rate(tier.rate)
+            lower = _yuan_to_fen_decimal(tier.min_revenue)
+            upper: Optional[Decimal] = (
+                _yuan_to_fen_decimal(tiers[i + 1].min_revenue) if i + 1 < len(tiers) else None
+            )
+            segments.append((lower, upper, _to_decimal_rate(tier.rate)))
 
-            if tier_min_fen >= revenue_fen_dec:
-                # 本档起点已超过营业额，本档之前的区间已全部处理完毕
+        # 累加各段贡献：段宽 × 段费率
+        for lower, upper, rate in segments:
+            if lower >= revenue_fen_dec:
+                # 段起点已 ≥ revenue，本段及后续段不贡献
                 break
-
-            # 若首档 min_revenue > 0，先用基础费率计算空缺区间 [0, tier_min)
-            if i == 0 and tier_min_fen > _DEC_ZERO:
-                gap_upper = min(tier_min_fen, revenue_fen_dec)
-                royalty_dec += gap_upper * base_rate
-                prev_threshold_fen = tier_min_fen
-                if revenue_fen_dec <= tier_min_fen:
-                    break
-
-            # 当前档区间：[tier_min, next_tier_min) 或 [tier_min, revenue)
-            if i + 1 < len(tiers):
-                next_threshold_fen = _yuan_to_fen_decimal(tiers[i + 1].min_revenue)
-            else:
-                next_threshold_fen = revenue_fen_dec
-
-            segment_upper_fen = min(next_threshold_fen, revenue_fen_dec)
-            segment_fen = segment_upper_fen - tier_min_fen
-
-            if segment_fen > _DEC_ZERO:
-                royalty_dec += segment_fen * tier_rate
-
-            prev_threshold_fen = segment_upper_fen
-
-        # 若营业额超出最后一档，最后一档费率延续
-        if prev_threshold_fen < revenue_fen_dec and tiers:
-            last_tier = tiers[-1]
-            last_rate = _to_decimal_rate(last_tier.rate)
-            royalty_dec += (revenue_fen_dec - prev_threshold_fen) * last_rate
+            seg_upper = revenue_fen_dec if upper is None else min(upper, revenue_fen_dec)
+            seg_width = seg_upper - lower
+            if seg_width > _DEC_ZERO:
+                royalty_dec += seg_width * rate
 
         return _quantize_fen(royalty_dec)
 
