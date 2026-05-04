@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 import os
 from datetime import date, datetime, timedelta
@@ -25,6 +26,9 @@ from uuid import UUID, uuid4
 import httpx
 import structlog
 from pydantic import BaseModel, Field
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 
 from ..models.franchise import Franchisee, RoyaltyTier
 from .royalty_calculator import RoyaltyCalculator
@@ -303,6 +307,31 @@ class FranchiseSettlementService:
             royalty_amount_fen=royalty_amount_fen,
             total_amount_fen=total_amount_fen,
         )
+
+        # ── v147+ 事件总线旁路写入：月结算单生成（draft 状态） ──
+        # stream_id = settlement.id；金额字段全部 fen（int）
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.SETTLEMENT_GENERATED,
+                tenant_id=tenant_id,
+                stream_id=str(settlement_id),
+                payload={
+                    "settlement_id": str(settlement_id),
+                    "franchisee_id": franchisee_id,
+                    "year": year,
+                    "month": month,
+                    "revenue_fen": revenue_fen,
+                    "royalty_amount_fen": royalty_amount_fen,
+                    "mgmt_fee_fen": mgmt_fee_fen,
+                    "total_amount_fen": total_amount_fen,
+                    "status": SettlementStatus.DRAFT,
+                    "due_date": due_date.isoformat() if due_date else None,
+                    "item_count": len(items),
+                },
+                source_service="tx-org",
+            )
+        )
+
         return settlement
 
     # ──────────────────────────────────────────────────────
