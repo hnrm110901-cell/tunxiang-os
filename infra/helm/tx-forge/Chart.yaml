@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-forge
+description: 屯象OS Forge 外部 ISV 应用市场（Tier 3，未合并 P0-2 分支）
+type: application
+version: 1.0.0
+appVersion: "latest"
