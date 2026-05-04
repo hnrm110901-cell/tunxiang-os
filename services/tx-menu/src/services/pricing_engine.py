@@ -9,7 +9,7 @@
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -89,7 +89,7 @@ class PricingEngine:
         """
         await self._set_tenant()
         dish_uuid = uuid.UUID(dish_id)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 1) 检查是否有生效中的时价（海鲜/活鲜）
         market_result = await self.db.execute(
@@ -684,7 +684,7 @@ class PricingEngine:
         """
         await self._set_tenant()
         change_uuid = uuid.UUID(change_id)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 查询调价申请
         result = await self.db.execute(

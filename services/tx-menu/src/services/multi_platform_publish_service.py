@@ -15,7 +15,7 @@
 
 import asyncio
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -102,7 +102,7 @@ class MultiPlatformPublishService:
                 "total_synced": total_synced,
                 "total_failed": total_failed,
                 "status": overall_status,
-                "published_at": datetime.utcnow().isoformat(),
+                "published_at": datetime.now(timezone.utc).isoformat(),
             },
         }
 
@@ -464,7 +464,7 @@ class MultiPlatformPublishService:
             "failed_count": len(failed),
             "errors": errors,
             "items": synced + failed,
-            "published_at": datetime.utcnow().isoformat(),
+            "published_at": datetime.now(timezone.utc).isoformat(),
         }
 
     # ━━━ TODO: 真实平台API调用方法(预留) ━━━

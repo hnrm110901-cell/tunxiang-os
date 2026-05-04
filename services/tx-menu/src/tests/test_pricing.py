@@ -4,7 +4,7 @@
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -89,7 +89,7 @@ async def test_get_standard_price_market():
             [
                 {  # market_price -> 有效
                     "price_fen": 12800,
-                    "effective_from": datetime.utcnow(),
+                    "effective_from": datetime.now(timezone.utc),
                 }
             ]
         ),
@@ -130,7 +130,7 @@ async def test_set_market_price_invalid():
     engine = _make_engine(db)
 
     with pytest.raises(ValueError, match="price_fen must be positive"):
-        await engine.set_market_price(DISH_ID, -100, datetime.utcnow())
+        await engine.set_market_price(DISH_ID, -100, datetime.now(timezone.utc))
 
 
 # ─── 4. 称重计价 ───
