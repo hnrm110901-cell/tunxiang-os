@@ -1,3 +1,56 @@
+## 2026-05-04 14:30  tx-org 加盟分润计算器金额单位统一（分 + Decimal）
+
+### 本次会话目标
+修复 Tier 1 财务红线：`services/tx-org/src/services/royalty_calculator.py` 与
+`api/franchise_routes.py` 用元（float）做分润计算，100 万元 × 5% 在 float 下出现
+4999999.999... 漂移，引发对账争议。必须改 int（分）入参/出参 + Decimal 中间。
+
+### 完成状态
+- [x] TDD 红灯：`services/tx-org/src/tests/test_royalty_calculator_tier1.py`（11 用例 @pytest.mark.tier1）
+  - test_100w_revenue_5pct_royalty_no_float_error（核心：100w × 5% = 5_000_000 分）
+  - test_tiered_revenue_segment_boundary_precision（100w/200w/600w 边界）
+  - test_management_fee_calculation_in_fen / test_zero_revenue_zero_fee
+  - test_partial_payment_balance_correct（分次付款余额精确）
+  - test_calculate_fen_uses_decimal_for_high_precision_rates（4.5%）
+  - test_calculate_fen_rounding_half_up（0.5 分进位）
+  - test_no_float_intermediate_in_high_value_tiered_calculation（1 亿元）
+- [x] 绿灯：`royalty_calculator.py` 引入 calculate_fen(int → int) + Decimal
+  - `_to_decimal_rate` 通过 str 中转避免 float→Decimal 精度污染
+  - `_yuan_to_fen_decimal` / `_quantize_fen` 辅助
+  - 旧 calculate(yuan) 改为 calculate_fen 包装（短期回归保护）
+  - 阶梯算法重写为段表模型（修正"边界回退末档费率"语义 bug）
+- [x] `franchise_settlement_service.py` 改用 calculate_fen 直传分（去掉 fen↔yuan 中转）
+- [x] `franchise_routes.py` 增加 `_fen` 字段：
+  - RoyaltyTierReq.min_revenue_fen（int）+ 旧 min_revenue（float）兼容
+  - CreateFranchiseeReq.management_fee_fen（int）
+  - /overdue-alerts 新增 threshold_fen（int），响应同时返回新旧字段
+
+### 关键决策
+- **保留旧 calculate(yuan) API 而不删**：避免一次性大改散落调用点（tests/ 里 dead test、franchise_settlement_service 之前的调用），内部已切到 calculate_fen 路径。
+- **阶梯 min_revenue 模型字段保持元（float）**：DB JSONB schema `royalty_tiers: [{"min_revenue": 100000, "rate": 0.04}]` 不可更名（生产数据兼容）；仅在 calculate_fen 内部 × 100 转 Decimal。
+- **HTTP 层 _fen 字段为 Optional + 兼容旧字段**：前端 FranchiseManagePage 用的是 franchise_v5_routes 不是本路由，本路由调用方有限，渐进迁移。
+- **算法语义修正**（`ee9bf01b` 中）：原算法当 revenue ≤ tiers[0].min 时错误回退到 last_tier.rate，改用清晰的"段表"枚举：[0, tiers[0].min) 用 base_rate；段间用 tier.rate；超末档延续 last_tier.rate。
+
+### 下一步
+1. 跑 `pytest services/tx-org/src/tests/test_royalty_calculator_tier1.py -m tier1` 验证 11 用例全绿（本会话沙箱无法执行 pytest）
+2. 跑 services/tx-org/tests/test_franchise.py + test_franchise_settlement.py 回归（这些是 dead test 不在 testpaths，但内容应仍正确）
+3. 评估 `services/tx-org/tests/` 是否需挂入 testpaths
+4. 检查生产 DB `royalty_bills.total_revenue` / `royalty_amount` NUMERIC(10,2) 列是否需迁移到 *_fen BIGINT（**现已并行字段都有 _fen，旧 NUMERIC 列暂保留兼容**）
+
+### 已知风险
+- 算法语义修正（边界 = base_rate）若有客户依赖原 buggy 行为，月度对账会出现差额。建议灰度时与首批客户（尝在一起 / 最黔线 / 尚宫厨）对账校验。
+- `franchise_router.py`（独立路由，不在本次改动范围）仍用元（float）；下个版本再处理。
+- `test_franchise.py / test_franchise_settlement.py` 不在 pytest testpaths（dead test），未实际运行。我手算逐条验证了它们对新算法仍返回相同期望值。
+
+### Commits（本会话）
+- 28aaf8d8 test(tx-org): 加盟分润计算器 Tier 1 测试（红灯阶段）[Tier1]
+- 094b151a fix(tx-org): RoyaltyCalculator 引入 calculate_fen(int→int) + Decimal 中间精度 [Tier1]
+- 7de545c0 fix(tx-org): franchise_settlement_service 改用 calculate_fen 直传分 [Tier1]
+- 86ada586（commit msg 错为 tx-member —— 并行 agent race 误打包）含我的 franchise_routes.py _fen 字段
+- ee9bf01b（commit msg 错为 tx-trade —— 并行 agent race 误打包）含我的算法语义修正
+
+---
+
 ## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
 
 ### 本次会话目标
