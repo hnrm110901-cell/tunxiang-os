@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -21,6 +22,9 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 
 from ..models.franchise import (
     Franchisee,
@@ -336,6 +340,30 @@ class RoyaltyCalculator:
                 total_revenue=total_revenue,
                 royalty_amount=royalty_amount,
                 status=bill.status,
+            )
+
+            # ── v147+ 事件总线旁路写入：分润计算完成 ──
+            # stream_id = royalty_bills.id（账单聚合根）；金额字段全部 fen（int）
+            asyncio.create_task(
+                emit_event(
+                    event_type=FranchiseEventType.ROYALTY_CALCULATED,
+                    tenant_id=str(tenant_id),
+                    stream_id=str(bill.id),
+                    payload={
+                        "bill_id": str(bill.id),
+                        "franchisee_id": str(franchisee.id),
+                        "bill_month": bill_month,
+                        "period_start": period_start.isoformat(),
+                        "period_end": period_end.isoformat(),
+                        "revenue_fen": total_revenue_fen,
+                        "royalty_amount_fen": royalty_amount_fen,
+                        "management_fee_fen": management_fee_fen,
+                        "total_due_fen": total_due_fen,
+                        "due_date": due_date.isoformat() if due_date else None,
+                        "status": bill.status,
+                    },
+                    source_service="tx-org",
+                )
             )
 
         log.info("franchise.generate_monthly_bills.done", count=len(bills))
