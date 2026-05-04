@@ -4,12 +4,19 @@
 1. 阶梯分润计算（类似个税累进）
 2. 月度账单批处理（查询、汇总、写入、逾期标记）
 3. 加盟商看板数据汇总
+
+金额单位约定（CLAUDE.md §10 + §17 Tier 1 财务红线）：
+- 公开 API：calculate_fen(int → int)，入参/出参一律分（整数）
+- 内部计算：Decimal（精度 6 位），rate 字面量用 Decimal(str)
+- 收尾舍入：ROUND_HALF_UP（金融业惯例）
+- 旧 API：calculate(yuan_float → yuan_float) 保留为兼容包装，内部走 calculate_fen
 """
 
 from __future__ import annotations
 
 import calendar
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -24,6 +31,38 @@ logger = structlog.get_logger(__name__)
 
 # 欠款超过此天数标记为 overdue
 OVERDUE_DAYS = 60
+
+# Decimal 字面量缓存（避免反复构造）
+_DEC_ZERO = Decimal("0")
+_DEC_ONE = Decimal("1")
+_DEC_HUNDRED = Decimal("100")  # 元 ↔ 分换算
+
+
+def _to_decimal_rate(rate: float | Decimal | str) -> Decimal:
+    """将费率转换为 Decimal（避免 float → Decimal 直接构造导致的精度污染）。
+
+    例：float 0.05 → Decimal('0.05000000000000000277555756...') ❌
+        str   '0.05' → Decimal('0.05')                             ✅
+    """
+    if isinstance(rate, Decimal):
+        return rate
+    # 通过 str 中转，确保字面量精度（如 0.05 在 float 下有微小漂移）
+    return Decimal(str(rate))
+
+
+def _yuan_to_fen_decimal(yuan: float | int | Decimal | str) -> Decimal:
+    """将元（可能是 float）安全转换为分（Decimal），避免 float 漂移。
+
+    例：float 1_000_000.0 → Decimal('1000000') × 100 = 100_000_000
+    """
+    if isinstance(yuan, Decimal):
+        return yuan * _DEC_HUNDRED
+    return Decimal(str(yuan)) * _DEC_HUNDRED
+
+
+def _quantize_fen(value: Decimal) -> int:
+    """将 Decimal 量化到分（int），ROUND_HALF_UP 舍入。"""
+    return int(value.quantize(_DEC_ONE, rounding=ROUND_HALF_UP))
 
 
 class FranchiseeDashboard:
@@ -101,65 +140,102 @@ class RoyaltyCalculator:
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     @staticmethod
-    def calculate(monthly_revenue: float, franchisee: Franchisee) -> float:
-        """计算月度分润金额。
+    def calculate_fen(monthly_revenue_fen: int, franchisee: Franchisee) -> int:
+        """计算月度分润金额（分 → 分，零浮点参与）。
 
-        无阶梯：royalty = revenue × royalty_rate
+        【Tier 1 财务红线】CLAUDE.md §10 + §17：
+        - 入参 monthly_revenue_fen：分（int）
+        - 出参 royalty_fen：分（int）
+        - 内部用 Decimal 做 segment_fen × rate 计算
+        - 收尾 quantize ROUND_HALF_UP 至分
+
+        无阶梯：royalty_fen = monthly_revenue_fen × royalty_rate
         有阶梯：按区间分段累进（类似个税）
 
-        阶梯示例（按 min_revenue 升序）：
-          [{"min_revenue": 0,      "rate": 0.05},
-           {"min_revenue": 100000, "rate": 0.04},
-           {"min_revenue": 500000, "rate": 0.03}]
+        阶梯示例（model.RoyaltyTier.min_revenue 单位为元，DB JSONB 兼容）：
+          [{"min_revenue": 0,        "rate": 0.05},
+           {"min_revenue": 100_000,  "rate": 0.04},   # 100_000 元 = 10_000_000 分
+           {"min_revenue": 500_000,  "rate": 0.03}]
 
-        营业额 200,000 时：
-          - [0, 100000)     → 100,000 × 0.05 = 5,000
-          - [100000, 200000)→ 100,000 × 0.04 = 4,000
-          合计 = 9,000
+        营业额 200_000 元（= 20_000_000 分）时：
+          - [0, 10_000_000)        × 0.05 = 500_000 分（5000 元）
+          - [10_000_000, 20_000_000)× 0.04 = 400_000 分（4000 元）
+          合计 = 900_000 分（9000 元）
         """
-        if monthly_revenue <= 0:
-            return 0.0
+        if monthly_revenue_fen <= 0:
+            return 0
 
+        revenue_fen_dec = Decimal(monthly_revenue_fen)
+        base_rate = _to_decimal_rate(franchisee.royalty_rate)
         tiers = franchisee.sorted_tiers()
 
-        # 无阶梯配置：直接用基础费率
+        # 无阶梯：直接 revenue × rate
         if not tiers:
-            return round(monthly_revenue * franchisee.royalty_rate, 2)
+            royalty_dec = revenue_fen_dec * base_rate
+            return _quantize_fen(royalty_dec)
 
-        # 确保第一个阶梯从 0 开始（若配置未覆盖0则用基础费率补齐）
-        # 若首档 min_revenue > 0，则 [0, tiers[0].min_revenue) 使用基础费率
-        royalty = 0.0
-        prev_threshold = 0.0
+        # 阶梯计算：所有 min_revenue 转 fen（model 字段单位为元，× 100 得分）
+        royalty_dec: Decimal = _DEC_ZERO
+        prev_threshold_fen: Decimal = _DEC_ZERO
 
         for i, tier in enumerate(tiers):
-            if tier.min_revenue >= monthly_revenue:
+            tier_min_fen = _yuan_to_fen_decimal(tier.min_revenue)
+            tier_rate = _to_decimal_rate(tier.rate)
+
+            if tier_min_fen >= revenue_fen_dec:
                 # 本档起点已超过营业额，本档之前的区间已全部处理完毕
                 break
 
-            # 若首档 min_revenue > 0，先用基础费率计算空缺区间
-            if i == 0 and tier.min_revenue > 0:
-                gap = min(tier.min_revenue, monthly_revenue)
-                royalty += gap * franchisee.royalty_rate
-                prev_threshold = tier.min_revenue
-                if monthly_revenue <= tier.min_revenue:
+            # 若首档 min_revenue > 0，先用基础费率计算空缺区间 [0, tier_min)
+            if i == 0 and tier_min_fen > _DEC_ZERO:
+                gap_upper = min(tier_min_fen, revenue_fen_dec)
+                royalty_dec += gap_upper * base_rate
+                prev_threshold_fen = tier_min_fen
+                if revenue_fen_dec <= tier_min_fen:
                     break
 
-            # 当前档区间：[tier.min_revenue, next_tier.min_revenue) 或 [tier.min_revenue, revenue)
-            next_threshold = tiers[i + 1].min_revenue if i + 1 < len(tiers) else monthly_revenue
-            segment_upper = min(next_threshold, monthly_revenue)
-            segment = segment_upper - tier.min_revenue
+            # 当前档区间：[tier_min, next_tier_min) 或 [tier_min, revenue)
+            if i + 1 < len(tiers):
+                next_threshold_fen = _yuan_to_fen_decimal(tiers[i + 1].min_revenue)
+            else:
+                next_threshold_fen = revenue_fen_dec
 
-            if segment > 0:
-                royalty += segment * tier.rate
+            segment_upper_fen = min(next_threshold_fen, revenue_fen_dec)
+            segment_fen = segment_upper_fen - tier_min_fen
 
-            prev_threshold = segment_upper
+            if segment_fen > _DEC_ZERO:
+                royalty_dec += segment_fen * tier_rate
+
+            prev_threshold_fen = segment_upper_fen
 
         # 若营业额超出最后一档，最后一档费率延续
-        if prev_threshold < monthly_revenue and tiers:
+        if prev_threshold_fen < revenue_fen_dec and tiers:
             last_tier = tiers[-1]
-            royalty += (monthly_revenue - prev_threshold) * last_tier.rate
+            last_rate = _to_decimal_rate(last_tier.rate)
+            royalty_dec += (revenue_fen_dec - prev_threshold_fen) * last_rate
 
-        return round(royalty, 2)
+        return _quantize_fen(royalty_dec)
+
+    @staticmethod
+    def calculate(monthly_revenue: float, franchisee: Franchisee) -> float:
+        """【DEPRECATED — 兼容包装】旧的元（float）入参/出参 API。
+
+        新代码请使用 calculate_fen(int → int)。
+        本方法保留是为了避免一次性大改散落调用点（test_franchise.py /
+        test_franchise_settlement.py 等），内部已切到 calculate_fen 路径以消除
+        float 漂移：
+          1. 元 → 分（Decimal 中转，避免 float * 100 漂移）
+          2. 调用 calculate_fen
+          3. 分 → 元（int / 100 → float）
+
+        Tier 1 验收：100 万元 × 5% 必须返回精确 50_000.0 元，不允许 49999.99...。
+        """
+        if monthly_revenue <= 0:
+            return 0.0
+        revenue_fen = int(_yuan_to_fen_decimal(monthly_revenue).quantize(_DEC_ONE, rounding=ROUND_HALF_UP))
+        royalty_fen = RoyaltyCalculator.calculate_fen(revenue_fen, franchisee)
+        # 出参元（float），但精度由 fen→yuan 整除保证
+        return royalty_fen / 100.0
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  月度账单批处理
@@ -201,18 +277,19 @@ class RoyaltyCalculator:
         today = date.today()
 
         for franchisee in active_franchisees:
-            # Step 2: 汇总该加盟商门店当月营业额
+            # Step 2: 汇总该加盟商门店当月营业额（分）
             store_ids = await RoyaltyCalculator._fetch_franchisee_store_ids(franchisee.id, tenant_id, db)
             total_revenue_fen: int = await RoyaltyCalculator._sum_store_revenue_fen(
                 store_ids, period_start, period_end, tenant_id, db
             )
-            total_revenue = total_revenue_fen / 100.0
 
-            # Step 3: 计算分润
-            royalty_amount = RoyaltyCalculator.calculate(total_revenue, franchisee)
-            royalty_amount_fen = int(round(royalty_amount * 100))
+            # Step 3: 计算分润（全程分，零浮点） — Tier 1 财务红线
+            royalty_amount_fen = RoyaltyCalculator.calculate_fen(total_revenue_fen, franchisee)
             management_fee_fen = franchisee.management_fee_fen  # type: ignore[attr-defined]
             total_due_fen = royalty_amount_fen + management_fee_fen
+            # 模型字段（元）仅用于回退兼容路径与日志展示，整除转换无误差
+            total_revenue = total_revenue_fen / 100.0
+            royalty_amount = royalty_amount_fen / 100.0
 
             # Step 4: 构建账单
             due_date = RoyaltyCalculator._calc_due_date(bill_month)
