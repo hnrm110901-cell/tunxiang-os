@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services import order_extensions as ext
 
@@ -69,7 +70,7 @@ async def gift_dish(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "订单操作失败", e)
 
 
 @router.post("/{order_id}/split")
@@ -90,7 +91,7 @@ async def split_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "订单操作失败", e)
 
 
 @router.post("/merge")
@@ -109,7 +110,7 @@ async def merge_orders(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "订单操作失败", e)
 
 
 @router.post("/{order_id}/change-request")
@@ -131,7 +132,7 @@ async def request_order_change(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "订单操作失败", e)
 
 
 @router.post("/changes/{change_id}/approve")
@@ -152,4 +153,4 @@ async def approve_order_change(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "订单操作失败", e)

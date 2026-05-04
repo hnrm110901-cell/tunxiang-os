@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services import order_extensions as ext
 
@@ -104,7 +105,7 @@ async def gift_dish(
         return _ok(result)
     except ValueError as e:
         log.warning("gift_dish_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "赠菜操作失败", e)
 
 
 # ─── 2. 拆单 ───
@@ -132,7 +133,7 @@ async def split_order(
         return _ok(result)
     except ValueError as e:
         log.warning("split_order_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "拆单操作失败", e)
 
 
 # ─── 3. 并单 ───
@@ -163,7 +164,7 @@ async def merge_orders(
         return _ok(result)
     except ValueError as e:
         log.warning("merge_orders_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "并单操作失败", e)
 
 
 # ─── 4. 改单申请 ───
@@ -192,7 +193,7 @@ async def request_order_change(
         return _ok(result)
     except ValueError as e:
         log.warning("order_change_request_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "改单申请失败", e)
 
 
 # ─── 5. 改单审批 ───
@@ -220,4 +221,4 @@ async def approve_order_change(
         return _ok(result)
     except ValueError as e:
         log.warning("approve_order_change_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "改单审批失败", e)

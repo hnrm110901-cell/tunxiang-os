@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.service_charge import (
     calculate_service_charge,
@@ -138,7 +139,7 @@ async def api_publish_template(
     try:
         result = await publish_template(body.template_id, body.store_ids, tenant_id, db)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "服务费模板不存在", e)
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e)
     return _ok(result)

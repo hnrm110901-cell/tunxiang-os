@@ -9,6 +9,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.invoice_service import (
     create_invoice_request,
     generate_qrcode_data,
@@ -75,7 +77,7 @@ async def api_create_invoice(body: CreateInvoiceReq, request: Request):
             items=body.items,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "开票请求参数无效", e)
     return _ok(result)
 
 
@@ -86,9 +88,9 @@ async def api_submit_invoice(body: SubmitInvoiceReq, request: Request):
     try:
         result = await submit_to_tax_platform(body.invoice_id, tenant_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "发票提交参数无效", e)
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e)
     return _ok(result)
 
 
@@ -99,9 +101,9 @@ async def api_get_invoice_status(invoice_id: str, request: Request):
     try:
         result = await get_invoice_status(invoice_id, tenant_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "发票记录不存在", e)
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e)
     return _ok(result)
 
 

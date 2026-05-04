@@ -17,6 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -217,7 +218,7 @@ async def get_shift_summary_history(
         return {"ok": True, "data": {"items": [], "total": 0}}
     except ValueError as e:
         log.warning("shift_summary_history_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "查询参数无效", e)
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("shift_summary_history_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

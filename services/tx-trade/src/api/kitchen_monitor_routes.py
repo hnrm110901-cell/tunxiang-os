@@ -24,6 +24,7 @@ from fastapi import APIRouter
 
 from shared.ontology.src.database import Depends, HTTPException, Request
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(tags=["kitchen-monitor"])
 
@@ -293,7 +294,7 @@ async def get_dashboard(
         shortage = await _get_shortage_alerts(store_id, tenant_id, db)
         remake = await _get_remake_tasks(store_id, tenant_id, db)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "厨房监控查询失败", e)
 
     total = len(overtime) + len(shortage) + len(remake)
     _log.info(
@@ -335,7 +336,7 @@ async def get_overtime(
     try:
         items = await _get_overtime_tasks(store_id, tenant_id, db)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "厨房监控查询失败", e)
 
     return {
         "ok": True,
@@ -365,7 +366,7 @@ async def get_shortage(
     try:
         alerts = await _get_shortage_alerts(store_id, tenant_id, db)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "厨房监控查询失败", e)
 
     return {
         "ok": True,
@@ -393,7 +394,7 @@ async def get_remake(
     try:
         tasks = await _get_remake_tasks(store_id, tenant_id, db)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "厨房监控查询失败", e)
 
     return {
         "ok": True,
@@ -432,7 +433,7 @@ async def get_trend(
     try:
         trend = await _get_hourly_trend(store_id, tenant_id, db)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "厨房监控查询失败", e)
 
     return {
         "ok": True,
