@@ -1,7 +1,9 @@
 """toxiproxy_required 烟测——只在真 toxiproxy 容器存在时跑。
 
 执行：
-    docker compose -f infra/docker/docker-compose.toxiproxy.yml up -d
+    docker compose -f infra/compose/base.yml \
+                   -f infra/compose/envs/dev.yml \
+                   -f infra/compose/special/toxiproxy.yml up -d toxiproxy
     pytest -m toxiproxy_required shared/test_infra/tests/test_toxiproxy_smoke.py
 
 CI（PR gate）默认跳过，只在手动 workflow_dispatch 触发。

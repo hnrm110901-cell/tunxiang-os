@@ -144,6 +144,46 @@
 - 推 ontology 审批：member_points_batches / member_card_points / points_log 三表 + RLS 策略
 - main.py lifespan 注册 PointsExpiryWorker（hour=3, minute=0）
 
+## 2026-05-04 P0.5 Phase 4 — 下游引用对齐 infra/compose/
+
+### 今日完成（feat/p0-compose-consolidation）
+
+#### 阶段 G — CI workflows
+- [ci] `.github/workflows/deploy.yml`：staging/prod ssh 部署脚本 `docker-compose -f docker-compose.{staging,prod}.yml` 改为 `docker compose -f infra/compose/base.yml -f infra/compose/envs/{staging,prod}.yml`
+- [ci] `.github/workflows/toxiproxy-smoke.yml`：toxiproxy 启停改用 `base.yml + envs/dev.yml + special/toxiproxy.yml` 三层叠加
+- [ci] `.github/workflows/offline-e2e.yml`：paths 触发器从 `infra/docker/docker-compose.toxiproxy.yml` 改为 `infra/compose/special/toxiproxy.yml`
+- [ci] `.github/workflows/pr-check.yml`：路径分类规则去掉已废弃的 `docker-compose*` 通配（`infra/*` 已覆盖）
+- 4 份 workflow 全部 yaml 校验通过
+
+#### 阶段 H — scripts
+- [scripts] `auto-sync.sh`：`COMPOSE_FILE`+`COMPOSE_DIR` 改为 `COMPOSE_ARGS=(-f base -f envs/prod)`；监听变更路径含 `infra/compose/`
+- [scripts] `rollback-service.sh`：`ps` 与 `up -d` 改用 base + envs/prod
+- [scripts] `deploy.sh`：重构 — 引入 `compose_files_for_target()` 函数，staging/prod/gray 全部走 `base + envs/<target>.yml`；`docker-compose` 全替换为 `docker compose`（v2）
+- [scripts] `gate1-manual-ops.sh` / `setup-security-keys.sh` / `DEPLOY_QUICKSTART.md`：手册命令对齐
+- [scripts] `week8_gate_check.sh`：端口冲突扫描器目标改为 `infra/compose/envs/dev.yml`
+- 7 份脚本 `bash -n` 校验通过
+
+#### 阶段 I — Helm chart 端口反向校验
+- 14 个 chart（api-gateway / tx-trade / tx-menu / tx-member / tx-growth / tx-ops / tx-supply / tx-finance / tx-agent / tx-analytics / tx-brain / tx-intel / tx-org / web-admin）port/targetPort 与 `infra/compose/base.yml` 完全一致，**无需改动**
+- mcp-server / tx-pay / tx-predict / tx-civic / tx-expense / tx-forge / tx-devforge 在 `infra/helm/` 下无独立 chart（待 P0-2 合并 + 后续补齐），本次未涉及
+- 机器无 `helm` CLI，未跑 `helm template`；14 个 `values.yaml` 全部 yaml 语法校验通过
+
+#### 阶段 J — 残留扫描 + 文档收尾
+- 全仓两条扫描清零：`grep -rn 'docker-compose\.(yml|prod|staging|gray|dev|demo|czyz|sgc|zqx|toxiproxy|resource-limits)'` 与 `grep -rn 'infra/docker/docker-compose'`（排除归档文档与 `infra/compose/special/` 内注释）
+- 附带对齐：`Makefile` / `README.md` / `.env.{staging,gray}.example` / `infra/nginx/conf.d/api.conf` / `e2e/README.md` / `e2e/scripts/toxiproxy-inject.sh` / `shared/test_infra/{fixtures.py,tests/test_toxiproxy_smoke.py}`
+- `docs/infra/compose-validation-2026-05.md` 新增 "Phase 4 执行结果" 小节
+
+### 数据变化
+- 改动文件：4 (workflows) + 7 (scripts) + 7 (附带对齐) + 1 (validation doc) + 1 (DEVLOG) = 20
+- 端口/Helm 改动：0（已全绿）
+
+### 遗留问题
+- `infra/compose/special/toxiproxy.yml` 与 `special/resource-limits.yml` 头部注释仍引用旧路径——按 "不碰 special/（P0.5 已稳定）" 原则未改，可放在 P0.6 维护轮
+- mcp-server/tx-pay/tx-predict 等 7 个服务无独立 helm chart，等 P0-2 合并后单独补
+- 旧根 `docker-compose.{yml,prod,staging,gray}.yml` 与 `infra/docker/docker-compose*.yml` 已在 P0.5 阶段 D 删除，本次仅清理引用
+
+---
+
 ## 2026-05-03 生产前安全审计全量修复 — 代码已 push
 
 ### 今日完成

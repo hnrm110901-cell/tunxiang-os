@@ -10,7 +10,7 @@
 #   ./toxiproxy-inject.sh reset tx-trade          # 清除所有 toxic
 #
 # 依赖：
-#   - docker-compose.toxiproxy.yml 已 up
+#   - toxiproxy 容器已启动（infra/compose/special/toxiproxy.yml）
 #   - curl
 # ============================================================
 set -euo pipefail
