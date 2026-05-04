@@ -41,10 +41,10 @@ class IdempotencyGuard:
                 FROM payment_idempotency
                 WHERE idempotency_key = :key
                   AND tenant_id = :tenant_id::UUID
-                  AND created_at > NOW() - INTERVAL ':hours hours'
-            """.replace(":hours", str(_IDEMPOTENCY_WINDOW_HOURS))
+                  AND created_at > NOW() - make_interval(hours => :hours)
+            """
             ),
-            {"key": idempotency_key, "tenant_id": tenant_id},
+            {"key": idempotency_key, "tenant_id": tenant_id, "hours": _IDEMPOTENCY_WINDOW_HOURS},
         )
         row = result.fetchone()
         if row is None:
