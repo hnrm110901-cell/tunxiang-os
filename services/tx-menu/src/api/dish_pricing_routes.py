@@ -12,11 +12,11 @@
 """
 from __future__ import annotations
 
-import logging
 from datetime import date as date_cls
 from typing import Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -32,7 +32,7 @@ from ..services.dish_dynamic_pricing_service import (
     transition_status,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(
     prefix="/api/v1/menu/dish/pricing",
     tags=["menu-dish-pricing"],
@@ -92,8 +92,9 @@ async def suggest_pricing(
     if not suggestion.constraint_check.get("margin_floor_passed"):
         # 本 PR 仍持久化（方便审计），但标记 rejected 建议
         logger.warning(
-            "dish_pricing_margin_floor_violation dish=%s current_margin=%s",
-            req.dish_name, suggestion.current_margin_rate,
+            "dish_pricing_margin_floor_violation",
+            dish=req.dish_name,
+            current_margin=suggestion.current_margin_rate,
         )
 
     try:

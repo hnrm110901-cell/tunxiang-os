@@ -27,14 +27,15 @@
 """
 from __future__ import annotations
 
-import logging
 import math
 import uuid
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 # 硬约束
 MARGIN_FLOOR = 0.15          # 毛利底线 15%（CLAUDE.md §9）
@@ -301,7 +302,7 @@ class DishDynamicPricingService:
                 response = await self.sonnet_invoker(prompt, "claude-sonnet-4-6")
                 return self._parse_sonnet_response(response, suggestion)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("sonnet_validate_failed error=%s", exc)
+                logger.warning("sonnet_validate_failed", error=str(exc))
                 # 降级到规则
 
         # Fallback：基于规则判定
