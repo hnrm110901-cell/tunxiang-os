@@ -203,6 +203,8 @@ async def backfill_one_table(
     if spec.has_store_id and "store_id" not in cols:
         cols += ", store_id"
     # 关键业务字段（mapper 会用到）— 用 SELECT *  简化（量级可控）
+    # spec.table / spec.pk_col 来自 _TABLE_SPECS 白名单（6 张固定表）；
+    # 所有外部值（tenant_id/limit）走 SQLAlchemy bind params。
     select_sql = f"""
         SELECT *
         FROM {spec.table}
@@ -210,7 +212,7 @@ async def backfill_one_table(
         {"AND tenant_id = :tenant_id" if tenant_filter else ""}
         ORDER BY created_at NULLS FIRST, {spec.pk_col}
         LIMIT :limit
-    """
+    """  # noqa: S608
     params: dict[str, Any] = {"limit": batch_size}
     if tenant_filter:
         params["tenant_id"] = tenant_filter
@@ -256,8 +258,9 @@ async def backfill_one_table(
             )
 
             if event_id:
+                # spec.table/pk_col 白名单常量；eid/pk 走 bind params
                 await db_update(
-                    f"UPDATE {spec.table} SET last_event_id = :eid WHERE {spec.pk_col} = :pk",
+                    f"UPDATE {spec.table} SET last_event_id = :eid WHERE {spec.pk_col} = :pk",  # noqa: S608
                     {"eid": event_id, "pk": row[spec.pk_col]},
                 )
                 stats.emitted += 1
@@ -296,9 +299,10 @@ async def _main_async(args: argparse.Namespace) -> int:
 
     # 真正运行：在调用方接线 AsyncSession + emit_event
     # （故意不在脚本启动时 import shared.* 以保持 dry-run 可在干净环境跑）
+    from sqlalchemy import text  # type: ignore
+
     from shared.events.src.emitter import emit_event  # type: ignore
     from shared.ontology.src.database import async_session_factory  # type: ignore
-    from sqlalchemy import text  # type: ignore
 
     async with async_session_factory() as session:
         if args.tenant_id:
