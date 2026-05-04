@@ -22,7 +22,7 @@ export default defineConfig({
     {
       name: 'web-admin',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /\/(auth|dish-management|member|navigation)\./,
+      testMatch: /\/(auth|dish-management|member|navigation|admin-|crew-)\./,
     },
     {
       name: 'web-pos',

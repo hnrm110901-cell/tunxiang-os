@@ -15,7 +15,7 @@ const OFFLINE_QUEUE_DB = 'tx-kds-offline-queue';
 const OFFLINE_QUEUE_STORE = 'queue';
 
 // 关键页面预缓存
-const PRECACHE_URLS = ['/', '/index.html'];
+const PRECACHE_URLS = ['/', '/index.html', '/offline.html'];
 
 // KDS 出餐确认操作路径前缀（需要离线队列）
 const KDS_WRITE_PATHS = [

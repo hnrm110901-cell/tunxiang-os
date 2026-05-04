@@ -1,4 +1,4 @@
-"""分账引擎 API — 8 个端点（v100 + 通道通知）
+"""分账引擎 API — 12 个端点（v100 + 通道通知 + Phase C1 微信/对账）
 
 端点：
 1. POST   /api/v1/finance/splits/rules              创建/更新分润规则
@@ -9,6 +9,10 @@
 6. GET    /api/v1/finance/splits/transactions       分润流水
 7. GET    /api/v1/finance/splits/settlement         分账汇总（按收款方）
 8. POST   /api/v1/finance/splits/channel-notify     通道异步结果（Y-B2 骨架 + 可选 HMAC）
+9. POST   /api/v1/finance/splits/channel-notify/wechat  微信 V3 分账回调（验签+解密+匹配）[C1]
+10. POST  /api/v1/finance/splits/reconciliation/run      触发分账对账（定时/手动）[C1]
+11. GET   /api/v1/finance/splits/reconciliation/report   分账对账报告 [C1]
+12. POST  /api/v1/finance/splits/reconciliation/cancel-stale 取消超时 pending 记录 [C1]
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Literal, Optional
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +29,10 @@ from shared.ontology.src.database import get_db_with_tenant
 
 from ..services.split_engine import RECIPIENT_TYPES, SPLIT_METHODS, SplitEngine
 from ..services.split_notify_security import verify_split_channel_notify_signature
+from ..services.split_reconciliation import SplitReconciler
+from ..services.wechat_split_callback import WechatSplitCallbackHandler
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/finance/splits", tags=["split_engine"])
 
@@ -354,3 +363,164 @@ async def get_settlement_summary(
         end_date=end_date,
     )
     return {"ok": True, "data": summary}
+
+
+# ─── 9. 微信 V3 分账回调（C1）─────────────────────────────────────────────────
+
+
+@router.post("/channel-notify/wechat", summary="微信 V3 分账回调（验签+解密+匹配）")
+async def wechat_split_callback(
+    request: Request,
+    db: AsyncSession = Depends(_get_tenant_db),
+    x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
+    wechatpay_signature: str = Header(..., alias="Wechatpay-Signature"),
+    wechatpay_timestamp: str = Header(..., alias="Wechatpay-Timestamp"),
+    wechatpay_nonce: str = Header(..., alias="Wechatpay-Nonce"),
+    wechatpay_serial: str = Header(..., alias="Wechatpay-Serial"),
+) -> Dict[str, Any]:
+    """接收微信支付 V3 分账完成通知。
+
+    微信回调格式：https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter8_1_11.shtml
+
+    流程：
+      1. 验证微信平台证书签名（RSA-SHA256 + 防重放）
+      2. 解密 resource.ciphertext（AEAD_AES_256_GCM）
+      3. 从回调 payload 提取 sub_mchid/out_order_no，解析 tenant_id
+         (微信回调不携带 X-Tenant-ID，需从商户号映射或 order_no DB 反查)
+      4. 将分账结果映射为内部格式
+      5. 调用 SplitEngine.apply_channel_notification 更新流水状态
+
+    幂等性：已 settled/cancelled 的记录不受重复通知影响。
+    """
+    from ..services.wechat_split_callback import _resolve_tenant_id_from_wechat
+
+    body_bytes = await request.body()
+    headers = {
+        "wechatpay-signature": wechatpay_signature,
+        "wechatpay-timestamp": wechatpay_timestamp,
+        "wechatpay-nonce": wechatpay_nonce,
+        "wechatpay-serial": wechatpay_serial,
+    }
+
+    # 微信回调不携带 X-Tenant-ID header，需从回调内容中解析
+    if not x_tenant_id:
+        # 尝试先解密以提取 sub_mchid / out_order_no 用于 tenant_id 解析
+        try:
+            import json as _json
+            notification = _json.loads(body_bytes.decode("utf-8"))
+            resource_data = notification.get("resource", {})
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            logger.warning(
+                "wechat_callback.body_parse_failed",
+                error=str(exc),
+            )
+            resource_data = {}
+
+        _sub_mchid = resource_data.get("sub_mchid", "") or notification.get("sub_mchid", "")
+        _order_no = resource_data.get("out_order_no", "") or notification.get("out_order_no", "")
+        x_tenant_id = _resolve_tenant_id_from_wechat(_sub_mchid, _order_no)
+
+    if not x_tenant_id:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "tenant_required",
+                "message": "Cannot determine tenant_id from WeChat callback. "
+                           "Set TX_WECHAT_MCH_TENANT_MAP or TX_WECHAT_DEFAULT_TENANT_ID.",
+            },
+        )
+
+    handler = WechatSplitCallbackHandler(db, x_tenant_id)
+    result = await handler.process_callback(body_bytes, headers)
+    if not result["ok"]:
+        error_code = result.get("error", {}).get("code", "UNKNOWN")
+        status_map = {
+            "MISSING_WECHAT_HEADERS": 400,
+            "SIGNATURE_VERIFICATION_FAILED": 401,
+            "DECRYPT_FAILED": 400,
+            "INVALID_JSON": 422,
+        }
+        raise HTTPException(
+            status_code=status_map.get(error_code, 400),
+            detail=result["error"],
+        )
+    return result
+
+
+# ─── 10-12. 分账对账（C1）─────────────────────────────────────────────────────
+
+
+class ReconciliationQuery(BaseModel):
+    """对账查询参数"""
+    start_date: Optional[str] = Field(None, description="开始日期 YYYY-MM-DD")
+    end_date: Optional[str] = Field(None, description="结束日期 YYYY-MM-DD")
+    cancel_stale_hours: int = Field(72, ge=24, le=720, description="超时取消阈值（小时）")
+
+
+@router.post("/reconciliation/run", summary="触发分账对账")
+async def run_reconciliation(
+    query: ReconciliationQuery,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """手动触发分账对账。
+
+    比对 profit_split_records 与支付通道实付金额，标记异常记录。
+    """
+    reconciler = SplitReconciler(db, x_tenant_id)
+
+    s_date = date.fromisoformat(query.start_date) if query.start_date else date.today()
+    e_date = date.fromisoformat(query.end_date) if query.end_date else date.today()
+
+    # 并行执行对账操作
+    timeouts = await reconciler.get_pending_timeouts(older_than_hours=24)
+    amount_mismatches = await reconciler.detect_amount_mismatches(s_date, e_date)
+    cancel_result = await reconciler.cancel_stale_pending(
+        older_than_hours=query.cancel_stale_hours
+    )
+
+    await db.commit()
+
+    return {
+        "ok": True,
+        "data": {
+            "period": {"start": s_date.isoformat(), "end": e_date.isoformat()},
+            "timeout_pending_count": len(timeouts),
+            "stale_cancelled_count": cancel_result["data"]["cancelled_records"],
+            "risk_breakdown": amount_mismatches,
+            "top_timeouts": timeouts[:10],
+        },
+    }
+
+
+@router.get("/reconciliation/report", summary="分账对账报告")
+async def get_reconciliation_report(
+    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """获取分账对账综合报告。
+
+    包含超时 pending、金额差异、风险评级。
+    """
+    reconciler = SplitReconciler(db, x_tenant_id)
+
+    s_date = date.fromisoformat(start_date) if start_date else date.today()
+    e_date = date.fromisoformat(end_date) if end_date else date.today()
+
+    report = await reconciler.generate_reconciliation_report(s_date, e_date)
+    return report
+
+
+@router.post("/reconciliation/cancel-stale", summary="取消超时 pending 记录")
+async def cancel_stale_pending(
+    older_than_hours: int = Query(72, ge=24, le=720, description="超时阈值（小时）"),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_tenant_db),
+) -> Dict[str, Any]:
+    """批量取消超过指定时间仍为 pending 的分账记录。"""
+    reconciler = SplitReconciler(db, x_tenant_id)
+    result = await reconciler.cancel_stale_pending(older_than_hours=older_than_hours)
+    await db.commit()
+    return result

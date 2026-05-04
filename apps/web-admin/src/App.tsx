@@ -77,6 +77,8 @@ import { DepositManagePage } from './pages/finance/DepositManagePage';
 import { CostManagePage } from './pages/finance/CostManagePage';
 import { BudgetManagePage } from './pages/finance/BudgetManagePage';
 import { AgreementUnitPage } from './pages/finance/AgreementUnitPage';  // TC-P1-09
+import SplitPaymentPage from './pages/finance/SplitPaymentPage';
+import SplitRuleManagePage from './pages/finance/SplitRuleManagePage';
 import { EnterprisePage } from './pages/trade/EnterprisePage';
 import { ServiceChargeConfigPage } from './pages/trade/ServiceChargeConfigPage';
 import { DispatchRuleConfigPage } from './pages/kds/DispatchRuleConfigPage';
@@ -287,6 +289,8 @@ function App() {
           <Route path="/finance/costs" element={<CostManagePage />} />
           <Route path="/finance/budgets" element={<BudgetManagePage />} />
           <Route path="/finance/agreement-units" element={<AgreementUnitPage />} />  {/* TC-P1-09 协议单位 */}
+          <Route path="/finance/split-payment" element={<SplitPaymentPage />} />
+          <Route path="/finance/split-rules" element={<SplitRuleManagePage />} />
           {/* ─── Phase1: 交易配置 ─── */}
           <Route path="/trade/enterprise" element={<EnterprisePage />} />
           <Route path="/trade/service-charge" element={<ServiceChargeConfigPage />} />

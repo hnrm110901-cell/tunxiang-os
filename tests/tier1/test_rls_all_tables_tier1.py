@@ -62,8 +62,7 @@ RLS_EXEMPT_TABLES: frozenset[str] = frozenset({
     "market_trend_signals",
     "supplier_profiles",  # 跨租户共享供应商目录
     "supplier_score_history",
-    # 下列业务表允许豁免（已在 TODO 清单）
-    "payment_events",  # v068：按 payment_id 的 FK 隔离；TODO 补 RLS
+    # payment_events 已从豁免移除——RLS 由 v384 迁移补齐
 })
 
 # 正则捕获的 CREATE TABLE 第一个 token 可能是假阳性

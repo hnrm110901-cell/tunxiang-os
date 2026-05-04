@@ -1,7 +1,15 @@
-"""屯象OS tx-agent AI 薪酬顾问 Agent：薪资推荐、离职风险预测、调薪方案优化。"""
+"""屯象OS tx-agent AI 薪酬顾问 Agent：薪资推荐、离职风险预测、调薪方案优化。
+
+Phase C2-Agent 升级（2026-05-03）：
+  添加 TX_AGENT_USE_MV_READS 环境变量 gate
+  _load_store_pnl:         MV 路径 → mv_store_pnl（已有），降级保持不变
+  _load_current_staffing:  MV 路径 → mv_employee_efficiency，降级 → 直接查询 employees
+  _load_employee_for_turnover: MV 路径 → mv_employee_efficiency + mv_store_pnl，降级 → 多表JOIN
+"""
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import date, datetime
 from typing import Any, Optional
@@ -13,6 +21,9 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
+
+# Phase C2-Agent: env-var gate for MV reads
+_USE_MV_READS = os.getenv("TX_AGENT_USE_MV_READS", "").lower() == "true"
 
 SALARY_BENCHMARKS: dict[tuple[str, str], dict[str, int]] = {
     ("changsha", "waiter"): {"p25": 350000, "p50": 420000, "p75": 500000},
@@ -814,19 +825,34 @@ class SalaryAdvisorAgent(SkillAgent):
         }
 
     async def _load_current_staffing(self, store_id: str) -> list[dict[str, Any]]:
-        """加载当前门店编制情况，降级为mock"""
+        """加载当前门店编制情况。
+
+        Phase C2-Agent: TX_AGENT_USE_MV_READS=true → mv_employee_efficiency
+                        降级 → 直接查询 employees
+        """
         if self._db is not None:
-            q = text("""
-                SELECT LOWER(COALESCE(role, 'waiter')) AS role,
-                       COUNT(*) AS count
-                FROM employees
-                WHERE tenant_id = CAST(:tenant_id AS uuid)
-                  AND store_id = CAST(:store_id AS uuid)
-                  AND is_deleted = false
-                  AND COALESCE(is_active, true) = true
-                GROUP BY LOWER(COALESCE(role, 'waiter'))
-            """)
             try:
+                if _USE_MV_READS:
+                    q = text("""
+                        SELECT LOWER(COALESCE(role_type, 'waiter')) AS role,
+                               COUNT(DISTINCT employee_id) AS count
+                        FROM mv_employee_efficiency
+                        WHERE tenant_id = CAST(:tenant_id AS uuid)
+                          AND store_id = CAST(:store_id AS uuid)
+                          AND stat_date >= CURRENT_DATE - INTERVAL '7 days'
+                        GROUP BY LOWER(COALESCE(role_type, 'waiter'))
+                    """)
+                else:
+                    q = text("""
+                        SELECT LOWER(COALESCE(role, 'waiter')) AS role,
+                               COUNT(*) AS count
+                        FROM employees
+                        WHERE tenant_id = CAST(:tenant_id AS uuid)
+                          AND store_id = CAST(:store_id AS uuid)
+                          AND is_deleted = false
+                          AND COALESCE(is_active, true) = true
+                        GROUP BY LOWER(COALESCE(role, 'waiter'))
+                    """)
                 result = await self._db.execute(
                     q,
                     {

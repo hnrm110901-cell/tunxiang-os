@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0D1117" />
+    <title>网络连接中断 - 屯象KDS</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #0D1117;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        color: #e6e6e6;
+      }
+      .container { text-align: center; padding: 40px 20px; max-width: 420px; }
+      .icon { font-size: 72px; margin-bottom: 16px; }
+      h1 { font-size: 22px; margin-bottom: 12px; color: #fff; }
+      p { font-size: 14px; color: #999; line-height: 1.6; margin-bottom: 24px; }
+      .hint { font-size: 12px; color: #555; margin-bottom: 24px; }
+      .retry-btn {
+        background: #FF6B2C;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 14px 40px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .retry-btn:active { opacity: 0.8; }
+      .queue-status {
+        margin-top: 16px;
+        font-size: 12px;
+        color: #4CAF50;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">🍳</div>
+      <h1>后厨网络已断开</h1>
+      <p>出餐确认仍在本地运行，恢复网络后自动同步。<br/>请检查路由器或网线连接。</p>
+      <div class="hint">出餐数据不会丢失</div>
+      <button class="retry-btn" onclick="retryConnection()">重试连接</button>
+      <div class="queue-status" id="queueStatus"></div>
+    </div>
+    <script>
+      const QUEUE_STATUS = document.getElementById('queueStatus');
+
+      function retryConnection() {
+        fetch('/api/v1/health', { method: 'HEAD', cache: 'no-store' })
+          .then(() => { window.location.reload(); })
+          .catch(() => {});
+      }
+
+      // 自动重试：每 15 秒检测一次（KDS 需要更快恢复）
+      setInterval(() => {
+        fetch('/api/v1/health', { method: 'HEAD', cache: 'no-store' })
+          .then(() => { window.location.reload(); })
+          .catch(() => {});
+      }, 15000);
+
+      // 监听 Service Worker 队列状态
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data?.type === 'OFFLINE_QUEUE_DRAINED') {
+            QUEUE_STATUS.style.display = 'block';
+            QUEUE_STATUS.textContent = '已同步 ' + event.data.count + ' 条离线出餐记录';
+          }
+        });
+      }
+
+      window.addEventListener('online', () => { window.location.reload(); });
+    </script>
+  </body>
+</html>

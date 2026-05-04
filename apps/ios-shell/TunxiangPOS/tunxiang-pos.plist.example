@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  屯象OS iPad POS Shell — 门店部署配置
+  部署时将此文件重命名为 tunxiang-pos.plist 放入 Bundle 根目录。
+
+  配置优先级：
+    1. 本文件（tunxiang-pos.plist）—— 门店部署包内置
+    2. UserDefaults —— 首次配置页交互写入
+    3. Info.plist 环境变量 —— Xcode Scheme 注入
+    4. 硬编码默认值 —— 仅开发用
+
+  用法：
+    cp tunxiang-pos.plist.example tunxiang-pos.plist
+    # 编辑 tunxiang-pos.plist 填入实际门店值
+    # 将 tunxiang-pos.plist 拖入 Xcode 项目 Bundle
+
+  注意：此文件包含门店内网 IP，请勿提交到版本控制。
+        tunxiang-pos.plist 已在 .gitignore 中排除。
+-->
+<plist version="1.0">
+<dict>
+    <!-- ═══ 门店标识 ════════════════════════════════════════════ -->
+    <!-- 门店 ID（租户标识，用于 RLS 隔离 + 数据路由） -->
+    <key>store_id</key>
+    <string>xuji-hunan-001</string>
+
+    <!-- ═══ 运行环境 ════════════════════════════════════════════ -->
+    <!-- dev | staging | prod -->
+    <key>environment</key>
+    <string>prod</string>
+
+    <!-- ═══ 服务器地址 ══════════════════════════════════════════ -->
+    <!-- React Web App 部署地址（门店局域网 Mac mini 或云端） -->
+    <key>app_url</key>
+    <string>http://192.168.1.100:8000</string>
+
+    <!-- Android POS 主机地址（外设指令 HTTP 转发目标） -->
+    <key>pos_host_url</key>
+    <string>http://192.168.1.10:8080</string>
+
+    <!-- Mac mini 边缘智能后台地址 -->
+    <key>mac_mini_url</key>
+    <string>http://192.168.1.100:8000</string>
+
+    <!-- ═══ 门店示例配置 ══════════════════════════════════════════
+    以下为各门店示例，部署时取消注释并修改：
+
+    徐记海鲜 湖南总店（旗舰店）
+    <key>store_id</key>
+    <string>xuji-hunan-001</string>
+    <key>environment</key>
+    <string>prod</string>
+    <key>app_url</key>
+    <string>http://192.168.1.100:8000</string>
+
+    尝在一起（品智POS试点）
+    <key>store_id</key>
+    <string>changzaiyiqi-001</string>
+    <key>environment</key>
+    <string>staging</string>
+    <key>app_url</key>
+    <string>http://192.168.2.100:8000</string>
+
+    最黔线（贵州试点）
+    <key>store_id</key>
+    <string>zuiqian-001</string>
+    <key>environment</key>
+    <string>dev</string>
+    <key>app_url</key>
+    <string>http://192.168.3.100:8000</string>
+
+    尚宫厨（广州试点）
+    <key>store_id</key>
+    <string>shangongchu-001</string>
+    <key>environment</key>
+    <string>dev</string>
+    <key>app_url</key>
+    <string>http://192.168.4.100:8000</string>
+    -->
+</dict>
+</plist>

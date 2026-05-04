@@ -1,6 +1,6 @@
-// 缓存关键资源，支持离线访问首页
+// 缓存关键资源，支持离线访问首页和离线页面
 const CACHE_NAME = 'tunxiang-admin-v1';
-const URLS_TO_CACHE = ['/', '/m/dashboard', '/static/js/main.js'];
+const URLS_TO_CACHE = ['/', '/m/dashboard', '/static/js/main.js', '/offline.html'];
 
 self.addEventListener('install', event => {
   event.waitUntil(

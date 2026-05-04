@@ -8,6 +8,10 @@ Phase 3 升级（2026-04-04）：
   新增 get_daily_discount_health — 直接读取 mv_discount_health 物化视图
   替代原有的跨服务查询模式（读视图延迟 < 5ms vs 跨服务拼接 > 100ms）
 
+Phase C2-Agent 升级（2026-05-03）：
+  添加 TX_AGENT_USE_MV_READS 环境变量 gate，控制 MV 读取 vs 直接查询的切换
+  get_daily_discount_health: MV 路径 → mv_discount_health，降级 → 直接查询 orders
+
 P1-5 升级（2026-04-12）：
   集成 EdgeAwareMixin — 折扣异常检测优先使用边缘 Core ML 推理
   边缘高置信度（>0.8）时直接使用边缘结果，节省 Claude API 成本
@@ -27,6 +31,9 @@ from ..base import ActionConfig, AgentResult, SkillAgent
 from ..edge_mixin import EdgeAwareMixin
 
 logger = structlog.get_logger()
+
+# Phase C2-Agent: env-var gate for MV reads
+_USE_MV_READS = os.getenv("TX_AGENT_USE_MV_READS", "").lower() == "true"
 
 
 # 报表类型
@@ -258,9 +265,9 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         )
 
     async def _get_daily_discount_health(self, params: dict) -> AgentResult:
-        """Phase 3 — 直接读 mv_discount_health 物化视图，返回当日折扣健康摘要。
+        """Phase 3 — 读 mv_discount_health 物化视图，返回当日折扣健康摘要。
 
-        替代原有的跨服务查询模式。视图由 DiscountHealthProjector 实时维护。
+        Phase C2-Agent gate: TX_AGENT_USE_MV_READS=true 使用 MV，否则降级到直接查询。
 
         Params:
             store_id:   门店 ID（必传）
@@ -288,111 +295,10 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
         try:
             stat_date: date = date.fromisoformat(stat_date_str) if stat_date_str else date.today()
 
-            row = await self._db.execute(
-                text("""
-                    SELECT
-                        total_orders,
-                        discounted_orders,
-                        discount_rate,
-                        total_discount_fen,
-                        unauthorized_count,
-                        threshold_breaches,
-                        leak_types,
-                        updated_at
-                    FROM mv_discount_health
-                    WHERE tenant_id = :tid
-                      AND store_id = :sid
-                      AND stat_date = :dt
-                """),
-                {
-                    "tid": self.tenant_id,
-                    "sid": store_id,
-                    "dt": stat_date,
-                },
-            )
-            health = dict((row.mappings().first() or {}))
-
-            if not health:
-                return AgentResult(
-                    success=True,
-                    action="get_daily_discount_health",
-                    data={
-                        "store_id": store_id,
-                        "stat_date": stat_date.isoformat(),
-                        "message": "暂无数据（投影器尚未消费到今日事件）",
-                        "discount_rate": 0,
-                        "is_alert": False,
-                    },
-                    reasoning="mv_discount_health 无当日记录",
-                    confidence=0.5,
-                )
-
-            discount_rate = float(health.get("discount_rate", 0))
-            unauthorized = int(health.get("unauthorized_count", 0))
-            threshold_breaches = int(health.get("threshold_breaches", 0))
-            is_alert = discount_rate > threshold or unauthorized > 0 or threshold_breaches > 0
-
-            # 风险等级
-            if discount_rate > 0.5 or threshold_breaches > 3:
-                risk_level = "critical"
-            elif discount_rate > threshold or unauthorized > 0:
-                risk_level = "high"
-            elif discount_rate > threshold * 0.7:
-                risk_level = "medium"
+            if _USE_MV_READS:
+                return await self._get_discount_health_from_mv(store_id, stat_date, threshold)
             else:
-                risk_level = "low"
-
-            # 若有风险且有 Claude，进行深度分析
-            llm_analysis = ""
-            if is_alert and risk_level in ("critical", "high") and self._router:
-                try:
-                    leak_types = health.get("leak_types") or {}
-                    llm_analysis = await self._router.complete(
-                        tenant_id=self.tenant_id,
-                        task_type="standard_analysis",
-                        system="你是餐饮收银审计专家，分析折扣健康数据并给出处理建议。用中文，80字以内。",
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": f"今日折扣率{discount_rate:.1%}（阈值{threshold:.1%}），"
-                                f"未授权折扣{unauthorized}次，超毛利底线{threshold_breaches}次，"
-                                f"泄漏类型：{leak_types}。请评估风险并给出具体处理建议。",
-                            }
-                        ],
-                        max_tokens=150,
-                        db=self._db,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("discount_health_llm_fallback", error=str(exc))
-
-            return AgentResult(
-                success=True,
-                action="get_daily_discount_health",
-                data={
-                    "store_id": store_id,
-                    "stat_date": stat_date.isoformat(),
-                    "total_orders": health.get("total_orders", 0),
-                    "discounted_orders": health.get("discounted_orders", 0),
-                    "discount_rate": discount_rate,
-                    "total_discount_yuan": round(int(health.get("total_discount_fen", 0)) / 100, 2),
-                    "unauthorized_count": unauthorized,
-                    "threshold_breaches": threshold_breaches,
-                    "leak_types": health.get("leak_types") or {},
-                    "is_alert": is_alert,
-                    "risk_level": risk_level,
-                    "threshold": threshold,
-                    "llm_analysis": llm_analysis,
-                    "data_freshness": health.get("updated_at", ""),
-                    "source": "mv_discount_health",  # Phase 3 标识
-                },
-                reasoning=(
-                    f"折扣率{discount_rate:.1%}，未授权{unauthorized}次，"
-                    f"超毛利底线{threshold_breaches}次，风险等级={risk_level}。"
-                    + (f"Claude分析：{llm_analysis[:40]}" if llm_analysis else "规则引擎判断")
-                ),
-                confidence=0.99 if llm_analysis else 0.95,
-                inference_layer="cloud" if llm_analysis else "edge",
-            )
+                return await self._get_discount_health_direct(store_id, stat_date, threshold)
 
         except Exception as exc:  # noqa: BLE001
             logger.error(
@@ -404,8 +310,167 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
             return AgentResult(
                 success=False,
                 action="get_daily_discount_health",
-                error=f"读取物化视图失败: {exc}",
+                error=f"读取折扣健康数据失败: {exc}",
             )
+
+    # Phase C2-Agent: MV read path
+    async def _get_discount_health_from_mv(
+        self, store_id: str, stat_date: date, threshold: float
+    ) -> AgentResult:
+        """从 mv_discount_health 物化视图读取折扣健康数据（< 5ms）"""
+        row = await self._db.execute(
+            text("""
+                SELECT
+                    total_orders,
+                    discounted_orders,
+                    discount_rate,
+                    total_discount_fen,
+                    unauthorized_count,
+                    threshold_breaches,
+                    leak_types,
+                    updated_at
+                FROM mv_discount_health
+                WHERE tenant_id = :tid
+                  AND store_id = :sid
+                  AND stat_date = :dt
+            """),
+            {
+                "tid": self.tenant_id,
+                "sid": store_id,
+                "dt": stat_date,
+            },
+        )
+        health = dict(row.mappings().first() or {})
+        return await self._build_discount_health_result(
+            store_id, stat_date, threshold, health, source="mv_discount_health"
+        )
+
+    # Phase C2-Agent: Direct query fallback
+    async def _get_discount_health_direct(
+        self, store_id: str, stat_date: date, threshold: float
+    ) -> AgentResult:
+        """降级：直接查询 orders 表聚合当日折扣健康数据"""
+        row = await self._db.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS total_orders,
+                    COUNT(*) FILTER (WHERE discount_amount_fen > 0) AS discounted_orders,
+                    CASE WHEN COUNT(*) > 0
+                         THEN ROUND(COUNT(*) FILTER (WHERE discount_amount_fen > 0)::NUMERIC / COUNT(*), 4)
+                         ELSE 0 END AS discount_rate,
+                    COALESCE(SUM(discount_amount_fen), 0) AS total_discount_fen,
+                    0 AS unauthorized_count,
+                    0 AS threshold_breaches,
+                    '{}'::JSONB AS leak_types,
+                    NOW() AS updated_at
+                FROM orders
+                WHERE tenant_id = :tid
+                  AND store_id = :sid
+                  AND DATE(created_at) = :dt
+                  AND status = 'paid'
+            """),
+            {
+                "tid": self.tenant_id,
+                "sid": store_id,
+                "dt": stat_date,
+            },
+        )
+        health = dict(row.mappings().first() or {})
+        return await self._build_discount_health_result(
+            store_id, stat_date, threshold, health, source="orders_direct"
+        )
+
+    async def _build_discount_health_result(
+        self,
+        store_id: str,
+        stat_date: date,
+        threshold: float,
+        health: dict,
+        source: str,
+    ) -> AgentResult:
+        """从 health dict 构建折扣健康 AgentResult，MV 和直接查询共用此方法"""
+
+        if not health:
+            return AgentResult(
+                success=True,
+                action="get_daily_discount_health",
+                data={
+                    "store_id": store_id,
+                    "stat_date": stat_date.isoformat(),
+                    "message": "暂无数据（投影器尚未消费到今日事件）",
+                    "discount_rate": 0,
+                    "is_alert": False,
+                },
+                reasoning=f"{source} 无当日记录",
+                confidence=0.5,
+            )
+
+        discount_rate = float(health.get("discount_rate", 0))
+        unauthorized = int(health.get("unauthorized_count", 0))
+        threshold_breaches = int(health.get("threshold_breaches", 0))
+        is_alert = discount_rate > threshold or unauthorized > 0 or threshold_breaches > 0
+
+        # 风险等级
+        if discount_rate > 0.5 or threshold_breaches > 3:
+            risk_level = "critical"
+        elif discount_rate > threshold or unauthorized > 0:
+            risk_level = "high"
+        elif discount_rate > threshold * 0.7:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+
+        # 若有风险且有 Claude，进行深度分析
+        llm_analysis = ""
+        if is_alert and risk_level in ("critical", "high") and self._router:
+            try:
+                leak_types = health.get("leak_types") or {}
+                llm_analysis = await self._router.complete(
+                    tenant_id=self.tenant_id,
+                    task_type="standard_analysis",
+                    system="你是餐饮收银审计专家，分析折扣健康数据并给出处理建议。用中文，80字以内。",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"今日折扣率{discount_rate:.1%}（阈值{threshold:.1%}），"
+                            f"未授权折扣{unauthorized}次，超毛利底线{threshold_breaches}次，"
+                            f"泄漏类型：{leak_types}。请评估风险并给出具体处理建议。",
+                        }
+                    ],
+                    max_tokens=150,
+                    db=self._db,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("discount_health_llm_fallback", error=str(exc))
+
+        return AgentResult(
+            success=True,
+            action="get_daily_discount_health",
+            data={
+                "store_id": store_id,
+                "stat_date": stat_date.isoformat(),
+                "total_orders": health.get("total_orders", 0),
+                "discounted_orders": health.get("discounted_orders", 0),
+                "discount_rate": discount_rate,
+                "total_discount_yuan": round(int(health.get("total_discount_fen", 0)) / 100, 2),
+                "unauthorized_count": unauthorized,
+                "threshold_breaches": threshold_breaches,
+                "leak_types": health.get("leak_types") or {},
+                "is_alert": is_alert,
+                "risk_level": risk_level,
+                "threshold": threshold,
+                "llm_analysis": llm_analysis,
+                "data_freshness": health.get("updated_at", ""),
+                "source": source,  # Phase C2-Agent: dynamic source tag
+            },
+            reasoning=(
+                f"折扣率{discount_rate:.1%}，未授权{unauthorized}次，"
+                f"超毛利底线{threshold_breaches}次，风险等级={risk_level}。"
+                + (f"Claude分析：{llm_analysis[:40]}" if llm_analysis else "规则引擎判断")
+            ),
+            confidence=0.99 if llm_analysis else 0.95,
+            inference_layer="cloud" if llm_analysis else "edge",
+        )
 
     async def _scan_licenses(self, params: dict) -> AgentResult:
         """单门店证照扫描"""

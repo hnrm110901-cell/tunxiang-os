@@ -19,6 +19,7 @@ import { DishAnalyticsPage } from '../pages/analytics/DishAnalyticsPage';
 import { ManagerDashboardPage } from '../pages/analytics/ManagerDashboardPage';
 import { WineDepositReportPage } from '../pages/analytics/WineDepositReportPage';
 import ReportCenterPage from '../pages/analytics/ReportCenterPage';
+import { OpsCockpitPage } from '../pages/analytics/OpsCockpitPage';
 import { RegionOverviewPage } from '../pages/hq/analytics/RegionOverviewPage';
 import { StoreInsightsPage } from '../pages/hq/insights/StoreInsightsPage';
 import { PeriodAnalysisPage } from '../pages/hq/insights/PeriodAnalysisPage';
@@ -46,6 +47,7 @@ export const analyticsRoutes = (
     <Route path="/analytics/dishes" element={<DishAnalyticsPage />} />
     <Route path="/analytics/manager-dashboard" element={<ManagerDashboardPage />} />
     <Route path="/analytics/wine-deposit-report" element={<WineDepositReportPage />} />
+    <Route path="/analytics/ops-cockpit" element={<OpsCockpitPage />} />
     <Route path="/analytics/reports" element={<ReportCenterPage />} />
   </>
 );

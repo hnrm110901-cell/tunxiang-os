@@ -18,6 +18,11 @@
   7. 定时: 节假日前5天         → 节日营销包
 
 升级自 PrivateOpsAgent(P2) → AiMarketingOrchestratorAgent(P1)
+
+Phase C2-Agent 升级（2026-05-03）：
+  添加 TX_AGENT_USE_MV_READS 环境变量 gate
+  _check_marketing_constraints: MV路径 → mv_channel_margin + mv_dish_profitability（真实毛利数据），降级 → 硬编码默认值
+  _marketing_health_score:     MV路径 → mv_channel_margin（渠道覆盖/归因率），降级 → params 输入
 """
 
 from __future__ import annotations
@@ -33,11 +38,14 @@ from typing import Any, Optional
 import httpx
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError, ProgrammingError
 
 from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
+
+# Phase C2-Agent: env-var gate for MV reads
+_USE_MV_READS = os.getenv("TX_AGENT_USE_MV_READS", "").lower() == "true"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 常量
@@ -530,11 +538,33 @@ class AiMarketingOrchestratorAgent(SkillAgent):
     # ─── 营销健康评分 ─────────────────────────────────────────────────────────
 
     async def _marketing_health_score(self, params: dict[str, Any]) -> AgentResult:
-        """计算门店营销健康评分（0-100）"""
+        """计算门店营销健康评分（0-100）。
+
+        Phase C2-Agent: TX_AGENT_USE_MV_READS=true 时从 mv_channel_margin 补充真实渠道数据
+        """
         store_id = params.get("store_id", "")
 
-        # 评分维度（示例逻辑，生产环境读真实 DB）
-        channel_coverage = params.get("channel_count", 2) / 6 * 35  # 渠道覆盖率 35分
+        # Phase C2-Agent: MV enrichment for channel coverage
+        mv_channels: list[str] = []
+        if _USE_MV_READS and self._db and store_id:
+            try:
+                rows = await self._db.execute(
+                    text("""
+                        SELECT DISTINCT channel
+                        FROM mv_channel_margin
+                        WHERE tenant_id = CAST(:tenant_id AS uuid)
+                          AND store_id = CAST(:store_id AS uuid)
+                          AND stat_date >= CURRENT_DATE - INTERVAL '30 days'
+                          AND order_count > 0
+                    """),
+                    {"tenant_id": str(self.tenant_id), "store_id": store_id},
+                )
+                mv_channels = [r.channel for r in rows.fetchall()]
+            except (OperationalError, ProgrammingError, ValueError, OSError) as exc:
+                logger.warning("mv_health_score_read_failed", error=str(exc))
+
+        channel_count = len(mv_channels) if mv_channels else params.get("channel_count", 2)
+        channel_coverage = channel_count / 6 * 35  # 渠道覆盖率 35分
         touch_frequency = min(params.get("monthly_touches_per_member", 0) / 4, 1) * 25  # 触达频率 25分
         content_quality = params.get("avg_open_rate", 0.08) / 0.15 * 25  # 内容质量 25分
         attribution_rate = params.get("attributed_order_pct", 0.3) * 15  # 归因率 15分
@@ -736,6 +766,36 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         logger.debug("cooldown_check", member_id=member_id, action_type=action_type, cooldown_hours=cooldown_hours)
         return {"ok": True, "cooldown_hours": cooldown_hours}
 
+    # Phase C2-Agent: MV read helper for marketing constraints
+    async def _fetch_mv_margin_data(self) -> dict[str, Any]:
+        """从 mv_channel_margin / mv_dish_profitability 获取真实利润率数据用于约束校验。
+
+        Returns:
+            dict with: avg_revenue_per_order_fen, avg_margin_rate, source
+        """
+        try:
+            # 从 mv_dish_profitability 获取全店平均毛利率
+            row = await self._db.execute(
+                text("""
+                    SELECT AVG(gross_margin_rate) AS avg_margin_rate,
+                           AVG(net_revenue_fen) AS avg_revenue_per_order_fen
+                    FROM mv_dish_profitability
+                    WHERE tenant_id = CAST(:tenant_id AS uuid)
+                      AND stat_date >= CURRENT_DATE - INTERVAL '30 days'
+                """),
+                {"tenant_id": str(self.tenant_id)},
+            )
+            data = dict(row.mappings().first() or {})
+            if data.get("avg_margin_rate") is not None:
+                return {
+                    "avg_margin_rate": float(data["avg_margin_rate"]) or DEFAULT_MARGIN_FLOOR_PCT,
+                    "avg_revenue_per_order_fen": int(data.get("avg_revenue_per_order_fen") or DEFAULT_AVG_ORDER_FEN),
+                    "source": "mv_dish_profitability",
+                }
+        except (OperationalError, ProgrammingError, ValueError, OSError) as exc:
+            logger.warning("mv_margin_read_failed", error=str(exc))
+        return {}
+
     async def _check_marketing_constraints(
         self,
         member_id: str,
@@ -751,18 +811,30 @@ class AiMarketingOrchestratorAgent(SkillAgent):
         violations: list[str] = []
         margin_floor_pct = DEFAULT_MARGIN_FLOOR_PCT
 
-        # 约束1: 毛利底线（生产环境应从门店配置读取均单，当前使用env配置兜底）
+        # Phase C2-Agent: MV read path — 从 mv_dish_profitability 获取真实菜品毛利率
+        mv_margin_data: dict[str, Any] = {}
+        if _USE_MV_READS and self._db and discount_fen > 0:
+            mv_margin_data = await self._fetch_mv_margin_data()
+
+        # 约束1: 毛利底线
         if discount_fen > 0:
-            avg_order_fen = DEFAULT_AVG_ORDER_FEN
-            if avg_order_fen == 40000:
-                logger.warning(
-                    "margin_constraint_using_default_avg_order",
-                    member_id=member_id,
-                    action_type=action_type,
-                    avg_order_fen=avg_order_fen,
-                    hint="Set DEFAULT_AVG_ORDER_FEN env var or wire store config",
-                )
-            max_discount = int(avg_order_fen * (1 - margin_floor_pct))
+            if mv_margin_data:
+                # MV path: 使用真实渠道/菜品利润率
+                avg_order_fen = mv_margin_data.get("avg_revenue_per_order_fen", DEFAULT_AVG_ORDER_FEN)
+                avg_margin_rate = mv_margin_data.get("avg_margin_rate", margin_floor_pct)
+            else:
+                avg_order_fen = DEFAULT_AVG_ORDER_FEN
+                avg_margin_rate = margin_floor_pct
+                if avg_order_fen == 40000:
+                    logger.warning(
+                        "margin_constraint_using_default_avg_order",
+                        member_id=member_id,
+                        action_type=action_type,
+                        avg_order_fen=avg_order_fen,
+                        hint="Set TX_AGENT_USE_MV_READS=true or wire store config",
+                    )
+
+            max_discount = int(avg_order_fen * (1 - avg_margin_rate))
             if discount_fen > max_discount:
                 violations.append(f"折扣 {discount_fen / 100:.1f}元 超过毛利底线允许上限 {max_discount / 100:.1f}元")
 

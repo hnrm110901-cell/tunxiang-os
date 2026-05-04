@@ -34,14 +34,18 @@ import structlog
 from .projector import ProjectorBase
 from .projectors import (
     ChannelMarginProjector,
+    CustomerLtvProjector,
     DailySettlementProjector,
+    DishProfitabilityProjector,
     DiscountHealthProjector,
+    EmployeeEfficiencyProjector,
     EnergyEfficiencyProjector,
     InventoryBomProjector,
     MemberClvProjector,
     PublicOpinionProjector,
     SafetyComplianceProjector,
     StorePnlProjector,
+    TableTurnoverProjector,
 )
 
 logger = structlog.get_logger(__name__)
@@ -66,6 +70,10 @@ class ProjectorRegistry:
             SafetyComplianceProjector(tenant_id=self.tenant_id),
             EnergyEfficiencyProjector(tenant_id=self.tenant_id),
             PublicOpinionProjector(tenant_id=self.tenant_id),
+            TableTurnoverProjector(tenant_id=self.tenant_id),
+            DishProfitabilityProjector(tenant_id=self.tenant_id),
+            EmployeeEfficiencyProjector(tenant_id=self.tenant_id),
+            CustomerLtvProjector(tenant_id=self.tenant_id),
         ]
         self._tasks: list[asyncio.Task] = []
 

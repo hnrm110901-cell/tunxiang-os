@@ -8,6 +8,7 @@
  * Admin 终端规范：Ant Design 5.x + ProComponents + 1280px 最小宽度
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -32,6 +33,7 @@ import {
   ApartmentOutlined,
   CalculatorOutlined,
   FileSearchOutlined,
+  LinkOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
@@ -758,6 +760,7 @@ const PreviewTab: React.FC = () => {
 // ── 主页面 ─────────────────────────────────────────────────────────────────────
 
 const SplitPaymentPage: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('orders');
 
   const tabs = [
@@ -774,6 +777,14 @@ const SplitPaymentPage: React.FC = () => {
             聚合支付 / 分账管理
           </Title>
           <Text type="secondary">微信/支付宝分账 · 差错账调账 · 分润试算</Text>
+        </Col>
+        <Col>
+          <Button
+            icon={<LinkOutlined />}
+            onClick={() => navigate('/finance/split-rules')}
+          >
+            分润规则管理
+          </Button>
         </Col>
       </Row>
 

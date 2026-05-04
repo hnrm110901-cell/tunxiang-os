@@ -1,4 +1,4 @@
-import { useEffect, useState, ReactNode } from 'react';
+import { useEffect, useState, ReactNode, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getStoreToken } from './api/index';
 import { fetchTrainingModeStatus } from './api/trainingModeApi';
@@ -7,6 +7,9 @@ import { isEnabled } from './config/featureFlags';
 // A1 安全修复：reportCrashToTelemetry 改从 api/tradeApi 导入（JWT-derived tenant_id）
 import { registerOfflineEnqueue, reportCrashToTelemetry } from './api/tradeApi';
 import { useOffline } from './hooks/useOffline';
+import { useIPadLayout } from './hooks/useIPadLayout';
+// iPad CSS 覆盖层 — Vite 将其注入 bundle，仅在 .shell--ipad 下生效
+import './styles/ipad.css';
 import { PosLoginPage } from './pages/PosLoginPage';
 import { InventoryAlertBanner } from './pages/InventoryAlertBanner';
 import { CashierPage } from './pages/CashierPage';
@@ -94,6 +97,19 @@ function OfflineBridge(): null {
 function AppLayout() {
   const { isTrainingMode, currentScenario, startedAt, exitTrainingMode } = useTrainingMode();
 
+  // ── iPad 布局检测 ──────────────────────────────────────────────────────────
+  const ipadLayout = useIPadLayout();
+  const shellClass = useMemo(() => {
+    if (ipadLayout.isIPad) return 'shell--ipad';
+    const platform = (window as unknown as Record<string, unknown>)
+      .__TUNXIANG_PLATFORM__ as string | undefined;
+    if (platform === 'android-pos' || platform === 'store') return 'shell--store';
+    if (platform === 'hq') return 'shell--hq';
+    if (platform === 'crew') return 'shell--crew';
+    // 桌面浏览器默认不添加 shell class（或使用精细模式）
+    return '';
+  }, [ipadLayout.isIPad]);
+
   // ── 服务端演示模式状态同步（30秒轮询，多设备同步）──────────────────────────
   // 优先以 localStorage（前端本地）为准；服务端状态用于感知其他设备触发的演示模式
   const [serverWatermarkText, setServerWatermarkText] = useState<string>('演示模式');
@@ -122,7 +138,10 @@ function AppLayout() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#111827' }}>
+    <div
+      className={shellClass}
+      style={{ minHeight: '100vh', background: '#111827' }}
+    >
       <OfflineBridge />
       {/* 训练模式橙色横幅 — 训练模式激活时固定在顶部 */}
       {isTrainingMode && (

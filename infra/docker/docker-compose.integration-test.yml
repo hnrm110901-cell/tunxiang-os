@@ -1,0 +1,25 @@
+# ============================================================
+# 屯象OS 集成测试环境
+# 用法: docker compose -f docker-compose.integration-test.yml up -d
+#       INTEGRATION_DATABASE_URL=postgresql+asyncpg://tunxiang:changeme_test@localhost:15432/tunxiang_os_test pytest tests/integration/
+# ============================================================
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: txos-integration-test-pg
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: changeme_test
+      POSTGRES_DB: tunxiang_os_test
+    ports:
+      - "15432:5432"
+    volumes:
+      - ./init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+      - ./init-pgvector.sql:/docker-entrypoint-initdb.d/02-pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tunxiang -d tunxiang_os_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    tmpfs: /var/lib/postgresql/data  # 测试数据不持久化

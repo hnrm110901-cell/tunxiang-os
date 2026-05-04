@@ -1,10 +1,10 @@
 """
-同步冲突解决器
+同步冲突解决器 — mac-station 订单推送冲突检测
 
-mac-station sync-engine 在将本地离线订单推送云端时，若发现云端已存在
-相同 idempotency_key 的记录，则触发冲突解决逻辑。
+本模块是屯象OS统一冲突解决器的 mac-station 适配层。
+核心解决逻辑委托给 edge/sync-engine/src/conflict_resolver.py 的 ConflictResolver.resolve()。
 
-策略（ConflictStrategy）：
+冲突策略（ConflictStrategy）：
 1. cloud_wins  — 云端优先（默认）：云端有记录则本地标记 conflict，不推送
 2. local_wins  — 本地优先（危险）：本地记录推送覆盖云端，需人工确认
 3. newer_wins  — 时间戳优先：比较 created_at，取更新的一条
@@ -14,18 +14,44 @@ ResolutionResult 字段：
   winner                 — "cloud" / "local" / "manual_review"
   reason                 — 决策理由（可读文字，供日志/审计）
   requires_manual_review — True 时 sync-engine 应暂停该订单，推送到人工队列
+
+数据层决策
+-----------
+委托给 edge/sync-engine/src/conflict_resolver.py 的 ConflictResolver.resolve()。
+该实现是 LWW + 终态保护 + POS 交易保护 + 云端权威覆盖，并非真正的 CRDT。
+详见 unified module 的 docstring。
 """
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import structlog
 
 log = structlog.get_logger(__name__)
+
+
+# ─── 统一冲突解决器导入 ────────────────────────────────────────────────
+
+_SYNC_ENGINE_RESOLVER_PATH = (
+    Path(__file__).resolve().parents[2] / "sync-engine" / "src" / "conflict_resolver.py"
+)
+_UNIFIED_RESOLVER: Any = None
+if _SYNC_ENGINE_RESOLVER_PATH.exists():
+    _spec = importlib.util.spec_from_file_location(
+        "_unified_conflict_resolver", str(_SYNC_ENGINE_RESOLVER_PATH)
+    )
+    if _spec and _spec.loader:
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        _UNIFIED_RESOLVER = getattr(_mod, "ConflictResolver", None)
+else:
+    log.warning("sync_conflict_resolver.unified_module_missing", path=str(_SYNC_ENGINE_RESOLVER_PATH))
 
 
 # ─── 策略枚举 ─────────────────────────────────────────────────────────────────
@@ -67,7 +93,10 @@ class ResolutionResult:
 
 
 class ConflictResolver:
-    """离线订单同步冲突解决器。
+    """mac-station 订单推送冲突检测器。
+
+    核心解决逻辑委托给 edge/sync-engine/src/conflict_resolver.py 的 LWW + 终态保护实现。
+    本类在其基础上增加了策略选择（CloudWins / LocalWins / NewerWins）和人工审核标记。
 
     Usage::
 
@@ -128,7 +157,6 @@ class ConflictResolver:
         elif self.strategy == ConflictStrategy.NEWER_WINS:
             result = self._resolve_newer_wins(local_order, cloud_order, local_id, cloud_id, ikey)
         else:
-            # 不可能走到此分支（Enum 已穷举），防御性处理
             raise ValueError(f"未知冲突策略: {self.strategy}")
 
         log.info(
@@ -182,10 +210,43 @@ class ConflictResolver:
         cloud_id: str,
         ikey: str,
     ) -> ResolutionResult:
-        """时间戳优先：比较 created_at，取更新的一条。
+        """时间戳优先：委托统一 ConflictResolver 做数据层决策，再做人工审核标记。
 
         若时间戳相差 < 1 秒（浮点精度问题），降级到 cloud_wins 并需人工确认。
         """
+        # 委托给统一数据层解决器做实际决策
+        if _UNIFIED_RESOLVER is not None:
+            unified_winner = _UNIFIED_RESOLVER.resolve(local_order, cloud_order)
+            # 判断获胜方
+            if unified_winner is local_order:
+                return ResolutionResult(
+                    strategy=self.strategy,
+                    winner="local",
+                    reason=(
+                        f"时间戳优先策略（统一解决器）：本地记录获胜 "
+                        f"(local_id={local_id}, cloud_id={cloud_id}, "
+                        f"idempotency_key={ikey!r})。需人工确认后执行覆盖。"
+                    ),
+                    requires_manual_review=True,
+                    local_order_id=local_id,
+                    cloud_order_id=cloud_id,
+                    metadata={"idempotency_key": ikey, "resolved_by": "unified_resolver"},
+                )
+            return ResolutionResult(
+                strategy=self.strategy,
+                winner="cloud",
+                reason=(
+                    f"时间戳优先策略（统一解决器）：云端记录获胜 "
+                    f"(local_id={local_id}, cloud_id={cloud_id}, "
+                    f"idempotency_key={ikey!r})。本地订单标记 conflict，跳过推送。"
+                ),
+                requires_manual_review=False,
+                local_order_id=local_id,
+                cloud_order_id=cloud_id,
+                metadata={"idempotency_key": ikey, "resolved_by": "unified_resolver"},
+            )
+
+        # 降级：统一模块不可用时用内联时间戳比较
         local_ts = self._parse_ts(local_order.get("created_at"))
         cloud_ts = self._parse_ts(cloud_order.get("created_at"))
 
@@ -207,7 +268,6 @@ class ConflictResolver:
 
         diff_secs = abs((local_ts - cloud_ts).total_seconds())
         if diff_secs < 1.0:
-            # 时间差极小，很可能是同一次事务的双写，不确定谁新，人工处理
             return ResolutionResult(
                 strategy=self.strategy,
                 winner="manual_review",
@@ -269,7 +329,6 @@ class ConflictResolver:
         """校验订单字典必要字段，缺失时抛出 ValueError。"""
         if not isinstance(order, dict):
             raise ValueError(f"{label}_order 必须是 dict，收到: {type(order).__name__}")
-        # 允许 id 或 order_id 二选一
         if not order.get("id") and not order.get("order_id"):
             raise ValueError(f"{label}_order 缺少 id / order_id 字段")
 

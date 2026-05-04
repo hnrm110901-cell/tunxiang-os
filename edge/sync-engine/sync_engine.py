@@ -17,15 +17,49 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import asyncpg
 import structlog
 
+# ─── 统一冲突解决器（目录名含 dash 无法常规 import）───────────────────
 logger = structlog.get_logger()
+
+_CONFLICT_RESOLVER_PATH = Path(__file__).resolve().parent / "src" / "conflict_resolver.py"
+if _CONFLICT_RESOLVER_PATH.exists():
+    try:
+        _spec = importlib.util.spec_from_file_location(
+            "_conflict_resolver_impl", str(_CONFLICT_RESOLVER_PATH)
+        )
+        if _spec and _spec.loader:
+            _cr_mod = importlib.util.module_from_spec(_spec)
+            _spec.loader.exec_module(_cr_mod)
+            ConflictResolver = _cr_mod.ConflictResolver
+            _resolve_parse_ts = _cr_mod._parse_ts
+            logger.info("sync_engine.conflict_resolver_loaded", path=str(_CONFLICT_RESOLVER_PATH))
+        else:
+            raise ImportError("Failed to create module spec for conflict_resolver")
+    except (FileNotFoundError, ImportError, AttributeError, SyntaxError) as exc:
+        logger.error(
+            "sync_engine.conflict_resolver_load_failed",
+            path=str(_CONFLICT_RESOLVER_PATH),
+            error=str(exc),
+            exc_info=True,
+        )
+        ConflictResolver = None  # type: ignore[assignment]
+        _resolve_parse_ts = None  # type: ignore[assignment]
+else:
+    logger.warning(
+        "sync_engine.conflict_resolver_not_found",
+        path=str(_CONFLICT_RESOLVER_PATH),
+    )
+    ConflictResolver = None  # type: ignore[assignment]
+    _resolve_parse_ts = None  # type: ignore[assignment]
 
 # ─── 同步表清单 ────────────────────────────────────────────────────────────
 
@@ -72,9 +106,6 @@ CREATE TABLE IF NOT EXISTS sync_conflicts_log (
     resolved_at       TIMESTAMPTZ DEFAULT NOW()
 );
 """
-
-# POS 交易保护状态集合
-_POS_PROTECTED_STATUSES: frozenset[str] = frozenset({"pending", "paid"})
 
 # 指数退避初始等待（秒）
 _BACKOFF_INITIAL: int = 30
@@ -288,9 +319,9 @@ class SyncEngine:
 
             records = [dict(r) for r in rows]
 
-            # 批量 upsert 到云端
+            # 批量 upsert 到云端（timestamp_safe=True 防止本地旧数据覆盖云端更新）
             async with self._cloud_pool.acquire() as cloud_conn:
-                await _batch_upsert(cloud_conn, table, records)
+                await _batch_upsert(cloud_conn, table, records, timestamp_safe=True)
 
             batch_max = max(r["updated_at"] for r in records if r.get("updated_at"))
             if batch_max > max_updated_at:
@@ -371,26 +402,42 @@ class SyncEngine:
         return total
 
     async def resolve_conflict(self, local_row: dict[str, Any], cloud_row: dict[str, Any]) -> dict[str, Any]:
-        """冲突解决：
-        - 云端 authoritative=true → 云端优先
-        - 否则比较 updated_at → 较新者优先
-        - 本地 source='pos' 且 status in ('pending','paid') → 本地优先（POS 交易保护）
+        """冲突解决：委托给统一 ConflictResolver.resolve()
+
+        策略优先级（由统一模块定义）：
+          1. 云端权威覆盖（cloud.authoritative == True）
+          2. POS 交易保护（local.source='pos' 且 status in ('pending','paid')）
+          3. 终态保护（local 终态不被 remote 非终态覆盖）
+          4. LWW：比较 updated_at，较新者优先
+
+        本实现不是 CRDT。详见 conflict_resolver.py 模块 docstring。
         """
-        # 规则 1：云端标记为权威 → 直接覆盖
+        if ConflictResolver is not None:
+            winner = ConflictResolver.resolve(local_row, cloud_row)
+            # 判断获胜方用于日志
+            resolution: str = "cloud_wins"
+            if winner is local_row:
+                resolution = "local_wins"
+                # 进一步区分 POS 保护和终态保护（仅用于日志标签）
+                local_status = str(local_row.get("status", ""))
+                local_source = str(local_row.get("source", ""))
+                if local_source == "pos" and local_status in ("pending", "paid"):
+                    resolution = "local_pos_protected"
+            await self._log_conflict(local_row, cloud_row, resolution=resolution)
+            return winner
+
+        # 降级：统一模块不可用时使用内联逻辑（不应出现在生产环境）
         if cloud_row.get("authoritative") is True:
             await self._log_conflict(local_row, cloud_row, resolution="cloud_authoritative")
             return cloud_row
 
-        # 规则 2：POS 交易保护 — 本地 source=pos 且处于活跃交易状态
-        local_source = local_row.get("source", "")
         local_status = str(local_row.get("status", ""))
-        if local_source == "pos" and local_status in _POS_PROTECTED_STATUSES:
+        if local_row.get("source") == "pos" and local_status in ("pending", "paid"):
             await self._log_conflict(local_row, cloud_row, resolution="local_wins")
             return local_row
 
-        # 规则 3：比较 updated_at
-        local_ts = _parse_ts(local_row.get("updated_at"))
-        cloud_ts = _parse_ts(cloud_row.get("updated_at"))
+        local_ts = _parse_ts_fallback(local_row.get("updated_at"))
+        cloud_ts = _parse_ts_fallback(cloud_row.get("updated_at"))
 
         if local_ts > cloud_ts:
             await self._log_conflict(local_row, cloud_row, resolution="local_wins")
@@ -553,8 +600,9 @@ class SyncEngine:
 
         table = local_row.get("__table__") or cloud_row.get("__table__") or "unknown"
         record_id = str(local_row.get("id") or cloud_row.get("id") or "")
-        local_ts = _parse_ts(local_row.get("updated_at"))
-        cloud_ts = _parse_ts(cloud_row.get("updated_at"))
+        _ts_fn = _resolve_parse_ts if _resolve_parse_ts is not None else _parse_ts_fallback
+        local_ts = _ts_fn(local_row.get("updated_at"))
+        cloud_ts = _ts_fn(cloud_row.get("updated_at"))
 
         try:
             async with self._local_pool.acquire() as conn:
@@ -605,8 +653,8 @@ def _q(table: str) -> str:
     return f'"{table}"'
 
 
-def _parse_ts(value: Any) -> datetime:
-    """将 updated_at 字段（datetime / str）解析为带时区的 datetime，失败返回 epoch"""
+def _parse_ts_fallback(value: Any) -> datetime:
+    """降级解析 updated_at（仅当统一模块不可用时使用）"""
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, str):
@@ -633,10 +681,15 @@ async def _batch_upsert(
     conn: asyncpg.Connection,
     table: str,
     records: list[dict[str, Any]],
+    timestamp_safe: bool = False,
 ) -> None:
     """批量 UPSERT 到目标 PG 表（ON CONFLICT (id) DO UPDATE）
 
     要求：所有 records 列名一致，且包含 id 列。
+
+    Args:
+        timestamp_safe: True 时仅在源 updated_at 比目标新时才覆盖，
+            防止上行同步时本地旧数据覆盖云端新数据。
     """
     if not records:
         return
@@ -648,9 +701,16 @@ async def _batch_upsert(
     col_list = ", ".join(f'"{c}"' for c in columns)
     update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
 
-    # asyncpg executemany — 传入参数列表
+    # 上行同步：仅当源时间戳更新时才覆盖（防止本地旧数据覆盖云端更新）
+    where_clause = ""
+    if timestamp_safe and "updated_at" in columns:
+        where_clause = f' WHERE EXCLUDED."updated_at" > {_q(table)}."updated_at"'
+
     placeholders = ", ".join(f"${i + 1}" for i in range(len(columns)))
-    sql = f"INSERT INTO {_q(table)} ({col_list}) VALUES ({placeholders}) ON CONFLICT (id) DO UPDATE SET {update_set}"
+    sql = (
+        f"INSERT INTO {_q(table)} ({col_list}) VALUES ({placeholders}) "
+        f"ON CONFLICT (id) DO UPDATE SET {update_set}{where_clause}"
+    )
 
     rows_as_tuples = [tuple(r.get(c) for c in columns) for r in records]
     await conn.executemany(sql, rows_as_tuples)

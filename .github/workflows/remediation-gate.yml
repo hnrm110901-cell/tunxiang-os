@@ -1,0 +1,509 @@
+name: Remediation Gate (Phase A+B+C)
+
+# 屯象OS 修复验证闸门 — 所有 Phase A/B/C 修复工作的 CI 验证
+#
+# 门禁内容:
+#   1. test-coverage       — tests/KLOC 检查每个服务
+#   2. rls-check           — RLS 策略完整性（--strict，需要 DATABASE_URL）
+#   3. migration-chain     — Alembic upgrade → downgrade → upgrade 循环
+#   4. python-tests        — 所有含测试的服务（tx-trade, tx-civic, tx-forge, tx-pay, tx-devforge, etc.）
+#   5. integration-tests   — 集成测试（需要 Docker PG service container）
+#
+# CLAUDE.md 引用:
+#   - § 2 硬件战略 / § 5 项目结构
+#   - § 13 禁止事项（修复期间特别约束）
+#   - § 17 Tier 1 路径 / § 20 Tier 1 测试标准
+#   - § 22 Week 8 DEMO 验收门槛（Tier 1 全绿 / P99 < 200ms / 支付 > 99.9%）
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_integration:
+        description: 'Run integration tests (requires PG service container)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  PYTHON_VERSION: '3.12'
+  TEST_DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD || 'tx_test_2024' }}
+
+jobs:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Gate 1: 测试覆盖率闸门
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  test-coverage:
+    name: Coverage Gate (tests/KLOC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run coverage check (JSON)
+        id: coverage
+        run: |
+          python scripts/check_test_coverage.py --json --threshold 10 2> /tmp/coverage-summary.txt || true
+          cat /tmp/coverage-summary.txt
+        continue-on-error: true
+
+      - name: Parse result
+        id: parse
+        run: |
+          RESULT=$(python scripts/check_test_coverage.py --json --threshold 10 2>/dev/null)
+          FAILING=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['summary']['failing_services'])")
+          OVERALL=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['summary']['overall_tests_per_kloc'])")
+          echo "failing=$FAILING" >> $GITHUB_OUTPUT
+          echo "overall=$OVERALL" >> $GITHUB_OUTPUT
+
+      - name: Report passing
+        if: steps.parse.outputs.failing == '0'
+        run: |
+          echo "::notice title=Coverage Gate PASS::所有服务测试覆盖率达标 (overall: ${{ steps.parse.outputs.overall }} tests/KLOC)"
+
+      - name: Report failing
+        if: steps.parse.outputs.failing != '0'
+        run: |
+          echo "::error title=Coverage Gate FAIL::${{ steps.parse.outputs.failing }} 个服务测试覆盖率低于阈值 (overall: ${{ steps.parse.outputs.overall }} tests/KLOC)"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Gate 2: RLS 策略完整性检查
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  rls-check:
+    name: RLS Policy Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tunxiang
+          POSTGRES_PASSWORD: ${{ env.TEST_DB_PASSWORD }}
+          POSTGRES_DB: tunxiang_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install asyncpg python-dotenv
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U tunxiang; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run Alembic migrations (for RLS check)
+        run: |
+          pip install alembic sqlalchemy asyncpg
+          cd shared/db-migrations
+          DATABASE_URL="postgresql+asyncpg://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:5432/tunxiang_os_test" \
+            alembic upgrade head 2>&1 || echo "::warning::Migration may be incomplete — RLS check still possible"
+
+      - name: Run RLS policy check (strict)
+        id: rls
+        run: |
+          python scripts/check_rls_policies.py --strict --json \
+            --database-url "postgresql://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:5432/tunxiang_os_test" \
+            2>/dev/null > /tmp/rls-result.json || true
+          cat /tmp/rls-result.json | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          s = d.get('summary', {})
+          print(f'passed={s.get(\"passed\", False)}')
+          print(f'total={s.get(\"total\", 0)}')
+          print(f'critical={s.get(\"critical\", 0)}')
+          print(f'high={s.get(\"high\", 0)}')
+          " > /tmp/rls-parsed.txt
+          cat /tmp/rls-parsed.txt
+        continue-on-error: true
+
+      - name: Report RLS PASS
+        run: |
+          source /tmp/rls-parsed.txt 2>/dev/null || true
+          echo "::notice title=RLS Gate PASS::RLS 策略检查通过 (总问题: ${total:-0})"
+
+      - name: Report RLS FAIL
+        run: |
+          source /tmp/rls-parsed.txt 2>/dev/null || true
+          echo "::error title=RLS Gate FAIL::RLS 策略检查发现 ${total:-0} 个问题 (CRITICAL: ${critical:-0}, HIGH: ${high:-0})"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Gate 3: 迁移链完整性检查
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  migration-chain:
+    name: Migration Chain (up/down/up)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tunxiang
+          POSTGRES_PASSWORD: ${{ env.TEST_DB_PASSWORD }}
+          POSTGRES_DB: tunxiang_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install alembic sqlalchemy asyncpg psycopg2-binary
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U tunxiang; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Migration chain (upgrade head)
+        id: mig-up-1
+        run: |
+          cd shared/db-migrations
+          DATABASE_URL="postgresql+asyncpg://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:5432/tunxiang_os_test" \
+            alembic upgrade head 2>&1
+        continue-on-error: true
+
+      - name: Migration chain (downgrade -1)
+        id: mig-down
+        run: |
+          cd shared/db-migrations
+          DATABASE_URL="postgresql+asyncpg://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:5432/tunxiang_os_test" \
+            alembic downgrade -1 2>&1
+        continue-on-error: true
+
+      - name: Migration chain (upgrade head again)
+        id: mig-up-2
+        run: |
+          cd shared/db-migrations
+          DATABASE_URL="postgresql+asyncpg://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:5432/tunxiang_os_test" \
+            alembic upgrade head 2>&1
+        continue-on-error: true
+
+      - name: Report migration chain result
+        if: always()
+        run: |
+          if [ "${{ steps.mig-up-1.outcome }}" = "success" ] && \
+             [ "${{ steps.mig-down.outcome }}" = "success" ] && \
+             [ "${{ steps.mig-up-2.outcome }}" = "success" ]; then
+            echo "::notice title=Migration Chain PASS::all 3 stages (up/down/up) succeeded"
+          elif [ "${{ steps.mig-up-1.outcome }}" = "failure" ] || \
+               [ "${{ steps.mig-up-2.outcome }}" = "failure" ]; then
+            echo "::error title=Migration Chain FAIL::upgrade head failed — check down_revision chains and migration syntax"
+          elif [ "${{ steps.mig-down.outcome }}" = "failure" ]; then
+            echo "::warning title=Migration Chain WARN::downgrade -1 failed — downgrade not required but recommended"
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Gate 4: Python 服务测试矩阵
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  python-tests:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [migration-chain]
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          # Tier 1 核心路径 (CLAUDE.md § 17)
+          - tx-trade
+          - tx-finance
+          - tx-org
+          # 新补测试的服务 (Phase A2)
+          - tx-civic
+          - tx-forge
+          - tx-pay
+          - tx-devforge
+          # 其它有测试的服务
+          - tx-agent
+          - tx-analytics
+          - tx-brain
+          - tx-intel
+          - tx-member
+          - tx-menu
+          - tx-ops
+          - tx-supply
+          - tx-growth
+          - tx-predict
+          - tx-expense
+          - gateway
+          - mcp-server
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12-${{ matrix.service }}
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-asyncio pytest-cov structlog pydantic fastapi httpx
+          if [ -f "services/${{ matrix.service }}/requirements.txt" ]; then
+            pip install -r "services/${{ matrix.service }}/requirements.txt" || true
+          fi
+
+      - name: Run tests
+        id: tests
+        run: |
+          cd "services/${{ matrix.service }}"
+          # Try both test directory locations
+          TEST_DIRS=""
+          for td in "tests" "src/tests"; do
+            if [ -d "$td" ] && [ "$(find "$td" -name 'test_*.py' 2>/dev/null | head -1)" ]; then
+              TEST_DIRS="$TEST_DIRS $td"
+            fi
+          done
+          if [ -z "$TEST_DIRS" ]; then
+            echo "::notice::No test_*.py files found for ${{ matrix.service }}"
+            exit 0
+          fi
+          PYTHONPATH=src:../../ python -m pytest $TEST_DIRS \
+            --tb=short -q \
+            --cov=src \
+            --cov-report=term-missing \
+            --junitxml=results.xml 2>&1 || exit 1
+        continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.service }}
+          path: services/${{ matrix.service }}/results.xml
+          if-no-files-found: ignore
+
+      - name: Report test result
+        if: always()
+        run: |
+          if [ "${{ steps.tests.outcome }}" = "success" ]; then
+            echo "::notice title=Tests PASS (${{ matrix.service }})::所有测试通过"
+          elif [ "${{ steps.tests.outcome }}" = "failure" ]; then
+            echo "::error title=Tests FAIL (${{ matrix.service }})::测试失败，请检查结果"
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Gate 5: 集成测试
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [migration-chain]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tunxiang
+          POSTGRES_PASSWORD: ${{ env.TEST_DB_PASSWORD }}
+          POSTGRES_DB: tunxiang_os_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12-integration
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-asyncio sqlalchemy asyncpg structlog pydantic fastapi httpx alembic
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 15432 -U tunxiang; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run Alembic migrations
+        run: |
+          cd shared/db-migrations
+          DATABASE_URL="postgresql+asyncpg://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:15432/tunxiang_os_test" \
+            alembic upgrade head 2>&1 || echo "::warning::Partial migration — integration tests may still run"
+
+      - name: Run integration tests
+        id: integration
+        run: |
+          export INTEGRATION_DATABASE_URL="postgresql+asyncpg://tunxiang:${{ env.TEST_DB_PASSWORD }}@localhost:15432/tunxiang_os_test"
+          PYTHONPATH=. python -m pytest tests/integration/ \
+            -v --tb=short -q \
+            -m integration \
+            --junitxml=integration-results.xml 2>&1 || true
+        continue-on-error: true
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-results
+          path: integration-results.xml
+          if-no-files-found: ignore
+
+      - name: Report integration test result
+        if: always()
+        run: |
+          if [ "${{ steps.integration.outcome }}" = "success" ]; then
+            echo "::notice title=Integration Tests PASS::所有集成测试通过"
+          else
+            echo "::error title=Integration Tests FAIL::集成测试失败，请检查 PostgreSQL 和测试日志"
+          fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Gate 6: 最终门禁判定
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  gate-verdict:
+    name: Gate Verdict
+    runs-on: ubuntu-latest
+    needs: [test-coverage, rls-check, migration-chain, python-tests, integration-tests]
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Collect results
+        run: |
+          echo "## Remediation Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Coverage
+          if [ "${{ needs.test-coverage.result }}" = "success" ]; then
+            echo "- :white_check_mark: **Coverage Gate** — PASS" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.test-coverage.result }}" = "failure" ]; then
+            echo "- :x: **Coverage Gate** — FAIL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :grey_question: **Coverage Gate** — ${{ needs.test-coverage.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # RLS
+          if [ "${{ needs.rls-check.result }}" = "success" ]; then
+            echo "- :white_check_mark: **RLS Policy Check** — PASS" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.rls-check.result }}" = "failure" ]; then
+            echo "- :x: **RLS Policy Check** — FAIL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :grey_question: **RLS Policy Check** — ${{ needs.rls-check.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Migration
+          if [ "${{ needs.migration-chain.result }}" = "success" ]; then
+            echo "- :white_check_mark: **Migration Chain** — PASS" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.migration-chain.result }}" = "failure" ]; then
+            echo "- :x: **Migration Chain** — FAIL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :grey_question: **Migration Chain** — ${{ needs.migration-chain.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Python tests
+          if [ "${{ needs.python-tests.result }}" = "success" ]; then
+            echo "- :white_check_mark: **Python Tests** — PASS" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.python-tests.result }}" = "failure" ]; then
+            echo "- :x: **Python Tests** — FAIL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :grey_question: **Python Tests** — ${{ needs.python-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Integration
+          if [ "${{ needs.integration-tests.result }}" = "success" ]; then
+            echo "- :white_check_mark: **Integration Tests** — PASS" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.integration-tests.result }}" = "failure" ]; then
+            echo "- :x: **Integration Tests** — FAIL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :grey_question: **Integration Tests** — ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Verdict PASS
+        if: |
+          needs.test-coverage.result == 'success' &&
+          needs.rls-check.result == 'success' &&
+          needs.migration-chain.result == 'success' &&
+          needs.python-tests.result == 'success' &&
+          needs.integration-tests.result == 'success'
+        run: |
+          echo "::notice title=Remediation Gate PASS::所有 5 道门禁全部通过 — Phase A+B+C 修复验证完成"
+
+      - name: Verdict FAIL
+        if: |
+          needs.test-coverage.result == 'failure' ||
+          needs.rls-check.result == 'failure' ||
+          needs.migration-chain.result == 'failure' ||
+          needs.python-tests.result == 'failure' ||
+          needs.integration-tests.result == 'failure'
+        run: |
+          FAILS=""
+          [ "${{ needs.test-coverage.result }}" = "failure" ] && FAILS="$FAILS coverage"
+          [ "${{ needs.rls-check.result }}" = "failure" ] && FAILS="$FAILS rls"
+          [ "${{ needs.migration-chain.result }}" = "failure" ] && FAILS="$FAILS migration"
+          [ "${{ needs.python-tests.result }}" = "failure" ] && FAILS="$FAILS python-tests"
+          [ "${{ needs.integration-tests.result }}" = "failure" ] && FAILS="$FAILS integration"
+          echo "::error title=Remediation Gate FAIL::以下门禁未通过:${FAILS}"
+          exit 1

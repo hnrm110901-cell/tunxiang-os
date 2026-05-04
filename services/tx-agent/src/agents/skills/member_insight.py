@@ -4,16 +4,27 @@
 能力：RFM分析、行为信号、流失检测、旅程触发、差评处理、服务质量
 
 迁移自 tunxiang V2.x private_domain/agent.py + service/agent.py
+
+Phase C2-Agent 升级（2026-05-03）：
+  添加 TX_AGENT_USE_MV_READS 环境变量 gate，控制 MV 读取 vs 直接查询的切换
+  _rfm_analysis:         MV 路径 → mv_member_clv + mv_customer_ltv，降级 → 直接查询 orders
+  _update_customer_rfm:  MV 路径 → mv_member_clv（查单会员），降级 → 直接查询 orders
+  _get_clv_snapshot:     已在 Phase 3 中使用 mv_member_clv，新增降级路径
 """
 
+import os
 from typing import Any
 
 import structlog
 from constraints.decorator import with_constraint_check
+from sqlalchemy import text
 
 from ..base import ActionConfig, AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
+
+# Phase C2-Agent: env-var gate for MV reads
+_USE_MV_READS = os.getenv("TX_AGENT_USE_MV_READS", "").lower() == "true"
 
 
 # RFM 分层阈值
@@ -450,82 +461,17 @@ class MemberInsightAgent(SkillAgent):
             confidence=0.95,
         )
 
-    # ─── RFM分析（真实DB） ───
+    # ─── RFM分析（Phase C2-Agent: gate MV vs direct） ───
 
     async def _rfm_analysis(self, params: dict) -> AgentResult:
         store_id = params.get("store_id") or self.store_id
         top_n = params.get("top_n", 20)
 
         if self._db:
-            from datetime import datetime, timezone
-
-            from sqlalchemy import text
-
-            now = datetime.now(timezone.utc)
-
-            rows = await self._db.execute(
-                text("""
-                SELECT
-                    o.customer_id,
-                    COUNT(DISTINCT o.id) as frequency,
-                    MAX(o.completed_at) as last_order_at,
-                    COALESCE(SUM(o.final_amount_fen), 0) as monetary_fen,
-                    EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as recency_days
-                FROM orders o
-                WHERE o.tenant_id = :tenant_id
-                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
-                  AND o.status = 'completed'
-                  AND o.customer_id IS NOT NULL
-                  AND o.completed_at >= NOW() - INTERVAL '90 days'
-                GROUP BY o.customer_id
-                ORDER BY monetary_fen DESC
-                LIMIT :top_n
-            """),
-                {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n},
-            )
-
-            members = []
-            for row in rows.mappings():
-                r = dict(row)
-                recency = float(r.get("recency_days") or 90)
-                frequency = int(r.get("frequency") or 1)
-                monetary = int(r.get("monetary_fen") or 0)
-
-                # RFM评分（各1-5分）
-                r_score = (
-                    5
-                    if recency <= 7
-                    else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1)))
-                )
-                f_score = (
-                    5
-                    if frequency >= 10
-                    else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1)))
-                )
-                m_score = (
-                    5
-                    if monetary >= 50000
-                    else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1)))
-                )
-                total = r_score + f_score + m_score
-
-                segment = (
-                    "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
-                )
-
-                members.append(
-                    {
-                        "customer_id": str(r["customer_id"]),
-                        "recency_days": round(recency, 1),
-                        "frequency": frequency,
-                        "monetary_fen": monetary,
-                        "rfm_score": total,
-                        "segment": segment,
-                        "r_score": r_score,
-                        "f_score": f_score,
-                        "m_score": m_score,
-                    }
-                )
+            if _USE_MV_READS:
+                members = await self._rfm_from_mv(top_n)
+            else:
+                members = await self._rfm_direct(store_id, top_n)
 
             segments: dict[str, int] = {}
             for m in members:
@@ -579,6 +525,99 @@ class MemberInsightAgent(SkillAgent):
             confidence=0.5,
         )
 
+    # Phase C2-Agent: MV read path for RFM
+    async def _rfm_from_mv(self, top_n: int) -> list[dict[str, Any]]:
+        """从 mv_member_clv 物化视图读取 RFM 分层数据（< 5ms，替代 orders 跨服务查询）"""
+        rows = await self._db.execute(
+            text("""
+                SELECT customer_id, visit_count AS frequency,
+                       total_spend_fen AS monetary_fen,
+                       COALESCE(churn_probability, 0) AS churn_probability,
+                       COALESCE(EXTRACT(DAY FROM NOW() - last_visit_at), 90) AS recency_days,
+                       rfm_segment
+                FROM mv_member_clv
+                WHERE tenant_id = :tenant_id
+                  AND visit_count > 0
+                ORDER BY total_spend_fen DESC
+                LIMIT :top_n
+            """),
+            {"tenant_id": self.tenant_id, "top_n": top_n},
+        )
+        members = []
+        for r in rows.mappings():
+            row = dict(r)
+            recency = float(row.get("recency_days") or 90)
+            frequency = int(row.get("frequency") or 1)
+            monetary = int(row.get("monetary_fen") or 0)
+
+            r_score = (5 if recency <= 7 else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1))))
+            f_score = (5 if frequency >= 10 else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1))))
+            m_score = (5 if monetary >= 50000 else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1))))
+            total = r_score + f_score + m_score
+            segment = "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
+
+            members.append({
+                "customer_id": str(row["customer_id"]),
+                "recency_days": round(recency, 1),
+                "frequency": frequency,
+                "monetary_fen": monetary,
+                "rfm_score": total,
+                "segment": segment,
+                "r_score": r_score,
+                "f_score": f_score,
+                "m_score": m_score,
+            })
+        return members
+
+    # Phase C2-Agent: Direct query fallback for RFM
+    async def _rfm_direct(self, store_id: str | None, top_n: int) -> list[dict[str, Any]]:
+        """降级：直接查询 orders 表聚合 RFM（原有行为）"""
+        rows = await self._db.execute(
+            text("""
+                SELECT
+                    o.customer_id,
+                    COUNT(DISTINCT o.id) as frequency,
+                    MAX(o.completed_at) as last_order_at,
+                    COALESCE(SUM(o.final_amount_fen), 0) as monetary_fen,
+                    EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as recency_days
+                FROM orders o
+                WHERE o.tenant_id = :tenant_id
+                  AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
+                  AND o.status = 'completed'
+                  AND o.customer_id IS NOT NULL
+                  AND o.completed_at >= NOW() - INTERVAL '90 days'
+                GROUP BY o.customer_id
+                ORDER BY monetary_fen DESC
+                LIMIT :top_n
+            """),
+            {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n},
+        )
+        members = []
+        for r in rows.mappings():
+            row = dict(r)
+            recency = float(row.get("recency_days") or 90)
+            frequency = int(row.get("frequency") or 1)
+            monetary = int(row.get("monetary_fen") or 0)
+
+            r_score = (5 if recency <= 7 else (4 if recency <= 14 else (3 if recency <= 30 else (2 if recency <= 60 else 1))))
+            f_score = (5 if frequency >= 10 else (4 if frequency >= 6 else (3 if frequency >= 3 else (2 if frequency >= 2 else 1))))
+            m_score = (5 if monetary >= 50000 else (4 if monetary >= 20000 else (3 if monetary >= 10000 else (2 if monetary >= 5000 else 1))))
+            total = r_score + f_score + m_score
+            segment = "高价值" if total >= 13 else ("成长型" if total >= 10 else ("潜在" if total >= 7 else "流失风险"))
+
+            members.append({
+                "customer_id": str(row["customer_id"]),
+                "recency_days": round(recency, 1),
+                "frequency": frequency,
+                "monetary_fen": monetary,
+                "rfm_score": total,
+                "segment": segment,
+                "r_score": r_score,
+                "f_score": f_score,
+                "m_score": m_score,
+            })
+        return members
+
     # ─── 事件驱动：订单支付后更新会员 RFM 分层 ───
 
     async def _update_customer_rfm(self, params: dict) -> AgentResult:
@@ -600,24 +639,38 @@ class MemberInsightAgent(SkillAgent):
                 error="缺少 customer_id，无法更新 RFM",
             )
 
-        # 若有 DB，从历史订单聚合最新 RFM 指标
+        # Phase C2-Agent: TX_AGENT_USE_MV_READS gate
+        # MV 路径 → mv_member_clv（查单会员 CLV），降级 → 直接查询 orders
         rfm_data: dict = {}
         if self._db and customer_id:
             from sqlalchemy import text
 
-            row = await self._db.execute(
-                text("""
-                SELECT
-                    COUNT(DISTINCT id) as frequency,
-                    EXTRACT(DAY FROM NOW() - MAX(completed_at)) as recency_days,
-                    COALESCE(SUM(final_amount_fen), 0) as monetary_fen
-                FROM orders
-                WHERE tenant_id = :tenant_id
-                  AND customer_id = :customer_id
-                  AND status = 'completed'
-            """),
-                {"tenant_id": self.tenant_id, "customer_id": customer_id},
-            )
+            if _USE_MV_READS:
+                row = await self._db.execute(
+                    text("""
+                    SELECT visit_count AS frequency,
+                           COALESCE(EXTRACT(DAY FROM NOW() - last_visit_at), 0) AS recency_days,
+                           COALESCE(total_spend_fen, 0) AS monetary_fen
+                    FROM mv_member_clv
+                    WHERE tenant_id = :tenant_id
+                      AND customer_id = :customer_id
+                """),
+                    {"tenant_id": self.tenant_id, "customer_id": customer_id},
+                )
+            else:
+                row = await self._db.execute(
+                    text("""
+                    SELECT
+                        COUNT(DISTINCT id) as frequency,
+                        EXTRACT(DAY FROM NOW() - MAX(completed_at)) as recency_days,
+                        COALESCE(SUM(final_amount_fen), 0) as monetary_fen
+                    FROM orders
+                    WHERE tenant_id = :tenant_id
+                      AND customer_id = :customer_id
+                      AND status = 'completed'
+                """),
+                    {"tenant_id": self.tenant_id, "customer_id": customer_id},
+                )
             r = dict(row.mappings().first() or {})
             rfm_data = {
                 "frequency": int(r.get("frequency") or 1),

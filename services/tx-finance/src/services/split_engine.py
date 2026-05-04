@@ -342,26 +342,108 @@ class SplitEngine:
         """支付通道异步结果：按条将流水置为 settled 或 cancelled。
 
         仅处理 ``status = pending`` 的行；已结算/已取消的重试调用不会产生副作用（幂等）。
+
+        支持两种定位方式：
+        - UUID record_id：直接按 profit_split_records.id 定位
+        - 非UUID record_id（如微信 wx_xxx）：按 order_id + recipient_account 组合定位
         """
         settled_ids: List[str] = []
         failed_ids: List[str] = []
+        lookup_items: List[Dict[str, Any]] = []  # 通过 order_id+receiver 定位
+
         for it in items:
             rid = str(it.get("record_id", "")).strip()
             outcome = str(it.get("outcome", "")).strip().lower()
             if not rid:
                 continue
-            if outcome == "settled":
-                settled_ids.append(rid)
-            elif outcome in ("failed", "cancelled", "canceled"):
-                failed_ids.append(rid)
+
+            # 分类：UUID 直接匹配 / 非UUID 通过组合键查找
+            try:
+                uuid.UUID(rid)
+                if outcome == "settled":
+                    settled_ids.append(rid)
+                elif outcome in ("failed", "cancelled", "canceled"):
+                    failed_ids.append(rid)
+            except ValueError:
+                lookup_items.append({**it, "record_id": rid})
+
         settled_n = await self.settle_records(settled_ids)
         failed_n = await self.fail_records(failed_ids)
+
+        # 处理非UUID的 record_id（微信回调等）：通过 order_id + recipient_account 定位
+        lookup_settled = 0
+        lookup_failed = 0
+        for it in lookup_items:
+            try:
+                n = await self._settle_by_lookup(it)
+                if it.get("outcome", "").strip().lower() == "settled":
+                    lookup_settled += n
+                else:
+                    lookup_failed += n
+            except Exception as exc:
+                log.warning(
+                    "split_channel_notify_lookup_failed",
+                    record_id=it.get("record_id"),
+                    error=str(exc),
+                    tenant_id=self.tenant_id,
+                    exc_info=True,
+                )
+
         return {
-            "settled": settled_n,
-            "cancelled": failed_n,
-            "settled_requested": len(settled_ids),
-            "cancelled_requested": len(failed_ids),
+            "settled": settled_n + lookup_settled,
+            "cancelled": failed_n + lookup_failed,
+            "settled_requested": len(settled_ids) + len([x for x in lookup_items if x.get("outcome", "").strip().lower() == "settled"]),
+            "cancelled_requested": len(failed_ids) + len([x for x in lookup_items if x.get("outcome", "").strip().lower() in ("failed", "cancelled", "canceled")]),
         }
+
+    async def _settle_by_lookup(self, item: Dict[str, Any]) -> int:
+        """通过 out_order_no 定位并更新分账记录。
+
+        用于微信分账回调等场景，回调中不携带内部 UUID record_id。
+        找到对应订单后，settle 该订单下所有 pending 的分账记录。
+        不按 receiver_account 精确匹配，因为外部商户号与内部 recipient UUID 无直接映射。
+        """
+        await self._set_tenant()
+        order_no = str(item.get("order_no", "")).strip()
+        outcome = str(item.get("outcome", "")).strip().lower()
+
+        if not order_no:
+            log.warning(
+                "split_lookup_missing_order_no",
+                record_id=item.get("record_id"),
+                tenant_id=self.tenant_id,
+            )
+            return 0
+
+        new_status = "settled" if outcome == "settled" else "cancelled"
+        now = datetime.now(timezone.utc)
+
+        result = await self.db.execute(
+            text("""
+                UPDATE profit_split_records r
+                SET status = :status,
+                    settled_at = CASE WHEN :status = 'settled' THEN :now ELSE r.settled_at END
+                WHERE r.tenant_id = :tid
+                  AND r.order_id = (SELECT id FROM orders WHERE out_order_no = :order_no LIMIT 1)
+                  AND r.status = 'pending'
+            """),
+            {
+                "status": new_status,
+                "now": now,
+                "tid": self._tid,
+                "order_no": order_no,
+            },
+        )
+        await self.db.flush()
+        log.info(
+            "split_lookup_settled",
+            order_no=order_no,
+            receiver_account=item.get("receiver_account", ""),
+            status=new_status,
+            count=result.rowcount,
+            tenant_id=self.tenant_id,
+        )
+        return result.rowcount
 
     # ══════════════════════════════════════════════════════
     # 查询 & 汇总

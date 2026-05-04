@@ -23,6 +23,8 @@ struct WebViewController: UIViewRepresentable {
                 window.__TUNXIANG_PLATFORM__ = 'ipad';
                 window.__POS_HOST_URL__ = '\(posHostUrl)';
                 window.__MAC_MINI_URL__ = '\(macMiniUrl)';
+                window.__STORE_ID__ = '\(AppConfig.storeId)';
+                window.__ENVIRONMENT__ = '\(AppConfig.environment.rawValue)';
             """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
@@ -69,6 +71,15 @@ struct WebViewController: UIViewRepresentable {
 
             let payload = body["payload"] as? [String: Any] ?? [:]
 
+            // 使用新的 TXBridge_iOS 统一处理（Phase C4）
+            TXBridge_iOS.handleMessage(
+                body,
+                webView: message.webView,
+                posHostUrl: posHostUrl,
+                macMiniUrl: macMiniUrl
+            )
+
+            // 保持向后兼容：原有映射继续工作
             switch type {
             case "print":
                 forwardToPOS(path: "/api/print", payload: payload)
@@ -80,7 +91,7 @@ struct WebViewController: UIViewRepresentable {
                 guard let endpoint = payload["endpoint"] as? String else { return }
                 forwardToMacMini(path: "/predict/\(endpoint)", payload: payload)
             default:
-                NSLog("TXiOS: unknown message type: %@", type)
+                break  // TXBridge_iOS 已处理
             }
         }
 
@@ -113,12 +124,32 @@ struct WebViewController: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             NSLog("TXiOS: navigation failed: %@", error.localizedDescription)
             let html = """
-            <html><body style="display:flex;align-items:center;justify-content:center;
-            height:100vh;font-family:-apple-system,sans-serif;background:#f5f5f7;">
-            <div style="text-align:center;color:#1d1d1f">
-              <div style="font-size:48px;margin-bottom:16px">⏳</div>
-              <h2 style="font-size:24px;font-weight:600">连接门店服务器中</h2>
-              <p style="color:#6e6e73">请确认 Mac mini 和 POS 主机已开机</p>
+            <!DOCTYPE html>
+            <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+            <style>
+              * { margin:0; padding:0; box-sizing:border-box; }
+              body { display:flex; align-items:center; justify-content:center;
+                     height:100vh; font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+                     background:#0B1A20; color:#cccccc; }
+              .container { text-align:center; padding:40px; max-width:480px; }
+              .icon { font-size:64px; margin-bottom:24px; color:#FF6B35; }
+              h2 { font-size:24px; font-weight:600; color:#ffffff; margin-bottom:12px; }
+              p { font-size:15px; color:#999999; margin-bottom:8px; line-height:1.5; }
+              .info { margin-top:32px; padding:16px; background:#112228; border-radius:12px;
+                      font-size:13px; color:#666666; }
+              .info span { display:block; margin-bottom:4px; }
+              .brand { color:#FF6B35; font-weight:600; }
+            </style></head><body>
+            <div class="container">
+              <div class="icon">&#x1F4E6;</div>
+              <h2>连接门店服务器中</h2>
+              <p>请确认 Mac mini 和 POS 主机已开机</p>
+              <p>且与 iPad 在同一 WiFi 网络</p>
+              <div class="info">
+                <span>POS 主机: \(posHostUrl)</span>
+                <span>Mac mini: \(macMiniUrl)</span>
+                <span class="brand">屯象OS</span>
+              </div>
             </div></body></html>
             """
             webView.loadHTMLString(html, baseURL: nil)

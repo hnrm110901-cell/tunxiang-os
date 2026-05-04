@@ -14,5 +14,21 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('[TX-ADMIN] SW registered:', reg.scope);
+              window.addEventListener('online', () => {
+                if (reg.active) {
+                  reg.active.postMessage({ type: 'ONLINE_RESTORED' });
+                }
+              });
+            })
+            .catch((err) => console.warn('[TX-ADMIN] SW registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>

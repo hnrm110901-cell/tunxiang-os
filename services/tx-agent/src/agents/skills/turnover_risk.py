@@ -1,7 +1,13 @@
-"""屯象OS tx-agent 离职风险 Agent：定期扫描员工多维信号，计算离职风险评分并生成干预建议。"""
+"""屯象OS tx-agent 离职风险 Agent：定期扫描员工多维信号，计算离职风险评分并生成干预建议。
+
+Phase C2-Agent 升级（2026-05-03）：
+  添加 TX_AGENT_USE_MV_READS 环境变量 gate
+  _calculate_risk_score: MV 路径 → mv_employee_efficiency（< 5ms），降级 → 直接多表查询
+"""
 
 from __future__ import annotations
 
+import os
 from typing import Any, Optional
 
 import structlog
@@ -11,6 +17,9 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from ..base import AgentResult, SkillAgent
 
 logger = structlog.get_logger(__name__)
+
+# Phase C2-Agent: env-var gate for MV reads
+_USE_MV_READS = os.getenv("TX_AGENT_USE_MV_READS", "").lower() == "true"
 
 
 # ── 权重配置 ─────────────────────────────────────────────────────────────────
@@ -482,6 +491,62 @@ async def _generate_business_interventions(risk_signals: dict[str, dict[str, Any
     return suggestions
 
 
+# ── Phase C2-Agent: MV read path ──────────────────────────────────────────────
+
+
+async def _scan_from_mv_employee_efficiency(
+    db: Any,
+    tenant_id: str,
+    store_id: Optional[str],
+) -> dict[str, dict[str, Any]]:
+    """从 mv_employee_efficiency 物化视图批量读取人效指标（替代多表JOIN查询）。
+
+    返回: {employee_id: {attendance_score, efficiency_score, error_incidents, ...}}
+    """
+    store_clause = ""
+    params: dict[str, Any] = {"tenant_id": tenant_id}
+    if store_id:
+        store_clause = "AND store_id = CAST(:store_id AS uuid)"
+        params["store_id"] = store_id
+
+    q = text(f"""
+        SELECT employee_id, employee_name, role_type,
+               shift_hours, efficiency_score, attendance_score,
+               error_incidents, revenue_contributed_fen, orders_handled,
+               stat_date
+        FROM mv_employee_efficiency
+        WHERE tenant_id = CAST(:tenant_id AS uuid)
+          AND stat_date >= CURRENT_DATE - INTERVAL '30 days'
+          {store_clause}
+        ORDER BY stat_date DESC
+    """)
+    try:
+        result = await db.execute(q, params)
+        rows = [dict(r) for r in result.mappings()]
+    except (OperationalError, ProgrammingError) as exc:
+        logger.warning("mv_employee_efficiency_read_failed", error=str(exc))
+        return {}
+
+    # 聚合到员工维度（去重，取最新记录）
+    from collections import defaultdict
+    latest: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        eid = str(row.get("employee_id") or "")
+        if not eid or eid in latest:
+            continue  # 已取到最新（按 stat_date DESC 排序）
+        latest[eid] = {
+            "employee_name": row.get("employee_name") or "",
+            "role_type": row.get("role_type") or "",
+            "efficiency_score": float(row.get("efficiency_score") or 50),
+            "attendance_score": float(row.get("attendance_score") or 50),
+            "error_incidents": int(row.get("error_incidents") or 0),
+            "revenue_contributed_fen": int(row.get("revenue_contributed_fen") or 0),
+            "orders_handled": int(row.get("orders_handled") or 0),
+            "shift_hours": float(row.get("shift_hours") or 0),
+        }
+    return latest
+
+
 async def _fetch_risk_employees(
     db: Any,
     tenant_id: str,
@@ -749,6 +814,11 @@ class TurnoverRiskAgent(SkillAgent):
                 error="数据库连接不可用",
             )
 
+        # Phase C2-Agent: MV read path — 优先从 mv_employee_efficiency 读取人效/出勤/差错数据
+        mv_efficiency: dict[str, dict[str, Any]] = {}
+        if _USE_MV_READS:
+            mv_efficiency = await _scan_from_mv_employee_efficiency(self._db, self.tenant_id, store_id)
+
         # 真实逻辑：聚合7个维度
         att_trends = await _scan_attendance_trends(self._db, self.tenant_id, store_id)
         perf_trends = await _scan_performance_trends(self._db, self.tenant_id, store_id)
@@ -764,6 +834,29 @@ class TurnoverRiskAgent(SkillAgent):
             perf = perf_trends.get(emp_id, {"score": 40, "detail": "无绩效数据"})
             biz = biz_trends.get(emp_id, {"score": 0, "detail": "经营表现正常", "signals": []})
             svc = svc_trends.get(emp_id, {"score": 0, "detail": "服务质量正常", "signals": []})
+
+            # Phase C2-Agent: enrich with mv_employee_efficiency data
+            mv_data = mv_efficiency.get(emp_id)
+            if mv_data:
+                # 出勤评分 (invert: 高评分=低风险)
+                mv_att = max(0, min(100, int(100 - mv_data["attendance_score"])))
+                # 效能评分 (invert: 高评分=低风险)
+                mv_perf = max(0, min(100, int(100 - mv_data["efficiency_score"])))
+                # 差错次数 → 风险分
+                mv_svc = min(100, mv_data["error_incidents"] * 15)
+                # 用 MV 数据补充或增强现有维度
+                if att["score"] == 30 and mv_att > 30:
+                    att = {"score": mv_att, "detail": f"人效视图: 出勤评分{mv_data['attendance_score']:.0f}",
+                           "recent_anomalies": mv_data["error_incidents"], "prev_anomalies": 0,
+                           "emp_name": emp_name, "store_id": emp_store}
+                if perf["score"] == 40 and mv_perf > 40:
+                    perf = {"score": mv_perf, "performance_score": f"效率{mv_data['efficiency_score']:.0f}",
+                            "detail": f"人效视图: 效率评分{mv_data['efficiency_score']:.0f}",
+                            "emp_name": emp_name, "store_id": emp_store}
+                if svc["score"] == 0 and mv_svc > 0:
+                    svc = {"score": mv_svc, "detail": f"近30天差错{mv_data['error_incidents']}次",
+                           "signals": [f"差错{mv_data['error_incidents']}次"]}
+
             # 积分/工龄/投诉暂用默认值
             engage = {"score": 50, "detail": "积分数据待接入"}
             tenure = {"score": 45, "detail": "工龄数据待接入"}

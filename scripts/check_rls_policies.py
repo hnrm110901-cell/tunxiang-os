@@ -87,25 +87,42 @@ BUSINESS_TABLES = [
     "orders", "order_items", "payments", "refunds", "settlements",
     "payment_records", "reconciliation_batches", "reconciliation_diffs",
     "tri_reconciliation_records", "store_daily_settlements", "payment_fees",
+    "invoice_ocr_results",
     # 客户/会员
     "customers", "member_transactions",
+    "stored_value_split_ledger", "stored_value_split_rules",
+    "sv_settlement_batches",
     # 门店/组织
     "stores", "employees",
     # 菜品/BOM
     "dishes", "dish_categories", "dish_ingredients",
     "bom_templates", "bom_items",
     "dish_practices", "dish_combos",
-    # 库存
+    "dish_co_occurrence",
+    # 库存（含供应链移动、中央厨房、WMS、三单匹配、食安追溯、盘亏审批）
     "ingredient_masters", "ingredients", "ingredient_transactions",
     "waste_events", "suppliers", "supply_orders",
+    "receiving_items", "stocktake_items",
+    "distribution_orders", "production_orders", "store_receiving_confirmations",
+    "stocktakes", "warehouse_transfers", "warehouse_transfer_items",
+    "purchase_invoices", "purchase_match_records",
+    "ingredient_location_bindings", "inventory_by_location",
+    "delivery_temperature_logs", "delivery_temperature_logs_default",
+    "procurement_feedback_logs",
+    "stocktake_loss_approvals", "stocktake_loss_case_no_seq",
+    "stocktake_loss_cases", "stocktake_loss_items", "stocktake_loss_writeoffs",
+    "warehouse_locations", "warehouse_zones",
+    "yield_alerts",
     # 预约/宴会
     "reservations", "queues", "banquet_halls", "banquet_leads",
     "banquet_orders", "banquet_contracts", "menu_packages", "banquet_checklists",
     "banquet_proposals", "banquet_quotations", "banquet_feedbacks", "banquet_cases",
+    "banquet_approval_logs", "banquet_eo_tickets",
     # HR
     "attendance_rules", "clock_records", "daily_attendance",
     "payroll_batches", "payroll_items", "leave_requests",
     "leave_balances", "settlement_records",
+    "bonus_rules", "daily_scorecards",
     # KDS
     "production_depts", "dish_dept_mappings", "kds_tasks",
     # 运营
@@ -113,6 +130,10 @@ BUSINESS_TABLES = [
     "daily_ops_flows", "daily_ops_nodes", "agent_decision_logs",
     "table_production_plans", "cook_time_baselines",
     "dispatch_rules", "shift_configs",
+    "ceo_cockpit_snapshots", "dynamic_pricing_logs", "dynamic_pricing_rules",
+    "satisfaction_ratings", "store_lifecycle_stages",
+    # 试点管理（v090_pilot_tracking）
+    "pilot_items", "pilot_metrics", "pilot_programs", "pilot_reviews",
     # 通知/任务
     "notifications", "notification_preferences",
     "training_courses", "training_enrollments",
@@ -124,6 +145,7 @@ BUSINESS_TABLES = [
     "premium_cards", "premium_card_tiers", "premium_card_records",
     "points_mall_items", "points_exchange_records",
     "attribution_touchpoints", "attribution_conversions",
+    "conversion_funnel_daily", "customer_journey_timings",
     # AB 测试（Sprint G v290）
     "ab_experiments", "ab_experiment_arms",
     "ab_experiment_assignments", "ab_experiment_events",
@@ -581,7 +603,7 @@ async def run_audit(args: argparse.Namespace) -> int:
 
     try:
         conn = await asyncpg.connect(normalized)
-    except Exception as exc:  # noqa: BLE001 — 所有连接异常统一处理
+    except (ConnectionError, OSError, ValueError, TimeoutError, asyncpg.PostgresError) as exc:
         _print_err(
             f"数据库连接失败: {exc}\n"
             f"请确认：\n"

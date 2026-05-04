@@ -1,8 +1,11 @@
-"""Tier 1 契约测试 — 断网恢复 / CRDT 冲突解决
+"""Tier 1 契约测试 — 断网恢复 / LWW 冲突解决（非 CRDT）
 
 CLAUDE.md § 17：断网 4 小时重连后，订单数据无丢失、无冲突。
-CLAUDE.md § 20：test_offline_4h_crdt_no_data_loss 是 Tier 1 必过用例。
+CLAUDE.md § 20：test_offline_4h_lww_no_data_loss 是 Tier 1 必过用例。
 Week 8 Go/No-Go §4：断网 4h E2E 绿连续 3 日。
+
+本文件校验 **LWW（Last-Writer-Wins）+ 终态保护** 的冲突解决策略。
+注意：本实现不是真正的 CRDT（详见 conflict_resolver.py 模块 docstring）。
 
 本文件做 **pure logic** 层校验：
   · ConflictResolver 的冲突解决策略（终态保护 / 云端优先）
@@ -262,14 +265,15 @@ class TestOffline4hRecoveryContractTier1:
 
 
 # ─────────────────────────────────────────────────────────────
-# 4. 事件乱序（CRDT 核心）
+# 4. 事件乱序（LWW 关键不变量）
 # ─────────────────────────────────────────────────────────────
 
 
 class TestEventOrderingTier1:
     """事件乱序 / 重放 不破坏最终一致性
 
-    真实 CRDT 实现见 shared/events/（Event Sourcing）。本测试校验关键不变量。
+    ConflictResolver 的 LWW + 终态保护策略确保乱序到达的事件
+    按 updated_at 和终态约束正确合并。本测试校验关键不变量。
     """
 
     def test_updated_at_monotonic_priority(self):

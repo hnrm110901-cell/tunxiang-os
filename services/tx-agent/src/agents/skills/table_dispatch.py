@@ -2,11 +2,17 @@
 
 能力：桌台利用率分析、最优桌台推荐、等位时间预测
 通过 ModelRouter (MODERATE) 调用 LLM 生成调度建议。
+
+Phase C2-Agent 升级（2026-05-03）：
+  _analyze_utilization: MV 路径 → mv_table_turnover（补充真实翻台率数据），降级 → 使用 params 传入数据
 """
 
+import os
 from typing import Any
 
 import structlog
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from ..base import AgentResult, SkillAgent
 
@@ -16,6 +22,9 @@ except ImportError:
     model_router = None  # 独立测试时无跨服务依赖
 
 logger = structlog.get_logger()
+
+# Phase C2-Agent: env-var gate for MV reads
+_USE_MV_READS = os.getenv("TX_AGENT_USE_MV_READS", "").lower() == "true"
 
 # 桌台类型权重
 TABLE_TYPE_WEIGHTS = {
@@ -123,12 +132,36 @@ class TableDispatchAgent(SkillAgent):
         )
 
     async def _analyze_utilization(self, params: dict) -> AgentResult:
-        """分析桌台利用率，建议调整桌台配置"""
+        """分析桌台利用率，建议调整桌台配置。
+
+        Phase C2-Agent: TX_AGENT_USE_MV_READS=true 时从 mv_table_turnover 补充真实翻台率数据
+        """
         store_id = params.get("store_id", "")
         tables = params.get("tables", [])
         period_hours = params.get("period_hours", 24)
 
-        if not tables:
+        # Phase C2-Agent: enrich with MV table turnover data
+        mv_turnover = None
+        if _USE_MV_READS and self._db and store_id:
+            try:
+                row = await self._db.execute(
+                    text("""
+                        SELECT total_tables, occupied_tables, turnover_count,
+                               avg_occupancy_mins, revenue_per_table_fen,
+                               table_utilization_rate, avg_party_size
+                        FROM mv_table_turnover
+                        WHERE tenant_id = :tid
+                          AND store_id = :sid
+                          AND stat_hour = 0
+                          AND stat_date = CURRENT_DATE
+                    """),
+                    {"tid": self.tenant_id, "sid": store_id},
+                )
+                mv_turnover = dict(row.mappings().first() or {})
+            except (OperationalError, ProgrammingError) as exc:
+                logger.warning("table_dispatch_mv_read_failed", error=str(exc))
+
+        if not tables and not mv_turnover:
             return AgentResult(
                 success=False,
                 action="analyze_utilization",
@@ -188,6 +221,21 @@ class TableDispatchAgent(SkillAgent):
                 success=True,
             )
 
+        # Phase C2-Agent: supplement with MV table_turnover data
+        mv_enrichment = {}
+        if mv_turnover:
+            mv_enrichment = {
+                "mv_total_tables": mv_turnover.get("total_tables"),
+                "mv_turnover_count": mv_turnover.get("turnover_count"),
+                "mv_avg_occupancy_mins": mv_turnover.get("avg_occupancy_mins"),
+                "mv_table_utilization_rate": float(mv_turnover.get("table_utilization_rate") or 0),
+                "mv_revenue_per_table_fen": mv_turnover.get("revenue_per_table_fen"),
+                "mv_avg_party_size": float(mv_turnover.get("avg_party_size") or 0),
+            }
+            # If params didn't have enough data, use MV for the overall utilization
+            if overall_utilization == 0 and mv_enrichment["mv_table_utilization_rate"] > 0:
+                overall_utilization = mv_enrichment["mv_table_utilization_rate"]
+
         return AgentResult(
             success=True,
             action="analyze_utilization",
@@ -198,9 +246,10 @@ class TableDispatchAgent(SkillAgent):
                 "suggestions": suggestions,
                 "period_hours": period_hours,
                 "total_tables": len(tables),
+                "mv_enrichment": mv_enrichment,
             },
             reasoning=f"门店 {store_id} 整体桌台利用率 {overall_utilization:.0%}，共 {len(suggestions)} 条优化建议",
-            confidence=0.8,
+            confidence=0.8 if not mv_turnover else 0.88,
         )
 
     async def _predict_wait(self, params: dict) -> AgentResult:
