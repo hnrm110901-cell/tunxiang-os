@@ -55,11 +55,28 @@ preflight() {
     fi
     log "Docker: OK"
 
-    # 检查 compose 文件存在
+    # 检查 compose 文件存在（P0.5 后收敛到 infra/compose/）
+    [[ -f infra/compose/base.yml ]] || { err "infra/compose/base.yml 不存在"; exit 1; }
     if [[ "$TARGET" == "staging" ]]; then
-        [[ -f docker-compose.staging.yml ]] || { err "docker-compose.staging.yml 不存在"; exit 1; }
+        [[ -f infra/compose/envs/staging.yml ]] || { err "infra/compose/envs/staging.yml 不存在"; exit 1; }
         [[ -f .env.staging ]] || { err ".env.staging 不存在（从 .env.staging.example 复制）"; exit 1; }
+    elif [[ "$TARGET" == "gray" ]]; then
+        [[ -f infra/compose/envs/gray.yml ]] || { err "infra/compose/envs/gray.yml 不存在"; exit 1; }
+    elif [[ "$TARGET" == "prod" ]]; then
+        [[ -f infra/compose/envs/prod.yml ]] || { err "infra/compose/envs/prod.yml 不存在"; exit 1; }
     fi
+}
+
+# ─── 构建 compose 调用参数 ───
+# P0.5 后 compose 收敛到 infra/compose/，所有命令统一用 base + envs/<target>.yml
+compose_files_for_target() {
+    local target=$1
+    case "$target" in
+        staging) echo "-f infra/compose/base.yml -f infra/compose/envs/staging.yml" ;;
+        prod)    echo "-f infra/compose/base.yml -f infra/compose/envs/prod.yml" ;;
+        gray)    echo "-f infra/compose/base.yml -f infra/compose/envs/gray.yml" ;;
+        *)       echo "-f infra/compose/base.yml" ;;
+    esac
 }
 
 # ─── 运行测试 ───
@@ -88,13 +105,15 @@ run_migration() {
 # ─── 构建镜像 ───
 build_images() {
     step "构建 Docker 镜像"
-    local compose_file
+    # shellcheck disable=SC2046
+    local compose_files
+    compose_files=$(compose_files_for_target "$TARGET")
     if [[ "$TARGET" == "staging" ]]; then
-        compose_file="docker-compose.staging.yml"
-        docker-compose -f "$compose_file" --env-file .env.staging build --parallel
+        # shellcheck disable=SC2086
+        docker compose $compose_files --env-file .env.staging build --parallel
     else
-        compose_file="docker-compose.prod.yml"
-        docker-compose -f "$compose_file" build --parallel
+        # shellcheck disable=SC2086
+        docker compose $compose_files build --parallel
     fi
     log "镜像构建完成"
 }
@@ -102,36 +121,38 @@ build_images() {
 # ─── 部署服务 ───
 deploy_services() {
     step "部署服务"
-    local compose_file compose_args
+    local compose_files compose_args
+    compose_files=$(compose_files_for_target "$TARGET")
 
     if [[ "$TARGET" == "staging" ]]; then
-        compose_file="docker-compose.staging.yml"
         compose_args="--env-file .env.staging"
     else
-        compose_file="docker-compose.prod.yml"
         compose_args=""
     fi
 
     # 滚动更新：先更新后端，再更新前端
     log "更新基础设施（postgres, redis）..."
-    docker-compose -f "$compose_file" $compose_args up -d stg-postgres stg-redis 2>/dev/null \
-        || docker-compose -f "$compose_file" $compose_args up -d postgres redis 2>/dev/null \
+    # shellcheck disable=SC2086
+    docker compose $compose_files $compose_args up -d stg-postgres stg-redis 2>/dev/null \
+        || docker compose $compose_files $compose_args up -d postgres redis 2>/dev/null \
         || true
 
     log "等待数据库就绪..."
     sleep 5
 
     log "更新后端服务..."
-    docker-compose -f "$compose_file" $compose_args up -d --no-deps \
-        $(docker-compose -f "$compose_file" config --services 2>/dev/null \
+    # shellcheck disable=SC2086
+    docker compose $compose_files $compose_args up -d --no-deps \
+        $(docker compose $compose_files config --services 2>/dev/null \
             | grep -E '(gateway|tx-|celery)' | tr '\n' ' ')
 
     log "等待后端就绪..."
     sleep 10
 
     log "更新前端..."
-    docker-compose -f "$compose_file" $compose_args up -d --no-deps \
-        $(docker-compose -f "$compose_file" config --services 2>/dev/null \
+    # shellcheck disable=SC2086
+    docker compose $compose_files $compose_args up -d --no-deps \
+        $(docker compose $compose_files config --services 2>/dev/null \
             | grep -E '(web-|nginx|miniapp)' | tr '\n' ' ')
 }
 
@@ -158,7 +179,7 @@ health_check() {
     done
 
     err "健康检查失败（${max_retries} 次重试后）"
-    warn "查看日志: docker-compose -f docker-compose.${TARGET}.yml logs --tail=50"
+    warn "查看日志: docker compose -f infra/compose/base.yml -f infra/compose/envs/${TARGET}.yml logs --tail=50"
     return 1
 }
 
@@ -230,8 +251,8 @@ deploy_prod() {
             >> "$PROJECT_ROOT/logs/deploy-history.log"
     else
         err "生产部署健康检查失败！"
-        warn "检查日志: docker-compose -f docker-compose.prod.yml logs --tail=100"
-        warn "回滚: docker-compose -f docker-compose.prod.yml down && git checkout HEAD~1 && ./scripts/deploy.sh prod --skip-test"
+        warn "检查日志: docker compose -f infra/compose/base.yml -f infra/compose/envs/prod.yml logs --tail=100"
+        warn "回滚: docker compose -f infra/compose/base.yml -f infra/compose/envs/prod.yml down && git checkout HEAD~1 && ./scripts/deploy.sh prod --skip-test"
 
         mkdir -p "$PROJECT_ROOT/logs"
         echo "$TIMESTAMP | $(git rev-parse --short HEAD 2>/dev/null) | prod | FAILED" \
@@ -247,11 +268,11 @@ deploy_gray() {
     run_tests
 
     step "灰度构建"
-    docker-compose -f docker-compose.gray.yml --env-file .env.gray build --parallel
+    docker compose -f infra/compose/base.yml -f infra/compose/envs/gray.yml --env-file .env.gray build --parallel
     log "灰度镜像构建完成"
 
     step "灰度部署"
-    docker-compose -f docker-compose.gray.yml --env-file .env.gray up -d
+    docker compose -f infra/compose/base.yml -f infra/compose/envs/gray.yml --env-file .env.gray up -d
     log "灰度服务已启动"
 
     step "灰度健康检查"
