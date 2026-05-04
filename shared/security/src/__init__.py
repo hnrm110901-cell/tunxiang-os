@@ -1,4 +1,5 @@
 from .encrypted_type import EncryptedString
+from .error_handler import generic_message, log_and_raise, safe_http_exception
 from .field_encryption import FieldEncryptor, get_encryptor, is_encrypted
 from .masking import mask_bank_card, mask_email, mask_id_card, mask_name, mask_phone
 from .sql_guard import check_sql_injection, sanitize_for_like
@@ -17,6 +18,10 @@ from .validators import (
 from .xss_guard import escape_html, get_csp_header, validate_no_script
 
 __all__ = [
+    # error_handler
+    "safe_http_exception",
+    "log_and_raise",
+    "generic_message",
     # validators
     "sanitize_string",
     "validate_uuid",
