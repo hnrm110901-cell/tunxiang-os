@@ -247,11 +247,9 @@ class FranchiseSettlementService:
             tenant_id=tenant_id,
             db=db,
         )
-        total_revenue = revenue_fen / 100.0
 
-        # Step 4: 计算特许权金
-        royalty_amount = RoyaltyCalculator.calculate(total_revenue, franchisee)
-        royalty_amount_fen = int(round(royalty_amount * 100))
+        # Step 4: 计算特许权金（全程分，零浮点） — Tier 1 财务红线
+        royalty_amount_fen = RoyaltyCalculator.calculate_fen(revenue_fen, franchisee)
 
         # Step 5: 管理费（从加盟商档案读取固定管理费）
         mgmt_fee_fen: int = getattr(franchisee, "management_fee_fen", 0)
