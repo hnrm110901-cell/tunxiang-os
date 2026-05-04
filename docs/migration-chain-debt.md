@@ -43,3 +43,37 @@ PI.1 修了正则后真实暴露的 3 个断链如下：
    - (1)/(2) 改 revision 字符串 + 准备 alembic_version 数据修复脚本
    - (3) 与原作者对接确定上游 → 改 down_revision
 3. **目标：** v400 migration 落库前清零白名单。
+
+---
+
+## PG.1.1 / PI.2：alembic multiple heads（2026-05-04 新增登记）
+
+### 当前状态
+
+仓库 `shared/db-migrations/versions/` 当前同时存在 **75 个 alembic head**（leaf revision，未被任何其他 down_revision 引用）。
+
+### 即时修补（PG.1.1，v397）
+
+v395（RLS WITH CHECK 安全修补）与 v392/v393（业务推进）从 v391 分叉后，未合并；本次 PR 用 `v397_merge_v393_v396_heads.py` 合并这两个**当前活跃链**头部，使 `v397` 成为 v391 之后的唯一活跃 head。
+
+### 残留债务（PI.2，待立项）
+
+剩余 73 个历史 head 集中在 v047 / v150b / v206-v297 等旧时代分支，绝大多数是迭代/灰度残留：
+
+- v047 分叉到 {v048, v049, v050, v054}（4 head）
+- v206 / v207 / v208 / v235 等带后缀字母的并行分支
+- v264-v297 的 b/c/d 后缀变体
+
+这些 head 在生产 DB 的 `alembic_version` 表中实际只有一条主干指针在用，其他全是"代码里残留、DB 不感知"的孤立 leaf。如果将来某个 PR 不慎把 down_revision 指到这些孤儿，就会引入新分叉。
+
+### 为什么本次不修
+
+- 工程量大（73 个 head × 平均 2 文件需改 = 150+ 文件）
+- 多数旧 head 的语义需考古（找原作者 / 看 PR 历史）
+- 误改可能导致 alembic_version 数据修复脚本爆雷
+
+### 下一步
+
+- 立 PI.2 sprint：分批把 73 head 用 merge migration 合并；每批不超过 5 head，灰度验证
+- 立 CI 增强：检测**新增**孤立 head（比对 PR 前后 head 集合差），允许保留历史白名单
+- 目标 v420 落库前 head ≤ 5（业务/安全/灰度三个稳定子链可接受）
