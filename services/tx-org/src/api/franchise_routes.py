@@ -55,8 +55,29 @@ def _parse_tenant_uuid(x_tenant_id: Optional[str]) -> UUID:
 
 
 class RoyaltyTierReq(BaseModel):
-    min_revenue: float = Field(..., ge=0)
+    """阶梯分润请求模型。
+
+    金额单位约定（CLAUDE.md §10 Tier 1 财务红线）：
+    - 新字段：min_revenue_fen（分，int）— 推荐
+    - 旧字段：min_revenue（元，float）— 兼容保留，前端如已迁移可仅传 _fen
+    - 二选一：传 _fen 优先；都未传时取 0；都传时以 _fen 为准
+    """
+
+    min_revenue: Optional[float] = Field(default=None, ge=0, description="[DEPRECATED] 元（float），改用 min_revenue_fen")
+    min_revenue_fen: Optional[int] = Field(default=None, ge=0, description="分（int，推荐）")
     rate: float = Field(..., gt=0, lt=1)
+
+    def effective_min_revenue_yuan(self) -> float:
+        """返回元（float）形态，供 model.RoyaltyTier 使用。
+
+        优先级：min_revenue_fen > min_revenue > 0
+        通过 fen → yuan 精确除法（×100 单位换算无误差）。
+        """
+        if self.min_revenue_fen is not None:
+            return self.min_revenue_fen / 100.0
+        if self.min_revenue is not None:
+            return self.min_revenue
+        return 0.0
 
 
 class CreateFranchiseeReq(BaseModel):
@@ -67,6 +88,8 @@ class CreateFranchiseeReq(BaseModel):
     contract_end: Optional[str] = None
     royalty_rate: float = Field(default=0.05, gt=0, lt=1)
     royalty_tiers: List[RoyaltyTierReq] = Field(default_factory=list)
+    # 管理费：优先取 _fen，未传时按 0（CLAUDE.md §10 — 金额一律分）
+    management_fee_fen: Optional[int] = Field(default=None, ge=0, description="固定管理费（分）")
 
 
 class AssignStoreReq(BaseModel):
@@ -87,11 +110,31 @@ async def create_franchisee(
     req: CreateFranchiseeReq,
     x_tenant_id: Optional[str] = Header(None),
 ):
-    """创建加盟商（总部操作）。"""
+    """创建加盟商（总部操作）。
+
+    阶梯字段兼容：min_revenue_fen 优先，未传时回退 min_revenue（元）。
+    管理费字段：management_fee_fen（分，int），未传按 0。
+    """
     tenant_id = _parse_tenant_uuid(x_tenant_id)
     try:
+        # 规范化阶梯：统一以元（float）形态进入 service / model.RoyaltyTier
+        # 内部计算（calculate_fen）会将 min_revenue × 100 转分用 Decimal
+        normalized_tiers = [
+            {"min_revenue": t.effective_min_revenue_yuan(), "rate": t.rate}
+            for t in req.royalty_tiers
+        ]
+        payload = {
+            "franchisee_name": req.franchisee_name,
+            "contact_name": req.contact_name,
+            "contact_phone": req.contact_phone,
+            "contract_start": req.contract_start,
+            "contract_end": req.contract_end,
+            "royalty_rate": req.royalty_rate,
+            "royalty_tiers": normalized_tiers,
+            "management_fee_fen": req.management_fee_fen or 0,
+        }
         franchisee = await FranchiseService.create_franchisee(
-            data=req.model_dump(),
+            data=payload,
             tenant_id=tenant_id,
             db=None,
         )
@@ -256,14 +299,39 @@ async def mark_bill_paid(
 
 @router.get("/overdue-alerts")
 async def get_overdue_alerts(
-    threshold: float = 50000.0,
+    threshold_fen: Optional[int] = None,
+    threshold: Optional[float] = None,
     x_tenant_id: Optional[str] = Header(None),
 ):
-    """欠款预警：累计欠款超阈值的加盟商列表。"""
+    """欠款预警：累计欠款超阈值的加盟商列表。
+
+    阈值字段兼容（CLAUDE.md §10 — 金额一律分）：
+    - 推荐：threshold_fen（分，int）
+    - 兼容：threshold（元，float）— 未来弃用
+    - 都未传：默认 5 万元（5_000_000 分）
+    """
     tenant_id = _parse_tenant_uuid(x_tenant_id)
+
+    # 优先 _fen，再回退 yuan，最后默认 5 万元
+    if threshold_fen is not None:
+        threshold_yuan = threshold_fen / 100.0
+    elif threshold is not None:
+        threshold_yuan = threshold
+    else:
+        threshold_yuan = 50_000.0
+
     alerts = await FranchiseService.check_overdue_alerts(
         tenant_id=tenant_id,
         db=None,
-        threshold=threshold,
+        threshold=threshold_yuan,
     )
-    return {"ok": True, "data": {"alerts": alerts, "count": len(alerts)}}
+    return {
+        "ok": True,
+        "data": {
+            "alerts": alerts,
+            "count": len(alerts),
+            "threshold_fen": int(threshold_yuan * 100),
+            # 旧字段保留，便于前端逐步迁移
+            "threshold": threshold_yuan,
+        },
+    }
