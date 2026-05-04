@@ -329,7 +329,7 @@ async def test_backfill_loops_until_exhausted() -> None:
     batches = [
         [_row(1), _row(2)],  # 满批
         [_row(3), _row(4)],  # 满批
-        [_row(5)],           # 半批 → 收尾
+        [_row(5)],  # 半批 → 收尾
     ]
     select_calls = {"n": 0}
 
@@ -438,7 +438,7 @@ async def test_backfill_resets_guc_for_cross_tenant_rows() -> None:
         {"id": "r1", "tenant_id": TENANT_A, "status": "active"},
         {"id": "r2", "tenant_id": TENANT_A, "status": "active"},
         {"id": "r3", "tenant_id": other_tenant, "status": "active"},  # 切换
-        {"id": "r4", "tenant_id": TENANT_A, "status": "active"},      # 再切回
+        {"id": "r4", "tenant_id": TENANT_A, "status": "active"},  # 再切回
     ]
     captured: list[tuple[str, dict[str, Any]]] = []
 
