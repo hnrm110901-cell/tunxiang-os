@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-expense
+description: 屯象OS 费控微服务 — 报销/费用/OCR 发票（Tier 2）
+type: application
+version: 1.0.0
+appVersion: "latest"
