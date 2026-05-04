@@ -145,16 +145,15 @@ export function CreditPayPage() {
                     key={c.id}
                     onClick={() => !isFrozen && !isInsufficient && handleSelectCustomer(c)}
                     disabled={isFrozen || isInsufficient}
+                    {...tf.handlers}
                     style={{
                       width: '100%', padding: 20, marginBottom: 12, borderRadius: 12,
                       background: '#112B36', border: '2px solid transparent',
                       color: '#fff', textAlign: 'left', cursor: isFrozen || isInsufficient ? 'not-allowed' : 'pointer',
                       opacity: isFrozen || isInsufficient ? 0.5 : 1,
                       transition: 'transform 200ms ease, border-color 200ms ease',
+                      ...tf.style,
                     }}
-                    onPointerDown={(e) => { if (!isFrozen && !isInsufficient) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                    onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontSize: 18, fontWeight: 'bold' }}>{c.name}</span>
@@ -182,7 +181,8 @@ export function CreditPayPage() {
             </div>
             <button
               onClick={() => navigate(-1)}
-              style={{ ...navBtn, background: '#333', marginTop: 12 }}
+              {...tf.handlers}
+              style={{ ...navBtn, background: '#333', marginTop: 12, ...tf.style }}
             >
               返回
             </button>
@@ -248,22 +248,22 @@ export function CreditPayPage() {
             <div style={{ display: 'flex', gap: 12, marginTop: 'auto' }}>
               <button
                 onClick={() => { setStep('search'); setSelectedCustomer(null); setSignerName(''); }}
-                style={{ ...navBtn, flex: 1, background: '#333' }}
+                {...tf.handlers}
+                style={{ ...navBtn, flex: 1, background: '#333', ...tf.style }}
               >
                 重新选择
               </button>
               <button
                 onClick={handleConfirm}
                 disabled={!canPay || submitting}
+                {...tf.handlers}
                 style={{
                   ...navBtn, flex: 2,
                   background: canPay && !submitting ? '#FF6B35' : '#444',
                   cursor: canPay && !submitting ? 'pointer' : 'not-allowed',
                   fontSize: 20, fontWeight: 'bold',
+                  ...tf.style,
                 }}
-                onPointerDown={(e) => { if (canPay && !submitting) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 {submitting ? '处理中...' : '确认挂账'}
               </button>
