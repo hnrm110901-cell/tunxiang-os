@@ -1,3 +1,39 @@
+## 2026-05-04 23:30  PG.1.1 alembic 双 head 合并（v397）
+
+### 本次会话目标
+按"持续开发"指令推进 P1。PG.1（v391 INSERT policy USING-only）核查发现：
+v395 已修 v391（早于本会话），但 v395 + v392/v393 从 v391 分叉后未合并，
+导致 alembic 双 head（v393_sync_checkpoints_token + v396）→ `upgrade head` 报错。
+
+### 完成状态
+- [x] PG.1 主项核查 — v395_delivery_dispatches_rls_with_check 已修 v391 RLS 漏洞（合入 main）
+- [x] PG.1.1 — `v397_merge_v393_v396_heads.py` 合并双 head 为单一 v397
+- [x] docs/migration-chain-debt.md 登记 PI.2 残留 73 历史 head 工程
+- [ ] PI.2 — 73 历史 head 分批收敛（独立 sprint）
+- [ ] PG.7（新增） — v392/v076/v067/v075/v386 等 UPDATE policy USING-only（缺 WITH CHECK，UPDATE SET tenant_id 跨租户逃逸风险）
+
+### 关键决策
+- **CI multiple-heads 守门撤回**：本地脚本检测到 75 head（远超本次范围），
+  强制阻塞会立即 fail 全仓所有 migration PR。改为 PI.2 sprint 用增量守门
+  （比对 PR 前后 head 集合差），不阻塞 PG.1.1 紧急修补。
+- **不直接改 v391**（CLAUDE.md §18 已应用迁移禁止修改），用 v395 修补 + v397 合并
+  两步走，alembic_version 端无数据修复。
+- **v397 为纯合并节点**（upgrade/downgrade 均 no-op），无 schema 变更，
+  灰度 / 生产部署零风险。
+
+### 下一步
+- 起 PR 后台 review；merge 后用 v398 起新业务 down_revision = v397
+- 评估 PG.7（UPDATE WITH CHECK 收紧）：v392 已建生产数据，需 DROP+重建 policy
+- PI.2 立项：分批 merge + CI 增量守门
+
+### 已知风险
+- v397 合并节点本身 no-op，但合并后 v398+ 必须 down_revision = v397，
+  不可绕回 v393 或 v396（CI 暂未守门，靠 review 把关）
+- 73 历史 head 中若有"看似孤立但生产 DB 实际依赖"的，PI.2 修补前需 alembic_version
+  数据快照核对
+
+---
+
 ## 2026-05-04 22:35  PG/PI/P2.2 后续会话收尾（7 PR admin merge）
 
 ### 本次会话目标
