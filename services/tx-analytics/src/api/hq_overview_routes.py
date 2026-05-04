@@ -10,11 +10,11 @@ RLS 安全：使用 X-Tenant-ID header，通过 get_db_with_tenant 设置 app.te
 容错：DB 查询失败或表不存在时返回 mock 数据，确保驾驶舱始终可展示。
 """
 
-import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Header, HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,7 +24,7 @@ from shared.ontology.src.database import async_session_factory
 from shared.ontology.src.entities import Dish, DishCategory, Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics-hq"])
 
@@ -226,7 +226,7 @@ async def _query_overview(
         }
 
     except SQLAlchemyError as exc:
-        logger.warning("_query_overview: SQLAlchemy error, returning zeros. error=%r", exc)
+        logger.warning("query_overview_sqlalchemy_error_returning_zeros", error=repr(exc))
         return _zero
 
 
@@ -274,7 +274,7 @@ async def _query_store_ranking(
         ]
 
     except SQLAlchemyError as exc:
-        logger.warning("_query_store_ranking: SQLAlchemy error, returning empty list. error=%r", exc)
+        logger.warning("query_store_ranking_sqlalchemy_error_returning_empty", error=repr(exc))
         return []
 
 
@@ -348,7 +348,7 @@ async def _query_category_sales(
         return {"date": target_date.isoformat(), "categories": categories, "total_fen": total_fen}
 
     except SQLAlchemyError as exc:
-        logger.warning("_query_category_sales: SQLAlchemy error, returning zeros. error=%r", exc)
+        logger.warning("query_category_sales_sqlalchemy_error_returning_zeros", error=repr(exc))
         return _zero
 
 
@@ -390,10 +390,10 @@ async def get_overview(
             data = await _query_overview(target_date, tenant_id, session, brand_id=brand_id)
 
     except (OSError, ConnectionRefusedError, TimeoutError) as exc:
-        logger.warning("overview: DB connection error, returning zeros. error=%r", exc)
+        logger.warning("overview_db_connection_error_returning_zeros", error=repr(exc))
         data = _zero_overview
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，驾驶舱不返回 500
-        logger.warning("overview: unexpected error, returning zeros. error=%r", exc, exc_info=True)
+        logger.warning("overview_unexpected_error_returning_zeros", error=repr(exc), exc_info=True)
         data = _zero_overview
 
     return {"ok": True, "data": data}
@@ -425,10 +425,10 @@ async def get_store_ranking(
             data = {"date": target_date.isoformat(), "stores": stores}
 
     except (OSError, ConnectionRefusedError, TimeoutError) as exc:
-        logger.warning("store-ranking: DB connection error, returning empty. error=%r", exc)
+        logger.warning("store_ranking_db_connection_error_returning_empty", error=repr(exc))
         data = {"date": target_date.isoformat(), "stores": []}
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，驾驶舱不返回 500
-        logger.warning("store-ranking: unexpected error, returning empty. error=%r", exc, exc_info=True)
+        logger.warning("store_ranking_unexpected_error_returning_empty", error=repr(exc), exc_info=True)
         data = {"date": target_date.isoformat(), "stores": []}
 
     return {"ok": True, "data": data}
@@ -460,10 +460,10 @@ async def get_category_sales(
             data = await _query_category_sales(target_date, tenant_id, session)
 
     except (OSError, ConnectionRefusedError, TimeoutError) as exc:
-        logger.warning("category-sales: DB connection error, returning zeros. error=%r", exc)
+        logger.warning("category_sales_db_connection_error_returning_zeros", error=repr(exc))
         data = {"date": target_date.isoformat(), "categories": [], "total_fen": 0}
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，驾驶舱不返回 500
-        logger.warning("category-sales: unexpected error, returning zeros. error=%r", exc, exc_info=True)
+        logger.warning("category_sales_unexpected_error_returning_zeros", error=repr(exc), exc_info=True)
         data = {"date": target_date.isoformat(), "categories": [], "total_fen": 0}
 
     return {"ok": True, "data": data}
