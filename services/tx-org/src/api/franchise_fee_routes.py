@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import date
 from typing import Any, Optional
@@ -39,6 +40,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
@@ -219,6 +222,47 @@ async def create_fee_bill(
         amount_fen=req.amount_fen,
         tenant_id=x_tenant_id,
     )
+
+    # ── v147+ 事件总线旁路写入：账单生成 + 已逾期标记 ──
+    # stream_id = bill_id（账单聚合根），金额单位分（int）
+    asyncio.create_task(
+        emit_event(
+            event_type=FranchiseEventType.FEE_BILLED,
+            tenant_id=x_tenant_id,
+            stream_id=str(bill_id),
+            payload={
+                "bill_id": str(bill_id),
+                "franchise_id": req.franchise_id,
+                "bill_type": req.bill_type,
+                "amount_fen": req.amount_fen,
+                "due_date": req.due_date,
+                "billing_period": req.billing_period,
+                "initial_status": initial_status,
+            },
+            source_service="tx-org",
+            metadata={"operator_id": x_operator},
+        )
+    )
+    if initial_status == "overdue":
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.FEE_OVERDUE,
+                tenant_id=x_tenant_id,
+                stream_id=str(bill_id),
+                payload={
+                    "bill_id": str(bill_id),
+                    "franchise_id": req.franchise_id,
+                    "bill_type": req.bill_type,
+                    "amount_fen": req.amount_fen,
+                    "unpaid_fen": req.amount_fen,
+                    "due_date": req.due_date,
+                    "reason": "due_date_in_past_at_creation",
+                },
+                source_service="tx-org",
+                metadata={"operator_id": x_operator},
+            )
+        )
+
     return {
         "ok": True,
         "data": {
@@ -336,8 +380,9 @@ async def list_overdue_bills(
     tid = await _set_rls(db, x_tenant_id)
 
     # 自动将到期未付账单标记为逾期
+    newly_overdue: list[dict] = []
     try:
-        await db.execute(
+        marked_res = await db.execute(
             text("""
                 UPDATE franchise_fee_bills
                 SET status = 'overdue', updated_at = now()
@@ -345,12 +390,38 @@ async def list_overdue_bills(
                   AND status = 'pending'
                   AND due_date < CURRENT_DATE
                   AND is_deleted IS NOT TRUE
+                RETURNING id, franchise_id, bill_type, amount_fen,
+                          COALESCE(paid_fen, 0) AS paid_fen, due_date
             """),
             {"tid": tid},
         )
+        newly_overdue = [dict(r._mapping) for r in marked_res.fetchall()]
         await db.commit()
     except SQLAlchemyError as exc:
         log.warning("overdue_bills.auto_mark_failed", error=str(exc))
+
+    # ── v147+ 事件总线旁路写入：每条新标记 overdue 的账单单独发射事件 ──
+    # stream_id = bill_id；金额单位 fen（int）
+    for nb in newly_overdue:
+        unpaid_fen = int(nb["amount_fen"]) - int(nb["paid_fen"])
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.FEE_OVERDUE,
+                tenant_id=x_tenant_id,
+                stream_id=str(nb["id"]),
+                payload={
+                    "bill_id": str(nb["id"]),
+                    "franchise_id": str(nb["franchise_id"]),
+                    "bill_type": nb["bill_type"],
+                    "amount_fen": int(nb["amount_fen"]),
+                    "paid_fen": int(nb["paid_fen"]),
+                    "unpaid_fen": unpaid_fen,
+                    "due_date": nb["due_date"].isoformat() if nb["due_date"] else None,
+                    "reason": "auto_mark_pending_past_due",
+                },
+                source_service="tx-org",
+            )
+        )
 
     where = "WHERE b.tenant_id = :tid AND b.status = 'overdue' AND b.is_deleted IS NOT TRUE"
     params: dict = {"tid": tid}
@@ -529,6 +600,36 @@ async def record_payment(
         new_status=new_status,
         tenant_id=x_tenant_id,
     )
+
+    # ── v147+ 事件总线旁路写入：收款完成 ──
+    # stream_id = bill_id；新状态可能为 partial（部分收款）或 paid（结清）
+    asyncio.create_task(
+        emit_event(
+            event_type=FranchiseEventType.FEE_PAID,
+            tenant_id=x_tenant_id,
+            stream_id=bill_id,
+            payload={
+                "bill_id": bill_id,
+                "payment_id": str(payment_id),
+                "franchise_id": bill["franchise_id"],
+                "bill_type": bill["bill_type"],
+                "amount_fen": bill["amount_fen"],
+                "paid_amount_fen": req.paid_amount_fen,
+                "total_paid_fen": new_paid_fen,
+                "remaining_fen": new_remaining,
+                "bill_status": new_status,
+                "fully_paid": new_status == "paid",
+                "payment_method": req.payment_method,
+                "payment_date": payment_date.isoformat(),
+            },
+            source_service="tx-org",
+            metadata={
+                "operator_id": x_operator,
+                "receipt_no": req.receipt_no,
+            },
+        )
+    )
+
     return {
         "ok": True,
         "data": {
