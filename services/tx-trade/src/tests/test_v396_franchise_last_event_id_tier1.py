@@ -97,18 +97,27 @@ def test_each_franchise_table_adds_last_event_id(table: str, captured_sql: dict[
 
 @pytest.mark.parametrize("table", EXPECTED_TABLES)
 def test_each_table_has_compound_index(table: str, captured_sql: dict[str, list[str]]) -> None:
-    """主索引：(tenant_id, last_event_id) — 反查事件归属"""
-    snippet = f"CREATE INDEX IF NOT EXISTS idx_{table}_last_event ON {table} (tenant_id, last_event_id)"
-    assert any(snippet in sql for sql in captured_sql["upgrade"]), f"{table} 缺主索引"
+    """主索引：(tenant_id, last_event_id) — 反查事件归属
+
+    PJ.2 改 CONCURRENTLY 后，单条 SQL 字面量被 PEP8 拆成多行 f-string 拼接，
+    captured_sql 收到的是已合并的完整字符串。这里用 substring 检查同时
+    覆盖 CONCURRENTLY 与非 CONCURRENTLY 写法（向前兼容）。
+    """
+    head = f"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{table}_last_event"
+    tail = f"ON {table} (tenant_id, last_event_id)"
+    assert any(head in sql and tail in sql for sql in captured_sql["upgrade"]), (
+        f"{table} 缺 CONCURRENTLY 主索引（PJ.2 生产零阻塞要求）"
+    )
 
 
 @pytest.mark.parametrize("table", EXPECTED_TABLES)
 def test_each_table_has_partial_null_index(table: str, captured_sql: dict[str, list[str]]) -> None:
     """PARTIAL 索引：定位未纳入事件流的旧行 — PG.5 backfill 入口"""
-    snippet = (
-        f"CREATE INDEX IF NOT EXISTS idx_{table}_last_event_null ON {table} (tenant_id) WHERE last_event_id IS NULL"
+    head = f"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{table}_last_event_null"
+    tail = f"ON {table} (tenant_id) WHERE last_event_id IS NULL"
+    assert any(head in sql and tail in sql for sql in captured_sql["upgrade"]), (
+        f"{table} 缺 CONCURRENTLY PARTIAL NULL 索引（PJ.2 生产零阻塞要求）"
     )
-    assert any(snippet in sql for sql in captured_sql["upgrade"]), f"{table} 缺 PARTIAL NULL 索引"
 
 
 # ──────────────── 4. downgrade 完整反向 ────────────────
@@ -122,8 +131,8 @@ def test_downgrade_drops_column(table: str, captured_sql: dict[str, list[str]]) 
 
 @pytest.mark.parametrize("table", EXPECTED_TABLES)
 def test_downgrade_drops_both_indexes(table: str, captured_sql: dict[str, list[str]]) -> None:
-    null_idx = f"DROP INDEX IF EXISTS idx_{table}_last_event_null"
-    main_idx = f"DROP INDEX IF EXISTS idx_{table}_last_event"
+    null_idx = f"DROP INDEX CONCURRENTLY IF EXISTS idx_{table}_last_event_null"
+    main_idx = f"DROP INDEX CONCURRENTLY IF EXISTS idx_{table}_last_event"
     assert any(null_idx in sql for sql in captured_sql["downgrade"]), f"{table} downgrade 未 DROP NULL 索引"
     assert any(main_idx in sql for sql in captured_sql["downgrade"]), f"{table} downgrade 未 DROP 主索引"
 
