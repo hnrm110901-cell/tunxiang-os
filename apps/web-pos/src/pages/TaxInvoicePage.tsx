@@ -186,7 +186,8 @@ export function TaxInvoicePage() {
 
         <button
           onClick={() => navigate(-1)}
-          style={{ marginTop: 16, width: '100%', padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 56 }}
+          {...tf.handlers}
+          style={{ marginTop: 16, width: '100%', padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 56, ...tf.style }}
         >
           返回
         </button>
@@ -326,20 +327,20 @@ export function TaxInvoicePage() {
             <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
               <button
                 onClick={() => setStep('type')}
-                style={{ flex: 1, padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer', minHeight: 56 }}
+                {...tf.handlers}
+                style={{ flex: 1, padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer', minHeight: 56, ...tf.style }}
               >
                 上一步
               </button>
               <button
                 onClick={handleNext}
+                {...tf.handlers}
                 style={{
                   flex: 2, padding: 16, background: '#FF6B35', border: 'none', borderRadius: 12,
                   color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
-                  transition: 'transform 200ms ease',
+                  transition: 'transform 200ms ease', ...tf.style,
                 }}
-                onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
               >
                 下一步
               </button>
