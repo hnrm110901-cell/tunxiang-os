@@ -65,16 +65,14 @@ def test_elasticity_typical_negative():
     # 价格 5000 → 销量 80；价格 6000 → 销量 60；价格 7000 → 销量 45
     # 用这三组 * 5 次重复构成 15 点数据
     obs = []
-    i = 0
-    for price, qty in [(5000, 80), (5500, 70), (6000, 60),
+    for i, (price, qty) in enumerate([(5000, 80), (5500, 70), (6000, 60),
                        (6500, 52), (7000, 45), (5200, 75), (5800, 65),
                        (6300, 55), (6800, 48), (7500, 40),
                        (5100, 78), (5700, 67), (6200, 57),
-                       (6700, 50), (7200, 42)]:
+                       (6700, 50), (7200, 42)]):
         obs.append(PricingObservation(
             day=date(2026, 1, i + 1), price_fen=price, quantity_sold=qty,
         ))
-        i += 1
     est = estimate_elasticity_log_log(obs)
     assert est.source == "log_log"
     assert est.elasticity < 0, f"典型涨价-减量应是负弹性，实际 {est.elasticity}"

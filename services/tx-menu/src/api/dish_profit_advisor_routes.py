@@ -329,6 +329,7 @@ async def trigger_weekly_report(
     if not store_name:
         # 自动查询门店名称
         from sqlalchemy import text
+
         from ..services.dish_pricing_advisor_service import _set_rls
 
         await _set_rls(db, x_tenant_id)

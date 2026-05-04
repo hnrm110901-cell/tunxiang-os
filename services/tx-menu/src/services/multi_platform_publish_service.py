@@ -13,14 +13,12 @@
 - 抖音: 团购商品名/价格/库存/有效期
 """
 
-import asyncio
 import uuid as _uuid
 from datetime import datetime
 from typing import Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
