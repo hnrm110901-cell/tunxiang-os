@@ -212,6 +212,8 @@ import { BrandOverview } from './pages/analytics/hq/BrandOverview';
 import { StorePerformanceMatrix } from './pages/analytics/hq/StorePerformanceMatrix';
 // ─── 模块4.4: Agent KPI 绑定仪表盘 ────────────────────────────────────────────
 // (duplicate import removed - AgentKPIDashboard already imported above)
+// ─── May W2: C-04 演示环境监控面板 ──────────────────────────────────────────────
+import DemoMonitorPage from './pages/DemoMonitorPage';
 
 function App() {
   return (
@@ -455,6 +457,8 @@ function AppContent() {
           <Route path="/trade/corporate" element={<CorporateCustomerPage />} />
           {/* ─── 模块4.4: Agent KPI 绑定仪表盘 ─── */}
           <Route path="/agent/kpi" element={<AgentKPIDashboard />} />
+          {/* ─── May W2: C-04 演示环境监控面板 ─── */}
+          <Route path="/demo-monitor" element={<DemoMonitorPage />} />
         </Routes>
       </ShellHQ>
     </BrowserRouter>

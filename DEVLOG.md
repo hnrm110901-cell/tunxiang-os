@@ -452,6 +452,226 @@
 - Docker 环境启动后: k6 压测 + 服务冒烟 + 报表逐张验收
 - 沙箱环境就绪后: 微信分账 POC + 美团真实接入
 - RLS 技术债: 独立 PR 补 26 张表
+## 2026-05-04 Gap B-03 + C-04 开发执行
+
+### 今日完成
+- [B-03] 商户目标配置外置化 + tx-brain 集成
+  - `services/tx-analytics/src/config/merchant_targets.py` — 外置化默认目标/KPI标签/LOWER_IS_BETTER
+  - `services/tx-analytics/src/api/merchant_targets_routes.py` — 重构为 import from config
+  - `services/tx-brain/src/api/merchant_target_routes.py` — 3 个新端点（GET targets/gap + POST analyze）
+  - `services/tx-brain/src/main.py` — 注册 merchant_target_router
+- [C-04] 演示环境监控面板
+  - `services/tx-analytics/src/api/demo_monitor_routes.py` — GET /demo-monitor/health + /demo-monitor/services
+  - `apps/web-admin/src/api/demoMonitorApi.ts` — 前端 API 类型 + fetch 函数
+  - `apps/web-admin/src/pages/DemoMonitorPage.tsx` — 暗色主题监控面板，30s 自动轮询
+  - `apps/web-admin/src/App.tsx` — 注册 /demo-monitor 路由
+
+### 状态更新
+- A 系列（A-01/A-02/A-03）：✅ 完成
+- B 系列（B-03/B-04）：✅ 完成
+- C 系列（C-03/C-04）：✅ 完成
+- 全部 7 项 Gap 任务代码完成，待发布闸门
+
+### 数据变化
+- 迁移版本：无变更
+- 新增服务模块：4 个（config/merchant_targets.py, demo_monitor_routes.py, demoMonitorApi.ts, DemoMonitorPage.tsx）
+- 新增 API 端点：5 个（GET /demo-monitor/health, GET /demo-monitor/services, GET /brain/merchant-targets/{code}, GET .../gap, POST .../analyze）
+
+## 2026-05-03 马来西亚版 Phase 1 开发执行
+
+### 今日完成
+- [docs/malaysia-development-plan.md] 基于市场进入报告制定马来西亚版开发计划
+  - 4个Phase、16个Sprint、覆盖40+周
+  - 新建 tx-malaysia 微服务 + 7个适配器 + 2个前端i18n框架
+  - 改造12个关键文件（country_code/多币种/SST-VAT路由）
+
+### Sprint 1.1 — 国家层基础设施
+- [shared/ontology/src/base.py] TenantBase 新增 country_code
+- [shared/ontology/src/entities.py] Store 继承 country_code
+- [shared/db-migrations/versions/v384_country_code.py] 17张业务表新增 country_code (v384)
+- [shared/feature_flags/flag_names.py] 新增 MalaysiaFlags (15个MY特性开关)
+- [services/tx-org/src/api/region_management_routes.py] 新增 by-country 端点
+
+### Sprint 1.2 — 多语言 i18n 框架
+- [apps/web-pos/src/i18n/] 新建POS i18n框架（zh/en/ms + LangContext）
+- [apps/web-admin/src/i18n/] 新建Admin i18n框架（zh/en/ms + LangContext）
+- [shared/i18n/ms_MY.py] 后端马来语翻译
+- [shared/design-system/src/utils/formatPrice.ts] 多币种支持（CNY/MYR/IDR/VND等）
+- [apps/h5-self-order/src/i18n/ms.ts] 130+马来语翻译 + LangContext 注册
+- [apps/miniapp-customer-v2/src/utils/i18n.ts] 新增 ms-MY locale
+
+### Sprint 1.3 — SST 税务引擎
+- [services/tx-malaysia/] 新建微服务（main.py + SST服务 + e-Invoice占位）
+- [services/tx-malaysia/src/services/sst_service.py] SST计算引擎（6%/8%/0%）
+- [services/tx-malaysia/src/api/sst_routes.py] SST申报API（/calculate/rates/categories）
+- [shared/ontology/src/entities.py] Dish 新增 sst_category 字段
+- [services/tx-trade/src/services/cashier_engine.py] SST/VAT 路由（country_code分支）
+- [shared/db-migrations/versions/v385_sst_category.py] dishes 表新增 sst_category
+
+### Sprint 1.4 — 马来西亚支付适配器
+- [shared/adapters/tng_ewallet/] Touch 'n Go eWallet 适配器（client + adapter）
+- [shared/adapters/grabpay/] GrabPay 适配器（OAuth2 + client + adapter）
+- [shared/adapters/boost/] Boost 适配器（client + adapter）
+- [services/tx-trade/src/services/payment_gateway.py] MY支付方法路由（tng_ewallet/grabpay/boost）
+- [services/tx-trade/src/routers/payment_router.py] MY支付方式注册
+- [services/tx-trade/src/services/my_payment_notify_service.py] MY回调通知处理
+
+### Sprint 1.5 — LHDN e-Invoice Hub
+- [shared/adapters/myinvois/src/client.py] MyInvois API客户端（OAuth2/提交/查询/取消）
+- [services/tx-malaysia/src/services/e_invoice_service.py] e-Invoice业务服务（submit/query/cancel/search + LHDN Phase合规）
+- [services/tx-malaysia/src/api/e_invoice_routes.py] e-Invoice API端点
+- [services/tx-finance/src/services/invoice_service.py] MY分支路由（country_code判断+MyInvois适配器）
+
+### Sprint 1.6 — POS前端马来西亚适配
+- [apps/web-pos/src/main.tsx] 引入 LangProvider 包裹App
+- [apps/web-pos/src/pages/TaxInvoicePage.tsx] MY e-Invoice开票流程（BRN/NRIC校验、RM币种)
+
+### 数据变化
+- 迁移版本：v384 → v385
+- 新增3个适配器包：tng_ewallet、grabpay、boost
+- 新增6个服务模块：e_invoice_service、sst_service、my_payment_notify_service
+- 新增2个前端i18n框架：web-pos、web-admin
+- 新增1个后端i18n模块：ms_MY
+
+### 当前状态
+- ② Phase 1（6个Sprint）全部代码完成
+- Phase 2-4 待后续分配Agent执行
+
+### 遗留问题
+- formatPrice MYR 符号在新版 Intl 中返回 "MYR" 而非 "RM"（备用方案通过 CURRENCY_CONFIG 硬编码修正）
+- MyInvois adapter 需要生产环境 client_id/client_secret 方可端到端测试
+- TaxInvoicePage 的 API 调用尚为 TODO 注释状态，需对接后端真实接口
+
+## 2026-05-03 马来西亚版 Phase 2-3 开发执行 + Phase 4 启动
+
+### 今日完成 (Phase 2 — 外卖平台与生态建设)
+
+### Sprint 2.1 — GrabFood 适配器
+- [shared/adapters/grabfood/] GrabFood 适配器（OAuth2 client + DeliveryPlatformAdapter）
+- [services/tx-trade/src/services/delivery_adapters/grabfood_adapter.py] GrabFood webhook适配器（HMAC-SHA256验签、parse_order、confirm/reject）
+- [shared/adapters/delivery_canonical/transformers.py] GrabFoodTransformer 添加
+- [shared/adapters/delivery_publish/publishers.py] GrabFoodPublisher 添加
+- [shared/adapters/delivery_factory.py] GrabFoodDeliveryAdapter 注册
+- [services/tx-trade/src/routers/delivery_panel_router.py] /webhooks/grabfood 端点
+
+### Sprint 2.2 — Foodpanda + ShopeeFood 适配器
+- [shared/adapters/foodpanda/] Foodpanda 适配器（HMAC-SHA256 client + adapter）
+- [shared/adapters/shopeefood/] ShopeeFood 适配器（OAuth2 + HMAC client + adapter）
+- [services/tx-trade/src/services/delivery_adapters/foodpanda_adapter.py] Foodpanda webhook 处理
+- [services/tx-trade/src/services/delivery_adapters/shopeefood_adapter.py] ShopeeFood webhook 处理
+- [shared/adapters/delivery_canonical/base.py] ALLOWED_PLATFORMS 添加 foodpanda/shopeefood
+- 8个共享层文件 + 4个服务层文件修改
+
+### Sprint 2.3 — 外卖聚合看板 + KDS
+- [apps/web-pos/src/pages/OmniChannelOrders.tsx] 新增 grabfood/foodpanda/shopeefood 平台支持（品牌色、平台过滤标签页）
+- [apps/web-pos/src/i18n/] 新增 delivery 命名空间（zh/en/ms 30+翻译键）
+- [apps/web-kds/src/components/DeliveryOrderBadge.tsx] 外卖平台徽标组件（GrabFood绿/foodpanda粉/ShopeeFood橙）
+- [apps/web-kds/src/pages/KDSBoardPage.tsx] 新增外卖过滤切换（全部/堂食/外卖）
+- [apps/web-kds/src/pages/KitchenBoard.tsx] 外卖订单显示 + DeliveryOrderBadge
+
+### Sprint 2.4 — PDPA 合规 + 数据主权
+- [services/tx-malaysia/src/services/pdpa_service.py] PDPA数据保护服务（查阅/更正/删除/可携带性、数据保留检查）
+- [services/tx-malaysia/src/api/pdpa_routes.py] PDPA请求API（7端点）
+- [shared/security/src/data_sovereignty.py] 数据主权路由层（国家PG映射、跨境传输校验）
+- [shared/db-migrations/versions/v387_pdpa_compliance.py] pdpa_requests + pdpa_consent_logs 表
+
+### Sprint 2.5 — SSM 企业验证 + 补贴套餐
+- [services/tx-malaysia/src/services/ssm_service.py] SSM企业注册验证（verify/search/detail/validate_director）
+- [services/tx-malaysia/src/api/ssm_routes.py] SSM验证API（4端点）
+- [services/tx-malaysia/src/services/subsidy_service.py] 政府补贴计费（MDEC 50%/SME Corp 40%）
+- [services/tx-malaysia/src/api/subsidy_routes.py] 补贴API（5端点）
+- [shared/db-migrations/versions/v386_subsidy_programs.py] tenant_subsidies + subsidy_bills 表
+
+### Sprint 2.6 — 管理后台马来西亚版
+- [apps/web-admin/src/App.tsx] LangProvider 接入 + 动态Ant Design locale
+- [apps/web-admin/src/shell/IconRail.tsx][TopbarHQ.tsx][SidebarHQ.tsx] t()调用替换硬编码中文
+- [apps/web-admin/src/config/menuConfigs.ts] 全量菜单新增 labelKey 支持
+- [apps/web-admin/src/i18n/zh/en/ms.ts] 200+翻译键扩展（nav/common/dashboard/finance等）
+- [apps/web-admin/src/pages/finance/EInvoicePage.tsx] MY模式（LHDN彩色标签、RM币种、MyInvois状态）
+- [apps/web-admin/src/pages/finance/TaxManagePage.tsx] SST申报标签页（6%/8%/0%税率表）
+
+### 数据变化 (Phase 2)
+- 迁移版本：v386 → v387
+- 新增7个适配器包：grabfood、foodpanda、shopeefood
+- 新增MY支付适配器：tng_ewallet、grabpay、boost
+- tx-malaysia 新增6个服务模块（PDPA/SSM/Subsidy）
+- 前端：OmniChannelOrders + KDS 支持6平台
+
+### 今日完成 (Phase 3 — 深度本地化与区域扩张)
+
+### Sprint 3.1 — 淡米尔语全平台
+- [apps/web-pos/src/i18n/ta.ts] POS淡米尔语翻译（56键：checkout/menu/order/table/einvoice/sst）
+- [apps/web-admin/src/i18n/ta.ts] Admin淡米尔语翻译（29键：nav/common/sst/einvoice）
+- [apps/h5-self-order/src/i18n/ta.ts] H5点餐淡米尔语翻译（87键）
+- [shared/i18n/ta_IN.py] 后端淡米尔语（CATEGORIES/UI/RECEIPT）
+- [apps/miniapp-customer-v2/src/utils/i18n.ts] ta-TA locale注册
+- 4个LangContext.tsx注册ta语言
+
+### Sprint 3.2 — AI模型马来西亚优化
+- [services/tx-agent/src/config/malaysia_holidays.py] 22个2026+15个2027马来西亚假日数据（含餐饮趋势、乘数）
+- [services/tx-agent/src/config/malaysia_cuisine_profiles.py] 5类菜系画像（马来/中华/印度/融合/东马）+ 6种饮料
+- [services/tx-agent/src/config/malaysia_ingredients.py] 26种食材档案（三语名称、真实供应商、季节性价格）
+- [services/tx-agent/src/services/malaysia_forecasting_service.py] 销量/库存预测服务（集成假日+菜系+食材数据）
+- [shared/vector_store/src/malaysia_embeddings.py] 7个多语嵌入命名空间配置
+- [services/tx-malaysia/src/services/malaysia_timezone.py] UTC+8时区工具（含历史偏移、用餐时段检测）
+
+### Sprint 3.3 — AI功能 + 报表深化
+- [services/tx-malaysia/src/services/my_dashboard_service.py] MY经营仪表盘（SST汇总、e-Invoice统计、假日影响分析、菜系表现、补贴利用率、多币种报表）
+- [services/tx-malaysia/src/api/my_dashboard_routes.py] 6个仪表盘API端点
+- [services/tx-malaysia/src/services/ai_insights_service.py] AI洞察服务（减少食物浪费建议、人力优化、Halal合规、定价建议）
+- [services/tx-malaysia/src/api/ai_insights_routes.py] 4个AI洞察API端点
+
+### Sprint 3.4 — 印尼市场准备
+- [apps/web-pos/src/i18n/id.ts] POS印尼语翻译
+- [apps/web-admin/src/i18n/id.ts] Admin印尼语翻译（370+键）
+- [apps/h5-self-order/src/i18n/id.ts] H5印尼语翻译
+- [shared/i18n/id_ID.py] 后端印尼语模块
+- [services/tx-indonesia/] 新建微服务（main.py + PPN引擎 + API）
+- [services/tx-indonesia/src/services/ppn_service.py] PPN 11%计算引擎
+- [shared/adapters/gopay/] GoPay适配器（OAuth2 + QR支付）
+- [shared/adapters/dana/] DANA适配器（HMAC-SHA256 + API Key）
+- [shared/db-migrations/versions/v388_id_market.py] dishes表新增ppn_category
+
+### Sprint 3.5 — 越南市场准备
+- [apps/web-pos/src/i18n/vi.ts] POS越南语翻译
+- [apps/web-admin/src/i18n/vi.ts] Admin越南语翻译
+- [apps/h5-self-order/src/i18n/vi.ts] H5越南语翻译
+- [shared/i18n/vi_VN.py] 后端越南语模块
+- [services/tx-vietnam/] 新建微服务（main.py + VAT引擎 + API）
+- [services/tx-vietnam/src/services/vat_service.py] VAT 10%/8%计算引擎（含10位加权校验和算法）
+- [shared/adapters/momo/] MoMo适配器（HMAC-SHA256 + QR支付）
+- [shared/adapters/zalopay/] ZaloPay适配器（Key1/Key2双钥HMAC）
+- [shared/db-migrations/versions/v389_vn_market.py] dishes表新增vat_category
+
+### Sprint 3.6 — 区域扩张基础设施
+- [shared/region/src/region_config.py] 中央区域配置中心（CN/MY/ID/VN + SG/TH预留）
+- [shared/region/src/cross_border_report.py] 跨境报表服务（多币种合并、市场对比、运营时段）
+- [services/tx-malaysia/src/api/regional_routes.py] 区域配置API
+- [services/tx-malaysia/src/api/sme_onboarding_routes.py] SME快速入驻（SSM验证→补贴资格→e-Invoice注册）
+- [docs/regional-deployment-guide.md] 区域部署架构指南（市场拓扑、数据流、环境变量）
+
+### 今日完成 (Phase 4 — 持续迭代启动)
+- Phase 4 项目启动：东南亚Top 5市场份额目标、开放API生态规划、AI 2.0方向确立
+- 全部4个Phase、16个Sprint代码已生成
+
+### 数据变化 (Phase 2 + Phase 3)
+- 迁移版本：v384 → v389（新增6个迁移文件）
+- 新增语言支持：马来语(ms)、印尼语(id)、越南语(vi)、淡米尔语(ta)（4个前端框架 × 4语言 = 16个翻译文件 + 4个后端模块）
+- 新增适配器：grabfood、foodpanda、shopeefood、gopay、dana、momo、zalopay（7个）
+- 新增微服务：tx-indonesia（port 8016）、tx-vietnam（port 8200）
+- tx-malaysia 扩展：PDPA/SSM/Subsidy/Dashboard/AI Insights/Regional/Onboarding（17个新模块）
+- tx-agent 新增：Holiday/Cuisine/Ingredient 3个配置 + 预测服务 + 向量嵌入配置
+- 前端修改：OmniChannelOrders(6平台)、KDS(外卖过滤)、Admin Shell(i18n接入)、EInvoicePage(MY模式)
+
+### 遗留问题
+- v389_vn_market 迁移修正：down_revision v383→v388 已修复
+- 印尼/越南微服务生产部署依赖各自云资源就绪
+- AI Insights 服务为数据驱动型存根，真实推理需要 Claude API 集成
+- MyInvois/e-Faktur 沙箱环境需在生产前验证
+- 部分Phase 3文件在主项目而非工作树中（已同步）
+- 货币汇率表为固定参考值（非实时）
+
+## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
 
 ### 今日完成
 - [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞
