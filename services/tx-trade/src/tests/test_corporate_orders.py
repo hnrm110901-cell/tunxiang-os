@@ -54,6 +54,7 @@ CORP_002_ID = "00000000-0000-0000-0000-000000000002"
 
 # ─── 辅助：构造 mock 行（同时支持 .attr 访问 和 ._mapping） ─────────────────
 
+
 def _row(**fields: Any) -> MagicMock:
     """构造路由 row.fetchone()/fetchall() 返回的行对象。
 
@@ -111,6 +112,7 @@ def _make_app(db: AsyncMock) -> FastAPI:
 
 # ─── 标准客户行（按路由 SELECT 查询字段构造） ─────────────────────────────────
 
+
 def _customer_row(
     *,
     cid: str = CORP_001_ID,
@@ -162,8 +164,8 @@ class TestCreateCorporateOrderWithDiscount:
         db.execute = AsyncMock(
             side_effect=[
                 _exec_fetchone(_customer_row(discount_rate=0.95)),  # SELECT
-                _exec_fetchone(_order_returning_row()),             # INSERT RETURNING
-                MagicMock(),                                         # UPDATE
+                _exec_fetchone(_order_returning_row()),  # INSERT RETURNING
+                MagicMock(),  # UPDATE
             ]
         )
         client = TestClient(_make_app(db))
@@ -288,9 +290,7 @@ class TestCreditLimitExceeded:
     def test_inactive_customer_returns_400(self) -> None:
         """status != active 的企业客户无法下单。"""
         db = _make_db()
-        db.execute = AsyncMock(
-            side_effect=[_exec_fetchone(_customer_row(cid=CORP_002_ID, status="inactive"))]
-        )
+        db.execute = AsyncMock(side_effect=[_exec_fetchone(_customer_row(cid=CORP_002_ID, status="inactive"))])
         client = TestClient(_make_app(db))
         payload = {
             "corporate_customer_id": CORP_002_ID,
