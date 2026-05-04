@@ -238,7 +238,7 @@ class SecurityReportService:
                 FROM audit_logs issued
                 WHERE issued.tenant_id = :tenant_id
                   AND issued.action = :issued_action
-                  AND issued.created_at < NOW() - INTERVAL ':days days'
+                  AND issued.created_at < NOW() - make_interval(days => :days)
                   AND NOT EXISTS (
                       SELECT 1 FROM audit_logs revoked
                       WHERE revoked.tenant_id = issued.tenant_id
@@ -272,7 +272,7 @@ class SecurityReportService:
                       WHERE recent.tenant_id = first_seen.tenant_id
                         AND recent.actor_id = first_seen.actor_id
                         AND recent.actor_type = 'api_app'
-                        AND recent.created_at >= NOW() - INTERVAL ':days days'
+                        AND recent.created_at >= NOW() - make_interval(days => :days)
                   )
             """),
             {
