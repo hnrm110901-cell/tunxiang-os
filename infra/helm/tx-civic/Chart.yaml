@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-civic
+description: 屯象OS 城市监管平台微服务 — 食安追溯/明厨亮灶/合规上报（Tier 3）
+type: application
+version: 1.0.0
+appVersion: "latest"
