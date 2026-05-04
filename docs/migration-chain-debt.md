@@ -2,6 +2,18 @@
 
 > 由 PI.1（2026-05-04）建立。`migration-ci.yml` 修了 regex bug 后暴露 3 个 main 既存断链。
 > 暂以 `KNOWN_BROKEN` 白名单允许 CI 通过，必须在 v400 之前清零。
+>
+> **PJ.5（2026-05-04 同日）更新**：CodeRabbit 指出 PI.1 白名单作用域过宽 ——
+> 新 PR 只要把 `down_revision` 写成白名单内的 rev 就 silent pass。修复：
+> 把检查抽到 `scripts/check_alembic_chain.py`，拆成两组：
+>
+>  - `KNOWN_BROKEN_PARENTS`：被引用但无文件声明的孤儿父 rev 名（下方 3 项）。
+>  - `KNOWN_BROKEN_CHILDREN`：现存的、已经引用孤儿父的 child rev ID
+>    （`v310` / `v311` / `v388`）—— 仅这三个 rev 可以 pass。
+>
+> Scope guard：若新 migration 的 `down_revision ∈ KNOWN_BROKEN_PARENTS` 且自身
+> ∉ `KNOWN_BROKEN_CHILDREN`，CI fail。下游链 chain off 真 declared rev（如
+> v311 / v389_vn_market）时按正常 chain 处理，不级联豁免。
 
 ## 背景
 
