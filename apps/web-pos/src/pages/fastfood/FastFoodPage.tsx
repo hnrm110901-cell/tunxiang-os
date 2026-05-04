@@ -236,11 +236,9 @@ export function FastFoodPage() {
                     flexDirection: 'column',
                     minHeight: 120,
                     transition: 'transform 200ms',
-                    position: 'relative',
+                    position: 'relative', ...tf.style,
                   }}
-                  onPointerDown={e => (e.currentTarget.style.transform = 'scale(0.97)')}
-                  onPointerUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-                  onPointerLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                  {...tf.handlers}
                 >
                   {/* Dish image placeholder */}
                   <div style={{

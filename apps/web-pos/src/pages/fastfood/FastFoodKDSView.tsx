@@ -375,11 +375,9 @@ export function FastFoodKDSView() {
                       fontWeight: 700,
                       cursor: loadingIds.has(order.fast_food_order_id) ? 'not-allowed' : 'pointer',
                       transition: 'background 200ms',
-                      marginTop: 4,
+                      marginTop: 4, ...tf.style,
                     }}
-                    onPointerDown={e => { if (!loadingIds.has(order.fast_food_order_id)) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                    onPointerUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-                    onPointerLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    {...tf.handlers}
                   >
                     {loadingIds.has(order.fast_food_order_id) ? '处理中...' : '出餐 ✓'}
                   </button>
