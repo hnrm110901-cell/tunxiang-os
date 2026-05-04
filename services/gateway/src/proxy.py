@@ -67,6 +67,10 @@ DOMAIN_ROUTES = {
     # DevForge 内部研发运维平台（tx-devforge:8017）
     # 与 tx-forge（外部 ISV 市场）严格区分
     "devforge": os.getenv("TX_DEVFORGE_URL", "http://localhost:8017"),
+    # Forge 外部 ISV 应用市场（tx-forge:8013）
+    # 与 tx-devforge（内部研发平台 :8017）严格区分
+    # 端口：8013 容器内（Docker DNS 隔离，与 tunxiang-api/tx-predict 同号不冲突）
+    "forge": os.getenv("TX_FORGE_URL", "http://localhost:8013"),
 }
 
 # 旧单体回退（M4a 后可移除）
