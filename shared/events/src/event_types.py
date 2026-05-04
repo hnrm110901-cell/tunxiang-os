@@ -318,6 +318,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     #   BanquetContractEventType 共用 tx_banquet_lead_events（banquet 域已存在）
     #   SalesCoachEventType 独立一条 stream
     "sales_coach": "tx_sales_coach_events",
+    # 加盟管理域（Wave I 新增 / v240 franchisees + franchise_fee_bills + franchise_settlements）
+    "franchise": "tx_franchise_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -374,6 +376,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "banquet": "banquet_lead",
     # 预订业务 Sprint R2 — SalesCoach 独立 stream_type（Reservation / Banquet 复用 R1/核心 stream_type）
     "sales_coach": "sales_coach",
+    # 加盟管理域（Wave I 新增）— stream_id = franchisee_id / bill_id / settlement_id
+    "franchise": "franchise",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -692,6 +696,52 @@ class BanquetContractEventType(str, Enum):
     SCHEDULE_LOCKED = "banquet.schedule_locked"  # 档期锁定（首交订金）
 
 
+# ──────────────────────────────────────────────────────────────────────
+# 加盟管理域（Wave I 新增 / v240 franchisees + franchise_fee_bills + franchise_settlements）
+# ──────────────────────────────────────────────────────────────────────
+
+
+class FranchiseEventType(str, Enum):
+    """加盟管理事件 — 加盟商生命周期 + 费用账单 + 月度结算
+
+    对应表（v240+）：
+      - franchisees                 — 加盟商档案 / 状态机
+      - franchise_contracts         — 合同档案
+      - franchise_fee_bills         — 月度账单（4 类：joining_fee/royalty/ad_fee/supply_fee）
+      - franchise_fee_payments      — 收款流水
+      - franchise_settlements       — 月结算单（draft/sent/confirmed/paid）
+      - royalty_bills               — 特许权金账单（royalty_calculator 写入）
+
+    业务流：
+      申请(applied) → 签约(signing) → 激活(activated/operating)
+                                     ↘ 暂停(suspended) ↘ 终止(terminated)
+      合同：contract_signed
+      账单流：fee_billed → fee_paid（或 fee_overdue）
+      结算流：royalty_calculated → settlement_generated → settlement_sent → settlement_paid
+
+    payload 金额字段统一使用 fen（分，整数），与 §15 / Tier1 财务红线一致。
+    """
+
+    # 加盟商生命周期
+    APPLIED = "franchise.franchisee_applied"  # 加盟申请提交（applying 状态）
+    SIGNING = "franchise.franchisee_signing"  # 进入签约阶段
+    ACTIVATED = "franchise.franchisee_activated"  # 成为正式加盟商（active/operating）
+    SUSPENDED = "franchise.franchisee_suspended"  # 加盟暂停
+    TERMINATED = "franchise.franchisee_terminated"  # 加盟终止
+
+    # 合同
+    CONTRACT_SIGNED = "franchise.contract_signed"  # 合同签署（franchise_contracts INSERT）
+
+    # 账单（费用流）
+    FEE_BILLED = "franchise.fee_billed"  # 月度账单生成（含 amount_fen, bill_type）
+    FEE_PAID = "franchise.fee_paid"  # 收款完成（含 paid_amount_fen, payment_method）
+    FEE_OVERDUE = "franchise.fee_overdue"  # 逾期标记
+
+    # 结算（财务流）
+    ROYALTY_CALCULATED = "franchise.royalty_calculated"  # 分润计算完成（royalty_bills 写入）
+    SETTLEMENT_GENERATED = "franchise.settlement_generated"  # 月结算单生成（draft 状态）
+
+
 def resolve_stream_key(event_type: str) -> str:
     """根据事件类型字符串解析目标 Redis Stream key。
 
@@ -764,6 +814,8 @@ ALL_EVENT_ENUMS = (
     R2ReservationEventType,
     SalesCoachEventType,
     BanquetContractEventType,
+    # 加盟管理域（Wave I 新增 / v240）
+    FranchiseEventType,
 )
 
 
@@ -818,6 +870,8 @@ __all__ = [
     "R2ReservationEventType",
     "SalesCoachEventType",
     "BanquetContractEventType",
+    # 加盟管理域（Wave I 新增）
+    "FranchiseEventType",
     # 全局查找表与工具
     "DOMAIN_STREAM_MAP",
     "DOMAIN_STREAM_TYPE_MAP",
