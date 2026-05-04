@@ -4,6 +4,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment } from '../api/tradeApi';
 import { formatPrice } from '@tx-ds/utils';
@@ -31,6 +32,7 @@ let splitCounter = 0;
 export function SplitPayPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const tf = useTouchFeedback();
   const { items, totalFen, discountFen, tableNo } = useOrderStore();
   const finalFen = totalFen - discountFen;
 

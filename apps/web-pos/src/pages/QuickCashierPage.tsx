@@ -20,6 +20,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { fetchDishes, fetchCategories, type DishItem } from '../api/menuApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
 import { formatPrice } from '@tx-ds/utils';
@@ -660,6 +661,7 @@ export function QuickCashierPage() {
   const navigate = useNavigate();
   const scanInputRef = useRef<HTMLInputElement>(null);
   const storeId = getStoreId();
+  const tf = useTouchFeedback();
 
   // ── 菜品数据 ──
   const [categories, setCategories] = useState<string[]>(MOCK_CATEGORIES);

@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { WineStorageQuickView } from '../components/WineStorageQuickView';
 
@@ -51,6 +52,7 @@ export function OpenTablePage() {
   const { tableNo, tableId } = useParams<{ tableNo?: string; tableId?: string }>();
   const navigate = useNavigate();
   const store = useOrderStore();
+  const tf = useTouchFeedback();
   const [activeCat, setActiveCat] = useState('推荐');
   const dishes = DISH_DATA[activeCat] || [];
 

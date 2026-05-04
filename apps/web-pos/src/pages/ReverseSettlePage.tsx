@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { getOrder } from '../api/tradeApi';
 import { formatPrice } from '@tx-ds/utils';
 
@@ -59,6 +60,7 @@ type Step = 'search' | 'detail' | 'auth' | 'done';
 
 export function ReverseSettlePage() {
   const navigate = useNavigate();
+  const tf = useTouchFeedback();
 
   const [step, setStep] = useState<Step>('search');
   const [searchInput, setSearchInput] = useState('');

@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment, settleOrder, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint } from '../bridge/TXBridge';
@@ -32,6 +33,7 @@ const MOCK_CUSTOMERS: CreditCustomer[] = [
 export function CreditPayPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const tf = useTouchFeedback();
   const { items, totalFen, discountFen, tableNo, clear } = useOrderStore();
   const finalFen = totalFen - discountFen;
 

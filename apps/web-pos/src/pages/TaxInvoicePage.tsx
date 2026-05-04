@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { formatPrice } from '@tx-ds/utils';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
@@ -55,6 +56,7 @@ const INITIAL_FORM: InvoiceForm = {
 export function TaxInvoicePage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const tf = useTouchFeedback();
 
   const [form, setForm] = useState<InvoiceForm>(INITIAL_FORM);
   const [step, setStep] = useState<'type' | 'info' | 'confirm' | 'done'>('type');
