@@ -1,3 +1,45 @@
+## 2026-05-05 00:00  PJ 系列后续修复 — 6 PR admin merge 收口
+
+### 本次会话目标
+上一轮 7 PR (PG/PI/P2.2) 合并后 CodeRabbit post-merge 发现 6 处真 P1。
+按"超级开发智能体团队"模式启动并行修复 + 主线协调 admin merge。
+
+### 完成状态
+- [x] PJ.1 sync/pull 三键 cursor + OperationalError 收窄 (#162 → `807f287d`)
+- [x] PJ.2 v396 索引改 CONCURRENTLY 生产零阻塞 (#159 → `952574c4`)
+- [x] PJ.3 PG.2 codemod 残留 tzinfo 不一致 (#158 → `a83247f2`，本会话之前)
+- [x] PJ.4 backfill 循环到底 + 每事务重设 tenant GUC (#161 → `b61f3c11`)
+- [x] PJ.5 KNOWN_BROKEN 白名单收窄到 revision 自身 (#164 → `86f1322e`)
+- [x] PJ.6 守门补 text(f) 模式 + 协议补 delete/rename fallback (#160 → `37576390`)
+- [x] PG.1.1 v393+v396 双 head merge 顺带合入 (#163 → `903c29d7`)
+
+### 关键决策
+- **5 agent worktree 隔离并行** — 各自创建 `/Users/lichun/.tunxiang-p0-worktrees/pj{N}-*` worktree，
+  零互踩；主线协调 ruff format / 既有守门同步 / admin merge
+- **PJ.1 旧二元组 cursor 兼容** — `since_id` 缺省零 UUID，旧客户端零迁移；新客户端用 max_event_id 续传
+- **PJ.1 OperationalError 精确化** — `e.orig` 字符串匹配 "events does not exist"；其他必须 raise
+  （lock timeout / 连接断 / 磁盘满不能吞成空响应骗客户端误判同步完成）
+- **PJ.2 既有守门同步** — 改 CONCURRENTLY 后既有 v396 测试精确字符串失效，主线手工修
+  （substring 检查同时强制 CONCURRENTLY 关键字 → 反退化更严）
+- **PJ.5 scope guard 不级联** — 白名单仅豁免 revision 自身断链；新 rev 引用白名单 → fail；
+  但白名单 rev 的下游不强制要求白名单（否则白名单要无穷扩散）
+- **PJ.6 text(f) 量化为债** — 全仓 298 处 / 200 文件 text(f) 注入面，按域风险优先级独立 codemod 立项
+- **gh api fallback 全程稳定** — git push 502 雪崩 4 次切 PUT /contents；sha 三态规则补入 PG.3 协议
+
+### 下一步
+- PI.2 — 73 个历史 alembic head 分批收敛（独立 sprint）
+- text(f) 全仓 codemod — 按 tx-trade > tx-finance > tx-supply 优先级分批
+- PJ.2 在 staging PG 实跑 dry-run alembic upgrade（验证 CONCURRENTLY 真不阻塞）
+- PD.2 / PE.2（环境/客户协作待）
+
+### 已知风险
+- v397 是 no-op merge migration，不带数据迁移，下次 alembic upgrade 后 alembic_version 自然推进，
+  无回滚顾虑；但 v396 改 CONCURRENTLY 在 staging 第一次实跑应观察索引创建时间
+- text(f) 残留 298 处都是项目内白名单变量插值（搜出 0 真注入路径），但守门已加，
+  防止后续 PR 引入新外部输入拼接
+
+---
+
 ## 2026-05-04 23:30  PG.1.1 alembic 双 head 合并（v397）
 
 ### 本次会话目标

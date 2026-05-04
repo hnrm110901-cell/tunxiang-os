@@ -1,3 +1,50 @@
+## 2026-05-05 PJ 系列后续修复（7 PR admin merge / CodeRabbit post-merge P1 全清 / 主分支事件总线收口）
+
+> 上一会话 7 PR 合并后 CodeRabbit 发现 6 处真 P1 + 主分支冒出 v393/v396 双 alembic head，
+> 本会话用"超级开发智能体团队 + 主线协调"模式串清。worktree 隔离 5 agent 并行，主线一次性
+> admin merge。完整闭环上一轮所有 in-flight 风险敞口。
+
+### 今日完成（按合并顺序）
+
+| PR | 主题 | 合并 SHA | Tier | 关键产出 |
+|---|---|---|---|---|
+| #158 | PJ.3 PG.2 codemod 残留 tzinfo 不一致 | `a83247f2` | Tier1 | kds_banquet_routes naive-aware TypeError 修 + members wecom_follow_at 强制 aware + 7 守门测试 |
+| #159 | PJ.2 v396 索引改 CONCURRENTLY 生产零阻塞 | `952574c4` | Tier1 | 6 表 × 2 索引全 CONCURRENTLY + autocommit_block + downgrade 对应 + 同步既有守门 |
+| #160 | PJ.6 守门补 text(f) 模式 + 协议补 delete/rename fallback | `37576390` | Tier1 | text(f) 注入面 regex + DELETE /contents fallback + sha 三态规则；发现 298 处 text(f) 待清理债 |
+| #161 | PJ.4 backfill 循环到底 + 每事务重设 tenant GUC | `b61f3c11` | Tier1 | keyset while 循环到底 + set_tenant_guc 抽出 + 跨租户切换重设 + 6 新测试（共 35）|
+| #162 | PJ.1 sync/pull 三键 cursor + OperationalError 收窄 | `807f287d` | Tier1 | event_id UUID 第三键 tiebreaker + max_event_id 响应 + lock-timeout/conn-lost raise + 9 守门测试 |
+| #163 | PG.1.1 合并 v393+v396 双 alembic head（v397 merge migration）| `903c29d7` | SECURITY | 消除 chain 分叉 + migration-chain-debt 文档登记 PI.2（73 历史 head）|
+| #164 | PJ.5 KNOWN_BROKEN 白名单收窄到 revision 自身 | `86f1322e` | Tier1 | scope guard：新 rev 引用白名单 → fail；scripts/check_alembic_chain.py 抽离 + 11 守门测试 |
+
+### 数据变化
+- 迁移版本：v396 → **v397**（v393+v396 双 head merge，no-op upgrade/downgrade）
+- 索引部署模式：v396 全表 12 索引改 CONCURRENTLY → 生产部署不阻塞写入
+- /api/v1/sync/pull 协议升级：cursor 二键 → 三键 (recorded_at, sequence_num, event_id)
+- 新增 Tier 1 测试：**约 38 个**（PJ.1 9 + PJ.2 6 + PJ.4 6 + PJ.5 11 + PJ.6 4 + 同步守门 2）
+- 守门反退化层数：text(f) 注入面 + KNOWN_BROKEN scope guard + CONCURRENTLY 索引
+
+### 关键决策
+
+1. **超级开发智能体团队并行调度** — 5 agent 同时启动 PJ.1/2/4/5/6，worktree 隔离零互踩；主线协调 admin merge + ruff 二轮修补
+2. **PJ.1 旧二元组 cursor 兼容** — `since_id` 缺省零 UUID 让旧客户端零迁移；新客户端用 max_event_id 续传消除数据丢失
+3. **PJ.1 OperationalError 精确化** — `e.orig` 字符串匹配 "events" + "does not exist"；其他（lock timeout / 连接断 / 磁盘满）必须 raise，绝不吞成空响应骗客户端
+4. **PJ.2 既有守门同步** — CREATE INDEX → CREATE INDEX CONCURRENTLY 时既有 v396 测试精确字符串断言失效；改 substring 检查同时强制要求 CONCURRENTLY 关键字
+5. **PJ.5 KNOWN_BROKEN scope** — 白名单仅豁免 revision 自身断链，新 rev `down_revision ∈ PARENTS` 且自身 `∉ CHILDREN` → fail；防止污染传播
+6. **PJ.6 text(f) 量化为债** — 全仓 298 处 text(f) 注入面成为独立工程债（独立 codemod 项目，按 tx-trade > tx-finance > tx-supply 优先级）
+7. **gh api fallback 全程稳定** — git push 502 雪崩 4 次切 PUT /contents；PR #163 来自外部 agent 补 v397 dual-head merge → 全部一次性合入
+
+### 遗留问题
+- **全仓 text(f) 收紧** — 298 处 / 200 文件待清理（独立大 codemod 项目）
+- **PI.2 73 个历史 alembic head 收敛** — 已登记 docs/migration-chain-debt.md，待立项
+- **PD.2 / PE.2** — 仍待外部环境与客户协作
+
+### 明日计划
+- 评估 PI.2 alembic head 收敛工程（73 个历史 head 是否影响 v397 之后的新 migration 节奏）
+- 评估 text(f) 全仓 codemod 立项（按域风险优先级分批）
+- 验证 PJ.2 CONCURRENTLY 在 staging PG 实跑（dry-run alembic upgrade）
+
+---
+
 ## 2026-05-04 PG/PI/P2.2 后续会话（7 PR admin merge / 70 个新 Tier 1 测试 / 3 类基建守门）
 
 > v6 审计修复总会话之后的延续会话。聚焦 in-flight PR 收尾 + 主分支基建欠债 +
