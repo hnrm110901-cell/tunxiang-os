@@ -137,9 +137,11 @@ export function SplitPayPage() {
           <h2 style={{ margin: 0, fontSize: 20 }}>拆单结账 · 桌号 {tableNo}</h2>
           <button
             onClick={selectAll}
+            {...tf.handlers}
             style={{
               padding: '8px 20px', background: '#1A3A48', border: '1px solid #333',
               borderRadius: 8, color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 48,
+              ...tf.style,
             }}
           >
             {selectedItemIds.size === items.length ? '取消全选' : '全选'}
@@ -228,7 +230,8 @@ export function SplitPayPage() {
             {step === 'pay' && (
               <button
                 onClick={() => { setStep('select'); setPayments([]); }}
-                style={{ flex: 2, padding: 16, background: '#1A3A48', border: '1px solid #FF6B35', borderRadius: 12, color: '#FF6B35', fontSize: 18, cursor: 'pointer', minHeight: 56 }}
+                {...tf.handlers}
+                style={{ flex: 2, padding: 16, background: '#1A3A48', border: '1px solid #FF6B35', borderRadius: 12, color: '#FF6B35', fontSize: 18, cursor: 'pointer', minHeight: 56, ...tf.style }}
               >
                 返回选菜
               </button>
@@ -326,9 +329,11 @@ export function SplitPayPage() {
                 />
                 <button
                   onClick={fillRemaining}
+                  {...tf.handlers}
                   style={{
                     padding: '0 16px', background: '#1A3A48', border: '1px solid #555',
                     borderRadius: 12, color: '#fff', fontSize: 16, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 48,
+                    ...tf.style,
                   }}
                 >
                   剩余全付

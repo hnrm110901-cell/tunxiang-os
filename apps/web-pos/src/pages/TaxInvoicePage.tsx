@@ -211,9 +211,7 @@ export function TaxInvoicePage() {
                     transition: 'transform 200ms ease, border-color 200ms ease',
                     minHeight: 72,
                   }}
-                  onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                  onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                  onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  {...tf.handlers}
                 >
                   <div style={{
                     width: 56, height: 56, borderRadius: 12, background: '#FF6B35', color: '#fff',
@@ -341,7 +339,6 @@ export function TaxInvoicePage() {
                   transition: 'transform 200ms ease', ...tf.style,
                 }}
               >
-              >
                 下一步
               </button>
             </div>
@@ -392,9 +389,7 @@ export function TaxInvoicePage() {
                   cursor: submitting ? 'not-allowed' : 'pointer', minHeight: 56,
                   transition: 'transform 200ms ease',
                 }}
-                onPointerDown={(e) => { if (!submitting) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                {...tf.handlers}
               >
                 {submitting ? '提交中...' : '确认开票'}
               </button>
@@ -431,9 +426,7 @@ export function TaxInvoicePage() {
                 color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                 transition: 'transform 200ms ease',
               }}
-              onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-              onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-              onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              {...tf.handlers}
             >
               返回
             </button>

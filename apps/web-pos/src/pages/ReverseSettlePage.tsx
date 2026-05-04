@@ -204,9 +204,7 @@ export function ReverseSettlePage() {
                   borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer',
                   minHeight: 56, fontWeight: 'bold', transition: 'transform 200ms ease',
                 }}
-                onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                {...tf.handlers}
               >
                 查询
               </button>
@@ -271,9 +269,7 @@ export function ReverseSettlePage() {
                       color: '#fff', cursor: 'pointer', transition: 'transform 200ms ease, border-color 200ms ease',
                       minHeight: 56,
                     }}
-                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                    onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    {...tf.handlers}
                   >
                     <div style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 4 }}>{r.label}</div>
                     <div style={{ fontSize: 16, color: '#8899A6' }}>{r.desc}</div>
@@ -303,9 +299,7 @@ export function ReverseSettlePage() {
                   cursor: selectedReason ? 'pointer' : 'not-allowed', minHeight: 56,
                   transition: 'transform 200ms ease',
                 }}
-                onPointerDown={(e) => { if (selectedReason) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                {...tf.handlers}
               >
                 下一步 — 权限验证
               </button>
@@ -379,9 +373,7 @@ export function ReverseSettlePage() {
                   cursor: submitting || !authCode.trim() ? 'not-allowed' : 'pointer',
                   transition: 'transform 200ms ease',
                 }}
-                onPointerDown={(e) => { if (!submitting && authCode.trim()) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                {...tf.handlers}
               >
                 {submitting ? '验证中...' : '确认反结账'}
               </button>
@@ -422,9 +414,7 @@ export function ReverseSettlePage() {
                   color: '#FF6B35', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                   transition: 'transform 200ms ease',
                 }}
-                onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                {...tf.handlers}
               >
                 重新点餐
               </button>

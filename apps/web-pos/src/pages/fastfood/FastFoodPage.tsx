@@ -463,7 +463,6 @@ export function FastFoodPage() {
               <TxButton variant="primary" size="lg" block disabled={isSubmitting} onClick={handleCheckout} style={{ flex: 2 }}>
                 {isSubmitting ? '下单中...' : '确认下单'}
               </TxButton>
-              </button>
             </div>
           </div>
         </div>
