@@ -1,0 +1,79 @@
+# mcp-server — MCP Protocol Server（对接 Claude Code）
+# Tier 3：辅助/低频，资源占用按最小档配置
+# 端口决议：原 8014 与 tx-civic（宪法 8014）冲突 → 改 8018
+# 来源：infra/compose/base.yml + docs/infra/port-allocation-2026-05.md
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/mcp-server
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8018
+  targetPort: 8018
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: mcp-server-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8018
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8018
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：MCP 服务 Pod 分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
