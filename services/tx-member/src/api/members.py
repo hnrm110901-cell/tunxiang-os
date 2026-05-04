@@ -401,8 +401,11 @@ async def bind_customer_by_external_id(
     log.info("bind_customer_by_external_id")
 
     try:
-        follow_at = datetime.fromisoformat(req.wecom_follow_at)
-    except ValueError:
+        # 微信回调 follow_at 可能不带时区（"2024-01-01T08:00:00"）→ 强制视为 UTC
+        # 否则 naive 与下游 aware 字段比较 TypeError，且 JSONB 序列化丢时区
+        parsed = datetime.fromisoformat(req.wecom_follow_at)
+        follow_at = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
         follow_at = datetime.now(timezone.utc)
 
     try:
