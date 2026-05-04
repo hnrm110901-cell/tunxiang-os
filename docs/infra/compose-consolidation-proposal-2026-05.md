@@ -241,3 +241,58 @@ docker compose -f infra/compose/base.yml -f infra/compose/envs/demo.override.yml
 - [ ] 其它（请说明）
 
 确认后启动 P0.5 第二阶段。
+
+---
+
+## 执行结果（P0.5 阶段 2，2026-05-04）
+
+用户最终决策：**方向 D**（删根 4 个 compose + infra/docker 内部用 base+override 重整）。
+方向 D = 方向 A 与 B 的合体精简版：保留 base+override 模型 + 同时删根 4 个文件。
+
+### 落地结构
+```
+infra/compose/
+  base.yml                        # 16 服务唯一权威源
+  envs/dev.yml                    # 主机端口暴露 + 热重载 + Vite Dev
+  envs/staging.yml                # 镜像构建 + auth=on + 资源减半
+  envs/prod.yml                   # PG 主从 + Nginx + Celery + pg-backup
+  envs/demo.yml                   # 精简 6 业务 + migrate + seed
+  envs/gray.yml                   # network_mode=host + 复用生产 PG
+  tenants/czyz.yml                # 端口偏移 TODO（创始人决策）
+  tenants/zqx.yml                 # +100
+  tenants/sgc.yml                 # +200
+  special/resource-limits.yml     # 压测叠加
+  special/toxiproxy.yml           # 故障注入叠加
+infra/docker/                     # Dockerfile / init-rls.sql / .env.example（不动）
+```
+
+### Commit 序列
+| 阶段 | Commit | 说明 |
+|------|--------|------|
+| 1 | `85292aeb` | docs: 拓扑审计 |
+| 1 | `3c3f05e8` | docs: 收敛方案 |
+| 2A | `ef8a9e26` | feat: base.yml |
+| 2B | `8ccd9f5c` | feat: 5 envs override |
+| 2C | `d5d18f57` | feat: 3 tenants override |
+| 2D | （本次） | chore: 删根 + scripts/CLAUDE.md |
+| 2E | （后续） | docs: 矩阵自检 + 端口表 |
+
+### 启动命令统一
+```bash
+# Dev
+docker compose -f infra/compose/base.yml -f infra/compose/envs/dev.yml up -d
+
+# Prod（叠加压测）
+docker compose -f infra/compose/base.yml -f infra/compose/envs/prod.yml \
+               -f infra/compose/special/resource-limits.yml up -d
+
+# 三租户演示
+docker compose -f infra/compose/base.yml -f infra/compose/envs/demo.yml \
+               -f infra/compose/tenants/zqx.yml up -d
+```
+
+### 端口冲突最终决议（写入 base.yml 注释）
+- tx-predict: 8013 → 8019
+- mcp-server: 8014 → 8018
+- tx-civic: 守 8014（宪法）
+- 完整端口表 → `docs/infra/port-allocation-2026-05.md`

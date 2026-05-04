@@ -310,3 +310,42 @@ root-prod/root-staging/root-gray 错位的端口规划：
 | YAML 抽象 | 仅 infra-base / root-prod / resource-override 用 anchor，其它原始重复 | 维护负担 |
 
 下一步建议见 `docs/infra/compose-consolidation-proposal-2026-05.md`。
+
+---
+
+## 9. 执行结果（P0.5 阶段 2，2026-05-04）
+
+用户决策：**方向 D = 删根 4 个 compose + infra/docker 内部用 base+override 重整**。
+
+### 最终结构
+```
+infra/compose/
+  base.yml                        # 16 服务公共定义（唯一权威源）
+  envs/{dev,staging,prod,demo,gray}.yml  # 5 环境 override
+  tenants/{czyz,zqx,sgc}.yml      # 3 租户 override
+  special/{resource-limits,toxiproxy}.yml  # 2 叠加层
+infra/docker/                     # 仅保留 Dockerfile/init-rls.sql/.env.example
+```
+
+### Commit 序列
+- `85292aeb` docs(infra): compose 拓扑审计 [Tier3]
+- `3c3f05e8` docs(infra): compose 收敛方案 [Tier3]
+- `ef8a9e26` feat(infra): compose base.yml 抽取 16 服务公共定义 [Tier1]
+- `8ccd9f5c` feat(infra): compose envs/{dev,staging,prod,demo,gray}.yml [Tier1]
+- `d5d18f57` feat(infra): compose tenants/{czyz,sgc,zqx}.yml override [Tier2]
+- 后续：阶段 D（删根 + scripts + CLAUDE.md）+ 阶段 E（自检 + 端口表）
+
+### 已删除文件清单
+根目录：`docker-compose.yml` / `.prod.yml` / `.staging.yml` / `.gray.yml`
+infra/docker/：`docker-compose.yml` / `.dev.yml` / `.prod.yml` / `.staging.yml` /
+  `.demo.yml` / `.czyz.yml` / `.zqx.yml` / `.sgc.yml`
+
+### 端口冲突修复结果
+- tx-predict: 8013 → **8019**（避让 tunxiang-api）
+- mcp-server: 8014 → **8018**（避让 tx-civic 宪法）
+- 其它 14 服务严格按 CLAUDE.md §五 宪法
+- 完整端口表见 `docs/infra/port-allocation-2026-05.md`
+
+### 待用户决策
+- **czyz 端口偏移值**（infra/compose/tenants/czyz.yml:11 TODO）：当前 0
+  与 dev/demo 互斥；建议 +50 / +300 / 保持 0 三选一

@@ -49,19 +49,16 @@ services:
       - "9003:9003"        # coreml_proxy（F2）
     command: ["-host", "0.0.0.0", "-config", "/config/proxies.json"]
     volumes:
-      - ./toxiproxy/proxies.json:/config/proxies.json:ro
+      - ../../docker/toxiproxy/proxies.json:/config/proxies.json:ro
     extra_hosts:
       # 让 coreml_proxy 能解析到宿主机 8100（macOS 上 Mac mini Core ML 桥接）
       - "host.docker.internal:host-gateway"
     networks:
-      - txos-dev
+      - txos-net
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8474/version"]
       interval: 5s
       timeout: 3s
       retries: 5
-
-networks:
-  txos-dev:
-    external: true
-    name: docker_txos-dev
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-dev}"
