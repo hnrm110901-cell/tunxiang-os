@@ -6,6 +6,11 @@
   后续接入完整权限系统（RBAC + JWT role claims）时替换 _require_group_admin 依赖项。
 
 响应格式统一：{ "ok": bool, "data": {}, "error": {} }
+
+[SECURITY][Tier1] 企业集团成员身份校验 (verify_group_membership)
+  企业集团（多店连锁集团）总览端点（dashboard / member-profile / churn-risk /
+  cross-brand）必须验证当前调用方所声明的 group_tenant_id 与目标 group_id 绑定，
+  否则攻击者可在集团 X 登录后传入 group_id=Y 越权读取集团 Y 的全店数据（IDOR）。
 """
 
 from __future__ import annotations
@@ -14,10 +19,12 @@ import uuid
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from models.group_config import BrandGroup
 from pydantic import BaseModel, Field
 from services.group_analytics import GroupAnalyticsService
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_session
@@ -54,6 +61,86 @@ def _require_group_admin(
             detail="x_tenant_id_required: X-Tenant-ID header missing",
         )
     return x_tenant_id
+
+
+# ─────────────────────────────────────────────────────────────────
+# 依赖项：企业集团成员身份校验 [SECURITY][Tier1]
+# ─────────────────────────────────────────────────────────────────
+
+
+async def verify_group_membership(
+    group_id: uuid.UUID = Path(..., description="集团 UUID"),
+    group_tenant_id: str = Depends(_require_group_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> uuid.UUID:
+    """[SECURITY][Tier1] 校验调用方所属租户对目标 group_id 的成员身份。
+
+    防止 IDOR：用户 A 在集团 X 登录后，不得通过传入 group_id=Y 读取集团 Y 数据。
+
+    校验规则：
+      1. group_tenant_id（来自 X-Tenant-ID / 后续 JWT）必须为合法 UUID。
+      2. brand_groups 表中存在 (id=group_id, tenant_id=group_tenant_id, is_deleted=false) 行。
+      3. 不存在 → 403 "Not a member of this enterprise"。
+
+    返回校验通过的 group_id（FastAPI 依赖注入用）。
+
+    备注：
+      - 当前架构下"集团成员"的定义即"集团主租户拥有该 BrandGroup"，
+        与服务层 _fetch_brand_group 的 RLS 校验语义一致；本依赖在路由入口处提前
+        拦截，避免 IDOR 数据被服务层泄露后才发现，也便于审计日志记录。
+      - 后续接入 JWT 后，可将 group_tenant_id 来源由 Header 改为 JWT claim，
+        本函数签名与下游调用方均无需修改。
+    """
+    try:
+        tenant_uuid = uuid.UUID(group_tenant_id)
+    except ValueError as exc:
+        logger.warning(
+            "verify_group_membership.invalid_tenant_id",
+            group_id=str(group_id),
+            tenant_id=group_tenant_id,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="invalid_tenant_id: X-Tenant-ID must be a valid UUID",
+        ) from exc
+
+    try:
+        await db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": group_tenant_id},
+        )
+        result = await db.execute(
+            select(BrandGroup.id)
+            .where(BrandGroup.id == group_id)
+            .where(BrandGroup.tenant_id == tenant_uuid)
+            .where(BrandGroup.is_deleted == False)  # noqa: E712
+        )
+        row = result.scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        logger.error(
+            "verify_group_membership.db_error",
+            group_id=str(group_id),
+            tenant_id=group_tenant_id,
+            error=str(exc),
+        )
+        # 安全默认：DB 异常时拒绝访问，禁止 fail-open
+        raise HTTPException(
+            status_code=503,
+            detail="membership_check_unavailable",
+        ) from exc
+
+    if row is None:
+        logger.warning(
+            "verify_group_membership.idor_attempt",
+            group_id=str(group_id),
+            tenant_id=group_tenant_id,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Not a member of this enterprise",
+        )
+
+    return group_id
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -146,13 +233,11 @@ async def create_brand_group(
 
 @router.get("/{group_id}", summary="集团配置详情")
 async def get_brand_group(
-    group_id: uuid.UUID,
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """查询品牌组配置详情（含旗下品牌列表和策略开关）。"""
-    from sqlalchemy import select, text
-
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": group_tenant_id},
@@ -191,14 +276,12 @@ async def get_brand_group(
 
 @router.put("/{group_id}/brands", summary="更新旗下品牌列表")
 async def update_brand_list(
-    group_id: uuid.UUID,
     req: UpdateBrandListReq,
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """替换品牌组旗下的品牌 tenant_id 完整列表（全量替换语义）。"""
-    from sqlalchemy import select, text
-
     try:
         brand_uuids = [str(uuid.UUID(tid)) for tid in req.brand_tenant_ids]
     except ValueError as exc:
@@ -255,7 +338,7 @@ async def update_brand_list(
 
 @router.get("/{group_id}/dashboard", summary="集团 RFM 总览")
 async def get_group_dashboard(
-    group_id: uuid.UUID,
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -280,8 +363,8 @@ async def get_group_dashboard(
 
 @router.get("/{group_id}/member-profile", summary="跨品牌会员全貌（by phone）")
 async def get_group_member_profile(
-    group_id: uuid.UUID,
     phone: str = Query(..., description="手机号（精确匹配）"),
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -305,7 +388,7 @@ async def get_group_member_profile(
 
 @router.get("/{group_id}/churn-risk", summary="集团流失风险汇总")
 async def get_group_churn_risk(
-    group_id: uuid.UUID,
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -329,8 +412,8 @@ async def get_group_churn_risk(
 
 @router.get("/{group_id}/cross-brand", summary="跨品牌消费客户列表")
 async def get_cross_brand_customers(
-    group_id: uuid.UUID,
     min_brands: int = Query(default=2, ge=2, le=20, description="最少出现品牌数"),
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -354,8 +437,8 @@ async def get_cross_brand_customers(
 
 @router.post("/{group_id}/stored-value-interop", summary="储值卡跨品牌互通配置")
 async def configure_stored_value_interop(
-    group_id: uuid.UUID,
     req: StoredValueInteropReq,
+    group_id: uuid.UUID = Depends(verify_group_membership),
     group_tenant_id: str = Depends(_require_group_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:

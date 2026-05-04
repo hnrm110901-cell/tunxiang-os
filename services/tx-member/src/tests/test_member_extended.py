@@ -247,6 +247,20 @@ def test_group_create_missing_admin_header():
 # ── 测试3: GET /groups/{group_id} — 正常获取集团详情 ─────────────────────────
 
 
+def _membership_ok_result(group_id_str: str) -> MagicMock:
+    """构造 verify_group_membership 的 SELECT 结果（命中：返回 group_id UUID）。"""
+    res = MagicMock()
+    res.scalar_one_or_none = MagicMock(return_value=uuid.UUID(group_id_str))
+    return res
+
+
+def _membership_miss_result() -> MagicMock:
+    """构造 verify_group_membership 的 SELECT 结果（未命中：返回 None → 403）。"""
+    res = MagicMock()
+    res.scalar_one_or_none = MagicMock(return_value=None)
+    return res
+
+
 def test_group_get_detail_success():
     """正常查询品牌组详情，DB 返回记录 → 200，ok=True。"""
     import datetime
@@ -264,11 +278,20 @@ def test_group_get_detail_success():
     fake_group.created_at = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
     fake_group.updated_at = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
 
-    # DB execute 调用顺序：set_config → SELECT
+    # DB execute 调用顺序：
+    #   1) verify_group_membership → set_config + SELECT id（命中）
+    #   2) get_brand_group → set_config + SELECT BrandGroup
     set_cfg_result = MagicMock()
     select_result = MagicMock()
     select_result.scalar_one_or_none = MagicMock(return_value=fake_group)
-    db.execute = AsyncMock(side_effect=[set_cfg_result, select_result])
+    db.execute = AsyncMock(
+        side_effect=[
+            set_cfg_result,
+            _membership_ok_result(GROUP_ID),
+            set_cfg_result,
+            select_result,
+        ]
+    )
 
     group_app.dependency_overrides[get_db_session] = override_db(db)
     client = TestClient(group_app)
@@ -287,17 +310,20 @@ def test_group_get_detail_success():
     assert body["data"]["brand_count"] == 1
 
 
-# ── 测试4: GET /groups/{group_id} — 组不存在 → 404 ──────────────────────────
+# ── 测试4: GET /groups/{group_id} — 集团成员校验未命中 → 403 IDOR 拒绝 ──────
 
 
 def test_group_get_detail_not_found():
-    """DB 返回 None → HTTPException 404 brand_group_not_found。"""
+    """[SECURITY][Tier1] verify_group_membership 未命中 → 403 (IDOR 防护生效)。
+
+    用户 A（tenant=GROUP_ADMIN_HEADERS）传入不属于自己租户的 group_id，
+    即使旧实现会落到服务层 404，新依赖层会先抛 403。
+    """
     db = make_mock_db()
 
+    # 唯一一次 SELECT：membership 校验未命中（DB 返回 None）
     set_cfg_result = MagicMock()
-    select_result = MagicMock()
-    select_result.scalar_one_or_none = MagicMock(return_value=None)
-    db.execute = AsyncMock(side_effect=[set_cfg_result, select_result])
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_miss_result()])
 
     group_app.dependency_overrides[get_db_session] = override_db(db)
     client = TestClient(group_app)
@@ -309,16 +335,25 @@ def test_group_get_detail_not_found():
 
     group_app.dependency_overrides.clear()
 
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "brand_group_not_found"
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Not a member of this enterprise"
 
 
 # ── 测试5: POST /groups/{group_id}/stored-value-interop — operator_id 格式非法 → 422 ──
 
 
 def test_group_interop_invalid_operator_id():
-    """operator_id 格式非法（非 UUID）→ HTTPException 422。"""
+    """operator_id 格式非法（非 UUID）→ HTTPException 422。
+
+    注意：verify_group_membership 在 handler 之前运行，需要先放行（mock 命中），
+    这样 422 才会来自 handler 内 operator_id 校验，而非 IDOR 拦截。
+    """
     db = make_mock_db()
+
+    set_cfg_result = MagicMock()
+    db.execute = AsyncMock(
+        side_effect=[set_cfg_result, _membership_ok_result(GROUP_ID)]
+    )
 
     group_app.dependency_overrides[get_db_session] = override_db(db)
     client = TestClient(group_app)
@@ -333,6 +368,144 @@ def test_group_interop_invalid_operator_id():
 
     assert resp.status_code == 422
     assert "invalid operator_id" in resp.json()["detail"]
+
+
+# ── [SECURITY][Tier1] IDOR 横向越权防护测试 ──────────────────────────────────
+
+
+def test_group_dashboard_idor_blocked_returns_403():
+    """[SECURITY][Tier1] 用户 A（集团 X）请求集团 Y 的 dashboard → 403。
+
+    场景：调用方提供有效的 X-Tenant-ID（自己的集团 X 主租户）+ X-Group-Admin: true，
+    但 URL 中的 group_id 属于另一个集团 Y。verify_group_membership 在 brand_groups
+    表中查询 (id=group_Y, tenant_id=tenant_X) 命中失败 → 403。
+    """
+    db = make_mock_db()
+
+    # 唯一一次 SELECT：membership 校验未命中
+    set_cfg_result = MagicMock()
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_miss_result()])
+
+    group_app.dependency_overrides[get_db_session] = override_db(db)
+    client = TestClient(group_app)
+
+    other_group_id = str(uuid.uuid4())  # 集团 Y 的 ID（不属于调用方租户）
+    resp = client.get(
+        f"/api/v1/member/groups/{other_group_id}/dashboard",
+        headers=GROUP_ADMIN_HEADERS,
+    )
+
+    group_app.dependency_overrides.clear()
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Not a member of this enterprise"
+
+
+def test_group_member_profile_idor_blocked_returns_403():
+    """[SECURITY][Tier1] member-profile 端点同样防 IDOR → 403。"""
+    db = make_mock_db()
+
+    set_cfg_result = MagicMock()
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_miss_result()])
+
+    group_app.dependency_overrides[get_db_session] = override_db(db)
+    client = TestClient(group_app)
+
+    other_group_id = str(uuid.uuid4())
+    resp = client.get(
+        f"/api/v1/member/groups/{other_group_id}/member-profile?phone=13800000000",
+        headers=GROUP_ADMIN_HEADERS,
+    )
+
+    group_app.dependency_overrides.clear()
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Not a member of this enterprise"
+
+
+def test_group_churn_risk_idor_blocked_returns_403():
+    """[SECURITY][Tier1] churn-risk 端点同样防 IDOR → 403。"""
+    db = make_mock_db()
+
+    set_cfg_result = MagicMock()
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_miss_result()])
+
+    group_app.dependency_overrides[get_db_session] = override_db(db)
+    client = TestClient(group_app)
+
+    other_group_id = str(uuid.uuid4())
+    resp = client.get(
+        f"/api/v1/member/groups/{other_group_id}/churn-risk",
+        headers=GROUP_ADMIN_HEADERS,
+    )
+
+    group_app.dependency_overrides.clear()
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Not a member of this enterprise"
+
+
+def test_group_cross_brand_idor_blocked_returns_403():
+    """[SECURITY][Tier1] cross-brand 端点同样防 IDOR → 403。"""
+    db = make_mock_db()
+
+    set_cfg_result = MagicMock()
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_miss_result()])
+
+    group_app.dependency_overrides[get_db_session] = override_db(db)
+    client = TestClient(group_app)
+
+    other_group_id = str(uuid.uuid4())
+    resp = client.get(
+        f"/api/v1/member/groups/{other_group_id}/cross-brand",
+        headers=GROUP_ADMIN_HEADERS,
+    )
+
+    group_app.dependency_overrides.clear()
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Not a member of this enterprise"
+
+
+def test_group_update_brands_idor_blocked_returns_403():
+    """[SECURITY][Tier1] PUT /brands 写操作端点同样防 IDOR → 403。"""
+    db = make_mock_db()
+
+    set_cfg_result = MagicMock()
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_miss_result()])
+
+    group_app.dependency_overrides[get_db_session] = override_db(db)
+    client = TestClient(group_app)
+
+    other_group_id = str(uuid.uuid4())
+    resp = client.put(
+        f"/api/v1/member/groups/{other_group_id}/brands",
+        json={"brand_tenant_ids": [str(uuid.uuid4())]},
+        headers=GROUP_ADMIN_HEADERS,
+    )
+
+    group_app.dependency_overrides.clear()
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Not a member of this enterprise"
+
+
+def test_group_invalid_tenant_id_format_returns_400():
+    """[SECURITY] X-Tenant-ID 非合法 UUID 时 verify_group_membership → 400。"""
+    db = make_mock_db()
+
+    group_app.dependency_overrides[get_db_session] = override_db(db)
+    client = TestClient(group_app)
+
+    resp = client.get(
+        f"/api/v1/member/groups/{GROUP_ID}/dashboard",
+        headers={"X-Group-Admin": "true", "X-Tenant-ID": "not-a-uuid"},
+    )
+
+    group_app.dependency_overrides.clear()
+
+    assert resp.status_code == 400
+    assert "invalid_tenant_id" in resp.json()["detail"]
 
 
 # ============================================================================
