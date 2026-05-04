@@ -167,7 +167,13 @@ tunxiang-os/
         .env.zqx.dev.example    #     zqx 联调端口偏移示例（offset +100）
         .env.sgc.dev.example    #     sgc 联调端口偏移示例（offset +200）
     docker/                     # Dockerfile + init-rls.sql + .env.example（保留）
-    helm/                       # Kubernetes Helm Chart（21 个）— P0.5 Phase 4.5 收齐
+    helm/                       # Kubernetes Helm Chart（21 个，工件齐全）— P0.6（2026-05）
+                                # 每 chart 含 11 文件：Chart.yaml + values.yaml +
+                                # _helpers.tpl + deployment + service + hpa +
+                                # NOTES.txt + serviceaccount + poddisruptionbudget +
+                                # networkpolicy + configmap（部分 chart 另含 ingress）
+                                # PDB Tier 化：T1 minA=1 / T2 maxU=1 / T3 default off
+                                # NetPol/ConfigMap 全部默认 disabled，业务按需启用
     nginx/                      # Nginx 反代 + SSL + WebSocket
     tailscale/                  # Tailscale 网络配置
     jumpserver/                 # 堡垒机配置
