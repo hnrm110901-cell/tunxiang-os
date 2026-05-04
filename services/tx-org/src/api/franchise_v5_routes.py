@@ -13,6 +13,7 @@
       v5 提供完整 RESTful 路径，v4 保持向下兼容。
 """
 
+import asyncio
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
@@ -24,6 +25,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 from shared.ontology.src.database import get_db
 
 log = structlog.get_logger()
@@ -195,6 +198,31 @@ async def create_franchisee_v5(
             },
         )
         await db.commit()
+        # ── v147+ 事件总线旁路写入：加盟商申请提交 ──
+        # 新建 franchisee 默认 status='active'，但业务流转视为 applied 入口；
+        # 后续 PUT /franchisees/{id} 升级为 ACTIVATED/SUSPENDED/TERMINATED
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.APPLIED,
+                tenant_id=x_tenant_id,
+                stream_id=new_id,
+                payload={
+                    "franchisee_id": new_id,
+                    "name": body.name,
+                    "company_name": body.company_name,
+                    "region": body.region,
+                    "store_name": body.store_name,
+                    "franchise_type": body.franchise_type,
+                    "brand_id": body.brand_id,
+                    "join_date": body.join_date,
+                    "contract_start_date": body.contract_start_date,
+                    "contract_end_date": body.contract_end_date,
+                    "status": "active",
+                },
+                source_service="tx-org",
+                metadata={"contact_phone": body.contact_phone},
+            )
+        )
     except SQLAlchemyError as exc:
         log.error("franchise_v5.create.db_error", error=str(exc), tenant_id=x_tenant_id)
         await db.rollback()
@@ -227,6 +255,40 @@ async def update_franchisee_v5(
         log.info(
             "franchise_v5.update", franchisee_id=franchisee_id, fields=list(body.model_dump(exclude_none=True).keys())
         )
+
+        # ── v147+ 事件总线旁路写入：加盟商状态变更 ──
+        # 仅当 status 字段被显式更新时发射对应事件，避免与 metadata 类编辑混淆
+        new_status = body.status
+        if new_status:
+            status_event_map = {
+                "active": FranchiseEventType.ACTIVATED,
+                "operating": FranchiseEventType.ACTIVATED,
+                "signing": FranchiseEventType.SIGNING,
+                "suspended": FranchiseEventType.SUSPENDED,
+                "terminated": FranchiseEventType.TERMINATED,
+            }
+            event_type = status_event_map.get(new_status)
+            if event_type is not None:
+                asyncio.create_task(
+                    emit_event(
+                        event_type=event_type,
+                        tenant_id=x_tenant_id,
+                        stream_id=franchisee_id,
+                        payload={
+                            "franchisee_id": franchisee_id,
+                            "new_status": new_status,
+                            "contract_start_date": body.contract_start_date,
+                            "contract_end_date": body.contract_end_date,
+                        },
+                        source_service="tx-org",
+                        metadata={
+                            "updated_fields": [
+                                k for k in updates.keys() if k != "franchisee_id"
+                            ]
+                        },
+                    )
+                )
+
         return {"ok": True, "data": {"id": franchisee_id, **body.model_dump(exclude_none=True)}}
     except HTTPException:
         raise
