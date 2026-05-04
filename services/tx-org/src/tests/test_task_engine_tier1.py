@@ -51,7 +51,7 @@ for _p in (_SRC_DIR, _ROOT):
 from repositories.task_repo import InMemoryTaskRepository  # noqa: E402
 from services.task_dispatch_service import TaskDispatchService  # noqa: E402
 
-from shared.events.src.event_types import TaskEventType  # noqa: E402
+from shared.events.src import TaskEventType  # noqa: E402
 from shared.ontology.src.extensions.tasks import TaskStatus, TaskType  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────

@@ -558,6 +558,7 @@ def test_xujihaixian_rls_with_check_blocks_cross_tenant_insert():
 
     # 4. revision/down_revision 衔接 v273（接受 v274 / v274b 等后缀变体）
     import re as _re
+
     assert _re.search(r'^revision\s*=\s*"v274[a-z]?"', src, _re.M), "未找到 revision = v274[a-z]?"
     assert 'down_revision = "v273"' in src
 

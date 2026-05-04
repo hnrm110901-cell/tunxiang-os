@@ -47,8 +47,7 @@ from uuid import UUID, uuid4
 import structlog
 from repositories.task_repo import InMemoryTaskRepository, TaskQuery, TaskRepository
 
-from shared.events.src.emitter import emit_event
-from shared.events.src.event_types import TaskEventType
+from shared.events.src import TaskEventType, emit_event
 from shared.ontology.src.extensions.tasks import Task, TaskStatus, TaskType
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
