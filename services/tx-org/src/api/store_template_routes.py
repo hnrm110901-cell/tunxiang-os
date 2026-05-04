@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Path
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -542,7 +542,7 @@ async def _apply_config_snapshot(
 def _row_to_dict(row) -> Dict[str, Any]:
     """将 SQLAlchemy Row 转为 dict，排除内部字段"""
     result = {}
-    for key in row._mapping.keys():
+    for key in row._mapping:
         if key.startswith("_"):
             continue
         val = row._mapping[key]

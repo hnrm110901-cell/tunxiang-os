@@ -13,11 +13,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
