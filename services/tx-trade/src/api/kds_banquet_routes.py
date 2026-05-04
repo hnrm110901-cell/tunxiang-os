@@ -12,7 +12,7 @@
 """
 
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -118,7 +118,7 @@ async def list_today_banquet_sessions(
         # 计算到开席倒计时秒数
         countdown_seconds = None
         if r[2] and r[4] == "scheduled":
-            delta = r[2].replace(tzinfo=None) - datetime.utcnow()
+            delta = r[2].replace(tzinfo=None) - datetime.now(timezone.utc)
             countdown_seconds = max(0, int(delta.total_seconds()))
 
         sessions.append(

@@ -6,7 +6,7 @@ v2: 注入 MeituanClient 替换 mock，真实 API 调用。
 """
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -614,7 +614,7 @@ class MeituanSaasAdapter:
             else:
                 created_at = datetime.fromisoformat(str(create_time_raw).replace("T", " "))
         except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         return OrderSchema(
             order_id=str(raw.get("order_id", raw.get("mt_order_id", ""))),
@@ -660,7 +660,7 @@ class MeituanSaasAdapter:
             else:
                 created_at = datetime.fromisoformat(str(action_time_raw).replace("T", " "))
         except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         amount_raw = raw.get("amount", raw.get("discount_price"))
         amount = Decimal(str(amount_raw)) / 100 if amount_raw is not None else None

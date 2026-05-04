@@ -10,7 +10,7 @@ shared/config_templates/base.py — 业态模板基础数据结构
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -124,7 +124,7 @@ class TenantConfigPackage(BaseModel):
     # 元信息
     schema_version: str = "1.0"
     restaurant_type: RestaurantType
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     delivery_session_id: str = ""  # DeliveryAgent 会话 ID，留痕
 
     # 门店基础

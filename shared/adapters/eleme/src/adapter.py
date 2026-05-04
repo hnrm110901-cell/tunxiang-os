@@ -7,7 +7,7 @@
 饿了么开放平台文档: https://open.shop.ele.me
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -349,7 +349,7 @@ class ElemeAdapter:
             else:
                 created_at = datetime.fromisoformat(str(create_time_raw).replace("T", " "))
         except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         return OrderSchema(
             order_id=str(raw.get("order_id", raw.get("eleme_order_id", ""))),

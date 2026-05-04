@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timezone, timedelta
 from enum import Enum
 from typing import Any, Optional
 
@@ -66,7 +66,7 @@ class DiagnosisReport(BaseModel):
     anomalies: list[Anomaly]
     summary_text: str = ""
     raw_data: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class DailySummary(BaseModel):
