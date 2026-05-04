@@ -267,7 +267,7 @@ def create_payment_event_consumer(
 
 async def start_payment_event_consumer(
     consumer: EventConsumer,
-    session_factory: async_session_factory[AsyncSession] | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
 ) -> asyncio.Task:
     """在后台 task 中启动支付事件消费者。
 
