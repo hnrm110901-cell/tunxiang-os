@@ -8,7 +8,7 @@ Uses 20%/day exponential decay algorithm.
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -109,7 +109,7 @@ class TableCardLearningEngine:
                 store_id=store_id,
                 table_no=table_no,
                 meal_period=meal_period,
-                clicked_at=datetime.utcnow(),
+                clicked_at=datetime.now(timezone.utc),
                 tenant_id=tenant_id,
                 metadata=metadata or {"user_id": user_id},
             )
@@ -185,7 +185,7 @@ class TableCardLearningEngine:
             Dict of field_key -> decayed_score
         """
         scores: Dict[str, float] = {}
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for field_key, count in click_counts.items():
             if count < MIN_CLICKS_FOR_RANKING:
@@ -275,7 +275,7 @@ class TableCardLearningEngine:
         Returns:
             Number of records affected
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         affected = 0
 
         # Filter events from memory cache

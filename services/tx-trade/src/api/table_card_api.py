@@ -6,7 +6,7 @@ FastAPI router for smart table card endpoints.
 Provides real DB queries against the `tables` and `orders` tables (v002).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -100,7 +100,7 @@ def _build_summary(rows) -> Dict[str, int]:
 
 
 def _detect_meal_period() -> str:
-    hour = datetime.utcnow().hour + 8  # CST approximation
+    hour = datetime.now(timezone.utc).hour + 8  # CST approximation
     hour = hour % 24
     if 6 <= hour < 11:
         return "breakfast"
@@ -162,7 +162,7 @@ async def get_statistics(
                 "total_occupied": occupied,
                 "total_available": free,
                 "summary": summary,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
     except SQLAlchemyError:

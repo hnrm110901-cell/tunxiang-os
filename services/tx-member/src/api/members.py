@@ -403,7 +403,7 @@ async def bind_customer_by_external_id(
     try:
         follow_at = datetime.fromisoformat(req.wecom_follow_at)
     except ValueError:
-        follow_at = datetime.utcnow()
+        follow_at = datetime.now(timezone.utc)
 
     try:
         async with get_db_with_tenant(x_tenant_id) as db:

@@ -5,7 +5,7 @@
 
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -672,7 +672,7 @@ class PinzhiAdapter:
         try:
             created_at = datetime.fromisoformat(str(open_time_raw).replace("T", " "))
         except (ValueError, TypeError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         pay_time_raw = raw.get("payTime")
         completed_at = None
@@ -798,7 +798,7 @@ class PinzhiAdapter:
         try:
             created_at = datetime.fromisoformat(str(action_time_raw).replace("T", " "))
         except (ValueError, TypeError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         amount_raw = raw.get("amount", raw.get("discountAmount"))
         amount = Decimal(str(amount_raw)) / 100 if amount_raw is not None else None

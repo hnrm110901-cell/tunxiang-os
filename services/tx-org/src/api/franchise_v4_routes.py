@@ -4,7 +4,7 @@
 数据源：franchisees（v060）/ franchise_contracts（v135）/ franchise_fees（v155）
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -303,7 +303,7 @@ async def mark_fee_paid(
 ):
     """标记费用已收缴"""
     log.info("franchise.fee.paid", fee_id=fee_id, tenant_id=x_tenant_id)
-    return {"ok": True, "data": {"fee_id": fee_id, "status": "paid", "paid_at": datetime.utcnow().isoformat()}}
+    return {"ok": True, "data": {"fee_id": fee_id, "status": "paid", "paid_at": datetime.now(timezone.utc).isoformat()}}
 
 
 @router.get("/stats")

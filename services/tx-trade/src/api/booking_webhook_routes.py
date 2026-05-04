@@ -22,7 +22,7 @@ import os
 import random
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Dict, Optional, Set
 
 import structlog
@@ -418,7 +418,7 @@ async def _upsert_reservation(
                     "type": "new_reservation",
                     "reservation": result,
                     "source": str(normalized["source_channel"]),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
             )
             return result
