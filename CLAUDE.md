@@ -153,13 +153,19 @@ tunxiang-os/
         prod.yml                #     生产（PG 主从 + Nginx + Celery + pg-backup）
         demo.yml                #     演示（精简 6 业务 + migrate + seed）
         gray.yml                #     灰度（network_mode=host + 复用生产 PG）
-      tenants/                  #   租户 override（叠加 base + demo 使用）
-        czyz.yml                #     尝在一起（端口偏移 TODO 等创始人决策）
-        zqx.yml                 #     最黔线（+100 偏移）
-        sgc.yml                 #     尚宫厨（+200 偏移）
+      tenants/                  #   租户身份层（纯商户身份，无端口偏移；
+                                #     生产独立部署 / 演示叠加 demo / 联调叠加
+                                #     special/multi-host-dev 三种用法）
+        czyz.yml                #     尝在一起
+        zqx.yml                 #     最黔线
+        sgc.yml                 #     尚宫厨
       special/                  #   叠加层（叠加任意 env 使用）
         resource-limits.yml     #     压测资源限制
         toxiproxy.yml           #     故障注入设施
+        multi-host-dev.yml      #     同机多租户联调端口暴露层（dev-only）
+        .env.czyz.dev.example   #     czyz 联调端口偏移示例（offset 0）
+        .env.zqx.dev.example    #     zqx 联调端口偏移示例（offset +100）
+        .env.sgc.dev.example    #     sgc 联调端口偏移示例（offset +200）
     docker/                     # Dockerfile + init-rls.sql + .env.example（保留）
     helm/                       # Kubernetes Helm Chart（11 个）
     nginx/                      # Nginx 反代 + SSL + WebSocket
