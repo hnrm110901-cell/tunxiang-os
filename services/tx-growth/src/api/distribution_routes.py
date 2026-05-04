@@ -19,7 +19,7 @@ CRM三级分销路由 — 私域裂变三级链路 + 奖励体系
 import random
 import string
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -137,7 +137,7 @@ def _generate_code() -> str:
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+    return datetime.now(timezone.utc).isoformat() + "Z"
 
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
