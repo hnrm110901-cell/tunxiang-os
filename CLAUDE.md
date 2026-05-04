@@ -145,7 +145,22 @@ tunxiang-os/
     skill_registry/             # Agent Skill 注册表
     api-types/                  # 跨服务 API 类型定义（TypeScript）
   infra/
-    docker/                     # Docker Compose（dev/prod/staging/gray/demo）
+    compose/                    # Docker Compose（P0.5 收敛后唯一权威源）
+      base.yml                  #   16 服务公共定义（image/build/端口/env/network）
+      envs/                     #   环境 override（叠加 base 使用）
+        dev.yml                 #     开发环境（端口暴露 + 热重载 + Vite Dev）
+        staging.yml             #     预发（镜像构建 + auth=on + 资源减半）
+        prod.yml                #     生产（PG 主从 + Nginx + Celery + pg-backup）
+        demo.yml                #     演示（精简 6 业务 + migrate + seed）
+        gray.yml                #     灰度（network_mode=host + 复用生产 PG）
+      tenants/                  #   租户 override（叠加 base + demo 使用）
+        czyz.yml                #     尝在一起（端口偏移 TODO 等创始人决策）
+        zqx.yml                 #     最黔线（+100 偏移）
+        sgc.yml                 #     尚宫厨（+200 偏移）
+      special/                  #   叠加层（叠加任意 env 使用）
+        resource-limits.yml     #     压测资源限制
+        toxiproxy.yml           #     故障注入设施
+    docker/                     # Dockerfile + init-rls.sql + .env.example（保留）
     helm/                       # Kubernetes Helm Chart（11 个）
     nginx/                      # Nginx 反代 + SSL + WebSocket
     tailscale/                  # Tailscale 网络配置
