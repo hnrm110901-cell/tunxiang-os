@@ -10,7 +10,7 @@ Revision: v170
 from alembic import op
 
 revision = "v170"
-down_revision = "v169"
+down_revision = "v169b"
 branch_labels = None
 depends_on = None
 

@@ -23,7 +23,7 @@ Create Date: 2026-04-23
 from alembic import op
 
 revision = "v285_canonical_delivery"
-down_revision = "v284_coupon_materialized_views"
+down_revision = "v284"
 branch_labels = None
 depends_on = None
 

@@ -4,6 +4,7 @@ Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
@@ -184,7 +185,7 @@ Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

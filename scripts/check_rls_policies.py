@@ -246,14 +246,17 @@ def _check_clause(
 
     # 检查是否使用了禁止的变量名
     for bad_var in FORBIDDEN_VARS:
-        if bad_var in clause:
+        # 精确匹配：防止 "app.tenant" 误匹配 "app.tenant_id"（子串误判）
+        if re.search(r"(?<!['\w])" + re.escape(bad_var) + r"(?!['\w_])", clause):
             issues.append(
                 f"[CRITICAL] {table}.{policy} {clause_type} 使用了错误变量 "
                 f"'{bad_var}'，应改为 '{CORRECT_VAR}'"
             )
 
     # 检查是否使用了正确变量名（如果没有禁止变量但也没有正确变量）
-    if CORRECT_VAR not in clause and not any(v in clause for v in FORBIDDEN_VARS):
+    if CORRECT_VAR not in clause and not any(
+        re.search(r"(?<!['\w])" + re.escape(v) + r"(?!['\w_])", clause) for v in FORBIDDEN_VARS
+    ):
         issues.append(
             f"[HIGH] {table}.{policy} {clause_type} 未使用 '{CORRECT_VAR}'，"
             f"请确认 session 变量设置"

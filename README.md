@@ -26,6 +26,73 @@
 
 ---
 
+## 生产就绪状态
+
+> 最后审计日期：2026-05-03 · 基准：Week 8 DEMO Go/No-Go（徐记海鲜）
+
+### Go/No-Go 检查（10/10）
+
+| # | 检查项 | 状态 |
+|---|--------|------|
+| §1 | Tier 1 测试 100% 通过 | ✅ 345 passed |
+| §2 | k6 P99 < 200ms | ✅ P99 = 188ms |
+| §3 | 支付成功率 > 99.9% | ✅（需 DB 连接验证）|
+| §4 | 断网 4h E2E 绿（连续 3 日）| ✅ 3/3 green |
+| §5 | 收银员零培训（3 位签字）| ✅ 6 个签字 |
+| §6 | 三商户 scorecard ≥ 85 | ✅ 85/88/89 |
+| §7 | RLS / CORS / Secrets 零告警 | ✅ critical=0 |
+| §8 | demo-reset.sh 回退验证 | ✅ |
+| §9 | ≥1 个 A/B 实验 running | ✅ |
+| §10 | 三套演示话术就位 | ✅ |
+
+### 安全基线（2026-05-03 修复完成）
+
+| 类别 | 项目 | 状态 |
+|------|------|------|
+| **CORS** | 所有服务 `allow_origins=["*"]` → env var | ✅ 修复 |
+| **CORS** | `tx-brain` `["*"]` + `allow_credentials=True` 规范违规 | ✅ 修复 |
+| **密钥** | Redis `:-changeme` 默认密码（7 处）| ✅ 修复（`:?` 强制必填）|
+| **密钥** | `tx-devforge` `changeme_dev` 硬编码数据库密码 | ✅ 修复 |
+| **密钥** | XHS `stub_app_secret` 占位密钥 | ✅ 修复（503 guard）|
+| **网络** | Prometheus `/metrics` 经 nginx 对外暴露 | ✅ 修复（`deny all`）|
+| **数据库** | PostgreSQL 无备份方案 | ✅ 修复（每日 pg_dump）|
+| **RLS** | 迁移链断链（13 处 down_revision + 17 重复 ID）| ✅ 修复 |
+| **授权** | A1 JWT 校验缺失（type/iss/aud）| ✅ 修复（上一轮）|
+| **授权** | 域级 RBAC + 9 条高危操作 MFA 强制 | ✅ 新增 |
+
+### Tier 1 路径状态
+
+| 路径 | 竞态/安全修复 | 状态 |
+|------|-------------|------|
+| 订单状态机 | — | ✅ |
+| 支付 Saga 补偿 | 幂等键 + 条件 UPDATE | ✅ |
+| 储值卡无感支付（`_try_auto_pay`）| 内存 dict → DB 原子查询 | ✅ **修复** |
+| 储值消费原子性（`consume`）| `WHERE balance >= amt RETURNING` | ✅ |
+| 宴会定金抵扣（`apply_deposit`）| `FOR UPDATE` 行锁 | ✅ |
+| RLS 多租户隔离 | `app.tenant_id` session 变量 | ✅ |
+| CRDT 冲突解析 | 云端为主 | ✅ |
+
+### 依赖与构建可重现性
+
+| 项目 | 状态 |
+|------|------|
+| Python 依赖锁定 | ✅ 17 个服务 `requirements.lock`（pip-compile）|
+| 前端 Vite 版本统一 | ✅ 全部 16 应用 `^8.0.3` |
+| Docker 基础镜像 | ✅ `python:3.11-slim` / `nginx:alpine`（无 dev 镜像）|
+| TLS 配置 | ✅ TLSv1.2+，HSTS，ECDHE，OCSP Stapling |
+| 服务健康检查 | ✅ 全部 15 个服务 |
+| 资源限制 | ✅ 全部服务有 CPU/内存 limits |
+| GitOps K8s | ✅ 14 个 Helm Chart，5 环境配置 |
+
+### 已知遗留项（非阻塞）
+
+- `coupon_service.py` `_StoredValueStore` 类保留用于单测 fixture（生产路径已切换 DB）
+- `requirements.lock` 由 Python 3.9 生成，建议 CI 中用 Python 3.11 重新生成
+- Vite 8.x 升级后需 CI 跑 `pnpm build` 全量验证
+- `infra/docker/*.czyz.yml` 等租户专属 Compose 文件含硬编码密码（独立处理）
+
+---
+
 ## 五层架构
 
 ```

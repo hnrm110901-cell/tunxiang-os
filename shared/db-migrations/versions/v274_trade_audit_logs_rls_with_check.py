@@ -40,7 +40,7 @@ Create Date: 2026-04-25
 import sqlalchemy as sa
 from alembic import op
 
-revision = "v274"
+revision = "v274b"
 down_revision = "v273"
 branch_labels = None
 depends_on = None

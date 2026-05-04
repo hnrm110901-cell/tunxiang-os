@@ -10,7 +10,7 @@ Revision: v169
 from alembic import op
 
 revision = "v304"
-down_revision = "v303"
+down_revision = "v303_customer_journey_sop"
 branch_labels = None
 depends_on = None
 

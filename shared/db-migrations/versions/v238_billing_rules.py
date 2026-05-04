@@ -13,7 +13,7 @@ Create Date: 2026-04-12
 from alembic import op
 
 revision = "v238"
-down_revision = "v237"
+down_revision = "v237b"
 branch_labels = None
 depends_on = None
 

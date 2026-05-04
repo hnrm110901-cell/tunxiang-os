@@ -13,7 +13,7 @@ from typing import Optional
 
 import httpx
 import structlog
-from sqlalchemy import Date, and_, cast, func, select, update
+from sqlalchemy import Date, and_, cast, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
@@ -1193,19 +1193,33 @@ class CashierEngine:
         查找顾客活跃储值卡，余额 >= final_amount 时自动扣款。
         扣款成功后推送微信通知。
         """
-        from .coupon_service import _StoredValueStore
+        # 查询 DB：找到该顾客在当前租户下余额充足的活跃储值账户
+        sva_result = await self.db.execute(
+            text("""
+                SELECT id, balance_fen, frozen_fen
+                FROM stored_value_accounts
+                WHERE member_id  = :member_id::uuid
+                  AND tenant_id  = :tenant_id::uuid
+                  AND is_deleted = FALSE
+                  AND (balance_fen - frozen_fen) >= :amount
+                ORDER BY balance_fen DESC
+                LIMIT 1
+            """),
+            {
+                "member_id": customer_id,
+                "tenant_id": str(self.tenant_id),
+                "amount": final_amount_fen,
+            },
+        )
+        sva_row = sva_result.mappings().first()
 
-        # 遍历储值卡找到该顾客的卡（余额充足）
         target_card: Optional[dict] = None
-        for card_data in _StoredValueStore._cards.values():
-            if (
-                card_data.get("customer_id") == customer_id
-                and card_data.get("tenant_id") == str(self.tenant_id)
-                and card_data.get("status") == "active"
-                and card_data.get("balance_fen", 0) >= final_amount_fen
-            ):
-                target_card = card_data
-                break
+        if sva_row is not None:
+            target_card = {
+                "card_id": str(sva_row["id"]),
+                "balance_fen": sva_row["balance_fen"],
+                "frozen_fen": sva_row["frozen_fen"],
+            }
 
         if not target_card:
             logger.info(

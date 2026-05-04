@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from typing import Any, Optional
 from uuid import UUID
@@ -37,6 +38,7 @@ from fastapi import (
     Query,
     Request,
 )
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -56,6 +58,9 @@ router = APIRouter(
     prefix="/api/v1/trade/delivery/xhs",
     tags=["trade-delivery-xhs"],
 )
+
+# XHS OAuth credentials — must be injected via environment variables
+_XHS_APP_SECRET = os.getenv("XHS_APP_SECRET", "")
 
 
 # ── 请求模型 ─────────────────────────────────────────────────────
@@ -129,6 +134,13 @@ async def oauth_callback(
     _parse_uuid(x_tenant_id, "X-Tenant-ID")
     _parse_uuid(req.binding_id, "binding_id")
 
+    if not _XHS_APP_SECRET:
+        logger.warning("xhs_oauth_not_configured", extra={"reason": "XHS_APP_SECRET not set"})
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "error": "XHS integration not configured"},
+        )
+
     binding = await _fetch_binding(db, x_tenant_id, req.binding_id)
     if not binding:
         raise HTTPException(status_code=404, detail="binding 不存在")
@@ -137,7 +149,7 @@ async def oauth_callback(
     # 真实部署：KMS 解密 + 单租户 app 凭证
     oauth_service = XhsOAuthTokenService(
         app_id=binding.get("xhs_merchant_id", "stub_app_id"),
-        app_secret="stub_app_secret",  # noqa: S106 — 占位，真实部署走 KMS
+        app_secret=_XHS_APP_SECRET,  # injected from XHS_APP_SECRET env var
     )
 
     try:
@@ -204,6 +216,13 @@ async def refresh_oauth_token(
     _parse_uuid(x_tenant_id, "X-Tenant-ID")
     _parse_uuid(binding_id, "binding_id")
 
+    if not _XHS_APP_SECRET:
+        logger.warning("xhs_oauth_not_configured", extra={"reason": "XHS_APP_SECRET not set"})
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "error": "XHS integration not configured"},
+        )
+
     binding = await _fetch_binding(db, x_tenant_id, binding_id)
     if not binding:
         raise HTTPException(status_code=404, detail="binding 不存在")
@@ -214,7 +233,7 @@ async def refresh_oauth_token(
 
     oauth_service = XhsOAuthTokenService(
         app_id=binding.get("xhs_merchant_id", "stub_app_id"),
-        app_secret="stub_app_secret",  # noqa: S106 — 占位，真实部署走 KMS
+        app_secret=_XHS_APP_SECRET,  # injected from XHS_APP_SECRET env var
     )
     try:
         token_pair = await oauth_service.refresh_access_token(
