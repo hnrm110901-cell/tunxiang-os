@@ -72,8 +72,7 @@ def test_no_datetime_utcnow_in_production_paths(rel_dir: str) -> None:
         msg_lines = [f"{p.relative_to(_REPO_ROOT)}:{ln} → {src}" for p, ln, src in hits]
         pytest.fail(
             f"在 {rel_dir}/ 发现 {len(hits)} 处 datetime.utcnow() 残留 — "
-            f"请用 datetime.now(timezone.utc) 替换：\n  - "
-            + "\n  - ".join(msg_lines)
+            f"请用 datetime.now(timezone.utc) 替换：\n  - " + "\n  - ".join(msg_lines)
         )
 
 
