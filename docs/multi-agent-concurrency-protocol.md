@@ -82,6 +82,39 @@ git worktree add ~/.tunxiang-p0-worktrees/datetime-pg2 \
 
 **禁止**：force push 到他人分支；force push 到 main/master。
 
+#### 删除 / 重命名 fallback（PJ.6 补充）
+
+push 失败走 gh api 时，**写文件**用 PUT /contents 已记录在上面，但**删除/改名**和
+**sha 规则**长期靠摸索。下次 422 之前先看本节：
+
+- **删除**：
+  ```bash
+  gh api -X DELETE "/repos/<owner>/<repo>/contents/<path>" \
+      -f sha=<file_sha> \
+      -f branch=<branch> \
+      -f message="<msg>"
+  ```
+  `sha` **必带**（GitHub 用它做乐观锁，否则 409/422）。
+
+- **重命名**：等价于"PUT 新路径 + DELETE 旧路径"两次独立调用。
+  GitHub Contents API 没有 atomic rename，容忍两次 commit；如要原子，回退用 git tree API。
+
+- **文件级 sha 规则（核心 422 来源）**：
+  | 场景 | sha 字段 | 后果 |
+  |------|---------|------|
+  | 已有文件 PUT（更新） | **必带** | 不带 → 422 "sha wasn't supplied" |
+  | 新文件 PUT（创建） | **不能带** | 带了 → 422 "reference does not exist" |
+  | 删除 DELETE | **必带** | 不带 → 422/409 |
+
+  **推荐探测一次**再决定：
+  ```bash
+  gh api "/repos/<owner>/<repo>/contents/<path>?ref=<branch>" 2>/dev/null \
+      | jq -r '.sha // empty'
+  # 返回非空 → 已存在 → PUT 时带 sha；空/404 → 新建 → PUT 时不带 sha
+  ```
+
+**反模式**：不要先 `git rm <path>` 再 PUT —— PUT 是写文件接口不会删，旧文件仍在分支上。
+
 ---
 
 ### 协议 4：PR 顺序 = 依赖拓扑序
@@ -192,6 +225,7 @@ Agent B 加守门测试（基于 main 当前状态，不知 A 已改业务）
 [ ] PR 描述提到了依赖前置（"depends on PR #X merged"）
 [ ] 本地跑 ruff check + ruff format + 相关 pytest 全绿
 [ ] PR 开后 4 分钟内不推第二个 commit（除非合并修复）
+[ ] 删除文件已用 DELETE /contents（带 sha + branch）而非 git rm 后 PUT —— 后者不会真正删除
 ```
 
 ---
@@ -204,3 +238,4 @@ Agent B 加守门测试（基于 main 当前状态，不知 A 已改业务）
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v1 | 2026-05-04 | 初稿。基于 PG.2 + PG.5 + P2.2 + PI.1 + PH.7b 五次实战经验 |
+| v1.1 | 2026-05-04 | PJ.6 补充：协议 3 加 DELETE/rename fallback + sha 三态规则；自检表加删除文件项 |

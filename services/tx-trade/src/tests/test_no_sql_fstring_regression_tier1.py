@@ -12,6 +12,13 @@ P2.2 清理范围：
   - 全仓约 400 处 f-string SQL，多数为内部白名单变量插值，零真注入风险
   - 一刀切会阻断所有不相关 PR
   - 真正的全仓收紧应分阶段：S608 ruff 规则 → 团队达成共识 → 大批量 codemod
+
+PJ.6 增强 (2026-05-04)：
+  扩展扫描器同时识别 SQLAlchemy `text(f"...")` / `text(f'...')` 包装模式 —
+  这是项目内更高频的注入面（全仓 ~298 处），表面上"安全"因为走了 text() 但 f-string
+  字符串拼接照样有风险。本测试守门范围不变（保护文件 + apikeys 强基线），
+  规则同时适用，确保未来任何在保护范围内新增 text(f"...") 立即 fail。
+  全仓 text(f) 清理是历史债（约 200 文件、298 处），需独立大规模 codemod。
 """
 
 from __future__ import annotations
@@ -31,10 +38,18 @@ _PROTECTED_FILES = (
 
 _FSTRING_START = re.compile(r"""(?<![A-Za-z_])[fF]['"]""")
 _SQL_KEYWORDS = ("SELECT", "INSERT INTO", "UPDATE ", "DELETE FROM", " JOIN ")
+# PJ.6: SQLAlchemy text() 包装的 f-string 也算注入面 — 即便没有命中
+# _SQL_KEYWORDS（如分页 LIMIT/动态 ORDER BY 等），text(f"...") 本身就足以判红。
+_TEXT_FSTRING_PATTERN = re.compile(r"""text\(\s*[fF]['"]""")
 
 
 def _scan_file(rel_path: str) -> list[tuple[int, str]]:
-    """单文件扫 f-string SQL 行。"""
+    """单文件扫 f-string SQL 行。
+
+    命中条件（任一）：
+      1. 行内有 f-string 起始 + 命中 SQL 关键字
+      2. 行内有 text(f"..." 或 text(f'..." 模式（PJ.6 新增）
+    """
     p = _REPO_ROOT / rel_path
     if not p.is_file():
         return []
@@ -44,9 +59,12 @@ def _scan_file(rel_path: str) -> list[tuple[int, str]]:
         return []
     hits: list[tuple[int, str]] = []
     for i, line in enumerate(text.splitlines(), 1):
-        if not _FSTRING_START.search(line):
+        # 规则 1：f-string + SQL keyword
+        if _FSTRING_START.search(line) and any(kw in line for kw in _SQL_KEYWORDS):
+            hits.append((i, line.strip()))
             continue
-        if any(kw in line for kw in _SQL_KEYWORDS):
+        # 规则 2：text(f"...") 包装（PJ.6 新增）
+        if _TEXT_FSTRING_PATTERN.search(line):
             hits.append((i, line.strip()))
     return hits
 
