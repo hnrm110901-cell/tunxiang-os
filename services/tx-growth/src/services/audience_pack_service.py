@@ -322,12 +322,21 @@ class AudiencePackService:
             elif key == "birthday_within_days":
                 conditions.append("""
                     m.birthday IS NOT NULL
-                    AND (
-                        EXTRACT(DOY FROM m.birthday) - EXTRACT(DOY FROM CURRENT_DATE)
-                        BETWEEN 0 AND :r_bday_days
-                        OR
-                        EXTRACT(DOY FROM m.birthday) - EXTRACT(DOY FROM CURRENT_DATE) + 365
-                        BETWEEN 0 AND :r_bday_days
+                    AND EXISTS (
+                        SELECT 1 FROM (VALUES
+                            (EXTRACT(YEAR FROM CURRENT_DATE)::int),
+                            (EXTRACT(YEAR FROM CURRENT_DATE)::int + 1)
+                        ) AS y(yr)
+                        WHERE make_date(
+                            y.yr,
+                            EXTRACT(MONTH FROM m.birthday)::int,
+                            CASE WHEN EXTRACT(MONTH FROM m.birthday)::int = 2
+                                  AND EXTRACT(DAY FROM m.birthday)::int = 29
+                                  AND NOT ((y.yr % 4 = 0 AND y.yr % 100 <> 0) OR (y.yr % 400 = 0))
+                                 THEN 28
+                                 ELSE EXTRACT(DAY FROM m.birthday)::int
+                            END
+                        ) - CURRENT_DATE BETWEEN 0 AND :r_bday_days
                     )
                 """)
                 params["r_bday_days"] = value
