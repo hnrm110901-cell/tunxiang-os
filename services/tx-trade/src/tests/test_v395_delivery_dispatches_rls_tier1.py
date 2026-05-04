@@ -27,13 +27,7 @@ import pytest
 
 # tests/ → src/ → tx-trade/ → services/ → repo_root
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_MIGRATION_PATH = (
-    _REPO_ROOT
-    / "shared"
-    / "db-migrations"
-    / "versions"
-    / "v395_delivery_dispatches_rls_with_check.py"
-)
+_MIGRATION_PATH = _REPO_ROOT / "shared" / "db-migrations" / "versions" / "v395_delivery_dispatches_rls_with_check.py"
 
 _AFFECTED_TABLES = ("delivery_dispatches", "delivery_provider_configs")
 _WRITE_ACTIONS = ("insert", "update", "delete")
@@ -51,9 +45,7 @@ def migration_src() -> str:
 
 def test_revision_id_is_v395(migration_src: str) -> None:
     """revision 字段必须为 'v395'（参考 v274b 模式）。"""
-    assert 'revision: str = "v395"' in migration_src, (
-        "v395 迁移 revision 字段必须为 'v395'"
-    )
+    assert 'revision: str = "v395"' in migration_src, "v395 迁移 revision 字段必须为 'v395'"
 
 
 def test_down_revision_chains_to_v391(migration_src: str) -> None:
@@ -67,9 +59,7 @@ def test_down_revision_chains_to_v391(migration_src: str) -> None:
 def test_both_tables_covered(migration_src: str) -> None:
     """两张表都必须被列入 _TABLES 元组。"""
     for table in _AFFECTED_TABLES:
-        assert f'"{table}"' in migration_src, (
-            f"v395 应修补 {table}（v391 创建的两张表之一）"
-        )
+        assert f'"{table}"' in migration_src, f"v395 应修补 {table}（v391 创建的两张表之一）"
 
 
 # ──────────────── 3. 每张表的 INSERT/UPDATE/DELETE 写入侧策略 ────────────────
@@ -96,32 +86,23 @@ def test_create_new_policy_with_using_and_with_check(migration_src: str) -> None
     # 模板字面量
     assert "CREATE POLICY {new_policy} ON {table}" in migration_src
     assert "AS PERMISSIVE FOR {action} TO PUBLIC" in migration_src
-    assert "USING (tenant_id = {_RLS_EXPR})" in migration_src or (
-        migration_src.count("tenant_id = {_RLS_EXPR}") >= 2
-    )
+    assert "USING (tenant_id = {_RLS_EXPR})" in migration_src or (migration_src.count("tenant_id = {_RLS_EXPR}") >= 2)
     # WITH CHECK 必须存在
-    assert "WITH CHECK (tenant_id = {_RLS_EXPR})" in migration_src, (
-        "v395 必须为新策略声明 WITH CHECK 子句"
-    )
+    assert "WITH CHECK (tenant_id = {_RLS_EXPR})" in migration_src, "v395 必须为新策略声明 WITH CHECK 子句"
 
 
 def test_using_and_with_check_use_same_rls_expression(migration_src: str) -> None:
     """USING + WITH CHECK 必须使用相同的 RLS 表达式（NULLIF + current_setting）。"""
     # _RLS_EXPR 的字面定义
-    assert (
-        '_RLS_EXPR = "NULLIF(current_setting(\'app.tenant_id\', true), \'\')::UUID"'
-        in migration_src
-    ), "v395 必须复用 v391 同款 RLS 表达式（NULLIF 防 UNSET）"
+    assert "_RLS_EXPR = \"NULLIF(current_setting('app.tenant_id', true), '')::UUID\"" in migration_src, (
+        "v395 必须复用 v391 同款 RLS 表达式（NULLIF 防 UNSET）"
+    )
 
     # USING + WITH CHECK 在新策略 CREATE 模板内各出现一次（共 2 次）
     create_block_signature = "USING (tenant_id = {_RLS_EXPR}) "
     with_check_signature = "WITH CHECK (tenant_id = {_RLS_EXPR})"
-    assert create_block_signature in migration_src, (
-        f"找不到 USING 模板：{create_block_signature!r}"
-    )
-    assert with_check_signature in migration_src, (
-        f"找不到 WITH CHECK 模板：{with_check_signature!r}"
-    )
+    assert create_block_signature in migration_src, f"找不到 USING 模板：{create_block_signature!r}"
+    assert with_check_signature in migration_src, f"找不到 WITH CHECK 模板：{with_check_signature!r}"
 
 
 def test_write_actions_tuple_contains_insert_update_delete(migration_src: str) -> None:

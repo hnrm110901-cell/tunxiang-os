@@ -34,8 +34,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 安装 pytest
-        run: pip install --quiet pytest
+      - name: 安装 pytest + 测试依赖
+        run: |
+          pip install --quiet \
+            pytest pytest-asyncio \
+            httpx fastapi pydantic \
+            sqlalchemy structlog asyncpg \
+            pyyaml aiosqlite
 
       - name: 识别本 PR 新增的 migration
         id: diff
