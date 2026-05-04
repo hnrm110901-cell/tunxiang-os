@@ -94,3 +94,9 @@ podAnnotations: {}
 nodeSelector: {}
 
 tolerations: []
+
+# P0.6 工件 3 — PodDisruptionBudget（Tier 3：默认禁用，保留模板）
+pdb:
+  enabled: false
+  minAvailable: ""
+  maxUnavailable: 1

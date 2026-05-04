@@ -89,3 +89,9 @@ podAnnotations: {}
 nodeSelector: {}
 
 tolerations: []
+
+# P0.6 工件 3 — PodDisruptionBudget（Tier 2：maxUnavailable=1）
+pdb:
+  enabled: true
+  minAvailable: ""
+  maxUnavailable: 1
