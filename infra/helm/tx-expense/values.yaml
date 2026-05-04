@@ -1,0 +1,81 @@
+# tx-expense — 费控微服务（Tier 2：报销/费用/OCR 发票）
+# 端口：8015（root-dev 沿用，宪法未列入但代码已实现）
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-expense
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8015
+  targetPort: 8015
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # OCR 服务商：默认百度 OCR（可在 Secret 中切换）
+  OCR_PROVIDER: baidu
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-expense-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY,
+  #       BAIDU_OCR_API_KEY, BAIDU_OCR_SECRET_KEY,
+  #       TAX_VERIFY_API_URL, TAX_VERIFY_API_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8015
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8015
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：费控服务 Pod 分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
