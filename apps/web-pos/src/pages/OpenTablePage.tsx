@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
+import { VoiceCommandBar, matchVoiceCommand } from '../components/VoiceCommandBar';
 import { useOrderStore } from '../store/orderStore';
 import { WineStorageQuickView } from '../components/WineStorageQuickView';
 
@@ -130,14 +131,18 @@ export function OpenTablePage() {
             <span>合计</span><span>¥{(total / 100).toFixed(0)}</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => navigate(`/tables`)} style={{ flex: 1, padding: 10, background: '#333', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>返回</button>
-            <button onClick={() => navigate(`/settle/${store.orderId || 'temp'}`)} disabled={itemCount === 0}
-              style={{ flex: 2, padding: 10, background: itemCount > 0 ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 15 }}>
+            <button onClick={() => navigate(`/tables`)} {...tf.handlers} style={{ flex: 1, padding: 10, background: '#333', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', ...tf.style }}>返回</button>
+            <button onClick={() => navigate(`/settle/${store.orderId || 'temp'}`)} disabled={itemCount === 0} {...tf.handlers}
+              style={{ flex: 2, padding: 10, background: itemCount > 0 ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 15, ...tf.style }}>
               下单结算
             </button>
           </div>
         </div>
       </div>
+      <VoiceCommandBar context="开台" position="bottom-right" onCommand={(cmd) => {
+        const action = matchVoiceCommand(cmd.text, '收银台');
+        if (action === 'view_tables') navigate('/tables');
+      }} />
     </div>
   );
 }
