@@ -32,16 +32,16 @@ Service 层硬编码 model_id=claude-sonnet-4-7 覆盖 ModelRouter 默认值，
 from __future__ import annotations
 
 import json
-import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Awaitable, Callable, Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ─────────────────────────────────────────────────────────────
 # 常量
@@ -442,7 +442,7 @@ def parse_sonnet_response(raw: str) -> dict:
     try:
         return json.loads(stripped)
     except json.JSONDecodeError:
-        logger.warning("budget_forecast_parse_failed", extra={"raw_preview": raw[:200]})
+        logger.warning("budget_forecast_parse_failed", raw_preview=raw[:200])
         return {}
 
 
@@ -675,10 +675,11 @@ class BudgetForecastService:
 
     async def forecast(self, bundle: BudgetSignalBundle) -> BudgetForecastResult:
         if self._invoker is None:
-            logger.info("budget_forecast_fallback_rule_engine", extra={
-                "forecast_month": bundle.forecast_month.isoformat(),
-                "business_type": bundle.business_type,
-            })
+            logger.info(
+                "budget_forecast_fallback_rule_engine",
+                forecast_month=bundle.forecast_month.isoformat(),
+                business_type=bundle.business_type,
+            )
             return fallback_forecast(bundle)
 
         request = CachedPromptBuilder.build_messages(bundle)
@@ -778,9 +779,10 @@ class BudgetForecastService:
         # 一致性校验：如 Sonnet 没返回 7 项 line_item，补规则引擎
         predicted_items = {li.line_item for li in result.predicted_line_items}
         if not set(LINE_ITEMS).issubset(predicted_items):
-            logger.warning("budget_forecast_incomplete_line_items", extra={
-                "missing": list(set(LINE_ITEMS) - predicted_items),
-            })
+            logger.warning(
+                "budget_forecast_incomplete_line_items",
+                missing=list(set(LINE_ITEMS) - predicted_items),
+            )
             fb = fallback_forecast(fallback_bundle)
             result.predicted_line_items = fb.predicted_line_items
             result.sonnet_analysis += "\n[行数不全，line_items 使用规则引擎补齐]"

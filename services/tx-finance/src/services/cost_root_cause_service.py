@@ -37,13 +37,14 @@ system prompt 固定 ~3000 tokens（BOM 行业基准 + 成本分析 SOP + 输出
 from __future__ import annotations
 
 import json
-import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 # Sprint D4 所有任务走 Sonnet 4.7（prompt cache beta 加持）
 SONNET_CACHED_MODEL = "claude-sonnet-4-7"
@@ -349,7 +350,7 @@ def parse_sonnet_response(
             cleaned = cleaned.rsplit("```", 1)[0].strip()
         payload = json.loads(cleaned)
     except (json.JSONDecodeError, ValueError, IndexError) as exc:
-        logger.warning("sonnet_response_parse_failed error=%s text=%s", exc, text[:200])
+        logger.warning("sonnet_response_parse_failed", error=str(exc), text=text[:200])
 
     # 3. 结构化
     analysis = str(payload.get("analysis", text[:200]))
@@ -423,7 +424,7 @@ class CostRootCauseService:
         try:
             response = await self.sonnet_invoker(request)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("sonnet_invoke_failed error=%s", exc)
+            logger.warning("sonnet_invoke_failed", error=str(exc))
             return self._fallback_analyze(signal_bundle)
 
         analysis, causes, actions, token_stats = parse_sonnet_response(response)
@@ -628,11 +629,11 @@ async def save_analysis_to_db(
     })
     await db.commit()
     logger.info(
-        "cost_root_cause_saved store=%s month=%s causes=%d cache_hit=%.2f",
-        signal_bundle.store_id,
-        signal_bundle.analysis_month,
-        len(result.ranked_causes),
-        result.cache_hit_rate,
+        "cost_root_cause_saved",
+        store=signal_bundle.store_id,
+        month=str(signal_bundle.analysis_month),
+        causes=len(result.ranked_causes),
+        cache_hit=round(result.cache_hit_rate, 2),
     )
     return record_id
 

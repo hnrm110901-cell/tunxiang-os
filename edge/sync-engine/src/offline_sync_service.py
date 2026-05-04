@@ -4,13 +4,15 @@
   - 断网时将订单快照存入 offline_order_queue（本地 PG）
   - 网络恢复后批量推送离线订单到云端
   - 拉取云端最新数据（菜单/会员/配置）
-  - 冲突解决：云端为主，保留本地备份
+  - 冲突解决：字段级 LWW-Register（W12-3 接线）+ 金额字段保留 server_wins（PN-Counter 语义）
   - 查询同步状态（pending_count / last_sync_at / is_connected）
+  - 增量同步 watermark 升级为 SyncToken（双键 ts+seq，崩溃恢复可续跑，v393 持久化）
 
 设计约束：
   - 所有金额以分（fen）整型存储
   - 异步运行，不阻塞收银业务
-  - 冲突策略：服务端为主（server-wins），本地记录冲突原因
+  - LWW-Register 字段（status/桌号/会员绑定/备注等）由 lww_register.resolve_lww 决策
+  - 累加金额（PN-Counter）保持 server_wins，避免 LWW 错误覆盖累加结果
 """
 
 from __future__ import annotations
@@ -27,7 +29,53 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+# W12-3 LWW-Register 接线（lww_register.py 已 23 测试全绿）
+from lww_register import LWWValue, SyncToken, resolve_lww
+
 logger = structlog.get_logger()
+
+
+# ─── 字段级冲突策略表 ──────────────────────────────────────────────────────
+# 决策规则：
+#   - LWW_FIELDS（状态类标量）：调 resolve_lww 字段级决策
+#   - MONETARY_FIELDS（PN-Counter 语义）：server_wins，绝不允许 LWW 覆盖累加值
+#   - LIST_FIELDS（顺序敏感列表）：server_wins，pragmatic（应使用 RGA/Logoot，暂不实现）
+#   - 其它未列字段：默认 server_wins（保守兜底）
+
+# LWW 字段：末次写入即真相的状态/标量字段
+LWW_FIELDS: frozenset[str] = frozenset({
+    "status",            # 订单状态（open/paid/cancelled/refunded）
+    "table_no",          # 桌号
+    "table_id",          # 桌台 ID
+    "customer_id",       # 顾客绑定
+    "member_id",         # 会员绑定
+    "notes",             # 备注
+    "remark",            # 备注（兼容字段名）
+    "operator_id",       # 经手人
+    "channel",           # 渠道
+})
+
+# 金额字段：PN-Counter 语义，禁止走 LWW，必须服务端为准
+MONETARY_FIELDS: frozenset[str] = frozenset({
+    "total_amount_fen",
+    "subtotal_fen",
+    "discount_fen",
+    "tax_fen",
+    "tip_fen",
+    "paid_fen",
+    "refund_fen",
+    "service_fee_fen",
+    "delivery_fee_fen",
+    "balance_fen",
+})
+
+# 顺序敏感列表：暂走 server_wins（应使用 RGA/Logoot，未来扩展）
+LIST_FIELDS: frozenset[str] = frozenset({
+    "items_data",
+    "items",
+    "payments_data",
+    "payments",
+})
 
 # ─── 环境配置 ──────────────────────────────────────────────────────────────
 
@@ -67,12 +115,22 @@ class SyncStatus:
 
 @dataclass
 class ConflictResolution:
-    """冲突解决结果"""
+    """冲突解决结果
+
+    resolution 取值：
+      - "lww_field_merge"   字段级 LWW 合并（W12-3 接线后默认策略）
+      - "server_wins"       仅服务端胜（无本地 payload 或纯金额冲突时回退）
+      - "local_backup"      仅作为审计备份（不再使用，保留兼容）
+    """
 
     local_order_id: str
     server_order_id: Optional[str]
-    resolution: str  # "server_wins" | "local_backup"
+    resolution: str
     conflict_reason: str
+    # W12-3 接线后新增：字段级决策明细，用于审计
+    field_decisions: dict[str, str] = field(default_factory=dict)
+    # 合并后的最终值（仅 LWW 字段；金额字段以 server 为准不在此体现）
+    merged_payload: dict[str, Any] = field(default_factory=dict)
 
 
 # ─── 核心服务 ──────────────────────────────────────────────────────────────
@@ -237,6 +295,9 @@ class OfflineSyncService:
                             push_result.get("server_order_id"),
                             conflict_reason=conflict_reason,
                             queue_row_id=row["id"],
+                            local_payload=row.get("order_data"),
+                            server_payload=push_result.get("server_payload"),
+                            local_node_id=row.get("local_node_id") or self._tenant_id or "edge",
                         )
                         result.conflict_count += 1
 
@@ -285,21 +346,25 @@ class OfflineSyncService:
         self,
         store_id: str,
         device_id: str,
-        since_seq: int,
+        since_seq: int | None = None,
         tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """拉取服务端最新数据（菜单变更、会员信息、配置等）
 
-        GET /api/v1/sync/pull?store_id=...&since_seq=...
+        W12-3 升级：watermark 从单一 since_seq 升级为 SyncToken（双键 ts+seq），
+        从 sync_checkpoints.last_pull_token 持久化加载，崩溃恢复后续跑。
+        since_seq 仍保留作为初始化兼容入参（None 时从持久化 token 读取）。
+
+        GET /api/v1/sync/pull?store_id=...&since_ts=...&since_seq=...
 
         Args:
             store_id:   门店 ID
             device_id:  设备 ID（用于更新 sync_checkpoints）
-            since_seq:  上次拉取的序列号（0 表示全量）
+            since_seq:  兼容入参（None 时从持久化 token 读取）
             tenant_id:  租户 ID
 
         Returns:
-            变更记录列表 [{"seq": int, "type": str, "payload": {...}}, ...]
+            变更记录列表（已经按 SyncToken.filter_unseen 过滤过，仅返回 token 之后的事件）
         """
         tid = tenant_id or self._tenant_id
         if not tid:
@@ -309,11 +374,21 @@ class OfflineSyncService:
             logger.warning("offline_sync_service.pull_skipped", reason="CLOUD_API_URL not set")
             return []
 
+        # 加载持久化 SyncToken（崩溃恢复入口）
+        token = await self.load_sync_token(store_id, device_id, tid)
+        if since_seq is not None and since_seq > token.last_seen_seq:
+            # 显式 since_seq 比持久化 token 更新（罕见场景：手动重置）
+            token = SyncToken(last_seen_ts=token.last_seen_ts, last_seen_seq=since_seq)
+
         try:
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 resp = await client.get(
                     f"{self._cloud_api_url}/api/v1/sync/pull",
-                    params={"store_id": store_id, "since_seq": since_seq},
+                    params={
+                        "store_id": store_id,
+                        "since_seq": token.last_seen_seq,
+                        "since_ts": token.last_seen_ts.isoformat(),
+                    },
                     headers={"X-Tenant-ID": tid},
                 )
                 resp.raise_for_status()
@@ -328,19 +403,23 @@ class OfflineSyncService:
 
             items: list[dict[str, Any]] = body.get("data", {}).get("items", [])
 
-            # 更新 sync_checkpoints
-            if items:
-                max_seq = max(i.get("seq", 0) for i in items)
-                await self._update_checkpoint_pull(store_id, device_id, tid, max_seq)
+            # SyncToken 过滤（双保险：服务端可能返回边界事件，本地按 token 严格过滤）
+            unseen = token.filter_unseen(items) if items else items
+
+            # 推进并持久化 token（即便 unseen 为空，server 端可能确认了 token）
+            if unseen:
+                new_token = token.advance(unseen)
+                await self.save_sync_token(store_id, device_id, tid, new_token)
 
             logger.info(
                 "offline_sync_service.pull_done",
                 store_id=store_id,
                 device_id=device_id,
-                since_seq=since_seq,
+                since_token=token.to_string(),
                 received=len(items),
+                unseen=len(unseen),
             )
-            return items
+            return unseen
 
         except httpx.ConnectError as exc:
             logger.warning(
@@ -366,35 +445,199 @@ class OfflineSyncService:
             )
             return []
 
+    async def load_sync_token(self, store_id: str, device_id: str, tenant_id: str) -> SyncToken:
+        """从 sync_checkpoints 持久化恢复 SyncToken（崩溃恢复入口，W12-3 接线）
+
+        优先级：
+          1. last_pull_token（v393 新列，权威序列化形式）
+          2. last_pull_token_ts + last_pull_seq（v393 新列，显式拆分形式）
+          3. last_pull_seq + last_pull_at（v036 老列，向后兼容）
+          4. SyncToken.initial()（首次拉取）
+        """
+        async with self._get_conn() as conn:
+            result = await conn.execute(
+                text("""
+                    SELECT last_pull_token, last_pull_token_ts,
+                           last_pull_seq, last_pull_at
+                    FROM sync_checkpoints
+                    WHERE tenant_id = :tenant_id
+                      AND store_id = :store_id
+                      AND device_id = :device_id
+                """),
+                {"tenant_id": tenant_id, "store_id": store_id, "device_id": device_id},
+            )
+            row = result.one_or_none()
+
+        if not row:
+            return SyncToken.initial()
+
+        keys = ["last_pull_token", "last_pull_token_ts", "last_pull_seq", "last_pull_at"]
+        d = dict(zip(keys, row))
+
+        token_str = d.get("last_pull_token")
+        if token_str:
+            return SyncToken.from_string(token_str)
+
+        token_ts = d.get("last_pull_token_ts") or d.get("last_pull_at")
+        token_seq = int(d.get("last_pull_seq") or 0)
+        if token_ts is not None:
+            ts = token_ts
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            return SyncToken(last_seen_ts=ts, last_seen_seq=token_seq)
+
+        return SyncToken.initial()
+
+    async def save_sync_token(
+        self,
+        store_id: str,
+        device_id: str,
+        tenant_id: str,
+        token: SyncToken,
+    ) -> None:
+        """持久化 SyncToken 到 sync_checkpoints（v393 新列）
+
+        UPSERT，并应用 GREATEST 防止并发回退。
+        """
+        now = datetime.now(timezone.utc)
+        async with self._get_conn() as conn:
+            await conn.execute(
+                text("""
+                    INSERT INTO sync_checkpoints
+                        (id, tenant_id, store_id, device_id,
+                         last_pull_seq, last_pull_at,
+                         last_pull_token, last_pull_token_ts)
+                    VALUES
+                        (:id, :tenant_id, :store_id, :device_id,
+                         :seq, :now,
+                         :token_str, :token_ts)
+                    ON CONFLICT (tenant_id, store_id, device_id) DO UPDATE
+                        SET last_pull_seq = GREATEST(sync_checkpoints.last_pull_seq, :seq),
+                            last_pull_at = :now,
+                            last_pull_token = :token_str,
+                            last_pull_token_ts = GREATEST(
+                                COALESCE(sync_checkpoints.last_pull_token_ts, :token_ts),
+                                :token_ts
+                            )
+                """),
+                {
+                    "id": str(uuid.uuid4()),
+                    "tenant_id": tenant_id,
+                    "store_id": store_id,
+                    "device_id": device_id,
+                    "seq": token.last_seen_seq,
+                    "now": now,
+                    "token_str": token.to_string(),
+                    "token_ts": token.last_seen_ts,
+                },
+            )
+
     async def resolve_conflict(
         self,
         local_order_id: str,
         server_order_id: Optional[str],
         conflict_reason: str = "server conflict",
         queue_row_id: str | None = None,
+        local_payload: dict[str, Any] | None = None,
+        server_payload: dict[str, Any] | None = None,
+        local_node_id: str = "edge",
+        server_node_id: str = "cloud",
     ) -> ConflictResolution:
-        """冲突解决：以服务端为准，保留本地备份记录
+        """冲突解决：字段级 LWW-Register（W12-3 接线）+ 金额字段 server_wins
 
-        策略：server_wins
-          - 本地记录标记为 conflict，写入冲突原因
-          - 服务端数据已持久化（云端为准）
-          - 本地离线记录作为审计备份保留
+        策略矩阵（详见模块顶部 LWW_FIELDS / MONETARY_FIELDS / LIST_FIELDS）：
+          - LWW_FIELDS（status/桌号/会员绑定/备注等标量）→ resolve_lww 按 (ts, node_id)
+            选最新写入；本地胜出则将合并值写回 offline_order_queue.order_data。
+          - MONETARY_FIELDS（*_fen 金额字段）→ 强制 server_wins（PN-Counter 语义，
+            LWW 会丢失累加，详见 lww_register.py 注释）。
+          - LIST_FIELDS（items/payments）→ server_wins（顺序敏感，应使用 RGA/Logoot）。
+          - 缺失 local_payload 或 server_payload → 整体回退 server_wins（向后兼容）。
+
+        本地记录始终标记为 'conflict' 状态（无论字段级胜负），保留原始离线快照
+        作为审计备份；如果 LWW 决策出本地新字段值，将其追加到 order_data 的
+        merged_local_lww 子对象中（不覆盖原始字段，便于回溯）。
 
         Args:
             local_order_id:   本地临时订单 ID
             server_order_id:  服务端实际订单 ID（可为 None）
             conflict_reason:  冲突说明
             queue_row_id:     offline_order_queue 行 ID（可选，加速查找）
+            local_payload:    本地订单 order_data（含 _ts/_node_id 元信息）
+            server_payload:   服务端返回的最新订单 payload（含字段级时间戳）
+            local_node_id:    本地节点标识（默认 'edge'，可由 POS device_id 覆盖）
+            server_node_id:   服务端节点标识（默认 'cloud'）
 
         Returns:
-            ConflictResolution
+            ConflictResolution（含 field_decisions 字段级决策明细 + merged_payload）
         """
         now = datetime.now(timezone.utc)
+        field_decisions: dict[str, str] = {}
+        merged_payload: dict[str, Any] = {}
+        resolution_strategy = "server_wins"
+
+        # 字段级 LWW 决策（仅当 local + server payload 都存在时执行）
+        if local_payload is not None and server_payload is not None:
+            resolution_strategy = "lww_field_merge"
+            local_ts = _extract_ts(local_payload, fallback=now)
+            server_ts = _extract_ts(server_payload, fallback=now)
+
+            # 收集双方所有出现过的字段（避免漏掉单边新增字段）
+            all_fields: set[str] = set(local_payload.keys()) | set(server_payload.keys())
+            for fname in all_fields:
+                if fname.startswith("_"):
+                    # 元字段（_ts/_node_id 等）跳过决策
+                    continue
+                local_v = local_payload.get(fname)
+                server_v = server_payload.get(fname)
+
+                if fname in MONETARY_FIELDS:
+                    # PN-Counter 语义：金额字段强制服务端胜
+                    field_decisions[fname] = "server_wins_monetary"
+                    if server_v is not None:
+                        merged_payload[fname] = server_v
+                elif fname in LIST_FIELDS:
+                    # 顺序敏感列表：服务端胜（应使用 RGA/Logoot，暂未实现）
+                    field_decisions[fname] = "server_wins_list"
+                    if server_v is not None:
+                        merged_payload[fname] = server_v
+                elif fname in LWW_FIELDS:
+                    # LWW-Register 决策
+                    if local_v is None:
+                        field_decisions[fname] = "server_wins_local_missing"
+                        merged_payload[fname] = server_v
+                    elif server_v is None:
+                        field_decisions[fname] = "local_wins_server_missing"
+                        merged_payload[fname] = local_v
+                    else:
+                        local_lww = LWWValue(value=local_v, timestamp=local_ts, node_id=local_node_id)
+                        server_lww = LWWValue(value=server_v, timestamp=server_ts, node_id=server_node_id)
+                        winner = resolve_lww(local_lww, server_lww)
+                        if winner.node_id == local_node_id and winner.value == local_v:
+                            field_decisions[fname] = "local_wins_lww"
+                        else:
+                            field_decisions[fname] = "server_wins_lww"
+                        merged_payload[fname] = winner.value
+                else:
+                    # 未列入策略表的字段 → 默认 server_wins（保守兜底）
+                    field_decisions[fname] = "server_wins_default"
+                    if server_v is not None:
+                        merged_payload[fname] = server_v
+
+            conflict_reason = (
+                f"{conflict_reason} | strategy=lww_field_merge "
+                f"local_wins={sum(1 for v in field_decisions.values() if v.startswith('local_wins'))} "
+                f"server_wins={sum(1 for v in field_decisions.values() if v.startswith('server_wins'))}"
+            )
+        else:
+            # 缺失任一 payload → 完全回退 server_wins
+            conflict_reason = f"{conflict_reason} | strategy=server_wins (payload missing)"
 
         where_clause = "local_order_id = :local_order_id"
         params: dict[str, Any] = {
             "local_order_id": local_order_id,
-            "conflict_reason": conflict_reason,
+            "conflict_reason": conflict_reason[:500],
             "synced_at": now,
         }
         if queue_row_id:
@@ -413,11 +656,34 @@ class OfflineSyncService:
                 params,
             )
 
+            # 如有 LWW 合并结果，把决策明细回写到 order_data._lww_resolution 子对象（审计用）
+            if resolution_strategy == "lww_field_merge" and merged_payload:
+                await conn.execute(
+                    text(f"""
+                        UPDATE offline_order_queue
+                        SET order_data = order_data || :patch::jsonb
+                        WHERE {where_clause}
+                    """),
+                    {
+                        **{k: v for k, v in params.items() if k != "conflict_reason"},
+                        "patch": _json_dumps({
+                            "_lww_resolution": {
+                                "merged_payload": merged_payload,
+                                "field_decisions": field_decisions,
+                                "server_order_id": server_order_id,
+                                "resolved_at": now.isoformat(),
+                            },
+                        }),
+                    },
+                )
+
         resolution = ConflictResolution(
             local_order_id=local_order_id,
             server_order_id=server_order_id,
-            resolution="server_wins",
+            resolution=resolution_strategy,
             conflict_reason=conflict_reason,
+            field_decisions=field_decisions,
+            merged_payload=merged_payload,
         )
 
         logger.warning(
@@ -425,7 +691,8 @@ class OfflineSyncService:
             local_order_id=local_order_id,
             server_order_id=server_order_id,
             reason=conflict_reason,
-            resolution="server_wins",
+            resolution=resolution_strategy,
+            field_decisions=field_decisions,
         )
         return resolution
 
@@ -589,10 +856,13 @@ class OfflineSyncService:
 
         if resp.status_code == 409:
             body = resp.json()
+            data = body.get("data", {}) or {}
             return {
                 "status": "conflict",
-                "server_order_id": body.get("data", {}).get("server_order_id"),
-                "reason": body.get("data", {}).get("reason", "duplicate order"),
+                "server_order_id": data.get("server_order_id"),
+                "reason": data.get("reason", "duplicate order"),
+                # W12-3 接线：服务端返回最新订单 payload，供字段级 LWW 决策
+                "server_payload": data.get("server_payload") or data.get("order_data"),
             }
 
         resp.raise_for_status()
@@ -688,3 +958,34 @@ def _json_dumps(obj: Any) -> str:
             return super().default(o)
 
     return json.dumps(obj, cls=_Enc)
+
+
+def _extract_ts(payload: dict[str, Any], fallback: datetime) -> datetime:
+    """从 payload 中提取 LWW 用的时间戳
+
+    优先级：
+      1. payload['_ts']           — 显式 LWW 时间戳元字段
+      2. payload['updated_at']    — 业务字段
+      3. payload['client_ts']     — 离线事件时间戳
+      4. payload['created_at']    — 兜底
+      5. fallback                 — 全部缺失时使用调用方提供的兜底（通常是 now()）
+
+    时间戳必须带 tzinfo（UTC）；字符串自动解析。
+    """
+    for key in ("_ts", "updated_at", "client_ts", "created_at"):
+        v = payload.get(key)
+        if v is None:
+            continue
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                v = v.replace(tzinfo=timezone.utc)
+            return v
+        if isinstance(v, str):
+            try:
+                dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+    return fallback

@@ -11,11 +11,11 @@
 """
 from __future__ import annotations
 
-import logging
 from datetime import date as date_cls
 from typing import Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -31,7 +31,7 @@ from ..services.budget_forecast_service import (
     save_forecast_to_db,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(
     prefix="/api/v1/finance/budget/forecast",
     tags=["finance-budget-forecast"],
