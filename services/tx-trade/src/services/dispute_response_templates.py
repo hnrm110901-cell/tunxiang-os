@@ -68,14 +68,9 @@ class ResponseTemplate:
             out = out.replace(placeholder, str(val))
         return out
 
-    def suggested_refund_fen(
-        self, customer_claim_fen: Optional[int]
-    ) -> Optional[int]:
+    def suggested_refund_fen(self, customer_claim_fen: Optional[int]) -> Optional[int]:
         """根据 suggested_refund_ratio × customer_claim_fen 算推荐退款金额"""
-        if (
-            self.suggested_refund_ratio is None
-            or customer_claim_fen is None
-        ):
+        if self.suggested_refund_ratio is None or customer_claim_fen is None:
             return None
         return int(customer_claim_fen * self.suggested_refund_ratio)
 

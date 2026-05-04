@@ -293,7 +293,8 @@ class DemandPredictor:
         """
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         pr.result_data,
                         pr.target_date
@@ -304,7 +305,8 @@ class DemandPredictor:
                       AND pr.target_date >= CURRENT_DATE - :days
                       AND pr.target_date < CURRENT_DATE
                     ORDER BY pr.target_date
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id, "days": days},
             )
             prediction_rows = result.fetchall()
@@ -320,7 +322,8 @@ class DemandPredictor:
 
             # 获取同期实际销量
             actual_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         oi.dish_id::text,
                         o.created_at::date AS sale_date,
@@ -333,7 +336,8 @@ class DemandPredictor:
                       AND o.created_at::date >= CURRENT_DATE - :days
                       AND o.created_at::date < CURRENT_DATE
                     GROUP BY oi.dish_id, sale_date
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id, "days": days},
             )
             actual_rows = actual_result.fetchall()
@@ -415,7 +419,8 @@ class DemandPredictor:
         """
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         oi.dish_id::text,
                         d.dish_name,
@@ -431,7 +436,8 @@ class DemandPredictor:
                       AND o.created_at >= NOW() - make_interval(days => :days)
                     GROUP BY oi.dish_id, d.dish_name, d.category, sale_date
                     ORDER BY oi.dish_id, sale_date
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id, "days": LOOKBACK_DAYS},
             )
             rows = result.fetchall()

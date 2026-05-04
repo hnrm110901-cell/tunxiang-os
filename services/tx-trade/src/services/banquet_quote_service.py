@@ -113,7 +113,8 @@ class BanquetQuoteService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_quote_templates (
                     id, tenant_id, store_id, name, event_type, tier,
                     per_table_price_fen, dishes_json, description,
@@ -127,7 +128,8 @@ class BanquetQuoteService:
                     :service_fee_rate, TRUE,
                     :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": self._tenant_id,
@@ -201,7 +203,8 @@ class BanquetQuoteService:
         where = " AND ".join(conditions)
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, name, event_type, tier,
                        per_table_price_fen, description, min_tables, max_tables,
                        beverage_per_table_fen, service_fee_rate, is_active,
@@ -209,7 +212,8 @@ class BanquetQuoteService:
                 FROM banquet_quote_templates
                 WHERE {where}
                 ORDER BY tier, per_table_price_fen ASC
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -237,10 +241,12 @@ class BanquetQuoteService:
     async def get_template(self, template_id: str) -> dict:
         """获取单个套餐模板详情（含菜品列表）。"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM banquet_quote_templates
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": template_id, "tenant_id": self._tenant_id},
         )
         row = result.mappings().first()
@@ -286,10 +292,12 @@ class BanquetQuoteService:
 
         # 验证存在
         check = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM banquet_quote_templates
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": template_id, "tenant_id": self._tenant_id},
         )
         if not check.first():
@@ -306,11 +314,13 @@ class BanquetQuoteService:
         updates["tenant_id"] = self._tenant_id
 
         await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE banquet_quote_templates
                 SET {set_clauses}
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             updates,
         )
         await self._db.flush()
@@ -371,11 +381,13 @@ class BanquetQuoteService:
 
         # 确定版本号
         version_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(MAX(version), 0) AS max_ver
                 FROM banquet_quotes
                 WHERE lead_id = :lead_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"lead_id": lead_id, "tenant_id": self._tenant_id},
         )
         version = (version_row.scalar() or 0) + 1
@@ -385,7 +397,8 @@ class BanquetQuoteService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_quotes (
                     id, tenant_id, quote_no, lead_id, template_id, version,
                     table_count, guest_count, menu_json,
@@ -399,7 +412,8 @@ class BanquetQuoteService:
                     :subtotal_fen, 0, :total_fen,
                     'draft', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": quote_id,
                 "tenant_id": self._tenant_id,
@@ -427,7 +441,8 @@ class BanquetQuoteService:
             line_total = unit_price * qty
 
             await self._db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO banquet_quote_items (
                         id, tenant_id, quote_id, seq, dish_name, category,
                         unit_price_fen, qty, line_total_fen, created_at
@@ -435,7 +450,8 @@ class BanquetQuoteService:
                         :id, :tenant_id, :quote_id, :seq, :dish_name, :category,
                         :unit_price_fen, :qty, :line_total_fen, :now
                     )
-                """),
+                """
+                ),
                 {
                     "id": item_id,
                     "tenant_id": self._tenant_id,
@@ -529,13 +545,15 @@ class BanquetQuoteService:
     ) -> dict:
         """对已有报价单进行菜单定制，自动重新计算价格并递增版本。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, lead_id, template_id, menu_json, table_count,
                        guest_count, version, status,
                        beverage_total_fen, service_fee_fen
                 FROM banquet_quotes
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": quote_id, "tenant_id": self._tenant_id},
         )
         quote = row.mappings().first()
@@ -549,10 +567,12 @@ class BanquetQuoteService:
 
         # 获取模板以重算费率
         tmpl_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT service_fee_rate FROM banquet_quote_templates
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": str(quote["template_id"]), "tenant_id": self._tenant_id},
         )
         tmpl = tmpl_row.mappings().first()
@@ -569,7 +589,8 @@ class BanquetQuoteService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_quotes
                 SET menu_json = :menu_json,
                     food_subtotal_fen = :food_subtotal_fen,
@@ -579,7 +600,8 @@ class BanquetQuoteService:
                     version = :version,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": quote_id,
                 "tenant_id": self._tenant_id,
@@ -595,10 +617,12 @@ class BanquetQuoteService:
 
         # 重建明细行
         await self._db.execute(
-            text("""
+            text(
+                """
                 DELETE FROM banquet_quote_items
                 WHERE quote_id = :quote_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"quote_id": quote_id, "tenant_id": self._tenant_id},
         )
 
@@ -608,7 +632,8 @@ class BanquetQuoteService:
             qty = dish.get("qty", 1)
 
             await self._db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO banquet_quote_items (
                         id, tenant_id, quote_id, seq, dish_name, category,
                         unit_price_fen, qty, line_total_fen, created_at
@@ -616,7 +641,8 @@ class BanquetQuoteService:
                         :id, :tenant_id, :quote_id, :seq, :dish_name, :category,
                         :unit_price_fen, :qty, :line_total_fen, :now
                     )
-                """),
+                """
+                ),
                 {
                     "id": item_id,
                     "tenant_id": self._tenant_id,
@@ -650,10 +676,12 @@ class BanquetQuoteService:
             raise ValueError(f"无效状态: {new_status}，可选: {QUOTE_STATUSES}")
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM banquet_quotes
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": quote_id, "tenant_id": self._tenant_id},
         )
         quote = row.mappings().first()
@@ -667,11 +695,13 @@ class BanquetQuoteService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_quotes
                 SET status = :new_status, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": quote_id,
                 "tenant_id": self._tenant_id,
@@ -694,7 +724,8 @@ class BanquetQuoteService:
     async def list_quotes(self, lead_id: str) -> list:
         """查询线索的所有报价单，按版本降序。"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, quote_no, lead_id, template_id, version,
                        table_count, guest_count,
                        food_subtotal_fen, beverage_total_fen,
@@ -703,7 +734,8 @@ class BanquetQuoteService:
                 FROM banquet_quotes
                 WHERE lead_id = :lead_id AND tenant_id = :tenant_id
                 ORDER BY version DESC
-            """),
+            """
+            ),
             {"lead_id": lead_id, "tenant_id": self._tenant_id},
         )
         rows = result.mappings().all()
@@ -768,10 +800,12 @@ class BanquetQuoteService:
     async def get_quote_detail(self, quote_id: str) -> dict:
         """获取报价单详情（含菜品明细行）。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM banquet_quotes
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": quote_id, "tenant_id": self._tenant_id},
         )
         quote = row.mappings().first()
@@ -780,13 +814,15 @@ class BanquetQuoteService:
 
         # 获取明细行
         items_result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, seq, dish_name, category,
                        unit_price_fen, qty, line_total_fen
                 FROM banquet_quote_items
                 WHERE quote_id = :quote_id AND tenant_id = :tenant_id
                 ORDER BY seq ASC
-            """),
+            """
+            ),
             {"quote_id": quote_id, "tenant_id": self._tenant_id},
         )
         items = items_result.mappings().all()

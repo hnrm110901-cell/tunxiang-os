@@ -220,12 +220,14 @@ async def verify_invoice(
     # 查询发票信息
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, invoice_code, invoice_number, invoice_date,
                        total_amount, buyer_tax_id, verify_status
                 FROM invoices
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().one_or_none()
@@ -260,13 +262,15 @@ async def verify_invoice(
         import json as _json
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoices SET
                     verify_status = :status,
                     verify_response = :response,
                     updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": str(invoice_id),
                 "tenant_id": str(tenant_id),
@@ -327,7 +331,8 @@ async def get_invoice_stats(
 
     try:
         stats_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*)                                                        AS total_count,
                     COUNT(*) FILTER (WHERE verify_status = 'verified_real')        AS verified_real,
@@ -341,7 +346,8 @@ async def get_invoice_stats(
                     COUNT(*) FILTER (WHERE ocr_status IN ('success', 'failed'))    AS ocr_attempted_count
                 FROM invoices
                 WHERE {where_clause}
-            """),
+            """
+            ),
             params,
         )
         row = stats_result.mappings().one()
@@ -480,7 +486,8 @@ async def list_invoices(
         total = count_result.scalar_one()
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, application_id, file_name, file_url,
                        invoice_type, invoice_code, invoice_number, invoice_date,
                        seller_name, total_amount, tax_amount,
@@ -491,7 +498,8 @@ async def list_invoices(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = rows_result.mappings().all()
@@ -554,7 +562,8 @@ async def get_invoice(
     """
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, brand_id, store_id, uploader_id,
                        application_id, file_name, file_type, file_url, file_size,
                        invoice_type, invoice_code, invoice_number, invoice_date,
@@ -569,7 +578,8 @@ async def get_invoice(
                        created_at, updated_at
                 FROM invoices
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().one_or_none()
@@ -630,11 +640,13 @@ async def get_invoice(
         duplicate_id = row["duplicate_invoice_id"]
         try:
             dup_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, store_id, file_name, created_at
                     FROM invoices
                     WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"id": str(duplicate_id), "tenant_id": str(tenant_id)},
             )
             dup_row = dup_result.mappings().one_or_none()
@@ -696,11 +708,13 @@ async def update_invoice_category(
     # 查询发票（校验归属 + 获取 application_id）
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, application_id
                 FROM invoices
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().one_or_none()
@@ -714,13 +728,15 @@ async def update_invoice_category(
     # 更新发票 confirmed_category_id
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoices SET
                     confirmed_category_id = :category_id,
                     notes = COALESCE(:notes, notes),
                     updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": str(invoice_id),
                 "tenant_id": str(tenant_id),
@@ -737,14 +753,16 @@ async def update_invoice_category(
     if application_id:
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE expense_items SET
                         category_id = :category_id,
                         updated_at = NOW()
                     WHERE application_id = :application_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "application_id": str(application_id),
                     "tenant_id": str(tenant_id),
@@ -765,14 +783,16 @@ async def update_invoice_category(
     # 返回更新后的发票
     try:
         updated_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, invoice_code, invoice_number, invoice_type,
                        seller_name, total_amount, verify_status,
                        suggested_category_id, confirmed_category_id, notes,
                        updated_at
                 FROM invoices
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": str(invoice_id), "tenant_id": str(tenant_id)},
         )
         updated_row = updated_result.mappings().one_or_none()

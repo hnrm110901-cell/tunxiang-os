@@ -68,11 +68,13 @@ def _row_to_addr(row: Any) -> dict[str, Any]:
 async def _clear_default(db: AsyncSession, tenant_id: str, customer_id: str) -> None:
     """清除同一顾客的所有默认地址标记"""
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE customer_addresses
             SET is_default = false, updated_at = NOW()
             WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
 
@@ -94,14 +96,16 @@ async def list_addresses(
         await _set_rls(db, x_tenant_id)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, name, phone,
                        province, city, district, detail_address,
                        location_lng, location_lat, tag, is_default
                 FROM customer_addresses
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
                 ORDER BY is_default DESC, created_at DESC
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "cid": customer_id},
         )
         items = [_row_to_addr(r) for r in rows.all()]
@@ -134,7 +138,8 @@ async def create_address(
         lat = req.location.get("lat") if req.location else None
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_addresses
                     (tenant_id, customer_id, name, phone,
                      province, city, district, detail_address,
@@ -146,7 +151,8 @@ async def create_address(
                 RETURNING id, customer_id, name, phone,
                           province, city, district, detail_address,
                           location_lng, location_lat, tag, is_default
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "cid": req.customer_id,
@@ -188,14 +194,16 @@ async def get_address(
         await _set_rls(db, x_tenant_id)
 
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, name, phone,
                        province, city, district, detail_address,
                        location_lng, location_lat, tag, is_default
                 FROM customer_addresses
                 WHERE id = :aid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"aid": address_id, "tid": x_tenant_id},
         )
         addr = row.first()
@@ -230,7 +238,8 @@ async def update_address(
         lat = req.location.get("lat") if req.location else None
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_addresses
                 SET name = :name, phone = :phone,
                     province = :province, city = :city, district = :district,
@@ -242,7 +251,8 @@ async def update_address(
                 RETURNING id, customer_id, name, phone,
                           province, city, district, detail_address,
                           location_lng, location_lat, tag, is_default
-            """),
+            """
+            ),
             {
                 "aid": address_id,
                 "tid": x_tenant_id,
@@ -286,11 +296,13 @@ async def delete_address(
         await _set_rls(db, x_tenant_id)
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_addresses
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :aid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"aid": address_id, "tid": x_tenant_id},
         )
         await db.commit()
@@ -323,12 +335,14 @@ async def set_default_address(
 
         # 设置新默认
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_addresses
                 SET is_default = true, updated_at = NOW()
                 WHERE id = :aid AND tenant_id = :tid AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"aid": address_id, "tid": x_tenant_id},
         )
         if not result.first():

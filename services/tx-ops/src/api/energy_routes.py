@@ -353,14 +353,16 @@ async def list_energy_budgets(
 
         where = " AND ".join(conditions)
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, period_type, period_value,
                        electricity_budget_kwh, gas_budget_m3, water_budget_ton,
                        cost_budget_fen, is_active, created_at, updated_at
                 FROM energy_budgets
                 WHERE {where}
                 ORDER BY period_value DESC
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows.fetchall()]
@@ -403,7 +405,8 @@ async def set_energy_budget(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO energy_budgets
                     (tenant_id, store_id, period_type, period_value,
                      electricity_budget_kwh, gas_budget_m3, water_budget_ton,
@@ -423,7 +426,8 @@ async def set_energy_budget(
                 RETURNING id, tenant_id, store_id, period_type, period_value,
                           electricity_budget_kwh, gas_budget_m3, water_budget_ton,
                           cost_budget_fen, is_active, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "store_id": req.store_id,
@@ -511,14 +515,16 @@ async def list_energy_alert_rules(
 
         where = " AND ".join(conditions)
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, rule_name, metric,
                        threshold, comparison, alert_level, is_active,
                        created_at, updated_at
                 FROM energy_alert_rules
                 WHERE {where}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows.fetchall()]
@@ -577,7 +583,8 @@ async def create_energy_alert_rule(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO energy_alert_rules
                     (tenant_id, store_id, rule_name, metric,
                      threshold, comparison, alert_level, is_active)
@@ -587,7 +594,8 @@ async def create_energy_alert_rule(
                 RETURNING id, tenant_id, store_id, rule_name, metric,
                           threshold, comparison, alert_level, is_active,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "store_id": req.store_id,
@@ -651,14 +659,16 @@ async def delete_energy_alert_rule(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE energy_alert_rules
                 SET is_deleted = TRUE, is_active = FALSE, updated_at = NOW()
                 WHERE id = :rule_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"rule_id": rule_id, "tenant_id": x_tenant_id},
         )
         await db.commit()
@@ -715,7 +725,8 @@ async def get_budget_vs_actual(
     try:
         await _set_tenant(db, x_tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT electricity_budget_kwh, gas_budget_m3, water_budget_ton, cost_budget_fen
                 FROM energy_budgets
                 WHERE tenant_id = :tenant_id
@@ -723,7 +734,8 @@ async def get_budget_vs_actual(
                   AND period_value = :period_value
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "store_id": store_id, "period_value": period_value},
         )
         found = row.fetchone()
@@ -763,14 +775,16 @@ async def get_budget_vs_actual(
     alert_triggered = False
     try:
         rules_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT metric, threshold, comparison
                 FROM energy_alert_rules
                 WHERE tenant_id = :tenant_id
                   AND store_id  = :store_id
                   AND is_active = TRUE
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "store_id": store_id},
         )
         active_rules = [dict(r._mapping) for r in rules_rows.fetchall()]

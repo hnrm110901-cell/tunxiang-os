@@ -30,6 +30,7 @@ import importlib.util as _ilu
 from datetime import date, datetime, timedelta
 
 import pytest
+
 from services.attendance_engine import (
     SHIFT_TIMES,
     AttendanceEngine,

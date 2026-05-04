@@ -84,7 +84,8 @@ async def record_rush_handled(
     """厨师处理催菜时累加 rush_handled 计数。"""
     today = date.today()
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE chef_performance_daily
             SET rush_handled = rush_handled + 1,
                 updated_at   = NOW()
@@ -92,7 +93,8 @@ async def record_rush_handled(
               AND operator_id = :operator_id
               AND dept_id     = :dept_id
               AND perf_date   = :today
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "operator_id": operator_id,
@@ -111,7 +113,8 @@ async def record_remake(
     """记录返工次数（负向指标）。"""
     today = date.today()
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE chef_performance_daily
             SET remake_count = remake_count + 1,
                 updated_at   = NOW()
@@ -119,7 +122,8 @@ async def record_remake(
               AND operator_id = :operator_id
               AND dept_id     = :dept_id
               AND perf_date   = :today
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "operator_id": operator_id,

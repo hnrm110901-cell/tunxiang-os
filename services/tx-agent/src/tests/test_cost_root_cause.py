@@ -103,15 +103,14 @@ def _fake_usage(cache_read: int = 3000, input_tokens: int = 500) -> dict[str, in
 
 def test_skill_registered_in_registry() -> None:
     assert CostRootCauseAgent in ALL_SKILL_AGENTS, (
-        "CostRootCauseAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 "
-        "ALL_SKILL_AGENTS 列表中注册"
+        "CostRootCauseAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 " "ALL_SKILL_AGENTS 列表中注册"
     )
 
 
 def test_scope_is_margin() -> None:
-    assert CostRootCauseAgent.constraint_scope == {"margin"}, (
-        f"D4a 成本根因必须且只声明 margin scope，实际：{CostRootCauseAgent.constraint_scope}"
-    )
+    assert CostRootCauseAgent.constraint_scope == {
+        "margin"
+    }, f"D4a 成本根因必须且只声明 margin scope，实际：{CostRootCauseAgent.constraint_scope}"
 
 
 def test_agent_metadata() -> None:
@@ -134,15 +133,9 @@ def test_system_blocks_meet_cache_threshold() -> None:
     assert isinstance(blocks, list) and len(blocks) >= 1
 
     total_text = "".join(b.get("text", "") for b in blocks)
-    assert len(total_text) >= 4000, (
-        f"系统提示合计 {len(total_text)} 字符，低于 4000 字符门槛（粗估 <1024 tokens）"
-    )
+    assert len(total_text) >= 4000, f"系统提示合计 {len(total_text)} 字符，低于 4000 字符门槛（粗估 <1024 tokens）"
 
-    has_cache = any(
-        isinstance(b, dict)
-        and b.get("cache_control", {}).get("type") == "ephemeral"
-        for b in blocks
-    )
+    has_cache = any(isinstance(b, dict) and b.get("cache_control", {}).get("type") == "ephemeral" for b in blocks)
     assert has_cache, "至少一个 system block 必须带 cache_control={'type':'ephemeral'}"
 
 
@@ -234,9 +227,9 @@ async def test_prompt_cache_hit_ratio_reports_75pct() -> None:
     assert usage["cache_read_input_tokens"] == 3000
     assert usage["input_tokens"] == 500
     # 比率应由 ModelRouter 层计算并透传出来
-    assert usage["cache_hit_ratio"] > 0.75, (
-        f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
-    )
+    assert (
+        usage["cache_hit_ratio"] > 0.75
+    ), f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -270,9 +263,9 @@ async def test_model_router_called_with_sonnet_4_7() -> None:
 
     fake_router.complete_with_cache.assert_awaited_once()
     kwargs = fake_router.complete_with_cache.await_args.kwargs
-    assert kwargs["task_type"] == "cost_root_cause", (
-        f"task_type 必须是 'cost_root_cause'（route 到 Sonnet 4.7），实际：{kwargs.get('task_type')}"
-    )
+    assert (
+        kwargs["task_type"] == "cost_root_cause"
+    ), f"task_type 必须是 'cost_root_cause'（route 到 Sonnet 4.7），实际：{kwargs.get('task_type')}"
     assert kwargs["tenant_id"] == TENANT_ID
     # 系统提示必须为 list[dict] 且至少一个块含 cache_control
     system_blocks = kwargs["system_blocks"]
@@ -301,9 +294,7 @@ def test_no_broad_except() -> None:
             continue
         exc_type = node.type
         # bare `except:` 也禁止
-        assert exc_type is not None, (
-            f"bare `except:` 在 cost_root_cause.py:{node.lineno} —— 必须声明具体异常类型"
-        )
+        assert exc_type is not None, f"bare `except:` 在 cost_root_cause.py:{node.lineno} —— 必须声明具体异常类型"
         # `except Exception:` / `except BaseException:` 不允许
         if isinstance(exc_type, ast.Name):
             assert exc_type.id not in ("Exception", "BaseException"), (
@@ -313,6 +304,7 @@ def test_no_broad_except() -> None:
         if isinstance(exc_type, ast.Tuple):
             for elt in exc_type.elts:
                 if isinstance(elt, ast.Name):
-                    assert elt.id not in ("Exception", "BaseException"), (
-                        f"broad `except (..., {elt.id}, ...):` 在 cost_root_cause.py:{node.lineno}"
-                    )
+                    assert elt.id not in (
+                        "Exception",
+                        "BaseException",
+                    ), f"broad `except (..., {elt.id}, ...):` 在 cost_root_cause.py:{node.lineno}"

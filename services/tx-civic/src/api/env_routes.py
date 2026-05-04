@@ -67,7 +67,8 @@ async def create_emission_record(
     record_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_emission_records (
                     id, tenant_id, store_id, device_id,
                     pm25, pm10, nmhc, emission_concentration,
@@ -77,7 +78,8 @@ async def create_emission_record(
                     :pm25, :pm10, :nmhc, :ec,
                     :pe, NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tid": x_tenant_id,
@@ -110,7 +112,8 @@ async def get_emission_trend(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     created_at::date AS record_date,
                     AVG(pm25) AS avg_pm25,
@@ -124,7 +127,8 @@ async def get_emission_trend(
                     AND created_at >= NOW() - :days * INTERVAL '1 day'
                 GROUP BY created_at::date
                 ORDER BY record_date
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id, "days": days},
         )
         items = [dict(r._mapping) for r in rows]
@@ -146,7 +150,8 @@ async def create_waste_disposal(
     record_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_waste_disposals (
                     id, tenant_id, store_id, waste_type, weight_kg,
                     collector_company, collector_license, vehicle_plate,
@@ -156,7 +161,8 @@ async def create_waste_disposal(
                     :cc, :cl, :vp,
                     :dcn, :photos, :notes, NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tid": x_tenant_id,
@@ -243,14 +249,16 @@ async def get_env_compliance(
     try:
         # Emission compliance: check records in last 30 days
         emission_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE emission_concentration <= 2.0) AS compliant
                 FROM civic_emission_records
                 WHERE tenant_id = :tid AND store_id = :sid
                     AND created_at >= NOW() - INTERVAL '30 days'
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         emission_row = emission_result.fetchone()
@@ -260,12 +268,14 @@ async def get_env_compliance(
 
         # Waste disposal compliance: check if disposal records exist for last 7 days
         waste_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT created_at::date) AS active_days
                 FROM civic_waste_disposals
                 WHERE tenant_id = :tid AND store_id = :sid
                     AND created_at >= NOW() - INTERVAL '7 days'
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         waste_days = waste_result.scalar() or 0

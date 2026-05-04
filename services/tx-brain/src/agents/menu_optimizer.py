@@ -291,7 +291,8 @@ class MenuOptimizer:
                     params["store_id"] = store_id
 
                 result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT
                             ingredient_id,
                             ingredient_name,
@@ -309,7 +310,8 @@ class MenuOptimizer:
                         )
                         ORDER BY loss_rate DESC
                         LIMIT 10
-                    """),
+                    """
+                    ),
                     params,
                 )
                 rows = result.mappings().all()

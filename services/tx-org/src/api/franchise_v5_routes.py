@@ -179,7 +179,8 @@ async def create_franchisee_v5(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchisees
                     (id, tenant_id, name, company_name, contact_phone, contact_email,
                      region, store_name, store_address, brand_id,
@@ -190,7 +191,8 @@ async def create_franchisee_v5(
                      :region, :store_name, :store_address, :brand_id,
                      :join_date, :franchise_type, :contract_start_date, :contract_end_date,
                      :contract_file_url, 'active', :notes, NOW(), NOW(), false)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -281,11 +283,7 @@ async def update_franchisee_v5(
                             "contract_end_date": body.contract_end_date,
                         },
                         source_service="tx-org",
-                        metadata={
-                            "updated_fields": [
-                                k for k in updates.keys() if k != "franchisee_id"
-                            ]
-                        },
+                        metadata={"updated_fields": [k for k in updates if k != "franchisee_id"]},
                     )
                 )
 
@@ -309,13 +307,15 @@ async def get_franchisee_contract(
         await _set_rls(db, x_tenant_id)
         # 从 franchisees 取合同字段
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, company_name,
                        contract_start_date, contract_end_date, contract_file_url,
                        franchise_type, join_date, status
                 FROM franchisees
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": franchisee_id},
         )
         row = result.fetchone()
@@ -326,11 +326,13 @@ async def get_franchisee_contract(
         # 从 franchise_contracts 追加合同明细（如存在）
         try:
             c_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT * FROM franchise_contracts
                     WHERE franchisee_id = :fid AND is_deleted = false
                     ORDER BY created_at DESC LIMIT 1
-                """),
+                """
+                ),
                 {"fid": franchisee_id},
             )
             c_row = c_result.fetchone()
@@ -478,7 +480,8 @@ async def collect_fee(
             raise HTTPException(status_code=400, detail="该费用已收款，请勿重复操作")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchise_fees
                 SET status = 'paid',
                     paid_amount_fen = :paid_amount_fen,
@@ -487,7 +490,8 @@ async def collect_fee(
                     receipt_no = :receipt_no,
                     updated_at = NOW()
                 WHERE id = :fee_id AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "fee_id": fee_id,
                 "paid_amount_fen": body.paid_amount_fen,
@@ -532,14 +536,16 @@ async def generate_monthly_fees(
             fid = str(f_row._mapping["id"])
             # 检查是否已有同月同类费用
             exists_res = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT 1 FROM franchise_fees
                     WHERE franchisee_id = :fid
                       AND fee_type = :fee_type
                       AND TO_CHAR(due_date, 'YYYY-MM') = :ym
                       AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"fid": fid, "fee_type": body.fee_type, "ym": body.year_month},
             )
             if exists_res.fetchone():
@@ -547,12 +553,14 @@ async def generate_monthly_fees(
                 continue
             new_fee_id = str(uuid4())
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO franchise_fees
                         (id, tenant_id, franchisee_id, fee_type, amount_fen, due_date, status, notes, created_at, updated_at, is_deleted)
                     VALUES
                         (:id, :tenant_id, :franchisee_id, :fee_type, :amount_fen, :due_date, 'pending', :notes, NOW(), NOW(), false)
-                """),
+                """
+                ),
                 {
                     "id": new_fee_id,
                     "tenant_id": x_tenant_id,
@@ -641,14 +649,16 @@ async def create_common_code(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_common_codes
                     (id, tenant_id, code_type, code_no, name, description, unit,
                      price_fen, applicable_stores, status, created_at, updated_at, is_deleted)
                 VALUES
                     (:id, :tenant_id, :code_type, :code_no, :name, :description, :unit,
                      :price_fen, :applicable_stores::jsonb, 'active', NOW(), NOW(), false)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -737,14 +747,16 @@ async def sync_common_codes(
             existing_stores: list = json.loads(row._mapping["applicable_stores"] or "[]")
             merged_stores = list(set(existing_stores + body.target_store_ids))
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE franchise_common_codes
                     SET is_synced = true,
                         synced_at = :synced_at,
                         applicable_stores = :stores::jsonb,
                         updated_at = NOW()
                     WHERE id = :code_id
-                """),
+                """
+                ),
                 {"code_id": code_id, "synced_at": synced_at, "stores": json.dumps(merged_stores)},
             )
             synced_count += 1
@@ -960,11 +972,13 @@ async def upload_contract_file(
 
         # 写回档案
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchisees
                 SET contract_file_url = :url, updated_at = NOW()
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"url": file_url, "id": franchisee_id},
         )
         await db.commit()
@@ -1002,7 +1016,8 @@ async def mark_overdue_fees(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchise_fees
                 SET status     = 'overdue',
                     updated_at = NOW()
@@ -1010,7 +1025,8 @@ async def mark_overdue_fees(
                   AND status    = 'pending'
                   AND due_date  < CURRENT_DATE
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         marked_count = result.rowcount

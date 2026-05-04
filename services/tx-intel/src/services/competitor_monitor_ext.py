@@ -52,11 +52,13 @@ class CompetitorMonitorExtService:
 
         # 1. 查询竞对品牌档案
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, platform_ids
                 FROM competitor_brands
                 WHERE id = :brand_id AND tenant_id = :tenant_id AND is_active = TRUE
-            """),
+            """
+            ),
             {"brand_id": str(competitor_brand_id), "tenant_id": str(tenant_id)},
         )
         brand = row.mappings().first()
@@ -85,7 +87,8 @@ class CompetitorMonitorExtService:
         snapshot_id = uuid.uuid4()
         today = date.today()
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO competitor_snapshots (
                     id, tenant_id, competitor_brand_id, snapshot_date,
                     avg_rating, review_count, price_range,
@@ -96,7 +99,8 @@ class CompetitorMonitorExtService:
                     :top_dishes, :active_promotions, :raw_data, :source
                 )
                 ON CONFLICT DO NOTHING
-            """),
+            """
+            ),
             {
                 "id": str(snapshot_id),
                 "tenant_id": str(tenant_id),

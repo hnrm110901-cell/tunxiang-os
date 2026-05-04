@@ -26,8 +26,10 @@ async def install_app(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.installations (tenant_id, app_id, store_id, status)
-                VALUES (:tid, :app_id, :store_id, 'active') RETURNING *"""),
+        text(
+            """INSERT INTO forge.installations (tenant_id, app_id, store_id, status)
+                VALUES (:tid, :app_id, :store_id, 'active') RETURNING *"""
+        ),
         {"tid": x_tenant_id, "app_id": body["app_id"], "store_id": body.get("store_id")},
     )
     await db.commit()

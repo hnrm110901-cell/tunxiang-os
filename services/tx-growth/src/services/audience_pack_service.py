@@ -131,7 +131,8 @@ class AudiencePackService:
         """创建人群包"""
         pack_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO audience_packs (
                     id, tenant_id, pack_name, description, pack_type,
                     rules, refresh_interval_hours, store_id, created_by
@@ -139,7 +140,8 @@ class AudiencePackService:
                     :id, :tenant_id, :pack_name, :description, :pack_type,
                     :rules::jsonb, :refresh_interval_hours, :store_id, :created_by
                 )
-            """),
+            """
+            ),
             {
                 "id": str(pack_id),
                 "tenant_id": str(tenant_id),
@@ -163,10 +165,12 @@ class AudiencePackService:
     ) -> dict:
         """获取人群包详情"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM audience_packs
                 WHERE tenant_id = :tenant_id AND id = :pack_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "pack_id": str(pack_id)},
         )
         row = result.mappings().first()
@@ -266,10 +270,12 @@ class AudiencePackService:
     ) -> dict:
         """软删除人群包"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE audience_packs SET is_deleted = TRUE, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :pack_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "pack_id": str(pack_id)},
         )
         if result.rowcount == 0:
@@ -284,11 +290,13 @@ class AudiencePackService:
     ) -> dict:
         """归档人群包"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE audience_packs SET status = 'archived', updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :pack_id
                   AND is_deleted = FALSE AND status = 'active'
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "pack_id": str(pack_id)},
         )
         if result.rowcount == 0:
@@ -320,7 +328,8 @@ class AudiencePackService:
                 params["r_gender"] = value
 
             elif key == "birthday_within_days":
-                conditions.append("""
+                conditions.append(
+                    """
                     m.birthday IS NOT NULL
                     AND EXISTS (
                         SELECT 1 FROM (VALUES
@@ -338,7 +347,8 @@ class AudiencePackService:
                             END
                         ) - CURRENT_DATE BETWEEN 0 AND :r_bday_days
                     )
-                """)
+                """
+                )
                 params["r_bday_days"] = value
 
             elif key == "member_level":
@@ -357,21 +367,27 @@ class AudiencePackService:
                 needs_order_agg = True
                 if isinstance(value, dict):
                     if "gte" in value:
-                        conditions.append("""
+                        conditions.append(
+                            """
                             (o_agg.last_order_at IS NULL
                              OR o_agg.last_order_at < CURRENT_DATE - :r_last_order_gte * INTERVAL '1 day')
-                        """)
+                        """
+                        )
                         params["r_last_order_gte"] = value["gte"]
                     if "lte" in value:
-                        conditions.append("""
+                        conditions.append(
+                            """
                             o_agg.last_order_at >= CURRENT_DATE - :r_last_order_lte * INTERVAL '1 day'
-                        """)
+                        """
+                        )
                         params["r_last_order_lte"] = value["lte"]
                 else:
-                    conditions.append("""
+                    conditions.append(
+                        """
                         (o_agg.last_order_at IS NULL
                          OR o_agg.last_order_at < CURRENT_DATE - :r_last_order_days * INTERVAL '1 day')
-                    """)
+                    """
+                    )
                     params["r_last_order_days"] = value
 
             elif key == "order_count":
@@ -398,11 +414,13 @@ class AudiencePackService:
                 needs_order_agg = True
                 if isinstance(value, dict):
                     if "gte" in value:
-                        conditions.append("""
+                        conditions.append(
+                            """
                             CASE WHEN COALESCE(o_agg.order_count, 0) > 0
                             THEN o_agg.total_spend_fen / o_agg.order_count
                             ELSE 0 END >= :r_avg_spend_gte
-                        """)
+                        """
+                        )
                         params["r_avg_spend_gte"] = value["gte"]
 
             elif key == "stored_value_fen":
@@ -432,7 +450,8 @@ class AudiencePackService:
 
         # 构建JOIN
         if needs_order_agg:
-            joins.append("""
+            joins.append(
+                """
                 LEFT JOIN (
                     SELECT customer_id,
                         COUNT(*) AS order_count,
@@ -442,15 +461,18 @@ class AudiencePackService:
                     WHERE is_deleted = FALSE AND tenant_id = :tenant_id
                     GROUP BY customer_id
                 ) o_agg ON o_agg.customer_id = m.id
-            """)
+            """
+            )
 
         if needs_sv:
-            joins.append("""
+            joins.append(
+                """
                 LEFT JOIN stored_value_accounts sv
                     ON sv.customer_id = m.id
                     AND sv.tenant_id = :tenant_id
                     AND sv.is_deleted = FALSE
-            """)
+            """
+            )
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
         join_clause = " ".join(joins)
@@ -543,11 +565,13 @@ class AudiencePackService:
 
         # 标记所有现有成员为不活跃
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE audience_pack_members
                 SET is_active = FALSE, removed_at = now(), updated_at = now()
                 WHERE tenant_id = :tenant_id AND pack_id = :pack_id AND is_active = TRUE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "pack_id": str(pack_id)},
         )
 
@@ -555,7 +579,8 @@ class AudiencePackService:
         new_count = 0
         for m in matched:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO audience_pack_members (
                         tenant_id, pack_id, customer_id, store_id, is_active, added_at
                     ) VALUES (
@@ -566,7 +591,8 @@ class AudiencePackService:
                         removed_at = NULL,
                         store_id = EXCLUDED.store_id,
                         updated_at = now()
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "pack_id": str(pack_id),
@@ -578,13 +604,15 @@ class AudiencePackService:
 
         # 更新人群包计数
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE audience_packs
                 SET member_count = :count,
                     last_refreshed_at = now(),
                     updated_at = now()
                 WHERE id = :pack_id
-            """),
+            """
+            ),
             {"pack_id": str(pack_id), "count": new_count},
         )
 
@@ -598,7 +626,8 @@ class AudiencePackService:
     ) -> dict:
         """批量刷新所有到期的动态人群包"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM audience_packs
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = FALSE
@@ -608,7 +637,8 @@ class AudiencePackService:
                     last_refreshed_at IS NULL
                     OR last_refreshed_at < now() - (refresh_interval_hours || ' hours')::interval
                   )
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id)},
         )
         pack_ids = [str(r[0]) for r in result.fetchall()]
@@ -644,7 +674,8 @@ class AudiencePackService:
         count = 0
         for preset in SYSTEM_PRESETS:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO audience_pack_presets (
                         tenant_id, preset_name, description, category,
                         rules, icon, sort_order, is_system
@@ -653,7 +684,8 @@ class AudiencePackService:
                         :rules::jsonb, :icon, :sort_order, TRUE
                     )
                     ON CONFLICT DO NOTHING
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "preset_name": preset["preset_name"],
@@ -700,10 +732,12 @@ class AudiencePackService:
     ) -> dict:
         """从预设创建人群包"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM audience_pack_presets
                 WHERE tenant_id = :tenant_id AND id = :preset_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "preset_id": str(preset_id)},
         )
         preset = result.mappings().first()
@@ -774,7 +808,8 @@ class AudiencePackService:
     ) -> list[dict]:
         """导出人群包全部活跃成员"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT apm.customer_id, apm.store_id, apm.added_at, apm.snapshot_data
                 FROM audience_pack_members apm
                 WHERE apm.tenant_id = :tenant_id
@@ -782,7 +817,8 @@ class AudiencePackService:
                   AND apm.is_active = TRUE
                   AND apm.is_deleted = FALSE
                 ORDER BY apm.added_at DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "pack_id": str(pack_id)},
         )
         return [dict(r) for r in result.mappings().all()]
@@ -797,7 +833,8 @@ class AudiencePackService:
     ) -> list[dict]:
         """获取人群包成员趋势（按日统计）"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     added_at::date AS trend_date,
                     COUNT(*) FILTER (WHERE is_active = TRUE) AS active_count,
@@ -809,7 +846,8 @@ class AudiencePackService:
                   AND added_at >= CURRENT_DATE - :days * INTERVAL '1 day'
                 GROUP BY added_at::date
                 ORDER BY trend_date DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "pack_id": str(pack_id),

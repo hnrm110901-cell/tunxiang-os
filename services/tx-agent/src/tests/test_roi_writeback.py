@@ -41,9 +41,7 @@ from src.services.decision_log_service import DecisionLogService  # noqa: E402
 def _load_v264():
     """从 shared/db-migrations/versions/ 动态 import v264_agent_roi_fields。"""
     here = os.path.dirname(__file__)
-    versions_dir = os.path.normpath(
-        os.path.join(here, "..", "..", "..", "..", "shared", "db-migrations", "versions")
-    )
+    versions_dir = os.path.normpath(os.path.join(here, "..", "..", "..", "..", "shared", "db-migrations", "versions"))
     target = None
     for fname in os.listdir(versions_dir):
         if fname.startswith("v264_") and fname.endswith(".py"):
@@ -110,9 +108,7 @@ class TestV264MigrationStructure:
             # 找到列定义那一行，确认没有 NOT NULL
             for line in src.splitlines():
                 if f"ADD COLUMN IF NOT EXISTS {col}" in line:
-                    assert "NOT NULL" not in line, (
-                        f"列 {col} 不应为 NOT NULL（违反向前兼容）"
-                    )
+                    assert "NOT NULL" not in line, f"列 {col} 不应为 NOT NULL（违反向前兼容）"
 
     def test_prevented_loss_uses_fen_bigint(self):
         """金额字段使用 BIGINT + 单位为分（CLAUDE.md §15 要求）。"""
@@ -280,10 +276,10 @@ class TestApplyRoiFields:
 
         record = _make_record()
         roi = {
-            "saved_labor_hours": "not-a-number",   # 无效
-            "prevented_loss_fen": 10000,           # 有效
-            "improved_kpi": "not-a-dict",          # 无效
-            "roi_evidence": {"ok": True},          # 有效
+            "saved_labor_hours": "not-a-number",  # 无效
+            "prevented_loss_fen": 10000,  # 有效
+            "improved_kpi": "not-a-dict",  # 无效
+            "roi_evidence": {"ok": True},  # 有效
         }
         with patch.object(decision_log_service, "_roi_writeback_enabled", return_value=True):
             decision_log_service._apply_roi_fields(record, roi)
@@ -301,6 +297,7 @@ class TestApplyRoiFields:
 
 class _FakeResult:
     """模拟 AgentResult，最小字段集合。"""
+
     def __init__(self, data=None, success=True):
         self.data = data or {}
         self.success = success
@@ -322,14 +319,16 @@ class TestLogSkillResultFlagGuard:
         mock_db.flush = AsyncMock()
 
         with patch.object(decision_log_service, "_roi_writeback_enabled", return_value=False):
-            asyncio.run(DecisionLogService.log_skill_result(
-                db=mock_db,
-                tenant_id=tenant,
-                agent_id="discount_guard",
-                action="detect_anomaly",
-                input_context={"foo": 1},
-                result=result,
-            ))
+            asyncio.run(
+                DecisionLogService.log_skill_result(
+                    db=mock_db,
+                    tenant_id=tenant,
+                    agent_id="discount_guard",
+                    action="detect_anomaly",
+                    input_context={"foo": 1},
+                    result=result,
+                )
+            )
 
         assert len(captured) == 1
         rec = captured[0]
@@ -347,14 +346,16 @@ class TestLogSkillResultFlagGuard:
         import uuid
 
         tenant = str(uuid.uuid4())
-        result = _FakeResult(data={
-            "roi": {
-                "saved_labor_hours": 2.0,
-                "prevented_loss_fen": 8800,
-                "improved_kpi": {"metric": "waste_rate", "delta_pct": -1.2},
-                "roi_evidence": {"algo": "v1", "upstream_event": "discount.alerted"},
-            },
-        })
+        result = _FakeResult(
+            data={
+                "roi": {
+                    "saved_labor_hours": 2.0,
+                    "prevented_loss_fen": 8800,
+                    "improved_kpi": {"metric": "waste_rate", "delta_pct": -1.2},
+                    "roi_evidence": {"algo": "v1", "upstream_event": "discount.alerted"},
+                },
+            }
+        )
         captured: list = []
 
         mock_db = AsyncMock()
@@ -362,14 +363,16 @@ class TestLogSkillResultFlagGuard:
         mock_db.flush = AsyncMock()
 
         with patch.object(decision_log_service, "_roi_writeback_enabled", return_value=True):
-            asyncio.run(DecisionLogService.log_skill_result(
-                db=mock_db,
-                tenant_id=tenant,
-                agent_id="discount_guard",
-                action="detect_anomaly",
-                input_context={},
-                result=result,
-            ))
+            asyncio.run(
+                DecisionLogService.log_skill_result(
+                    db=mock_db,
+                    tenant_id=tenant,
+                    agent_id="discount_guard",
+                    action="detect_anomaly",
+                    input_context={},
+                    result=result,
+                )
+            )
 
         assert len(captured) == 1
         rec = captured[0]
@@ -392,15 +395,17 @@ class TestLogSkillResultFlagGuard:
         mock_db.flush = AsyncMock()
 
         with patch.object(decision_log_service, "_roi_writeback_enabled", return_value=True):
-            asyncio.run(DecisionLogService.log_skill_result(
-                db=mock_db,
-                tenant_id=tenant,
-                agent_id="discount_guard",
-                action="act",
-                input_context={},
-                result=result,
-                roi={"prevented_loss_fen": 999},
-            ))
+            asyncio.run(
+                DecisionLogService.log_skill_result(
+                    db=mock_db,
+                    tenant_id=tenant,
+                    agent_id="discount_guard",
+                    action="act",
+                    input_context={},
+                    result=result,
+                    roi={"prevented_loss_fen": 999},
+                )
+            )
 
         assert len(captured) == 1
         assert captured[0].prevented_loss_fen == 999
@@ -417,28 +422,26 @@ class TestRoiFlagRegistration:
     def test_flag_name_constant_declared(self):
         """AgentFlags.ROI_WRITEBACK 常量存在。"""
         from shared.feature_flags.flag_names import AgentFlags
+
         assert hasattr(AgentFlags, "ROI_WRITEBACK")
         assert AgentFlags.ROI_WRITEBACK == "agent.roi.writeback"
 
     def test_flag_default_off_in_all_envs(self):
         """YAML 中本 flag 在所有环境均默认 false（避免意外开启）。"""
         import yaml
+
         here = os.path.dirname(__file__)
-        yaml_path = os.path.normpath(os.path.join(
-            here, "..", "..", "..", "..", "flags", "agents", "agent_flags.yaml"
-        ))
+        yaml_path = os.path.normpath(os.path.join(here, "..", "..", "..", "..", "flags", "agents", "agent_flags.yaml"))
         with open(yaml_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        roi_flag = next(
-            (f for f in data["flags"] if f["name"] == "agent.roi.writeback"), None
-        )
+        roi_flag = next((f for f in data["flags"] if f["name"] == "agent.roi.writeback"), None)
         assert roi_flag is not None, "agent.roi.writeback 未在 agent_flags.yaml 注册"
         assert roi_flag["defaultValue"] is False
         for env in ("dev", "test", "uat", "pilot", "prod"):
-            assert roi_flag["environments"].get(env) is False, (
-                f"{env} 环境不得默认开启 agent.roi.writeback（需创始人签字后手动开）"
-            )
+            assert (
+                roi_flag["environments"].get(env) is False
+            ), f"{env} 环境不得默认开启 agent.roi.writeback（需创始人签字后手动开）"
 
 
 # ─────────────────────────────────────────────────────────────────

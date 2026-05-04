@@ -88,9 +88,7 @@ def captured_events(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
 
 @pytest.mark.asyncio
-async def test_decompose_target_calls_r1_api(
-    agent: SalesCoachAgent, fake_http: _FakeHttp
-) -> None:
+async def test_decompose_target_calls_r1_api(agent: SalesCoachAgent, fake_http: _FakeHttp) -> None:
     target_id = uuid4()
     fake_http.decompose_target.return_value = {
         "ok": True,
@@ -141,19 +139,14 @@ async def test_dispatch_daily_tasks_creates_10_task_types(
     assert result.data["dispatched_count"] == len(DEFAULT_DAILY_TASK_TYPES)
     assert len(result.data["dispatched_count_by_type"]) == 10
     # 10 类 TaskType 全覆盖
-    assert set(result.data["dispatched_count_by_type"].keys()) == {
-        t.value for t in DEFAULT_DAILY_TASK_TYPES
-    }
+    assert set(result.data["dispatched_count_by_type"].keys()) == {t.value for t in DEFAULT_DAILY_TASK_TYPES}
     assert fake_http.dispatch_task.await_count == 10
 
     # 等待事件 task 完成
     import asyncio
 
     await asyncio.sleep(0)
-    assert any(
-        e.get("event_type").value == "sales_coach.daily_tasks_dispatched"
-        for e in captured_events
-    )
+    assert any(e.get("event_type").value == "sales_coach.daily_tasks_dispatched" for e in captured_events)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -191,10 +184,7 @@ async def test_diagnose_gap_emits_alert_when_deviation_over_15pct(
     import asyncio
 
     await asyncio.sleep(0)
-    gap_alerts = [
-        e for e in captured_events
-        if e.get("event_type").value == "sales_coach.gap_alert"
-    ]
+    gap_alerts = [e for e in captured_events if e.get("event_type").value == "sales_coach.gap_alert"]
     assert len(gap_alerts) == 1
 
 
@@ -221,10 +211,7 @@ async def test_diagnose_gap_no_alert_when_on_track(
     import asyncio
 
     await asyncio.sleep(0)
-    gap_alerts = [
-        e for e in captured_events
-        if e.get("event_type").value == "sales_coach.gap_alert"
-    ]
+    gap_alerts = [e for e in captured_events if e.get("event_type").value == "sales_coach.gap_alert"]
     assert gap_alerts == []
 
 
@@ -239,9 +226,7 @@ async def test_coach_action_emits_advice_event(
     captured_events: list[dict],
 ) -> None:
     employee_id = uuid4()
-    result = await agent.run(
-        "coach_action", {"employee_id": str(employee_id), "focus": "dormant"}
-    )
+    result = await agent.run("coach_action", {"employee_id": str(employee_id), "focus": "dormant"})
 
     assert result.success is True
     assert result.data["focus"] == "dormant"
@@ -250,10 +235,7 @@ async def test_coach_action_emits_advice_event(
     import asyncio
 
     await asyncio.sleep(0)
-    advice_events = [
-        e for e in captured_events
-        if e.get("event_type").value == "sales_coach.coaching_advice"
-    ]
+    advice_events = [e for e in captured_events if e.get("event_type").value == "sales_coach.coaching_advice"]
     assert len(advice_events) == 1
     assert advice_events[0]["payload"]["focus"] == "dormant"
 
@@ -452,14 +434,10 @@ async def test_run_waived_scope_passes_constraints(
         "data": {"children": [], "total": 0},
         "error": None,
     }
-    result = await agent.run(
-        "decompose_target", {"year_target_id": str(uuid4())}
-    )
+    result = await agent.run("decompose_target", {"year_target_id": str(uuid4())})
     assert result.constraints_passed is True
     assert result.constraints_detail["scope"] == "waived"
-    assert result.constraints_detail["waived_reason"] == (
-        SalesCoachAgent.constraint_waived_reason
-    )
+    assert result.constraints_detail["waived_reason"] == (SalesCoachAgent.constraint_waived_reason)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -475,10 +453,14 @@ async def test_decision_log_written_for_every_action(
 ) -> None:
     """SkillAgent.run() 基类负责写决策留痕：验证 reasoning/confidence 齐备。"""
     fake_http.decompose_target.return_value = {
-        "ok": True, "data": {"children": [], "total": 0}, "error": None,
+        "ok": True,
+        "data": {"children": [], "total": 0},
+        "error": None,
     }
     fake_http.dispatch_task.return_value = {
-        "ok": True, "data": {"task_id": str(uuid4())}, "error": None,
+        "ok": True,
+        "data": {"task_id": str(uuid4())},
+        "error": None,
     }
     fake_http.get_achievement.return_value = {
         "ok": True,

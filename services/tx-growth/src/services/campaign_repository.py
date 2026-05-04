@@ -59,7 +59,8 @@ class CampaignRepository:
         now = datetime.now(timezone.utc)
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaigns
                     (id, tenant_id, campaign_type, name, description, status,
                      config, start_time, end_time, target_stores, target_segments,
@@ -69,7 +70,8 @@ class CampaignRepository:
                      :config::jsonb, :start_time, :end_time,
                      :stores::jsonb, :segments::jsonb,
                      :budget, :ab_test_id, :variants::jsonb, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": campaign_id,
                 "tid": self._tid,
@@ -98,7 +100,8 @@ class CampaignRepository:
         """查询活动详情"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, campaign_type, name, description, status, config,
                        start_time, end_time, target_stores, target_segments,
                        budget_fen, spent_fen, ab_test_id, variants,
@@ -106,7 +109,8 @@ class CampaignRepository:
                        created_at, updated_at
                 FROM campaigns
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": uuid.UUID(campaign_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -139,7 +143,8 @@ class CampaignRepository:
         """查询指定类型的活跃活动（供 TriggerEngine 使用）"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, campaign_type, name, status, config,
                        target_segments, budget_fen, spent_fen,
                        participant_count, ab_test_id, variants,
@@ -148,7 +153,8 @@ class CampaignRepository:
                 WHERE tenant_id = :tid AND status = 'active'
                   AND campaign_type = ANY(:types)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": self._tid, "types": list(campaign_types)},
         )
         return [self._row_to_dict(r) for r in result.fetchall()]
@@ -169,11 +175,13 @@ class CampaignRepository:
             raise ValueError(f"活动状态 {current} 不允许转换为 {new_status}")
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaigns
                 SET status = :status, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"status": new_status, "id": uuid.UUID(campaign_id), "tid": self._tid},
         )
         await self.db.flush()
@@ -187,10 +195,12 @@ class CampaignRepository:
         """统计某客户在某活动的参与次数"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM campaign_participants
                 WHERE tenant_id = :tid AND campaign_id = :cid AND customer_id = :uid
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "cid": uuid.UUID(campaign_id),
@@ -219,14 +229,16 @@ class CampaignRepository:
 
         # 参与记录
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaign_participants
                     (id, tenant_id, campaign_id, customer_id,
                      trigger_event, reward, ab_variant, participated_at)
                 VALUES
                     (:id, :tid, :cid, :uid,
                      :event::jsonb, :reward::jsonb, :variant, NOW())
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -241,14 +253,16 @@ class CampaignRepository:
         # 奖励记录
         reward_type = reward.get("reward_type", "coupon")
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaign_rewards
                     (id, tenant_id, campaign_id, customer_id,
                      reward_type, reward_data, cost_fen, status, granted_at)
                 VALUES
                     (:id, :tid, :cid, :uid,
                      :rtype, :rdata::jsonb, :cost, 'granted', NOW())
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -262,7 +276,8 @@ class CampaignRepository:
 
         # 原子更新统计
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaigns
                 SET participant_count = participant_count + 1,
                     reward_count      = reward_count + 1,
@@ -270,7 +285,8 @@ class CampaignRepository:
                     spent_fen         = spent_fen + :cost,
                     updated_at        = NOW()
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cost": reward_cost_fen, "cid": cid, "tid": self._tid},
         )
         await self.db.flush()
@@ -288,12 +304,14 @@ class CampaignRepository:
 
         # 奖励类型分组统计
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT reward_type, COUNT(*) AS cnt
                 FROM campaign_rewards
                 WHERE tenant_id = :tid AND campaign_id = :cid
                 GROUP BY reward_type
-            """),
+            """
+            ),
             {"tid": self._tid, "cid": uuid.UUID(campaign_id)},
         )
         reward_breakdown = {r.reward_type: r.cnt for r in result.fetchall()}

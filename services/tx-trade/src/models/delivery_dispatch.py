@@ -144,7 +144,9 @@ class DeliveryProviderConfig(TenantBase):
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     priority: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=99,
+        Integer,
+        nullable=False,
+        default=99,
         comment="优先级 0=最高，99=最低",
     )
 
@@ -158,12 +160,17 @@ class DeliveryProviderConfig(TenantBase):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "store_id", "provider",
+            "tenant_id",
+            "store_id",
+            "provider",
             name="uniq_delivery_provider_per_store",
         ),
         Index(
             "idx_delivery_provider_configs_lookup",
-            "tenant_id", "store_id", "enabled", "priority",
+            "tenant_id",
+            "store_id",
+            "enabled",
+            "priority",
         ),
         {"comment": "门店级配送商配置（达达/顺丰/自有骑手）"},
     )

@@ -38,10 +38,7 @@ def get_adapter(
     """
     cls = PROVIDER_ADAPTER_MAP.get(provider)
     if cls is None:
-        raise ValueError(
-            f"unknown delivery provider: {provider!r}, "
-            f"valid: {list(PROVIDER_ADAPTER_MAP)}"
-        )
+        raise ValueError(f"unknown delivery provider: {provider!r}, " f"valid: {list(PROVIDER_ADAPTER_MAP)}")
     return cls(store_config)
 
 

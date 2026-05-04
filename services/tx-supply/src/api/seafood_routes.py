@@ -10,10 +10,10 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from services.tx_supply.src.services import live_seafood_v2
-from services.tx_supply.src.services import seafood_management_service as svc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_supply.src.services import live_seafood_v2
+from services.tx_supply.src.services import seafood_management_service as svc
 from shared.ontology.src.database import get_db as _get_db
 
 log = structlog.get_logger(__name__)

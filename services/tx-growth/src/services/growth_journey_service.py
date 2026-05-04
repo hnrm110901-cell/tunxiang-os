@@ -75,7 +75,8 @@ class GrowthJourneyService:
             raise ValueError(f"Invalid journey_type: {journey_type}")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_journey_templates
                     (id, tenant_id, name, journey_type, description,
                      trigger_rule_json, total_steps, is_active)
@@ -85,7 +86,8 @@ class GrowthJourneyService:
                 RETURNING id, tenant_id, name, journey_type, description,
                           trigger_rule_json, total_steps, is_active,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": tenant_id,
@@ -105,7 +107,8 @@ class GrowthJourneyService:
                 raise ValueError(f"Invalid step_type at step {idx}: {step_type}")
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO growth_journey_template_steps
                         (tenant_id, template_id, step_no, step_type,
                          touch_template_code, wait_minutes, decision_rule_json,
@@ -116,7 +119,8 @@ class GrowthJourneyService:
                          :touch_template_code, :wait_minutes, :decision_rule_json::jsonb,
                          :observe_window_hours, :offer_type,
                          :on_success_goto, :on_fail_goto, :on_skip_goto)
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "template_id": template_id,
@@ -175,13 +179,15 @@ class GrowthJourneyService:
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, name, journey_type, description,
                        total_steps, is_active, created_at, updated_at
                 FROM growth_journey_templates
                 WHERE {where_sql}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows_result.fetchall()]
@@ -192,13 +198,15 @@ class GrowthJourneyService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, name, journey_type, description,
                        trigger_rule_json, total_steps, is_active,
                        created_at, updated_at
                 FROM growth_journey_templates
                 WHERE tenant_id = :tid AND id = :tmpl_id AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id)},
         )
         row = result.fetchone()
@@ -208,7 +216,8 @@ class GrowthJourneyService:
         template = dict(row._mapping)
 
         steps_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT step_no, step_type, touch_template_code,
                        wait_minutes, decision_rule_json,
                        observe_window_hours, offer_type,
@@ -216,7 +225,8 @@ class GrowthJourneyService:
                 FROM growth_journey_template_steps
                 WHERE tenant_id = :tid AND template_id = :tmpl_id AND is_deleted = false
                 ORDER BY step_no ASC
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id)},
         )
         template["steps"] = [dict(s._mapping) for s in steps_result.fetchall()]
@@ -256,14 +266,16 @@ class GrowthJourneyService:
 
         set_sql = ", ".join(set_parts)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE growth_journey_templates
                 SET {set_sql}
                 WHERE tenant_id = :tid AND id = :tmpl_id AND is_deleted = false
                 RETURNING id, tenant_id, name, journey_type, description,
                           trigger_rule_json, total_steps, is_active,
                           created_at, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.fetchone()
@@ -274,11 +286,13 @@ class GrowthJourneyService:
         # 重建steps
         if steps is not None:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE growth_journey_template_steps
                     SET is_deleted = true, updated_at = NOW()
                     WHERE tenant_id = :tid AND template_id = :tmpl_id
-                """),
+                """
+                ),
                 {"tid": tenant_id, "tmpl_id": str(template_id)},
             )
             for idx, step in enumerate(steps, start=1):
@@ -286,7 +300,8 @@ class GrowthJourneyService:
                 if step_type not in self.VALID_STEP_TYPES:
                     raise ValueError(f"Invalid step_type at step {idx}: {step_type}")
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO growth_journey_template_steps
                             (tenant_id, template_id, step_no, step_type,
                              touch_template_code, wait_minutes, decision_rule_json,
@@ -297,7 +312,8 @@ class GrowthJourneyService:
                              :touch_template_code, :wait_minutes, :decision_rule_json::jsonb,
                              :observe_window_hours, :offer_type,
                              :on_success_goto, :on_fail_goto, :on_skip_goto)
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "template_id": str(template_id),
@@ -322,12 +338,14 @@ class GrowthJourneyService:
         """UPDATE is_active=true"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_journey_templates
                 SET is_active = true, updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :tmpl_id AND is_deleted = false
                 RETURNING id, name, is_active, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id)},
         )
         row = result.fetchone()
@@ -340,12 +358,14 @@ class GrowthJourneyService:
         """UPDATE is_active=false"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_journey_templates
                 SET is_active = false, updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :tmpl_id AND is_deleted = false
                 RETURNING id, name, is_active, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id)},
         )
         row = result.fetchone()
@@ -392,7 +412,8 @@ class GrowthJourneyService:
         params["lim"] = size
         params["off"] = offset
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT e.id, e.tenant_id, e.customer_id, e.journey_template_id AS template_id,
                        e.journey_state, e.current_step_no, e.enrollment_source,
                        e.source_event_type, e.source_event_id,
@@ -407,7 +428,8 @@ class GrowthJourneyService:
                 WHERE {where_sql}
                 ORDER BY e.created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows_result.fetchall()]
@@ -418,7 +440,8 @@ class GrowthJourneyService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT e.id, e.tenant_id, e.customer_id, e.journey_template_id AS template_id,
                        e.journey_state, e.current_step_no, e.enrollment_source,
                        e.source_event_type, e.source_event_id,
@@ -431,7 +454,8 @@ class GrowthJourneyService:
                 LEFT JOIN growth_journey_templates t
                   ON t.id = e.journey_template_id AND t.tenant_id = e.tenant_id
                 WHERE e.tenant_id = :tid AND e.id = :eid AND e.is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         row = result.fetchone()
@@ -459,10 +483,12 @@ class GrowthJourneyService:
         # 如果指定了store_id，检查门店是否存在且活跃
         if store_id:
             store_check = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT id, is_active FROM stores
                 WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {"sid": str(store_id), "tid": tenant_id},
             )
             store_row = store_check.fetchone()
@@ -473,11 +499,13 @@ class GrowthJourneyService:
 
         # 如果模板有brand_scope=specific，校验brand_id在allowed_brand_ids中
         template_scope = await db.execute(
-            text("""
+            text(
+                """
             SELECT brand_scope, allowed_brand_ids
             FROM growth_journey_templates
             WHERE id = :tid AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"tid": str(template_id)},
         )
         scope_row = template_scope.fetchone()
@@ -489,7 +517,8 @@ class GrowthJourneyService:
 
         # 去重: 同一template+customer如果已有活跃enrollment，拒绝
         dup = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM growth_journey_enrollments
                 WHERE tenant_id = :tid
                   AND template_id = :tmpl_id
@@ -497,7 +526,8 @@ class GrowthJourneyService:
                   AND journey_state IN ('eligible', 'active', 'paused', 'waiting_observe')
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id), "cid": str(customer_id)},
         )
         if dup.fetchone() is not None:
@@ -508,10 +538,12 @@ class GrowthJourneyService:
         ab_variant = None
 
         template_ab = await db.execute(
-            text("""
+            text(
+                """
             SELECT ab_test_id FROM growth_journey_templates
             WHERE id = :tid AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"tid": str(template_id)},
         )
         ab_row = template_ab.fetchone()
@@ -537,7 +569,8 @@ class GrowthJourneyService:
 
         enrollment_id = str(uuid4())
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_journey_enrollments
                     (id, tenant_id, customer_id, template_id, journey_state,
                      current_step_no, enrollment_source, source_event_type,
@@ -554,7 +587,8 @@ class GrowthJourneyService:
                           ab_test_id, ab_variant,
                           store_id, brand_id,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": enrollment_id,
                 "tenant_id": tenant_id,
@@ -602,12 +636,14 @@ class GrowthJourneyService:
 
         # 读enrollment
         enr_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, template_id, journey_state,
                        current_step_no, next_execute_at
                 FROM growth_journey_enrollments
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         enr_row = enr_result.fetchone()
@@ -625,10 +661,12 @@ class GrowthJourneyService:
 
         # 读模板总步数
         tmpl_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT total_steps FROM growth_journey_templates
                 WHERE tenant_id = :tid AND id = :tmpl_id AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id)},
         )
         tmpl_row = tmpl_result.fetchone()
@@ -638,14 +676,16 @@ class GrowthJourneyService:
 
         # 读当前step
         step_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT step_no, step_type, touch_template_code, wait_minutes,
                        decision_rule_json, observe_window_hours, offer_type,
                        on_success_goto, on_fail_goto, on_skip_goto
                 FROM growth_journey_template_steps
                 WHERE tenant_id = :tid AND template_id = :tmpl_id
                   AND step_no = :step_no AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "tmpl_id": str(template_id), "step_no": current_step_no},
         )
         step_row = step_result.fetchone()
@@ -733,10 +773,12 @@ class GrowthJourneyService:
             elif check_type == "has_active_owned_benefit":
                 # 检查客户是否持有有效权益
                 profile_result = await db.execute(
-                    text("""
+                    text(
+                        """
                     SELECT has_active_owned_benefit FROM customer_growth_profiles
                     WHERE customer_id = :cid AND is_deleted = FALSE
-                """),
+                """
+                    ),
                     {"cid": str(customer_id)},
                 )
                 row = profile_result.fetchone()
@@ -748,11 +790,13 @@ class GrowthJourneyService:
                 touch_step = decision_rule.get("touch_step_no")
                 if touch_step and enrollment_id:
                     touch_result = await db.execute(
-                        text("""
+                        text(
+                            """
                         SELECT execution_state FROM growth_touch_executions
                         WHERE journey_enrollment_id = :eid AND step_no = :sno AND is_deleted = FALSE
                         ORDER BY created_at DESC LIMIT 1
-                    """),
+                    """
+                        ),
                         {"eid": str(enrollment_id), "sno": touch_step},
                     )
                     trow = touch_result.fetchone()
@@ -762,10 +806,12 @@ class GrowthJourneyService:
             elif check_type == "ab_variant":
                 # A/B测试变体分支
                 enr_ab = await db.execute(
-                    text("""
+                    text(
+                        """
                     SELECT ab_variant FROM growth_journey_enrollments
                     WHERE id = :eid AND is_deleted = FALSE
-                """),
+                """
+                    ),
                     {"eid": str(enrollment_id)},
                 )
                 ab_row = enr_ab.fetchone()
@@ -777,19 +823,23 @@ class GrowthJourneyService:
             elif check_type == "has_revisited":
                 # 查客户是否在旅程期间有新订单
                 profile_result = await db.execute(
-                    text("""
+                    text(
+                        """
                     SELECT last_order_at FROM customer_growth_profiles
                     WHERE customer_id = :cid AND is_deleted = FALSE
-                """),
+                """
+                    ),
                     {"cid": str(customer_id)},
                 )
                 row = profile_result.fetchone()
                 # 读enrollment的entered_at作为基准
                 enr_entered = await db.execute(
-                    text("""
+                    text(
+                        """
                     SELECT entered_at FROM growth_journey_enrollments
                     WHERE id = :eid AND is_deleted = FALSE
-                """),
+                """
+                    ),
                     {"eid": str(enrollment_id)},
                 )
                 enr_row = enr_entered.fetchone()
@@ -829,7 +879,8 @@ class GrowthJourneyService:
 
         # 更新enrollment
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_journey_enrollments
                 SET journey_state = :state,
                     current_step_no = :step_no,
@@ -838,7 +889,8 @@ class GrowthJourneyService:
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
                 RETURNING id, customer_id, template_id, journey_state,
                           current_step_no, next_execute_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "eid": str(enrollment_id),
@@ -882,10 +934,12 @@ class GrowthJourneyService:
 
         # 校验当前state
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT journey_state FROM growth_journey_enrollments
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         cur_row = cur.fetchone()
@@ -895,12 +949,14 @@ class GrowthJourneyService:
             raise ValueError(f"Cannot pause enrollment in state '{cur_row._mapping['journey_state']}'")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_journey_enrollments
                 SET journey_state = 'paused', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
                 RETURNING id, customer_id, template_id, journey_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -926,10 +982,12 @@ class GrowthJourneyService:
         await self._set_tenant(db, tenant_id)
 
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT journey_state FROM growth_journey_enrollments
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         cur_row = cur.fetchone()
@@ -941,12 +999,14 @@ class GrowthJourneyService:
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_journey_enrollments
                 SET journey_state = 'active', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
                 RETURNING id, customer_id, template_id, journey_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -968,10 +1028,12 @@ class GrowthJourneyService:
         await self._set_tenant(db, tenant_id)
 
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT journey_state FROM growth_journey_enrollments
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         cur_row = cur.fetchone()
@@ -982,12 +1044,14 @@ class GrowthJourneyService:
             raise ValueError(f"Cannot cancel enrollment in terminal state '{current_state}'")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_journey_enrollments
                 SET journey_state = 'cancelled', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
                 RETURNING id, customer_id, template_id, journey_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(enrollment_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -1019,7 +1083,8 @@ class GrowthJourneyService:
             params["tid"] = tenant_id
 
         pending = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id
                 FROM growth_journey_enrollments
                 WHERE journey_state IN ('active', 'waiting_observe')
@@ -1029,7 +1094,8 @@ class GrowthJourneyService:
                   {where_tenant}
                 ORDER BY next_execute_at ASC
                 LIMIT 500
-            """),
+            """
+            ),
             params,
         )
         rows = pending.fetchall()

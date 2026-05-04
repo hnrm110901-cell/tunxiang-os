@@ -113,9 +113,7 @@ class DynamicPricingAIService:
         cost_fen: int = int(dish_row["cost_fen"]) if dish_row["cost_fen"] else 0
 
         # 2) 查询匹配规则
-        rules = await self._get_active_rules(
-            db, store_uuid, tenant_uuid, dish_uuid, daypart, today
-        )
+        rules = await self._get_active_rules(db, store_uuid, tenant_uuid, dish_uuid, daypart, today)
 
         # 3+4) 评估并叠加调整
         adjustments: list[dict[str, Any]] = []
@@ -124,9 +122,7 @@ class DynamicPricingAIService:
 
         for rule in rules:
             condition = rule["condition"] or {}
-            satisfied = await self.evaluate_condition(
-                db, store_id, tenant_id, condition, ctx
-            )
+            satisfied = await self.evaluate_condition(db, store_id, tenant_id, condition, ctx)
             if not satisfied:
                 continue
 
@@ -242,13 +238,15 @@ class DynamicPricingAIService:
 
         # 获取门店所有在售菜品
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM dishes
                 WHERE tenant_id = :tid
                   AND is_deleted = false
                   AND is_available = true
                 ORDER BY dish_name
-            """),
+            """
+            ),
             {"tid": tenant_uuid},
         )
         dish_ids = [str(row[0]) for row in result.fetchall()]
@@ -263,9 +261,7 @@ class DynamicPricingAIService:
         results: list[dict[str, Any]] = []
         for did in dish_ids:
             try:
-                price_result = await self.calculate_dynamic_price(
-                    db, store_id, tenant_id, did, context=ctx
-                )
+                price_result = await self.calculate_dynamic_price(db, store_id, tenant_id, did, context=ctx)
                 results.append(price_result)
             except (ValueError, SQLAlchemyError) as exc:
                 log.error("batch_price_error", dish_id=did, error=str(exc))
@@ -374,7 +370,8 @@ class DynamicPricingAIService:
         tenant_uuid = uuid.UUID(tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'occupied') AS occupied,
                     COUNT(*) AS total
@@ -382,7 +379,8 @@ class DynamicPricingAIService:
                 WHERE store_id = :sid
                   AND tenant_id = :tid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"sid": store_uuid, "tid": tenant_uuid},
         )
         row = result.mappings().first()
@@ -421,7 +419,8 @@ class DynamicPricingAIService:
                 daypart = rule.get("daypart")
 
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO dynamic_pricing_rules (
                             tenant_id, store_id, dish_id,
                             rule_type, daypart, condition,
@@ -450,7 +449,8 @@ class DynamicPricingAIService:
                             effective_until  = EXCLUDED.effective_until,
                             updated_at       = NOW()
                         RETURNING (xmax = 0) AS is_insert
-                    """),
+                    """
+                    ),
                     {
                         "tid": tenant_uuid,
                         "sid": store_uuid,
@@ -475,9 +475,7 @@ class DynamicPricingAIService:
                     updated += 1
 
             except (ValueError, SQLAlchemyError) as exc:
-                errors.append(
-                    {"dish_id": rule.get("dish_id", "?"), "error": str(exc)}
-                )
+                errors.append({"dish_id": rule.get("dish_id", "?"), "error": str(exc)})
 
         await db.flush()
         log.info(
@@ -503,7 +501,8 @@ class DynamicPricingAIService:
         dish_uuid = uuid.UUID(rule["dish_id"])
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dynamic_pricing_rules (
                     tenant_id, store_id, dish_id,
                     rule_type, daypart, condition,
@@ -525,7 +524,8 @@ class DynamicPricingAIService:
                           priority, is_active,
                           effective_from, effective_until,
                           created_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_uuid,
                 "sid": store_uuid,
@@ -563,9 +563,16 @@ class DynamicPricingAIService:
 
         # 构建动态SET子句
         allowed_fields = {
-            "condition", "adjustment_type", "adjustment_value",
-            "min_price_fen", "max_price_fen", "priority",
-            "is_active", "effective_from", "effective_until", "daypart",
+            "condition",
+            "adjustment_type",
+            "adjustment_value",
+            "min_price_fen",
+            "max_price_fen",
+            "priority",
+            "is_active",
+            "effective_from",
+            "effective_until",
+            "daypart",
         }
         set_parts: list[str] = ["updated_at = NOW()"]
         params: dict[str, Any] = {"tid": tenant_uuid, "rid": rule_uuid}
@@ -592,7 +599,8 @@ class DynamicPricingAIService:
 
         set_clause = ", ".join(set_parts)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE dynamic_pricing_rules
                 SET {set_clause}
                 WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
@@ -601,7 +609,8 @@ class DynamicPricingAIService:
                           min_price_fen, max_price_fen, priority,
                           is_active, effective_from, effective_until,
                           created_at, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()
@@ -624,11 +633,13 @@ class DynamicPricingAIService:
         rule_uuid = uuid.UUID(rule_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dynamic_pricing_rules
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"rid": rule_uuid, "tid": tenant_uuid},
         )
         await db.flush()
@@ -665,7 +676,8 @@ class DynamicPricingAIService:
 
         where_clause = " AND ".join(where_parts)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, dish_id, store_id, rule_type, daypart,
                        condition, adjustment_type, adjustment_value,
                        min_price_fen, max_price_fen, priority,
@@ -674,14 +686,12 @@ class DynamicPricingAIService:
                 FROM dynamic_pricing_rules
                 WHERE {where_clause}
                 ORDER BY priority DESC, rule_type, daypart
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
-        return [
-            _rule_row_to_dict(r, str(r["dish_id"]), str(r["store_id"]))
-            for r in rows
-        ]
+        return [_rule_row_to_dict(r, str(r["dish_id"]), str(r["store_id"])) for r in rows]
 
     # ─── 6. 定价历史查询 ────────────────────────────────────────────
 
@@ -701,7 +711,8 @@ class DynamicPricingAIService:
         since = date.today() - timedelta(days=days)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, pricing_date,
                        original_price_fen, adjusted_price_fen,
                        adjustment_reason, rules_applied, context,
@@ -713,7 +724,8 @@ class DynamicPricingAIService:
                   AND pricing_date >= :since
                   AND is_deleted = false
                 ORDER BY pricing_date DESC, created_at DESC
-            """),
+            """
+            ),
             {"tid": tenant_uuid, "sid": store_uuid, "did": dish_uuid, "since": since},
         )
         rows = result.mappings().all()
@@ -764,9 +776,7 @@ class DynamicPricingAIService:
         base_price_fen = int(dish_row["price_fen"])
         cost_fen = int(dish_row["cost_fen"]) if dish_row["cost_fen"] else 0
 
-        rules = await self._get_active_rules(
-            db, store_uuid, tenant_uuid, dish_uuid, daypart, today
-        )
+        rules = await self._get_active_rules(db, store_uuid, tenant_uuid, dish_uuid, daypart, today)
 
         adjustments: list[dict[str, Any]] = []
         percent_deltas: list[float] = []
@@ -774,9 +784,7 @@ class DynamicPricingAIService:
 
         for rule in rules:
             condition = rule["condition"] or {}
-            satisfied = await self.evaluate_condition(
-                db, store_id, tenant_id, condition, ctx
-            )
+            satisfied = await self.evaluate_condition(db, store_id, tenant_id, condition, ctx)
             if not satisfied:
                 continue
 
@@ -854,7 +862,8 @@ class DynamicPricingAIService:
     ) -> Optional[Any]:
         """查询菜品基础售价和BOM成本"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT d.price_fen,
                        COALESCE(
                            (SELECT SUM(
@@ -880,7 +889,8 @@ class DynamicPricingAIService:
                 WHERE d.id = :did
                   AND d.tenant_id = :tid
                   AND d.is_deleted = false
-            """),
+            """
+            ),
             {"did": dish_uuid, "tid": tenant_uuid},
         )
         return result.mappings().first()
@@ -896,7 +906,8 @@ class DynamicPricingAIService:
     ) -> list[Any]:
         """获取匹配的活跃规则(按priority DESC)"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, rule_type, daypart, condition,
                        adjustment_type, adjustment_value,
                        min_price_fen, max_price_fen, priority
@@ -910,7 +921,8 @@ class DynamicPricingAIService:
                   AND (effective_from IS NULL OR effective_from <= :td)
                   AND (effective_until IS NULL OR effective_until >= :td)
                 ORDER BY priority DESC
-            """),
+            """
+            ),
             {
                 "tid": tenant_uuid,
                 "sid": store_uuid,
@@ -936,7 +948,8 @@ class DynamicPricingAIService:
     ) -> None:
         """写入定价日志"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dynamic_pricing_logs (
                     tenant_id, store_id, dish_id, pricing_date,
                     original_price_fen, adjusted_price_fen,
@@ -946,7 +959,8 @@ class DynamicPricingAIService:
                     :orig, :adj,
                     :reason, :rules::JSONB, :ctx::JSONB
                 )
-            """),
+            """
+            ),
             {
                 "tid": tenant_uuid,
                 "sid": store_uuid,
@@ -973,7 +987,8 @@ class DynamicPricingAIService:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT weather_condition
                     FROM demand_forecast_enhanced
                     WHERE store_id = :sid
@@ -982,7 +997,8 @@ class DynamicPricingAIService:
                       AND is_deleted = false
                     ORDER BY created_at DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"sid": store_uuid, "tid": tenant_uuid, "td": today},
             )
             row = result.scalar_one_or_none()
@@ -1014,9 +1030,7 @@ class DynamicPricingAIService:
         field: str,
     ) -> Optional[int]:
         """从所有规则中提取价格边界(取最严格值)"""
-        values = [
-            int(r[field]) for r in rules if r.get(field) is not None
-        ]
+        values = [int(r[field]) for r in rules if r.get(field) is not None]
         if not values:
             return None
         if field == "min_price_fen":
@@ -1030,6 +1044,7 @@ class DynamicPricingAIService:
 def _json_dumps(obj: Any) -> str:
     """安全JSON序列化"""
     import json
+
     return json.dumps(obj, ensure_ascii=False, default=str)
 
 

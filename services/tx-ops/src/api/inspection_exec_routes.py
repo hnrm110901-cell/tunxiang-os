@@ -173,7 +173,8 @@ async def get_today_inspection(
 
         # 今日巡检记录 + 门店名称
         records_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     pr.id,
                     pr.store_id,
@@ -187,20 +188,23 @@ async def get_today_inspection(
                   AND pr.patrol_date = :today
                   AND pr.is_deleted = FALSE
                 ORDER BY pr.created_at
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "today": str(today)},
         )
         records = records_result.fetchall()
 
         # 今日严重问题数（patrol_issues created today）
         critical_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM patrol_issues
                 WHERE tenant_id = :tid
                   AND DATE(created_at) = :today
                   AND severity = 'critical'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "today": str(today)},
         )
         critical_count = critical_result.scalar() or 0
@@ -464,7 +468,8 @@ async def submit_inspection(
         today = date.today()
         # 找到该门店今日的草稿记录
         record_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM patrol_records
                 WHERE tenant_id = :tid
                   AND store_id = :store_id::uuid
@@ -473,7 +478,8 @@ async def submit_inspection(
                   AND is_deleted = FALSE
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "store_id": body.store_id, "today": str(today)},
         )
         record_row = record_result.fetchone()
@@ -481,14 +487,16 @@ async def submit_inspection(
         if record_row:
             # 更新为 submitted 并写入总分
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE patrol_records
                     SET status = 'submitted',
                         total_score = :score,
                         patroller_id = :patroller_id::uuid,
                         updated_at = NOW()
                     WHERE id = :rid
-                """),
+                """
+                ),
                 {
                     "score": body.overall_score,
                     "patroller_id": body.inspector_id,
@@ -501,12 +509,14 @@ async def submit_inspection(
             # 无草稿则创建一条 submitted 记录
             new_id = str(uuid.uuid4())
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO patrol_records
                         (id, tenant_id, store_id, patrol_date, patroller_id, status, total_score)
                     VALUES
                         (:id, :tid, :store_id::uuid, :today, :patroller_id::uuid, 'submitted', :score)
-                """),
+                """
+                ),
                 {
                     "id": new_id,
                     "tid": x_tenant_id,
@@ -521,10 +531,12 @@ async def submit_inspection(
 
         # 统计因此产生的整改任务数
         tasks_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM patrol_issues
                 WHERE record_id = :rid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"rid": report_id},
         )
         tasks_count = tasks_result.scalar() or 0
@@ -607,12 +619,14 @@ async def get_my_rectification_tasks(
 
         # Aggregate counts across all tasks (regardless of filter)
         all_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT status, COUNT(*) AS cnt
                 FROM patrol_issues
                 WHERE tenant_id = :tid AND is_deleted = FALSE
                 GROUP BY status
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         counts: Dict[str, int] = {"pending": 0, "in_progress": 0, "completed": 0}
@@ -668,14 +682,16 @@ async def submit_rectification_feedback(
         await _set_rls(db, x_tenant_id)
 
         task_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT pi.id, pi.status, pi.resolution_notes, pi.store_id,
                        pi.item_name, pi.severity, pi.due_date, pi.record_id,
                        pi.created_at, s.store_name
                 FROM patrol_issues pi
                 LEFT JOIN stores s ON s.id = pi.store_id AND s.tenant_id = pi.tenant_id
                 WHERE pi.id = :tid AND pi.tenant_id = :tenant AND pi.is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": task_id, "tenant": x_tenant_id},
         )
         task_row = task_result.fetchone()
@@ -714,14 +730,16 @@ async def submit_rectification_feedback(
             new_status = "resolved"
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE patrol_issues
                 SET status           = :status,
                     resolution_notes = :notes,
                     resolved_at      = CASE WHEN :status = 'resolved' THEN NOW() ELSE resolved_at END,
                     updated_at       = NOW()
                 WHERE id = :iid
-            """),
+            """
+            ),
             {
                 "status": new_status,
                 "notes": json.dumps(existing_notes, ensure_ascii=False),

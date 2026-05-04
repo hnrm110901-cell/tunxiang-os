@@ -62,7 +62,8 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 async def _get_group_with_options(db: AsyncSession, group_id: str, tenant_id: str) -> Optional[dict]:
     """按 group_id 查询规格组及其选项"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT g.id, g.dish_id, g.name AS group_name, g.is_required,
                    g.min_select, g.max_select, g.sort_order,
                    g.created_at, g.updated_at
@@ -70,7 +71,8 @@ async def _get_group_with_options(db: AsyncSession, group_id: str, tenant_id: st
             WHERE g.id = :gid::uuid
               AND g.tenant_id = :tid::uuid
               AND g.is_deleted = false
-        """),
+        """
+        ),
         {"gid": group_id, "tid": tenant_id},
     )
     row = result.mappings().one_or_none()
@@ -78,14 +80,16 @@ async def _get_group_with_options(db: AsyncSession, group_id: str, tenant_id: st
         return None
 
     opts_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, price_delta_fen, is_default, sort_order, stock_status
             FROM dish_spec_options
             WHERE group_id = :gid::uuid
               AND tenant_id = :tid::uuid
               AND is_deleted = false
             ORDER BY sort_order, id
-        """),
+        """
+        ),
         {"gid": group_id, "tid": tenant_id},
     )
     opts = [dict(o) for o in opts_result.mappings().all()]
@@ -132,17 +136,20 @@ async def list_specs(
             params["dish_id"] = dish_id
 
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT count(*) FROM dish_spec_groups g
                 WHERE g.tenant_id = :tid::uuid AND g.is_deleted = false
                 {where_extra}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT g.id, g.dish_id, g.name AS group_name, g.is_required,
                        g.min_select, g.max_select, g.sort_order
                 FROM dish_spec_groups g
@@ -150,7 +157,8 @@ async def list_specs(
                 {where_extra}
                 ORDER BY g.sort_order, g.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         groups = result.mappings().all()
@@ -160,12 +168,14 @@ async def list_specs(
         for g in groups:
             gid = str(g["id"])
             opts_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, name, price_delta_fen, is_default, sort_order, stock_status
                     FROM dish_spec_options
                     WHERE group_id = :gid::uuid AND tenant_id = :tid::uuid AND is_deleted = false
                     ORDER BY sort_order
-                """),
+                """
+                ),
                 {"gid": gid, "tid": x_tenant_id},
             )
             opts = opts_result.mappings().all()
@@ -214,13 +224,15 @@ async def create_spec(
         tenant_uuid = x_tenant_id
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_spec_groups
                   (id, tenant_id, dish_id, name, is_required, min_select, max_select, sort_order)
                 VALUES
                   (:id::uuid, :tid::uuid, :dish_id::uuid, :name, :is_required,
                    :min_select, :max_select, :sort_order)
-            """),
+            """
+            ),
             {
                 "id": str(group_id),
                 "tid": tenant_uuid,
@@ -234,12 +246,14 @@ async def create_spec(
         )
         for opt in body.options:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dish_spec_options
                       (id, tenant_id, group_id, name, price_delta_fen, is_default, sort_order)
                     VALUES
                       (gen_random_uuid(), :tid::uuid, :gid::uuid, :name, :delta, :is_default, :sort)
-                """),
+                """
+                ),
                 {
                     "tid": tenant_uuid,
                     "gid": str(group_id),
@@ -274,13 +288,15 @@ async def update_spec(
             raise HTTPException(status_code=404, detail=f"规格组不存在: {spec_id}")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_spec_groups
                 SET name = :name, is_required = :is_required,
                     min_select = :min_select, max_select = :max_select,
                     sort_order = :sort_order, updated_at = now()
                 WHERE id = :id::uuid AND tenant_id = :tid::uuid AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "id": spec_id,
                 "tid": x_tenant_id,
@@ -293,21 +309,25 @@ async def update_spec(
         )
         # 软删除旧选项
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_spec_options SET is_deleted = true
                 WHERE group_id = :gid::uuid AND tenant_id = :tid::uuid
-            """),
+            """
+            ),
             {"gid": spec_id, "tid": x_tenant_id},
         )
         # 重建选项
         for opt in body.options:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dish_spec_options
                       (id, tenant_id, group_id, name, price_delta_fen, is_default, sort_order)
                     VALUES
                       (gen_random_uuid(), :tid::uuid, :gid::uuid, :name, :delta, :is_default, :sort)
-                """),
+                """
+                ),
                 {
                     "tid": x_tenant_id,
                     "gid": spec_id,
@@ -338,19 +358,23 @@ async def delete_spec(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_spec_groups SET is_deleted = true, updated_at = now()
                 WHERE id = :id::uuid AND tenant_id = :tid::uuid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": spec_id, "tid": x_tenant_id},
         )
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail=f"规格组不存在: {spec_id}")
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_spec_options SET is_deleted = true
                 WHERE group_id = :gid::uuid AND tenant_id = :tid::uuid
-            """),
+            """
+            ),
             {"gid": spec_id, "tid": x_tenant_id},
         )
         await db.commit()
@@ -409,12 +433,14 @@ async def patch_spec(
             )
             for opt in body.options:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO dish_spec_options
                           (id, tenant_id, group_id, name, price_delta_fen, is_default, sort_order)
                         VALUES
                           (gen_random_uuid(), :tid::uuid, :gid::uuid, :name, :delta, :is_default, :sort)
-                    """),
+                    """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "gid": spec_id,

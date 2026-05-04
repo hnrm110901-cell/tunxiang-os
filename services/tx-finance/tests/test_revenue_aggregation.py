@@ -16,6 +16,7 @@ from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from services.tx_finance.src.services.revenue_aggregation_service import (
     DailyRevenueFast,
     PaymentReconciliationReport,
@@ -43,6 +44,7 @@ def _make_service() -> RevenueAggregationService:
 
 
 # ─── Test 1: 日营收正常计算 ───────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_daily_revenue_fast_normal():
@@ -96,6 +98,7 @@ async def test_daily_revenue_fast_normal():
 
 # ─── Test 2: 空数据返回 0 而非报错 ───────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_daily_revenue_fast_empty_store():
     """空数据场景：无订单时所有金额为 0，不抛异常"""
@@ -103,26 +106,27 @@ async def test_daily_revenue_fast_empty_store():
     db = _make_db()
 
     with (
-        patch.object(service._repo, "fetch_daily_order_summary",
-                     new=AsyncMock(return_value={"gross_revenue_fen": 0, "discount_fen": 0, "order_count": 0})),
-        patch.object(service._repo, "fetch_payment_breakdown",
-                     new=AsyncMock(return_value=[])),
-        patch.object(service._repo, "fetch_daily_refund_from_payments",
-                     new=AsyncMock(return_value=0)),
-        patch.object(service._repo, "fetch_hourly_breakdown",
-                     new=AsyncMock(return_value=[])),
+        patch.object(
+            service._repo,
+            "fetch_daily_order_summary",
+            new=AsyncMock(return_value={"gross_revenue_fen": 0, "discount_fen": 0, "order_count": 0}),
+        ),
+        patch.object(service._repo, "fetch_payment_breakdown", new=AsyncMock(return_value=[])),
+        patch.object(service._repo, "fetch_daily_refund_from_payments", new=AsyncMock(return_value=0)),
+        patch.object(service._repo, "fetch_hourly_breakdown", new=AsyncMock(return_value=[])),
     ):
         result = await service.get_daily_revenue_fast(TENANT_A, STORE_A, BIZ_DATE, db)
 
     assert result.gross_revenue_fen == 0
     assert result.net_revenue_fen == 0
     assert result.order_count == 0
-    assert result.avg_ticket_fen == 0   # 不除以零
+    assert result.avg_ticket_fen == 0  # 不除以零
     assert result.payment_breakdown == []
     assert result.hourly_breakdown == []
 
 
 # ─── Test 3: 多门店 RLS 隔离 ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_tenant_rls_isolation():
@@ -160,6 +164,7 @@ async def test_tenant_rls_isolation():
 
 # ─── Test 4: 退款 fallback 逻辑 ──────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_daily_revenue_fallback_to_return_items():
     """refunds 表查询失败时，fallback 到 order_items.return_flag 计算退款"""
@@ -169,13 +174,14 @@ async def test_daily_revenue_fallback_to_return_items():
     fallback_refund = 1_500
 
     with (
-        patch.object(service._repo, "fetch_daily_order_summary",
-                     new=AsyncMock(return_value={"gross_revenue_fen": 50_000, "discount_fen": 0, "order_count": 5})),
+        patch.object(
+            service._repo,
+            "fetch_daily_order_summary",
+            new=AsyncMock(return_value={"gross_revenue_fen": 50_000, "discount_fen": 0, "order_count": 5}),
+        ),
         patch.object(service._repo, "fetch_payment_breakdown", new=AsyncMock(return_value=[])),
-        patch.object(service._repo, "fetch_daily_refund_from_payments",
-                     side_effect=OSError("DB table not found")),
-        patch.object(service._repo, "fetch_daily_refund_from_items",
-                     new=AsyncMock(return_value=fallback_refund)),
+        patch.object(service._repo, "fetch_daily_refund_from_payments", side_effect=OSError("DB table not found")),
+        patch.object(service._repo, "fetch_daily_refund_from_items", new=AsyncMock(return_value=fallback_refund)),
         patch.object(service._repo, "fetch_hourly_breakdown", new=AsyncMock(return_value=[])),
     ):
         result = await service.get_daily_revenue_fast(TENANT_A, STORE_A, BIZ_DATE, db)
@@ -187,6 +193,7 @@ async def test_daily_revenue_fallback_to_return_items():
 
 # ─── Test 5: 区间报表日期校验 ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_revenue_range_report_invalid_granularity():
     """granularity 参数不合法时抛出 ValueError"""
@@ -194,12 +201,11 @@ async def test_revenue_range_report_invalid_granularity():
     db = _make_db()
 
     with pytest.raises(ValueError, match="day/week/month"):
-        await service.get_revenue_range_report(
-            TENANT_A, STORE_A, START_DATE, END_DATE, "hour", db
-        )
+        await service.get_revenue_range_report(TENANT_A, STORE_A, START_DATE, END_DATE, "hour", db)
 
 
 # ─── Test 6: 区间报表正常聚合 ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_revenue_range_report_normal():
@@ -224,9 +230,7 @@ async def test_revenue_range_report_normal():
         patch.object(service._repo, "fetch_range_refund_from_payments", new=AsyncMock(return_value=range_refund)),
         patch.object(service._repo, "fetch_revenue_by_granularity", new=AsyncMock(return_value=trend_rows)),
     ):
-        result = await service.get_revenue_range_report(
-            TENANT_A, STORE_A, START_DATE, END_DATE, "day", db
-        )
+        result = await service.get_revenue_range_report(TENANT_A, STORE_A, START_DATE, END_DATE, "day", db)
 
     assert isinstance(result, RevenueRangeReport)
     # 净营收 = 600000 - 30000 - 10000 = 560000
@@ -240,6 +244,7 @@ async def test_revenue_range_report_normal():
 
 
 # ─── Test 7: 支付方式对账计算 ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_payment_reconciliation_calculation():
@@ -265,9 +270,7 @@ async def test_payment_reconciliation_calculation():
     ]
 
     with patch.object(service._repo, "fetch_payment_reconciliation", new=AsyncMock(return_value=raw_rows)):
-        result = await service.get_payment_reconciliation(
-            TENANT_A, STORE_A, START_DATE, END_DATE, db
-        )
+        result = await service.get_payment_reconciliation(TENANT_A, STORE_A, START_DATE, END_DATE, db)
 
     assert isinstance(result, PaymentReconciliationReport)
 
@@ -292,6 +295,7 @@ async def test_payment_reconciliation_calculation():
 
 # ─── Test 8: 对账报表空数据 ──────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_payment_reconciliation_empty():
     """无数据时对账报表所有金额为 0，rows 为空列表"""
@@ -299,9 +303,7 @@ async def test_payment_reconciliation_empty():
     db = _make_db()
 
     with patch.object(service._repo, "fetch_payment_reconciliation", new=AsyncMock(return_value=[])):
-        result = await service.get_payment_reconciliation(
-            TENANT_A, STORE_A, START_DATE, END_DATE, db
-        )
+        result = await service.get_payment_reconciliation(TENANT_A, STORE_A, START_DATE, END_DATE, db)
 
     assert result.rows == []
     assert result.total_order_amount_fen == 0
@@ -312,6 +314,7 @@ async def test_payment_reconciliation_empty():
 
 # ─── Test 9: to_dict 序列化完整性 ────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_daily_revenue_fast_to_dict_keys():
     """to_dict() 输出包含所有约定字段，确保 API 响应结构稳定"""
@@ -319,21 +322,37 @@ async def test_daily_revenue_fast_to_dict_keys():
     db = _make_db()
 
     with (
-        patch.object(service._repo, "fetch_daily_order_summary",
-                     new=AsyncMock(return_value={"gross_revenue_fen": 10_000, "discount_fen": 0, "order_count": 1})),
-        patch.object(service._repo, "fetch_payment_breakdown",
-                     new=AsyncMock(return_value=[{"method": "cash", "amount_fen": 10_000, "order_count": 1}])),
+        patch.object(
+            service._repo,
+            "fetch_daily_order_summary",
+            new=AsyncMock(return_value={"gross_revenue_fen": 10_000, "discount_fen": 0, "order_count": 1}),
+        ),
+        patch.object(
+            service._repo,
+            "fetch_payment_breakdown",
+            new=AsyncMock(return_value=[{"method": "cash", "amount_fen": 10_000, "order_count": 1}]),
+        ),
         patch.object(service._repo, "fetch_daily_refund_from_payments", new=AsyncMock(return_value=0)),
-        patch.object(service._repo, "fetch_hourly_breakdown",
-                     new=AsyncMock(return_value=[{"hour": 12, "order_count": 1, "revenue_fen": 10_000}])),
+        patch.object(
+            service._repo,
+            "fetch_hourly_breakdown",
+            new=AsyncMock(return_value=[{"hour": 12, "order_count": 1, "revenue_fen": 10_000}]),
+        ),
     ):
         result = await service.get_daily_revenue_fast(TENANT_A, STORE_A, BIZ_DATE, db)
 
     d = result.to_dict()
     required_keys = {
-        "store_id", "biz_date", "gross_revenue_fen", "discount_fen",
-        "refund_fen", "net_revenue_fen", "order_count", "avg_ticket_fen",
-        "payment_breakdown", "hourly_breakdown",
+        "store_id",
+        "biz_date",
+        "gross_revenue_fen",
+        "discount_fen",
+        "refund_fen",
+        "net_revenue_fen",
+        "order_count",
+        "avg_ticket_fen",
+        "payment_breakdown",
+        "hourly_breakdown",
     }
     assert required_keys.issubset(d.keys()), f"缺少字段: {required_keys - d.keys()}"
 
@@ -345,6 +364,7 @@ async def test_daily_revenue_fast_to_dict_keys():
 
 
 # ─── Test 10: 区间报表退款查询失败时降级为 0 ─────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_revenue_range_report_refund_failure_degrades_gracefully():
@@ -361,13 +381,12 @@ async def test_revenue_range_report_refund_failure_degrades_gracefully():
 
     with (
         patch.object(service._repo, "fetch_range_order_summary", new=AsyncMock(return_value=range_summary)),
-        patch.object(service._repo, "fetch_range_refund_from_payments",
-                     side_effect=OSError("payments table unavailable")),
+        patch.object(
+            service._repo, "fetch_range_refund_from_payments", side_effect=OSError("payments table unavailable")
+        ),
         patch.object(service._repo, "fetch_revenue_by_granularity", new=AsyncMock(return_value=[])),
     ):
-        result = await service.get_revenue_range_report(
-            TENANT_A, STORE_A, START_DATE, END_DATE, "day", db
-        )
+        result = await service.get_revenue_range_report(TENANT_A, STORE_A, START_DATE, END_DATE, "day", db)
 
     # refund 降级为 0
     assert result.refund_fen == 0

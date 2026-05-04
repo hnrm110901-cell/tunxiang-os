@@ -51,7 +51,7 @@ class PDPARequestCreate(BaseModel):
     )
     request_data: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="请求附加数据（correction 需提供 corrections 字典: {\"corrections\": {\"field\": \"value\"}}）",
+        description='请求附加数据（correction 需提供 corrections 字典: {"corrections": {"field": "value"}}）',
     )
     notes: Optional[str] = Field(default=None, max_length=500, description="备注")
 

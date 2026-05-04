@@ -246,7 +246,8 @@ class SmartReplenishmentService:
 
         from sqlalchemy import text
 
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO inventory_thresholds
               (tenant_id, store_id, ingredient_id, safety_stock, target_stock,
                min_order_qty, trigger_rule, updated_at)
@@ -260,7 +261,8 @@ class SmartReplenishmentService:
               trigger_rule  = EXCLUDED.trigger_rule,
               updated_at    = NOW()
             RETURNING id, updated_at
-        """)
+        """
+        )
 
         await db.execute(
             text("SELECT set_config('app.tenant_id', :tid, TRUE)"),
@@ -318,7 +320,8 @@ class SmartReplenishmentService:
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT it.id, it.ingredient_id, it.safety_stock, it.target_stock,
                        it.min_order_qty, it.trigger_rule, it.updated_at,
                        COALESCE(i.ingredient_name, '') AS ingredient_name
@@ -330,7 +333,8 @@ class SmartReplenishmentService:
                 WHERE it.tenant_id = :tenant_id
                   AND it.store_id = :store_id
                 ORDER BY it.updated_at DESC
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         rows = result.fetchall()
@@ -447,7 +451,8 @@ class SmartReplenishmentService:
         from sqlalchemy import text
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text AS ingredient_id,
                        COALESCE(current_quantity, 0) AS current_quantity
                 FROM ingredients
@@ -455,7 +460,8 @@ class SmartReplenishmentService:
                   AND store_id = :store_id
                   AND id = ANY(:ids::uuid[])
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -488,7 +494,8 @@ class SmartReplenishmentService:
 
         # 近7日消耗
         result_recent = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_id::text,
                        COALESCE(SUM(ABS(quantity)) / :window_days, 0) AS daily_consumption
                 FROM ingredient_transactions
@@ -499,7 +506,8 @@ class SmartReplenishmentService:
                   AND created_at >= :cutoff
                   AND is_deleted = FALSE
                 GROUP BY ingredient_id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -514,7 +522,8 @@ class SmartReplenishmentService:
         # 历史平均（取过去30天）
         cutoff_30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         result_avg = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_id::text,
                        COALESCE(SUM(ABS(quantity)) / 30.0, 0) AS daily_consumption
                 FROM ingredient_transactions
@@ -525,7 +534,8 @@ class SmartReplenishmentService:
                   AND created_at >= :cutoff
                   AND is_deleted = FALSE
                 GROUP BY ingredient_id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,

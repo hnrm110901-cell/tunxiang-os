@@ -113,17 +113,11 @@ class TestInvoiceComplianceTier1:
         invalid_tax_no_special = "9143@100MA4L**12"  # 含特殊字符
 
         # 金税四期格式：15-20位字母数字
-        pattern = r'^[A-Z0-9]{15,20}$'
+        pattern = r"^[A-Z0-9]{15,20}$"
 
-        assert re.match(pattern, valid_enterprise_tax_no), (
-            f"有效纳税人识别号 {valid_enterprise_tax_no} 应通过格式验证"
-        )
-        assert not re.match(pattern, invalid_tax_no_short), (
-            f"无效纳税人识别号 {invalid_tax_no_short} 应被拒绝（太短）"
-        )
-        assert not re.match(pattern, invalid_tax_no_special), (
-            "含特殊字符的纳税人识别号应被拒绝"
-        )
+        assert re.match(pattern, valid_enterprise_tax_no), f"有效纳税人识别号 {valid_enterprise_tax_no} 应通过格式验证"
+        assert not re.match(pattern, invalid_tax_no_short), f"无效纳税人识别号 {invalid_tax_no_short} 应被拒绝（太短）"
+        assert not re.match(pattern, invalid_tax_no_special), "含特殊字符的纳税人识别号应被拒绝"
 
     @pytest.mark.asyncio
     async def test_invoice_status_tracking(self):
@@ -154,6 +148,9 @@ class TestInvoiceComplianceTier1:
                 invoice_id=invoice_id,
             )
 
-        assert result["status"] in ["pending", "submitted", "completed", "failed"], (
-            f"发票状态 {result['status']} 不在合法状态列表中"
-        )
+        assert result["status"] in [
+            "pending",
+            "submitted",
+            "completed",
+            "failed",
+        ], f"发票状态 {result['status']} 不在合法状态列表中"

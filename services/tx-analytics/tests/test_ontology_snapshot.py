@@ -35,6 +35,7 @@ SNAPSHOT_DATE = date(2026, 3, 31)
 
 # ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
+
 def _make_row(**kwargs) -> MagicMock:
     """构造模拟 DB 行 mappings().one() 返回值。"""
     m = MagicMock()
@@ -58,6 +59,7 @@ def _make_db_session(row_data: dict | None = None) -> AsyncMock:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. compute_daily_snapshots — 返回6个实体摘要
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestComputeDailySnapshots:
     """compute_daily_snapshots 主流程测试。"""
@@ -163,34 +165,65 @@ class TestComputeDailySnapshots:
 #  2. metrics 结构验证 — 必需字段存在
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestMetricsStructure:
     """各实体 metrics 必需字段存在性验证。"""
 
     REQUIRED_FIELDS = {
         "customer": [
-            "total_count", "active_count", "new_count", "high_value_count",
-            "avg_rfm_score", "churn_risk_count", "avg_lifetime_value_fen",
+            "total_count",
+            "active_count",
+            "new_count",
+            "high_value_count",
+            "avg_rfm_score",
+            "churn_risk_count",
+            "avg_lifetime_value_fen",
         ],
         "dish": [
-            "active_count", "avg_profit_margin", "low_margin_count",
-            "total_revenue_fen", "top_dish_sales", "recommended_count", "avg_rating",
+            "active_count",
+            "avg_profit_margin",
+            "low_margin_count",
+            "total_revenue_fen",
+            "top_dish_sales",
+            "recommended_count",
+            "avg_rating",
         ],
         "order": [
-            "total_count", "total_revenue_fen", "total_discount_fen",
-            "avg_order_value_fen", "abnormal_count", "margin_alert_count",
-            "dine_in_count", "takeaway_count", "delivery_count", "avg_gross_margin",
+            "total_count",
+            "total_revenue_fen",
+            "total_discount_fen",
+            "avg_order_value_fen",
+            "abnormal_count",
+            "margin_alert_count",
+            "dine_in_count",
+            "takeaway_count",
+            "delivery_count",
+            "avg_gross_margin",
         ],
         "ingredient": [
-            "total_sku_count", "low_stock_count", "out_of_stock_count",
-            "total_inventory_value_fen", "normal_count",
+            "total_sku_count",
+            "low_stock_count",
+            "out_of_stock_count",
+            "total_inventory_value_fen",
+            "normal_count",
         ],
         "employee": [
-            "total_count", "active_count", "chef_count", "waiter_count",
-            "manager_count", "cert_expiry_alert_count", "avg_seniority_months",
+            "total_count",
+            "active_count",
+            "chef_count",
+            "waiter_count",
+            "manager_count",
+            "cert_expiry_alert_count",
+            "avg_seniority_months",
         ],
         "store": [
-            "total_store_count", "direct_count", "franchise_count", "active_count",
-            "fine_dining_count", "fast_food_count", "avg_daily_revenue_fen",
+            "total_store_count",
+            "direct_count",
+            "franchise_count",
+            "active_count",
+            "fine_dining_count",
+            "fast_food_count",
+            "avg_daily_revenue_fen",
             "top_store_revenue_fen",
         ],
     }
@@ -267,6 +300,7 @@ class TestMetricsStructure:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  3. get_entity_trend — 日期范围与排序
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestGetEntityTrend:
     """get_entity_trend 查询行为测试。"""
@@ -386,6 +420,7 @@ class TestGetEntityTrend:
 #  4. get_cross_brand_comparison — 排序与结构
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestGetCrossBrandComparison:
     """跨品牌对比测试。"""
 
@@ -424,10 +459,12 @@ class TestGetCrossBrandComparison:
         svc = OntologySnapshotService()
         brand_a = uuid4()
         brand_b = uuid4()
-        db = self._make_comparison_db([
-            {"brand_id": brand_a, "metric_value": 50000},
-            {"brand_id": brand_b, "metric_value": 30000},
-        ])
+        db = self._make_comparison_db(
+            [
+                {"brand_id": brand_a, "metric_value": 50000},
+                {"brand_id": brand_b, "metric_value": 30000},
+            ]
+        )
 
         result = await svc.get_cross_brand_comparison(
             tenant_id=TENANT_A,
@@ -446,9 +483,11 @@ class TestGetCrossBrandComparison:
         """对比结果每项包含 brand_id / metric_value / rank。"""
         svc = OntologySnapshotService()
         brand_a = uuid4()
-        db = self._make_comparison_db([
-            {"brand_id": brand_a, "metric_value": 12200},
-        ])
+        db = self._make_comparison_db(
+            [
+                {"brand_id": brand_a, "metric_value": 12200},
+            ]
+        )
 
         result = await svc.get_cross_brand_comparison(
             tenant_id=TENANT_A,
@@ -482,6 +521,7 @@ class TestGetCrossBrandComparison:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  5. RLS 隔离 — 不同 tenant_id 不可见
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestRLSIsolation:
     """RLS 隔离行为测试（模拟层验证 tenant_id 隔离逻辑）。"""
@@ -531,6 +571,7 @@ class TestRLSIsolation:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  6. ModelRouter 不可用时优雅降级
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestModelRouterDegradation:
     """ModelRouter 不可用时不抛异常，业务流程正常完成。"""
@@ -608,6 +649,7 @@ class TestModelRouterDegradation:
 #  7. get_latest_group_snapshot — 边界情况
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestGetLatestGroupSnapshot:
     """get_latest_group_snapshot 边界情况测试。"""
 
@@ -671,6 +713,7 @@ class TestGetLatestGroupSnapshot:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  8. ENTITY_TYPES / SNAPSHOT_TYPES 常量完整性
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestConstants:
     """模块常量完整性检查。"""

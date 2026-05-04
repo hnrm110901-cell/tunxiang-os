@@ -14,12 +14,16 @@
 
 from __future__ import annotations
 
+import uuid  # noqa: F401 — used in string-forward type annotations
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from ..models.voucher import FinancialVoucher  # noqa: F401 — forward ref
 
 from shared.adapters.erp.src import (
     ERPPushResult,
@@ -82,17 +86,17 @@ ACCOUNT_MAPPING: dict[str, dict[str, dict[str, str]]] = {
     #   借: 1403 原材料       (现在才挂账, 真实库存 2026 已入库)
     #   贷: 6901 以前年度损益  (冲减以前年度利润, 本质是补认历史费用)
     "prior_period_adjustment": {
-        "debit":  {"code": "1403", "name": "原材料"},
+        "debit": {"code": "1403", "name": "原材料"},
         "credit": {"code": "6901", "name": "以前年度损益调整"},
     },
 }
 
 # W1.7 VoucherType (中文 ERP 约定) → financial_vouchers.voucher_type (英文 DB 约定)
 _VOUCHER_TYPE_ERP_TO_DB: dict[str, str] = {
-    "收": "receipt",     # RECEIPT — 收款凭证
-    "付": "payment",     # PAYMENT — 付款凭证
-    "记": "cost",        # MEMO    — 记账凭证 (通常成本结转)
-    "转": "cost",        # TRANSFER — 转账凭证 (归到 cost, 后续 W2 可独立)
+    "收": "receipt",  # RECEIPT — 收款凭证
+    "付": "payment",  # PAYMENT — 付款凭证
+    "记": "cost",  # MEMO    — 记账凭证 (通常成本结转)
+    "转": "cost",  # TRANSFER — 转账凭证 (归到 cost, 后续 W2 可独立)
 }
 
 
@@ -122,14 +126,16 @@ class VoucherGenerator:
         """加载租户科目映射：优先读 tenant_config，缺省用全局默认"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT config_value
                     FROM tenant_config
                     WHERE tenant_id = :tenant_id
                       AND config_key = 'erp_account_mapping'
                       AND is_deleted = FALSE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id},
             )
             row = result.mappings().first()
@@ -187,7 +193,8 @@ class VoucherGenerator:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     po.id,
                     po.store_id,
@@ -201,7 +208,8 @@ class VoucherGenerator:
                   AND po.tenant_id = :tenant_id
                   AND po.is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"order_id": purchase_order_id, "tenant_id": tenant_id},
         )
         row = result.mappings().first()
@@ -274,7 +282,8 @@ class VoucherGenerator:
 
         date_str = business_date.isoformat()
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     p.pay_method,
                     COALESCE(SUM(p.amount_fen), 0) AS amount_fen,
@@ -289,7 +298,8 @@ class VoucherGenerator:
                   AND COALESCE(o.biz_date, DATE(o.created_at)) = :biz_date::DATE
                 GROUP BY p.pay_method
                 ORDER BY amount_fen DESC
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "biz_date": date_str},
         )
         rows = result.mappings().all()
@@ -578,7 +588,8 @@ class VoucherGenerator:
         """异步记录推送结果到 erp_push_log 表（失败不阻断主流程）"""
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO erp_push_log (
                         id, tenant_id, store_id, voucher_id, erp_type,
                         status, erp_voucher_id, error_message,
@@ -598,7 +609,8 @@ class VoucherGenerator:
                         NOW()
                     )
                     ON CONFLICT DO NOTHING
-                """),
+                """
+                ),
                 {
                     "tenant_id": voucher.tenant_id,
                     "store_id": voucher.store_id,

@@ -320,13 +320,15 @@ class DishHealthScoreEngine:
         dish_row = (
             (
                 await db.execute(
-                    text("""
+                    text(
+                        """
                 SELECT price_fen, cost_fen, total_sales
                 FROM dishes
                 WHERE id = :dish_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+                    ),
                     {"dish_id": dish_uuid, "tenant_id": tenant_uuid},
                 )
             )
@@ -345,13 +347,15 @@ class DishHealthScoreEngine:
 
         # 门店所有菜品销量（用于百分位）
         all_sales_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT total_sales
                 FROM dishes
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = false
                   AND is_available = true
-            """),
+            """
+            ),
             {"tenant_id": tenant_uuid},
         )
         all_sales = [int(r[0] or 0) for r in all_sales_result.fetchall()]
@@ -361,7 +365,8 @@ class DishHealthScoreEngine:
         return_row = (
             (
                 await db.execute(
-                    text("""
+                    text(
+                        """
                 SELECT
                     COUNT(*) FILTER (WHERE oi.is_returned = true) AS return_count,
                     COUNT(*) AS total_count
@@ -369,7 +374,8 @@ class DishHealthScoreEngine:
                 WHERE oi.dish_id = :dish_id
                   AND oi.tenant_id = :tenant_id
                   AND oi.created_at >= NOW() - INTERVAL '30 days'
-            """),
+            """
+                    ),
                     {"dish_id": dish_uuid, "tenant_id": tenant_uuid},
                 )
             )
@@ -419,13 +425,15 @@ class DishHealthScoreEngine:
         )
 
         dishes_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id
                 FROM dishes
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = false
                   AND is_available = true
-            """),
+            """
+            ),
             {"tenant_id": tenant_uuid},
         )
         dish_ids = [str(r[0]) for r in dishes_result.fetchall()]

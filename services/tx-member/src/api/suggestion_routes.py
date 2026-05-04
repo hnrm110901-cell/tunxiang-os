@@ -42,13 +42,15 @@ async def create_suggestion(
         store_id: Optional[UUID] = UUID(req.store_id) if req.store_id else None
         customer_id: Optional[UUID] = UUID(req.customer_id) if req.customer_id else None
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_suggestions
                     (tenant_id, store_id, customer_id, category, content, contact_phone)
                 VALUES
                     (:tenant_id, :store_id, :customer_id, :category, :content, :contact_phone)
                 RETURNING id, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": UUID(x_tenant_id),
                 "store_id": store_id,
@@ -84,7 +86,8 @@ async def list_suggestions(
         await _set_tenant(db, x_tenant_id)
         if store_id:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, category, content, contact_phone, store_id,
                            customer_id, status, reply, replied_at, created_at
                     FROM customer_suggestions
@@ -92,19 +95,22 @@ async def list_suggestions(
                       AND store_id = :store_id
                     ORDER BY created_at DESC
                     LIMIT 50
-                """),
+                """
+                ),
                 {"store_id": UUID(store_id)},
             )
         else:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, category, content, contact_phone, store_id,
                            customer_id, status, reply, replied_at, created_at
                     FROM customer_suggestions
                     WHERE is_deleted = FALSE
                     ORDER BY created_at DESC
                     LIMIT 50
-                """),
+                """
+                ),
             )
         rows = result.fetchall()
         items = [

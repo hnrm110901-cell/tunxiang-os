@@ -33,7 +33,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from .cost_snapshot import Base
 
-
 # 状态枚举 (应用层用, DB CHECK 同步)
 STATUS_OPEN = "open"
 STATUS_CLOSED = "closed"
@@ -53,91 +52,60 @@ class AccountingPeriod(Base):
         → voucher 允许写
         否则 ValueError("账期已关, 请红冲").
     """
+
     __tablename__ = "accounting_periods"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True,
-        comment="租户 ID (RLS)."
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户 ID (RLS)."
     )
 
-    period_year: Mapped[int] = mapped_column(
-        Integer, nullable=False,
-        comment="账期年份 (2020-2100)."
-    )
-    period_month: Mapped[int] = mapped_column(
-        Integer, nullable=False,
-        comment="账期月份 (1-12)."
-    )
-    period_start: Mapped[date] = mapped_column(
-        Date, nullable=False,
-        comment="账期首日."
-    )
-    period_end: Mapped[date] = mapped_column(
-        Date, nullable=False,
-        comment="账期末日."
-    )
+    period_year: Mapped[int] = mapped_column(Integer, nullable=False, comment="账期年份 (2020-2100).")
+    period_month: Mapped[int] = mapped_column(Integer, nullable=False, comment="账期月份 (1-12).")
+    period_start: Mapped[date] = mapped_column(Date, nullable=False, comment="账期首日.")
+    period_end: Mapped[date] = mapped_column(Date, nullable=False, comment="账期末日.")
 
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=STATUS_OPEN,
+        String(20),
+        nullable=False,
+        default=STATUS_OPEN,
         server_default=sa.text("'open'"),
-        comment="open / closed / locked."
+        comment="open / closed / locked.",
     )
 
     # closed 审计
     closed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="月结时间. status='closed' 时 CHECK 非空."
+        DateTime(timezone=True), comment="月结时间. status='closed' 时 CHECK 非空."
     )
     closed_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="月结操作员 UUID. status='closed' 时 CHECK 非空."
+        UUID(as_uuid=True), comment="月结操作员 UUID. status='closed' 时 CHECK 非空."
     )
-    closed_reason: Mapped[str | None] = mapped_column(
-        String(200),
-        comment="月结原因/备注."
-    )
+    closed_reason: Mapped[str | None] = mapped_column(String(200), comment="月结原因/备注.")
 
     # reopened 审计 (closed → open)
     reopened_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="重开时间 (仅 closed → open 填)."
+        DateTime(timezone=True), comment="重开时间 (仅 closed → open 填)."
     )
-    reopened_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="重开操作员 UUID."
-    )
-    reopened_reason: Mapped[str | None] = mapped_column(
-        String(200),
-        comment="重开原因 (应用层强制非空)."
-    )
+    reopened_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="重开操作员 UUID.")
+    reopened_reason: Mapped[str | None] = mapped_column(String(200), comment="重开原因 (应用层强制非空).")
 
     # locked 审计 (year close)
     locked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="年结锁定时间. status='locked' 时 CHECK 非空."
+        DateTime(timezone=True), comment="年结锁定时间. status='locked' 时 CHECK 非空."
     )
-    locked_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="年结操作员 UUID."
-    )
-    locked_reason: Mapped[str | None] = mapped_column(
-        String(200),
-        comment="年结原因."
-    )
+    locked_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="年结操作员 UUID.")
+    locked_reason: Mapped[str | None] = mapped_column(String(200), comment="年结原因.")
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "period_year", "period_month",
+            "tenant_id",
+            "period_year",
+            "period_month",
             name="uq_ap_tenant_year_month",
         ),
         CheckConstraint(
@@ -157,22 +125,23 @@ class AccountingPeriod(Base):
             name="chk_ap_date_range",
         ),
         CheckConstraint(
-            "status != 'closed' "
-            "OR (closed_at IS NOT NULL AND closed_by IS NOT NULL)",
+            "status != 'closed' " "OR (closed_at IS NOT NULL AND closed_by IS NOT NULL)",
             name="chk_ap_closed_audit",
         ),
         CheckConstraint(
-            "status != 'locked' "
-            "OR (locked_at IS NOT NULL AND locked_by IS NOT NULL)",
+            "status != 'locked' " "OR (locked_at IS NOT NULL AND locked_by IS NOT NULL)",
             name="chk_ap_locked_audit",
         ),
         Index(
-            "ix_ap_tenant_open", "tenant_id",
+            "ix_ap_tenant_open",
+            "tenant_id",
             postgresql_where=sa.text("status = 'open'"),
         ),
         Index(
             "ix_ap_tenant_date_range",
-            "tenant_id", "period_start", "period_end",
+            "tenant_id",
+            "period_start",
+            "period_end",
         ),
     )
 
@@ -212,8 +181,7 @@ class AccountingPeriod(Base):
         """
         if self.status != STATUS_OPEN:
             raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} "
-                f"不支持月结 (需 open)"
+                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} " f"不支持月结 (需 open)"
             )
         if not reason or not reason.strip():
             raise ValueError("月结原因必填 (审计留痕)")
@@ -235,13 +203,11 @@ class AccountingPeriod(Base):
         """
         if self.status == STATUS_LOCKED:
             raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 已年结锁定, "
-                f"不可重开 (只能追加红冲凭证)"
+                f"账期 {self.period_year}-{self.period_month:02d} 已年结锁定, " f"不可重开 (只能追加红冲凭证)"
             )
         if self.status != STATUS_CLOSED:
             raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} "
-                f"不支持重开 (需 closed)"
+                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} " f"不支持重开 (需 closed)"
             )
         if not reason or not reason.strip():
             raise ValueError("重开原因必填 (审计留痕)")
@@ -303,6 +269,7 @@ class AccountingPeriod(Base):
 
 def _utcnow() -> datetime:
     from datetime import timezone
+
     return datetime.now(timezone.utc)
 
 

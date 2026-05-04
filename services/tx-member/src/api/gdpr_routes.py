@@ -220,12 +220,14 @@ async def get_pending_count(
     from sqlalchemy import text as sa_text
 
     result = await db.execute(
-        sa_text("""
+        sa_text(
+            """
             SELECT status, COUNT(*) AS cnt
             FROM gdpr_requests
             WHERE tenant_id = :tid
             GROUP BY status
-        """),
+        """
+        ),
         {"tid": x_tenant_id},
     )
     counts = {r.status: int(r.cnt) for r in result.fetchall()}
@@ -310,14 +312,16 @@ async def list_retention_policies(
     数据类别：orders / members / logs / payments
     """
     result = await db.execute(
-        _sa_text("""
+        _sa_text(
+            """
             SELECT id, tenant_id, data_category, retention_days,
                    anonymize_after_days, legal_basis, is_active,
                    created_at, updated_at
             FROM data_retention_policies
             WHERE tenant_id = :tid AND is_active = TRUE
             ORDER BY data_category
-        """),
+        """
+        ),
         {"tid": x_tenant_id},
     )
     rows = result.fetchall()
@@ -372,7 +376,8 @@ async def update_retention_policy(
     now = datetime.now(timezone.utc)
     # UPSERT：若存在则更新，否则插入
     await db.execute(
-        _sa_text("""
+        _sa_text(
+            """
             INSERT INTO data_retention_policies
                 (id, tenant_id, data_category, retention_days,
                  anonymize_after_days, legal_basis, is_active,
@@ -388,7 +393,8 @@ async def update_retention_policy(
                 legal_basis           = EXCLUDED.legal_basis,
                 is_active             = EXCLUDED.is_active,
                 updated_at            = EXCLUDED.updated_at
-        """),
+        """
+        ),
         {
             "tid": x_tenant_id,
             "cat": category,

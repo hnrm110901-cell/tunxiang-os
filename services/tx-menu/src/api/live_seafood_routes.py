@@ -127,7 +127,8 @@ async def list_tank_zones(
     tid = _tenant(request)
     await _set_rls(db, tid)
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, zone_code, zone_name, capacity_kg, water_temp_celsius,
                is_active, sort_order, notes
         FROM fish_tank_zones
@@ -135,7 +136,8 @@ async def list_tank_zones(
           AND tenant_id = :tid
           AND is_deleted = false
         ORDER BY sort_order, zone_code
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)},
     )
     rows = result.fetchall()
@@ -169,13 +171,15 @@ async def create_tank_zone(
     await _set_rls(db, tid)
     zone_id = _uuid.uuid4()
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO fish_tank_zones
             (id, tenant_id, store_id, zone_code, zone_name,
              capacity_kg, water_temp_celsius, notes, sort_order)
         VALUES
             (:id, :tid, :sid, :code, :name, :cap, :temp, :notes, :sort)
-    """),
+    """
+        ),
         {
             "id": zone_id,
             "tid": _uuid.UUID(tid),
@@ -222,7 +226,8 @@ async def list_live_seafood(
 
     where_clause = " AND ".join(conditions)
     result = await db.execute(
-        text(f"""  # noqa: S608 — dynamic WHERE built from validated params only
+        text(
+            f"""  # noqa: S608 — dynamic WHERE built from validated params only
         SELECT
             d.id, d.dish_name, d.pricing_method,
             d.weight_unit, d.price_per_unit_fen, d.min_order_qty, d.display_unit,
@@ -234,7 +239,8 @@ async def list_live_seafood(
         LEFT JOIN fish_tank_zones tz ON tz.id = d.tank_zone_id
         WHERE {where_clause}
         ORDER BY d.dish_name
-    """),
+    """
+        ),
         params,
     )
 
@@ -278,7 +284,8 @@ async def update_live_seafood_config(
     tid = _tenant(request)
     await _set_rls(db, tid)
     result = await db.execute(
-        text("""
+        text(
+            """
         UPDATE dishes SET
             pricing_method = :method,
             weight_unit = :wunit,
@@ -290,7 +297,8 @@ async def update_live_seafood_config(
             updated_at = now()
         WHERE id = :did AND tenant_id = :tid AND is_deleted = false
         RETURNING id, dish_name, pricing_method, price_per_unit_fen
-    """),
+    """
+        ),
         {
             "did": _uuid.UUID(dish_id),
             "tid": _uuid.UUID(tid),
@@ -333,11 +341,13 @@ async def update_live_stock(
         params["dw"] = req.delta_weight_g
 
     result = await db.execute(
-        text(f"""  # noqa: S608 — dynamic SET built from validated params only
+        text(
+            f"""  # noqa: S608 — dynamic SET built from validated params only
         UPDATE dishes SET {", ".join(set_clauses)}
         WHERE id = :did AND tenant_id = :tid AND is_deleted = false
         RETURNING id, dish_name, live_stock_count, live_stock_weight_g
-    """),
+    """
+        ),
         params,
     )
     row = result.fetchone()
@@ -458,14 +468,16 @@ async def create_weigh_record(
 
     record_id = _uuid.uuid4()
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO live_seafood_weigh_records
             (id, tenant_id, store_id, dish_id, weighed_qty, weight_unit,
              price_per_unit_fen, amount_fen, tank_zone_id, weighed_by, notes, status)
         VALUES
             (:id, :tid, :sid, :did, :qty, :wunit,
              :price, :amount, :zone, :weighed_by, :notes, 'pending')
-    """),
+    """
+        ),
         {
             "id": record_id,
             "tid": _uuid.UUID(tid),
@@ -486,9 +498,11 @@ async def create_weigh_record(
 
     # 更新 dish_name 快照
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE live_seafood_weigh_records SET dish_name = :name WHERE id = :id
-    """),
+    """
+        ),
         {"name": dish_name, "id": record_id},
     )
 
@@ -536,12 +550,14 @@ async def confirm_weigh_record(
 
     # 查称重记录
     rec_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, dish_id, dish_name, weighed_qty, weight_unit,
                price_per_unit_fen, amount_fen, status
         FROM live_seafood_weigh_records
         WHERE id = :rid AND tenant_id = :tid
-    """),
+    """
+        ),
         {"rid": _uuid.UUID(record_id), "tid": _uuid.UUID(tid)},
     )
     rec = rec_result.fetchone()
@@ -556,7 +572,8 @@ async def confirm_weigh_record(
 
     # 更新称重记录
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE live_seafood_weigh_records SET
             order_id = :oid,
             confirmed_by = :confirmed_by,
@@ -565,7 +582,8 @@ async def confirm_weigh_record(
             amount_fen = :amount,
             status = 'confirmed'
         WHERE id = :rid AND tenant_id = :tid
-    """),
+    """
+        ),
         {
             "oid": _uuid.UUID(req.order_id),
             "rid": _uuid.UUID(record_id),
@@ -579,12 +597,14 @@ async def confirm_weigh_record(
     # 扣减活鲜库存（按克计）
     weight_g = _to_grams(float(final_qty), rec[4])
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE dishes SET
             live_stock_weight_g = GREATEST(0, live_stock_weight_g - :wg),
             updated_at = now()
         WHERE id = :did AND tenant_id = :tid
-    """),
+    """
+        ),
         {"did": rec[1], "tid": _uuid.UUID(tid), "wg": weight_g},
     )
 
@@ -614,7 +634,8 @@ async def list_pending_weigh(
     tid = _tenant(request)
     await _set_rls(db, tid)
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT r.id, r.dish_id, r.dish_name, r.weighed_qty, r.weight_unit,
                r.price_per_unit_fen, r.amount_fen, r.created_at,
                tz.zone_name
@@ -623,7 +644,8 @@ async def list_pending_weigh(
         WHERE r.store_id = :sid AND r.tenant_id = :tid
           AND r.status = 'pending'
         ORDER BY r.created_at DESC
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)},
     )
     rows = result.fetchall()

@@ -490,7 +490,8 @@ class BudgetForecastService:
                 store_clause = "AND b.store_id IS NULL"
 
             result = await db.execute(
-                sql_text(f"""
+                sql_text(
+                    f"""
                     SELECT
                         ba.category_code,
                         ba.allocated_amount AS total_fen,
@@ -507,7 +508,8 @@ class BudgetForecastService:
                       AND b.is_deleted = false
                       {store_clause}
                     ORDER BY rate DESC
-                """),
+                """
+                ),
                 params,
             )
             rows = result.mappings().all()
@@ -545,7 +547,8 @@ class BudgetForecastService:
         # 连续超支检测
         try:
             result2 = await db.execute(
-                sql_text(f"""
+                sql_text(
+                    f"""
                     SELECT
                         b.budget_year, b.budget_month,
                         b.total_amount, b.used_amount,
@@ -559,7 +562,8 @@ class BudgetForecastService:
                       {store_clause}
                     ORDER BY b.budget_year DESC, b.budget_month DESC
                     LIMIT :limit
-                """),
+                """
+                ),
                 {**params, "limit": CONSECUTIVE_OVERSPEND_ESCALATION},
             )
             recent_rows = result2.mappings().all()
@@ -689,7 +693,8 @@ class BudgetForecastService:
         try:
             # 查预算主表 + 科目分配
             result = await db.execute(
-                sql_text(f"""
+                sql_text(
+                    f"""
                     SELECT
                         b.id AS budget_id,
                         b.budget_year,
@@ -707,7 +712,8 @@ class BudgetForecastService:
                       {store_clause}
                     ORDER BY b.budget_year DESC, b.budget_month DESC
                     LIMIT :limit_alloc
-                """),
+                """
+                ),
                 {**params, "limit_alloc": months * 10},  # 每月最多 10 个科目
             )
             rows = result.mappings().all()
@@ -917,7 +923,8 @@ class BudgetForecastService:
 
         try:
             await db.execute(
-                sql_text("""
+                sql_text(
+                    """
                     INSERT INTO agent_decision_logs (
                         id, tenant_id, store_id, agent_id,
                         decision_type, input_context, reasoning,
@@ -936,7 +943,8 @@ class BudgetForecastService:
                         :confidence,
                         :created_at
                     )
-                """),
+                """
+                ),
                 {
                     "id": record_id,
                     "tenant_id": tenant_id,
@@ -1029,7 +1037,8 @@ async def get_latest_forecast(
 
     try:
         result = await db.execute(
-            sql_text(f"""
+            sql_text(
+                f"""
                 SELECT
                     id, input_context, reasoning, output_action,
                     constraints_check, confidence, created_at
@@ -1040,7 +1049,8 @@ async def get_latest_forecast(
                   {store_clause}
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()

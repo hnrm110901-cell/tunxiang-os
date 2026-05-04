@@ -74,7 +74,8 @@ async def list_brands(
     total = count_result.scalar() or 0
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 b.id::text          AS brand_id,
                 b.name,
@@ -98,7 +99,8 @@ async def list_brands(
             WHERE {where}
             ORDER BY b.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
 
@@ -124,7 +126,8 @@ async def get_brand(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 b.id::text          AS brand_id,
                 b.name,
@@ -152,7 +155,8 @@ async def get_brand(
             WHERE b.id = :brand_id
               AND b.tenant_id = :tenant_id
               AND b.is_deleted = FALSE
-        """),
+        """
+        ),
         {"brand_id": brand_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -200,7 +204,8 @@ async def create_brand(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO brands (
                     id, tenant_id, name, brand_code, brand_type,
                     logo_url, primary_color, description, hq_store_id,
@@ -211,7 +216,8 @@ async def create_brand(
                     :strategy_config, 'active', FALSE, :now, :now
                 )
                 RETURNING id::text AS brand_id, name, brand_code
-            """),
+            """
+            ),
             {
                 "id": brand_id,
                 "tenant_id": tenant_id,
@@ -251,10 +257,12 @@ async def update_brand(
     await _set_tenant(db, tenant_id)
 
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM brands
             WHERE id = :brand_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"brand_id": brand_id, "tenant_id": tenant_id},
     )
     if not check.fetchone():
@@ -327,10 +335,12 @@ async def assign_stores_to_brand(
 
     # 验证品牌归属
     brand_check = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM brands
             WHERE id = :brand_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"brand_id": brand_id, "tenant_id": tenant_id},
     )
     if not brand_check.fetchone():
@@ -341,12 +351,14 @@ async def assign_stores_to_brand(
 
     # 验证门店都属于该租户（防止跨租户分配）
     store_check = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM stores
             WHERE id::text = ANY(:store_ids)
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"store_ids": store_ids, "tenant_id": tenant_id},
     )
     valid_count = store_check.scalar() or 0
@@ -358,14 +370,16 @@ async def assign_stores_to_brand(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stores
                 SET brand_id = :brand_id,
                     updated_at = NOW()
                 WHERE id::text = ANY(:store_ids)
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"brand_id": brand_id, "store_ids": store_ids, "tenant_id": tenant_id},
         )
         await db.commit()
@@ -405,26 +419,31 @@ async def get_brand_stores(
 
     # 验证品牌归属
     brand_check = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM brands
             WHERE id = :brand_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"brand_id": brand_id, "tenant_id": tenant_id},
     )
     if not brand_check.fetchone():
         raise HTTPException(status_code=404, detail="品牌不存在")
 
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM stores
             WHERE brand_id = :brand_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"brand_id": brand_id},
     )
     total = count_result.scalar() or 0
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 id::text        AS store_id,
                 name            AS store_name,
@@ -435,7 +454,8 @@ async def get_brand_stores(
             WHERE brand_id = :brand_id AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {"brand_id": brand_id, "limit": size, "offset": (page - 1) * size},
     )
 

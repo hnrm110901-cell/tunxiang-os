@@ -24,11 +24,13 @@ class ChurnScoringWorker:
 
         # 获取所有活跃租户
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT tenant_id FROM members
                 WHERE is_deleted = FALSE
                 LIMIT 100
-            """),
+            """
+            ),
         )
         tenant_ids = [row["tenant_id"] for row in result.mappings().all()]
 

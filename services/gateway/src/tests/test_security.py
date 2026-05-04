@@ -37,13 +37,14 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "shared"))
 
+from utils.data_masker import DataMasker
+
 from services.audit_log_service import (
     AuditAction,
     AuditEntry,
     AuditLogService,
     _mask_sensitive,
 )
-from utils.data_masker import DataMasker
 
 # ────────────────────────────────────────────────────────────────────
 # Fixtures 工具

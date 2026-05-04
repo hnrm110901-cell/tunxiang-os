@@ -115,9 +115,7 @@ class _SalesCoachHttpClient:
     def _headers(self, tenant_id: str) -> dict[str, str]:
         return {"X-Tenant-ID": str(tenant_id), "Content-Type": "application/json"}
 
-    async def decompose_target(
-        self, *, tenant_id: str, target_id: UUID
-    ) -> dict[str, Any]:
+    async def decompose_target(self, *, tenant_id: str, target_id: UUID) -> dict[str, Any]:
         """POST /api/v1/sales-targets/{target_id}/decompose"""
         url = f"{self.tx_org_base}/api/v1/sales-targets/{target_id}/decompose"
         client = await self._get_client()
@@ -125,9 +123,7 @@ class _SalesCoachHttpClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def get_achievement(
-        self, *, tenant_id: str, target_id: UUID
-    ) -> dict[str, Any]:
+    async def get_achievement(self, *, tenant_id: str, target_id: UUID) -> dict[str, Any]:
         """GET /api/v1/sales-targets/{target_id}/achievement"""
         url = f"{self.tx_org_base}/api/v1/sales-targets/{target_id}/achievement"
         client = await self._get_client()
@@ -163,9 +159,7 @@ class _SalesCoachHttpClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def get_lifecycle_summary(
-        self, *, tenant_id: str, flow_window_days: int = 30
-    ) -> dict[str, Any]:
+    async def get_lifecycle_summary(self, *, tenant_id: str, flow_window_days: int = 30) -> dict[str, Any]:
         """GET /api/v1/customer-lifecycle/summary"""
         url = f"{self.tx_member_base}/api/v1/customer-lifecycle/summary"
         client = await self._get_client()
@@ -292,9 +286,7 @@ class SalesCoachAgent(SkillAgent):
         target_id = _coerce_uuid(target_id_raw)
 
         try:
-            resp = await self._http.decompose_target(
-                tenant_id=self.tenant_id, target_id=target_id
-            )
+            resp = await self._http.decompose_target(tenant_id=self.tenant_id, target_id=target_id)
         except httpx.HTTPError as exc:
             logger.warning(
                 "decompose_target_http_failed",
@@ -370,9 +362,7 @@ class SalesCoachAgent(SkillAgent):
         for ttype in task_types:
             type_customers = customers_map.get(ttype.value) or [None]
             for cust_raw in type_customers:
-                customer_id = (
-                    _coerce_uuid(cust_raw) if cust_raw else None
-                )
+                customer_id = _coerce_uuid(cust_raw) if cust_raw else None
                 payload = {
                     "source": SOURCE_SERVICE,
                     "plan_date": plan_date.isoformat(),
@@ -402,9 +392,7 @@ class SalesCoachAgent(SkillAgent):
                     continue
 
                 dispatched.append(resp.get("data") or {})
-                dispatched_count_by_type[ttype.value] = (
-                    dispatched_count_by_type.get(ttype.value, 0) + 1
-                )
+                dispatched_count_by_type[ttype.value] = dispatched_count_by_type.get(ttype.value, 0) + 1
 
         # 发射 DAILY_TASKS_DISPATCHED
         asyncio.create_task(
@@ -455,9 +443,7 @@ class SalesCoachAgent(SkillAgent):
         threshold = Decimal(str(params.get("gap_threshold") or DEFAULT_GAP_THRESHOLD))
 
         try:
-            resp = await self._http.get_achievement(
-                tenant_id=self.tenant_id, target_id=target_id
-            )
+            resp = await self._http.get_achievement(tenant_id=self.tenant_id, target_id=target_id)
         except httpx.HTTPError as exc:
             return AgentResult(
                 success=False,
@@ -514,14 +500,8 @@ class SalesCoachAgent(SkillAgent):
                         "achievement_rate": str(rate),
                         "gap_threshold": str(threshold),
                         "deviation": str(deviation),
-                        "suggested_call_count": remediations[0][
-                            "suggested_call_count"
-                        ]
-                        if remediations
-                        else 0,
-                        "expected_recovery_fen": sum(
-                            r["expected_recovery_fen"] for r in remediations
-                        ),
+                        "suggested_call_count": remediations[0]["suggested_call_count"] if remediations else 0,
+                        "expected_recovery_fen": sum(r["expected_recovery_fen"] for r in remediations),
                     },
                     source_service=SOURCE_SERVICE,
                 )
@@ -619,9 +599,7 @@ class SalesCoachAgent(SkillAgent):
     # ── 5. audit_coverage ────────────────────────────────────────────
 
     async def _audit_coverage(self, params: dict[str, Any]) -> AgentResult:
-        dormant_threshold = Decimal(
-            str(params.get("dormant_ratio_alert") or DEFAULT_DORMANT_RATIO_ALERT)
-        )
+        dormant_threshold = Decimal(str(params.get("dormant_ratio_alert") or DEFAULT_DORMANT_RATIO_ALERT))
 
         try:
             resp = await self._http.get_lifecycle_summary(
@@ -671,17 +649,10 @@ class SalesCoachAgent(SkillAgent):
 
     # ── 6. score_profile_completeness ────────────────────────────────
 
-    async def _score_profile_completeness(
-        self, params: dict[str, Any]
-    ) -> AgentResult:
+    async def _score_profile_completeness(self, params: dict[str, Any]) -> AgentResult:
         customers: list[dict[str, Any]] = list(params.get("customers") or [])
         employee_id = _coerce_uuid(params.get("employee_id"))
-        threshold = Decimal(
-            str(
-                params.get("alert_threshold")
-                or DEFAULT_PROFILE_COMPLETENESS_THRESHOLD
-            )
-        )
+        threshold = Decimal(str(params.get("alert_threshold") or DEFAULT_PROFILE_COMPLETENESS_THRESHOLD))
         dispatch_tasks_on_low = bool(params.get("dispatch_tasks_on_low", True))
 
         if not customers:

@@ -44,7 +44,8 @@ class ForgeOntologyService:
 
     async def set_binding(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""INSERT INTO forge.ontology_bindings
+            text(
+                """INSERT INTO forge.ontology_bindings
                     (tenant_id, app_id, entity_name, access_mode, allowed_fields, constraints)
                     VALUES (:tid, :app_id, :entity_name, :access_mode, :allowed_fields::jsonb, :constraints::jsonb)
                     ON CONFLICT (tenant_id, app_id, entity_name)
@@ -52,7 +53,8 @@ class ForgeOntologyService:
                                   allowed_fields = EXCLUDED.allowed_fields,
                                   constraints = EXCLUDED.constraints,
                                   updated_at = NOW()
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {
                 "tid": self.tenant_id,
                 "app_id": payload["app_id"],
@@ -67,11 +69,13 @@ class ForgeOntologyService:
 
     async def get_entity_apps(self, entity: str) -> list[Dict[str, Any]]:
         rows = await self.db.execute(
-            text("""SELECT ob.*, a.name AS app_name
+            text(
+                """SELECT ob.*, a.name AS app_name
                     FROM forge.ontology_bindings ob
                     LEFT JOIN forge.apps a ON a.id = ob.app_id AND a.tenant_id = ob.tenant_id
                     WHERE ob.tenant_id = :tid AND ob.entity_name = :entity
-                    ORDER BY ob.app_id"""),
+                    ORDER BY ob.app_id"""
+            ),
             {"tid": self.tenant_id, "entity": entity},
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -100,12 +104,14 @@ class ForgeOntologyService:
         if not validation["valid"]:
             raise HTTPException(status_code=422, detail={"errors": validation["errors"]})
         result = await self.db.execute(
-            text("""INSERT INTO forge.app_manifests
+            text(
+                """INSERT INTO forge.app_manifests
                     (tenant_id, app_id, manifest, status)
                     VALUES (:tid, :app_id, :manifest::jsonb, 'submitted')
                     ON CONFLICT (tenant_id, app_id)
                     DO UPDATE SET manifest = EXCLUDED.manifest, status = 'submitted', updated_at = NOW()
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {"tid": self.tenant_id, "app_id": app_id, "manifest": str(manifest_content)},
         )
         await self.db.commit()

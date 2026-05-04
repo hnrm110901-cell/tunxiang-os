@@ -75,7 +75,8 @@ class IdempotencyGuard:
     ) -> None:
         """记录幂等结果"""
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO payment_idempotency (
                     idempotency_key, tenant_id, payment_id,
                     status, trade_no, amount_fen, channel_data,
@@ -91,7 +92,8 @@ class IdempotencyGuard:
                     trade_no = COALESCE(EXCLUDED.trade_no, payment_idempotency.trade_no),
                     channel_data = COALESCE(EXCLUDED.channel_data, payment_idempotency.channel_data),
                     updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "key": idempotency_key,
                 "tenant_id": tenant_id,

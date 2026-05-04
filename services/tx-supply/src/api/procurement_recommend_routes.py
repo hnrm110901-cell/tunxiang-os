@@ -163,13 +163,15 @@ async def get_supplier_scores(
 
     # 查询该原料的所有历史供应商
     try:
-        sql = text("""
+        sql = text(
+            """
             SELECT DISTINCT supplier_id, supplier_name
             FROM receiving_records
             WHERE ingredient_id = :ingredient_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {

@@ -86,12 +86,14 @@ async def create_menu_plan(
     margin = round((1 - total_cost / total_price) * 100, 2) if total_price > 0 else 0
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO banquet_menu_plans
                 (tenant_id, name, guest_count, budget_fen, dishes, total_cost_fen, total_price_fen, margin_rate)
             VALUES (:tid::UUID, :name, :gc, :budget, :dishes::JSONB, :cost, :price, :margin)
             RETURNING id, created_at
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "name": body.name,
@@ -123,11 +125,13 @@ async def list_menu_plans(
     total = count_r.scalar() or 0
 
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, name, guest_count, budget_fen, total_price_fen, margin_rate, status, created_at
         FROM banquet_menu_plans WHERE is_deleted=FALSE
         ORDER BY created_at DESC LIMIT :lim OFFSET :off
-    """),
+    """
+        ),
         {"lim": size, "off": (page - 1) * size},
     )
     items = [dict(r) for r in result.mappings().all()]
@@ -148,9 +152,11 @@ async def get_menu_plan(
     tenant_id: str = Depends(_tid),
 ):
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT * FROM banquet_menu_plans WHERE id = :pid::UUID AND is_deleted=FALSE
-    """),
+    """
+        ),
         {"pid": plan_id},
     )
     row = result.mappings().first()
@@ -175,7 +181,8 @@ async def create_session(
     tenant_id: str = Depends(_tid),
 ):
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO banquet_sessions
                 (tenant_id, store_id, menu_plan_id, session_date, time_slot,
                  room_ids, table_count, guest_count, contact_name, contact_phone,
@@ -183,7 +190,8 @@ async def create_session(
             VALUES (:tid::UUID, :sid::UUID, :mpid, :sdate::DATE, :slot,
                     :rooms::JSONB, :tc, :gc, :cn, :cp, :dep, :notes)
             RETURNING id, created_at
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "sid": body.store_id,
@@ -235,12 +243,14 @@ async def list_sessions(
     total = count_r.scalar() or 0
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT id, store_id, session_date, time_slot, table_count, guest_count,
                contact_name, status, total_amount_fen, deposit_fen, created_at
         FROM banquet_sessions WHERE {w}
         ORDER BY session_date DESC, created_at DESC LIMIT :lim OFFSET :off
-    """),
+    """
+        ),
         params,
     )
     items = []
@@ -282,10 +292,12 @@ async def update_session_status(
         raise HTTPException(status_code=400, detail=f"不允许从 {current} 转到 {body.status}，允许: {allowed}")
 
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE banquet_sessions SET status = :st, updated_at = now()
         WHERE id = :sid::UUID
-    """),
+    """
+        ),
         {"st": body.status, "sid": session_id},
     )
     await db.commit()
@@ -323,11 +335,13 @@ async def split_bill(
             amount = t.get("amount_fen", 0)
 
         r = await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_split_bills (tenant_id, session_id, table_no, split_mode, ratio, amount_fen)
             VALUES (:tid::UUID, :sid::UUID, :tn, :mode, :ratio, :amt)
             RETURNING id
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "sid": session_id,
@@ -351,12 +365,14 @@ async def get_session_bills(
     tenant_id: str = Depends(_tid),
 ):
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, table_no, split_mode, ratio, amount_fen, paid, paid_at, payment_method
         FROM banquet_split_bills
         WHERE session_id = :sid::UUID AND is_deleted=FALSE
         ORDER BY table_no
-    """),
+    """
+        ),
         {"sid": session_id},
     )
     items = []
@@ -396,7 +412,8 @@ async def banquet_analytics(
     w = " AND ".join(wheres)
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*) AS session_count,
             COALESCE(SUM(total_amount_fen), 0) AS total_revenue_fen,
@@ -408,14 +425,16 @@ async def banquet_analytics(
                  THEN SUM(total_amount_fen) / COUNT(*)
                  ELSE 0 END AS avg_per_session_fen
         FROM banquet_sessions WHERE {w}
-    """),
+    """
+        ),
         params,
     )
     stats = dict(result.mappings().first())
 
     # TOP5排菜方案
     top_plans = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT mp.name, COUNT(bs.id) AS usage_count,
                COALESCE(SUM(bs.total_amount_fen), 0) AS revenue_fen
         FROM banquet_sessions bs
@@ -424,7 +443,8 @@ async def banquet_analytics(
         {"AND bs.session_date >= :sd::DATE" if start_date else ""}
         {"AND bs.session_date <= :ed::DATE" if end_date else ""}
         GROUP BY mp.name ORDER BY usage_count DESC LIMIT 5
-    """),
+    """
+        ),
         params,
     )
     top = [dict(r) for r in top_plans.mappings().all()]

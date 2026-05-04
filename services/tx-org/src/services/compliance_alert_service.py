@@ -62,7 +62,8 @@ async def scan_expiring_documents(
     await _set_tenant(db, tenant_id)
     today = datetime.now(timezone.utc).date()
     horizon = today + timedelta(days=threshold_days)
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT id, emp_name, health_cert_expiry, id_card_expiry
         FROM {EMPLOYEES_TABLE}
         WHERE tenant_id = CAST(:tid AS uuid)
@@ -71,7 +72,8 @@ async def scan_expiring_documents(
             (health_cert_expiry IS NOT NULL AND health_cert_expiry <= :horizon)
             OR (id_card_expiry IS NOT NULL AND id_card_expiry <= :horizon)
           )
-    """)
+    """
+    )
     result = await db.execute(sql, {"horizon": horizon, "tid": tenant_id})
     rows = result.mappings().all()
     out: list[dict[str, Any]] = []
@@ -121,7 +123,8 @@ async def scan_low_performers(
     """扫描连续多个月绩效低于阈值的员工（数据来自 payroll_records_v2.performance_score）。"""
     await _set_tenant(db, tenant_id)
     ref = datetime.now(timezone.utc).date()
-    sql = text(f"""
+    sql = text(
+        f"""
         WITH month_span AS (
             SELECT
                 EXTRACT(YEAR FROM m)::int AS y,
@@ -161,7 +164,8 @@ async def scan_low_performers(
           AND s.score < 60
         GROUP BY e.id, e.emp_name
         HAVING COUNT(DISTINCT (s.period_year, s.period_month)) = :n_months
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -208,7 +212,8 @@ async def _daily_attendance_late_rollup(
     end: date,
 ) -> dict[str, dict[str, int]]:
     await _set_tenant(db, tenant_id)
-    sql = text("""
+    sql = text(
+        """
         SELECT
             employee_id,
             COUNT(*) FILTER (WHERE status = 'late') AS late_count,
@@ -219,7 +224,8 @@ async def _daily_attendance_late_rollup(
           AND date >= :start_d
           AND date < :end_d
         GROUP BY employee_id
-    """)
+    """
+    )
     try:
         result = await db.execute(
             sql,
@@ -254,7 +260,8 @@ async def scan_attendance_anomalies(
         raise ValueError("month 必须在 1–12 之间")
     start, end = _month_range(year, mon)
     await _set_tenant(db, tenant_id)
-    absent_sql = text("""
+    absent_sql = text(
+        """
         SELECT
             ar.employee_id,
             COUNT(*) FILTER (WHERE ar.absence_type = 'absent') AS absent_count
@@ -264,7 +271,8 @@ async def scan_attendance_anomalies(
           AND ar.work_date >= :start_d
           AND ar.work_date < :end_d
         GROUP BY ar.employee_id
-    """)
+    """
+    )
     absent_result = await db.execute(
         absent_sql,
         {"start_d": start, "end_d": end, "tid": tenant_id},
@@ -300,13 +308,15 @@ async def scan_attendance_anomalies(
         )
         return out
     await _set_tenant(db, tenant_id)
-    names_sql = text(f"""
+    names_sql = text(
+        f"""
         SELECT id, emp_name
         FROM {EMPLOYEES_TABLE}
         WHERE tenant_id = CAST(:tid AS uuid)
           AND is_deleted = FALSE
           AND id IN :ids
-    """).bindparams(bindparam("ids", expanding=True))
+    """
+    ).bindparams(bindparam("ids", expanding=True))
     names_result = await db.execute(names_sql, {"ids": list(parsed_ids.values()), "tid": tenant_id})
     names = {str(r["id"]): r["emp_name"] for r in names_result.mappings().all()}
     for eid in sorted(parsed_ids.keys()):

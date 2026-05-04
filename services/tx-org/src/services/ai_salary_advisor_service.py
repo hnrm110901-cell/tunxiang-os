@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 import structlog
+
 from services.labor_efficiency_service import INDUSTRY_BENCHMARKS
 from services.salary_item_library import SalaryItem, get_item_by_code
 

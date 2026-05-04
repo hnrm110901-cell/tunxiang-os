@@ -121,9 +121,7 @@ class ReservationConciergeAgent(SkillAgent):
 
     agent_id = "reservation_concierge"
     agent_name = "AI 预订礼宾员"
-    description = (
-        "来电识别 / 档期推荐 / 撞单合并 / 邀请函联发 / T-2h 核餐外呼"
-    )
+    description = "来电识别 / 档期推荐 / 撞单合并 / 邀请函联发 / T-2h 核餐外呼"
     priority = "P0"
     run_location = "cloud+edge"
 
@@ -214,14 +212,8 @@ class ReservationConciergeAgent(SkillAgent):
                 matched_by = "phone"
 
         # 2) 若命中客户且有 customer_id → 调 R1 customer_lifecycle API 填充 lifecycle_state
-        if (
-            profile is not None
-            and profile.customer_id is not None
-            and self._lifecycle_fetcher is not None
-        ):
-            state = await self._lifecycle_fetcher(
-                profile.customer_id, p.tenant_id
-            )
+        if profile is not None and profile.customer_id is not None and self._lifecycle_fetcher is not None:
+            state = await self._lifecycle_fetcher(profile.customer_id, p.tenant_id)
             if state is not None:
                 profile = profile.model_copy(update={"lifecycle_state": state})
 
@@ -247,12 +239,8 @@ class ReservationConciergeAgent(SkillAgent):
         )
         inv.output_action = {
             "matched_by": matched_by,
-            "customer_id": str(profile.customer_id)
-            if profile and profile.customer_id
-            else None,
-            "lifecycle_state": profile.lifecycle_state.value
-            if profile and profile.lifecycle_state
-            else None,
+            "customer_id": str(profile.customer_id) if profile and profile.customer_id else None,
+            "lifecycle_state": profile.lifecycle_state.value if profile and profile.lifecycle_state else None,
         }
 
         # 决策留痕
@@ -327,21 +315,15 @@ class ReservationConciergeAgent(SkillAgent):
                     table_type=str(raw.get("table_type", "round_10")),
                     room_type=raw.get("room_type"),
                     recommended_package_id=raw.get("recommended_package_id"),
-                    estimated_amount_fen=int(
-                        raw.get("estimated_amount_fen", _DEFAULT_PACKAGE_FEN)
-                    ),
+                    estimated_amount_fen=int(raw.get("estimated_amount_fen", _DEFAULT_PACKAGE_FEN)),
                 )
             )
 
         # 体验约束：预估排队时长（人数 / 每桌 10 → 每桌 2 分钟 * 扩张因子）
-        estimated_queue_minutes = min(
-            30.0, max(5.0, p.guest_count * 0.8)
-        )
+        estimated_queue_minutes = min(30.0, max(5.0, p.guest_count * 0.8))
 
         # 毛利约束：以 Top1 推荐套餐金额 + 成本比推 cost_fen
-        top_price_fen = (
-            options[0].estimated_amount_fen if options else _DEFAULT_PACKAGE_FEN
-        )
+        top_price_fen = options[0].estimated_amount_fen if options else _DEFAULT_PACKAGE_FEN
         top_cost_fen = int(top_price_fen * _DEFAULT_COST_RATIO)
 
         ctx = ConstraintContext(
@@ -405,14 +387,10 @@ class ReservationConciergeAgent(SkillAgent):
 
         existing: list[tuple[uuid.UUID, SourceChannel, datetime]] = []
         if self._collision_fetcher is not None:
-            existing = await self._collision_fetcher(
-                p.customer_id, p.target_date, p.tenant_id
-            )
+            existing = await self._collision_fetcher(p.customer_id, p.target_date, p.tenant_id)
 
         # 剔除自身
-        existing = [
-            item for item in existing if item[0] != p.incoming_reservation_id
-        ]
+        existing = [item for item in existing if item[0] != p.incoming_reservation_id]
 
         is_collision = len(existing) > 0
         winning_id = None
@@ -427,9 +405,7 @@ class ReservationConciergeAgent(SkillAgent):
             all_reservations.sort(key=lambda x: x[2])
             winning_id = all_reservations[0][0]
             priority_channel = all_reservations[0][1]
-            merged_ids = [
-                r[0] for r in all_reservations[1:]
-            ]
+            merged_ids = [r[0] for r in all_reservations[1:]]
 
         decision = CollisionDecision(
             is_collision=is_collision,
@@ -447,11 +423,7 @@ class ReservationConciergeAgent(SkillAgent):
             constraint_scope={"experience"},
         )
 
-        reasoning = (
-            f"撞单：保留首收单 {winning_id}，合并 {len(merged_ids)} 条"
-            if is_collision
-            else "未发现撞单"
-        )
+        reasoning = f"撞单：保留首收单 {winning_id}，合并 {len(merged_ids)} 条" if is_collision else "未发现撞单"
         inv.reasoning = reasoning
         inv.confidence = 0.95 if is_collision else 0.9
         inv.output_action = {
@@ -523,9 +495,7 @@ class ReservationConciergeAgent(SkillAgent):
                     customer_id=p.customer_id,
                     coupon_code=p.coupon_code,
                     coupon_value_fen=p.coupon_value_fen,
-                    payload={"template_id": p.template_id}
-                    if p.template_id
-                    else {},
+                    payload={"template_id": p.template_id} if p.template_id else {},
                 )
                 sent = await self._invitation_service.mark_sent(
                     invitation_id=record.invitation_id,
@@ -695,18 +665,13 @@ class ReservationConciergeAgent(SkillAgent):
             constraint_scope={"experience"},
         )
 
-        reasoning = (
-            f"外呼 outcome={outcome.value}，推理层={inference_layer}，"
-            f"距原定到店 {delta_minutes:.0f} 分钟"
-        )
+        reasoning = f"外呼 outcome={outcome.value}，推理层={inference_layer}，" f"距原定到店 {delta_minutes:.0f} 分钟"
         inv.reasoning = reasoning
         inv.confidence = confidence
         inv.inference_layer = inference_layer
         inv.output_action = {
             "outcome": outcome.value,
-            "new_scheduled_at": new_scheduled_at.isoformat()
-            if new_scheduled_at
-            else None,
+            "new_scheduled_at": new_scheduled_at.isoformat() if new_scheduled_at else None,
             "transcript_present": transcript is not None,
         }
 
@@ -738,11 +703,7 @@ class ReservationConciergeAgent(SkillAgent):
 
     def _write_decision_log(self, inv: _InvocationContext) -> None:
         """写 AgentDecisionLog 记录（每次 action 必写一条）。"""
-        tenant_uuid = (
-            self.tenant_id
-            if isinstance(self.tenant_id, uuid.UUID)
-            else uuid.UUID(str(self.tenant_id))
-        )
+        tenant_uuid = self.tenant_id if isinstance(self.tenant_id, uuid.UUID) else uuid.UUID(str(self.tenant_id))
         record = AgentDecisionLogRecord(
             decision_id=inv.decision_id,
             tenant_id=tenant_uuid,
@@ -771,11 +732,7 @@ class ReservationConciergeAgent(SkillAgent):
                 )
         logger.info(
             "reservation_concierge_decision",
-            **{
-                k: v
-                for k, v in payload.items()
-                if k in ("decision_id", "action", "confidence", "inference_layer")
-            },
+            **{k: v for k, v in payload.items() if k in ("decision_id", "action", "confidence", "inference_layer")},
         )
 
 
@@ -798,13 +755,9 @@ def _as_dt(value: Any) -> datetime:
     return datetime.fromisoformat(str(value))
 
 
-def _build_fallback_slots(
-    *, target_date: date, guest_count: int, peak: bool
-) -> list[dict[str, Any]]:
+def _build_fallback_slots(*, target_date: date, guest_count: int, peak: bool) -> list[dict[str, Any]]:
     """构造默认三档期：午市/晚市/包间（当 slot_searcher 未注入时）。"""
-    base_day = datetime(
-        target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc
-    )
+    base_day = datetime(target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc)
     vip_price = _DEFAULT_PACKAGE_FEN * (3 if guest_count >= 10 else 2)
     hall_price = _DEFAULT_PACKAGE_FEN * (2 if guest_count >= 10 else 1)
     slots = [

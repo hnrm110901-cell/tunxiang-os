@@ -128,7 +128,8 @@ async def list_mentions(
         count_row = await db.execute(count_sql, params)
         total = count_row.scalar() or 0
 
-        select_sql = text(f"""
+        select_sql = text(
+            f"""
             SELECT id, tenant_id, store_id, platform, content, sentiment,
                    sentiment_score, rating, author_name, author_id,
                    published_at, source_url, tags,
@@ -138,7 +139,8 @@ async def list_mentions(
             WHERE {where}
             ORDER BY published_at DESC NULLS LAST, created_at DESC
             LIMIT :limit OFFSET :offset
-        """)
+        """
+        )
         rows = await db.execute(select_sql, params)
         mentions = [dict(r._mapping) for r in rows]
 
@@ -174,7 +176,8 @@ async def create_mention(
     published_at = req.published_at or now
 
     try:
-        insert_sql = text("""
+        insert_sql = text(
+            """
             INSERT INTO public_opinion_mentions (
                 id, tenant_id, store_id, platform, content, sentiment,
                 sentiment_score, rating, author_name, author_id,
@@ -186,7 +189,8 @@ async def create_mention(
                 :published_at, :source_url, :tags,
                 false, :now, :now
             )
-        """)
+        """
+        )
         await db.execute(
             insert_sql,
             {
@@ -270,7 +274,8 @@ async def get_mention(
     """查询单条舆情详情。"""
     await _set_rls(db, tenant_id)
     try:
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT id, tenant_id, store_id, platform, content, sentiment,
                    sentiment_score, rating, author_name, author_id,
                    published_at, source_url, tags,
@@ -278,7 +283,8 @@ async def get_mention(
                    created_at, updated_at
             FROM public_opinion_mentions
             WHERE id = :mention_id AND {_SAFE_TENANT}
-        """)
+        """
+        )
         row = await db.execute(sql, {"mention_id": mention_id, "tid": tenant_id})
         record = row.mappings().first()
         if not record:
@@ -314,16 +320,19 @@ async def resolve_mention(
     now = datetime.now(timezone.utc)
     try:
         # 先查，获取 store_id 用于事件
-        select_sql = text(f"""
+        select_sql = text(
+            f"""
             SELECT store_id, is_resolved FROM public_opinion_mentions
             WHERE id = :mention_id AND {_SAFE_TENANT}
-        """)
+        """
+        )
         row = await db.execute(select_sql, {"mention_id": mention_id, "tid": tenant_id})
         record = row.mappings().first()
         if not record:
             return {"ok": False, "error": {"message": "舆情记录不存在", "code": "NOT_FOUND"}}
 
-        update_sql = text(f"""
+        update_sql = text(
+            f"""
             UPDATE public_opinion_mentions
             SET is_resolved = true,
                 resolution_note = :resolution_note,
@@ -331,7 +340,8 @@ async def resolve_mention(
                 resolver_id = :resolver_id,
                 updated_at = :now
             WHERE id = :mention_id AND {_SAFE_TENANT}
-        """)
+        """
+        )
         await db.execute(
             update_sql,
             {
@@ -394,7 +404,8 @@ async def get_stats(
         where = " AND ".join(mv_conditions)
 
         try:
-            mv_sql = text(f"""
+            mv_sql = text(
+                f"""
                 SELECT store_id, platform,
                        SUM(total_count) AS total_count,
                        SUM(positive_count) AS positive_count,
@@ -406,7 +417,8 @@ async def get_stats(
                 WHERE {where}
                 GROUP BY store_id, platform
                 ORDER BY store_id, platform
-            """)
+            """
+            )
             rows = await db.execute(mv_sql, mv_params)
             stats = [dict(r._mapping) for r in rows]
             # 数值序列化
@@ -419,7 +431,8 @@ async def get_stats(
             # 视图不存在时降级到明细表聚合
             pass
 
-        fallback_sql = text(f"""
+        fallback_sql = text(
+            f"""
             SELECT store_id, platform,
                    COUNT(*) AS total_count,
                    COUNT(*) FILTER (WHERE sentiment = 'positive') AS positive_count,
@@ -431,7 +444,8 @@ async def get_stats(
             WHERE {where}
             GROUP BY store_id, platform
             ORDER BY store_id, platform
-        """)
+        """
+        )
         rows = await db.execute(fallback_sql, mv_params)
         stats = [dict(r._mapping) for r in rows]
         for s in stats:
@@ -469,7 +483,8 @@ async def get_trends(
             params["platform"] = platform
         where = " AND ".join(conditions)
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 DATE_TRUNC('week', published_at) AS week_start,
                 COUNT(*) FILTER (WHERE sentiment = 'positive') AS positive_count,
@@ -482,7 +497,8 @@ async def get_trends(
             GROUP BY DATE_TRUNC('week', published_at)
             ORDER BY week_start ASC
             LIMIT 8
-        """)
+        """
+        )
         rows = await db.execute(sql, params)
         trends = []
         for r in rows:
@@ -524,7 +540,8 @@ async def get_top_complaints(
         where = " AND ".join(conditions)
 
         # 展开 tags 数组并统计频次
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT tag, COUNT(*) AS frequency
             FROM public_opinion_mentions,
                  UNNEST(tags) AS tag
@@ -532,18 +549,21 @@ async def get_top_complaints(
             GROUP BY tag
             ORDER BY frequency DESC
             LIMIT :limit
-        """)
+        """
+        )
         rows = await db.execute(sql, params)
         keywords = [{"keyword": r.tag, "frequency": int(r.frequency)} for r in rows]
 
         # 若没有 tags 数据，尝试基于内容关键词（简单分词）
         if not keywords:
-            content_sql = text(f"""
+            content_sql = text(
+                f"""
                 SELECT content FROM public_opinion_mentions
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT 200
-            """)
+            """
+            )
             content_rows = await db.execute(content_sql, {k: v for k, v in params.items() if k != "limit"})
             keyword_map: dict[str, int] = {}
             common_keywords = [
@@ -600,7 +620,8 @@ async def batch_capture(
         mention_id = str(uuid.uuid4())
         published_at = item.published_at or now
         try:
-            insert_sql = text("""
+            insert_sql = text(
+                """
                 INSERT INTO public_opinion_mentions (
                     id, tenant_id, store_id, platform, content, sentiment,
                     sentiment_score, rating, author_name,
@@ -613,7 +634,8 @@ async def batch_capture(
                     false, :now, :now
                 )
                 ON CONFLICT DO NOTHING
-            """)
+            """
+            )
             await db.execute(
                 insert_sql,
                 {

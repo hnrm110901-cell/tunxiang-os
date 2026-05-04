@@ -208,9 +208,7 @@ def test_franchisees_crud_owner_is_v5():
         routes = _routes_for(method, path)
         assert len(routes) == 1
         owner = _module_basename(routes[0])
-        assert owner == "franchise_v5_routes", (
-            f"{method} {path} should be owned by franchise_v5_routes, got {owner}"
-        )
+        assert owner == "franchise_v5_routes", f"{method} {path} should be owned by franchise_v5_routes, got {owner}"
 
 
 def test_dashboard_owner_is_v2_router():
@@ -218,9 +216,7 @@ def test_dashboard_owner_is_v2_router():
     routes = _routes_for("GET", "/api/v1/franchise/franchisees/{franchisee_id}/dashboard")
     assert len(routes) == 1
     owner = _module_basename(routes[0])
-    assert owner == "franchise_router", (
-        f"dashboard should be owned by franchise_router, got {owner}"
-    )
+    assert owner == "franchise_router", f"dashboard should be owned by franchise_router, got {owner}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -295,9 +291,7 @@ async def test_post_franchisee_accepts_v5_payload():
     app.dependency_overrides[get_db] = _override_db(mock_db)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.post(
-                "/api/v1/franchise/franchisees", headers=HEADERS, json=payload_v5
-            )
+            resp = await ac.post("/api/v1/franchise/franchisees", headers=HEADERS, json=payload_v5)
     finally:
         app.dependency_overrides.clear()
 
@@ -327,9 +321,7 @@ async def test_put_franchisee_uses_v5_field_names():
     app.dependency_overrides[get_db] = _override_db(mock_db)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            resp = await ac.put(
-                f"/api/v1/franchise/franchisees/{fid}", headers=HEADERS, json=update_v5
-            )
+            resp = await ac.put(f"/api/v1/franchise/franchisees/{fid}", headers=HEADERS, json=update_v5)
     finally:
         app.dependency_overrides.clear()
 
@@ -345,9 +337,7 @@ async def test_dashboard_returns_v2_router_payload():
     """GET /franchisees/{id}/dashboard → 走 V2 router → FranchiseService（v5 无此端点）。"""
     fid = str(uuid4())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        resp = await ac.get(
-            f"/api/v1/franchise/franchisees/{fid}/dashboard", headers=HEADERS
-        )
+        resp = await ac.get(f"/api/v1/franchise/franchisees/{fid}/dashboard", headers=HEADERS)
 
     assert resp.status_code == 200, resp.text
     body = resp.json()

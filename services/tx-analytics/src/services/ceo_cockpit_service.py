@@ -45,7 +45,7 @@ PLATFORM_COMMISSION_RATES: dict[str, float] = {
 }
 
 # 异常检测阈值
-ANOMALY_WARNING_THRESHOLD = 0.20   # ±20% 标黄
+ANOMALY_WARNING_THRESHOLD = 0.20  # ±20% 标黄
 ANOMALY_CRITICAL_THRESHOLD = 0.35  # ±35% 标红
 
 # AI决策卡片最大数量
@@ -53,6 +53,7 @@ MAX_AI_DECISIONS = 3
 
 
 # ─── 辅助纯函数 ────────────────────────────────────────────────────────────────
+
 
 def _fen_to_yuan(fen: int) -> float:
     """分转元（保留2位小数）"""
@@ -182,7 +183,8 @@ class CEOCockpitService:
         """
         # 营业额 + 客数
         rev_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(o.final_amount_fen), 0)::BIGINT AS revenue_fen,
                     COUNT(*)::INT AS customer_count
@@ -192,7 +194,8 @@ class CEOCockpitService:
                   AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
                   AND o.status IN ('paid', 'completed')
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         rev_row = rev_result.mappings().first()
@@ -201,7 +204,8 @@ class CEOCockpitService:
 
         # 食材成本
         cost_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(
                         COALESCE(oi.food_cost_fen, oi.cost_fen, 0) * oi.quantity
@@ -214,7 +218,8 @@ class CEOCockpitService:
                   AND o.status IN ('paid', 'completed')
                   AND o.is_deleted = FALSE
                   AND oi.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         cost_row = cost_result.mappings().first()
@@ -223,7 +228,8 @@ class CEOCockpitService:
 
         # 翻台率
         table_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)::INT AS session_count,
                     (SELECT COUNT(*) FROM tables t
@@ -239,7 +245,8 @@ class CEOCockpitService:
                   AND o.table_id IS NOT NULL
                   AND o.status IN ('paid', 'completed', 'pending_payment')
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         table_row = table_result.mappings().first()
@@ -310,9 +317,7 @@ class CEOCockpitService:
         ]
 
         # 查询全日人力成本（用于按时段工时分摊）
-        total_labor_fen = await self._query_daily_labor_cost(
-            db, store_id, tenant_id, target_date
-        )
+        total_labor_fen = await self._query_daily_labor_cost(db, store_id, tenant_id, target_date)
 
         # 全日营业时长（用于工时分摊比例计算）
         total_biz_hours = 15  # 默认营业15小时（11:00-02:00）
@@ -320,9 +325,7 @@ class CEOCockpitService:
         dayparts = []
         for name, start_h, end_h in dayparts_config:
             # 时段营业额和食材成本
-            dp_data = await self._query_daypart_revenue(
-                db, store_id, tenant_id, target_date, start_h, end_h
-            )
+            dp_data = await self._query_daypart_revenue(db, store_id, tenant_id, target_date, start_h, end_h)
             revenue_fen = dp_data["revenue_fen"]
             food_cost_fen = dp_data["food_cost_fen"]
             customer_count = dp_data["customer_count"]
@@ -339,30 +342,28 @@ class CEOCockpitService:
             avg_ticket_fen = revenue_fen // customer_count if customer_count > 0 else 0
             variable_cost_per_customer = food_cost_fen // customer_count if customer_count > 0 else 0
             margin_per_customer = avg_ticket_fen - variable_cost_per_customer
-            breakeven_customers = (
-                int(labor_cost_fen / margin_per_customer)
-                if margin_per_customer > 0
-                else 0
-            )
+            breakeven_customers = int(labor_cost_fen / margin_per_customer) if margin_per_customer > 0 else 0
 
-            dayparts.append({
-                "name": name,
-                "start_hour": start_h if start_h < 24 else start_h - 24,
-                "end_hour": end_h if end_h < 24 else end_h - 24,
-                "revenue_fen": revenue_fen,
-                "revenue_yuan": _fen_to_yuan(revenue_fen),
-                "food_cost_fen": food_cost_fen,
-                "food_cost_yuan": _fen_to_yuan(food_cost_fen),
-                "labor_cost_fen": labor_cost_fen,
-                "labor_cost_yuan": _fen_to_yuan(labor_cost_fen),
-                "total_cost_fen": total_cost_fen,
-                "profit_fen": profit_fen,
-                "profit_yuan": _fen_to_yuan(profit_fen),
-                "customer_count": customer_count,
-                "avg_ticket_fen": avg_ticket_fen,
-                "avg_ticket_yuan": _fen_to_yuan(avg_ticket_fen),
-                "breakeven_customers": breakeven_customers,
-            })
+            dayparts.append(
+                {
+                    "name": name,
+                    "start_hour": start_h if start_h < 24 else start_h - 24,
+                    "end_hour": end_h if end_h < 24 else end_h - 24,
+                    "revenue_fen": revenue_fen,
+                    "revenue_yuan": _fen_to_yuan(revenue_fen),
+                    "food_cost_fen": food_cost_fen,
+                    "food_cost_yuan": _fen_to_yuan(food_cost_fen),
+                    "labor_cost_fen": labor_cost_fen,
+                    "labor_cost_yuan": _fen_to_yuan(labor_cost_fen),
+                    "total_cost_fen": total_cost_fen,
+                    "profit_fen": profit_fen,
+                    "profit_yuan": _fen_to_yuan(profit_fen),
+                    "customer_count": customer_count,
+                    "avg_ticket_fen": avg_ticket_fen,
+                    "avg_ticket_yuan": _fen_to_yuan(avg_ticket_fen),
+                    "breakeven_customers": breakeven_customers,
+                }
+            )
 
         return {"dayparts": dayparts}
 
@@ -404,7 +405,8 @@ class CEOCockpitService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     o.channel,
                     COUNT(*)::INT AS order_count,
@@ -436,7 +438,8 @@ class CEOCockpitService:
                   AND o.is_deleted = FALSE
                 GROUP BY o.channel
                 ORDER BY revenue_fen DESC
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
 
@@ -463,30 +466,29 @@ class CEOCockpitService:
             commission_fen = int(revenue_fen * commission_rate)
 
             # 真实利润 = 营业额 - 食材成本 - 佣金 - 包装费 - 补贴
-            real_profit_fen = (
-                revenue_fen - food_cost_fen - commission_fen
-                - packaging_fen - subsidy_fen
-            )
+            real_profit_fen = revenue_fen - food_cost_fen - commission_fen - packaging_fen - subsidy_fen
             avg_profit_fen = real_profit_fen // order_count if order_count > 0 else 0
 
-            by_channel.append({
-                "channel": channel,
-                "order_count": order_count,
-                "revenue_fen": revenue_fen,
-                "revenue_yuan": _fen_to_yuan(revenue_fen),
-                "food_cost_fen": food_cost_fen,
-                "commission_rate": commission_rate,
-                "commission_fen": commission_fen,
-                "commission_yuan": _fen_to_yuan(commission_fen),
-                "packaging_fen": packaging_fen,
-                "packaging_yuan": _fen_to_yuan(packaging_fen),
-                "subsidy_fen": subsidy_fen,
-                "subsidy_yuan": _fen_to_yuan(subsidy_fen),
-                "real_profit_fen": real_profit_fen,
-                "real_profit_yuan": _fen_to_yuan(real_profit_fen),
-                "avg_profit_fen": avg_profit_fen,
-                "avg_profit_yuan": _fen_to_yuan(avg_profit_fen),
-            })
+            by_channel.append(
+                {
+                    "channel": channel,
+                    "order_count": order_count,
+                    "revenue_fen": revenue_fen,
+                    "revenue_yuan": _fen_to_yuan(revenue_fen),
+                    "food_cost_fen": food_cost_fen,
+                    "commission_rate": commission_rate,
+                    "commission_fen": commission_fen,
+                    "commission_yuan": _fen_to_yuan(commission_fen),
+                    "packaging_fen": packaging_fen,
+                    "packaging_yuan": _fen_to_yuan(packaging_fen),
+                    "subsidy_fen": subsidy_fen,
+                    "subsidy_yuan": _fen_to_yuan(subsidy_fen),
+                    "real_profit_fen": real_profit_fen,
+                    "real_profit_yuan": _fen_to_yuan(real_profit_fen),
+                    "avg_profit_fen": avg_profit_fen,
+                    "avg_profit_yuan": _fen_to_yuan(avg_profit_fen),
+                }
+            )
 
             total_order_count += order_count
             total_revenue_fen += revenue_fen
@@ -496,13 +498,9 @@ class CEOCockpitService:
             total_subsidy_fen += subsidy_fen
 
         total_real_profit_fen = (
-            total_revenue_fen - total_food_cost_fen - total_commission_fen
-            - total_packaging_fen - total_subsidy_fen
+            total_revenue_fen - total_food_cost_fen - total_commission_fen - total_packaging_fen - total_subsidy_fen
         )
-        total_avg_profit_fen = (
-            total_real_profit_fen // total_order_count
-            if total_order_count > 0 else 0
-        )
+        total_avg_profit_fen = total_real_profit_fen // total_order_count if total_order_count > 0 else 0
 
         return {
             "total": {
@@ -557,7 +555,8 @@ class CEOCockpitService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.id AS dish_id,
                     COALESCE(d.dish_name, oi.item_name, '') AS dish_name,
@@ -589,7 +588,8 @@ class CEOCockpitService:
                   AND oi.is_deleted = FALSE
                 GROUP BY d.id, d.dish_name, oi.item_name, d.category
                 ORDER BY total_margin_fen DESC
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
 
@@ -597,18 +597,20 @@ class CEOCockpitService:
 
         all_dishes = []
         for row in rows:
-            all_dishes.append({
-                "dish_id": str(row["dish_id"]) if row["dish_id"] else None,
-                "dish_name": row["dish_name"] or "",
-                "category": row["category"] or "",
-                "sales_qty": int(row["sales_qty"]),
-                "total_revenue_fen": int(row["total_revenue_fen"]),
-                "total_cost_fen": int(row["total_cost_fen"]),
-                "total_margin_fen": int(row["total_margin_fen"]),
-                "total_margin_yuan": _fen_to_yuan(int(row["total_margin_fen"])),
-                "margin_per_unit_fen": int(row["margin_per_unit_fen"]),
-                "margin_per_unit_yuan": _fen_to_yuan(int(row["margin_per_unit_fen"])),
-            })
+            all_dishes.append(
+                {
+                    "dish_id": str(row["dish_id"]) if row["dish_id"] else None,
+                    "dish_name": row["dish_name"] or "",
+                    "category": row["category"] or "",
+                    "sales_qty": int(row["sales_qty"]),
+                    "total_revenue_fen": int(row["total_revenue_fen"]),
+                    "total_cost_fen": int(row["total_cost_fen"]),
+                    "total_margin_fen": int(row["total_margin_fen"]),
+                    "total_margin_yuan": _fen_to_yuan(int(row["total_margin_fen"])),
+                    "margin_per_unit_fen": int(row["margin_per_unit_fen"]),
+                    "margin_per_unit_yuan": _fen_to_yuan(int(row["margin_per_unit_fen"])),
+                }
+            )
 
         # TOP5: 总毛利最高的5个菜
         top_dishes = all_dishes[:5]
@@ -661,7 +663,8 @@ class CEOCockpitService:
         # ── 优先级1: 亏损菜干预 ──────────────────────────────────────
         try:
             loss_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(d.dish_name, oi.item_name, '') AS dish_name,
                         SUM(
@@ -684,28 +687,30 @@ class CEOCockpitService:
                     ) < 0
                     ORDER BY total_margin_fen ASC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
             )
             loss_row = loss_result.mappings().first()
             if loss_row:
                 loss_yuan = _fen_to_yuan(abs(int(loss_row["total_margin_fen"])))
-                decisions.append({
-                    "priority": 1,
-                    "action_type": "dish_adjust",
-                    "severity": "critical",
-                    "title": f"{loss_row['dish_name']}已亏",
-                    "description": (
-                        f"{loss_row['dish_name']}今日累计亏损"
-                        f"\u00a5{loss_yuan} \u2192 建议下架或提价\u00a55"
-                    ),
-                    "action_label": "调整菜品",
-                    "metadata": {
-                        "dish_name": loss_row["dish_name"],
-                        "loss_fen": int(loss_row["total_margin_fen"]),
-                        "loss_yuan": loss_yuan,
-                    },
-                })
+                decisions.append(
+                    {
+                        "priority": 1,
+                        "action_type": "dish_adjust",
+                        "severity": "critical",
+                        "title": f"{loss_row['dish_name']}已亏",
+                        "description": (
+                            f"{loss_row['dish_name']}今日累计亏损" f"\u00a5{loss_yuan} \u2192 建议下架或提价\u00a55"
+                        ),
+                        "action_label": "调整菜品",
+                        "metadata": {
+                            "dish_name": loss_row["dish_name"],
+                            "loss_fen": int(loss_row["total_margin_fen"]),
+                            "loss_yuan": loss_yuan,
+                        },
+                    }
+                )
         except (OperationalError, SQLAlchemyError) as exc:
             log.warning("ai_decisions.loss_dish_check_failed", exc_info=True)
             _ = exc
@@ -713,7 +718,8 @@ class CEOCockpitService:
         # ── 优先级2: 采购紧急（库存<2天） ───────────────────────────
         try:
             low_stock_result = await db.execute(
-                text("""
+                text(
+                    """
                     WITH daily_usage AS (
                         SELECT
                             it.ingredient_id,
@@ -750,26 +756,28 @@ class CEOCockpitService:
                       AND cs.stock_qty / du.avg_daily_qty < 2
                     ORDER BY days_remaining ASC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
             )
             low_stock_row = low_stock_result.mappings().first()
             if low_stock_row and len(decisions) < MAX_AI_DECISIONS:
-                decisions.append({
-                    "priority": 2,
-                    "action_type": "procurement",
-                    "severity": "warning",
-                    "title": "明日预计缺货",
-                    "description": (
-                        f"库存仅剩{float(low_stock_row['days_remaining'])}天用量"
-                        f" \u2192 采购单已生成待确认"
-                    ),
-                    "action_label": "确认采购",
-                    "metadata": {
-                        "ingredient_id": str(low_stock_row["ingredient_id"]),
-                        "days_remaining": float(low_stock_row["days_remaining"]),
-                    },
-                })
+                decisions.append(
+                    {
+                        "priority": 2,
+                        "action_type": "procurement",
+                        "severity": "warning",
+                        "title": "明日预计缺货",
+                        "description": (
+                            f"库存仅剩{float(low_stock_row['days_remaining'])}天用量" f" \u2192 采购单已生成待确认"
+                        ),
+                        "action_label": "确认采购",
+                        "metadata": {
+                            "ingredient_id": str(low_stock_row["ingredient_id"]),
+                            "days_remaining": float(low_stock_row["days_remaining"]),
+                        },
+                    }
+                )
         except (OperationalError, SQLAlchemyError) as exc:
             log.warning("ai_decisions.low_stock_check_failed", exc_info=True)
             _ = exc
@@ -777,7 +785,8 @@ class CEOCockpitService:
         # ── 优先级3: VIP客户召回 ─────────────────────────────────────
         try:
             vip_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS dormant_count
                     FROM (
                         SELECT o.customer_id,
@@ -792,28 +801,30 @@ class CEOCockpitService:
                         HAVING MAX(o.created_at) < :target_date - INTERVAL '30 days'
                            AND COUNT(*) >= 3
                     ) dormant_vips
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
             )
             vip_row = vip_result.mappings().first()
             dormant_count = int(vip_row["dormant_count"]) if vip_row else 0
             if dormant_count > 0 and len(decisions) < MAX_AI_DECISIONS:
                 estimated_recall = max(1, int(dormant_count * 0.3))
-                decisions.append({
-                    "priority": 3,
-                    "action_type": "customer_recall",
-                    "severity": "info",
-                    "title": f"{dormant_count}名VIP超30天未来",
-                    "description": (
-                        f"{dormant_count}名VIP客户超30天未消费"
-                        f" \u2192 发券预计回流{estimated_recall}人"
-                    ),
-                    "action_label": "发送召回券",
-                    "metadata": {
-                        "dormant_count": dormant_count,
-                        "estimated_recall": estimated_recall,
-                    },
-                })
+                decisions.append(
+                    {
+                        "priority": 3,
+                        "action_type": "customer_recall",
+                        "severity": "info",
+                        "title": f"{dormant_count}名VIP超30天未来",
+                        "description": (
+                            f"{dormant_count}名VIP客户超30天未消费" f" \u2192 发券预计回流{estimated_recall}人"
+                        ),
+                        "action_label": "发送召回券",
+                        "metadata": {
+                            "dormant_count": dormant_count,
+                            "estimated_recall": estimated_recall,
+                        },
+                    }
+                )
         except (OperationalError, SQLAlchemyError) as exc:
             log.warning("ai_decisions.vip_recall_check_failed", exc_info=True)
             _ = exc
@@ -821,7 +832,8 @@ class CEOCockpitService:
         # ── 优先级4: 损耗告警 ────────────────────────────────────────
         try:
             waste_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(wr.quantity * wr.unit_cost_fen), 0)::BIGINT AS waste_fen,
                         COALESCE((
@@ -841,7 +853,8 @@ class CEOCockpitService:
                     WHERE wr.store_id = :store_id
                       AND wr.tenant_id = :tenant_id
                       AND DATE(wr.created_at) = :target_date
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
             )
             waste_row = waste_result.mappings().first()
@@ -850,31 +863,28 @@ class CEOCockpitService:
                 usage_fen = int(waste_row["usage_fen"])
                 waste_rate = waste_fen / usage_fen if usage_fen > 0 else 0.0
                 if waste_rate > 0.08 and len(decisions) < MAX_AI_DECISIONS:
-                    decisions.append({
-                        "priority": 4,
-                        "action_type": "waste_alert",
-                        "severity": "warning",
-                        "title": f"损耗率{waste_rate:.0%}超标",
-                        "description": (
-                            f"今日损耗率{waste_rate:.0%}(目标<5%)"
-                            f" \u2192 需定位到具体班次"
-                        ),
-                        "action_label": "查看详情",
-                        "metadata": {
-                            "waste_rate": round(waste_rate * 100, 1),
-                            "waste_fen": waste_fen,
-                            "usage_fen": usage_fen,
-                        },
-                    })
+                    decisions.append(
+                        {
+                            "priority": 4,
+                            "action_type": "waste_alert",
+                            "severity": "warning",
+                            "title": f"损耗率{waste_rate:.0%}超标",
+                            "description": (f"今日损耗率{waste_rate:.0%}(目标<5%)" f" \u2192 需定位到具体班次"),
+                            "action_label": "查看详情",
+                            "metadata": {
+                                "waste_rate": round(waste_rate * 100, 1),
+                                "waste_fen": waste_fen,
+                                "usage_fen": usage_fen,
+                            },
+                        }
+                    )
         except (OperationalError, SQLAlchemyError) as exc:
             log.warning("ai_decisions.waste_check_failed", exc_info=True)
             _ = exc
 
         # ── 优先级5: 外卖亏损 ────────────────────────────────────────
         try:
-            delivery = await self._compute_delivery_real_profit(
-                db, store_id, tenant_id, target_date
-            )
+            delivery = await self._compute_delivery_real_profit(db, store_id, tenant_id, target_date)
             for ch in delivery.get("by_channel", []):
                 if ch["real_profit_fen"] < 0 and len(decisions) < MAX_AI_DECISIONS:
                     channel_name = {
@@ -883,22 +893,21 @@ class CEOCockpitService:
                         "douyin": "抖音",
                     }.get(ch["channel"], ch["channel"])
                     avg_loss_yuan = _fen_to_yuan(abs(ch["avg_profit_fen"]))
-                    decisions.append({
-                        "priority": 5,
-                        "action_type": "delivery_adjust",
-                        "severity": "warning",
-                        "title": f"{channel_name}外卖亏损",
-                        "description": (
-                            f"{channel_name}单均亏\u00a5{avg_loss_yuan}"
-                            f" \u2192 建议调整满减门槛"
-                        ),
-                        "action_label": "调整满减",
-                        "metadata": {
-                            "channel": ch["channel"],
-                            "avg_loss_fen": ch["avg_profit_fen"],
-                            "total_loss_fen": ch["real_profit_fen"],
-                        },
-                    })
+                    decisions.append(
+                        {
+                            "priority": 5,
+                            "action_type": "delivery_adjust",
+                            "severity": "warning",
+                            "title": f"{channel_name}外卖亏损",
+                            "description": (f"{channel_name}单均亏\u00a5{avg_loss_yuan}" f" \u2192 建议调整满减门槛"),
+                            "action_label": "调整满减",
+                            "metadata": {
+                                "channel": ch["channel"],
+                                "avg_loss_fen": ch["avg_profit_fen"],
+                                "total_loss_fen": ch["real_profit_fen"],
+                            },
+                        }
+                    )
                     break  # 只取第一个亏损渠道
         except (OperationalError, SQLAlchemyError) as exc:
             log.warning("ai_decisions.delivery_check_failed", exc_info=True)
@@ -950,7 +959,8 @@ class CEOCockpitService:
                 pass  # 在下方统一查询
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                     WITH period_stats AS (
                         SELECT
                             COALESCE(o.biz_date, DATE(o.created_at)) AS stat_date,
@@ -974,7 +984,8 @@ class CEOCockpitService:
                         customer_count,
                         avg_ticket_fen
                     FROM period_stats
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -982,9 +993,7 @@ class CEOCockpitService:
                     "baseline_date": baseline_date,
                 },
             )
-            stats_rows = {
-                str(r["stat_date"]): r for r in result.mappings().all()
-            }
+            stats_rows = {str(r["stat_date"]): r for r in result.mappings().all()}
 
             today_stats = stats_rows.get(str(target_date), {})
             baseline_stats = stats_rows.get(str(baseline_date), {})
@@ -1003,27 +1012,24 @@ class CEOCockpitService:
                 if pct_change is not None:
                     severity = _deviation_severity(pct_change)
                     if severity:
-                        anomalies.append({
-                            "metric_key": metric_key,
-                            "metric_name": metric_name,
-                            "current_value": current_val,
-                            "current_display": (
-                                _fen_to_yuan(current_val) if unit == "fen"
-                                else current_val
-                            ),
-                            "baseline_value": baseline_val,
-                            "baseline_display": (
-                                _fen_to_yuan(baseline_val) if unit == "fen"
-                                else baseline_val
-                            ),
-                            "deviation_pct": pct_change,
-                            "severity": severity,
-                            "baseline_label": f"上周{self._weekday_cn(baseline_date)}",
-                        })
+                        anomalies.append(
+                            {
+                                "metric_key": metric_key,
+                                "metric_name": metric_name,
+                                "current_value": current_val,
+                                "current_display": (_fen_to_yuan(current_val) if unit == "fen" else current_val),
+                                "baseline_value": baseline_val,
+                                "baseline_display": (_fen_to_yuan(baseline_val) if unit == "fen" else baseline_val),
+                                "deviation_pct": pct_change,
+                                "severity": severity,
+                                "baseline_label": f"上周{self._weekday_cn(baseline_date)}",
+                            }
+                        )
 
             # 退菜率
             return_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(o.biz_date, DATE(o.created_at)) AS stat_date,
                         COUNT(*) FILTER (WHERE oi.status = 'returned')::INT AS return_count,
@@ -1036,7 +1042,8 @@ class CEOCockpitService:
                       AND o.is_deleted = FALSE
                       AND oi.is_deleted = FALSE
                     GROUP BY COALESCE(o.biz_date, DATE(o.created_at))
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -1044,9 +1051,7 @@ class CEOCockpitService:
                     "baseline_date": baseline_date,
                 },
             )
-            return_rows = {
-                str(r["stat_date"]): r for r in return_result.mappings().all()
-            }
+            return_rows = {str(r["stat_date"]): r for r in return_result.mappings().all()}
 
             today_return = return_rows.get(str(target_date), {})
             baseline_return = return_rows.get(str(baseline_date), {})
@@ -1063,23 +1068,24 @@ class CEOCockpitService:
             )
             if baseline_return_rate > 0:
                 return_pct_change = round(
-                    (today_return_rate - baseline_return_rate)
-                    / baseline_return_rate * 100,
+                    (today_return_rate - baseline_return_rate) / baseline_return_rate * 100,
                     1,
                 )
                 return_severity = _deviation_severity(return_pct_change)
                 if return_severity:
-                    anomalies.append({
-                        "metric_key": "return_rate",
-                        "metric_name": "退菜率",
-                        "current_value": round(today_return_rate, 1),
-                        "current_display": f"{today_return_rate:.1f}%",
-                        "baseline_value": round(baseline_return_rate, 1),
-                        "baseline_display": f"{baseline_return_rate:.1f}%",
-                        "deviation_pct": return_pct_change,
-                        "severity": return_severity,
-                        "baseline_label": f"上周{self._weekday_cn(baseline_date)}",
-                    })
+                    anomalies.append(
+                        {
+                            "metric_key": "return_rate",
+                            "metric_name": "退菜率",
+                            "current_value": round(today_return_rate, 1),
+                            "current_display": f"{today_return_rate:.1f}%",
+                            "baseline_value": round(baseline_return_rate, 1),
+                            "baseline_display": f"{baseline_return_rate:.1f}%",
+                            "deviation_pct": return_pct_change,
+                            "severity": return_severity,
+                            "baseline_label": f"上周{self._weekday_cn(baseline_date)}",
+                        }
+                    )
 
         except (OperationalError, SQLAlchemyError) as exc:
             log.warning("detect_anomalies.query_failed", exc_info=True)
@@ -1129,14 +1135,16 @@ class CEOCockpitService:
 
         # 月度目标
         target_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(revenue_target_fen, 0)::BIGINT AS target_fen
                 FROM stores
                 WHERE id = :store_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id},
         )
         target_row = target_result.mappings().first()
@@ -1145,7 +1153,8 @@ class CEOCockpitService:
         # 本月累计营业额
         month_start = target_date.replace(day=1)
         actual_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(o.final_amount_fen), 0)::BIGINT AS actual_fen
                 FROM orders o
                 WHERE o.store_id = :store_id
@@ -1154,7 +1163,8 @@ class CEOCockpitService:
                   AND COALESCE(o.biz_date, DATE(o.created_at)) <= :target_date
                   AND o.status IN ('paid', 'completed')
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -1171,10 +1181,7 @@ class CEOCockpitService:
         date_progress_pct = round(day_of_month / days_in_month * 100, 1)
 
         # 营收进度
-        revenue_progress_pct = (
-            round(month_actual_fen / month_target_fen * 100, 1)
-            if month_target_fen > 0 else 0.0
-        )
+        revenue_progress_pct = round(month_actual_fen / month_target_fen * 100, 1) if month_target_fen > 0 else 0.0
 
         # 节奏判断
         if month_target_fen <= 0:
@@ -1192,7 +1199,8 @@ class CEOCockpitService:
             daily_target_fen = month_target_fen // days_in_month
             try:
                 behind_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             COALESCE(o.biz_date, DATE(o.created_at)) AS biz_day,
                             COALESCE(SUM(o.final_amount_fen), 0)::BIGINT AS day_revenue_fen
@@ -1207,7 +1215,8 @@ class CEOCockpitService:
                         HAVING COALESCE(SUM(o.final_amount_fen), 0) < :daily_target
                         ORDER BY day_revenue_fen ASC
                         LIMIT 5
-                    """),
+                    """
+                    ),
                     {
                         "store_id": store_id,
                         "tenant_id": tenant_id,
@@ -1218,13 +1227,15 @@ class CEOCockpitService:
                 )
                 for row in behind_result.mappings().all():
                     gap_fen = daily_target_fen - int(row["day_revenue_fen"])
-                    behind_days.append({
-                        "date": str(row["biz_day"]),
-                        "revenue_fen": int(row["day_revenue_fen"]),
-                        "revenue_yuan": _fen_to_yuan(int(row["day_revenue_fen"])),
-                        "gap_fen": gap_fen,
-                        "gap_yuan": _fen_to_yuan(gap_fen),
-                    })
+                    behind_days.append(
+                        {
+                            "date": str(row["biz_day"]),
+                            "revenue_fen": int(row["day_revenue_fen"]),
+                            "revenue_yuan": _fen_to_yuan(int(row["day_revenue_fen"])),
+                            "gap_fen": gap_fen,
+                            "gap_yuan": _fen_to_yuan(gap_fen),
+                        }
+                    )
             except (OperationalError, SQLAlchemyError) as exc:
                 log.warning("month_progress.behind_analysis_failed", exc_info=True)
                 _ = exc
@@ -1286,7 +1297,8 @@ class CEOCockpitService:
                 params["brand_id"] = brand_id
 
             stores_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         s.id AS store_id,
                         s.name AS store_name,
@@ -1323,7 +1335,8 @@ class CEOCockpitService:
                       AND s.is_deleted = FALSE
                       {brand_filter}
                     ORDER BY revenue_fen DESC NULLS LAST
-                """),
+                """
+                ),
                 params,
             )
 
@@ -1374,9 +1387,7 @@ class CEOCockpitService:
                     "total_profit_fen": total_profit_fen,
                     "total_profit_yuan": _fen_to_yuan(total_profit_fen),
                     "total_customers": total_customers,
-                    "avg_revenue_fen": (
-                        total_revenue_fen // store_count if store_count > 0 else 0
-                    ),
+                    "avg_revenue_fen": (total_revenue_fen // store_count if store_count > 0 else 0),
                     "bleeding_count": len(bleeding_stores),
                 },
                 "stores": stores_data,
@@ -1442,7 +1453,8 @@ class CEOCockpitService:
             # 段2: 00:00 到 end_hour-24 (次日)
             next_date = target_date + timedelta(days=1)
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(o.final_amount_fen), 0)::BIGINT AS revenue_fen,
                         COUNT(*)::INT AS customer_count
@@ -1458,7 +1470,8 @@ class CEOCockpitService:
                           (COALESCE(o.biz_date, DATE(o.created_at)) = :next_date
                            AND EXTRACT(HOUR FROM o.created_at) < :end_hour_wrapped)
                       )
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -1470,7 +1483,8 @@ class CEOCockpitService:
             )
         else:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(o.final_amount_fen), 0)::BIGINT AS revenue_fen,
                         COUNT(*)::INT AS customer_count
@@ -1482,7 +1496,8 @@ class CEOCockpitService:
                       AND EXTRACT(HOUR FROM o.created_at) < :end_hour
                       AND o.status IN ('paid', 'completed')
                       AND o.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -1500,7 +1515,8 @@ class CEOCockpitService:
         if end_hour > 24:
             next_date = target_date + timedelta(days=1)
             cost_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(
                             COALESCE(oi.food_cost_fen, oi.cost_fen, 0) * oi.quantity
@@ -1519,7 +1535,8 @@ class CEOCockpitService:
                           (COALESCE(o.biz_date, DATE(o.created_at)) = :next_date
                            AND EXTRACT(HOUR FROM o.created_at) < :end_hour_wrapped)
                       )
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -1531,7 +1548,8 @@ class CEOCockpitService:
             )
         else:
             cost_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(
                             COALESCE(oi.food_cost_fen, oi.cost_fen, 0) * oi.quantity
@@ -1546,7 +1564,8 @@ class CEOCockpitService:
                       AND o.status IN ('paid', 'completed')
                       AND o.is_deleted = FALSE
                       AND oi.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -1588,7 +1607,8 @@ class CEOCockpitService:
         """
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(
                         cs.actual_hours * COALESCE(e.hourly_wage_fen, 0)
                     ), 0)::BIGINT AS labor_cost_fen
@@ -1598,7 +1618,8 @@ class CEOCockpitService:
                     WHERE cs.store_id = :store_id
                       AND cs.tenant_id = :tenant_id
                       AND cs.shift_date = :target_date
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
             )
             row = result.mappings().first()
@@ -1626,21 +1647,34 @@ class CEOCockpitService:
             "date": target_date.isoformat(),
             "snapshot_time": datetime.now(timezone.utc).isoformat(),
             "overview": {
-                "revenue_fen": 0, "revenue_yuan": 0.0,
-                "cost_fen": 0, "cost_yuan": 0.0,
-                "profit_fen": 0, "profit_yuan": 0.0,
-                "customer_count": 0, "turnover_rate": 0.0,
-                "avg_ticket_fen": 0, "avg_ticket_yuan": 0.0,
+                "revenue_fen": 0,
+                "revenue_yuan": 0.0,
+                "cost_fen": 0,
+                "cost_yuan": 0.0,
+                "profit_fen": 0,
+                "profit_yuan": 0.0,
+                "customer_count": 0,
+                "turnover_rate": 0.0,
+                "avg_ticket_fen": 0,
+                "avg_ticket_yuan": 0.0,
             },
             "daypart_pnl": {"dayparts": []},
             "delivery_profit": {
                 "total": {
-                    "order_count": 0, "revenue_fen": 0, "revenue_yuan": 0.0,
-                    "food_cost_fen": 0, "commission_fen": 0, "commission_yuan": 0.0,
-                    "packaging_fen": 0, "packaging_yuan": 0.0,
-                    "subsidy_fen": 0, "subsidy_yuan": 0.0,
-                    "real_profit_fen": 0, "real_profit_yuan": 0.0,
-                    "avg_profit_fen": 0, "avg_profit_yuan": 0.0,
+                    "order_count": 0,
+                    "revenue_fen": 0,
+                    "revenue_yuan": 0.0,
+                    "food_cost_fen": 0,
+                    "commission_fen": 0,
+                    "commission_yuan": 0.0,
+                    "packaging_fen": 0,
+                    "packaging_yuan": 0.0,
+                    "subsidy_fen": 0,
+                    "subsidy_yuan": 0.0,
+                    "real_profit_fen": 0,
+                    "real_profit_yuan": 0.0,
+                    "avg_profit_fen": 0,
+                    "avg_profit_yuan": 0.0,
                 },
                 "by_channel": [],
             },
@@ -1649,10 +1683,15 @@ class CEOCockpitService:
             "ai_decisions": [],
             "anomalies": [],
             "month_progress": {
-                "month_target_fen": 0, "month_target_yuan": 0.0,
-                "month_actual_fen": 0, "month_actual_yuan": 0.0,
-                "revenue_progress_pct": 0.0, "date_progress_pct": 0.0,
-                "day_of_month": 0, "days_in_month": 0,
-                "pace": "no_target", "behind_days": [],
+                "month_target_fen": 0,
+                "month_target_yuan": 0.0,
+                "month_actual_fen": 0,
+                "month_actual_yuan": 0.0,
+                "revenue_progress_pct": 0.0,
+                "date_progress_pct": 0.0,
+                "day_of_month": 0,
+                "days_in_month": 0,
+                "pace": "no_target",
+                "behind_days": [],
             },
         }

@@ -29,10 +29,12 @@ class ForgeTrustService:
 
     async def submit_trust_audit(self, app_id: str, requested_tier: str, evidence: Dict[str, Any]) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""INSERT INTO forge.trust_audits
+            text(
+                """INSERT INTO forge.trust_audits
                     (tenant_id, app_id, requested_tier, evidence, status)
                     VALUES (:tid, :app_id, :tier, :evidence::jsonb, 'pending')
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {"tid": self.tenant_id, "app_id": app_id, "tier": requested_tier, "evidence": str(evidence)},
         )
         await self.db.commit()
@@ -54,10 +56,12 @@ class ForgeTrustService:
 
     async def request_upgrade(self, app_id: str, target_tier: str, evidence: Dict[str, Any]) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""INSERT INTO forge.trust_upgrade_requests
+            text(
+                """INSERT INTO forge.trust_upgrade_requests
                     (tenant_id, app_id, target_tier, evidence, status)
                     VALUES (:tid, :app_id, :tier, :evidence::jsonb, 'pending')
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {"tid": self.tenant_id, "app_id": app_id, "tier": target_tier, "evidence": str(evidence)},
         )
         await self.db.commit()
@@ -65,10 +69,12 @@ class ForgeTrustService:
 
     async def auto_downgrade(self, app_id: str, reason: str) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""UPDATE forge.app_trust_status
+            text(
+                """UPDATE forge.app_trust_status
                     SET current_tier = current_tier - 1, downgrade_reason = :reason, updated_at = NOW()
                     WHERE tenant_id = :tid AND app_id = :app_id
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {"tid": self.tenant_id, "app_id": app_id, "reason": reason},
         )
         await self.db.commit()

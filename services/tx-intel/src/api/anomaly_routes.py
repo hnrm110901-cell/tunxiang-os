@@ -96,25 +96,29 @@ async def _detect_revenue_drop(db: AsyncSession, tenant_id: uuid.UUID, days: int
         yoy_end = day_end_time - timedelta(days=365)
 
         r = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_amount), 0) AS revenue
                 FROM orders
                 WHERE tenant_id = :tenant_id
                   AND status = 'completed'
                   AND created_at BETWEEN :start AND :end
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "start": day_start.isoformat(), "end": day_end_time.isoformat()},
         )
         this_rev = float(r.scalar() or 0)
 
         r2 = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_amount), 0) AS revenue
                 FROM orders
                 WHERE tenant_id = :tenant_id
                   AND status = 'completed'
                   AND created_at BETWEEN :start AND :end
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "start": yoy_start.isoformat(), "end": yoy_end.isoformat()},
         )
         yoy_rev = float(r2.scalar() or 0)
@@ -150,21 +154,25 @@ async def _detect_cost_spike(db: AsyncSession, tenant_id: uuid.UUID, days: int) 
         params = {"tenant_id": str(tenant_id), "start": day_start.isoformat(), "end": day_end.isoformat()}
 
         r = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_amount), 0) FROM orders
                 WHERE tenant_id = :tenant_id AND status = 'completed'
                   AND created_at BETWEEN :start AND :end
-            """),
+            """
+            ),
             params,
         )
         revenue = float(r.scalar() or 0)
 
         r2 = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(amount), 0) FROM cost_records
                 WHERE tenant_id = :tenant_id AND cost_type = 'ingredient'
                   AND recorded_at BETWEEN :start AND :end
-            """),
+            """
+            ),
             params,
         )
         cost = float(r2.scalar() or 0)
@@ -195,14 +203,16 @@ async def _detect_high_refund(db: AsyncSession, tenant_id: uuid.UUID, days: int)
     now = datetime.now(timezone.utc)
     period_start = (now - timedelta(days=days)).isoformat()
     r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE status='completed') AS completed,
                 COUNT(*) FILTER (WHERE status='refunded') AS refunded
             FROM orders
             WHERE tenant_id = :tenant_id
               AND created_at BETWEEN :start AND :end
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "start": period_start, "end": now.isoformat()},
     )
     row = r.fetchone()
@@ -237,13 +247,15 @@ async def _detect_slow_kitchen(db: AsyncSession, tenant_id: uuid.UUID, days: int
     now = datetime.now(timezone.utc)
     period_start = (now - timedelta(days=days)).isoformat()
     r = await db.execute(
-        text("""
+        text(
+            """
             SELECT AVG(EXTRACT(EPOCH FROM (finished_at - created_at)) / 60.0) AS avg_min
             FROM kitchen_orders
             WHERE tenant_id = :tenant_id
               AND status = 'done'
               AND created_at BETWEEN :start AND :end
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "start": period_start, "end": now.isoformat()},
     )
     avg_min = float(r.scalar() or 0)
@@ -271,14 +283,16 @@ async def _detect_expiry_risk(db: AsyncSession, tenant_id: uuid.UUID) -> list[di
     now = datetime.now(timezone.utc)
     threshold_date = (now + timedelta(days=7)).isoformat()
     r = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(DISTINCT id) AS expiry_count
             FROM inventory_items
             WHERE tenant_id = :tenant_id
               AND expires_at IS NOT NULL
               AND expires_at > :now
               AND expires_at <= :threshold
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "now": now.isoformat(), "threshold": threshold_date},
     )
     count = int(r.scalar() or 0)
@@ -325,7 +339,8 @@ async def _fetch_compliance_anomalies(
         params["store_id"] = store_id
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, store_id, severity, status, title, description, created_at
             FROM compliance_alerts
             WHERE tenant_id = :tenant_id
@@ -335,7 +350,8 @@ async def _fetch_compliance_anomalies(
                 CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
                 created_at DESC
             LIMIT 50
-        """),
+        """
+        ),
         params,
     )
     rows = r.fetchall()
@@ -385,7 +401,8 @@ async def _fetch_revenue_anomalies(
         params["store_id"] = store_id
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 store_id,
                 COALESCE(SUM(total_fen) FILTER (
@@ -400,7 +417,8 @@ async def _fetch_revenue_anomalies(
               AND created_at BETWEEN :prev_start AND :curr_end
               {store_filter}
             GROUP BY store_id
-        """),
+        """
+        ),
         params,
     )
     rows = r.fetchall()
@@ -518,11 +536,13 @@ async def dismiss_anomaly(
         # 尝试写入 anomaly_dismissals 表（如存在）
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO anomaly_dismissals (id, tenant_id, anomaly_ref_id, dismissed_at)
                 VALUES (:id, :tenant_id, :anomaly_id, :dismissed_at)
                 ON CONFLICT (tenant_id, anomaly_ref_id) DO UPDATE SET dismissed_at = :dismissed_at
-            """),
+            """
+            ),
             {
                 "id": str(uuid.uuid4()),
                 "tenant_id": str(tenant_id),

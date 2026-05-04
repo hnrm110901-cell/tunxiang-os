@@ -23,6 +23,7 @@ logger = structlog.get_logger(__name__)
 
 from .api.approval_center_routes import router as approval_center_router
 from .api.approval_workflow_routes import router as approval_router
+from .api.customer_journey_routes import router as customer_journey_router
 from .api.daily_ops import router
 from .api.daily_settlement_routes import router as settlement_router
 from .api.daily_summary_routes import router as daily_summary_router
@@ -47,7 +48,6 @@ from .api.shift_routes import router as shift_router
 from .api.store_clone import router as clone_router
 from .api.sync_management_routes import router as sync_management_router
 from .api.telemetry_routes import router as telemetry_router
-from .api.customer_journey_routes import router as customer_journey_router
 from .api.trial_data_routes import router as trial_data_router
 
 app = FastAPI(title="TunxiangOS tx-ops", version="3.0.0", description="日清日结操作层")
@@ -77,7 +77,12 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
-app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","), allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(router)
 app.include_router(clone_router)
 app.include_router(ops_router)

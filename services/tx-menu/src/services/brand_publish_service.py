@@ -358,13 +358,15 @@ class BrandPublishService:
         # 1. 获取品牌标准价
         await self._repo._set_tenant()
         dish_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT price_fen, dish_name
                 FROM dishes
                 WHERE id = :dish_id
                   AND tenant_id = :tid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"dish_id": _uuid.UUID(dish_id), "tid": self._repo._tid},
         )
         dish_row = dish_result.fetchone()

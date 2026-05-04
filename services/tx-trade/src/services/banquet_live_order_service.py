@@ -29,10 +29,12 @@ class BanquetLiveOrderService:
     ) -> dict:
         oid = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_live_orders (id, tenant_id, banquet_id, order_type, items_json, amount_fen, quantity, requested_by, requested_name, notes, status)
             VALUES (:id, :tid, :bid, :otype, :items::jsonb, :amt, :qty, :rby, :rname, :notes, 'pending')
-        """),
+        """
+            ),
             {
                 "id": oid,
                 "tid": self.tenant_id,

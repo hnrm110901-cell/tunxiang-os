@@ -75,12 +75,8 @@ class WarehouseZone(TenantBase):
     zone_code: Mapped[str] = mapped_column(String(32), nullable=False)
     zone_name: Mapped[str] = mapped_column(String(64), nullable=False)
     temperature_type: Mapped[str] = mapped_column(String(24), nullable=False)
-    min_temp_celsius: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(5, 2), nullable=True
-    )
-    max_temp_celsius: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(5, 2), nullable=True
-    )
+    min_temp_celsius: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    max_temp_celsius: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
@@ -117,12 +113,8 @@ class IngredientLocationBinding(TenantBase):
         nullable=False,
     )
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    bound_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    bound_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    bound_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
 
 
 class InventoryByLocation(TenantBase):
@@ -142,18 +134,10 @@ class InventoryByLocation(TenantBase):
     )
     ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     batch_no: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    quantity: Mapped[Decimal] = mapped_column(
-        Numeric(14, 3), nullable=False, default=0
-    )
-    reserved_quantity: Mapped[Decimal] = mapped_column(
-        Numeric(14, 3), nullable=False, default=0
-    )
-    last_in_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    last_out_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    reserved_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    last_in_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_out_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     expiry_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
 

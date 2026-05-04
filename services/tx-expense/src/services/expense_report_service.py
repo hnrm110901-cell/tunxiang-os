@@ -199,7 +199,8 @@ class ExpenseReportService:
         end: date,
     ) -> dict:
         """查询周期总览数据。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 COUNT(DISTINCT ea.id)                                           AS total_applications,
                 COALESCE(SUM(ea.total_amount), 0)                               AS total_amount_fen,
@@ -211,7 +212,8 @@ class ExpenseReportService:
             WHERE ea.tenant_id = :tenant_id
               AND ea.is_deleted = FALSE
               AND DATE(ea.created_at) BETWEEN :start AND :end
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -244,7 +246,8 @@ class ExpenseReportService:
         end: date,
     ) -> list:
         """按门店统计费用。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 ea.store_id                                                         AS store_id,
                 COUNT(DISTINCT ea.id)                                               AS application_count,
@@ -257,7 +260,8 @@ class ExpenseReportService:
               AND DATE(ea.created_at) BETWEEN :start AND :end
             GROUP BY ea.store_id
             ORDER BY SUM(ea.total_amount) DESC NULLS LAST
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -292,7 +296,8 @@ class ExpenseReportService:
         end: date,
     ) -> list:
         """按科目统计费用（聚合 SQL，含科目占比）。"""
-        sql = text("""
+        sql = text(
+            """
             WITH period_total AS (
                 SELECT COALESCE(SUM(ei.amount), 0) AS grand_total
                 FROM expense_items ei
@@ -321,7 +326,8 @@ class ExpenseReportService:
               AND DATE(ea.created_at) BETWEEN :start AND :end
             GROUP BY ec.id, ec.name, ec.code, pt.grand_total
             ORDER BY SUM(ei.amount) DESC NULLS LAST
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -351,7 +357,8 @@ class ExpenseReportService:
         end: date,
     ) -> list:
         """按申请人统计费用（TOP20，聚合 SQL）。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 ea.applicant_id                                                     AS applicant_id,
                 COUNT(DISTINCT ea.id)                                               AS application_count,
@@ -365,7 +372,8 @@ class ExpenseReportService:
             GROUP BY ea.applicant_id
             ORDER BY SUM(ea.total_amount) DESC NULLS LAST
             LIMIT 20
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -421,7 +429,8 @@ class ExpenseReportService:
         if months < 1 or months > 24:
             months = 6
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 EXTRACT(YEAR FROM ea.created_at)::INT      AS year,
                 EXTRACT(MONTH FROM ea.created_at)::INT     AS month,
@@ -434,7 +443,8 @@ class ExpenseReportService:
               AND ea.created_at >= (NOW() - INTERVAL '1 month' * :months)
             GROUP BY year, month
             ORDER BY year ASC, month ASC
-        """)
+        """
+        )
 
         try:
             result = await db.execute(
@@ -516,7 +526,8 @@ class ExpenseReportService:
 
         start, end = _month_range(year, month)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 ea.applicant_id,
                 COUNT(DISTINCT ea.id)                                               AS application_count,
@@ -530,7 +541,8 @@ class ExpenseReportService:
             GROUP BY ea.applicant_id
             ORDER BY approved_amount_fen DESC NULLS LAST
             LIMIT :limit
-        """)
+        """
+        )
 
         try:
             result = await db.execute(
@@ -653,7 +665,8 @@ class ExpenseReportService:
         q_end: date,
     ) -> list:
         """Rule-1：单笔超过本人上季度单笔平均的 3 倍。"""
-        sql = text("""
+        sql = text(
+            """
             WITH personal_avg AS (
                 -- 上季度本人平均单笔金额（按明细行）
                 SELECT
@@ -687,7 +700,8 @@ class ExpenseReportService:
               AND ei.amount > pa.avg_item_fen * :multiplier
             ORDER BY ei.amount DESC
             LIMIT 100
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -724,7 +738,8 @@ class ExpenseReportService:
         end: date,
     ) -> list:
         """Rule-2：同一申请人同一天同一科目多次报销。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 ea.applicant_id,
                 DATE(ea.created_at)     AS expense_date,
@@ -743,7 +758,8 @@ class ExpenseReportService:
             HAVING COUNT(DISTINCT ea.id) > 1
             ORDER BY COUNT(DISTINCT ea.id) DESC, SUM(ei.amount) DESC
             LIMIT 50
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -782,7 +798,8 @@ class ExpenseReportService:
         end: date,
     ) -> list:
         """Rule-3：节假日大额报销（单笔超过阈值）。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 ea.id           AS application_id,
                 ea.applicant_id AS applicant_id,
@@ -795,7 +812,8 @@ class ExpenseReportService:
               AND DATE(ea.created_at) BETWEEN :start AND :end
             ORDER BY ea.total_amount DESC
             LIMIT 100
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {

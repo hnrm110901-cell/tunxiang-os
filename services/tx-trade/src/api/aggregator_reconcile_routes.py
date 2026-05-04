@@ -111,7 +111,8 @@ async def _fetch_local_orders(
             params["store_id"] = store_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     external_order_id  AS platform_order_id,
                     total_fen,
@@ -122,7 +123,8 @@ async def _fetch_local_orders(
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :reconcile_date::date
                   {store_filter}
                 ORDER BY created_at
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()

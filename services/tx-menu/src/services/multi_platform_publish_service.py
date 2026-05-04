@@ -13,14 +13,12 @@
 - 抖音: 团购商品名/价格/库存/有效期
 """
 
-import asyncio
 import uuid as _uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -171,13 +169,15 @@ class MultiPlatformPublishService:
 
         # 获取门店菜品总数
         count_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM dishes
                 WHERE tenant_id = :tid
                   AND is_deleted = false
                   AND is_available = true
-            """),
+            """
+            ),
             {"tid": _uuid.UUID(self.tenant_id)},
         )
         total_dishes: int = count_result.scalar() or 0
@@ -186,15 +186,17 @@ class MultiPlatformPublishService:
         # TODO: 真实接入后，从 platform_sync_logs 表查询最近同步记录
         platforms_status: list[dict] = []
         for platform in self.PLATFORMS:
-            platforms_status.append({
-                "platform": platform,
-                "total_dishes": total_dishes,
-                "synced_count": 0,
-                "pending_count": total_dishes,
-                "failed_count": 0,
-                "last_sync_at": None,
-                "status": "not_synced",
-            })
+            platforms_status.append(
+                {
+                    "platform": platform,
+                    "total_dishes": total_dishes,
+                    "synced_count": 0,
+                    "pending_count": total_dishes,
+                    "failed_count": 0,
+                    "last_sync_at": None,
+                    "status": "not_synced",
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -263,16 +265,18 @@ class MultiPlatformPublishService:
         """
         items: list[dict] = []
         for dish in dishes:
-            items.append({
-                "name": dish["dish_name"],
-                "min_price": dish["price_fen"],
-                "sku_id": dish.get("dish_code") or str(dish["id"]),
-                "is_online": 1 if dish.get("is_available", True) else 0,
-                "stock": 999,
-                "description": dish.get("description", ""),
-                "picture": dish.get("image_url", ""),
-                "category_name": dish.get("category_name", "默认分类"),
-            })
+            items.append(
+                {
+                    "name": dish["dish_name"],
+                    "min_price": dish["price_fen"],
+                    "sku_id": dish.get("dish_code") or str(dish["id"]),
+                    "is_online": 1 if dish.get("is_available", True) else 0,
+                    "stock": 999,
+                    "description": dish.get("description", ""),
+                    "picture": dish.get("image_url", ""),
+                    "category_name": dish.get("category_name", "默认分类"),
+                }
+            )
         return items
 
     def _transform_to_eleme(self, dishes: list[dict]) -> list[dict]:
@@ -287,15 +291,17 @@ class MultiPlatformPublishService:
         """
         items: list[dict] = []
         for dish in dishes:
-            items.append({
-                "name": dish["dish_name"],
-                "price": dish["price_fen"],
-                "categoryName": dish.get("category_name", "默认分类"),
-                "imagePath": dish.get("image_url", ""),
-                "onShelf": dish.get("is_available", True),
-                "description": dish.get("description", ""),
-                "skuId": dish.get("dish_code") or str(dish["id"]),
-            })
+            items.append(
+                {
+                    "name": dish["dish_name"],
+                    "price": dish["price_fen"],
+                    "categoryName": dish.get("category_name", "默认分类"),
+                    "imagePath": dish.get("image_url", ""),
+                    "onShelf": dish.get("is_available", True),
+                    "description": dish.get("description", ""),
+                    "skuId": dish.get("dish_code") or str(dish["id"]),
+                }
+            )
         return items
 
     def _transform_to_douyin(self, dishes: list[dict]) -> list[dict]:
@@ -310,16 +316,18 @@ class MultiPlatformPublishService:
         """
         items: list[dict] = []
         for dish in dishes:
-            items.append({
-                "product_name": dish["dish_name"],
-                "sold_price": dish["price_fen"],
-                "original_price": dish["price_fen"],
-                "stock_qty": 999,
-                "valid_days": 30,
-                "description": dish.get("description", ""),
-                "cover_image": dish.get("image_url", ""),
-                "category": dish.get("category_name", "默认分类"),
-            })
+            items.append(
+                {
+                    "product_name": dish["dish_name"],
+                    "sold_price": dish["price_fen"],
+                    "original_price": dish["price_fen"],
+                    "stock_qty": 999,
+                    "valid_days": 30,
+                    "description": dish.get("description", ""),
+                    "cover_image": dish.get("image_url", ""),
+                    "category": dish.get("category_name", "默认分类"),
+                }
+            )
         return items
 
     # ──────────────────────────────────────────────
@@ -353,14 +361,16 @@ class MultiPlatformPublishService:
                 params[f"did_{i}"] = _uuid.UUID(did)
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT d.id, d.dish_name, d.dish_code, d.price_fen,
                        d.description, d.image_url, d.category_id,
                        d.is_available
                 FROM dishes d
                 {where}
                 ORDER BY d.sort_order, d.dish_name
-            """),
+            """
+            ),
             params,
         )
 
@@ -429,21 +439,25 @@ class MultiPlatformPublishService:
                 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
                 # 模拟成功
-                synced.append({
-                    "dish_name": item.get("name") or item.get("product_name", ""),
-                    "platform_item": item,
-                    "status": "synced",
-                })
+                synced.append(
+                    {
+                        "dish_name": item.get("name") or item.get("product_name", ""),
+                        "platform_item": item,
+                        "status": "synced",
+                    }
+                )
 
             except (RuntimeError, ConnectionError, TimeoutError) as exc:
                 error_msg = f"菜品 {item.get('name', item.get('product_name', i))} 同步失败: {exc}"
                 errors.append(error_msg)
-                failed.append({
-                    "dish_name": item.get("name") or item.get("product_name", ""),
-                    "platform_item": item,
-                    "status": "failed",
-                    "error": str(exc),
-                })
+                failed.append(
+                    {
+                        "dish_name": item.get("name") or item.get("product_name", ""),
+                        "platform_item": item,
+                        "status": "failed",
+                        "error": str(exc),
+                    }
+                )
                 log.warning(
                     "multi_platform_publish.item_failed",
                     store_id=store_id,

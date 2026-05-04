@@ -124,7 +124,8 @@ async def _fetch_history_from_db(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": tenant_id},
     )
-    sql = text("""
+    sql = text(
+        """
         SELECT
             id::text                                            AS id,
             crew_id::text                                       AS crew_id,
@@ -137,7 +138,8 @@ async def _fetch_history_from_db(
           AND is_deleted = FALSE
         ORDER BY created_at DESC
         LIMIT 20
-    """)
+    """
+    )
     result = await db.execute(sql, {"crew_id": crew_id})
     rows = result.mappings().all()
     items = []

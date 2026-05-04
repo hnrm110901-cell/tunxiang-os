@@ -75,9 +75,7 @@ class ShopeeFoodAdapter(BaseDeliveryAdapter):
             eta_str: Optional[str] = raw.get("expect_time")
             if eta_str:
                 try:
-                    estimated_delivery_at = datetime.fromisoformat(
-                        eta_str.replace("Z", "+00:00")
-                    )
+                    estimated_delivery_at = datetime.fromisoformat(eta_str.replace("Z", "+00:00"))
                 except ValueError:
                     pass
 
@@ -124,16 +122,9 @@ class ShopeeFoodAdapter(BaseDeliveryAdapter):
         try:
             body: dict = json.loads(payload)
             # 提取并排序 query 参数（排除签名本身及 body 字段）
-            query_params = {
-                k: v for k, v in body.items()
-                if k != "sign" and not isinstance(v, (dict, list))
-            }
+            query_params = {k: v for k, v in body.items() if k != "sign" and not isinstance(v, (dict, list))}
             sorted_keys = sorted(query_params.keys())
-            sorted_str = "&".join(
-                f"{k}={query_params[k]}"
-                for k in sorted_keys
-                if query_params[k] is not None
-            )
+            sorted_str = "&".join(f"{k}={query_params[k]}" for k in sorted_keys if query_params[k] is not None)
             # 拼接排序后的 query 字符串和原始 body
             payload_str = sorted_str + payload.decode("utf-8")
 

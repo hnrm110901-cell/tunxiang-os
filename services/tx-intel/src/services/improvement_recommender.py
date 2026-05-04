@@ -91,7 +91,8 @@ class ImprovementRecommender:
         # 从order_reviews获取差评
         try:
             result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT id, store_id, review_text, rating, platform
                     FROM order_reviews
                     WHERE tenant_id = :tenant_id
@@ -103,7 +104,8 @@ class ImprovementRecommender:
                       {store_filter}
                     ORDER BY created_at DESC
                     LIMIT 500
-                """),
+                """
+                ),
                 params,
             )
             for row in result.fetchall():
@@ -123,7 +125,8 @@ class ImprovementRecommender:
         # 从nps_surveys获取贬损者反馈
         try:
             result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT id, store_id, feedback_text, nps_score
                     FROM nps_surveys
                     WHERE tenant_id = :tenant_id
@@ -135,7 +138,8 @@ class ImprovementRecommender:
                       {store_filter}
                     ORDER BY sent_at DESC
                     LIMIT 200
-                """),
+                """
+                ),
                 params,
             )
             for row in result.fetchall():

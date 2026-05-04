@@ -47,9 +47,7 @@ router = APIRouter(
 
 
 class IngestRequest(BaseModel):
-    platform: str = Field(
-        ..., description="meituan|eleme|douyin|xiaohongshu|wechat"
-    )
+    platform: str = Field(..., description="meituan|eleme|douyin|xiaohongshu|wechat")
     raw_payload: dict = Field(..., min_length=1)
     ingested_by: str = Field(
         default="webhook",
@@ -74,23 +72,18 @@ async def ingest_canonical(
     if req.platform not in list_supported_platforms():
         raise HTTPException(
             status_code=400,
-            detail=f"platform 未注册 transformer: {req.platform!r}，"
-            f"支持 {list_supported_platforms()}",
+            detail=f"platform 未注册 transformer: {req.platform!r}，" f"支持 {list_supported_platforms()}",
         )
 
     # 1. 转换
     try:
-        order: CanonicalDeliveryOrder = transform(
-            req.platform, req.raw_payload, tenant_id=str(tenant_uuid)
-        )
+        order: CanonicalDeliveryOrder = transform(req.platform, req.raw_payload, tenant_id=str(tenant_uuid))
     except TransformationError as exc:
         logger.warning(
             "canonical_transform_failed",
             extra={"platform": req.platform, "error": str(exc)},
         )
-        raise HTTPException(
-            status_code=422, detail=f"transformation 失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=422, detail=f"transformation 失败: {exc}") from exc
 
     # 2. 生成 canonical_order_no（若 transformer 未填）
     if not order.canonical_order_no:
@@ -101,14 +94,10 @@ async def ingest_canonical(
 
     # 3. 持久化（幂等）
     try:
-        analysis_id, was_new = await _upsert_canonical_order(
-            db, tenant_id=x_tenant_id, order=order
-        )
+        analysis_id, was_new = await _upsert_canonical_order(db, tenant_id=x_tenant_id, order=order)
     except SQLAlchemyError as exc:
         logger.exception("canonical_upsert_failed")
-        raise HTTPException(
-            status_code=500, detail=f"持久化失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"持久化失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -136,12 +125,14 @@ async def get_canonical_order(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM canonical_delivery_orders
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"id": canonical_order_id, "tenant_id": x_tenant_id},
         )
         order = row.mappings().first()
@@ -149,20 +140,20 @@ async def get_canonical_order(
             raise HTTPException(status_code=404, detail="canonical 订单不存在")
 
         items_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM canonical_delivery_items
                 WHERE order_id = CAST(:id AS uuid)
                   AND is_deleted = false
                 ORDER BY line_no
-            """),
+            """
+            ),
             {"id": canonical_order_id},
         )
         items = [dict(r) for r in items_row.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("canonical_get_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -224,7 +215,8 @@ async def list_canonical_orders(
 
         list_params = {**params, "limit": size, "offset": offset}
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, canonical_order_no, platform, platform_order_id,
                        status, order_type, placed_at,
                        gross_amount_fen, paid_amount_fen, net_amount_fen,
@@ -233,15 +225,14 @@ async def list_canonical_orders(
                 WHERE {where}
                 ORDER BY placed_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             list_params,
         )
         items = [dict(r) for r in rows.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("canonical_list_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -281,7 +272,8 @@ async def _upsert_canonical_order(
 
     # 先尝试 INSERT；冲突则读现有 id
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO canonical_delivery_orders (
                 tenant_id, canonical_order_no, platform, platform_order_id,
                 platform_sub_type, store_id, brand_id, order_type, status,
@@ -327,7 +319,8 @@ async def _upsert_canonical_order(
                 transformation_errors = EXCLUDED.transformation_errors,
                 updated_at = NOW()
             RETURNING id, (xmax = 0) AS was_new
-        """),
+        """
+        ),
         params,
     )
     result = row.mappings().first()
@@ -342,11 +335,11 @@ async def _upsert_canonical_order(
             item_params["order_id"] = canonical_id
             # dataclass 里的 modifiers 是 list，写入时转 JSON 字符串
             import json as _json
-            item_params["modifiers"] = _json.dumps(
-                item_params.get("modifiers") or [], ensure_ascii=False
-            )
+
+            item_params["modifiers"] = _json.dumps(item_params.get("modifiers") or [], ensure_ascii=False)
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO canonical_delivery_items (
                         tenant_id, order_id, platform_sku_id, internal_dish_id,
                         dish_name_platform, dish_name_canonical,
@@ -360,7 +353,8 @@ async def _upsert_canonical_order(
                         :discount_amount_fen, :total_fen, CAST(:modifiers AS jsonb),
                         :notes, :line_no
                     )
-                """),
+                """
+                ),
                 item_params,
             )
 
@@ -381,6 +375,4 @@ def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

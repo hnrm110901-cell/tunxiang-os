@@ -79,9 +79,7 @@ def test_weather_mock_no_tenant_required(client: TestClient):
 # ─── POST 端点 + 状态保持（5 个）────────────────────────────────
 
 
-def test_screen_register_then_heartbeat_then_unregister(
-    client: TestClient, headers: dict
-):
+def test_screen_register_then_heartbeat_then_unregister(client: TestClient, headers: dict):
     register_body = {
         "store_id": STORE,
         "screen_id": "screen-tier1-001",
@@ -109,9 +107,7 @@ def test_screen_register_then_heartbeat_then_unregister(
     assert r4.json()["data"]["removed"] is False
 
 
-def test_mark_sold_out_then_query_then_dishes_filter(
-    client: TestClient, headers: dict
-):
+def test_mark_sold_out_then_query_then_dishes_filter(client: TestClient, headers: dict):
     """沽清 → 列表 → 菜品过滤的端到端链路"""
     # 选一个测试用门店避开污染
     test_store = "store-soldout-test"

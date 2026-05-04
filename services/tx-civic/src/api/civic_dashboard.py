@@ -123,24 +123,28 @@ async def get_dashboard(
 
         # Expiring health certs
         hc_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM civic_health_certs
                 WHERE tenant_id = :tid AND is_deleted = FALSE
                     AND expiry_date <= CURRENT_DATE + 30 * INTERVAL '1 day'
                     AND expiry_date >= CURRENT_DATE
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         expiring_health_certs = hc_result.scalar() or 0
 
         # Due fire equipment
         fire_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM civic_fire_equipment
                 WHERE tenant_id = :tid AND is_deleted = FALSE AND status = 'active'
                     AND (next_inspection_date IS NULL
                          OR next_inspection_date <= CURRENT_DATE + 7 * INTERVAL '1 day')
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         due_fire_equipment = fire_result.scalar() or 0
@@ -180,14 +184,16 @@ async def get_store_dashboard(
 
         # Trace completeness for today
         trace_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE origin_trace_code IS NOT NULL) AS traced
                 FROM civic_inbound_records
                 WHERE tenant_id = :tid AND store_id = :sid
                     AND created_at::date = CURRENT_DATE
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         trace_row = trace_result.fetchone()
@@ -197,13 +203,15 @@ async def get_store_dashboard(
 
         # Kitchen device online rate
         dev_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'online') AS online
                 FROM civic_kitchen_devices
                 WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         dev_row = dev_result.fetchone()
@@ -213,14 +221,16 @@ async def get_store_dashboard(
 
         # Env compliance (last 30 days emission)
         env_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE emission_concentration <= 2.0) AS compliant
                 FROM civic_emission_records
                 WHERE tenant_id = :tid AND store_id = :sid
                     AND created_at >= NOW() - INTERVAL '30 days'
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         env_row = env_result.fetchone()

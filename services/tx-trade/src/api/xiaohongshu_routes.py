@@ -110,15 +110,11 @@ async def receive_webhook(
 
     service = XhsVerificationService(db, tenant_id=x_tenant_id)
     try:
-        outcome = await service.process_webhook(
-            body=body_bytes, headers=headers, source_ip=source_ip
-        )
+        outcome = await service.process_webhook(body=body_bytes, headers=headers, source_ip=source_ip)
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("xhs_webhook_db_error")
-        raise HTTPException(
-            status_code=500, detail=f"DB 错误: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"DB 错误: {exc}") from exc
 
     # 即便签名校验失败也返回 200，避免平台重试（事件已归档）
     return {"ok": True, "data": outcome.to_dict()}
@@ -158,14 +154,13 @@ async def oauth_callback(
         )
     except XhsOAuthError as exc:
         logger.warning("xhs_oauth_exchange_failed", extra={"error": str(exc)})
-        raise HTTPException(
-            status_code=400, detail=f"OAuth 失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"OAuth 失败: {exc}") from exc
 
     # 更新 binding：status=active + token
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE xiaohongshu_shop_bindings SET
                     access_token = :access,
                     refresh_token = :refresh,
@@ -177,7 +172,8 @@ async def oauth_callback(
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "access": token_pair.access_token,
                 "refresh": token_pair.refresh_token,
@@ -191,9 +187,7 @@ async def oauth_callback(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("xhs_binding_update_failed")
-        raise HTTPException(
-            status_code=500, detail=f"binding 更新失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"binding 更新失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -227,37 +221,34 @@ async def refresh_oauth_token(
     if not binding:
         raise HTTPException(status_code=404, detail="binding 不存在")
     if not binding.get("refresh_token"):
-        raise HTTPException(
-            status_code=400, detail="refresh_token 缺失，需重新走 OAuth"
-        )
+        raise HTTPException(status_code=400, detail="refresh_token 缺失，需重新走 OAuth")
 
     oauth_service = XhsOAuthTokenService(
         app_id=binding.get("xhs_merchant_id", "stub_app_id"),
         app_secret=_XHS_APP_SECRET,  # injected from XHS_APP_SECRET env var
     )
     try:
-        token_pair = await oauth_service.refresh_access_token(
-            refresh_token=binding["refresh_token"]
-        )
+        token_pair = await oauth_service.refresh_access_token(refresh_token=binding["refresh_token"])
     except XhsOAuthError as exc:
         # 刷新失败 → 标记 expired
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE xiaohongshu_shop_bindings SET
                     status = 'expired',
                     consecutive_auth_errors = consecutive_auth_errors + 1,
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
-            """),
+            """
+            ),
             {"id": binding_id},
         )
         await db.commit()
-        raise HTTPException(
-            status_code=400, detail=f"刷新失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"刷新失败: {exc}") from exc
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE xiaohongshu_shop_bindings SET
                 access_token = :access,
                 refresh_token = :refresh,
@@ -267,7 +258,8 @@ async def refresh_oauth_token(
                 consecutive_auth_errors = 0,
                 updated_at = NOW()
             WHERE id = CAST(:id AS uuid)
-        """),
+        """
+        ),
         {
             "access": token_pair.access_token,
             "refresh": token_pair.refresh_token,
@@ -303,7 +295,8 @@ async def create_binding(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO xiaohongshu_shop_bindings (
                     tenant_id, store_id, brand_id, xhs_shop_code,
                     xhs_merchant_id, xhs_shop_name, webhook_secret,
@@ -315,7 +308,8 @@ async def create_binding(
                     :webhook_url, 'pending'
                 )
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "store_id": req.store_id,
@@ -332,9 +326,7 @@ async def create_binding(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("xhs_binding_create_failed")
-        raise HTTPException(
-            status_code=500, detail=f"binding 创建失败（可能重复 store/shop_code）: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"binding 创建失败（可能重复 store/shop_code）: {exc}") from exc
 
     return {
         "ok": True,
@@ -370,7 +362,8 @@ async def list_bindings(
 
     try:
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, brand_id, xhs_shop_code, xhs_merchant_id,
                        xhs_shop_name, status, token_expires_at,
                        last_webhook_at, consecutive_auth_errors,
@@ -378,15 +371,14 @@ async def list_bindings(
                 FROM xiaohongshu_shop_bindings
                 WHERE {where}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("xhs_bindings_list_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -406,7 +398,8 @@ async def unbind(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE xiaohongshu_shop_bindings SET
                     status = 'unbound',
                     is_deleted = true,
@@ -417,7 +410,8 @@ async def unbind(
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"id": binding_id, "tenant_id": x_tenant_id},
         )
         result = row.mappings().first()
@@ -425,9 +419,7 @@ async def unbind(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("xhs_binding_unbind_failed")
-        raise HTTPException(
-            status_code=500, detail=f"解绑失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"解绑失败: {exc}") from exc
 
     if not result:
         raise HTTPException(status_code=404, detail="binding 不存在或已解绑")
@@ -468,7 +460,8 @@ async def list_events(
 
     try:
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, binding_id, event_type, verify_code, xhs_shop_code,
                        xhs_order_id, signature_valid, signature_error,
                        transform_status, canonical_order_id, transform_error,
@@ -477,15 +470,14 @@ async def list_events(
                 WHERE {where}
                 ORDER BY received_at DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("xhs_events_list_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -496,11 +488,10 @@ async def list_events(
 # ── 辅助 ─────────────────────────────────────────────────────────
 
 
-async def _fetch_binding(
-    db: AsyncSession, tenant_id: str, binding_id: str
-) -> Optional[dict[str, Any]]:
+async def _fetch_binding(db: AsyncSession, tenant_id: str, binding_id: str) -> Optional[dict[str, Any]]:
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_id, brand_id, xhs_shop_code, xhs_merchant_id,
                    webhook_secret, access_token, refresh_token, status
             FROM xiaohongshu_shop_bindings
@@ -508,7 +499,8 @@ async def _fetch_binding(
               AND tenant_id = CAST(:tenant_id AS uuid)
               AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {"id": binding_id, "tenant_id": tenant_id},
     )
     rec = row.mappings().first()
@@ -519,6 +511,4 @@ def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

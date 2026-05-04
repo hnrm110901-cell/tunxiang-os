@@ -90,14 +90,16 @@ async def get_kds_rules(
     tenant_id = _get_tenant_id(request)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT config
             FROM kds_rules_config
             WHERE store_id = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -125,34 +127,40 @@ async def put_kds_rules(
 
     # 检查是否已有记录
     existing = await db.execute(
-        text("""
+        text(
+            """
             SELECT id
             FROM kds_rules_config
             WHERE store_id = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     row = existing.fetchone()
 
     if row:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE kds_rules_config
                 SET config = :config::jsonb, updated_at = now()
                 WHERE id = :id
-            """),
+            """
+            ),
             {"config": config_str, "id": str(row[0])},
         )
     else:
         new_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kds_rules_config (id, tenant_id, store_id, config)
                 VALUES (:id, :tenant_id, :store_id, :config::jsonb)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": tenant_id,

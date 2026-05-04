@@ -490,8 +490,7 @@ async def test_xujihaixian_mark_synced_already_synced_returns_false_no_overwrite
     # Step3：cloud_order_id 必须保持原值（双扣费防护核心断言）
     row_after_retry = await svc.get(offline_id)
     assert row_after_retry["cloud_order_id"] == original_cloud, (
-        f"cloud_order_id 被覆盖：原={original_cloud} 现={row_after_retry['cloud_order_id']} "
-        "→ 资金双扣费风险！"
+        f"cloud_order_id 被覆盖：原={original_cloud} 现={row_after_retry['cloud_order_id']} " "→ 资金双扣费风险！"
     )
     assert row_after_retry["state"] == MappingState.SYNCED.value, "state 不得回退"
 
@@ -596,12 +595,8 @@ async def test_xujihaixian_sync_route_ack_lost_replay_returns_original_cloud_id(
     assert mapping2["state"] == "synced"
 
     # 数据层验证：mapping 表里依然只有一行，cloud_order_id 仍是首次值
-    final_row = next(
-        r for k, r in db._rows.items() if k[1] == offline_id and k[0] == XUJI_CHANGSHA_TENANT
-    )
-    assert final_row["cloud_order_id"] == cloud_id_first, (
-        "DB 中 cloud_order_id 已被覆盖 → 资金双扣费"
-    )
+    final_row = next(r for k, r in db._rows.items() if k[1] == offline_id and k[0] == XUJI_CHANGSHA_TENANT)
+    assert final_row["cloud_order_id"] == cloud_id_first, "DB 中 cloud_order_id 已被覆盖 → 资金双扣费"
 
 
 @pytest.mark.asyncio
@@ -667,9 +662,7 @@ async def test_xujihaixian_sync_route_unique_violation_swallowed_as_idempotent()
         user=user,
     )
     # 关键断言：IntegrityError 被吞 → ok=True，不是 DB_ERROR
-    assert resp_uniq.ok is True, (
-        f"IntegrityError 被错误归类为 DB_ERROR：error={resp_uniq.error}"
-    )
+    assert resp_uniq.ok is True, f"IntegrityError 被错误归类为 DB_ERROR：error={resp_uniq.error}"
     assert resp_uniq.error is None, "幂等冲突不应填 error 字段"
     # rollback 至少一次
     assert db_uniq.rollbacks >= 1, "IntegrityError 必须触发 rollback 释放事务"
@@ -731,13 +724,9 @@ class _DeadLetterAwareMockDB(_MockDB):
             cnt = sum(
                 1
                 for r in self._rows.values()
-                if r["tenant_id"] == tenant
-                and r["state"] == state
-                and (store is None or r.get("store_id") == store)
+                if r["tenant_id"] == tenant and r["state"] == state and (store is None or r.get("store_id") == store)
             )
-            return SimpleNamespace(
-                mappings=lambda: SimpleNamespace(first=lambda: {"cnt": cnt})
-            )
+            return SimpleNamespace(mappings=lambda: SimpleNamespace(first=lambda: {"cnt": cnt}))
 
         # 2) list_dead_letter：SELECT 多列含 "AND state = :state"，无 "AND offline_order_id"
         if (
@@ -753,9 +742,7 @@ class _DeadLetterAwareMockDB(_MockDB):
             rows = [
                 r
                 for r in self._rows.values()
-                if r["tenant_id"] == tenant
-                and r["state"] == state
-                and (store is None or r.get("store_id") == store)
+                if r["tenant_id"] == tenant and r["state"] == state and (store is None or r.get("store_id") == store)
             ]
             return SimpleNamespace(
                 mappings=lambda: SimpleNamespace(
@@ -780,20 +767,14 @@ class _DeadLetterAwareMockDB(_MockDB):
                 row["state"] = p["pending_state"]
                 row["sync_attempts"] = 0
                 row["last_error_message"] = None
-                row["dead_letter_reason"] = (
-                    f"manual_retry_by:{p['retry_user_id']}|prev:"
-                    + str(row.get("dead_letter_reason") or "")
+                row["dead_letter_reason"] = f"manual_retry_by:{p['retry_user_id']}|prev:" + str(
+                    row.get("dead_letter_reason") or ""
                 )
                 self.executes.append((sql, p))
                 return AsyncMock(rowcount=1)
 
             # 3b) manual_resolve：守 state=:state（dead_letter），SET dead_letter_reason 拼前缀
-            if (
-                "state" in p
-                and "pending_state" not in p
-                and "dead_letter_state" not in p
-                and "prefix" in p
-            ):
+            if "state" in p and "pending_state" not in p and "dead_letter_state" not in p and "prefix" in p:
                 if row.get("state") != p["state"]:
                     self.executes.append((sql, p))
                     return AsyncMock(rowcount=0)
@@ -836,18 +817,16 @@ async def test_xujihaixian_sync_failure_20_attempts_triggers_dead_letter():
             offline_order_id=offline_id,
             last_error=f"edge_unreachable_attempt_{i + 1}",
         )
-        assert new_attempts == i + 1, (
-            f"第 {i + 1} 次失败应让 sync_attempts={i + 1}，得 {new_attempts}"
-        )
+        assert new_attempts == i + 1, f"第 {i + 1} 次失败应让 sync_attempts={i + 1}，得 {new_attempts}"
 
     # 第 20 次失败：路由层判断达阈值，调 mark_dead_letter
     final_attempts = await svc.increment_attempts(
         offline_order_id=offline_id,
         last_error="edge_unreachable_attempt_20",
     )
-    assert final_attempts == DEAD_LETTER_MAX_ATTEMPTS, (
-        f"达 {DEAD_LETTER_MAX_ATTEMPTS} 次必须落 dead_letter，得 {final_attempts}"
-    )
+    assert (
+        final_attempts == DEAD_LETTER_MAX_ATTEMPTS
+    ), f"达 {DEAD_LETTER_MAX_ATTEMPTS} 次必须落 dead_letter，得 {final_attempts}"
 
     await svc.mark_dead_letter(
         offline_order_id=offline_id,
@@ -855,9 +834,7 @@ async def test_xujihaixian_sync_failure_20_attempts_triggers_dead_letter():
     )
     row = await svc.get(offline_id)
     assert row is not None
-    assert row["state"] == MappingState.DEAD_LETTER.value, (
-        "20 次后必须自动 dead_letter，等店长确认（不允许自动删除）"
-    )
+    assert row["state"] == MappingState.DEAD_LETTER.value, "20 次后必须自动 dead_letter，等店长确认（不允许自动删除）"
     assert row["dead_letter_reason"] == "max_attempts_exceeded"
 
 
@@ -896,9 +873,7 @@ async def test_xujihaixian_count_dead_letters_returns_correct_total():
     )
 
     cnt = await svc.count_dead_letters(store_id=XUJI_SHAOSHAN_STORE)
-    assert cnt == 1, (
-        f"3 条 (2 pending + 1 dl) 中只统计 dead_letter，期望 1 得 {cnt}"
-    )
+    assert cnt == 1, f"3 条 (2 pending + 1 dl) 中只统计 dead_letter，期望 1 得 {cnt}"
 
     # 跨租户隔离：tenant_A 的视角看不到 tenant_B 的死信
     svc_other = OfflineOrderMappingService(db=db, tenant_id=XUJI_CHANGSHA_TENANT)
@@ -944,13 +919,9 @@ async def test_xujihaixian_list_dead_letter_only_dead_letter_state():
         dl_ids.append(oid_dl)
 
     rows = await svc.list_dead_letter(store_id=XUJI_CHANGSHA_STORE, limit=10)
-    assert len(rows) == 2, (
-        f"4 条数据 (2 pending + 2 dl) 中只列 dead_letter，期望 2 得 {len(rows)}"
-    )
+    assert len(rows) == 2, f"4 条数据 (2 pending + 2 dl) 中只列 dead_letter，期望 2 得 {len(rows)}"
     states = {r["state"] for r in rows}
-    assert states == {MappingState.DEAD_LETTER.value}, (
-        f"list_dead_letter 不允许漏出 pending 条目，得 {states}"
-    )
+    assert states == {MappingState.DEAD_LETTER.value}, f"list_dead_letter 不允许漏出 pending 条目，得 {states}"
     listed_ids = {r["offline_order_id"] for r in rows}
     assert listed_ids == set(dl_ids)
 
@@ -989,18 +960,15 @@ async def test_xujihaixian_manual_resolve_appends_audit_signal_in_reason():
     row = await svc.get(offline_id)
     assert row is not None
     # 仍保留 dead_letter（不删除条目）
-    assert row["state"] == MappingState.DEAD_LETTER.value, (
-        "manual_resolve 不允许改 state=resolved/deleted（CLAUDE.md §13 禁吞单）"
-    )
+    assert (
+        row["state"] == MappingState.DEAD_LETTER.value
+    ), "manual_resolve 不允许改 state=resolved/deleted（CLAUDE.md §13 禁吞单）"
     # dead_letter_reason 前缀含审计标记
     reason = row["dead_letter_reason"]
     assert reason.startswith("manual_resolved:mgr-xuji-001:"), (
-        f"dead_letter_reason 必须含 'manual_resolved:{{uid}}:{{note}}' 前缀，"
-        f"得：{reason}"
+        f"dead_letter_reason 必须含 'manual_resolved:{{uid}}:{{note}}' 前缀，" f"得：{reason}"
     )
-    assert "max_attempts_exceeded" in reason, (
-        "原 reason 必须保留在前缀之后供审计追溯"
-    )
+    assert "max_attempts_exceeded" in reason, "原 reason 必须保留在前缀之后供审计追溯"
 
     # 拒绝对非 dead_letter 条目调 manual_resolve
     pending_id, _ = generate_offline_order_id(POS_DEVICE_A, counter=778)
@@ -1014,9 +982,7 @@ async def test_xujihaixian_manual_resolve_appends_audit_signal_in_reason():
         resolver_user_id="mgr-xuji-001",
         resolution_note="误操作",
     )
-    assert not_ok is False, (
-        "manual_resolve 守 state=dead_letter，pending 条目必须返回 False"
-    )
+    assert not_ok is False, "manual_resolve 守 state=dead_letter，pending 条目必须返回 False"
 
 
 # ──────────────── 场景 17：店长 manual_retry 重置 attempts 与 state ────────────────
@@ -1056,21 +1022,15 @@ async def test_xujihaixian_manual_retry_resets_attempts_and_state_to_pending():
     assert ok is True
 
     row = await svc.get(offline_id)
-    assert row["state"] == MappingState.PENDING.value, (
-        "manual_retry 必须把 state 推回 pending 让 Flusher 重新捡起"
-    )
-    assert row["sync_attempts"] == 0, (
-        "重试必须重置 sync_attempts=0，否则下一轮会立即再次触发死信"
-    )
-    assert row["dead_letter_reason"].startswith("manual_retry_by:mgr-shao-007|prev:"), (
-        f"dead_letter_reason 必须保留人工重试痕迹，得：{row['dead_letter_reason']}"
-    )
+    assert row["state"] == MappingState.PENDING.value, "manual_retry 必须把 state 推回 pending 让 Flusher 重新捡起"
+    assert row["sync_attempts"] == 0, "重试必须重置 sync_attempts=0，否则下一轮会立即再次触发死信"
+    assert row["dead_letter_reason"].startswith(
+        "manual_retry_by:mgr-shao-007|prev:"
+    ), f"dead_letter_reason 必须保留人工重试痕迹，得：{row['dead_letter_reason']}"
 
     # 拒绝对 pending 条目重复 manual_retry
     not_ok = await svc.manual_retry(
         offline_order_id=offline_id,
         retry_user_id="mgr-shao-007",
     )
-    assert not_ok is False, (
-        "manual_retry 守 state=dead_letter，已是 pending 必须返回 False"
-    )
+    assert not_ok is False, "manual_retry 守 state=dead_letter，已是 pending 必须返回 False"

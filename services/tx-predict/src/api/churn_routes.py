@@ -63,7 +63,8 @@ async def list_churn_scores(
 
     # 只取每个客户的最新评分
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             WITH latest AS (
                 SELECT customer_id, MAX(scored_at) AS latest_scored_at
                 FROM churn_scores
@@ -76,13 +77,15 @@ async def list_churn_scores(
             WHERE {where}
             ORDER BY cs.score DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in result.mappings().all()]
 
     count_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             WITH latest AS (
                 SELECT customer_id, MAX(scored_at) AS latest_scored_at
                 FROM churn_scores
@@ -92,7 +95,8 @@ async def list_churn_scores(
             SELECT COUNT(*) FROM churn_scores cs
             INNER JOIN latest l ON cs.customer_id = l.customer_id AND cs.scored_at = l.latest_scored_at
             WHERE {where}
-        """),
+        """
+        ),
         params,
     )
     total = count_result.scalar() or 0
@@ -113,12 +117,14 @@ async def get_customer_churn_score(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT * FROM churn_scores
             WHERE tenant_id = :tenant_id AND customer_id = :customer_id AND is_deleted = FALSE
             ORDER BY scored_at DESC
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "customer_id": customer_id},
     )
     row = result.mappings().first()
@@ -192,12 +198,14 @@ async def list_interventions(
     params["offset"] = offset
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT * FROM churn_interventions
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in result.mappings().all()]

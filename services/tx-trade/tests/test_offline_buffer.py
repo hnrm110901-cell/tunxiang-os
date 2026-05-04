@@ -17,6 +17,7 @@ from offline_buffer import OfflineBuffer
 
 # ─── 测试夹具 ───
 
+
 @pytest.fixture
 def tmp_db(tmp_path):
     db_path = str(tmp_path / "test_offline_buffer.db")
@@ -45,6 +46,7 @@ def _make_order(order_id: str = "ORD-2026-001", table: str = "A03") -> dict:
 
 
 # ─── Test 1: 断网时新订单写入本地 SQLite 缓冲 ───
+
 
 @pytest.mark.asyncio
 async def test_buffer_order_stores_to_sqlite(buffer):
@@ -81,6 +83,7 @@ async def test_buffered_order_data_preserved(buffer):
 
 
 # ─── Test 2: 恢复连接后增量同步到云端 ───
+
 
 @pytest.mark.asyncio
 async def test_sync_to_cloud_marks_synced(buffer):
@@ -164,6 +167,7 @@ async def test_sync_partial_failure_preserves_unsynced(buffer):
 
 # ─── Test 3: 重复同步幂等性 ───
 
+
 @pytest.mark.asyncio
 async def test_idempotent_sync_no_duplicate(buffer):
     """相同 order_id 重复缓冲时，只保留一条记录（幂等）"""
@@ -214,6 +218,7 @@ async def test_idempotent_buffer_updates_existing(buffer):
 
 
 # ─── get_pending_count 边界测试 ───
+
 
 @pytest.mark.asyncio
 async def test_pending_count_zero_initially(buffer):

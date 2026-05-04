@@ -53,7 +53,8 @@ class BanquetPricingAgent:
             event_month = datetime.now().month
         # 查询历史同类型宴会均价
         row = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT AVG(total_amount_fen / NULLIF(table_count, 0)) AS avg_per_table,
                    COUNT(*) AS history_count,
                    MIN(total_amount_fen / NULLIF(table_count, 0)) AS min_per_table,
@@ -61,7 +62,8 @@ class BanquetPricingAgent:
             FROM banquets
             WHERE store_id = :sid AND tenant_id = :tid AND event_type = :etype
               AND status IN ('completed','settled') AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"sid": store_id, "tid": self.tenant_id, "etype": event_type},
         )
         hist = row.mappings().first()
@@ -94,10 +96,12 @@ class BanquetPricingAgent:
         }
         # 记录决策
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_ai_decisions (id, tenant_id, store_id, agent_type, decision_type, input_context_json, recommendation_json, reasoning, confidence)
             VALUES (:id, :tid, :sid, 'pricing', 'quote_pricing', :input::jsonb, :rec::jsonb, :reason, :conf)
-        """),
+        """
+            ),
             {
                 "id": str(uuid.uuid4()),
                 "tid": self.tenant_id,
@@ -117,12 +121,14 @@ class BanquetPricingAgent:
     async def suggest_menu(self, event_type: str, tier: str, budget_per_table_fen: int) -> dict:
         """基于预算推荐套餐"""
         row = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT id, name, per_table_price_fen, dishes_json, tier
             FROM banquet_menu_templates
             WHERE tenant_id = :tid AND event_type = :etype AND is_active = TRUE AND is_deleted = FALSE
             ORDER BY ABS(per_table_price_fen - :budget) LIMIT 3
-        """),
+        """
+            ),
             {"tid": self.tenant_id, "etype": event_type, "budget": budget_per_table_fen},
         )
         templates = [dict(r) for r in row.mappings().all()]

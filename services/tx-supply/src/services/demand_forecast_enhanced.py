@@ -15,11 +15,11 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import date, timedelta
+from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,9 +93,9 @@ HOLIDAY_CALENDAR_2026: dict[tuple[int, int], tuple[float, str]] = {
 WORKDAY_ADJUSTMENTS_2026: set[tuple[int, int]] = {
     (2, 14),  # 春节调休
     (2, 15),  # 春节调休
-    (4, 7),   # 清明调休 (预估)
+    (4, 7),  # 清明调休 (预估)
     (9, 26),  # 中秋调休 (预估)
-    (10, 10), # 国庆调休 (预估)
+    (10, 10),  # 国庆调休 (预估)
 }
 
 WEEKEND_FACTOR = 1.15
@@ -155,9 +155,7 @@ class EnhancedDemandForecastService:
     def __init__(self) -> None:
         self._base_forecast = DemandForecastService()
         self._weather_api_key: str | None = os.environ.get("QWEATHER_API_KEY")
-        self._weather_api_base: str = os.environ.get(
-            "QWEATHER_API_BASE", "https://devapi.qweather.com"
-        )
+        self._weather_api_base: str = os.environ.get("QWEATHER_API_BASE", "https://devapi.qweather.com")
 
     # ──────────────────────────────────────────────────────
     #  RLS set_config
@@ -387,7 +385,8 @@ class EnhancedDemandForecastService:
 
         since_date = date.today() - timedelta(days=lookback_days)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT deviation_pct
             FROM procurement_feedback_logs
             WHERE tenant_id = :tenant_id
@@ -397,7 +396,8 @@ class EnhancedDemandForecastService:
               AND is_deleted = FALSE
               AND deviation_pct IS NOT NULL
             ORDER BY feedback_date ASC, created_at ASC
-        """)
+        """
+        )
 
         try:
             result = await db.execute(
@@ -453,14 +453,16 @@ class EnhancedDemandForecastService:
         db: AsyncSession,
     ) -> str | None:
         """从 ingredients 表获取食材品类"""
-        sql = text("""
+        sql = text(
+            """
             SELECT category
             FROM ingredients
             WHERE id = :ingredient_id::UUID
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
             LIMIT 1
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 sql,
@@ -551,7 +553,9 @@ class EnhancedDemandForecastService:
         # 2. 获取食材品类 (季节系数用)
         if ingredient_category is None and _mock_season_factor is None:
             ingredient_category = await self._get_ingredient_category(
-                ingredient_id, tenant_id, db,
+                ingredient_id,
+                tenant_id,
+                db,
             )
 
         # 3. 历史修正系数
@@ -559,7 +563,10 @@ class EnhancedDemandForecastService:
             correction = _mock_correction_factor
         else:
             correction = await self.get_correction_factor(
-                ingredient_id, store_id, tenant_id, db,
+                ingredient_id,
+                store_id,
+                tenant_id,
+                db,
             )
 
         # 4. 逐日计算 (天气+节假日+季节各日不同)
@@ -580,7 +587,8 @@ class EnhancedDemandForecastService:
                 w_condition = "mock"
             else:
                 w_factor, w_condition = await self.get_weather_factor(
-                    target_date, city,
+                    target_date,
+                    city,
                 )
 
             # 节假日因子
@@ -595,49 +603,39 @@ class EnhancedDemandForecastService:
                 s_factor = _mock_season_factor
             else:
                 s_factor = self.get_season_factor(
-                    ingredient_category, target_date.month,
+                    ingredient_category,
+                    target_date.month,
                 )
 
             # 组合: 日均消耗 x 天气 x 节假日 x 季节 x 修正
-            day_forecast = (
-                daily_consumption
-                * w_factor
-                * h_factor
-                * s_factor
-                * correction
-            )
+            day_forecast = daily_consumption * w_factor * h_factor * s_factor * correction
             total_forecast += day_forecast
 
             weather_factors_used.append(w_factor)
             holiday_factors_used.append(h_factor)
             season_factors_used.append(s_factor)
 
-            daily_breakdown.append({
-                "date": target_date.isoformat(),
-                "day_of_week": target_date.strftime("%A"),
-                "base_consumption": round(daily_consumption, 4),
-                "weather_factor": round(w_factor, 2),
-                "weather_condition": w_condition,
-                "holiday_factor": round(h_factor, 2),
-                "holiday_name": h_name,
-                "season_factor": round(s_factor, 2),
-                "correction_factor": round(correction, 3),
-                "forecast_qty": round(day_forecast, 4),
-            })
+            daily_breakdown.append(
+                {
+                    "date": target_date.isoformat(),
+                    "day_of_week": target_date.strftime("%A"),
+                    "base_consumption": round(daily_consumption, 4),
+                    "weather_factor": round(w_factor, 2),
+                    "weather_condition": w_condition,
+                    "holiday_factor": round(h_factor, 2),
+                    "holiday_name": h_name,
+                    "season_factor": round(s_factor, 2),
+                    "correction_factor": round(correction, 3),
+                    "forecast_qty": round(day_forecast, 4),
+                }
+            )
 
         # 汇总因子平均值 (用于概览)
         avg_weather = (
-            sum(weather_factors_used) / len(weather_factors_used)
-            if weather_factors_used else DEFAULT_WEATHER_FACTOR
+            sum(weather_factors_used) / len(weather_factors_used) if weather_factors_used else DEFAULT_WEATHER_FACTOR
         )
-        avg_holiday = (
-            sum(holiday_factors_used) / len(holiday_factors_used)
-            if holiday_factors_used else WORKDAY_FACTOR
-        )
-        avg_season = (
-            sum(season_factors_used) / len(season_factors_used)
-            if season_factors_used else 1.0
-        )
+        avg_holiday = sum(holiday_factors_used) / len(holiday_factors_used) if holiday_factors_used else WORKDAY_FACTOR
+        avg_season = sum(season_factors_used) / len(season_factors_used) if season_factors_used else 1.0
 
         result = {
             "ingredient_id": ingredient_id,

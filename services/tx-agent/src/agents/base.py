@@ -43,10 +43,10 @@ class AgentResult:
 
     # Sprint D2：ROI 三字段 + 证据（v264 迁移）
     # Skill.execute() 填入这些字段，base.run() 写入 agent_decision_logs，mv_agent_roi_monthly 聚合
-    saved_labor_hours: float = 0.0             # 节省的人力工时
-    prevented_loss_fen: int = 0                # 拦截的损失金额（分）
-    improved_kpi: dict = field(default_factory=dict)    # {"revenue_uplift_fen":..., "nps_delta":...}
-    roi_evidence: dict = field(default_factory=dict)    # 证据链：{"data_source":..., "sql":..., "event_id":...}
+    saved_labor_hours: float = 0.0  # 节省的人力工时
+    prevented_loss_fen: int = 0  # 拦截的损失金额（分）
+    improved_kpi: dict = field(default_factory=dict)  # {"revenue_uplift_fen":..., "nps_delta":...}
+    roi_evidence: dict = field(default_factory=dict)  # 证据链：{"data_source":..., "sql":..., "event_id":...}
 
 
 @dataclass

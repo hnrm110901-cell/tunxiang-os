@@ -21,9 +21,9 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
-from services.tx_finance.src.services.pl_report import PLReportService
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_finance.src.services.pl_report import PLReportService
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
@@ -330,7 +330,8 @@ async def _generate_voucher_internal(
     from sqlalchemy import text
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO financial_vouchers (
                 tenant_id, store_id, voucher_no, voucher_date,
                 voucher_type, total_amount, entries,
@@ -341,7 +342,8 @@ async def _generate_voucher_internal(
                 :source_type, :source_id::UUID, 'draft'
             )
             ON CONFLICT (voucher_no) DO NOTHING
-        """),
+        """
+        ),
         {
             "tenant_id": str(tenant_id),
             "store_id": str(store_id),

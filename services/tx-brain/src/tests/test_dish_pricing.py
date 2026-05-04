@@ -191,15 +191,11 @@ async def test_gross_margin_floor_clamps_aggressive_discount():
     )
 
     service = DishPricingService(edge_client=edge)
-    response = await service.recommend(
-        _make_request(base_price_fen=base_price_fen, cost_fen=cost_fen)
-    )
+    response = await service.recommend(_make_request(base_price_fen=base_price_fen, cost_fen=cost_fen))
 
     expected_floor_fen = int(-(-int((cost_fen / (1 - GROSS_MARGIN_FLOOR)) * 100) // 100))
     # 直观：cost=5000, floor 价 >= 5000/0.85 = 5882.35 → 5883
-    assert response.recommended_price_fen >= 5883, (
-        f"floor must be enforced; got {response.recommended_price_fen}"
-    )
+    assert response.recommended_price_fen >= 5883, f"floor must be enforced; got {response.recommended_price_fen}"
     assert response.recommended_price_fen >= expected_floor_fen
     assert response.floor_protected is True
     # 必须夹回到至少能保 15% 毛利

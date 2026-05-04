@@ -77,7 +77,8 @@ class CampaignOptimizer:
         """为Campaign创建优化记录（第1轮）"""
         opt_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaign_optimization_logs (
                     id, tenant_id, campaign_id, marketing_task_id,
                     ab_test_id, optimization_round, status,
@@ -87,7 +88,8 @@ class CampaignOptimizer:
                     :ab_test_id, 1, 'evaluating',
                     :auto_apply_threshold
                 )
-            """),
+            """
+            ),
             {
                 "id": str(opt_id),
                 "tenant_id": str(tenant_id),
@@ -125,7 +127,8 @@ class CampaignOptimizer:
         """
         # 获取当前优化记录
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
@@ -133,7 +136,8 @@ class CampaignOptimizer:
                   AND is_deleted = FALSE
                 ORDER BY optimization_round DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "campaign_id": str(campaign_id)},
         )
         row = result.mappings().first()
@@ -153,7 +157,8 @@ class CampaignOptimizer:
         # 样本量不足 → 保持evaluating
         if sample_a < MIN_SAMPLE_SIZE or sample_b < MIN_SAMPLE_SIZE:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE campaign_optimization_logs
                     SET variant_a_metrics = :va::jsonb,
                         variant_b_metrics = :vb::jsonb,
@@ -161,7 +166,8 @@ class CampaignOptimizer:
                         sample_size_b = :sb,
                         updated_at = NOW()
                     WHERE id = :id
-                """),
+                """
+                ),
                 {
                     "id": str(opt_id),
                     "va": json.dumps(variant_a_metrics),
@@ -219,7 +225,8 @@ class CampaignOptimizer:
         }
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaign_optimization_logs
                 SET variant_a_metrics = :va::jsonb,
                     variant_b_metrics = :vb::jsonb,
@@ -233,7 +240,8 @@ class CampaignOptimizer:
                     applied_at = CASE WHEN :status = 'auto_applied' THEN NOW() ELSE NULL END,
                     updated_at = NOW()
                 WHERE id = :id
-            """),
+            """
+            ),
             {
                 "id": str(opt_id),
                 "va": json.dumps(variant_a_metrics),
@@ -281,13 +289,15 @@ class CampaignOptimizer:
     ) -> dict:
         """审批并应用优化结果"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id
                   AND id = :opt_id
                   AND status = 'pending_approval'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "opt_id": str(optimization_id)},
         )
         row = result.mappings().first()
@@ -295,14 +305,16 @@ class CampaignOptimizer:
             raise CampaignOptimizationError("NOT_FOUND", "优化记录不存在或非待审批状态")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaign_optimization_logs
                 SET status = 'approved',
                     approved_by = :approved_by,
                     approved_at = NOW(),
                     updated_at = NOW()
                 WHERE id = :opt_id
-            """),
+            """
+            ),
             {"opt_id": str(optimization_id), "approved_by": str(approved_by)},
         )
 
@@ -321,14 +333,16 @@ class CampaignOptimizer:
     ) -> dict:
         """拒绝优化建议"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaign_optimization_logs
                 SET status = 'rejected', updated_at = NOW()
                 WHERE tenant_id = :tenant_id
                   AND id = :opt_id
                   AND status = 'pending_approval'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "opt_id": str(optimization_id)},
         )
         log.info("optimization_rejected", opt_id=str(optimization_id))
@@ -345,13 +359,15 @@ class CampaignOptimizer:
         将budget_shift_pct写入营销任务配置，并启动下一轮优化
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id
                   AND id = :opt_id
                   AND status IN ('approved', 'auto_applied')
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "opt_id": str(optimization_id)},
         )
         row = result.mappings().first()
@@ -360,13 +376,15 @@ class CampaignOptimizer:
 
         # 标记已应用
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaign_optimization_logs
                 SET status = 'applied',
                     applied_at = NOW(),
                     updated_at = NOW()
                 WHERE id = :opt_id
-            """),
+            """
+            ),
             {"opt_id": str(optimization_id)},
         )
 
@@ -374,7 +392,8 @@ class CampaignOptimizer:
         next_round = row["optimization_round"] + 1
         next_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaign_optimization_logs (
                     id, tenant_id, campaign_id, marketing_task_id,
                     ab_test_id, optimization_round, status,
@@ -384,7 +403,8 @@ class CampaignOptimizer:
                     :ab_test_id, :round, 'evaluating',
                     :threshold
                 )
-            """),
+            """
+            ),
             {
                 "id": str(next_id),
                 "tenant_id": str(tenant_id),
@@ -430,25 +450,29 @@ class CampaignOptimizer:
         offset = (page - 1) * size
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "campaign_id": str(campaign_id)},
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND is_deleted = FALSE
                 ORDER BY optimization_round DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "campaign_id": str(campaign_id),
@@ -468,14 +492,16 @@ class CampaignOptimizer:
     ) -> Optional[dict]:
         """获取Campaign最新一轮优化状态"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND is_deleted = FALSE
                 ORDER BY optimization_round DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "campaign_id": str(campaign_id)},
         )
         row = result.mappings().first()
@@ -492,7 +518,8 @@ class CampaignOptimizer:
     ) -> dict:
         """获取租户维度的优化大盘数据"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_rounds,
                     COUNT(*) FILTER (WHERE status = 'applied' OR status = 'auto_applied') AS applied_count,
@@ -504,7 +531,8 @@ class CampaignOptimizer:
                     COUNT(DISTINCT campaign_id) AS campaigns_optimized
                 FROM campaign_optimization_logs
                 WHERE tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id)},
         )
         row = result.mappings().first()

@@ -32,8 +32,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
-from services.audience_pack_service import AudiencePackError, AudiencePackService
 
+from services.audience_pack_service import AudiencePackError, AudiencePackService
 from shared.ontology.src.database import async_session_factory
 
 log = structlog.get_logger(__name__)

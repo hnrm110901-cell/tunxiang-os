@@ -68,7 +68,8 @@ async def compute_affinity_matrix(
     try:
         # 步骤1: 计算共现对及其出现次数
         co_result = await db.execute(
-            text("""
+            text(
+                """
                 WITH paid_items AS (
                     SELECT oi.dish_id, oi.order_id
                     FROM order_items oi
@@ -95,7 +96,8 @@ async def compute_affinity_matrix(
                 GROUP BY a.dish_id, b.dish_id
                 HAVING COUNT(DISTINCT a.order_id) >= 2
                 ORDER BY co_occurrence_count DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -114,14 +116,16 @@ async def compute_affinity_matrix(
 
         # 步骤3: 软删除旧数据
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_affinity_matrix
                 SET is_deleted = TRUE, updated_at = NOW()
                 WHERE tenant_id = :tenant_id
                   AND store_id = :store_id
                   AND period = :period
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -133,7 +137,8 @@ async def compute_affinity_matrix(
         for row in pairs:
             score = row["co_occurrence_count"] / max_co if max_co > 0 else 0.0
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dish_affinity_matrix
                         (tenant_id, store_id, dish_a_id, dish_b_id,
                          co_occurrence_count, affinity_score, period,
@@ -148,7 +153,8 @@ async def compute_affinity_matrix(
                         sample_order_count = EXCLUDED.sample_order_count,
                         is_deleted = FALSE,
                         updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": str(store_id),
@@ -193,7 +199,8 @@ async def get_affinities(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     CASE WHEN dish_a_id = :dish_id THEN dish_b_id ELSE dish_a_id END AS related_dish_id,
                     affinity_score,
@@ -206,7 +213,8 @@ async def get_affinities(
                   AND (dish_a_id = :dish_id OR dish_b_id = :dish_id)
                 ORDER BY affinity_score DESC
                 LIMIT :lim
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -253,7 +261,8 @@ async def get_combo_suggestions(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 WITH cart_affinities AS (
                     SELECT
                         CASE
@@ -278,7 +287,8 @@ async def get_combo_suggestions(
                 GROUP BY suggest_dish_id
                 ORDER BY total_affinity DESC
                 LIMIT :lim
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),

@@ -49,13 +49,15 @@ class BanquetMaterialService:
 
             # 查询菜品BOM (dish_ingredients表)
             bom_rows = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT di.ingredient_id, im.ingredient_name, im.category,
                            di.quantity, di.unit, im.unit_price_fen
                     FROM dish_ingredients di
                     JOIN ingredient_master im ON im.id = di.ingredient_id
                     WHERE di.dish_id = :did AND di.tenant_id = :tid AND di.is_deleted = FALSE
-                """),
+                """
+                ),
                 {"did": dish_id, "tid": self.tenant_id},
             )
             for bom in bom_rows.mappings().all():
@@ -81,13 +83,15 @@ class BanquetMaterialService:
             total_cost += cost
             mid = str(uuid.uuid4())
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO banquet_material_requirements
                         (id, tenant_id, banquet_id, ingredient_id, ingredient_name,
                          category, required_qty, unit, unit_cost_fen, total_cost_fen, status)
                     VALUES (:id, :tid, :bid, :iid, :name,
                         :cat, :qty, :unit, :ucost, :tcost, 'calculated')
-                """),
+                """
+                ),
                 {
                     "id": mid,
                     "tid": self.tenant_id,
@@ -110,12 +114,14 @@ class BanquetMaterialService:
     async def check_inventory(self, banquet_id: str) -> dict:
         """核查库存"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT bmr.*, COALESCE(i.quantity, 0) AS stock_qty
                 FROM banquet_material_requirements bmr
                 LEFT JOIN ingredients i ON i.ingredient_id = bmr.ingredient_id AND i.tenant_id = bmr.tenant_id AND i.is_deleted = FALSE
                 WHERE bmr.banquet_id = :bid AND bmr.tenant_id = :tid AND bmr.is_deleted = FALSE
-            """),
+            """
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         sufficient = []
@@ -141,11 +147,13 @@ class BanquetMaterialService:
 
             # 更新记录
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_material_requirements
                     SET inventory_available = :stock, purchase_needed = :purchase, source = :source, updated_at = NOW()
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {
                     "id": str(item["id"]),
                     "tid": self.tenant_id,
@@ -168,23 +176,27 @@ class BanquetMaterialService:
     async def reserve_inventory(self, banquet_id: str) -> dict:
         """预留库存"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, ingredient_id, required_qty, inventory_available, source
                 FROM banquet_material_requirements
                 WHERE banquet_id = :bid AND tenant_id = :tid AND status = 'calculated'
                   AND source IN ('inventory', 'both') AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         reserved_count = 0
         for r in rows.mappings().all():
             reserve_qty = min(float(r["required_qty"]), float(r["inventory_available"]))
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_material_requirements
                     SET inventory_reserved = :rqty, status = 'reserved', updated_at = NOW()
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"id": str(r["id"]), "tid": self.tenant_id, "rqty": reserve_qty},
             )
             reserved_count += 1
@@ -216,11 +228,13 @@ class BanquetMaterialService:
 
         # 收集需采购项
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, ingredient_id, ingredient_name, purchase_needed, unit, unit_cost_fen
                 FROM banquet_material_requirements
                 WHERE banquet_id = :bid AND tenant_id = :tid AND purchase_needed > 0 AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         items = []
@@ -248,13 +262,15 @@ class BanquetMaterialService:
         po_id = str(uuid.uuid4())
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_purchase_orders
                     (id, tenant_id, po_no, banquet_id, store_id, supplier_id,
                      items_json, total_fen, required_by, status)
                 VALUES (:id, :tid, :no, :bid, :sid, :supid,
                     :items::jsonb, :total, :rby, 'draft')
-            """),
+            """
+            ),
             {
                 "id": po_id,
                 "tid": self.tenant_id,
@@ -291,12 +307,14 @@ class BanquetMaterialService:
     async def get_material_summary(self, banquet_id: str) -> dict:
         """原料汇总(按类别)"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT category, COUNT(*) AS item_count, SUM(total_cost_fen) AS category_cost_fen
                 FROM banquet_material_requirements
                 WHERE banquet_id = :bid AND tenant_id = :tid AND is_deleted = FALSE
                 GROUP BY category ORDER BY category_cost_fen DESC
-            """),
+            """
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         categories = [dict(r) for r in rows.mappings().all()]
@@ -306,11 +324,13 @@ class BanquetMaterialService:
     async def update_purchase_status(self, po_id: str, new_status: str) -> dict:
         """更新采购单状态"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_purchase_orders SET status = :status, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
                 RETURNING id, po_no
-            """),
+            """
+            ),
             {"id": po_id, "tid": self.tenant_id, "status": new_status},
         )
         row = result.mappings().first()

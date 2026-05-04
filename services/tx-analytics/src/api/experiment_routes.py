@@ -150,9 +150,7 @@ async def bucket_assign(
     result: OrchestratorBucketResult = await orchestrator.get_bucket(
         tenant_id=tenant_id,
         experiment_key=key,
-        subject=ExperimentSubject(
-            subject_type=body.subject_type, subject_id=body.subject_id
-        ),
+        subject=ExperimentSubject(subject_type=body.subject_type, subject_id=body.subject_id),
         store_id=body.store_id,
         context=body.context or {},
     )
@@ -179,14 +177,8 @@ async def dashboard_summary(
     dashboard: ExperimentDashboard = Depends(get_dashboard),
 ) -> dict:
     """跨变体显著性汇总。默认窗口为最近 24 小时。"""
-    end = (
-        datetime.fromisoformat(to_iso) if to_iso else datetime.now(timezone.utc)
-    )
-    start = (
-        datetime.fromisoformat(from_iso)
-        if from_iso
-        else (end - timedelta(hours=24))
-    )
+    end = datetime.fromisoformat(to_iso) if to_iso else datetime.now(timezone.utc)
+    start = datetime.fromisoformat(from_iso) if from_iso else (end - timedelta(hours=24))
     if start >= end:
         raise HTTPException(status_code=400, detail="from 必须早于 to")
 
@@ -205,9 +197,7 @@ async def dashboard_summary(
                 "start": summary.time_window.start.isoformat(),
                 "end": summary.time_window.end.isoformat(),
             },
-            "variant_subject_counts": {
-                v: len(ids) for v, ids in summary.variant_subjects.items()
-            },
+            "variant_subject_counts": {v: len(ids) for v, ids in summary.variant_subjects.items()},
             "cells": [
                 {
                     "variant": c.variant,

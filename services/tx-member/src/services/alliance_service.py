@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -65,7 +64,8 @@ class AllianceService:
         now = _now_utc()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO alliance_partners
                     (id, tenant_id, partner_name, partner_type,
                      partner_brand_logo, contact_name, contact_phone, contact_email,
@@ -80,7 +80,8 @@ class AllianceService:
                      :exchange_rate_out, :exchange_rate_in, :daily_exchange_limit,
                      'pending', :contract_start, :contract_end, :terms_summary,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": partner_id,
                 "tid": tenant_id,
@@ -130,10 +131,12 @@ class AllianceService:
 
         # 检查伙伴是否存在
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         row = result.mappings().first()
@@ -142,11 +145,20 @@ class AllianceService:
 
         # 构建动态 UPDATE 字段
         allowed_fields = [
-            "partner_name", "partner_type", "partner_brand_logo",
-            "contact_name", "contact_phone", "contact_email",
-            "api_endpoint", "api_key_encrypted",
-            "exchange_rate_out", "exchange_rate_in", "daily_exchange_limit",
-            "contract_start", "contract_end", "terms_summary",
+            "partner_name",
+            "partner_type",
+            "partner_brand_logo",
+            "contact_name",
+            "contact_phone",
+            "contact_email",
+            "api_endpoint",
+            "api_key_encrypted",
+            "exchange_rate_out",
+            "exchange_rate_in",
+            "daily_exchange_limit",
+            "contract_start",
+            "contract_end",
+            "terms_summary",
         ]
         set_clauses = []
         params: dict[str, Any] = {"pid": partner_id, "tid": tenant_id, "now": _now_utc()}
@@ -163,10 +175,12 @@ class AllianceService:
         set_sql = ", ".join(set_clauses)
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE alliance_partners SET {set_sql}
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
 
@@ -189,10 +203,12 @@ class AllianceService:
         await _set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         row = result.mappings().first()
@@ -202,11 +218,13 @@ class AllianceService:
             raise AllianceServiceError("partner_terminated", "已终止的合作伙伴不可激活")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE alliance_partners
                 SET status = 'active', updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id, "now": _now_utc()},
         )
 
@@ -223,10 +241,12 @@ class AllianceService:
         await _set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         row = result.mappings().first()
@@ -236,11 +256,13 @@ class AllianceService:
             raise AllianceServiceError("partner_not_active", "只能暂停活跃状态的合作伙伴")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE alliance_partners
                 SET status = 'suspended', updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id, "now": _now_utc()},
         )
 
@@ -258,10 +280,12 @@ class AllianceService:
     ) -> int:
         """检查每日兑换限额，返回 daily_exchange_limit"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT daily_exchange_limit FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         row = result.mappings().first()
@@ -272,14 +296,16 @@ class AllianceService:
 
         # 查询今日已兑换总量
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(points_amount), 0) AS today_total
                 FROM alliance_transactions
                 WHERE partner_id = :pid AND tenant_id = :tid
                   AND status IN ('pending', 'completed')
                   AND created_at::date = CURRENT_DATE
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         today_row = result.mappings().first()
@@ -288,8 +314,7 @@ class AllianceService:
         if today_total + points_amount > daily_limit:
             raise AllianceServiceError(
                 "daily_limit_exceeded",
-                f"每日兑换限额 {daily_limit}，今日已兑换 {today_total}，"
-                f"本次请求 {points_amount} 超出限额",
+                f"每日兑换限额 {daily_limit}，今日已兑换 {today_total}，" f"本次请求 {points_amount} 超出限额",
             )
 
         return daily_limit
@@ -311,11 +336,13 @@ class AllianceService:
 
         # 检查合作伙伴状态
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, exchange_rate_out, partner_name
                 FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         partner = result.mappings().first()
@@ -333,12 +360,14 @@ class AllianceService:
 
         # 扣减客户积分（检查余额，FOR UPDATE 防止并发扣减导致负余额）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(CASE WHEN type = 'earn' THEN points ELSE -points END), 0) AS balance
                 FROM points_ledger
                 WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false
                 FOR UPDATE
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id},
         )
         balance_row = result.mappings().first()
@@ -354,13 +383,15 @@ class AllianceService:
         ledger_id = str(uuid.uuid4())
         now = _now_utc()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO points_ledger
                     (id, tenant_id, customer_id, type, points, source, memo, created_at)
                 VALUES
                     (:id, :tid, :cid, 'spend', :pts, 'alliance_exchange_out',
                      :memo, :now)
-            """),
+            """
+            ),
             {
                 "id": ledger_id,
                 "tid": tenant_id,
@@ -374,7 +405,8 @@ class AllianceService:
         # 创建兑换交易记录
         tx_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO alliance_transactions
                     (id, tenant_id, partner_id, customer_id, direction,
                      points_amount, converted_points, exchange_rate,
@@ -383,7 +415,8 @@ class AllianceService:
                     (:id, :tid, :pid, :cid, 'outbound',
                      :pts, :converted, :rate,
                      'completed', :now, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": tx_id,
                 "tid": tenant_id,
@@ -398,12 +431,14 @@ class AllianceService:
 
         # 更新合作伙伴累计兑出
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE alliance_partners
                 SET total_points_exchanged_out = total_points_exchanged_out + :pts,
                     updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id, "pts": points_amount, "now": now},
         )
 
@@ -442,11 +477,13 @@ class AllianceService:
 
         # 检查合作伙伴状态
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, exchange_rate_in, partner_name
                 FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         partner = result.mappings().first()
@@ -466,13 +503,15 @@ class AllianceService:
         ledger_id = str(uuid.uuid4())
         now = _now_utc()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO points_ledger
                     (id, tenant_id, customer_id, type, points, source, memo, created_at)
                 VALUES
                     (:id, :tid, :cid, 'earn', :pts, 'alliance_exchange_in',
                      :memo, :now)
-            """),
+            """
+            ),
             {
                 "id": ledger_id,
                 "tid": tenant_id,
@@ -486,7 +525,8 @@ class AllianceService:
         # 创建兑换交易记录
         tx_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO alliance_transactions
                     (id, tenant_id, partner_id, customer_id, direction,
                      points_amount, converted_points, exchange_rate,
@@ -495,7 +535,8 @@ class AllianceService:
                     (:id, :tid, :pid, :cid, 'inbound',
                      :pts, :converted, :rate,
                      'completed', :now, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": tx_id,
                 "tid": tenant_id,
@@ -510,12 +551,14 @@ class AllianceService:
 
         # 更新合作伙伴累计兑入
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE alliance_partners
                 SET total_points_exchanged_in = total_points_exchanged_in + :pts,
                     updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id, "pts": external_points, "now": now},
         )
 
@@ -550,11 +593,13 @@ class AllianceService:
 
         # 检查合作伙伴
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, exchange_rate_in, partner_name
                 FROM alliance_partners
                 WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": partner_id, "tid": tenant_id},
         )
         partner = result.mappings().first()
@@ -565,11 +610,13 @@ class AllianceService:
 
         # 查询优惠券模板
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, points_cost
                 FROM coupon_templates
                 WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"ctid": coupon_template_id, "tid": tenant_id},
         )
         coupon_tpl = result.mappings().first()
@@ -586,7 +633,8 @@ class AllianceService:
         tx_id = str(uuid.uuid4())
         now = _now_utc()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO alliance_transactions
                     (id, tenant_id, partner_id, customer_id, direction,
                      points_amount, converted_points, exchange_rate,
@@ -597,7 +645,8 @@ class AllianceService:
                      :pts, 0, :rate,
                      :coupon_id, :coupon_name,
                      'completed', :now, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": tx_id,
                 "tid": tenant_id,
@@ -666,7 +715,8 @@ class AllianceService:
         params["offset"] = offset
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, partner_name, partner_type,
                        partner_brand_logo, contact_name, contact_phone, contact_email,
                        exchange_rate_out, exchange_rate_in, daily_exchange_limit,
@@ -677,7 +727,8 @@ class AllianceService:
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -723,7 +774,8 @@ class AllianceService:
         params["offset"] = offset
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT t.id, t.partner_id, t.customer_id, t.direction,
                        t.points_amount, t.converted_points, t.exchange_rate,
                        t.coupon_id, t.coupon_name, t.status, t.failure_reason,
@@ -734,7 +786,8 @@ class AllianceService:
                 WHERE {where_sql}
                 ORDER BY t.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -752,7 +805,8 @@ class AllianceService:
 
         # 合作伙伴统计
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_partners,
                     COUNT(*) FILTER (WHERE status = 'active') AS active_partners,
@@ -762,14 +816,16 @@ class AllianceService:
                     COALESCE(SUM(total_points_exchanged_in), 0) AS total_points_in
                 FROM alliance_partners
                 WHERE tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         stats = dict(result.mappings().first())
 
         # 每个合作伙伴的兑换量排名
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, partner_name, partner_type, status,
                        total_points_exchanged_out, total_points_exchanged_in,
                        (total_points_exchanged_out + total_points_exchanged_in) AS total_volume
@@ -777,14 +833,16 @@ class AllianceService:
                 WHERE tenant_id = :tid AND is_deleted = false
                 ORDER BY total_volume DESC
                 LIMIT 10
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         top_partners = [dict(r) for r in result.mappings().all()]
 
         # 最近30天交易趋势
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     created_at::date AS tx_date,
                     direction,
@@ -796,7 +854,8 @@ class AllianceService:
                   AND created_at >= CURRENT_DATE - INTERVAL '30 days'
                 GROUP BY created_at::date, direction
                 ORDER BY tx_date DESC
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         trend = [dict(r) for r in result.mappings().all()]

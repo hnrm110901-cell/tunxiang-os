@@ -15,14 +15,14 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from pydantic import BaseModel
+from workers.journey_executor import JourneyEventListener, JourneyExecutor
+
 from services.audience_segmentation import AudienceSegmentationService
 from services.brand_strategy import BrandStrategyService
 from services.journey_orchestrator import JourneyOrchestratorService
 
 # ChannelEngine / ContentEngine / OfferEngine: v144 DB化，已移至各自路由文件
 from services.roi_attribution import ROIAttributionService
-from workers.journey_executor import JourneyEventListener, JourneyExecutor
-
 from shared.events.event_publisher import MemberEventPublisher
 from shared.ontology.src.database import async_session_factory, init_db
 
@@ -90,6 +90,7 @@ def _on_tick_done(task: asyncio.Task) -> None:
 
 from engine.event_bridge import get_event_bridge as _get_event_bridge
 from engine.journey_engine import JourneyEngine as _JourneyEngine
+
 from services.approval_service import ApprovalService as _ApprovalService
 
 from .api.ab_test_routes import router as ab_test_router

@@ -11,6 +11,7 @@ from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from services.tx_finance.src.services.pl_report import PLReport, PLReportService
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ def _make_pl_data(revenue_fen, raw_cost_fen, labor_fen=0, rent_fen=0, other_fen=
 
 # ─── Test 1: 日P&L = 收入 - 原料成本 ─────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_daily_pl_basic_calculation():
     """日P&L基础计算：毛利=收入-原料成本，毛利率=毛利/收入"""
@@ -42,20 +44,19 @@ async def test_daily_pl_basic_calculation():
     biz_date = date(2026, 3, 30)
 
     mock_data = _make_pl_data(
-        revenue_fen=100_000,      # 1000元收入
-        raw_cost_fen=35_000,      # 350元原料成本
+        revenue_fen=100_000,  # 1000元收入
+        raw_cost_fen=35_000,  # 350元原料成本
     )
 
-    with patch.object(service, "_fetch_daily_revenue", new=AsyncMock(return_value=100_000)), \
-         patch.object(service, "_fetch_daily_raw_cost", new=AsyncMock(return_value=35_000)), \
-         patch.object(service, "_fetch_daily_opex", new=AsyncMock(return_value={})):
-
+    with patch.object(service, "_fetch_daily_revenue", new=AsyncMock(return_value=100_000)), patch.object(
+        service, "_fetch_daily_raw_cost", new=AsyncMock(return_value=35_000)
+    ), patch.object(service, "_fetch_daily_opex", new=AsyncMock(return_value={})):
         result = await service.get_daily_pl(STORE_A, biz_date, TENANT_ID, db)
 
     assert isinstance(result, PLReport)
     assert result.revenue_fen == 100_000
     assert result.raw_material_cost_fen == 35_000
-    assert result.gross_profit_fen == 65_000   # 1000 - 350 = 650元
+    assert result.gross_profit_fen == 65_000  # 1000 - 350 = 650元
     assert result.gross_margin_rate == pytest.approx(0.65, abs=0.001)
 
 
@@ -66,10 +67,9 @@ async def test_daily_pl_zero_revenue():
     db = AsyncMock()
     biz_date = date(2026, 3, 30)
 
-    with patch.object(service, "_fetch_daily_revenue", new=AsyncMock(return_value=0)), \
-         patch.object(service, "_fetch_daily_raw_cost", new=AsyncMock(return_value=0)), \
-         patch.object(service, "_fetch_daily_opex", new=AsyncMock(return_value={})):
-
+    with patch.object(service, "_fetch_daily_revenue", new=AsyncMock(return_value=0)), patch.object(
+        service, "_fetch_daily_raw_cost", new=AsyncMock(return_value=0)
+    ), patch.object(service, "_fetch_daily_opex", new=AsyncMock(return_value={})):
         result = await service.get_daily_pl(STORE_A, biz_date, TENANT_ID, db)
 
     assert result.revenue_fen == 0
@@ -77,6 +77,7 @@ async def test_daily_pl_zero_revenue():
 
 
 # ─── Test 2: 期间P&L聚合（周/月）────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_period_pl_weekly_aggregation():
@@ -88,17 +89,12 @@ async def test_period_pl_weekly_aggregation():
     end = date(2026, 3, 30)
 
     # 每天 10000 收入，3500 成本，共7天
-    daily_rows = [
-        {"biz_date": date(2026, 3, 24 + i), "revenue_fen": 10_000, "raw_cost_fen": 3_500}
-        for i in range(7)
-    ]
+    daily_rows = [{"biz_date": date(2026, 3, 24 + i), "revenue_fen": 10_000, "raw_cost_fen": 3_500} for i in range(7)]
 
-    with patch.object(service, "_fetch_period_daily_rows",
-                      new=AsyncMock(return_value=daily_rows)):
-
+    with patch.object(service, "_fetch_period_daily_rows", new=AsyncMock(return_value=daily_rows)):
         result = await service.get_period_pl(STORE_A, start, end, TENANT_ID, db)
 
-    assert result.revenue_fen == 70_000       # 7 × 10000
+    assert result.revenue_fen == 70_000  # 7 × 10000
     assert result.raw_material_cost_fen == 24_500  # 7 × 3500
     assert result.gross_profit_fen == 45_500
     assert result.period_days == 7
@@ -113,23 +109,19 @@ async def test_period_pl_monthly_aggregation():
     start = date(2026, 3, 1)
     end = date(2026, 3, 30)
 
-    daily_rows = [
-        {"biz_date": date(2026, 3, 1 + i), "revenue_fen": 50_000, "raw_cost_fen": 17_500}
-        for i in range(30)
-    ]
+    daily_rows = [{"biz_date": date(2026, 3, 1 + i), "revenue_fen": 50_000, "raw_cost_fen": 17_500} for i in range(30)]
 
-    with patch.object(service, "_fetch_period_daily_rows",
-                      new=AsyncMock(return_value=daily_rows)):
-
+    with patch.object(service, "_fetch_period_daily_rows", new=AsyncMock(return_value=daily_rows)):
         result = await service.get_period_pl(STORE_A, start, end, TENANT_ID, db)
 
-    assert result.revenue_fen == 1_500_000     # 30 × 50000
+    assert result.revenue_fen == 1_500_000  # 30 × 50000
     assert result.gross_profit_fen == 975_000  # 30 × (50000 - 17500)
     assert result.period_days == 30
     assert result.avg_daily_revenue_fen == 50_000
 
 
 # ─── Test 3: 分店P&L对比 ──────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_multi_store_pl_comparison():
@@ -140,7 +132,7 @@ async def test_multi_store_pl_comparison():
 
     store_data = {
         STORE_A: {"revenue_fen": 100_000, "raw_cost_fen": 30_000},  # margin 70%
-        STORE_B: {"revenue_fen": 80_000, "raw_cost_fen": 40_000},   # margin 50%
+        STORE_B: {"revenue_fen": 80_000, "raw_cost_fen": 40_000},  # margin 50%
         STORE_C: {"revenue_fen": 120_000, "raw_cost_fen": 36_000},  # margin 70%
     }
 
@@ -172,6 +164,7 @@ async def test_multi_store_pl_comparison():
 
 # ─── Test 4: 同比/环比计算 ────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_year_over_year_calculation():
     """同比：本期收入与去年同期对比，计算增减幅度"""
@@ -182,13 +175,9 @@ async def test_year_over_year_calculation():
     current_end = date(2026, 3, 30)
 
     current_rows = [
-        {"biz_date": date(2026, 3, 1 + i), "revenue_fen": 50_000, "raw_cost_fen": 15_000}
-        for i in range(30)
+        {"biz_date": date(2026, 3, 1 + i), "revenue_fen": 50_000, "raw_cost_fen": 15_000} for i in range(30)
     ]
-    prior_rows = [
-        {"biz_date": date(2025, 3, 1 + i), "revenue_fen": 40_000, "raw_cost_fen": 14_000}
-        for i in range(30)
-    ]
+    prior_rows = [{"biz_date": date(2025, 3, 1 + i), "revenue_fen": 40_000, "raw_cost_fen": 14_000} for i in range(30)]
 
     call_count = 0
 
@@ -228,13 +217,9 @@ async def test_month_over_month_calculation():
     current_end = date(2026, 3, 31)
 
     current_rows = [
-        {"biz_date": date(2026, 3, 1 + i), "revenue_fen": 55_000, "raw_cost_fen": 16_500}
-        for i in range(31)
+        {"biz_date": date(2026, 3, 1 + i), "revenue_fen": 55_000, "raw_cost_fen": 16_500} for i in range(31)
     ]
-    prior_rows = [
-        {"biz_date": date(2026, 2, 1 + i), "revenue_fen": 50_000, "raw_cost_fen": 15_000}
-        for i in range(28)
-    ]
+    prior_rows = [{"biz_date": date(2026, 2, 1 + i), "revenue_fen": 50_000, "raw_cost_fen": 15_000} for i in range(28)]
 
     async def mock_fetch(store_id, start, end, tenant_id, db_session):
         if start.month == 3:
@@ -259,6 +244,7 @@ async def test_month_over_month_calculation():
 
 # ─── Test 5: PLReport 数据结构完整性 ─────────────────────────────────────────
 
+
 def test_pl_report_fields():
     """PLReport 包含所有必要字段"""
     report = PLReport(
@@ -274,13 +260,14 @@ def test_pl_report_fields():
     )
 
     assert report.gross_profit_fen == 65_000
-    assert report.net_profit_fen == 30_000       # 100000-35000-20000-10000-5000
+    assert report.net_profit_fen == 30_000  # 100000-35000-20000-10000-5000
     assert report.gross_margin_rate == pytest.approx(0.65, abs=0.001)
     assert report.net_margin_rate == pytest.approx(0.30, abs=0.001)
     assert report.avg_daily_revenue_fen == 100_000
 
 
 # ─── Test 6: 凭证列表查询 ────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_vouchers_by_store_date():
@@ -289,14 +276,23 @@ async def test_get_vouchers_by_store_date():
     db = AsyncMock()
 
     mock_vouchers = [
-        {"id": str(uuid.uuid4()), "voucher_no": "V20260330001",
-         "voucher_type": "sales", "total_amount": "1000.00", "status": "draft"},
-        {"id": str(uuid.uuid4()), "voucher_no": "V20260330002",
-         "voucher_type": "cost", "total_amount": "350.00", "status": "confirmed"},
+        {
+            "id": str(uuid.uuid4()),
+            "voucher_no": "V20260330001",
+            "voucher_type": "sales",
+            "total_amount": "1000.00",
+            "status": "draft",
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "voucher_no": "V20260330002",
+            "voucher_type": "cost",
+            "total_amount": "350.00",
+            "status": "confirmed",
+        },
     ]
 
-    with patch.object(service, "_fetch_vouchers",
-                      new=AsyncMock(return_value=mock_vouchers)):
+    with patch.object(service, "_fetch_vouchers", new=AsyncMock(return_value=mock_vouchers)):
         result = await service.get_vouchers(
             store_id=STORE_A,
             biz_date=date(2026, 3, 30),

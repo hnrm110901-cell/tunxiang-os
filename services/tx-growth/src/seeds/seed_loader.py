@@ -33,7 +33,8 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
     touch_loaded = 0
     for tmpl in SYSTEM_TOUCH_TEMPLATES:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_touch_templates
                     (tenant_id, code, name, template_family, mechanism_type, channel, tone,
                      content_template, variables_schema_json, forbidden_phrases_json,
@@ -44,7 +45,8 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
                      :requires_human_review, TRUE, TRUE)
                 ON CONFLICT (tenant_id, code) DO NOTHING
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "code": tmpl["code"],
@@ -70,7 +72,8 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
 
         # 插入旅程模板
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_journey_templates
                     (tenant_id, code, name, journey_type, mechanism_family,
                      entry_rule_json, exit_rule_json, pause_rule_json,
@@ -81,7 +84,8 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
                      :priority, TRUE, TRUE)
                 ON CONFLICT (tenant_id, code) DO NOTHING
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "code": jtmpl["code"],
@@ -102,7 +106,8 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
             # 插入旅程步骤
             for step in steps:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO growth_journey_template_steps
                             (tenant_id, journey_template_id, step_no, step_type, mechanism_type,
                              wait_minutes, decision_rule_json, offer_rule_json, touch_template_id,
@@ -113,7 +118,8 @@ async def seed_growth_templates(tenant_id: str, db: AsyncSession) -> dict:
                              (SELECT id FROM growth_touch_templates
                               WHERE tenant_id = :tenant_id AND code = :touch_code LIMIT 1),
                              :observe_window_hours, :success_next, :fail_next, :skip_next)
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "template_id": template_id,

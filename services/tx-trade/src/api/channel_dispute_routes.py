@@ -58,9 +58,7 @@ def _ok(data: dict | BaseModel | None) -> StandardResponse:
     return StandardResponse(ok=True, data=data)
 
 
-def _check_tenant_consistency(
-    *, header_tenant: str, body_tenant: str, user: UserContext
-) -> None:
+def _check_tenant_consistency(*, header_tenant: str, body_tenant: str, user: UserContext) -> None:
     if header_tenant != body_tenant:
         logger.warning(
             "channel_dispute_tenant_mismatch_header",
@@ -88,9 +86,7 @@ async def open_dispute(
     request: Request,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(
-        require_role("integration", "store_manager", "admin")
-    ),
+    user: UserContext = Depends(require_role("integration", "store_manager", "admin")),
 ) -> StandardResponse:
     """打开异议；小额自动接受，大额走人工 pending。
 
@@ -105,9 +101,7 @@ async def open_dispute(
 
     svc = ChannelDisputeService(db, tenant_id=str(body.tenant_id))
     try:
-        record, created = await svc.open_dispute(
-            body, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN
-        )
+        record, created = await svc.open_dispute(body, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN)
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
@@ -183,18 +177,14 @@ async def list_disputes(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(
-        require_role("viewer", "store_manager", "admin", "integration")
-    ),
+    user: UserContext = Depends(require_role("viewer", "store_manager", "admin", "integration")),
 ) -> StandardResponse:
     if user.tenant_id and user.tenant_id != x_tenant_id:
         raise HTTPException(status_code=403, detail="USER_TENANT_MISMATCH")
 
     svc = ChannelDisputeService(db, tenant_id=x_tenant_id)
     try:
-        records, total = await svc.list_pending(
-            store_id=store_id, states=state, page=page, size=size
-        )
+        records, total = await svc.list_pending(store_id=store_id, states=state, page=page, size=size)
     except SQLAlchemyError:
         logger.exception("channel_dispute_list_db_error", tenant_id=x_tenant_id)
         raise HTTPException(
@@ -202,7 +192,5 @@ async def list_disputes(
             detail={"code": "DB_ERROR", "message": "dispute list failed"},
         )
 
-    resp = DisputeListResponse(
-        items=records, total=total, page=page, size=size
-    )
+    resp = DisputeListResponse(items=records, total=total, page=page, size=size)
     return _ok(resp)

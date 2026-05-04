@@ -176,8 +176,7 @@ class BanquetEOTicketService:
             update={
                 "status": EOTicketStatus.DISPATCHED,
                 "dispatched_at": now,
-                "assignee_employee_id": assignee_employee_id
-                or ticket.assignee_employee_id,
+                "assignee_employee_id": assignee_employee_id or ticket.assignee_employee_id,
                 "updated_at": now,
             }
         )

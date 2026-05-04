@@ -106,14 +106,16 @@ async def list_rewards(
 
     params.update({"lim": size, "off": offset})
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, name, description, points_required, stock,
                    product_type AS category, image_url
             FROM points_mall_products
             WHERE {base_where}
             ORDER BY sort_order ASC, created_at ASC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         params,
     )
 
@@ -174,13 +176,15 @@ async def redeem_reward(
 
     # Step 1: 锁定商品行，读取当前状态
     product_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, points_required, stock, is_active, is_deleted,
                    valid_from, valid_until
             FROM points_mall_products
             WHERE id = :rid AND tenant_id = :tid
             FOR UPDATE
-        """),
+        """
+        ),
         {"rid": body.reward_id, "tid": tenant_id},
     )
     product = product_row.first()
@@ -204,13 +208,15 @@ async def redeem_reward(
 
     # Step 2: 查找并锁定会员卡
     card_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, points FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false
             ORDER BY created_at ASC
             LIMIT 1
             FOR UPDATE
-        """),
+        """
+        ),
         {"cid": body.customer_id, "tid": tenant_id},
     )
     card = card_row.first()
@@ -230,12 +236,14 @@ async def redeem_reward(
     # Step 4: 减库存（stock=-1 表示不限库存，跳过减库存）
     if stock != -1:
         stock_result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_products
                 SET stock = stock - 1, updated_at = :now
                 WHERE id = :rid AND tenant_id = :tid AND stock > 0
                 RETURNING stock
-            """),
+            """
+            ),
             {"rid": body.reward_id, "tid": tenant_id, "now": now},
         )
         if not stock_result.first():
@@ -243,13 +251,15 @@ async def redeem_reward(
 
     # Step 5: 扣积分（原子操作，WHERE points >= pts 防超扣）
     deduct_result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points - :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
               AND points >= :pts
             RETURNING points
-        """),
+        """
+        ),
         {"pts": points_required, "cid": card_id, "tid": tenant_id, "now": now},
     )
     deduct_row = deduct_result.first()
@@ -257,11 +267,13 @@ async def redeem_reward(
         # 回滚库存（若已减过）
         if stock != -1:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE points_mall_products
                     SET stock = stock + 1, updated_at = :now
                     WHERE id = :rid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"rid": body.reward_id, "tid": tenant_id, "now": now},
             )
         await db.flush()
@@ -272,11 +284,13 @@ async def redeem_reward(
     # Step 6: 记录积分流水
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, order_id, created_at)
             VALUES (:id, :tid, :cid, 'spend', 'redeem', :pts, :rid, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -291,14 +305,16 @@ async def redeem_reward(
     order_id = str(uuid.uuid4())
     order_no = f"RW-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_mall_orders
                 (id, tenant_id, order_no, product_id, customer_id, card_id,
                  quantity, points_spent, status, created_at, updated_at)
             VALUES
                 (:oid, :tid, :ono, :pid, :cid, :card_id,
                  1, :pts, 'pending', :now, :now)
-        """),
+        """
+        ),
         {
             "oid": order_id,
             "tid": tenant_id,

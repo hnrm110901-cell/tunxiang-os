@@ -20,8 +20,6 @@ import httpx
 import structlog
 from fastapi import APIRouter, HTTPException, Query
 
-from shared.security.src.error_handler import safe_http_exception
-
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/wecom", tags=["wecom-jssdk"])

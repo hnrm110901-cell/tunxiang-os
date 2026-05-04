@@ -25,11 +25,13 @@ class ForgeInstallationService:
     ) -> dict:
         # ── 验证应用存在且已发布 ──
         app_check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, current_version, status
                 FROM forge_apps
                 WHERE app_id = :aid AND is_deleted = false
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         app_row = app_check.mappings().first()
@@ -43,14 +45,16 @@ class ForgeInstallationService:
 
         # ── 检查是否已安装 ──
         dup_check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT install_id
                 FROM forge_installations
                 WHERE tenant_id = :tid::uuid
                   AND app_id = :aid
                   AND status = 'active'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "aid": app_id},
         )
         if dup_check.first():
@@ -61,7 +65,8 @@ class ForgeInstallationService:
 
         # ── 插入安装记录 ──
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_installations
                     (id, tenant_id, install_id, app_id, store_ids,
                      status, installed_version, installed_at)
@@ -71,7 +76,8 @@ class ForgeInstallationService:
                      'active', :version, NOW())
                 RETURNING install_id, app_id, store_ids, status,
                           installed_version, installed_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "install_id": install_id,
@@ -84,11 +90,13 @@ class ForgeInstallationService:
 
         # ── 递增安装计数 ──
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_apps
                 SET install_count = install_count + 1, updated_at = NOW()
                 WHERE app_id = :aid
-            """),
+            """
+            ),
             {"aid": app_id},
         )
 
@@ -104,7 +112,8 @@ class ForgeInstallationService:
         app_id: str,
     ) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_installations
                 SET status = 'uninstalled', uninstalled_at = NOW(), updated_at = NOW()
                 WHERE tenant_id = :tid::uuid
@@ -112,7 +121,8 @@ class ForgeInstallationService:
                   AND status = 'active'
                   AND is_deleted = false
                 RETURNING install_id, app_id, status, uninstalled_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "aid": app_id},
         )
         row = result.mappings().first()
@@ -124,12 +134,14 @@ class ForgeInstallationService:
 
         # ── 递减安装计数（最低为 0） ──
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_apps
                 SET install_count = GREATEST(install_count - 1, 0),
                     updated_at = NOW()
                 WHERE app_id = :aid
-            """),
+            """
+            ),
             {"aid": app_id},
         )
 
@@ -152,19 +164,22 @@ class ForgeInstallationService:
         }
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM forge_installations i
                 WHERE i.tenant_id = :tid::uuid
                   AND i.status = 'active'
                   AND i.is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     i.install_id, i.app_id, i.store_ids, i.status,
                     i.installed_version, i.installed_at,
@@ -178,7 +193,8 @@ class ForgeInstallationService:
                   AND i.is_deleted = false
                 ORDER BY i.installed_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -187,7 +203,8 @@ class ForgeInstallationService:
     # ── 安装状态 ─────────────────────────────────────────────
     async def get_installation_status(self, db: AsyncSession, tenant_id: str, app_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT install_id, app_id, store_ids, status,
                        installed_version, installed_at, uninstalled_at
                 FROM forge_installations
@@ -196,7 +213,8 @@ class ForgeInstallationService:
                   AND is_deleted = false
                 ORDER BY installed_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "aid": app_id},
         )
         row = result.mappings().first()

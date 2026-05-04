@@ -82,72 +82,56 @@ class FinancialVoucher(Base):
     - confirmed : 已确认（财务审核通过）
     - exported  : 已导出（推送金蝶/用友等ERP）
     """
+
     __tablename__ = "financial_vouchers"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     # v264 后 nullable=True（物理 schema 允许 NULL 以兼容历史行）
     # 应用层对 INSERT 仍强制要求 store_id / voucher_date 非空.
     store_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True,
-        comment="门店 ID (v264 起 nullable, 应用层仍要求新建凭证必填)"
+        UUID(as_uuid=True), nullable=True, index=True, comment="门店 ID (v264 起 nullable, 应用层仍要求新建凭证必填)"
     )
 
     # 凭证标识
     voucher_no: Mapped[str] = mapped_column(
-        String(50), nullable=False, unique=True,
-        comment="凭证编号，格式: V{store_short}{YYYYMMDD}{SEQ}"
+        String(50), nullable=False, unique=True, comment="凭证编号，格式: V{store_short}{YYYYMMDD}{SEQ}"
     )
     voucher_date: Mapped[date | None] = mapped_column(
-        Date, nullable=True, index=True,
-        comment="凭证日期(业务日期). v264 起 nullable, 应用层仍要求新建凭证必填."
+        Date, nullable=True, index=True, comment="凭证日期(业务日期). v264 起 nullable, 应用层仍要求新建凭证必填."
     )
     voucher_type: Mapped[str] = mapped_column(
-        String(40), nullable=False,
-        comment="凭证类型: sales/cost/payment/receipt/prior_period_adjustment (W2.A)"
+        String(40), nullable=False, comment="凭证类型: sales/cost/payment/receipt/prior_period_adjustment (W2.A)"
     )
 
     # 金额
     # v264 后 total_amount (NUMERIC 元) DEPRECATED, 过渡期双写, 下游优先读 total_amount_fen.
     total_amount: Mapped[float | None] = mapped_column(
-        Numeric(12, 2), nullable=True,
-        comment="DEPRECATED v264 (NUMERIC 元). 用 total_amount_fen (BIGINT 分). 将在 v270+ drop."
+        Numeric(12, 2),
+        nullable=True,
+        comment="DEPRECATED v264 (NUMERIC 元). 用 total_amount_fen (BIGINT 分). 将在 v270+ drop.",
     )
     total_amount_fen: Mapped[int | None] = mapped_column(
-        BigInteger, nullable=True,
-        comment="凭证总金额 (分, 屯象 fen BIGINT 约定). v264 起为 SSOT."
+        BigInteger, nullable=True, comment="凭证总金额 (分, 屯象 fen BIGINT 约定). v264 起为 SSOT."
     )
 
     # 分录（JSONB）
     entries: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, default=list,
-        comment="会计分录列表 [{account_code, debit, credit, summary}]"
+        JSONB, nullable=False, default=list, comment="会计分录列表 [{account_code, debit, credit, summary}]"
     )
 
     # 来源追溯
-    source_type: Mapped[str | None] = mapped_column(
-        String(30),
-        comment="来源类型: order/settlement/payment"
-    )
-    source_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="来源单据ID（订单ID/日结ID等）"
-    )
+    source_type: Mapped[str | None] = mapped_column(String(30), comment="来源类型: order/settlement/payment")
+    source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="来源单据ID（订单ID/日结ID等）")
 
     # v268 幂等字段. (tenant_id, event_type, event_id) partial UNIQUE.
     # order.paid / daily_settlement.closed / refund.processed 事件重试不生成重复凭证.
     # 手工凭证 / 历史凭证 event_id=NULL, 不参与去重 (partial 索引允许 NULL).
     event_type: Mapped[str | None] = mapped_column(
-        String(50),
-        comment="事件类型 (e.g. order.paid / daily_settlement.closed). 幂等键之一."
+        String(50), comment="事件类型 (e.g. order.paid / daily_settlement.closed). 幂等键之一."
     )
     event_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="事件去重 UUID. 同 (tenant, event_type, event_id) 唯一."
+        UUID(as_uuid=True), comment="事件去重 UUID. 同 (tenant, event_type, event_id) 唯一."
     )
 
     # v278 以前年度损益调整 (W2.A). 跨期调账的元数据.
@@ -155,41 +139,33 @@ class FinancialVoucher(Base):
     # source_period_year=2026, source_period_month=12, 配合科目 6901.
     # CHECK: 两列同时 NULL 或同时非空.
     source_period_year: Mapped[int | None] = mapped_column(
-        Integer,
-        comment="以前年度损益调整 — 业务原属年份 (NULL 为当期凭证)."
+        Integer, comment="以前年度损益调整 — 业务原属年份 (NULL 为当期凭证)."
     )
-    source_period_month: Mapped[int | None] = mapped_column(
-        Integer,
-        comment="以前年度损益调整 — 业务原属月份."
-    )
+    source_period_month: Mapped[int | None] = mapped_column(Integer, comment="以前年度损益调整 — 业务原属月份.")
 
     # 状态
     status: Mapped[str] = mapped_column(
-        String(20), default="draft", index=True,
-        comment="状态: draft/confirmed/exported"
+        String(20), default="draft", index=True, comment="状态: draft/confirmed/exported"
     )
-    exported_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="导出到ERP的时间"
-    )
+    exported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="导出到ERP的时间")
 
     # v268 作废状态机. CHECK 强制 voided=TRUE 时 voided_at + voided_by 必填.
     # 区别于红冲 (W1.5 PR): void 用于 draft/confirmed 误生成; exported 必须 red_flush.
     voided: Mapped[bool] = mapped_column(
-        sa.Boolean, nullable=False, default=False, server_default=sa.text("FALSE"),
-        comment="作废标志. TRUE 时 DB CHECK 强制 voided_at + voided_by 非空."
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.text("FALSE"),
+        comment="作废标志. TRUE 时 DB CHECK 强制 voided_at + voided_by 非空.",
     )
     voided_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="作废时间. voided=TRUE 时 CHECK 非空."
+        DateTime(timezone=True), comment="作废时间. voided=TRUE 时 CHECK 非空."
     )
     voided_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="作废操作员 UUID. voided=TRUE 时 CHECK 非空."
+        UUID(as_uuid=True), comment="作废操作员 UUID. voided=TRUE 时 CHECK 非空."
     )
     voided_reason: Mapped[str | None] = mapped_column(
-        String(200),
-        comment="作废原因 (审计). DB 允许 NULL, 应用层 (W1.3 PR) 强制非空."
+        String(200), comment="作废原因 (审计). DB 允许 NULL, 应用层 (W1.3 PR) 强制非空."
     )
 
     # v272 红冲链接. DB CHECK 守互斥 (不能同时是红冲凭证且被红冲).
@@ -198,32 +174,27 @@ class FinancialVoucher(Base):
     red_flush_of_voucher_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("financial_vouchers.id", ondelete="RESTRICT"),
-        comment="本凭证是哪个原凭证的红冲 (红字凭证)."
+        comment="本凭证是哪个原凭证的红冲 (红字凭证).",
     )
     red_flushed_by_voucher_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("financial_vouchers.id", ondelete="RESTRICT"),
-        comment="本凭证被哪个红冲凭证冲正 (最多一次)."
+        comment="本凭证被哪个红冲凭证冲正 (最多一次).",
     )
 
     # v280 红冲审计字段 (W2.F). CHECK: 红字凭证 (red_flush_of 非空) 必须有 operator + at.
     red_flush_operator_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        comment="红冲操作员 UUID. 红字凭证 CHECK 非空."
+        UUID(as_uuid=True), comment="红冲操作员 UUID. 红字凭证 CHECK 非空."
     )
     red_flush_reason: Mapped[str | None] = mapped_column(
-        String(200),
-        comment="红冲原因 (审计). 应用层强制非空, DB 允许 NULL 兼容历史."
+        String(200), comment="红冲原因 (审计). 应用层强制非空, DB 允许 NULL 兼容历史."
     )
     red_flushed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        comment="红冲操作时间. 红字凭证 CHECK 非空."
+        DateTime(timezone=True), comment="红冲操作时间. 红字凭证 CHECK 非空."
     )
 
     # 时间戳
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -240,15 +211,11 @@ class FinancialVoucher(Base):
     )
 
     __table_args__ = (
-        Index(
-            "idx_financial_vouchers_tenant_store_date",
-            "tenant_id", "store_id", "voucher_date"
-        ),
+        Index("idx_financial_vouchers_tenant_store_date", "tenant_id", "store_id", "voucher_date"),
         Index("idx_financial_vouchers_status", "tenant_id", "status"),
         # v268 CHECK: voided=TRUE → voided_at + voided_by 必填 (审计留痕)
         CheckConstraint(
-            "voided = FALSE "
-            "OR (voided = TRUE AND voided_at IS NOT NULL AND voided_by IS NOT NULL)",
+            "voided = FALSE " "OR (voided = TRUE AND voided_at IS NOT NULL AND voided_by IS NOT NULL)",
             name="chk_voucher_void_consistency",
         ),
         # v272 CHECK: 红冲互斥 — 一张凭证不能既是红冲又被红冲 (防红冲链)
@@ -258,8 +225,7 @@ class FinancialVoucher(Base):
         ),
         # v280 CHECK: 红字凭证 (red_flush_of 非空) 必须有 red_flush_operator + at
         CheckConstraint(
-            "red_flush_of_voucher_id IS NULL "
-            "OR (red_flush_operator_id IS NOT NULL AND red_flushed_at IS NOT NULL)",
+            "red_flush_of_voucher_id IS NULL " "OR (red_flush_operator_id IS NOT NULL AND red_flushed_at IS NOT NULL)",
             name="chk_voucher_red_flush_audit",
         ),
         # v278 CHECK: source_period 两列同时 NULL 或同时非空 (跨期调账元数据一致性)
@@ -366,13 +332,9 @@ class FinancialVoucher(Base):
         if self.voided:
             raise ValueError(f"凭证 {self.voucher_no} 已作废, 不可重复作废")
         if self.status == "exported":
-            raise ValueError(
-                f"凭证 {self.voucher_no} 已导出 ERP, 作废禁止, 必须走红冲 (red_flush)"
-            )
+            raise ValueError(f"凭证 {self.voucher_no} 已导出 ERP, 作废禁止, 必须走红冲 (red_flush)")
         if self.status not in ("draft", "confirmed"):
-            raise ValueError(
-                f"凭证 {self.voucher_no} 状态 {self.status} 不支持作废"
-            )
+            raise ValueError(f"凭证 {self.voucher_no} 状态 {self.status} 不支持作废")
         if not reason or not reason.strip():
             raise ValueError("作废原因必填 (审计留痕)")
 
@@ -407,20 +369,14 @@ class FinancialVoucher(Base):
             "voided_reason": self.voided_reason,
             "is_active": self.is_active,
             # v272: 红冲
-            "red_flush_of_voucher_id": (
-                str(self.red_flush_of_voucher_id)
-                if self.red_flush_of_voucher_id else None
-            ),
+            "red_flush_of_voucher_id": (str(self.red_flush_of_voucher_id) if self.red_flush_of_voucher_id else None),
             "red_flushed_by_voucher_id": (
-                str(self.red_flushed_by_voucher_id)
-                if self.red_flushed_by_voucher_id else None
+                str(self.red_flushed_by_voucher_id) if self.red_flushed_by_voucher_id else None
             ),
             "is_red_flush_voucher": self.is_red_flush_voucher,
             "has_been_red_flushed": self.has_been_red_flushed,
             # v280: 红冲审计字段
-            "red_flush_operator_id": (
-                str(self.red_flush_operator_id) if self.red_flush_operator_id else None
-            ),
+            "red_flush_operator_id": (str(self.red_flush_operator_id) if self.red_flush_operator_id else None),
             "red_flush_reason": self.red_flush_reason,
             "red_flushed_at": self.red_flushed_at.isoformat() if self.red_flushed_at else None,
             # v278: 以前年度损益调整
@@ -449,68 +405,47 @@ class FinancialVoucherLine(Base):
            可能绕过 RLS USING; 子表自带 tenant_id 走相同 app.tenant_id 校验, 零风险.
         2. 性能: 科目总账 (tenant_id, account_code) 单表索引比 JOIN 父表快 10x+.
     """
+
     __tablename__ = "financial_voucher_lines"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False,
-        comment="租户 ID (RLS). 与 voucher.tenant_id 同步."
+        UUID(as_uuid=True), nullable=False, comment="租户 ID (RLS). 与 voucher.tenant_id 同步."
     )
     voucher_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("financial_vouchers.id", ondelete="CASCADE"),
         nullable=False,
-        comment="父凭证 ID (CASCADE 删)."
+        comment="父凭证 ID (CASCADE 删).",
     )
-    line_no: Mapped[int] = mapped_column(
-        Integer, nullable=False,
-        comment="凭证内分录序号 (1-based)."
-    )
+    line_no: Mapped[int] = mapped_column(Integer, nullable=False, comment="凭证内分录序号 (1-based).")
 
     # 会计科目
-    account_code: Mapped[str] = mapped_column(
-        String(20), nullable=False,
-        comment="科目代码 (e.g. 6001 主营业务收入)."
-    )
-    account_name: Mapped[str] = mapped_column(
-        String(100), nullable=False,
-        comment="科目名称 (冗余, ERP 推送直接读)."
-    )
+    account_code: Mapped[str] = mapped_column(String(20), nullable=False, comment="科目代码 (e.g. 6001 主营业务收入).")
+    account_name: Mapped[str] = mapped_column(String(100), nullable=False, comment="科目名称 (冗余, ERP 推送直接读).")
 
     # 借贷金额 (分, 互斥)
     debit_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0,
-        comment="借方金额 (分). 与 credit_fen 互斥, 非负."
+        BigInteger, nullable=False, default=0, comment="借方金额 (分). 与 credit_fen 互斥, 非负."
     )
     credit_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0,
-        comment="贷方金额 (分). 与 debit_fen 互斥, 非负."
+        BigInteger, nullable=False, default=0, comment="贷方金额 (分). 与 debit_fen 互斥, 非负."
     )
 
-    summary: Mapped[str | None] = mapped_column(
-        String(200),
-        comment="分录摘要."
-    )
+    summary: Mapped[str | None] = mapped_column(String(200), comment="分录摘要.")
 
     # 时间戳
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # 反向关系
-    voucher: Mapped["FinancialVoucher"] = relationship(
-        "FinancialVoucher", back_populates="lines"
-    )
+    voucher: Mapped["FinancialVoucher"] = relationship("FinancialVoucher", back_populates="lines")
 
     __table_args__ = (
         CheckConstraint(
-            "(debit_fen = 0 AND credit_fen > 0) "
-            "OR (debit_fen > 0 AND credit_fen = 0)",
+            "(debit_fen = 0 AND credit_fen > 0) " "OR (debit_fen > 0 AND credit_fen = 0)",
             name="chk_fvl_debit_credit_exclusive",
         ),
         CheckConstraint(
@@ -518,7 +453,8 @@ class FinancialVoucherLine(Base):
             name="chk_fvl_non_negative",
         ),
         UniqueConstraint(
-            "voucher_id", "line_no",
+            "voucher_id",
+            "line_no",
             name="uq_fvl_voucher_line_no",
         ),
         Index("ix_fvl_voucher_id", "voucher_id"),

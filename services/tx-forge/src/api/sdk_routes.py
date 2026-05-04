@@ -26,8 +26,10 @@ async def generate_key(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.sdk_keys (tenant_id, developer_id, name, key_hash, status)
-                VALUES (:tid, :developer_id, :name, gen_random_uuid()::text, 'active') RETURNING *"""),
+        text(
+            """INSERT INTO forge.sdk_keys (tenant_id, developer_id, name, key_hash, status)
+                VALUES (:tid, :developer_id, :name, gen_random_uuid()::text, 'active') RETURNING *"""
+        ),
         {"tid": x_tenant_id, "developer_id": body["developer_id"], "name": body.get("name", "default")},
     )
     await db.commit()

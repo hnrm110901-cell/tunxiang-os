@@ -77,9 +77,8 @@ class OrchestratorBucketResult:
 
 
 class DefinitionRepo(Protocol):
-    async def get_definition(
-        self, tenant_id: str, experiment_key: str
-    ) -> Optional[ExperimentDefinition]: ...
+    async def get_definition(self, tenant_id: str, experiment_key: str) -> Optional[ExperimentDefinition]:
+        ...
 
 
 class ExposureRepo(Protocol):
@@ -107,7 +106,8 @@ class ExposureRepo(Protocol):
 
 
 class CircuitBreakerStateProvider(Protocol):
-    async def is_tripped(self, tenant_id: str, experiment_key: str) -> bool: ...
+    async def is_tripped(self, tenant_id: str, experiment_key: str) -> bool:
+        ...
 
 
 EmitFunc = Callable[..., Awaitable[Optional[str]]]
@@ -221,9 +221,7 @@ class ExperimentOrchestrator:
 
     # ── private ───────────────────────────────────────────────────────────
 
-    async def _load_definition_safe(
-        self, tenant_id: str, experiment_key: str
-    ) -> Optional[ExperimentDefinition]:
+    async def _load_definition_safe(self, tenant_id: str, experiment_key: str) -> Optional[ExperimentDefinition]:
         cache_key = (tenant_id, experiment_key)
         now = time.monotonic()
         cached = self._cache.get(cache_key)
@@ -302,6 +300,7 @@ class ExperimentOrchestrator:
 
             event_type = ExperimentEventType.EXPOSED
         except ImportError:
+
             class _ExposedFallback:
                 value = "experiment.exposed"
 

@@ -14,9 +14,10 @@ S3W11-12 Smart Content Factory
 import json
 
 import structlog
-from services.channel_engine import ChannelEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.channel_engine import ChannelEngine
 
 logger = structlog.get_logger(__name__)
 
@@ -52,7 +53,8 @@ class ContentPublisher:
         """
         # 使用无 RLS 的查询获取到期内容（需要超级用户/bypass RLS角色）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id
                 FROM content_calendar
                 WHERE status = 'scheduled'
@@ -60,7 +62,8 @@ class ContentPublisher:
                   AND is_deleted = false
                 ORDER BY scheduled_at ASC
                 LIMIT 50
-            """)
+            """
+            )
         )
         due_items = result.mappings().all()
 
@@ -103,21 +106,25 @@ class ContentPublisher:
 
         # 标记为 publishing
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE content_calendar
                 SET status = 'publishing', updated_at = NOW()
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"cid": content_id, "tid": tenant_id},
         )
 
         # 读取内容详情
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, content_body, content_type, target_channels, media_urls
                 FROM content_calendar
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"cid": content_id, "tid": tenant_id},
         )
         content = row.mappings().first()
@@ -168,14 +175,16 @@ class ContentPublisher:
         publish_result_json = json.dumps({"channel_results": channel_results}, ensure_ascii=False)
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE content_calendar
                 SET status = :status,
                     published_at = CASE WHEN :status = 'published' THEN NOW() ELSE published_at END,
                     publish_result = :result::jsonb,
                     updated_at = NOW()
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "status": final_status,
                 "result": publish_result_json,

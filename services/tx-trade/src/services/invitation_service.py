@@ -61,21 +61,24 @@ async def list_templates(
 
     # 查询总数
     count_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*) AS total
             FROM invitation_templates t
             WHERE (t.tenant_id IS NULL OR t.tenant_id = :tenant_id)
               AND t.is_active = true
               AND t.is_deleted = false
               {type_filter}
-        """),
+        """
+        ),
         params,
     )
     total = count_result.scalar() or 0
 
     # 查询列表
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 t.id, t.tenant_id, t.template_name, t.template_code,
                 t.banquet_type, t.cover_image_url, t.background_color,
@@ -88,7 +91,8 @@ async def list_templates(
               {type_filter}
             ORDER BY t.is_system DESC, t.sort_order, t.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = []
@@ -111,13 +115,15 @@ async def get_template(
 ) -> Optional[dict]:
     """获取单个模板详情"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT *
             FROM invitation_templates
             WHERE id = :template_id
               AND (tenant_id IS NULL OR tenant_id = :tenant_id)
               AND is_deleted = false
-        """),
+        """
+        ),
         {"template_id": template_id, "tenant_id": tenant_id},
     )
     row = result.mappings().first()
@@ -140,7 +146,8 @@ async def create_template(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO invitation_templates (
                 id, tenant_id, template_name, template_code,
                 banquet_type, cover_image_url, background_color,
@@ -154,7 +161,8 @@ async def create_template(
                 false, true, :sort_order,
                 :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": template_id,
             "tenant_id": tenant_id,
@@ -185,13 +193,15 @@ async def update_template(
     """更新租户自定义模板（系统模板不可修改）"""
     # 检查模板存在且为租户自有
     existing = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, is_system
             FROM invitation_templates
             WHERE id = :template_id
               AND tenant_id = :tenant_id
               AND is_deleted = false
-        """),
+        """
+        ),
         {"template_id": template_id, "tenant_id": tenant_id},
     )
     row = existing.mappings().first()
@@ -224,11 +234,13 @@ async def update_template(
         params["layout_config"] = data["layout_config"]
 
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE invitation_templates
             SET {", ".join(set_clauses)}
             WHERE id = :template_id AND tenant_id = :tenant_id AND is_deleted = false
-        """),
+        """
+        ),
         params,
     )
     await db.commit()
@@ -244,14 +256,16 @@ async def delete_template(
 ) -> bool:
     """软删除租户自定义模板"""
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE invitation_templates
             SET is_deleted = true, updated_at = NOW()
             WHERE id = :template_id
               AND tenant_id = :tenant_id
               AND is_system = false
               AND is_deleted = false
-        """),
+        """
+        ),
         {"template_id": template_id, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -275,7 +289,8 @@ async def create_invitation(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO invitation_instances (
                 id, tenant_id, store_id, template_id, banquet_order_id,
                 share_code, title, host_names, event_date,
@@ -291,7 +306,8 @@ async def create_invitation(
                 :music_url, 'draft', :rsvp_enabled, :rsvp_deadline,
                 :created_by, :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": invitation_id,
             "tenant_id": tenant_id,
@@ -340,7 +356,8 @@ async def publish_invitation(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE invitation_instances
             SET status = 'published',
                 published_at = :now,
@@ -350,7 +367,8 @@ async def publish_invitation(
               AND status = 'draft'
               AND is_deleted = false
             RETURNING id, share_code, published_at
-        """),
+        """
+        ),
         {"invitation_id": invitation_id, "tenant_id": tenant_id, "now": now},
     )
     row = result.mappings().first()
@@ -375,7 +393,8 @@ async def get_invitation(
 ) -> Optional[dict]:
     """获取邀请函详情（管理端，需认证）"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 i.*,
                 t.template_name,
@@ -386,7 +405,8 @@ async def get_invitation(
             WHERE i.id = :invitation_id
               AND i.tenant_id = :tenant_id
               AND i.is_deleted = false
-        """),
+        """
+        ),
         {"invitation_id": invitation_id, "tenant_id": tenant_id},
     )
     row = result.mappings().first()
@@ -405,7 +425,8 @@ async def get_invitation_by_share_code(
     只返回已发布的邀请函。
     """
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 i.id, i.template_id, i.share_code,
                 i.title, i.host_names, i.event_date,
@@ -422,7 +443,8 @@ async def get_invitation_by_share_code(
             WHERE i.share_code = :share_code
               AND i.status = 'published'
               AND i.is_deleted = false
-        """),
+        """
+        ),
         {"share_code": share_code},
     )
     row = result.mappings().first()
@@ -447,14 +469,16 @@ async def record_view(
 ) -> bool:
     """记录邀请函浏览量（公开端点，无需认证）"""
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE invitation_instances
             SET view_count = view_count + 1,
                 updated_at = NOW()
             WHERE share_code = :share_code
               AND status = 'published'
               AND is_deleted = false
-        """),
+        """
+        ),
         {"share_code": share_code},
     )
     await db.commit()
@@ -476,13 +500,15 @@ async def submit_rsvp(
     """
     # 检查邀请函存在且 RSVP 开启
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, rsvp_enabled, rsvp_deadline
             FROM invitation_instances
             WHERE share_code = :share_code
               AND status = 'published'
               AND is_deleted = false
-        """),
+        """
+        ),
         {"share_code": share_code},
     )
     invitation = check.mappings().first()
@@ -505,25 +531,29 @@ async def submit_rsvp(
     # 更新统计
     if attending:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invitation_instances
                 SET rsvp_yes_count = rsvp_yes_count + 1,
                     rsvp_total_guests = rsvp_total_guests + :guest_count,
                     updated_at = NOW()
                 WHERE share_code = :share_code
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"share_code": share_code, "guest_count": guest_count},
         )
     else:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invitation_instances
                 SET rsvp_no_count = rsvp_no_count + 1,
                     updated_at = NOW()
                 WHERE share_code = :share_code
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"share_code": share_code},
         )
     await db.commit()
@@ -554,19 +584,22 @@ async def get_invitation_stats(
     offset = (page - 1) * size
 
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS total
             FROM invitation_instances
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id
               AND is_deleted = false
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id},
     )
     total = count_result.scalar() or 0
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 i.id, i.share_code, i.title, i.host_names,
                 i.event_date, i.status, i.published_at,
@@ -581,7 +614,8 @@ async def get_invitation_stats(
               AND i.is_deleted = false
             ORDER BY i.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,

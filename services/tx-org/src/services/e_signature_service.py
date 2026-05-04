@@ -109,14 +109,16 @@ class ESignatureService:
         cb = _parse_uuid(created_by, "created_by") if created_by else None
 
         await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO {TEMPLATES_TABLE}
                     (id, tenant_id, template_name, contract_type, content_html,
                      variables, is_active, version, created_by)
                 VALUES
                     (:id, :tid, :name, :ctype, :html,
                      CAST(:vars AS jsonb), TRUE, 1, :created_by)
-            """),
+            """
+            ),
             {
                 "id": tpl_id,
                 "tid": tid,
@@ -166,7 +168,8 @@ class ESignatureService:
         offset = (page - 1) * size
         params_list = {**params, "lim": size, "off": offset}
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_name, contract_type, content_html,
                        variables, is_active, version, created_by,
                        created_at, updated_at
@@ -174,7 +177,8 @@ class ESignatureService:
                 WHERE {where}
                 ORDER BY updated_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             params_list,
         )
         items = []
@@ -202,13 +206,15 @@ class ESignatureService:
         tid = _parse_uuid(self.tenant_id, "tenant_id")
         tpl_id = _parse_uuid(template_id, "template_id")
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_name, contract_type, content_html,
                        variables, is_active, version, created_by,
                        created_at, updated_at
                 FROM {TEMPLATES_TABLE}
                 WHERE id = :tpl_id AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tpl_id": tpl_id, "tid": tid},
         )
         row = result.mappings().one_or_none()
@@ -257,12 +263,14 @@ class ESignatureService:
 
         set_sql = ", ".join(set_clauses)
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE {TEMPLATES_TABLE}
                 SET {set_sql}
                 WHERE id = :tpl_id AND tenant_id = :tid AND is_deleted = FALSE
                 RETURNING id, template_name, contract_type, version
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().one_or_none()
@@ -315,11 +323,13 @@ class ESignatureService:
 
         # 获取模板
         tpl_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT template_name, contract_type, content_html, variables
                 FROM {TEMPLATES_TABLE}
                 WHERE id = :tpl_id AND tenant_id = :tid AND is_deleted = FALSE AND is_active = TRUE
-            """),
+            """
+            ),
             {"tpl_id": tpl_id, "tid": tid},
         )
         tpl = tpl_result.mappings().one_or_none()
@@ -328,10 +338,12 @@ class ESignatureService:
 
         # 查员工姓名
         emp_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT emp_name FROM employees
                 WHERE id = :eid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"eid": eid, "tid": tid},
         )
         emp_row = emp_result.mappings().one_or_none()
@@ -348,7 +360,8 @@ class ESignatureService:
 
         record_id = uuid.uuid4()
         await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO {SIGNING_TABLE}
                     (id, tenant_id, template_id, contract_type, employee_id,
                      employee_name, store_id, contract_no, start_date, end_date,
@@ -357,7 +370,8 @@ class ESignatureService:
                     (:id, :tid, :tpl_id, :ctype, :eid,
                      :emp_name, :sid, :cno, :sd, :ed,
                      'pending_sign', :snapshot, CAST(:vars AS jsonb))
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tid": tid,
@@ -393,7 +407,8 @@ class ESignatureService:
         tid = _parse_uuid(self.tenant_id, "tenant_id")
         rid = _parse_uuid(record_id, "record_id")
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE {SIGNING_TABLE}
                 SET status = 'employee_signed',
                     signed_at = NOW(),
@@ -401,7 +416,8 @@ class ESignatureService:
                 WHERE id = :rid AND tenant_id = :tid
                   AND status = 'pending_sign' AND is_deleted = FALSE
                 RETURNING id, contract_no, signed_at
-            """),
+            """
+            ),
             {"rid": rid, "tid": tid},
         )
         row = result.mappings().one_or_none()
@@ -423,7 +439,8 @@ class ESignatureService:
         rid = _parse_uuid(record_id, "record_id")
         suid = _parse_uuid(signer_id, "signer_id")
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE {SIGNING_TABLE}
                 SET status = 'completed',
                     company_signed_at = NOW(),
@@ -432,7 +449,8 @@ class ESignatureService:
                 WHERE id = :rid AND tenant_id = :tid
                   AND status = 'employee_signed' AND is_deleted = FALSE
                 RETURNING id, contract_no, company_signed_at
-            """),
+            """
+            ),
             {"rid": rid, "tid": tid, "suid": suid},
         )
         row = result.mappings().one_or_none()
@@ -457,7 +475,8 @@ class ESignatureService:
         rid = _parse_uuid(record_id, "record_id")
         reason_json = json.dumps(reason, ensure_ascii=False)
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE {SIGNING_TABLE}
                 SET status = 'terminated',
                     metadata = jsonb_set(COALESCE(metadata, '{{}}'), '{{terminate_reason}}', :reason_json::jsonb),
@@ -466,7 +485,8 @@ class ESignatureService:
                   AND status IN ('pending_sign', 'employee_signed', 'completed')
                   AND is_deleted = FALSE
                 RETURNING id, contract_no
-            """),
+            """
+            ),
             {"rid": rid, "tid": tid, "reason_json": reason_json},
         )
         row = result.mappings().one_or_none()
@@ -519,7 +539,8 @@ class ESignatureService:
         offset = (page - 1) * size
         params_list = {**params, "lim": size, "off": offset}
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_id, contract_type, employee_id, employee_name,
                        store_id, contract_no, start_date, end_date, status,
                        signed_at, company_signed_at, company_signer_id,
@@ -528,7 +549,8 @@ class ESignatureService:
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             params_list,
         )
         items = []
@@ -542,7 +564,8 @@ class ESignatureService:
         tid = _parse_uuid(self.tenant_id, "tenant_id")
         rid = _parse_uuid(record_id, "record_id")
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_id, contract_type, employee_id, employee_name,
                        store_id, contract_no, start_date, end_date, status,
                        signed_at, company_signed_at, company_signer_id,
@@ -550,7 +573,8 @@ class ESignatureService:
                        metadata, expire_remind_days, created_at, updated_at
                 FROM {SIGNING_TABLE}
                 WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"rid": rid, "tid": tid},
         )
         row = result.mappings().one_or_none()
@@ -574,7 +598,8 @@ class ESignatureService:
         today = date.today()
         deadline = today + timedelta(days=days_threshold)
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, employee_id, employee_name, contract_no,
                        contract_type, store_id, start_date, end_date,
                        expire_remind_days
@@ -586,7 +611,8 @@ class ESignatureService:
                   AND end_date >= :today
                   AND end_date <= :deadline
                 ORDER BY end_date ASC
-            """),
+            """
+            ),
             {"tid": tid, "today": today, "deadline": deadline},
         )
         items = []
@@ -616,7 +642,8 @@ class ESignatureService:
         await self._ensure_tenant()
         tid = _parse_uuid(self.tenant_id, "tenant_id")
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'completed') AS completed,
@@ -631,7 +658,8 @@ class ESignatureService:
                     ) AS expiring_30d
                 FROM {SIGNING_TABLE}
                 WHERE tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": tid},
         )
         row = result.mappings().one()

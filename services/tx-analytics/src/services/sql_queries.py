@@ -44,7 +44,8 @@ async def query_daily_revenue(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(total_fen), 0) AS revenue_fen,
                    COUNT(*) AS order_count
             FROM orders
@@ -53,7 +54,8 @@ async def query_daily_revenue(
               AND DATE(created_at) = :target_date
               AND status = 'paid'
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -99,7 +101,8 @@ async def query_order_count(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS total,
                    COUNT(*) FILTER (WHERE status = 'paid') AS paid,
                    COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
@@ -109,7 +112,8 @@ async def query_order_count(
               AND tenant_id = :tenant_id
               AND DATE(created_at) = :target_date
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -163,7 +167,8 @@ async def query_dish_sales(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT oi.dish_id,
                    d.dish_name,
                    d.category,
@@ -181,7 +186,8 @@ async def query_dish_sales(
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name, d.category
             ORDER BY sales_qty DESC
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -226,7 +232,8 @@ async def query_hourly_distribution(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
                    COALESCE(SUM(total_fen), 0) AS revenue_fen,
                    COUNT(*) AS order_count
@@ -238,7 +245,8 @@ async def query_hourly_distribution(
               AND is_deleted = FALSE
             GROUP BY EXTRACT(HOUR FROM created_at)::int
             ORDER BY hour
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -280,7 +288,8 @@ async def query_payment_breakdown(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(payment_method, 'unknown') AS payment_method,
                    COALESCE(SUM(total_fen), 0) AS amount_fen,
                    COUNT(*) AS count
@@ -292,7 +301,8 @@ async def query_payment_breakdown(
               AND is_deleted = FALSE
             GROUP BY COALESCE(payment_method, 'unknown')
             ORDER BY amount_fen DESC
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -344,21 +354,24 @@ async def query_table_sessions(
 
     # 查询桌台总数
     tables_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS total_tables
             FROM tables
             WHERE store_id = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
               AND is_active = TRUE
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     total_tables = int(tables_result.scalar() or 0)
 
     # 查询当日桌台使用次数和平均时长
     sessions_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(DISTINCT (table_id, id)) AS occupied_sessions,
                    AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 60) AS avg_duration_minutes
             FROM orders
@@ -368,7 +381,8 @@ async def query_table_sessions(
               AND table_id IS NOT NULL
               AND status IN ('paid', 'pending_payment')
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -424,7 +438,8 @@ async def query_returns(
 
     # 按菜品汇总退菜
     dish_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT oi.dish_id,
                    d.dish_name,
                    SUM(oi.quantity) AS return_qty,
@@ -441,7 +456,8 @@ async def query_returns(
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name
             ORDER BY return_qty DESC
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -462,7 +478,8 @@ async def query_returns(
 
     # 按原因汇总
     reason_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(oi.return_reason, 'unknown') AS reason,
                    COUNT(*) AS count
             FROM order_items oi
@@ -476,7 +493,8 @@ async def query_returns(
               AND oi.is_deleted = FALSE
             GROUP BY COALESCE(oi.return_reason, 'unknown')
             ORDER BY count DESC
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -523,7 +541,8 @@ async def query_alerts_today(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id,
                    type,
                    severity,
@@ -545,7 +564,8 @@ async def query_alerts_today(
                     ELSE 3
                 END,
                 time DESC
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -593,7 +613,8 @@ async def query_revenue_trend(
     log.info("query_revenue_trend", store_id=store_id, tenant_id=tenant_id, days=days)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT DATE(COALESCE(biz_date, created_at::date)) AS biz_day,
                    COALESCE(SUM(final_amount_fen), 0)::bigint  AS revenue_fen,
                    COUNT(*)::int                               AS order_count
@@ -605,7 +626,8 @@ async def query_revenue_trend(
               AND is_deleted = FALSE
             GROUP BY biz_day
             ORDER BY biz_day
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id, "days": days},
     )
     rows = result.mappings().all()
@@ -649,7 +671,8 @@ async def query_top_dishes(
     log.info("query_top_dishes", store_id=store_id, tenant_id=tenant_id, days=days, limit=limit, order_by=order_by)
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT oi.dish_id,
                    COALESCE(d.dish_name, oi.item_name) AS dish_name,
                    d.category,
@@ -670,7 +693,8 @@ async def query_top_dishes(
             GROUP BY oi.dish_id, COALESCE(d.dish_name, oi.item_name), d.category
             ORDER BY {sort_col} DESC
             LIMIT :limit
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id, "days": days, "limit": limit},
     )
     rows = result.mappings().all()

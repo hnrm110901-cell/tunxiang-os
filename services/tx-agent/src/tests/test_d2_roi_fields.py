@@ -27,6 +27,7 @@ from agents.base import AgentResult
 # 1. AgentResult ROI 字段默认值
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_agent_result_roi_fields_default_zero():
     r = AgentResult(success=True, action="noop")
     assert r.saved_labor_hours == 0.0
@@ -61,6 +62,7 @@ def test_agent_result_roi_fields_independent_per_instance():
 # ──────────────────────────────────────────────────────────────────────
 # 2. decision_log_service 提取 ROI（mock db）
 # ──────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_decision_log_service_extracts_roi_fields():
@@ -153,8 +155,12 @@ async def test_decision_log_service_degrades_non_dict_kpi():
     result.roi_evidence = "also not a dict"  # type: ignore[assignment]
 
     await DecisionLogService.log_skill_result(
-        db=mock_db, tenant_id="00000000-0000-0000-0000-000000000001",
-        agent_id="x", action="x", input_context={}, result=result,
+        db=mock_db,
+        tenant_id="00000000-0000-0000-0000-000000000001",
+        agent_id="x",
+        action="x",
+        input_context={},
+        result=result,
     )
     log_record = mock_db.add.call_args[0][0]
     assert log_record.improved_kpi == {}
@@ -165,11 +171,19 @@ async def test_decision_log_service_degrades_non_dict_kpi():
 # 3. v264/v265 迁移文件静态校验
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_v264_migration_has_four_roi_columns():
     """v264 迁移 SQL 必须含 4 个 ROI 列定义"""
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v264_agent_decision_logs_roi_fields.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v264_agent_decision_logs_roi_fields.py",
     )
     if not os.path.exists(path):
         pytest.skip(f"迁移文件不存在: {path}")
@@ -189,8 +203,15 @@ def test_v264_migration_has_four_roi_columns():
 def test_v265_migration_creates_materialized_view():
     """v265 迁移必须创建 mv_agent_roi_monthly 物化视图 + refresh function"""
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v265_mv_agent_roi_monthly.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v265_mv_agent_roi_monthly.py",
     )
     if not os.path.exists(path):
         pytest.skip(f"迁移文件不存在: {path}")
@@ -210,8 +231,15 @@ def test_v265_migration_creates_materialized_view():
 def test_v265_down_revision_chains_to_v264():
     """v265 必须 depends on v264_roi"""
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v265_mv_agent_roi_monthly.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v265_mv_agent_roi_monthly.py",
     )
     if not os.path.exists(path):
         pytest.skip("迁移文件不存在")
@@ -222,8 +250,15 @@ def test_v265_down_revision_chains_to_v264():
 
 def test_v264_down_revision_chains_to_v263():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v264_agent_decision_logs_roi_fields.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v264_agent_decision_logs_roi_fields.py",
     )
     if not os.path.exists(path):
         pytest.skip("迁移文件不存在")

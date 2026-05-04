@@ -35,9 +35,9 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.security.data_masking import mask_value
 from shared.security.src.data_sovereignty import DataSovereigntyRouter
 from shared.security.src.field_encryption import get_encryptor, is_encrypted
-from shared.security.data_masking import mask_value
 
 log = structlog.get_logger(__name__)
 
@@ -147,12 +147,14 @@ class PDPAService:
 
         # 检查是否存在同类型进行中请求
         existing = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM pdpa_requests
                 WHERE tenant_id = :tid AND customer_id = :cid
                   AND request_type = :rtype
                   AND status IN ('pending', 'processing')
-            """),
+            """
+            ),
             {"tid": self._tid, "cid": uuid.UUID(customer_id), "rtype": request_type},
         )
         if existing.fetchone():
@@ -164,14 +166,16 @@ class PDPAService:
         auto_complete = request_type in ("access", "portability")
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO pdpa_requests
                     (id, tenant_id, customer_id, request_type, status,
                      requested_by, request_data, notes)
                 VALUES
                     (:id, :tid, :cid, :rtype, :status,
                      :by, :req_data::jsonb, :notes)
-            """),
+            """
+            ),
             {
                 "id": request_id,
                 "tid": self._tid,
@@ -237,12 +241,14 @@ class PDPAService:
 
         # 检查是否存在进行中的 access 请求
         existing = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM pdpa_requests
                 WHERE tenant_id = :tid AND customer_id = :cid
                   AND request_type = 'access'
                   AND status IN ('pending', 'processing')
-            """),
+            """
+            ),
             {"tid": self._tid, "cid": uuid.UUID(customer_id)},
         )
         if existing.fetchone():
@@ -252,14 +258,16 @@ class PDPAService:
         now = datetime.now(timezone.utc)
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO pdpa_requests
                     (id, tenant_id, customer_id, request_type, status,
                      requested_by, notes, created_at, updated_at)
                 VALUES
                     (:id, :tid, :cid, 'access', 'pending',
                      :by, :notes, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": request_id,
                 "tid": self._tid,
@@ -355,13 +363,15 @@ class PDPAService:
                 raise ValueError(f"只能拒绝 pending/processing 状态的请求，当前: {req['status']}")
 
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE pdpa_requests
                     SET status = 'rejected',
                         response_data = :resp::jsonb,
                         updated_at = :now
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {
                     "resp": json.dumps({"rejection_reason": rejection_reason}),
                     "now": now,
@@ -385,11 +395,13 @@ class PDPAService:
 
             # 标记为 processing
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE pdpa_requests
                     SET status = 'processing', updated_at = :now
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"now": now, "id": uuid.UUID(request_id), "tid": self._tid},
             )
 
@@ -455,11 +467,13 @@ class PDPAService:
         cid = uuid.UUID(customer_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT *
                 FROM customers
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cid": cid, "tid": self._tid},
         )
         row = result.fetchone()
@@ -468,7 +482,7 @@ class PDPAService:
 
         # 将 Row 转为字典，自动解密加密字段
         profile: Dict[str, Any] = {}
-        for key in row._mapping.keys():
+        for key in row._mapping:
             value = row._mapping[key]
             if isinstance(value, str) and is_encrypted(value):
                 try:
@@ -511,10 +525,18 @@ class PDPAService:
 
         # 允许更新的字段白名单（防止 SQL 注入）
         allowed_fields = {
-            "primary_phone", "display_name", "gender", "birth_date",
-            "dietary_restrictions", "wechat_openid", "wechat_unionid",
-            "meituan_user_id", "meituan_openid", "douyin_openid",
-            "eleme_user_id", "wecom_external_userid",
+            "primary_phone",
+            "display_name",
+            "gender",
+            "birth_date",
+            "dietary_restrictions",
+            "wechat_openid",
+            "wechat_unionid",
+            "meituan_user_id",
+            "meituan_openid",
+            "douyin_openid",
+            "eleme_user_id",
+            "wecom_external_userid",
         }
         unknown_fields = set(correction_fields.keys()) - allowed_fields
         if unknown_fields:
@@ -530,9 +552,14 @@ class PDPAService:
 
         # 敏感字段列表（需要加密存储）
         sensitive_fields = {
-            "primary_phone", "wechat_openid", "wechat_unionid",
-            "meituan_user_id", "meituan_openid", "douyin_openid",
-            "eleme_user_id", "wecom_external_userid",
+            "primary_phone",
+            "wechat_openid",
+            "wechat_unionid",
+            "meituan_user_id",
+            "meituan_openid",
+            "douyin_openid",
+            "eleme_user_id",
+            "wecom_external_userid",
         }
 
         for i, (field, value) in enumerate(correction_fields.items()):
@@ -549,9 +576,7 @@ class PDPAService:
                         error=str(exc),
                         exc_info=True,
                     )
-                    raise RuntimeError(
-                        f"敏感字段加密失败，已中止更新: {field}"
-                    ) from exc
+                    raise RuntimeError(f"敏感字段加密失败，已中止更新: {field}") from exc
 
             set_clauses.append(f"{field} = :{param}")
             params[param] = value
@@ -670,7 +695,8 @@ class PDPAService:
 
         # 基本信息
         cust_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, primary_phone, display_name, gender, birth_date,
                        total_order_count, total_order_amount_fen,
                        rfm_recency_days, rfm_frequency, rfm_monetary_fen,
@@ -678,7 +704,8 @@ class PDPAService:
                        created_at, updated_at, country_code
                 FROM customers
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cid": cid, "tid": self._tid},
         )
         cust = cust_result.fetchone()
@@ -695,7 +722,8 @@ class PDPAService:
 
         # 消费历史（最近 1000 条）
         orders_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, total_amount_fen, discount_amount_fen,
                        final_amount_fen, status, order_type, order_time,
                        completed_at
@@ -703,7 +731,8 @@ class PDPAService:
                 WHERE customer_id = :cid AND tenant_id = :tid
                 ORDER BY order_time DESC
                 LIMIT 1000
-            """),
+            """
+            ),
             {"cid": cid, "tid": self._tid},
         )
         orders = [
@@ -793,14 +822,16 @@ class PDPAService:
         now = datetime.now(timezone.utc)
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO pdpa_consent_logs
                     (id, tenant_id, customer_id, consent_type, granted,
                      ip_address, user_agent, created_at)
                 VALUES
                     (:id, :tid, :cid, :ctype, :granted,
                      :ip, :ua, :now)
-            """),
+            """
+            ),
             {
                 "id": log_id,
                 "tid": self._tid,
@@ -839,12 +870,14 @@ class PDPAService:
         """查询客户同意历史（按时间倒序）"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, consent_type, granted, ip_address, user_agent, created_at
                 FROM pdpa_consent_logs
                 WHERE tenant_id = :tid AND customer_id = :cid
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tid": self._tid, "cid": uuid.UUID(customer_id)},
         )
         return [
@@ -888,7 +921,8 @@ class PDPAService:
         await self._set_tenant()
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT c.id, c.display_name, c.primary_phone,
                        c.last_order_at, c.total_order_count,
                        c.created_at
@@ -902,21 +936,24 @@ class PDPAService:
                   )
                 ORDER BY c.last_order_at ASC NULLS FIRST
                 LIMIT 100
-            """),
+            """
+            ),
             {"tid": self._tid, "retention_days": retention_days},
         )
         rows = result.fetchall()
 
         candidates = []
         for r in rows:
-            candidates.append({
-                "customer_id": str(r.id),
-                "display_name": mask_value("display_name", r.display_name) if r.display_name else None,
-                "phone": mask_value("phone", r.primary_phone) if r.primary_phone else None,
-                "last_order_at": r.last_order_at.isoformat() if r.last_order_at else None,
-                "total_order_count": r.total_order_count or 0,
-                "member_since": r.created_at.isoformat() if r.created_at else None,
-            })
+            candidates.append(
+                {
+                    "customer_id": str(r.id),
+                    "display_name": mask_value("display_name", r.display_name) if r.display_name else None,
+                    "phone": mask_value("phone", r.primary_phone) if r.primary_phone else None,
+                    "last_order_at": r.last_order_at.isoformat() if r.last_order_at else None,
+                    "total_order_count": r.total_order_count or 0,
+                    "member_since": r.created_at.isoformat() if r.created_at else None,
+                }
+            )
 
         log.info(
             "pdpa.retention_check",
@@ -941,13 +978,15 @@ class PDPAService:
         """查询单条 PDPA 请求"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, customer_id, request_type, status,
                        request_data, response_data, notes,
                        requested_by, created_at, updated_at
                 FROM pdpa_requests
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(request_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -1000,7 +1039,8 @@ class PDPAService:
         offset = (page - 1) * size
 
         rows_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, customer_id, request_type, status,
                        request_data, response_data, notes,
                        requested_by, created_at, updated_at
@@ -1008,7 +1048,8 @@ class PDPAService:
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {**params, "limit": size, "offset": offset},
         )
 
@@ -1029,13 +1070,15 @@ class PDPAService:
         """更新 pdpa_requests 的 response_data 字段"""
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE pdpa_requests
                 SET status = 'completed',
                     response_data = response_data || :resp::jsonb,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "resp": json.dumps(data),
                 "now": now,
@@ -1046,6 +1089,7 @@ class PDPAService:
 
     def _row_to_dict(self, row) -> Dict[str, Any]:
         """将 SQLAlchemy Row 转为字典"""
+
         def _parse_json(v):
             if v is None:
                 return None
@@ -1069,10 +1113,21 @@ class PDPAService:
     def _summarize_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
         """精简数据画像用于 response_data（避免存储全量数据到 JSONB）"""
         summary: Dict[str, Any] = {}
-        for key in ("id", "display_name", "primary_phone", "gender", "birth_date",
-                     "total_order_count", "total_order_amount_fen",
-                     "rfm_level", "tags", "dietary_restrictions",
-                     "created_at", "updated_at", "country_code"):
+        for key in (
+            "id",
+            "display_name",
+            "primary_phone",
+            "gender",
+            "birth_date",
+            "total_order_count",
+            "total_order_amount_fen",
+            "rfm_level",
+            "tags",
+            "dietary_restrictions",
+            "created_at",
+            "updated_at",
+            "country_code",
+        ):
             if key in profile:
                 summary[key] = profile[key]
         summary["field_count"] = len(profile)

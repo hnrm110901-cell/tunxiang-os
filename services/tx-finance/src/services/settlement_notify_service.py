@@ -204,10 +204,12 @@ class SettlementNotifyService:
         """保存站内通知（降级容忍：表不存在时跳过）"""
         try:
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO notifications (id, tenant_id, title, content, category, ref_id)
                     VALUES (:id, :tid, :title, :content, :category, :ref_id)
-                """),
+                """
+                ),
                 {
                     "id": uuid.uuid4(),
                     "tid": self._tid,

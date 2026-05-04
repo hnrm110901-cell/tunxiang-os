@@ -22,6 +22,7 @@ from api.external_import_routes import (
 from api.wifi_probe_routes import router as wifi_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from services.wifi_probe_service import (
     OUI_VENDORS,
     _detect_vendor,

@@ -19,7 +19,7 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from services.dual_reward_service import DualRewardError, DualRewardService
+from services.dual_reward_service import DualRewardService
 from services.group_deal_service import GroupDealError, GroupDealService
 
 log = structlog.get_logger(__name__)
@@ -157,9 +157,7 @@ async def get_stats(
     tenant_id = uuid.UUID(x_tenant_id)
     db = request.state.db
 
-    result = await _deal_svc.get_deal_stats(
-        tenant_id=tenant_id, db=db, days=days
-    )
+    result = await _deal_svc.get_deal_stats(tenant_id=tenant_id, db=db, days=days)
     return ok_response(result)
 
 
@@ -173,9 +171,7 @@ async def get_leaderboard(
     tenant_id = uuid.UUID(x_tenant_id)
     db = request.state.db
 
-    result = await _reward_svc.get_referral_leaderboard(
-        tenant_id=tenant_id, db=db, limit=limit
-    )
+    result = await _reward_svc.get_referral_leaderboard(tenant_id=tenant_id, db=db, limit=limit)
     return ok_response(result)
 
 
@@ -190,9 +186,7 @@ async def get_deal(
     db = request.state.db
 
     try:
-        result = await _deal_svc.get_deal(
-            tenant_id=tenant_id, deal_id=deal_id, db=db
-        )
+        result = await _deal_svc.get_deal(tenant_id=tenant_id, deal_id=deal_id, db=db)
         return ok_response(result)
     except GroupDealError as e:
         raise HTTPException(status_code=404, detail=error_response(e.message, e.code))

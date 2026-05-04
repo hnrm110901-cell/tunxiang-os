@@ -139,7 +139,8 @@ class UnifiedSendScheduler:
         content = content_by_channel.get(ch_name, {})
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO notification_tasks (
                     id, tenant_id, customer_id, campaign_id,
                     channel, content, scheduled_at, priority, status
@@ -147,7 +148,8 @@ class UnifiedSendScheduler:
                     :id, :tenant_id, :customer_id, :campaign_id,
                     :channel, :content::jsonb, :scheduled_at, :priority, 'pending'
                 )
-            """),
+            """
+            ),
             {
                 "id": str(task_id),
                 "tenant_id": str(tenant_id),
@@ -241,7 +243,8 @@ class UnifiedSendScheduler:
     ) -> bool:
         """检查该客户该Campaign该渠道是否已发送"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM notification_tasks
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
@@ -250,7 +253,8 @@ class UnifiedSendScheduler:
                   AND status != 'failed'
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "customer_id": str(customer_id),
@@ -275,7 +279,8 @@ class UnifiedSendScheduler:
             daily_limit += HIGH_PRIORITY_EXTRA_ALLOWANCE
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM notification_tasks
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
@@ -283,7 +288,8 @@ class UnifiedSendScheduler:
                   AND scheduled_at::date = CURRENT_DATE
                   AND status != 'failed'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "customer_id": str(customer_id),

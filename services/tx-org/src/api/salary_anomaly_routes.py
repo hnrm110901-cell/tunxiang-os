@@ -213,7 +213,8 @@ async def review_analysis(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE salary_anomaly_analyses
             SET status = :new_status,
                 reviewed_by = CAST(:op AS uuid),
@@ -224,7 +225,8 @@ async def review_analysis(
               AND status IN ('analyzed', 'escalated')
               AND is_deleted = false
             RETURNING id, status
-        """),
+        """
+            ),
             {
                 "id": analysis_id,
                 "tenant_id": x_tenant_id,
@@ -261,7 +263,8 @@ async def salary_anomaly_summary(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 status,
                 city,
@@ -278,7 +281,8 @@ async def salary_anomaly_summary(
               AND created_at >= CURRENT_DATE - (:months_back || ' months')::interval
             GROUP BY status, city
             ORDER BY status, city NULLS LAST
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id, "months_back": str(months_back)},
         )
         rows = [dict(r) for r in result.mappings()]

@@ -279,12 +279,14 @@ async def list_franchisees(
     total: int = total_row.scalar_one()
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT * FROM franchisees
              WHERE {where}
              ORDER BY created_at DESC
              LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = _rows_to_list(rows)
@@ -303,10 +305,12 @@ async def create_franchisee(
 
     # 校验编号唯一性
     dup = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM franchisees
              WHERE tenant_id = :tid AND franchisee_no = :no AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "no": req.franchisee_no},
     )
     if dup.first():
@@ -316,7 +320,8 @@ async def create_franchisee(
         )
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO franchisees (
                 tenant_id, franchisee_no, legal_name, brand_name,
                 contact_name, contact_phone, contact_email,
@@ -335,7 +340,8 @@ async def create_franchisee(
                 :initial_fee_fen, :royalty_rate, :notes
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "franchisee_no": req.franchisee_no,
@@ -375,10 +381,12 @@ async def get_franchisee(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT * FROM franchisees
              WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"id": franchisee_id, "tid": tenant_id},
     )
     franchisee = row.first()
@@ -386,11 +394,13 @@ async def get_franchisee(
         raise HTTPException(status_code=404, detail="加盟商不存在")
 
     stores_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT * FROM franchise_stores
              WHERE franchisee_id = :fid AND tenant_id = :tid
              ORDER BY created_at DESC
-        """),
+        """
+        ),
         {"fid": franchisee_id, "tid": tenant_id},
     )
     franchisee_dict = _row_to_dict(franchisee)
@@ -410,10 +420,12 @@ async def patch_franchisee_status(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status FROM franchisees
              WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"id": franchisee_id, "tid": tenant_id},
     )
     record = row.first()
@@ -432,11 +444,13 @@ async def patch_franchisee_status(
         )
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE franchisees
                SET status = :status, updated_at = now()
              WHERE id = :id AND tenant_id = :tid
-        """),
+        """
+        ),
         {"status": req.status, "id": franchisee_id, "tid": tenant_id},
     )
     await db.commit()
@@ -467,10 +481,12 @@ async def create_franchise_store(
 
     # 校验加盟商存在
     franchisee_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM franchisees
              WHERE id = :fid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"fid": req.franchisee_id, "tid": tenant_id},
     )
     if not franchisee_row.first():
@@ -479,7 +495,8 @@ async def create_franchise_store(
     clone_status = "pending" if req.template_store_id else None
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO franchise_stores (
                 tenant_id, franchisee_id, store_id, store_name,
                 open_date, status, template_store_id, clone_status
@@ -488,7 +505,8 @@ async def create_franchise_store(
                 :open_date, 'preparing', :template_store_id, :clone_status
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "franchisee_id": req.franchisee_id,
@@ -562,11 +580,13 @@ async def trigger_store_clone(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, template_store_id, clone_status
               FROM franchise_stores
              WHERE store_id = :store_id AND tenant_id = :tid
-        """),
+        """
+        ),
         {"store_id": store_id, "tid": tenant_id},
     )
     fs = row.first()
@@ -605,11 +625,13 @@ async def get_clone_status(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, store_name, template_store_id, clone_status, updated_at
               FROM franchise_stores
              WHERE store_id = :store_id AND tenant_id = :tid
-        """),
+        """
+        ),
         {"store_id": store_id, "tid": tenant_id},
     )
     fs = row.first()
@@ -680,7 +702,8 @@ async def create_royalty_rule(
     tiers_json = json.dumps(req.tiers) if req.tiers else None
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO franchise_royalty_rules (
                 tenant_id, franchisee_id, rule_type,
                 revenue_pct, monthly_fee_fen, tiers,
@@ -691,7 +714,8 @@ async def create_royalty_rule(
                 :applies_to, :effective_from, :effective_to, true
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "franchisee_id": req.franchisee_id,
@@ -775,7 +799,8 @@ async def generate_royalty_bill(
 
     # 查激活规则（优先精确期间匹配，再取最近生效的）
     rule_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT rule_type, revenue_pct, monthly_fee_fen, tiers
               FROM franchise_royalty_rules
              WHERE franchisee_id = :fid
@@ -785,7 +810,8 @@ async def generate_royalty_bill(
                AND (effective_to IS NULL OR effective_to >= :period_start)
              ORDER BY effective_from DESC
              LIMIT 1
-        """),
+        """
+        ),
         {
             "fid": req.franchisee_id,
             "tid": tenant_id,
@@ -814,7 +840,8 @@ async def generate_royalty_bill(
 
     # upsert：同加盟商 + 同门店 + 同账期 → 覆盖
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO franchise_royalty_bills (
                 tenant_id, franchisee_id, store_id, bill_period,
                 revenue_fen, royalty_rate_applied, royalty_amount_fen,
@@ -838,7 +865,8 @@ async def generate_royalty_bill(
                 due_date             = EXCLUDED.due_date,
                 notes                = EXCLUDED.notes
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "franchisee_id": req.franchisee_id,
@@ -898,12 +926,14 @@ async def list_royalty_bills(
     total: int = total_row.scalar_one()
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT * FROM franchise_royalty_bills
              WHERE {where}
              ORDER BY bill_period DESC, created_at DESC
              LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     return _ok({"items": _rows_to_list(rows), "total": total, "page": page, "size": size})
@@ -932,11 +962,13 @@ async def pay_royalty_bill(
         raise HTTPException(status_code=422, detail=f"当前状态 '{bill.status}' 不支持付款操作")
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE franchise_royalty_bills
                SET status = 'paid', paid_at = now()
              WHERE id = :id AND tenant_id = :tid
-        """),
+        """
+        ),
         {"id": bill_id, "tid": tenant_id},
     )
     await db.commit()
@@ -1018,7 +1050,8 @@ async def create_kpi_record(
     kpi_month = f"{req.kpi_period}-01"
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO franchise_kpi_records (
                 tenant_id, franchisee_id, store_id,
                 kpi_period, kpi_month,
@@ -1035,7 +1068,8 @@ async def create_kpi_record(
                 :overall_score, :tier_recommendation
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "franchisee_id": req.franchisee_id,
@@ -1086,12 +1120,14 @@ async def list_kpi_records(
     total: int = total_row.scalar_one()
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT * FROM franchise_kpi_records
              WHERE {where}
              ORDER BY kpi_month DESC
              LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     return _ok({"items": _rows_to_list(rows), "total": total, "page": page, "size": size})
@@ -1109,11 +1145,13 @@ async def kpi_dashboard(
 
     # 查加盟商基本信息
     frow = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, legal_name, brand_name, tier, status
               FROM franchisees
              WHERE id = :fid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"fid": franchisee_id, "tid": tenant_id},
     )
     franchisee = frow.first()
@@ -1122,7 +1160,8 @@ async def kpi_dashboard(
 
     # 近 12 个月 KPI
     kpi_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT kpi_period, kpi_month,
                    revenue_target_fen, revenue_actual_fen,
                    order_count_target, order_count_actual,
@@ -1132,7 +1171,8 @@ async def kpi_dashboard(
              WHERE franchisee_id = :fid AND tenant_id = :tid
                AND kpi_month >= (now() - interval '12 months')::date
              ORDER BY kpi_month DESC
-        """),
+        """
+        ),
         {"fid": franchisee_id, "tid": tenant_id},
     )
     kpi_list = _rows_to_list(kpi_rows)
@@ -1161,13 +1201,15 @@ async def kpi_dashboard(
 
     # 未付账单汇总
     bill_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT coalesce(sum(total_due_fen), 0) AS overdue_total_fen,
                    count(*) AS overdue_count
               FROM franchise_royalty_bills
              WHERE franchisee_id = :fid AND tenant_id = :tid
                AND status IN ('pending', 'overdue')
-        """),
+        """
+        ),
         {"fid": franchisee_id, "tid": tenant_id},
     )
     bill_summary = dict(bill_row.one()._mapping)

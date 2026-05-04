@@ -57,8 +57,10 @@ class ForgeRuntimeService:
             raise HTTPException(status_code=400, detail="no fields to update")
         sets.append("updated_at = NOW()")
         result = await self.db.execute(
-            text(f"""UPDATE forge.runtime_policies SET {", ".join(sets)}
-                     WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""),
+            text(
+                f"""UPDATE forge.runtime_policies SET {", ".join(sets)}
+                     WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""
+            ),
             params,
         )
         await self.db.commit()
@@ -69,9 +71,11 @@ class ForgeRuntimeService:
 
     async def activate_kill_switch(self, app_id: str, reason: str, operator_id: str) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""UPDATE forge.runtime_policies
+            text(
+                """UPDATE forge.runtime_policies
                     SET kill_switch = TRUE, kill_reason = :reason, kill_operator = :op, kill_at = NOW(), updated_at = NOW()
-                    WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""),
+                    WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""
+            ),
             {"tid": self.tenant_id, "app_id": app_id, "reason": reason, "op": operator_id},
         )
         await self.db.commit()
@@ -83,9 +87,11 @@ class ForgeRuntimeService:
 
     async def deactivate_kill_switch(self, app_id: str) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""UPDATE forge.runtime_policies
+            text(
+                """UPDATE forge.runtime_policies
                     SET kill_switch = FALSE, kill_reason = NULL, kill_operator = NULL, kill_at = NULL, updated_at = NOW()
-                    WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""),
+                    WHERE tenant_id = :tid AND app_id = :app_id RETURNING *"""
+            ),
             {"tid": self.tenant_id, "app_id": app_id},
         )
         await self.db.commit()

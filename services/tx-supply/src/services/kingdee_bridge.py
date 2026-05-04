@@ -111,7 +111,8 @@ async def export_purchase_receipt(
     start_date = f"{month}-01"
     # 月末: 用下月第一天减一天的方式
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(it.cost_fen), 0) AS total_cost_fen,
                 COUNT(*) AS tx_count
@@ -122,7 +123,8 @@ async def export_purchase_receipt(
               AND it.tx_type = 'purchase'
               AND it.tx_date >= :start_date::DATE
               AND it.tx_date < (:start_date::DATE + INTERVAL '1 month')
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start_date": start_date},
     )
     row = result.mappings().first()
@@ -188,7 +190,8 @@ async def export_cost_transfer(
 
     start_date = f"{month}-01"
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(it.cost_fen), 0) AS total_cost_fen,
                 COUNT(*) AS tx_count
@@ -199,7 +202,8 @@ async def export_cost_transfer(
               AND it.tx_type = 'usage'
               AND it.tx_date >= :start_date::DATE
               AND it.tx_date < (:start_date::DATE + INTERVAL '1 month')
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start_date": start_date},
     )
     row = result.mappings().first()
@@ -260,7 +264,8 @@ async def export_transfer_in_out(
     start_date = f"{month}-01"
     # 调出金额
     result_out = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(it.cost_fen), 0) AS total_fen, COUNT(*) AS cnt
             FROM inventory_transactions it
             WHERE it.tenant_id = :tenant_id
@@ -269,7 +274,8 @@ async def export_transfer_in_out(
               AND it.tx_type = 'transfer_out'
               AND it.tx_date >= :start_date::DATE
               AND it.tx_date < (:start_date::DATE + INTERVAL '1 month')
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start_date": start_date},
     )
     row_out = result_out.mappings().first()
@@ -278,7 +284,8 @@ async def export_transfer_in_out(
 
     # 调入金额
     result_in = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(it.cost_fen), 0) AS total_fen, COUNT(*) AS cnt
             FROM inventory_transactions it
             WHERE it.tenant_id = :tenant_id
@@ -287,7 +294,8 @@ async def export_transfer_in_out(
               AND it.tx_type = 'transfer_in'
               AND it.tx_date >= :start_date::DATE
               AND it.tx_date < (:start_date::DATE + INTERVAL '1 month')
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start_date": start_date},
     )
     row_in = result_in.mappings().first()
@@ -368,7 +376,8 @@ async def export_salary_accrual(
 
     start_date = f"{month}-01"
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(p.base_salary_fen + COALESCE(p.bonus_fen, 0)
                              + COALESCE(p.overtime_fen, 0)), 0) AS total_salary_fen,
@@ -378,7 +387,8 @@ async def export_salary_accrual(
               AND p.store_id = :store_id::UUID
               AND p.is_deleted = FALSE
               AND p.pay_month = :month
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "month": month},
     )
     row = result.mappings().first()
@@ -438,7 +448,8 @@ async def export_daily_revenue(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 p.pay_method,
                 COALESCE(SUM(p.amount_fen), 0) AS amount_fen,
@@ -453,7 +464,8 @@ async def export_daily_revenue(
               AND COALESCE(o.biz_date, DATE(o.created_at)) = :biz_date::DATE
             GROUP BY p.pay_method
             ORDER BY amount_fen DESC
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "biz_date": date_str},
     )
     rows = result.mappings().all()
@@ -530,7 +542,8 @@ async def export_sales_delivery(
 
     start_date = f"{month}-01"
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(oi.food_cost_fen * oi.quantity), 0) AS total_cost_fen,
                 COUNT(DISTINCT o.id) AS order_count
@@ -543,7 +556,8 @@ async def export_sales_delivery(
               AND o.status IN ('completed', 'paid')
               AND COALESCE(o.biz_date, DATE(o.created_at)) >= :start_date::DATE
               AND COALESCE(o.biz_date, DATE(o.created_at)) < (:start_date::DATE + INTERVAL '1 month')
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start_date": start_date},
     )
     row = result.mappings().first()
@@ -628,7 +642,8 @@ async def get_export_history(
 
     # 查明细
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 eh.id AS export_id,
                 eh.export_type,
@@ -643,7 +658,8 @@ async def get_export_history(
             WHERE {where_clause}
             ORDER BY eh.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     rows = [dict(r) for r in result.mappings().all()]
@@ -681,13 +697,15 @@ async def retry_failed_export(
 
     # 查原导出记录
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, export_type, store_id, period, status
             FROM erp_export_history
             WHERE id = :export_id::UUID
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"export_id": export_id, "tenant_id": tenant_id},
     )
     original = result.mappings().first()

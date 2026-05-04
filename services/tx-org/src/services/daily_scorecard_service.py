@@ -40,62 +40,101 @@ class DailyScorecardService:
     ROLE_KPI_CONFIG: dict[str, dict[str, dict[str, Any]]] = {
         "waiter": {
             "turnover_rate": {
-                "weight": 0.30, "target": 3.0, "unit": "次",
-                "higher_better": True, "label": "翻台率",
+                "weight": 0.30,
+                "target": 3.0,
+                "unit": "次",
+                "higher_better": True,
+                "label": "翻台率",
             },
             "avg_ticket_fen": {
-                "weight": 0.30, "target": 10000, "unit": "元",
-                "higher_better": True, "label": "客单价",
+                "weight": 0.30,
+                "target": 10000,
+                "unit": "元",
+                "higher_better": True,
+                "label": "客单价",
             },
             "complaint_rate": {
-                "weight": 0.40, "target": 0.02, "unit": "%",
-                "higher_better": False, "label": "投诉率",
+                "weight": 0.40,
+                "target": 0.02,
+                "unit": "%",
+                "higher_better": False,
+                "label": "投诉率",
             },
         },
         "chef": {
             "serve_speed_min": {
-                "weight": 0.40, "target": 15.0, "unit": "分钟",
-                "higher_better": False, "label": "出餐速度",
+                "weight": 0.40,
+                "target": 15.0,
+                "unit": "分钟",
+                "higher_better": False,
+                "label": "出餐速度",
             },
             "waste_rate": {
-                "weight": 0.30, "target": 0.05, "unit": "%",
-                "higher_better": False, "label": "浪费率",
+                "weight": 0.30,
+                "target": 0.05,
+                "unit": "%",
+                "higher_better": False,
+                "label": "浪费率",
             },
             "dish_rating": {
-                "weight": 0.30, "target": 4.5, "unit": "分",
-                "higher_better": True, "label": "菜品评分",
+                "weight": 0.30,
+                "target": 4.5,
+                "unit": "分",
+                "higher_better": True,
+                "label": "菜品评分",
             },
         },
         "purchaser": {
             "on_time_rate": {
-                "weight": 0.40, "target": 0.95, "unit": "%",
-                "higher_better": True, "label": "到货准时率",
+                "weight": 0.40,
+                "target": 0.95,
+                "unit": "%",
+                "higher_better": True,
+                "label": "到货准时率",
             },
             "price_variance": {
-                "weight": 0.35, "target": 0.05, "unit": "%",
-                "higher_better": False, "label": "价格偏差率",
+                "weight": 0.35,
+                "target": 0.05,
+                "unit": "%",
+                "higher_better": False,
+                "label": "价格偏差率",
             },
             "waste_from_overstock": {
-                "weight": 0.25, "target": 0.03, "unit": "%",
-                "higher_better": False, "label": "过量库存浪费率",
+                "weight": 0.25,
+                "target": 0.03,
+                "unit": "%",
+                "higher_better": False,
+                "label": "过量库存浪费率",
             },
         },
         "manager": {
             "revenue_achievement": {
-                "weight": 0.25, "target": 1.0, "unit": "%",
-                "higher_better": True, "label": "营收达成率",
+                "weight": 0.25,
+                "target": 1.0,
+                "unit": "%",
+                "higher_better": True,
+                "label": "营收达成率",
             },
             "profit_margin": {
-                "weight": 0.25, "target": 0.15, "unit": "%",
-                "higher_better": True, "label": "利润率",
+                "weight": 0.25,
+                "target": 0.15,
+                "unit": "%",
+                "higher_better": True,
+                "label": "利润率",
             },
             "employee_retention": {
-                "weight": 0.25, "target": 0.90, "unit": "%",
-                "higher_better": True, "label": "员工留存率",
+                "weight": 0.25,
+                "target": 0.90,
+                "unit": "%",
+                "higher_better": True,
+                "label": "员工留存率",
             },
             "customer_satisfaction": {
-                "weight": 0.25, "target": 4.0, "unit": "分",
-                "higher_better": True, "label": "顾客满意度",
+                "weight": 0.25,
+                "target": 4.0,
+                "unit": "分",
+                "higher_better": True,
+                "label": "顾客满意度",
             },
         },
     }
@@ -142,7 +181,12 @@ class DailyScorecardService:
                 continue
 
             raw_values = await self._fetch_kpi_raw_values(
-                db, tenant_id, store_id, UUID(str(emp["employee_id"])), role, target_date,
+                db,
+                tenant_id,
+                store_id,
+                UUID(str(emp["employee_id"])),
+                role,
+                target_date,
             )
 
             dimension_scores: dict[str, dict[str, Any]] = {}
@@ -150,7 +194,9 @@ class DailyScorecardService:
             for dim_key, cfg in kpi_config.items():
                 value = raw_values.get(dim_key, 0.0)
                 score = self._compute_dimension_score(
-                    value, cfg["target"], cfg["higher_better"],
+                    value,
+                    cfg["target"],
+                    cfg["higher_better"],
                 )
                 weighted_total += score * cfg["weight"]
                 dimension_scores[dim_key] = {
@@ -163,13 +209,15 @@ class DailyScorecardService:
 
             total_score = round(min(100.0, max(0.0, weighted_total)), 1)
 
-            scored.append({
-                "employee_id": str(emp["employee_id"]),
-                "employee_name": emp.get("emp_name", ""),
-                "role": role,
-                "total_score": total_score,
-                "dimension_scores": dimension_scores,
-            })
+            scored.append(
+                {
+                    "employee_id": str(emp["employee_id"]),
+                    "employee_name": emp.get("emp_name", ""),
+                    "role": role,
+                    "total_score": total_score,
+                    "dimension_scores": dimension_scores,
+                }
+            )
 
         # 5. 排名
         scored.sort(key=lambda x: x["total_score"], reverse=True)
@@ -190,7 +238,10 @@ class DailyScorecardService:
         # 6. 昨日对比
         yesterday = target_date - timedelta(days=1)
         yesterday_map = await self._fetch_yesterday_scores(
-            db, tenant_id, store_id, yesterday,
+            db,
+            tenant_id,
+            store_id,
+            yesterday,
         )
 
         # 7. 生成亮点+待改善 & 8. 批量UPSERT
@@ -198,20 +249,23 @@ class DailyScorecardService:
         for item in scored:
             emp_id = item["employee_id"]
             yesterday_score = yesterday_map.get(emp_id)
-            vs_yesterday = (
-                round(item["total_score"] - yesterday_score, 1)
-                if yesterday_score is not None
-                else None
-            )
+            vs_yesterday = round(item["total_score"] - yesterday_score, 1) if yesterday_score is not None else None
 
             highlights, improvements = self._generate_insights(
-                item["dimension_scores"], item["role"],
+                item["dimension_scores"],
+                item["role"],
             )
 
             # UPSERT
             await self._upsert_scorecard(
-                db, tenant_id, store_id, item, target_date,
-                vs_yesterday, highlights, improvements,
+                db,
+                tenant_id,
+                store_id,
+                item,
+                target_date,
+                vs_yesterday,
+                highlights,
+                improvements,
             )
 
             result = {
@@ -275,14 +329,16 @@ class DailyScorecardService:
         await _set_tenant(db, tenant_id)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, employee_name, role, total_score,
                        rank_total, highlights, improvements, dimension_scores
                 FROM daily_scorecards
                 WHERE tenant_id = :tid AND store_id = :sid AND score_date = :d
                   AND is_deleted = FALSE AND pushed_at IS NULL
                 ORDER BY rank_total
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": store_id, "d": target_date},
         )
         cards = rows.mappings().fetchall()
@@ -305,22 +361,21 @@ class DailyScorecardService:
             top_str = highlights_arr[0] if highlights_arr else "无"
             imp_str = improvements_arr[0] if improvements_arr else "无"
 
-            body = (
-                f"今日得分{score:.0f}分(排名{rank}/{total_emp}), "
-                f"TOP:{top_str}, 待改善:{imp_str}"
-            )
+            body = f"今日得分{score:.0f}分(排名{rank}/{total_emp}), " f"TOP:{top_str}, 待改善:{imp_str}"
             title = f"【日得分卡】{name} {target_date.isoformat()}"
 
             try:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO notifications
                             (id, tenant_id, target_type, target_id, title, body, channel,
                              created_at, is_deleted)
                         VALUES
                             (gen_random_uuid(), :tid, 'employee', :emp_id, :title, :body,
                              'im', NOW(), FALSE)
-                    """),
+                    """
+                    ),
                     {
                         "tid": tenant_id,
                         "emp_id": emp_id,
@@ -330,11 +385,13 @@ class DailyScorecardService:
                 )
 
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE daily_scorecards
                         SET pushed_at = NOW(), updated_at = NOW()
                         WHERE id = :cid AND tenant_id = :tid
-                    """),
+                    """
+                    ),
                     {"cid": card_id, "tid": tenant_id},
                 )
                 pushed += 1
@@ -366,7 +423,8 @@ class DailyScorecardService:
         await _set_tenant(db, tenant_id)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, score_date, total_score, dimension_scores,
                        rank_in_role, rank_total, total_employees_in_role,
                        vs_yesterday, highlights, improvements, pushed_at,
@@ -377,7 +435,8 @@ class DailyScorecardService:
                   AND score_date >= :d0 AND score_date <= :d1
                   AND is_deleted = FALSE
                 ORDER BY score_date DESC
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,
@@ -390,7 +449,9 @@ class DailyScorecardService:
         for r in rows.mappings().fetchall():
             row = dict(r)
             row["id"] = str(row["id"])
-            row["score_date"] = row["score_date"].isoformat() if hasattr(row["score_date"], "isoformat") else str(row["score_date"])
+            row["score_date"] = (
+                row["score_date"].isoformat() if hasattr(row["score_date"], "isoformat") else str(row["score_date"])
+            )
             row["total_score"] = float(row["total_score"]) if row["total_score"] is not None else 0.0
             row["vs_yesterday"] = float(row["vs_yesterday"]) if row["vs_yesterday"] is not None else None
             ds = row.get("dimension_scores")
@@ -426,7 +487,8 @@ class DailyScorecardService:
 
         where = " AND ".join(conds)
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT employee_id, employee_name, role, total_score,
                        dimension_scores, rank_in_role, rank_total,
                        total_employees_in_role, vs_yesterday,
@@ -434,7 +496,8 @@ class DailyScorecardService:
                 FROM daily_scorecards
                 WHERE {where}
                 ORDER BY total_score DESC, employee_name
-            """),
+            """
+            ),
             params,
         )
         items: list[dict[str, Any]] = []
@@ -460,7 +523,8 @@ class DailyScorecardService:
         """查询门店在岗员工"""
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT e.id::text AS employee_id, e.emp_name,
                            COALESCE(p.code, e.role, '') AS role
                     FROM employees e
@@ -470,7 +534,8 @@ class DailyScorecardService:
                       AND e.is_deleted = FALSE
                       AND COALESCE(e.status, 'active') = 'active'
                     ORDER BY e.emp_name
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             return [dict(r) for r in rows.mappings().fetchall()]
@@ -516,7 +581,8 @@ class DailyScorecardService:
         # 翻台率 & 客单价 — 从 orders 表
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS order_count,
                            COALESCE(AVG(final_amount_fen), 0) AS avg_ticket
                     FROM orders
@@ -524,7 +590,8 @@ class DailyScorecardService:
                       AND store_id = :sid
                       AND created_at::date = :d
                       AND status NOT IN ('cancelled', 'refunded')
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": target_date},
             )
             r = row.mappings().first()
@@ -534,10 +601,12 @@ class DailyScorecardService:
                 table_count = 30
                 try:
                     tbl_row = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT COUNT(*) AS cnt FROM tables
                             WHERE store_id = :sid AND is_deleted = FALSE
-                        """),
+                        """
+                        ),
                         {"sid": store_id},
                     )
                     tbl_r = tbl_row.mappings().first()
@@ -554,13 +623,15 @@ class DailyScorecardService:
         # 投诉率 — 从 satisfaction_ratings 表降级
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS total,
                            COUNT(*) FILTER (WHERE overall_score <= 2) AS bad
                     FROM satisfaction_ratings
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND created_at::date = :d AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": target_date},
             )
             r = row.mappings().first()
@@ -589,7 +660,8 @@ class DailyScorecardService:
         # 出餐速度 — 从 customer_journey_timings
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT AVG(
                         EXTRACT(EPOCH FROM (first_served_at - ordered_at)) / 60
                     ) AS avg_serve_min
@@ -597,7 +669,8 @@ class DailyScorecardService:
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND journey_date = :d AND is_deleted = FALSE
                       AND first_served_at IS NOT NULL AND ordered_at IS NOT NULL
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": target_date},
             )
             r = row.mappings().first()
@@ -609,13 +682,15 @@ class DailyScorecardService:
         # 菜品评分 — 从 satisfaction_ratings
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT AVG(food_score) AS avg_food
                     FROM satisfaction_ratings
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND created_at::date = :d AND is_deleted = FALSE
                       AND food_score IS NOT NULL
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": target_date},
             )
             r = row.mappings().first()
@@ -644,7 +719,8 @@ class DailyScorecardService:
         # 到货准时率 — 查 purchase_orders 表
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS total,
                            COUNT(*) FILTER (
                                WHERE actual_delivery_date <= expected_delivery_date
@@ -655,7 +731,8 @@ class DailyScorecardService:
                       AND actual_delivery_date::date
                           BETWEEN :d - INTERVAL '30 days' AND :d
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": target_date},
             )
             r = row.mappings().first()
@@ -685,14 +762,16 @@ class DailyScorecardService:
         try:
             first_of_month = target_date.replace(day=1)
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(final_amount_fen), 0) AS actual_fen
                     FROM orders
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND created_at::date >= :m0
                       AND created_at::date <= :d
                       AND status NOT IN ('cancelled', 'refunded')
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "m0": first_of_month, "d": target_date},
             )
             r = row.mappings().first()
@@ -700,10 +779,12 @@ class DailyScorecardService:
 
             # 查目标
             target_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT revenue_target_fen FROM stores
                     WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"sid": store_id, "tid": tenant_id},
             )
             t = target_row.mappings().first()
@@ -713,6 +794,7 @@ class DailyScorecardService:
                 # 按日期比例折算月目标
                 days_in_month = (target_date - first_of_month).days + 1
                 import calendar
+
                 _, total_days = calendar.monthrange(target_date.year, target_date.month)
                 prorated_target = target_fen * (days_in_month / total_days)
                 result["revenue_achievement"] = round(actual_fen / max(prorated_target, 1), 4)
@@ -722,12 +804,14 @@ class DailyScorecardService:
         # 顾客满意度
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT AVG(overall_score) AS avg_sat
                     FROM satisfaction_ratings
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND created_at::date = :d AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": target_date},
             )
             r = row.mappings().first()
@@ -748,18 +832,17 @@ class DailyScorecardService:
         """获取昨日得分map: employee_id -> total_score"""
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT employee_id::text, total_score
                     FROM daily_scorecards
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND score_date = :d AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "d": yesterday},
             )
-            return {
-                str(r["employee_id"]): float(r["total_score"])
-                for r in rows.mappings().fetchall()
-            }
+            return {str(r["employee_id"]): float(r["total_score"]) for r in rows.mappings().fetchall()}
         except (ProgrammingError, DBAPIError):
             return {}
 
@@ -808,7 +891,8 @@ class DailyScorecardService:
         """UPSERT 得分卡到 daily_scorecards 表"""
         dim_json = json.dumps(item["dimension_scores"], ensure_ascii=False)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO daily_scorecards
                     (id, tenant_id, store_id, employee_id, employee_name, role,
                      score_date, total_score, dimension_scores,
@@ -830,7 +914,8 @@ class DailyScorecardService:
                     highlights = EXCLUDED.highlights,
                     improvements = EXCLUDED.improvements,
                     updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,

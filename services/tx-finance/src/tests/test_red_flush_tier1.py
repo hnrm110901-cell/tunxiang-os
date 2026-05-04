@@ -33,6 +33,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore  # noqa: E402
+
 from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
 )
@@ -54,24 +55,38 @@ def _exported_voucher(
         total_amount_fen=10000,
         total_amount=100.00,
         entries=[
-            {"account_code": "1001", "account_name": "现金",
-             "debit": 100.00, "credit": 0.00, "summary": "堂食现金"},
-            {"account_code": "6001", "account_name": "主营业务收入",
-             "debit": 0.00, "credit": 100.00, "summary": "堂食收入"},
+            {"account_code": "1001", "account_name": "现金", "debit": 100.00, "credit": 0.00, "summary": "堂食现金"},
+            {
+                "account_code": "6001",
+                "account_name": "主营业务收入",
+                "debit": 0.00,
+                "credit": 100.00,
+                "summary": "堂食收入",
+            },
         ],
         status="exported",
         voided=False,
     )
     v.lines = [
         FinancialVoucherLine(
-            id=uuid.uuid4(), tenant_id=t, line_no=1,
-            account_code="1001", account_name="现金",
-            debit_fen=10000, credit_fen=0, summary="堂食现金",
+            id=uuid.uuid4(),
+            tenant_id=t,
+            line_no=1,
+            account_code="1001",
+            account_name="现金",
+            debit_fen=10000,
+            credit_fen=0,
+            summary="堂食现金",
         ),
         FinancialVoucherLine(
-            id=uuid.uuid4(), tenant_id=t, line_no=2,
-            account_code="6001", account_name="主营业务收入",
-            debit_fen=0, credit_fen=10000, summary="堂食收入",
+            id=uuid.uuid4(),
+            tenant_id=t,
+            line_no=2,
+            account_code="6001",
+            account_name="主营业务收入",
+            debit_fen=0,
+            credit_fen=10000,
+            summary="堂食收入",
         ),
     ]
     return v
@@ -156,8 +171,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
 
         entries_by_code = {e["account_code"]: e for e in red.entries}
@@ -180,8 +197,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
 
         for line in red.lines:
@@ -201,8 +220,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
 
         # 双向 link
@@ -224,8 +245,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
         assert red.voucher_no == "V_XJ_20260419_001-R"
 
@@ -243,8 +266,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
             new_voucher_no="V_CUSTOM_RED_001",
         )
         assert red.voucher_no == "V_CUSTOM_RED_001"
@@ -264,8 +289,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
         assert red.status == "draft"
 
@@ -284,8 +311,10 @@ class TestRedFlushGeneration:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
         assert red.event_type == "red_flush.voucher"
         assert red.event_id is None
@@ -314,8 +343,7 @@ class TestRedFlushRejections:
         svc, session = await self._service_with_voucher(v)
 
         with pytest.raises(ValueError, match="draft.*void"):
-            await svc.red_flush(v.id, operator_id=uuid.uuid4(),
-                                reason="test", session=session)
+            await svc.red_flush(v.id, operator_id=uuid.uuid4(), reason="test", session=session)
 
     @pytest.mark.asyncio
     async def test_reject_confirmed_voucher(self):
@@ -324,8 +352,7 @@ class TestRedFlushRejections:
         svc, session = await self._service_with_voucher(v)
 
         with pytest.raises(ValueError, match="confirmed.*void"):
-            await svc.red_flush(v.id, operator_id=uuid.uuid4(),
-                                reason="test", session=session)
+            await svc.red_flush(v.id, operator_id=uuid.uuid4(), reason="test", session=session)
 
     @pytest.mark.asyncio
     async def test_reject_nonexistent_voucher(self):
@@ -335,8 +362,10 @@ class TestRedFlushRejections:
 
         with pytest.raises(ValueError, match="凭证不存在"):
             await svc.red_flush(
-                uuid.uuid4(), operator_id=uuid.uuid4(),
-                reason="test", session=session,
+                uuid.uuid4(),
+                operator_id=uuid.uuid4(),
+                reason="test",
+                session=session,
             )
 
     @pytest.mark.asyncio
@@ -346,8 +375,10 @@ class TestRedFlushRejections:
 
         with pytest.raises(ValueError, match="红冲原因必填"):
             await svc.red_flush(
-                v.id, operator_id=uuid.uuid4(),
-                reason="   ", session=session,
+                v.id,
+                operator_id=uuid.uuid4(),
+                reason="   ",
+                session=session,
             )
 
     @pytest.mark.asyncio
@@ -358,8 +389,7 @@ class TestRedFlushRejections:
         svc, session = await self._service_with_voucher(v)
 
         with pytest.raises(ValueError, match="已作废"):
-            await svc.red_flush(v.id, operator_id=uuid.uuid4(),
-                                reason="test", session=session)
+            await svc.red_flush(v.id, operator_id=uuid.uuid4(), reason="test", session=session)
 
     @pytest.mark.asyncio
     async def test_reject_already_red_flushed(self):
@@ -369,8 +399,7 @@ class TestRedFlushRejections:
         svc, session = await self._service_with_voucher(v)
 
         with pytest.raises(ValueError, match="已被红冲.*不可重复"):
-            await svc.red_flush(v.id, operator_id=uuid.uuid4(),
-                                reason="test", session=session)
+            await svc.red_flush(v.id, operator_id=uuid.uuid4(), reason="test", session=session)
 
     @pytest.mark.asyncio
     async def test_reject_is_red_flush_voucher_itself(self):
@@ -380,8 +409,7 @@ class TestRedFlushRejections:
         svc, session = await self._service_with_voucher(v)
 
         with pytest.raises(ValueError, match="本身是红冲凭证.*防递归"):
-            await svc.red_flush(v.id, operator_id=uuid.uuid4(),
-                                reason="test", session=session)
+            await svc.red_flush(v.id, operator_id=uuid.uuid4(), reason="test", session=session)
 
 
 # ─── 账期校验绕过 ──────────────────────────────────────────────────
@@ -396,9 +424,7 @@ class TestRedFlushBypassesPeriodCheck:
         from unittest.mock import AsyncMock
 
         period_service = AsyncMock()
-        period_service.is_date_writable = AsyncMock(
-            side_effect=RuntimeError("不该被调用")
-        )
+        period_service.is_date_writable = AsyncMock(side_effect=RuntimeError("不该被调用"))
 
         svc = FinancialVoucherService(period_service=period_service)
         original = _exported_voucher()
@@ -412,8 +438,10 @@ class TestRedFlushBypassesPeriodCheck:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="闭账月错账修正", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="闭账月错账修正",
+            session=session,
         )
 
         # 成功生成, 且 period_service.is_date_writable 未被调用
@@ -444,7 +472,9 @@ class TestW2FRedFlushAuditFields:
         reason = "2026-04 科目误记"
 
         red = await svc.red_flush(
-            original.id, operator_id=operator, reason=reason,
+            original.id,
+            operator_id=operator,
+            reason=reason,
             session=session,
         )
 
@@ -466,15 +496,18 @@ class TestW2FRedFlushAuditFields:
         session.execute = AsyncMock(return_value=_pre)
 
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="  带空白的原因  ", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="  带空白的原因  ",
+            session=session,
         )
         assert red.red_flush_reason == "带空白的原因"
 
     @pytest.mark.asyncio
     async def test_red_flush_audit_timestamp_recent(self):
         """red_flushed_at 应为当前 UTC 时间."""
-        from datetime import datetime as _datetime, timezone as _tz
+        from datetime import datetime as _datetime
+        from datetime import timezone as _tz
 
         svc = FinancialVoucherService()
         original = _exported_voucher()
@@ -488,8 +521,10 @@ class TestW2FRedFlushAuditFields:
 
         before = _datetime.now(_tz.utc)
         red = await svc.red_flush(
-            original.id, operator_id=uuid.uuid4(),
-            reason="test", session=session,
+            original.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
         )
         after = _datetime.now(_tz.utc)
 
@@ -500,7 +535,9 @@ class TestW2FRedFlushAuditFields:
         v.red_flush_of_voucher_id = uuid.uuid4()
         v.red_flush_operator_id = uuid.uuid4()
         v.red_flush_reason = "科目调整"
-        from datetime import datetime as _dt, timezone as _tz
+        from datetime import datetime as _dt
+        from datetime import timezone as _tz
+
         v.red_flushed_at = _dt(2027, 3, 10, 12, 0, tzinfo=_tz.utc)
 
         d = v.to_dict()
@@ -518,7 +555,9 @@ class TestV280RedFlushAuditMigration:
     def _load(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v280_red_flush_audit_fields.py"
         )
         self.migration_src = path.read_text(encoding="utf-8")
@@ -533,7 +572,8 @@ class TestV280RedFlushAuditMigration:
         for col in ("red_flush_operator_id", "red_flush_reason", "red_flushed_at"):
             assert re.search(
                 rf"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+{col}",
-                self.migration_src, re.I,
+                self.migration_src,
+                re.I,
             )
 
     def test_check_audit_with_not_valid(self):
@@ -544,7 +584,8 @@ class TestV280RedFlushAuditMigration:
             r"red_flush_of_voucher_id\s+IS\s+NULL\s+OR\s+\(\s*"
             r"red_flush_operator_id\s+IS\s+NOT\s+NULL\s+AND\s+"
             r"red_flushed_at\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
         # NOT VALID (历史行豁免)
         assert re.search(r"\)\s*NOT\s+VALID", self.migration_src, re.I)
@@ -571,9 +612,13 @@ class TestW2DRedFlushOrphanProtection:
 
         # 模拟已有孤儿红字凭证
         orphan_red = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=original.tenant_id,
-            voucher_no="V_ORPHAN_RED", voucher_type="sales",
-            status="draft", entries=[], voided=False,
+            id=uuid.uuid4(),
+            tenant_id=original.tenant_id,
+            voucher_no="V_ORPHAN_RED",
+            voucher_type="sales",
+            status="draft",
+            entries=[],
+            voided=False,
             red_flush_of_voucher_id=original.id,
         )
 
@@ -586,8 +631,10 @@ class TestW2DRedFlushOrphanProtection:
 
         with pytest.raises(ValueError, match="孤儿|DBA 手工修复"):
             await svc.red_flush(
-                original.id, operator_id=uuid.uuid4(),
-                reason="重试", session=session,
+                original.id,
+                operator_id=uuid.uuid4(),
+                reason="重试",
+                session=session,
             )
 
     @pytest.mark.asyncio
@@ -605,17 +652,15 @@ class TestW2DRedFlushOrphanProtection:
         pre_miss.scalar_one_or_none = MagicMock(return_value=None)
         session.execute = AsyncMock(return_value=pre_miss)
         # flush 撞 v276 UNIQUE
-        fake_orig = Exception(
-            'duplicate key value violates unique constraint "ix_fv_red_flush_of"'
-        )
-        session.flush = AsyncMock(
-            side_effect=IntegrityError("INSERT ...", {}, fake_orig)
-        )
+        fake_orig = Exception('duplicate key value violates unique constraint "ix_fv_red_flush_of"')
+        session.flush = AsyncMock(side_effect=IntegrityError("INSERT ...", {}, fake_orig))
 
         with pytest.raises(ValueError, match="并发红冲冲突"):
             await svc.red_flush(
-                original.id, operator_id=uuid.uuid4(),
-                reason="并发", session=session,
+                original.id,
+                operator_id=uuid.uuid4(),
+                reason="并发",
+                session=session,
             )
 
 
@@ -628,7 +673,9 @@ class TestV276RedFlushOfUniqueMigration:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v276_red_flush_of_unique.py"
         )
         assert path.exists(), f"v276 迁移不存在: {path}"
@@ -644,7 +691,8 @@ class TestV276RedFlushOfUniqueMigration:
         """step 1: DROP INDEX IF EXISTS 老 ix_fv_red_flush_of."""
         assert re.search(
             r"DROP\s+INDEX\s+CONCURRENTLY\s+IF\s+EXISTS\s+ix_fv_red_flush_of",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_creates_unique_partial_index(self):
@@ -652,7 +700,8 @@ class TestV276RedFlushOfUniqueMigration:
         assert re.search(
             r"CREATE\s+UNIQUE\s+INDEX\s+CONCURRENTLY.*?ix_fv_red_flush_of"
             r".*?WHERE\s+red_flush_of_voucher_id\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         )
 
     def test_uses_autocommit_block(self):
@@ -674,7 +723,9 @@ class TestV272MigrationFileStructure:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v272_financial_vouchers_red_flush.py"
         )
         assert path.exists(), f"v272 不存在: {path}"
@@ -690,7 +741,8 @@ class TestV272MigrationFileStructure:
         for col in ("red_flush_of_voucher_id", "red_flushed_by_voucher_id"):
             assert re.search(
                 rf"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+{col}",
-                self.migration_src, re.I,
+                self.migration_src,
+                re.I,
             ), f"v272 缺 ADD COLUMN {col}"
 
     def test_fk_with_on_delete_restrict(self):
@@ -699,16 +751,15 @@ class TestV272MigrationFileStructure:
         assert "fk_fv_red_flushed_by" in self.migration_src
         # 两个 FK 都应 ON DELETE RESTRICT
         restrict_count = len(re.findall(r"ON\s+DELETE\s+RESTRICT", self.migration_src))
-        assert restrict_count >= 2, (
-            f"两个 FK 都需 ON DELETE RESTRICT, 实际 {restrict_count}"
-        )
+        assert restrict_count >= 2, f"两个 FK 都需 ON DELETE RESTRICT, 实际 {restrict_count}"
 
     def test_check_red_flush_exclusive(self):
         """CHECK: 一张凭证不能既是红冲又被红冲 (防递归)."""
         assert "chk_voucher_red_flush_exclusive" in self.migration_src
         assert re.search(
             r"red_flush_of_voucher_id\s+IS\s+NULL\s+OR\s+red_flushed_by_voucher_id\s+IS\s+NULL",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_unique_red_flushed_by_partial(self):
@@ -717,7 +768,8 @@ class TestV272MigrationFileStructure:
         assert re.search(
             r"CREATE\s+UNIQUE\s+INDEX\s+CONCURRENTLY.*?uq_fv_red_flushed_by"
             r".*?WHERE\s+red_flushed_by_voucher_id\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         )
 
     def test_partial_index_for_red_flush_of(self):
@@ -726,28 +778,31 @@ class TestV272MigrationFileStructure:
         assert re.search(
             r"CREATE\s+INDEX\s+CONCURRENTLY.*?ix_fv_red_flush_of"
             r".*?WHERE\s+red_flush_of_voucher_id\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         )
 
     def test_all_indexes_concurrently(self):
         """老表加索引必须 CONCURRENTLY."""
         create_index_stmts = re.findall(
             r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?(\w+)",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
-        concurrent_count = len(re.findall(
-            r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY", self.migration_src, re.I,
-        ))
-        assert concurrent_count == len(create_index_stmts), (
-            f"老表 {len(create_index_stmts)} 个 CREATE INDEX 全需 CONCURRENTLY"
+        concurrent_count = len(
+            re.findall(
+                r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY",
+                self.migration_src,
+                re.I,
+            )
         )
+        assert concurrent_count == len(
+            create_index_stmts
+        ), f"老表 {len(create_index_stmts)} 个 CREATE INDEX 全需 CONCURRENTLY"
 
     def test_orm_has_check_constraint_mirror(self):
         """ORM __table_args__ 必须镜像 DB CHECK (flush 前校验)."""
-        orm_path = (
-            Path(__file__).resolve().parents[1]
-            / "models" / "voucher.py"
-        )
+        orm_path = Path(__file__).resolve().parents[1] / "models" / "voucher.py"
         orm_src = orm_path.read_text(encoding="utf-8")
         assert "chk_voucher_red_flush_exclusive" in orm_src
 

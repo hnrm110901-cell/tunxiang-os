@@ -17,6 +17,8 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.tax_filing_service import (
     check_filing_status,
     generate_tax_declaration,
@@ -26,7 +28,6 @@ from services.tax_filing_service import (
     retry_filing,
     submit_to_tax_bureau,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/tax-filing", tags=["tax-filing"])

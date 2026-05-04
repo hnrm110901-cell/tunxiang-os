@@ -46,7 +46,8 @@ class PricingEngine:
 
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT config_value
                 FROM store_configs
                 WHERE store_id = :store_id
@@ -54,7 +55,8 @@ class PricingEngine:
                   AND config_key = 'min_margin_rate'
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": uuid.UUID(store_id), "tenant_id": self._tenant_uuid},
         )
         row = result.scalar_one_or_none()
@@ -93,7 +95,8 @@ class PricingEngine:
 
         # 1) 检查是否有生效中的时价（海鲜/活鲜）
         market_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT price_fen, effective_from
                 FROM dish_market_prices
                 WHERE dish_id = :dish_id
@@ -102,7 +105,8 @@ class PricingEngine:
                   AND is_deleted = false
                 ORDER BY effective_from DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid, "now": now},
         )
         market_row = market_result.mappings().first()
@@ -117,7 +121,8 @@ class PricingEngine:
 
         # 2) 检查渠道差异价
         channel_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT price_fen
                 FROM dish_channel_prices
                 WHERE dish_id = :dish_id
@@ -125,7 +130,8 @@ class PricingEngine:
                   AND channel = :channel
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid, "channel": channel},
         )
         channel_row = channel_result.scalar_one_or_none()
@@ -140,7 +146,8 @@ class PricingEngine:
 
         # 3) 检查促销价（有效期内）
         promo_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT promo_price_fen
                 FROM dish_promotions
                 WHERE dish_id = :dish_id
@@ -150,7 +157,8 @@ class PricingEngine:
                   AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid, "now": now},
         )
         promo_row = promo_result.scalar_one_or_none()
@@ -165,13 +173,15 @@ class PricingEngine:
 
         # 4) 基础售价
         base_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT price_fen
                 FROM dishes
                 WHERE id = :dish_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid},
         )
         base_price = base_result.scalar_one_or_none()
@@ -214,12 +224,14 @@ class PricingEngine:
         record_id = uuid.uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_market_prices
                     (id, dish_id, tenant_id, price_fen, effective_from, is_deleted)
                 VALUES
                     (:id, :dish_id, :tenant_id, :price_fen, :effective_from, false)
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "dish_id": uuid.UUID(dish_id),
@@ -274,13 +286,15 @@ class PricingEngine:
 
         # 查询称重菜单价（按500g计价）
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT price_fen, unit
                 FROM dishes
                 WHERE id = :dish_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"dish_id": uuid.UUID(dish_id), "tenant_id": self._tenant_uuid},
         )
         row = result.mappings().first()
@@ -343,13 +357,15 @@ class PricingEngine:
             quantity = entry.get("quantity", 1)
 
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT price_fen, dish_name
                     FROM dishes
                     WHERE id = :dish_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"dish_id": uuid.UUID(dish_id), "tenant_id": self._tenant_uuid},
             )
             row = result.mappings().first()
@@ -416,14 +432,16 @@ class PricingEngine:
 
             # UPSERT: 存在则更新，不存在则插入
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dish_channel_prices
                         (id, dish_id, tenant_id, channel, price_fen, is_deleted)
                     VALUES
                         (:id, :dish_id, :tenant_id, :channel, :price_fen, false)
                     ON CONFLICT (dish_id, tenant_id, channel)
                     DO UPDATE SET price_fen = :price_fen, is_deleted = false
-                """),
+                """
+                ),
                 {
                     "id": uuid.uuid4(),
                     "dish_id": dish_uuid,
@@ -474,12 +492,14 @@ class PricingEngine:
         record_id = uuid.uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_promotions
                     (id, dish_id, tenant_id, promo_price_fen, start_time, end_time, is_deleted)
                 VALUES
                     (:id, :dish_id, :tenant_id, :promo_price_fen, :start_time, :end_time, false)
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "dish_id": uuid.UUID(dish_id),
@@ -599,7 +619,8 @@ class PricingEngine:
 
         # 查找激活的 BOM 模板
         bom_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, yield_rate
                 FROM bom_templates
                 WHERE dish_id = :dish_id
@@ -608,7 +629,8 @@ class PricingEngine:
                   AND is_deleted = false
                 ORDER BY effective_date DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid},
         )
         bom_row = bom_result.mappings().first()
@@ -616,13 +638,15 @@ class PricingEngine:
         if not bom_row:
             # 无 BOM 时回退到 dishes.cost_fen
             fallback = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT cost_fen
                     FROM dishes
                     WHERE id = :dish_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid},
             )
             cost = fallback.scalar_one_or_none()
@@ -633,7 +657,8 @@ class PricingEngine:
 
         # 计算 BOM 成本
         items_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT bi.standard_qty,
                        bi.unit_cost_fen AS bom_unit_cost_fen,
                        bi.waste_factor,
@@ -646,7 +671,8 @@ class PricingEngine:
                 WHERE bi.bom_id = :bom_id
                   AND bi.tenant_id = :tenant_id
                   AND bi.is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tenant_id": self._tenant_uuid},
         )
 
@@ -688,13 +714,15 @@ class PricingEngine:
 
         # 查询调价申请
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, old_price_fen, new_price_fen, status
                 FROM price_change_requests
                 WHERE id = :change_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"change_id": change_uuid, "tenant_id": self._tenant_uuid},
         )
         row = result.mappings().first()
@@ -712,14 +740,16 @@ class PricingEngine:
         if not margin_result["passed"]:
             # 审批拒绝 — 毛利不达标
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE price_change_requests
                     SET status = 'rejected',
                         approver_id = :approver_id,
                         approved_at = :now,
                         reject_reason = '毛利底线不达标'
                     WHERE id = :change_id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "change_id": change_uuid,
                     "tenant_id": self._tenant_uuid,
@@ -746,13 +776,15 @@ class PricingEngine:
 
         # 审批通过 — 更新菜品价格
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE price_change_requests
                 SET status = 'approved',
                     approver_id = :approver_id,
                     approved_at = :now
                 WHERE id = :change_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "change_id": change_uuid,
                 "tenant_id": self._tenant_uuid,
@@ -763,11 +795,13 @@ class PricingEngine:
 
         # 生效新价格
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE dishes
                 SET price_fen = :new_price_fen
                 WHERE id = :dish_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "new_price_fen": int(row["new_price_fen"]),
                 "dish_id": row["dish_id"],

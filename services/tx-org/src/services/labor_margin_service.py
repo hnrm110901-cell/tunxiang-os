@@ -130,7 +130,8 @@ class LaborMarginService:
     ) -> list[dict[str, Any]]:
         """月度趋势（每日一行）"""
         # 尝试从 mv_store_pnl 物化视图读取
-        q = text("""
+        q = text(
+            """
             SELECT pnl_date::text AS pnl_date,
                    COALESCE(revenue_fen, 0) AS revenue_fen,
                    COALESCE(food_cost_fen, 0) AS food_cost_fen,
@@ -141,7 +142,8 @@ class LaborMarginService:
               AND store_id = CAST(:store_id AS uuid)
               AND to_char(pnl_date, 'YYYY-MM') = :month
             ORDER BY pnl_date
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 q,
@@ -190,7 +192,8 @@ class LaborMarginService:
         month: str,
     ) -> list[dict[str, Any]]:
         """多店对比"""
-        q = text("""
+        q = text(
+            """
             SELECT s.id::text AS store_id, s.store_name,
                    COALESCE(SUM(p.revenue_fen), 0) AS revenue_fen,
                    COALESCE(SUM(p.food_cost_fen), 0) AS food_cost_fen,
@@ -205,7 +208,8 @@ class LaborMarginService:
               AND s.is_deleted = false
             GROUP BY s.id, s.store_name
             ORDER BY s.store_name
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 q,
@@ -295,7 +299,8 @@ class LaborMarginService:
         target_date: date,
     ) -> dict[int, int]:
         """A. 营收：查orders表按小时聚合"""
-        q = text("""
+        q = text(
+            """
             SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
                    COALESCE(SUM(total_fen), 0)::bigint AS revenue_fen
             FROM orders
@@ -304,7 +309,8 @@ class LaborMarginService:
               AND created_at::date = :target_date
               AND status NOT IN ('cancelled', 'refunded')
             GROUP BY EXTRACT(HOUR FROM created_at)
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 q,
@@ -328,7 +334,8 @@ class LaborMarginService:
     ) -> dict[int, int]:
         """B. 食材成本：查orders.cost_fen或mv_inventory_bom"""
         # 先尝试 orders.cost_fen
-        q = text("""
+        q = text(
+            """
             SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
                    COALESCE(SUM(cost_fen), 0)::bigint AS food_cost_fen
             FROM orders
@@ -338,7 +345,8 @@ class LaborMarginService:
               AND status NOT IN ('cancelled', 'refunded')
               AND cost_fen IS NOT NULL AND cost_fen > 0
             GROUP BY EXTRACT(HOUR FROM created_at)
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 q,
@@ -364,7 +372,8 @@ class LaborMarginService:
         target_date: date,
     ) -> dict[int, int]:
         """C. 渠道佣金：查channel_commissions或降级为0"""
-        q = text("""
+        q = text(
+            """
             SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
                    COALESCE(SUM(commission_fen), 0)::bigint AS channel_fee_fen
             FROM channel_commissions
@@ -372,7 +381,8 @@ class LaborMarginService:
               AND store_id = CAST(:store_id AS uuid)
               AND created_at::date = :target_date
             GROUP BY EXTRACT(HOUR FROM created_at)
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 q,
@@ -395,7 +405,8 @@ class LaborMarginService:
         target_date: date,
     ) -> dict[int, dict[str, int]]:
         """D. 人力成本：查unified_schedules JOIN employees"""
-        q = text("""
+        q = text(
+            """
             SELECT gs.hour_slot,
                    COUNT(DISTINCT us.employee_id) AS staff_count,
                    COALESCE(SUM(
@@ -417,7 +428,8 @@ class LaborMarginService:
               AND e.is_deleted = false
             GROUP BY gs.hour_slot
             ORDER BY gs.hour_slot
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 q,

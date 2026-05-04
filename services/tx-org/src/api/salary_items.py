@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+
 from services.salary_item_library import (
     compute_salary_by_items,
     create_custom_salary_item,

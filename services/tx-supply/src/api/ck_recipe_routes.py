@@ -758,7 +758,8 @@ async def get_material_list(
 
     # 使用 SQL 聚合直接计算原料汇总
     agg_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT ri.ingredient_name,
                    ri.ingredient_id,
                    ri.unit,
@@ -773,7 +774,8 @@ async def get_material_list(
               AND r.yield_qty > 0
             GROUP BY ri.ingredient_name, ri.ingredient_id, ri.unit
             ORDER BY ri.ingredient_name
-        """),
+        """
+        ),
         {"plan_id": plan_id, "tenant_id": x_tenant_id},
     )
     material_list = []

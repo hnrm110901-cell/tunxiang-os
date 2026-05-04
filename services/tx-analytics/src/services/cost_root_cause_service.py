@@ -17,8 +17,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from decimal import ROUND_HALF_UP, Decimal
+from datetime import date, timedelta
 from typing import Any, Optional
 
 import structlog
@@ -98,15 +97,11 @@ class CostRootCauseService:
         log.info("cost_root_cause.analyze_start")
 
         # 1. 计算当期成本率
-        current_rates = await self._calc_current_rates(
-            db, store_id, tenant_id, period_start, period_end
-        )
+        current_rates = await self._calc_current_rates(db, store_id, tenant_id, period_start, period_end)
         ingredient_rate = current_rates["ingredient_cost_rate"]
 
         # 2. 判断是否超标
-        is_over_budget = ingredient_rate > (
-            BENCHMARKS["ingredient_cost_rate"] + OVERSHOOT_THRESHOLD
-        )
+        is_over_budget = ingredient_rate > (BENCHMARKS["ingredient_cost_rate"] + OVERSHOOT_THRESHOLD)
 
         # 3. 构建摘要
         benchmark_pct = BENCHMARKS["ingredient_cost_rate"] * 100
@@ -114,56 +109,38 @@ class CostRootCauseService:
         diff_pct = actual_pct - benchmark_pct
 
         if is_over_budget:
-            summary = (
-                f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%),"
-                f"超标{diff_pct:.1f}%"
-            )
+            summary = f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%)," f"超标{diff_pct:.1f}%"
         else:
-            summary = (
-                f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%),"
-                f"在合理范围内"
-            )
+            summary = f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%)," f"在合理范围内"
 
         # 4. 根因分析（仅超标时执行全部维度）
         root_causes: list[dict[str, Any]] = []
         if is_over_budget:
             # 品类归因
-            category_causes = await self._analyze_by_category(
-                db, store_id, tenant_id, period_start, period_end
-            )
+            category_causes = await self._analyze_by_category(db, store_id, tenant_id, period_start, period_end)
             root_causes.extend(category_causes)
 
             # 供应商归因
-            supplier_causes = await self._analyze_by_supplier(
-                db, store_id, tenant_id, period_start, period_end
-            )
+            supplier_causes = await self._analyze_by_supplier(db, store_id, tenant_id, period_start, period_end)
             root_causes.extend(supplier_causes)
 
             # 菜品归因
-            dish_causes = await self._analyze_by_dish(
-                db, store_id, tenant_id, period_start, period_end
-            )
+            dish_causes = await self._analyze_by_dish(db, store_id, tenant_id, period_start, period_end)
             root_causes.extend(dish_causes)
 
             # 时间归因
-            time_causes = await self._analyze_by_time(
-                db, store_id, tenant_id, period_start, period_end
-            )
+            time_causes = await self._analyze_by_time(db, store_id, tenant_id, period_start, period_end)
             root_causes.extend(time_causes)
 
             # 操作归因
-            operation_causes = await self._analyze_by_operation(
-                db, store_id, tenant_id, period_start, period_end
-            )
+            operation_causes = await self._analyze_by_operation(db, store_id, tenant_id, period_start, period_end)
             root_causes.extend(operation_causes)
 
         # 按影响金额降序排列
         root_causes.sort(key=lambda x: x.get("impact_fen", 0), reverse=True)
 
         # 5. 生成可执行建议
-        recommendations = self._generate_recommendations(
-            root_causes, current_rates
-        )
+        recommendations = self._generate_recommendations(root_causes, current_rates)
 
         log.info(
             "cost_root_cause.analyze_done",
@@ -209,7 +186,8 @@ class CostRootCauseService:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     WITH current_period AS (
                         SELECT
                             COALESCE(i.category, '未分类') AS category,
@@ -246,7 +224,8 @@ class CostRootCauseService:
                     FROM current_period c
                     LEFT JOIN prev_period p ON c.category = p.category
                     ORDER BY c.cost_fen - COALESCE(p.cost_fen, 0) DESC
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -269,24 +248,22 @@ class CostRootCauseService:
 
             current_fen = int(row.get("current_cost_fen", 0) or 0)
             prev_fen = int(row.get("prev_cost_fen", 0) or 0)
-            change_rate = (
-                round(delta_fen / prev_fen, 4) if prev_fen > 0 else 0.0
-            )
+            change_rate = round(delta_fen / prev_fen, 4) if prev_fen > 0 else 0.0
 
-            causes.append({
-                "dimension": "category",
-                "detail": (
-                    f"{row['category']}品类成本环比上涨"
-                    f"{change_rate * 100:.1f}%,"
-                    f"增加{delta_fen / 100:.2f}元"
-                ),
-                "category": row["category"],
-                "current_cost_fen": current_fen,
-                "prev_cost_fen": prev_fen,
-                "impact_fen": delta_fen,
-                "change_rate": change_rate,
-                "confidence": 0.85,
-            })
+            causes.append(
+                {
+                    "dimension": "category",
+                    "detail": (
+                        f"{row['category']}品类成本环比上涨" f"{change_rate * 100:.1f}%," f"增加{delta_fen / 100:.2f}元"
+                    ),
+                    "category": row["category"],
+                    "current_cost_fen": current_fen,
+                    "prev_cost_fen": prev_fen,
+                    "impact_fen": delta_fen,
+                    "change_rate": change_rate,
+                    "confidence": 0.85,
+                }
+            )
 
         log.info("category_analysis.done", cause_count=len(causes))
         return causes
@@ -311,7 +288,8 @@ class CostRootCauseService:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     WITH current_prices AS (
                         SELECT
                             poi.supplier_id,
@@ -361,7 +339,8 @@ class CostRootCauseService:
                     WHERE c.avg_price_fen > COALESCE(p.avg_price_fen, c.avg_price_fen)
                     ORDER BY impact_fen DESC
                     LIMIT 10
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -385,33 +364,31 @@ class CostRootCauseService:
             if prev_price <= 0 or impact_fen <= 0:
                 continue
 
-            price_change_rate = round(
-                (current_price - prev_price) / prev_price, 4
-            )
+            price_change_rate = round((current_price - prev_price) / prev_price, 4)
             if price_change_rate < SUPPLIER_PRICE_ALERT_THRESHOLD:
                 continue
 
-            supplier_name = row.get("supplier_name") or str(
-                row.get("supplier_id", "未知")
-            )
+            supplier_name = row.get("supplier_name") or str(row.get("supplier_id", "未知"))
             ingredient_name = row.get("ingredient_name", "")
 
-            causes.append({
-                "dimension": "supplier",
-                "detail": (
-                    f"{supplier_name}的{ingredient_name}采购价上涨"
-                    f"{price_change_rate * 100:.1f}%,"
-                    f"影响{impact_fen / 100:.2f}元"
-                ),
-                "supplier_name": supplier_name,
-                "supplier_id": str(row.get("supplier_id", "")),
-                "ingredient_name": ingredient_name,
-                "current_price_fen": current_price,
-                "prev_price_fen": prev_price,
-                "price_change_rate": price_change_rate,
-                "impact_fen": impact_fen,
-                "confidence": 0.90,
-            })
+            causes.append(
+                {
+                    "dimension": "supplier",
+                    "detail": (
+                        f"{supplier_name}的{ingredient_name}采购价上涨"
+                        f"{price_change_rate * 100:.1f}%,"
+                        f"影响{impact_fen / 100:.2f}元"
+                    ),
+                    "supplier_name": supplier_name,
+                    "supplier_id": str(row.get("supplier_id", "")),
+                    "ingredient_name": ingredient_name,
+                    "current_price_fen": current_price,
+                    "prev_price_fen": prev_price,
+                    "price_change_rate": price_change_rate,
+                    "impact_fen": impact_fen,
+                    "confidence": 0.90,
+                }
+            )
 
         log.info("supplier_analysis.done", cause_count=len(causes))
         return causes
@@ -432,7 +409,8 @@ class CostRootCauseService:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         oi.dish_id,
                         d.dish_name,
@@ -461,7 +439,8 @@ class CostRootCauseService:
                     HAVING AVG(oi.price_fen) > 0
                     ORDER BY cost_rate DESC
                     LIMIT 20
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -486,29 +465,29 @@ class CostRootCauseService:
             total_cost_fen = int(row.get("total_cost_fen", 0) or 0)
 
             # 超出基准的成本 = (实际成本率 - 基准成本率) * 售价 * 销量
-            overshoot_per_unit = int(
-                (cost_rate - DISH_COST_RATE_ALERT) * avg_price_fen
-            )
+            overshoot_per_unit = int((cost_rate - DISH_COST_RATE_ALERT) * avg_price_fen)
             impact_fen = overshoot_per_unit * total_sold
 
-            causes.append({
-                "dimension": "dish",
-                "detail": (
-                    f"{row.get('dish_name', '')}成本率"
-                    f"{cost_rate * 100:.1f}%(基准30%),"
-                    f"日均售{total_sold}份,"
-                    f"超标影响{impact_fen / 100:.2f}元"
-                ),
-                "dish_id": str(row.get("dish_id", "")),
-                "dish_name": row.get("dish_name", ""),
-                "cost_rate": round(cost_rate, 4),
-                "total_sold": total_sold,
-                "avg_cost_fen": avg_cost_fen,
-                "avg_price_fen": avg_price_fen,
-                "total_cost_fen": total_cost_fen,
-                "impact_fen": impact_fen,
-                "confidence": 0.88,
-            })
+            causes.append(
+                {
+                    "dimension": "dish",
+                    "detail": (
+                        f"{row.get('dish_name', '')}成本率"
+                        f"{cost_rate * 100:.1f}%(基准30%),"
+                        f"日均售{total_sold}份,"
+                        f"超标影响{impact_fen / 100:.2f}元"
+                    ),
+                    "dish_id": str(row.get("dish_id", "")),
+                    "dish_name": row.get("dish_name", ""),
+                    "cost_rate": round(cost_rate, 4),
+                    "total_sold": total_sold,
+                    "avg_cost_fen": avg_cost_fen,
+                    "avg_price_fen": avg_price_fen,
+                    "total_cost_fen": total_cost_fen,
+                    "impact_fen": impact_fen,
+                    "confidence": 0.88,
+                }
+            )
 
         log.info("dish_analysis.done", cause_count=len(causes))
         return causes
@@ -529,7 +508,8 @@ class CostRootCauseService:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         DATE_TRUNC('week', o.created_at)::DATE AS week_start,
                         SUM(COALESCE(oi.food_cost_fen, 0) * oi.quantity) AS food_cost_fen,
@@ -545,7 +525,8 @@ class CostRootCauseService:
                       AND oi.is_deleted = FALSE
                     GROUP BY DATE_TRUNC('week', o.created_at)
                     ORDER BY week_start
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -579,21 +560,23 @@ class CostRootCauseService:
                 rate_increase = current_rate - prev_rate
                 if rate_increase > 0.01:  # 超过1%才标记
                     impact_fen = int(rate_increase * revenue_fen)
-                    causes.append({
-                        "dimension": "time",
-                        "detail": (
-                            f"{week_start}周食材成本率上升"
-                            f"{rate_increase * 100:.1f}%"
-                            f"(从{prev_rate * 100:.1f}%到"
-                            f"{current_rate * 100:.1f}%)"
-                        ),
-                        "week_start": str(week_start),
-                        "cost_rate": current_rate,
-                        "prev_cost_rate": prev_rate,
-                        "rate_increase": rate_increase,
-                        "impact_fen": impact_fen,
-                        "confidence": 0.75,
-                    })
+                    causes.append(
+                        {
+                            "dimension": "time",
+                            "detail": (
+                                f"{week_start}周食材成本率上升"
+                                f"{rate_increase * 100:.1f}%"
+                                f"(从{prev_rate * 100:.1f}%到"
+                                f"{current_rate * 100:.1f}%)"
+                            ),
+                            "week_start": str(week_start),
+                            "cost_rate": current_rate,
+                            "prev_cost_rate": prev_rate,
+                            "rate_increase": rate_increase,
+                            "impact_fen": impact_fen,
+                            "confidence": 0.75,
+                        }
+                    )
 
             prev_rate = current_rate
 
@@ -623,7 +606,8 @@ class CostRootCauseService:
         # 1. 检查损耗
         try:
             waste_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         SUM(wr.quantity * wr.unit_cost_fen) AS waste_cost_fen,
                         COUNT(*) AS waste_count
@@ -633,7 +617,8 @@ class CostRootCauseService:
                       AND wr.wasted_at >= :period_start
                       AND wr.wasted_at < :period_end_next
                       AND wr.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -651,23 +636,23 @@ class CostRootCauseService:
             waste_count = int(waste_row.get("waste_count", 0) or 0)
 
             if waste_cost_fen > 0:
-                causes.append({
-                    "dimension": "operation",
-                    "sub_type": "waste",
-                    "detail": (
-                        f"期间报损{waste_count}次,"
-                        f"损耗成本{waste_cost_fen / 100:.2f}元"
-                    ),
-                    "waste_cost_fen": waste_cost_fen,
-                    "waste_count": waste_count,
-                    "impact_fen": waste_cost_fen,
-                    "confidence": 0.80,
-                })
+                causes.append(
+                    {
+                        "dimension": "operation",
+                        "sub_type": "waste",
+                        "detail": (f"期间报损{waste_count}次," f"损耗成本{waste_cost_fen / 100:.2f}元"),
+                        "waste_cost_fen": waste_cost_fen,
+                        "waste_count": waste_count,
+                        "impact_fen": waste_cost_fen,
+                        "confidence": 0.80,
+                    }
+                )
 
         # 2. 检查超量使用（理论 vs 实际）
         try:
             overuse_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         SUM(ABS(it.total_cost_fen)) AS actual_usage_fen
                     FROM ingredient_transactions it
@@ -677,7 +662,8 @@ class CostRootCauseService:
                       AND it.transaction_time >= :period_start
                       AND it.transaction_time < :period_end_next
                       AND it.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -691,34 +677,30 @@ class CostRootCauseService:
             overuse_row = None
 
         if overuse_row:
-            actual_usage_fen = int(
-                overuse_row.get("actual_usage_fen", 0) or 0
-            )
+            actual_usage_fen = int(overuse_row.get("actual_usage_fen", 0) or 0)
             # 理论消耗（简化估算: 实际 * 0.95 为理论基准）
             # TODO: 从 BOM * 销量精确计算理论消耗
             theoretical_usage_fen = int(actual_usage_fen * 0.95)
             overuse_fen = actual_usage_fen - theoretical_usage_fen
 
             if overuse_fen > 0:
-                overuse_rate = round(
-                    overuse_fen / theoretical_usage_fen, 4
-                ) if theoretical_usage_fen > 0 else 0.0
+                overuse_rate = round(overuse_fen / theoretical_usage_fen, 4) if theoretical_usage_fen > 0 else 0.0
 
-                causes.append({
-                    "dimension": "operation",
-                    "sub_type": "overuse",
-                    "detail": (
-                        f"实际用量超出理论配方约"
-                        f"{overuse_rate * 100:.1f}%,"
-                        f"超量成本{overuse_fen / 100:.2f}元"
-                    ),
-                    "actual_usage_fen": actual_usage_fen,
-                    "theoretical_usage_fen": theoretical_usage_fen,
-                    "overuse_fen": overuse_fen,
-                    "overuse_rate": overuse_rate,
-                    "impact_fen": overuse_fen,
-                    "confidence": 0.70,
-                })
+                causes.append(
+                    {
+                        "dimension": "operation",
+                        "sub_type": "overuse",
+                        "detail": (
+                            f"实际用量超出理论配方约" f"{overuse_rate * 100:.1f}%," f"超量成本{overuse_fen / 100:.2f}元"
+                        ),
+                        "actual_usage_fen": actual_usage_fen,
+                        "theoretical_usage_fen": theoretical_usage_fen,
+                        "overuse_fen": overuse_fen,
+                        "overuse_rate": overuse_rate,
+                        "impact_fen": overuse_fen,
+                        "confidence": 0.70,
+                    }
+                )
 
         log.info("operation_analysis.done", cause_count=len(causes))
         return causes
@@ -752,12 +734,14 @@ class CostRootCauseService:
                     seen_actions.add(action)
                     # 预估谈判可挽回50%涨幅
                     expected_saving = int(impact_fen * 0.5)
-                    recommendations.append({
-                        "action": action,
-                        "expected_saving_fen": expected_saving,
-                        "priority": PRIORITY_HIGH,
-                        "dimension": "supplier",
-                    })
+                    recommendations.append(
+                        {
+                            "action": action,
+                            "expected_saving_fen": expected_saving,
+                            "priority": PRIORITY_HIGH,
+                            "dimension": "supplier",
+                        }
+                    )
 
             elif dimension == "dish":
                 dish_name = cause.get("dish_name", "")
@@ -768,13 +752,15 @@ class CostRootCauseService:
                     # 预估优化配方可降低5%成本
                     total_cost = cause.get("total_cost_fen", 0)
                     expected_saving = int(total_cost * 0.05)
-                    recommendations.append({
-                        "action": action,
-                        "expected_saving_fen": expected_saving,
-                        "priority": PRIORITY_HIGH if cost_rate > 0.40 else PRIORITY_MEDIUM,
-                        "dimension": "dish",
-                        "dish_name": dish_name,
-                    })
+                    recommendations.append(
+                        {
+                            "action": action,
+                            "expected_saving_fen": expected_saving,
+                            "priority": PRIORITY_HIGH if cost_rate > 0.40 else PRIORITY_MEDIUM,
+                            "dimension": "dish",
+                            "dish_name": dish_name,
+                        }
+                    )
 
             elif dimension == "operation":
                 sub_type = cause.get("sub_type", "")
@@ -784,24 +770,28 @@ class CostRootCauseService:
                         seen_actions.add(action)
                         # 预估可减少30%损耗
                         expected_saving = int(impact_fen * 0.3)
-                        recommendations.append({
-                            "action": action,
-                            "expected_saving_fen": expected_saving,
-                            "priority": PRIORITY_MEDIUM,
-                            "dimension": "operation/waste",
-                        })
+                        recommendations.append(
+                            {
+                                "action": action,
+                                "expected_saving_fen": expected_saving,
+                                "priority": PRIORITY_MEDIUM,
+                                "dimension": "operation/waste",
+                            }
+                        )
                 elif sub_type == "overuse":
                     action = "加强出品标准化培训;使用定量工具(电子秤/量杯)"
                     if action not in seen_actions:
                         seen_actions.add(action)
                         # 预估可减少50%超量
                         expected_saving = int(impact_fen * 0.5)
-                        recommendations.append({
-                            "action": action,
-                            "expected_saving_fen": expected_saving,
-                            "priority": PRIORITY_HIGH,
-                            "dimension": "operation/overuse",
-                        })
+                        recommendations.append(
+                            {
+                                "action": action,
+                                "expected_saving_fen": expected_saving,
+                                "priority": PRIORITY_HIGH,
+                                "dimension": "operation/overuse",
+                            }
+                        )
 
             elif dimension == "category":
                 category = cause.get("category", "")
@@ -809,17 +799,17 @@ class CostRootCauseService:
                 if action not in seen_actions:
                     seen_actions.add(action)
                     expected_saving = int(impact_fen * 0.3)
-                    recommendations.append({
-                        "action": action,
-                        "expected_saving_fen": expected_saving,
-                        "priority": PRIORITY_MEDIUM,
-                        "dimension": "category",
-                    })
+                    recommendations.append(
+                        {
+                            "action": action,
+                            "expected_saving_fen": expected_saving,
+                            "priority": PRIORITY_MEDIUM,
+                            "dimension": "category",
+                        }
+                    )
 
         # 按预估节省降序
-        recommendations.sort(
-            key=lambda x: x.get("expected_saving_fen", 0), reverse=True
-        )
+        recommendations.sort(key=lambda x: x.get("expected_saving_fen", 0), reverse=True)
 
         return recommendations
 
@@ -847,7 +837,8 @@ class CostRootCauseService:
         # 1. 营收和食材成本
         try:
             rev_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(o.final_amount_fen), 0) AS net_revenue_fen,
                         COALESCE(SUM(
@@ -861,7 +852,8 @@ class CostRootCauseService:
                       AND o.created_at >= :period_start
                       AND o.created_at < :period_end_next
                       AND o.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -873,18 +865,10 @@ class CostRootCauseService:
         except (AttributeError, TypeError):
             rev_row = None
 
-        net_revenue_fen = int(
-            rev_row.get("net_revenue_fen", 0) or 0
-        ) if rev_row else 0
-        food_cost_fen = int(
-            rev_row.get("food_cost_fen", 0) or 0
-        ) if rev_row else 0
+        net_revenue_fen = int(rev_row.get("net_revenue_fen", 0) or 0) if rev_row else 0
+        food_cost_fen = int(rev_row.get("food_cost_fen", 0) or 0) if rev_row else 0
 
-        ingredient_rate = (
-            round(food_cost_fen / net_revenue_fen, 6)
-            if net_revenue_fen > 0
-            else 0.0
-        )
+        ingredient_rate = round(food_cost_fen / net_revenue_fen, 6) if net_revenue_fen > 0 else 0.0
 
         # 2. 损耗率（简化）
         waste_rate = 0.0
@@ -906,9 +890,7 @@ class CostRootCauseService:
         period_end: date,
     ) -> list[dict[str, Any]]:
         """品类归因明细（供独立端点调用）"""
-        return await self._analyze_by_category(
-            db, store_id, tenant_id, period_start, period_end
-        )
+        return await self._analyze_by_category(db, store_id, tenant_id, period_start, period_end)
 
     async def get_supplier_detail(
         self,
@@ -919,9 +901,7 @@ class CostRootCauseService:
         period_end: date,
     ) -> list[dict[str, Any]]:
         """供应商归因明细（供独立端点调用）"""
-        return await self._analyze_by_supplier(
-            db, store_id, tenant_id, period_start, period_end
-        )
+        return await self._analyze_by_supplier(db, store_id, tenant_id, period_start, period_end)
 
     async def get_recommendations(
         self,
@@ -932,7 +912,5 @@ class CostRootCauseService:
         period_end: date,
     ) -> list[dict[str, Any]]:
         """获取可执行建议（供独立端点调用）"""
-        result = await self.analyze_root_cause(
-            db, store_id, tenant_id, period_start, period_end
-        )
+        result = await self.analyze_root_cause(db, store_id, tenant_id, period_start, period_end)
         return result.get("recommendations", [])

@@ -164,9 +164,7 @@ async def lifespan(app: FastAPI):
 
     await init_db()
     _register_background_task(asyncio.create_task(start_daily_scheduler(async_session_factory)))
-    _register_background_task(
-        asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
-    )
+    _register_background_task(asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory)))
 
     # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
     # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
@@ -245,9 +243,7 @@ async def lifespan(app: FastAPI):
         )
 
         _payment_consumer = create_payment_event_consumer(async_session_factory)
-        payment_event_consumer_task = await start_payment_event_consumer(
-            _payment_consumer, async_session_factory
-        )
+        payment_event_consumer_task = await start_payment_event_consumer(_payment_consumer, async_session_factory)
         _register_background_task(payment_event_consumer_task)
         import structlog as _structlog
 
@@ -595,9 +591,9 @@ _sprint_e_mount = auto_mount_routes(
     api_dir=_Path(__file__).parent / "api",
     modules=[
         ("canonical_delivery_routes", "router"),  # E1 #91
-        ("dish_publish_routes", "router"),         # E2 #92
-        ("xiaohongshu_routes", "router"),          # E3 #93
-        ("dispute_routes", "router"),              # E4 #94
+        ("dish_publish_routes", "router"),  # E2 #92
+        ("xiaohongshu_routes", "router"),  # E3 #93
+        ("dispute_routes", "router"),  # E4 #94
     ],
 )
 # 校验：失败 → stderr + WARNING；env AUTO_MOUNT_STRICT=1 时 sys.exit(1)

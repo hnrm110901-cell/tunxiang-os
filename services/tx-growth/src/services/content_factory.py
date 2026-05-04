@@ -116,12 +116,14 @@ class ContentFactory:
         """获取品牌信息（名称、调性）"""
         await self._set_tenant(db, tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT brand_name, brand_voice, tone_keywords
                 FROM brand_strategies
                 WHERE tenant_id = :tid AND is_deleted = false
                 ORDER BY updated_at DESC LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         r = row.mappings().first()
@@ -256,11 +258,13 @@ class ContentFactory:
 
         # 读取菜品数据
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT name, description, price_fen, category
                 FROM dishes
                 WHERE id = :did AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"did": dish_id, "tid": tenant_id},
         )
         dish = row.mappings().first()
@@ -398,14 +402,16 @@ class ContentFactory:
         """设置内容排期"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE content_calendar
                 SET status = 'scheduled',
                     scheduled_at = :scheduled_at,
                     updated_at = NOW()
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
                 RETURNING id, status, scheduled_at
-            """),
+            """
+            ),
             {"cid": content_id, "tid": tenant_id, "scheduled_at": scheduled_at},
         )
         row = result.mappings().first()
@@ -427,14 +433,16 @@ class ContentFactory:
         """审批内容"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE content_calendar
                 SET approved_by = :approved_by,
                     approved_at = NOW(),
                     updated_at = NOW()
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
                 RETURNING id, approved_by, approved_at
-            """),
+            """
+            ),
             {"cid": content_id, "tid": tenant_id, "approved_by": approved_by},
         )
         row = result.mappings().first()

@@ -133,14 +133,16 @@ async def list_dish_dept_mappings(
     count_result = await db.execute(count_sql, params)
     total = count_result.scalar() or 0
 
-    list_sql = text(f"""
+    list_sql = text(
+        f"""
         SELECT m.id, m.tenant_id, m.store_id, m.dish_id, m.dept_id, m.dept_name,
                m.is_primary, m.priority, m.created_at, m.updated_at
         FROM dish_dept_mappings m
         WHERE {where_clause}
         ORDER BY m.is_primary DESC, m.priority ASC, m.created_at DESC
         LIMIT :limit OFFSET :offset
-    """)
+    """
+    )
     result = await db.execute(list_sql, params)
     rows = result.fetchall()
 
@@ -169,14 +171,16 @@ async def upsert_dish_dept_mapping(
     now = now_result.scalar()
 
     # 检查是否已存在（含软删除的）
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT id, is_deleted FROM dish_dept_mappings
         WHERE tenant_id = :tenant_id
           AND dish_id = :dish_id
           AND dept_id = :dept_id
           AND (store_id = :store_id OR (store_id IS NULL AND :store_id IS NULL))
         LIMIT 1
-    """)
+    """
+    )
     check_result = await db.execute(
         check_sql,
         {
@@ -190,7 +194,8 @@ async def upsert_dish_dept_mapping(
 
     if existing:
         mapping_id = existing.id
-        update_sql = text("""
+        update_sql = text(
+            """
             UPDATE dish_dept_mappings
             SET dept_name  = :dept_name,
                 is_primary = :is_primary,
@@ -200,7 +205,8 @@ async def upsert_dish_dept_mapping(
             WHERE id = :id
             RETURNING id, tenant_id, store_id, dish_id, dept_id, dept_name,
                       is_primary, priority, created_at, updated_at
-        """)
+        """
+        )
         result = await db.execute(
             update_sql,
             {
@@ -215,7 +221,8 @@ async def upsert_dish_dept_mapping(
         action = "updated"
     else:
         new_id = str(uuid.uuid4())
-        insert_sql = text("""
+        insert_sql = text(
+            """
             INSERT INTO dish_dept_mappings
               (id, tenant_id, store_id, dish_id, dept_id, dept_name,
                is_primary, priority, created_at, updated_at, is_deleted)
@@ -224,7 +231,8 @@ async def upsert_dish_dept_mapping(
                :is_primary, :priority, :now, :now, false)
             RETURNING id, tenant_id, store_id, dish_id, dept_id, dept_name,
                       is_primary, priority, created_at, updated_at
-        """)
+        """
+        )
         result = await db.execute(
             insert_sql,
             {
@@ -260,19 +268,23 @@ async def delete_dish_dept_mapping(
     await _rls(db, tid)
 
     # 校验存在性
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT id FROM dish_dept_mappings
         WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-    """)
+    """
+    )
     check_result = await db.execute(check_sql, {"id": mapping_id, "tenant_id": tid})
     if not check_result.fetchone():
         raise HTTPException(status_code=404, detail="映射记录不存在或已删除")
 
-    del_sql = text("""
+    del_sql = text(
+        """
         UPDATE dish_dept_mappings
         SET is_deleted = true, updated_at = NOW()
         WHERE id = :id AND tenant_id = :tenant_id
-    """)
+    """
+    )
     await db.execute(del_sql, {"id": mapping_id, "tenant_id": tid})
     await db.commit()
 
@@ -302,13 +314,15 @@ async def batch_set_dish_dept_mappings(
     now = now_result.scalar()
 
     if req.replace_existing and req.store_id:
-        del_sql = text("""
+        del_sql = text(
+            """
             UPDATE dish_dept_mappings
             SET is_deleted = true, updated_at = :now
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id
               AND is_deleted = false
-        """)
+        """
+        )
         await db.execute(del_sql, {"tenant_id": tid, "store_id": req.store_id, "now": now})
 
     created_count = 0
@@ -318,14 +332,16 @@ async def batch_set_dish_dept_mappings(
     for idx, item in enumerate(req.mappings):
         effective_store_id = item.store_id or req.store_id
         try:
-            check_sql = text("""
+            check_sql = text(
+                """
                 SELECT id, is_deleted FROM dish_dept_mappings
                 WHERE tenant_id = :tenant_id
                   AND dish_id   = :dish_id
                   AND dept_id   = :dept_id
                   AND (store_id = :store_id OR (store_id IS NULL AND :store_id IS NULL))
                 LIMIT 1
-            """)
+            """
+            )
             check_result = await db.execute(
                 check_sql,
                 {
@@ -338,7 +354,8 @@ async def batch_set_dish_dept_mappings(
             existing = check_result.fetchone()
 
             if existing:
-                upd_sql = text("""
+                upd_sql = text(
+                    """
                     UPDATE dish_dept_mappings
                     SET dept_name  = :dept_name,
                         is_primary = :is_primary,
@@ -346,7 +363,8 @@ async def batch_set_dish_dept_mappings(
                         is_deleted = false,
                         updated_at = :now
                     WHERE id = :id
-                """)
+                """
+                )
                 await db.execute(
                     upd_sql,
                     {
@@ -359,14 +377,16 @@ async def batch_set_dish_dept_mappings(
                 )
                 updated_count += 1
             else:
-                ins_sql = text("""
+                ins_sql = text(
+                    """
                     INSERT INTO dish_dept_mappings
                       (id, tenant_id, store_id, dish_id, dept_id, dept_name,
                        is_primary, priority, created_at, updated_at, is_deleted)
                     VALUES
                       (:id, :tenant_id, :store_id, :dish_id, :dept_id, :dept_name,
                        :is_primary, :priority, :now, :now, false)
-                """)
+                """
+                )
                 await db.execute(
                     ins_sql,
                     {
@@ -421,7 +441,8 @@ async def get_mappings_by_dish(
         store_filter = "AND (m.store_id = :store_id OR m.store_id IS NULL)"
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT m.id, m.tenant_id, m.store_id, m.dish_id, m.dept_id, m.dept_name,
                m.is_primary, m.priority, m.created_at, m.updated_at
         FROM dish_dept_mappings m
@@ -430,7 +451,8 @@ async def get_mappings_by_dish(
           AND m.is_deleted = false
           {store_filter}
         ORDER BY m.is_primary DESC, m.priority ASC
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     rows = result.fetchall()
 
@@ -469,7 +491,8 @@ async def list_departments(
             store_filter = "AND (d.store_id = :store_id OR d.store_id IS NULL)"
             params["store_id"] = store_id
 
-        dept_sql = text(f"""
+        dept_sql = text(
+            f"""
             SELECT d.id, d.store_id, d.dept_name, d.dept_code,
                    d.display_order, d.is_active, d.created_at
             FROM kds_departments d
@@ -477,7 +500,8 @@ async def list_departments(
               AND d.is_deleted = false
               {store_filter}
             ORDER BY d.display_order ASC, d.created_at ASC
-        """)
+        """
+        )
         result = await db.execute(dept_sql, params)
         rows = result.fetchall()
 
@@ -504,14 +528,16 @@ async def list_departments(
         store_filter2 = "AND (store_id = :store_id OR store_id IS NULL)"
         params2["store_id"] = store_id
 
-    fallback_sql = text(f"""
+    fallback_sql = text(
+        f"""
         SELECT DISTINCT dept_id, dept_name
         FROM dish_dept_mappings
         WHERE tenant_id = :tenant_id
           AND is_deleted = false
           {store_filter2}
         ORDER BY dept_name
-    """)
+    """
+    )
     result2 = await db.execute(fallback_sql, params2)
     rows2 = result2.fetchall()
 

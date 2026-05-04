@@ -37,7 +37,8 @@ async def get_station_profit_report(
 
     通过 SQL JOIN kds_tasks → order_items → dish_bom_items 计算。
     """
-    sql = text("""
+    sql = text(
+        """
         WITH completed_tasks AS (
             SELECT
                 kt.dept_id,
@@ -85,7 +86,8 @@ async def get_station_profit_report(
         WHERE ct.dept_id IS NOT NULL
         GROUP BY ct.dept_id, pd.name
         ORDER BY revenue DESC
-    """)
+    """
+    )
 
     result = await db.execute(
         sql,

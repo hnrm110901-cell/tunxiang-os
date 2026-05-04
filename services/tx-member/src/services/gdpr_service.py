@@ -77,12 +77,14 @@ class GDPRService:
 
         # 检查是否有同类型 pending/reviewing 请求
         existing = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM gdpr_requests
                 WHERE tenant_id = :tid AND customer_id = :cid
                   AND request_type = :rtype
                   AND status IN ('pending','reviewing')
-            """),
+            """
+            ),
             {"tid": self._tid, "cid": uuid.UUID(customer_id), "rtype": request_type},
         )
         if existing.fetchone():
@@ -90,14 +92,16 @@ class GDPRService:
 
         req_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO gdpr_requests
                     (id, tenant_id, customer_id, request_type, status,
                      requested_by, note)
                 VALUES
                     (:id, :tid, :cid, :rtype, 'pending',
                      :by, :note)
-            """),
+            """
+            ),
             {
                 "id": req_id,
                 "tid": self._tid,
@@ -121,7 +125,8 @@ class GDPRService:
         """查询单条请求"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, request_type, status,
                        requested_by, requested_at,
                        reviewed_by, reviewed_at,
@@ -130,7 +135,8 @@ class GDPRService:
                        export_data_url, note, created_at, updated_at
                 FROM gdpr_requests
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(request_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -188,24 +194,28 @@ class GDPRService:
         if approved:
             new_status = "reviewing"
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE gdpr_requests
                     SET status = 'reviewing', reviewed_by = :by,
                         reviewed_at = :now, updated_at = :now
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"by": uuid.UUID(reviewed_by), "now": now, "id": uuid.UUID(request_id), "tid": self._tid},
             )
         else:
             new_status = "rejected"
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE gdpr_requests
                     SET status = 'rejected', reviewed_by = :by,
                         reviewed_at = :now, rejection_reason = :reason,
                         updated_at = :now
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {
                     "by": uuid.UUID(reviewed_by),
                     "now": now,
@@ -241,7 +251,8 @@ class GDPRService:
 
         # 执行匿名化
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customers
                 SET name          = :anon_name,
                     phone         = NULL,
@@ -252,7 +263,8 @@ class GDPRService:
                     avatar_url    = NULL,
                     updated_at    = :now
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"anon_name": anon_name, "now": now, "cid": cid, "tid": self._tid},
         )
         affected = result.rowcount
@@ -267,14 +279,16 @@ class GDPRService:
         }
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE gdpr_requests
                 SET status = 'executed', executed_by = :by,
                     executed_at = :now,
                     anonymization_log = :log::jsonb,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "by": uuid.UUID(executed_by),
                 "now": now,
@@ -304,12 +318,14 @@ class GDPRService:
 
         # 基本信息
         cust_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, phone, email, gender, birth_date,
                        created_at, updated_at
                 FROM customers
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cid": cid, "tid": self._tid},
         )
         cust = cust_result.fetchone()
@@ -318,13 +334,15 @@ class GDPRService:
 
         # 消费历史（订单摘要）
         orders_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, total_amount_fen, status, created_at
                 FROM orders
                 WHERE customer_id = :cid AND tenant_id = :tid
                 ORDER BY created_at DESC
                 LIMIT 1000
-            """),
+            """
+            ),
             {"cid": cid, "tid": self._tid},
         )
         orders = [

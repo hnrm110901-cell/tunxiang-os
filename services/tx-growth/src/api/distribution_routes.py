@@ -206,14 +206,16 @@ async def generate_referral_link(
         now = _now_iso()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO referral_links
                     (id, tenant_id, member_id, referral_code, channel,
                      expires_at, click_count, convert_count, is_active, created_at)
                 VALUES
                     (:id, :tenant_id, :member_id, :referral_code, :channel,
                      :expires_at, 0, 0, true, :created_at)
-            """),
+            """
+            ),
             {
                 "id": link_id,
                 "tenant_id": x_tenant_id,
@@ -265,7 +267,8 @@ async def get_member_links(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, member_id::text, referral_code, channel,
                        expires_at, click_count, convert_count, is_active, created_at
                 FROM referral_links
@@ -273,7 +276,8 @@ async def get_member_links(
                   AND member_id = :member_id::uuid
                   AND is_active = true
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "member_id": member_id},
         )
         rows = result.mappings().all()
@@ -343,14 +347,16 @@ async def bind_referral_relationship(
 
         # 幂等检查：已绑定则直接返回
         existing = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, referee_id::text,
                        level1_id::text, level2_id::text, level3_id::text,
                        referral_link_id::text, registered_at
                 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND referee_id = :referee_id::uuid
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "referee_id": req.referee_id},
         )
         existing_row = existing.mappings().fetchone()
@@ -363,13 +369,15 @@ async def bind_referral_relationship(
 
         # 查找推荐码对应的 link
         link_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, member_id::text, tenant_id::text
                 FROM referral_links
                 WHERE referral_code = :code
                   AND tenant_id = :tenant_id
                   AND is_active = true
-            """),
+            """
+            ),
             {"code": req.referral_code, "tenant_id": x_tenant_id},
         )
         link_row = link_result.mappings().fetchone()
@@ -388,12 +396,14 @@ async def bind_referral_relationship(
 
         # 推导二级（level1 的直接推荐人）
         level1_rel_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT level1_id::text
                 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND referee_id = :level1_id::uuid
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "level1_id": level1_id},
         )
         level1_rel_row = level1_rel_result.mappings().fetchone()
@@ -403,12 +413,14 @@ async def bind_referral_relationship(
         level3_id: Optional[str] = None
         if level2_id:
             level2_rel_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT level1_id::text
                     FROM referral_relationships
                     WHERE tenant_id = :tenant_id
                       AND referee_id = :level2_id::uuid
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "level2_id": level2_id},
             )
             level2_rel_row = level2_rel_result.mappings().fetchone()
@@ -418,14 +430,16 @@ async def bind_referral_relationship(
         now = _now_iso()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO referral_relationships
                     (id, tenant_id, referee_id, level1_id, level2_id, level3_id,
                      referral_link_id, registered_at)
                 VALUES
                     (:id, :tenant_id, :referee_id::uuid, :level1_id::uuid,
                      :level2_id::uuid, :level3_id::uuid, :link_id::uuid, :registered_at)
-            """),
+            """
+            ),
             {
                 "id": rel_id,
                 "tenant_id": x_tenant_id,
@@ -440,12 +454,14 @@ async def bind_referral_relationship(
 
         # 更新推荐码的转化计数
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE referral_links
                 SET convert_count = convert_count + 1
                 WHERE id = :link_id::uuid
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"link_id": link_id, "tenant_id": x_tenant_id},
         )
 
@@ -496,36 +512,42 @@ async def get_referral_tree(
 
         # 直接下线（level1 = member_id）
         direct_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT referee_id::text, level1_id::text
                 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND level1_id = :member_id::uuid
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "member_id": member_id},
         )
         direct_rows = direct_result.mappings().all()
 
         # 二级下线（level2 = member_id）
         indirect_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT referee_id::text, level2_id::text
                 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND level2_id = :member_id::uuid
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "member_id": member_id},
         )
         indirect_rows = indirect_result.mappings().all()
 
         # 三级下线（level3 = member_id）
         level3_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT referee_id::text, level3_id::text
                 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND level3_id = :member_id::uuid
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "member_id": member_id},
         )
         level3_rows = level3_result.mappings().all()
@@ -603,12 +625,14 @@ async def calculate_rewards(
         rules = dict(_DEFAULT_RULES)
         try:
             rules_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT level1_rate, level2_rate, level3_rate,
                            reward_type, trigger_type
                     FROM referral_rules
                     WHERE tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id},
             )
             rules_row = rules_result.mappings().fetchone()
@@ -626,13 +650,15 @@ async def calculate_rewards(
 
         # 查询推荐关系
         rel_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT referee_id::text, level1_id::text,
                        level2_id::text, level3_id::text
                 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND referee_id = :member_id::uuid
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "member_id": req.member_id},
         )
         rel_row = rel_result.mappings().fetchone()
@@ -664,7 +690,8 @@ async def calculate_rewards(
             reward_id = str(uuid.uuid4())
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO referral_rewards
                         (id, tenant_id, member_id, referee_id, reward_level,
                          trigger_type, reward_type, reward_value_fen,
@@ -674,7 +701,8 @@ async def calculate_rewards(
                          :reward_level, :trigger_type, :reward_type,
                          :reward_value_fen, 'pending', :order_id::uuid,
                          NULL, NULL, :created_at)
-                """),
+                """
+                ),
                 {
                     "id": reward_id,
                     "tenant_id": x_tenant_id,
@@ -746,14 +774,16 @@ async def issue_reward(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, member_id::text, referee_id::text,
                        reward_level, trigger_type, reward_type, reward_value_fen,
                        status, order_id::text, issued_at, expires_at, created_at
                 FROM referral_rewards
                 WHERE id = :reward_id::uuid
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"reward_id": reward_id, "tenant_id": x_tenant_id},
         )
         row = result.mappings().fetchone()
@@ -768,12 +798,14 @@ async def issue_reward(
 
         now = _now_iso()
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE referral_rewards
                 SET status = 'issued', issued_at = :issued_at
                 WHERE id = :reward_id::uuid
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"reward_id": reward_id, "tenant_id": x_tenant_id, "issued_at": now},
         )
         await db.commit()
@@ -826,7 +858,8 @@ async def get_member_rewards(
         status_filter = "AND status = :status" if status else ""
 
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS cnt,
                        COALESCE(SUM(CASE WHEN status = 'issued' THEN reward_value_fen ELSE 0 END), 0) AS issued_fen,
                        COALESCE(SUM(CASE WHEN status = 'pending' THEN reward_value_fen ELSE 0 END), 0) AS pending_fen
@@ -834,7 +867,8 @@ async def get_member_rewards(
                 WHERE tenant_id = :tenant_id
                   AND member_id = :member_id::uuid
                   {status_filter}
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "member_id": member_id, "status": status},
         )
         agg = count_result.mappings().fetchone()
@@ -843,7 +877,8 @@ async def get_member_rewards(
         total_pending_fen = int(agg["pending_fen"]) if agg else 0
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id::text, tenant_id::text, member_id::text, referee_id::text,
                        reward_level, trigger_type, reward_type, reward_value_fen,
                        status, order_id::text, issued_at, expires_at, created_at
@@ -853,7 +888,8 @@ async def get_member_rewards(
                   {status_filter}
                 ORDER BY created_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "member_id": member_id,
@@ -923,13 +959,15 @@ async def get_distribution_stats(
 
         # 参与会员数（有推荐码的唯一会员数）
         part_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT member_id) AS participant_count,
                        COALESCE(SUM(click_count), 0) AS total_click,
                        COALESCE(SUM(convert_count), 0) AS total_convert
                 FROM referral_links
                 WHERE tenant_id = :tenant_id AND is_active = true
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id},
         )
         part_row = part_result.mappings().fetchone()
@@ -943,12 +981,14 @@ async def get_distribution_stats(
 
         # 奖励汇总
         reward_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(CASE WHEN status = 'issued' THEN reward_value_fen ELSE 0 END), 0) AS issued_fen,
                        COALESCE(SUM(CASE WHEN status = 'pending' THEN reward_value_fen ELSE 0 END), 0) AS pending_fen
                 FROM referral_rewards
                 WHERE tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id},
         )
         reward_row = reward_result.mappings().fetchone()
@@ -1015,7 +1055,8 @@ async def get_leaderboard(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     rr.level1_id::text AS member_id,
                     COUNT(DISTINCT rr.referee_id) AS direct_referrals,
@@ -1031,7 +1072,8 @@ async def get_leaderboard(
                 GROUP BY rr.level1_id
                 ORDER BY direct_referrals DESC, total_reward_fen DESC
                 LIMIT 20
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id},
         )
         rows = result.mappings().all()
@@ -1079,7 +1121,8 @@ async def save_distribution_rules(
 
         now = _now_iso()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO referral_rules
                     (tenant_id, level1_rate, level2_rate, level3_rate,
                      reward_type, trigger_type, updated_at)
@@ -1093,7 +1136,8 @@ async def save_distribution_rules(
                     reward_type  = EXCLUDED.reward_type,
                     trigger_type = EXCLUDED.trigger_type,
                     updated_at   = EXCLUDED.updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "level1_rate": req.level1_rate,
@@ -1147,12 +1191,14 @@ async def get_distribution_rules(
         await db.execute(text(_REFERRAL_RULES_DDL))
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT level1_rate, level2_rate, level3_rate,
                        reward_type, trigger_type, updated_at
                 FROM referral_rules
                 WHERE tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id},
         )
         row = result.mappings().fetchone()
@@ -1197,12 +1243,14 @@ async def detect_abuse(
 
         # 检查1：referee_id 是否已绑定（重复绑定）
         dup_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM referral_relationships
                 WHERE tenant_id = :tenant_id
                   AND referee_id = :referee_id::uuid
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "referee_id": req.referee_id},
         )
         if dup_result.fetchone():
@@ -1211,11 +1259,13 @@ async def detect_abuse(
         # 检查2：同设备绑定次数（通过 referral_records 的 invitee_device_id）
         if req.device_id:
             device_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS cnt FROM referral_records
                     WHERE tenant_id = :tenant_id
                       AND invitee_device_id = :device_id
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "device_id": req.device_id},
             )
             device_row = device_result.mappings().fetchone()
@@ -1226,11 +1276,13 @@ async def detect_abuse(
         # 检查3：同IP短时间多次绑定（同IP超过5次视为异常）
         if req.ip:
             ip_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS cnt FROM referral_records
                     WHERE tenant_id = :tenant_id
                       AND invitee_ip = :ip
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "ip": req.ip},
             )
             ip_row = ip_result.mappings().fetchone()

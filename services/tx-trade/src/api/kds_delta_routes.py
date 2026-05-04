@@ -236,7 +236,8 @@ async def api_kds_heartbeat(
     # 如果表不存在，仅记录日志，不报错（渐进式部署）
     device_registered = False
     try:
-        upsert_sql = text("""
+        upsert_sql = text(
+            """
             INSERT INTO kds_device_heartbeats (
                 id, tenant_id, device_id, store_id, device_kind,
                 station_id, software_version, last_sync_at,
@@ -255,7 +256,8 @@ async def api_kds_heartbeat(
                 last_sync_at = EXCLUDED.last_sync_at,
                 last_heartbeat_at = EXCLUDED.last_heartbeat_at,
                 updated_at = EXCLUDED.updated_at
-        """)
+        """
+        )
 
         import uuid as _uuid
 

@@ -159,9 +159,7 @@ class DishPublishOrchestrator:
         )
 
         # 2. 判断 operation：新 registry → publish；已有 SKU → update_full
-        operation = (
-            PublishOperation.UPDATE_FULL if existing_sku else PublishOperation.PUBLISH
-        )
+        operation = PublishOperation.UPDATE_FULL if existing_sku else PublishOperation.PUBLISH
 
         # 3. 写 publish_task（审计）
         task_id = await self._enqueue_task(
@@ -311,7 +309,8 @@ class DishPublishOrchestrator:
     ) -> tuple[str, Optional[str]]:
         """UPSERT registry，返回 (registry_id, existing_platform_sku_id)"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_publish_registry (
                     tenant_id, dish_id, brand_id, store_id, platform,
                     platform_shop_id, status, target_price_fen,
@@ -334,7 +333,8 @@ class DishPublishOrchestrator:
                     stock_target = EXCLUDED.stock_target,
                     updated_at = NOW()
                 RETURNING id, platform_sku_id
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "dish_id": dish_id,
@@ -363,7 +363,8 @@ class DishPublishOrchestrator:
         trigger_source: str,
     ) -> str:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_publish_tasks (
                     tenant_id, registry_id, dish_id, platform,
                     operation, payload, status, triggered_by, trigger_source,
@@ -375,7 +376,8 @@ class DishPublishOrchestrator:
                     CAST(:triggered_by AS uuid), :trigger_source, NOW()
                 )
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "registry_id": registry_id,
@@ -400,7 +402,8 @@ class DishPublishOrchestrator:
         """回写 registry + task 的最终结果"""
         if result.ok:
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_publish_registry SET
                         platform_sku_id = COALESCE(:sku_id, platform_sku_id),
                         status = :status,
@@ -417,21 +420,21 @@ class DishPublishOrchestrator:
                         platform_metadata = CAST(:platform_metadata AS jsonb),
                         updated_at = NOW()
                     WHERE id = CAST(:registry_id AS uuid)
-                """),
+                """
+                ),
                 {
                     "sku_id": result.platform_sku_id,
                     "status": result.status.value,
                     "published_price": result.published_price_fen,
                     "published_stock": result.published_stock,
                     "operation": operation.value,
-                    "platform_metadata": json.dumps(
-                        result.platform_response, ensure_ascii=False
-                    ),
+                    "platform_metadata": json.dumps(result.platform_response, ensure_ascii=False),
                     "registry_id": registry_id,
                 },
             )
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_publish_tasks SET
                         status = 'completed',
                         completed_at = NOW(),
@@ -439,17 +442,17 @@ class DishPublishOrchestrator:
                         platform_response = CAST(:response AS jsonb),
                         updated_at = NOW()
                     WHERE id = CAST(:task_id AS uuid)
-                """),
+                """
+                ),
                 {
                     "task_id": task_id,
-                    "response": json.dumps(
-                        result.platform_response, ensure_ascii=False
-                    ),
+                    "response": json.dumps(result.platform_response, ensure_ascii=False),
                 },
             )
         else:
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_publish_registry SET
                         status = 'error',
                         last_sync_at = NOW(),
@@ -459,17 +462,17 @@ class DishPublishOrchestrator:
                         consecutive_error_count = consecutive_error_count + 1,
                         updated_at = NOW()
                     WHERE id = CAST(:registry_id AS uuid)
-                """),
+                """
+                ),
                 {
                     "operation": operation.value,
-                    "error": (
-                        result.error_message or "unknown error"
-                    )[:2000],
+                    "error": (result.error_message or "unknown error")[:2000],
                     "registry_id": registry_id,
                 },
             )
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_publish_tasks SET
                         status = 'failed',
                         completed_at = NOW(),
@@ -478,37 +481,33 @@ class DishPublishOrchestrator:
                         platform_response = CAST(:response AS jsonb),
                         updated_at = NOW()
                     WHERE id = CAST(:task_id AS uuid)
-                """),
+                """
+                ),
                 {
                     "task_id": task_id,
-                    "error": (
-                        result.error_message or "unknown"
-                    )[:2000],
-                    "response": json.dumps(
-                        result.platform_response, ensure_ascii=False
-                    ),
+                    "error": (result.error_message or "unknown")[:2000],
+                    "response": json.dumps(result.platform_response, ensure_ascii=False),
                 },
             )
 
         await self._db.commit()
 
-    async def _mark_registry_status(
-        self, *, registry_id: str, status: str
-    ) -> None:
+    async def _mark_registry_status(self, *, registry_id: str, status: str) -> None:
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_publish_registry
                 SET status = :status, updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
-            """),
+            """
+            ),
             {"id": registry_id, "status": status},
         )
 
-    async def _fetch_registry(
-        self, *, dish_id: str, platform: str
-    ) -> Optional[dict[str, Any]]:
+    async def _fetch_registry(self, *, dish_id: str, platform: str) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, platform, platform_sku_id,
                        platform_shop_id, status, target_price_fen,
                        original_price_fen, stock_target, stock_available
@@ -518,7 +517,8 @@ class DishPublishOrchestrator:
                   AND platform = :platform
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "dish_id": dish_id,

@@ -88,9 +88,7 @@ def _parse_tenant_uuid(x_tenant_id: str) -> UUID:
     try:
         return UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"invalid X-Tenant-ID: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"invalid X-Tenant-ID: {exc}") from exc
 
 
 def _estimate_delivery_minutes(distance_meters: int, provider: str) -> int:
@@ -203,9 +201,7 @@ class CreateDispatchReq(BaseModel):
     delivery_fee_fen: int = Field(default=0, ge=0)
     tip_fen: int = Field(default=0, ge=0)
     customer_phone: Optional[str] = Field(None, max_length=20)
-    preferred_provider: Optional[ProviderEnum] = Field(
-        None, description="指定配送商，为空则按门店配置自动选择"
-    )
+    preferred_provider: Optional[ProviderEnum] = Field(None, description="指定配送商，为空则按门店配置自动选择")
 
 
 class CancelDispatchReq(BaseModel):
@@ -262,18 +258,14 @@ async def create_dispatch(
     # 1. 选 provider
     if req.preferred_provider is not None:
         provider_str = req.preferred_provider.value
-        cfg = await DeliveryProviderConfigRepository.get_one(
-            db, tenant_uuid, req.store_id, provider_str
-        )
+        cfg = await DeliveryProviderConfigRepository.get_one(db, tenant_uuid, req.store_id, provider_str)
         snapshot = (
             _config_to_snapshot(cfg, tenant_uuid)
             if cfg is not None
             else _empty_snapshot(provider_str, tenant_uuid, req.store_id)
         )
     else:
-        cfg = await DeliveryProviderConfigRepository.select_best_enabled(
-            db, tenant_uuid, req.store_id
-        )
+        cfg = await DeliveryProviderConfigRepository.select_best_enabled(db, tenant_uuid, req.store_id)
         if cfg is None:
             _err(422, "该门店未配置任何可用配送商，请先在配送商配置中启用至少一个配送商")
         provider_str = cfg.provider  # type: ignore[union-attr]
@@ -301,8 +293,7 @@ async def create_dispatch(
     if not api_result.success:
         _err(
             502,
-            f"配送商下单失败 [{api_result.error_code or 'UNKNOWN'}]: "
-            f"{api_result.error_message or '未知错误'}",
+            f"配送商下单失败 [{api_result.error_code or 'UNKNOWN'}]: " f"{api_result.error_message or '未知错误'}",
         )
 
     # 3. 持久化
@@ -354,7 +345,10 @@ async def track_dispatch(
         and dispatch.status in ("accepted", "picked_up", "delivering")  # type: ignore[union-attr]
     ):
         cfg = await DeliveryProviderConfigRepository.get_one(
-            db, tenant_uuid, dispatch.store_id, dispatch.provider  # type: ignore[union-attr]
+            db,
+            tenant_uuid,
+            dispatch.store_id,
+            dispatch.provider,  # type: ignore[union-attr]
         )
         snapshot = (
             _config_to_snapshot(cfg, tenant_uuid)
@@ -420,7 +414,10 @@ async def cancel_dispatch(
     # 三方 adapter 取消
     if dispatch.provider_order_id:  # type: ignore[union-attr]
         cfg = await DeliveryProviderConfigRepository.get_one(
-            db, tenant_uuid, dispatch.store_id, dispatch.provider  # type: ignore[union-attr]
+            db,
+            tenant_uuid,
+            dispatch.store_id,
+            dispatch.provider,  # type: ignore[union-attr]
         )
         snapshot = (
             _config_to_snapshot(cfg, tenant_uuid)
@@ -430,9 +427,7 @@ async def cancel_dispatch(
         adapter = get_adapter(dispatch.provider, snapshot)  # type: ignore[union-attr]
         await adapter.cancel(dispatch.provider_order_id, req.reason)  # type: ignore[union-attr]
 
-    await DeliveryDispatchRepository.cancel(
-        db, dispatch_id, tenant_uuid, req.reason
-    )
+    await DeliveryDispatchRepository.cancel(db, dispatch_id, tenant_uuid, req.reason)
     dispatch = await DeliveryDispatchRepository.get(db, dispatch_id, tenant_uuid)
 
     logger.info(
@@ -458,9 +453,7 @@ async def kds_ready_hook(
     触发方：tx-trade KDS 路由 / delivery_kds_bridge.mark_kds_ready 在全部出餐完成时调用。
     """
     tenant_uuid = _parse_tenant_uuid(x_tenant_id)
-    dispatch = await DeliveryDispatchRepository.get_by_order(
-        db, req.order_id, tenant_uuid
-    )
+    dispatch = await DeliveryDispatchRepository.get_by_order(db, req.order_id, tenant_uuid)
     if dispatch is None:
         # 未走自营配送的订单（如平台直接派单），静默 200 即可
         logger.info(
@@ -484,9 +477,7 @@ async def kds_ready_hook(
     await DeliveryDispatchRepository.mark_kds_ready(db, dispatch.dispatch_no, tenant_uuid)
 
     # 通过 adapter 推送骑手
-    cfg = await DeliveryProviderConfigRepository.get_one(
-        db, tenant_uuid, dispatch.store_id, dispatch.provider
-    )
+    cfg = await DeliveryProviderConfigRepository.get_one(db, tenant_uuid, dispatch.store_id, dispatch.provider)
     snapshot = (
         _config_to_snapshot(cfg, tenant_uuid)
         if cfg is not None
@@ -498,9 +489,7 @@ async def kds_ready_hook(
         dispatch.dispatch_no,
     )
     if notified:
-        await DeliveryDispatchRepository.mark_rider_notified(
-            db, dispatch.dispatch_no, tenant_uuid
-        )
+        await DeliveryDispatchRepository.mark_rider_notified(db, dispatch.dispatch_no, tenant_uuid)
 
     logger.info(
         "delivery_dispatch.kds_ready.notified",
@@ -528,9 +517,7 @@ async def get_provider_config(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_uuid = _parse_tenant_uuid(x_tenant_id)
-    rows = await DeliveryProviderConfigRepository.list_for_store(
-        db, tenant_uuid, store_id
-    )
+    rows = await DeliveryProviderConfigRepository.list_for_store(db, tenant_uuid, store_id)
 
     if not rows:
         # 返回默认模板

@@ -36,12 +36,14 @@ class BanquetSettlementService:
         settlement_no = f"BST-{uuid.uuid4().hex[:12].upper()}"
         sid = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_settlements (id, tenant_id, settlement_no, banquet_id, store_id,
                 contract_amount_fen, deposit_paid_fen, live_order_amount_fen,
                 subtotal_fen, balance_due_fen)
             VALUES (:id, :tid, :no, :bid, :sid, :contract, :deposit, :live, :subtotal, :balance)
-        """),
+        """
+            ),
             {
                 "id": sid,
                 "tid": self.tenant_id,
@@ -66,10 +68,12 @@ class BanquetSettlementService:
             )
         for item in items:
             await self.db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO banquet_settlement_items (id, tenant_id, settlement_id, item_type, item_name, quantity, unit_price_fen, subtotal_fen, source)
                 VALUES (:id, :tid, :sid, :type, :name, :qty, :price, :subtotal, :source)
-            """),
+            """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tid": self.tenant_id,
@@ -97,11 +101,13 @@ class BanquetSettlementService:
     async def finalize(self, settlement_id: str, payment_method: str, payment_ref: str = None) -> dict:
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
-            text("""
+            text(
+                """
             UPDATE banquet_settlements SET payment_method = :pm, payment_ref = :ref, settled_at = :now, updated_at = :now
             WHERE id = :id AND tenant_id = :tid AND settled_at IS NULL AND is_deleted = FALSE
             RETURNING id, banquet_id
-        """),
+        """
+            ),
             {"id": settlement_id, "tid": self.tenant_id, "pm": payment_method, "ref": payment_ref, "now": now},
         )
         row = result.mappings().first()

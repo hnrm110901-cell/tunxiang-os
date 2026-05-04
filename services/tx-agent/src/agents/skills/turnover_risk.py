@@ -128,7 +128,8 @@ async def _scan_attendance_trends(
         store_clause = "AND da.store_id = CAST(:store_id AS text)"
         params["store_id"] = store_id
 
-    q = text(f"""
+    q = text(
+        f"""
         SELECT da.employee_id,
                SUM(CASE WHEN da.date >= CURRENT_DATE - 30
                         AND da.status IN ('absent', 'late', 'missing_clock_out')
@@ -148,7 +149,8 @@ async def _scan_attendance_trends(
         GROUP BY da.employee_id, e.emp_name, e.store_id
         HAVING SUM(CASE WHEN da.status IN ('absent', 'late', 'missing_clock_out')
                         THEN 1 ELSE 0 END) > 0
-    """)
+    """
+    )
     try:
         result = await db.execute(q, params)
         rows = [dict(r) for r in result.mappings()]
@@ -197,7 +199,8 @@ async def _scan_performance_trends(
         store_clause = "AND e.store_id = CAST(:store_id AS uuid)"
         params["store_id"] = store_id
 
-    q = text(f"""
+    q = text(
+        f"""
         SELECT e.id::text AS employee_id, e.emp_name, e.performance_score,
                e.store_id::text AS store_id
         FROM employees e
@@ -206,7 +209,8 @@ async def _scan_performance_trends(
           AND COALESCE(e.is_active, true) = true
           AND e.performance_score IS NOT NULL
           {store_clause}
-    """)
+    """
+    )
     try:
         result = await db.execute(q, params)
         rows = [dict(r) for r in result.mappings()]
@@ -271,7 +275,8 @@ async def _scan_business_performance(
         store_clause = "AND o.store_id = CAST(:store_id AS TEXT)"
         params["store_id"] = store_id
 
-    q = text(f"""
+    q = text(
+        f"""
         WITH emp_list AS (
             SELECT DISTINCT COALESCE(o.waiter_id, o.cashier_id) AS eid
             FROM orders o
@@ -314,7 +319,8 @@ async def _scan_business_performance(
         FROM emp_list el
         LEFT JOIN recent r ON r.eid = el.eid
         LEFT JOIN previous p ON p.eid = el.eid
-    """)
+    """
+    )
     try:
         result = await db.execute(q, params)
         rows = [dict(r) for r in result.mappings()]
@@ -381,7 +387,8 @@ async def _scan_service_quality(
         params["store_id"] = store_id
 
     # 退菜/退款统计
-    q = text(f"""
+    q = text(
+        f"""
         WITH recent_refunds AS (
             SELECT r.responsible_employee_id AS eid, COUNT(*) AS cnt
             FROM order_refunds r
@@ -404,7 +411,8 @@ async def _scan_service_quality(
                COALESCE(pr.cnt, 0) AS prev_refund_count
         FROM recent_refunds rr
         FULL OUTER JOIN prev_refunds pr ON rr.eid = pr.eid
-    """)
+    """
+    )
     try:
         result = await db.execute(q, params)
         rows = [dict(r) for r in result.mappings()]
@@ -498,7 +506,8 @@ async def _fetch_risk_employees(
         store_clause = "AND e.store_id = CAST(:store_id AS uuid)"
         params["store_id"] = store_id
 
-    q = text(f"""
+    q = text(
+        f"""
         WITH absence_counts AS (
             SELECT da.employee_id::text AS emp_id,
                    COUNT(*) AS absent_cnt
@@ -544,7 +553,8 @@ async def _fetch_risk_employees(
           )
         ORDER BY COALESCE(ac.absent_cnt, 0) DESC, e.emp_name
         LIMIT 200
-    """)
+    """
+    )
     try:
         result = await db.execute(q, params)
         rows = [dict(r) for r in result.mappings()]

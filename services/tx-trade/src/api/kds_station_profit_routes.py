@@ -6,7 +6,8 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+
 from ..services.kds_station_profit import get_station_profit_summary
 
 router = APIRouter(prefix="/api/v1/kds/station-profit", tags=["kds-station-profit"])

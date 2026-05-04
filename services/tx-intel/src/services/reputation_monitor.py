@@ -66,7 +66,8 @@ class ReputationMonitor:
 
         # 1. 滚动基线：过去7天负面提及总数 / (7*24) = 每小时平均
         baseline_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*)
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -74,7 +75,8 @@ class ReputationMonitor:
                   AND captured_at > NOW() - INTERVAL '7 days'
                   AND is_deleted = false
                   {store_filter}
-            """),
+            """
+            ),
             params,
         )
         baseline_total = int(baseline_result.scalar() or 0)
@@ -82,7 +84,8 @@ class ReputationMonitor:
 
         # 2. 当前窗口负面提及数
         current_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*)
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -90,7 +93,8 @@ class ReputationMonitor:
                   AND captured_at > NOW() - INTERVAL '1 minute' * :window_minutes
                   AND is_deleted = false
                   {store_filter}
-            """),
+            """
+            ),
             params,
         )
         current_count = int(current_result.scalar() or 0)
@@ -112,7 +116,8 @@ class ReputationMonitor:
 
         # 4. 获取触发提及的 ID 列表
         mention_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -122,7 +127,8 @@ class ReputationMonitor:
                   {store_filter}
                 ORDER BY captured_at DESC
                 LIMIT 50
-            """),
+            """
+            ),
             params,
         )
         mention_ids = [str(r[0]) for r in mention_result.fetchall()]
@@ -139,7 +145,8 @@ class ReputationMonitor:
 
         # 6. 确定主要平台
         platform_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT platform, COUNT(*) as cnt
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -150,7 +157,8 @@ class ReputationMonitor:
                 GROUP BY platform
                 ORDER BY cnt DESC
                 LIMIT 1
-            """),
+            """
+            ),
             params,
         )
         platform_row = platform_result.fetchone()
@@ -206,7 +214,8 @@ class ReputationMonitor:
 
         # 近24h平均评分
         recent_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT AVG(rating)
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -214,14 +223,16 @@ class ReputationMonitor:
                   AND captured_at > NOW() - INTERVAL '24 hours'
                   AND is_deleted = false
                   {store_filter}
-            """),
+            """
+            ),
             params,
         )
         recent_avg = recent_result.scalar()
 
         # 近30天平均评分
         monthly_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT AVG(rating)
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -229,7 +240,8 @@ class ReputationMonitor:
                   AND captured_at > NOW() - INTERVAL '30 days'
                   AND is_deleted = false
                   {store_filter}
-            """),
+            """
+            ),
             params,
         )
         monthly_avg = monthly_result.scalar()
@@ -247,7 +259,8 @@ class ReputationMonitor:
         severity = "high" if drop >= 0.5 else "medium"
 
         platform_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT platform, COUNT(*) as cnt
                 FROM public_opinion_mentions
                 WHERE tenant_id = :tenant_id
@@ -257,7 +270,8 @@ class ReputationMonitor:
                 GROUP BY platform
                 ORDER BY cnt DESC
                 LIMIT 1
-            """),
+            """
+            ),
             params,
         )
         platform_row = platform_result.fetchone()
@@ -312,7 +326,8 @@ class ReputationMonitor:
 
         alert_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO reputation_alerts (
                     id, tenant_id, store_id, platform, alert_type, severity,
                     trigger_mention_ids, trigger_data, summary,
@@ -322,7 +337,8 @@ class ReputationMonitor:
                     :trigger_mention_ids::jsonb, :trigger_data::jsonb, :summary,
                     :recommended_actions::jsonb, 'pending'
                 )
-            """),
+            """
+            ),
             {
                 "id": str(alert_id),
                 "tenant_id": str(tenant_id),
@@ -330,9 +346,7 @@ class ReputationMonitor:
                 "platform": alert_data["platform"],
                 "alert_type": alert_data["alert_type"],
                 "severity": alert_data.get("severity", "medium"),
-                "trigger_mention_ids": json.dumps(
-                    alert_data.get("trigger_mention_ids", [])
-                ),
+                "trigger_mention_ids": json.dumps(alert_data.get("trigger_mention_ids", [])),
                 "trigger_data": json.dumps(alert_data.get("trigger_data", {})),
                 "summary": summary,
                 "recommended_actions": json.dumps(recommended_actions),
@@ -365,7 +379,8 @@ class ReputationMonitor:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE reputation_alerts
                 SET response_status = 'acknowledged',
                     assigned_to = :assigned_to,
@@ -375,7 +390,8 @@ class ReputationMonitor:
                   AND response_status = 'pending'
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "alert_id": str(alert_id),
                 "tenant_id": str(tenant_id),
@@ -409,14 +425,16 @@ class ReputationMonitor:
 
         # 读取预警信息以计算响应时间
         alert_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT created_at, sla_target_sec
                 FROM reputation_alerts
                 WHERE id = :alert_id
                   AND tenant_id = :tenant_id
                   AND response_status IN ('pending', 'acknowledged')
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"alert_id": str(alert_id), "tenant_id": str(tenant_id)},
         )
         alert_row = alert_result.fetchone()
@@ -431,7 +449,8 @@ class ReputationMonitor:
         sla_met = response_time_sec <= sla_target_sec
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE reputation_alerts
                 SET response_status = 'responding',
                     response_text = :response_text,
@@ -443,7 +462,8 @@ class ReputationMonitor:
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "alert_id": str(alert_id),
                 "tenant_id": str(tenant_id),
@@ -487,7 +507,8 @@ class ReputationMonitor:
 
         now = datetime.now(tz=timezone.utc)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE reputation_alerts
                 SET response_status = 'escalated',
                     escalated_to = :escalated_to,
@@ -498,7 +519,8 @@ class ReputationMonitor:
                   AND response_status IN ('pending', 'acknowledged', 'responding')
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "alert_id": str(alert_id),
                 "tenant_id": str(tenant_id),
@@ -531,7 +553,8 @@ class ReputationMonitor:
 
         now = datetime.now(tz=timezone.utc)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE reputation_alerts
                 SET response_status = 'resolved',
                     resolution_note = :resolution_note,
@@ -544,7 +567,8 @@ class ReputationMonitor:
                   )
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "alert_id": str(alert_id),
                 "tenant_id": str(tenant_id),
@@ -575,7 +599,8 @@ class ReputationMonitor:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE reputation_alerts
                 SET response_status = 'dismissed',
                     updated_at = NOW()
@@ -584,7 +609,8 @@ class ReputationMonitor:
                   AND response_status IN ('pending', 'acknowledged')
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"alert_id": str(alert_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -610,55 +636,63 @@ class ReputationMonitor:
 
         # 总预警数
         total_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM reputation_alerts
                 WHERE tenant_id = :tenant_id
                   AND created_at > NOW() - MAKE_INTERVAL(days => :days)
                   AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         total_alerts = int(total_result.scalar() or 0)
 
         # 按严重级别分组
         severity_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT severity, COUNT(*)
                 FROM reputation_alerts
                 WHERE tenant_id = :tenant_id
                   AND created_at > NOW() - MAKE_INTERVAL(days => :days)
                   AND is_deleted = false
                 GROUP BY severity
-            """),
+            """
+            ),
             params,
         )
         by_severity = {str(r[0]): int(r[1]) for r in severity_result.fetchall()}
 
         # 按平台分组
         platform_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT platform, COUNT(*)
                 FROM reputation_alerts
                 WHERE tenant_id = :tenant_id
                   AND created_at > NOW() - MAKE_INTERVAL(days => :days)
                   AND is_deleted = false
                 GROUP BY platform
-            """),
+            """
+            ),
             params,
         )
         by_platform = {str(r[0]): int(r[1]) for r in platform_result.fetchall()}
 
         # 平均响应时间
         avg_response_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT AVG(response_time_sec)
                 FROM reputation_alerts
                 WHERE tenant_id = :tenant_id
                   AND response_time_sec IS NOT NULL
                   AND created_at > NOW() - MAKE_INTERVAL(days => :days)
                   AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         avg_response_time = avg_response_result.scalar()
@@ -666,7 +700,8 @@ class ReputationMonitor:
 
         # SLA合规率
         sla_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE sla_met = true) AS met,
                     COUNT(*) FILTER (WHERE sla_met IS NOT NULL) AS total
@@ -674,7 +709,8 @@ class ReputationMonitor:
                 WHERE tenant_id = :tenant_id
                   AND created_at > NOW() - MAKE_INTERVAL(days => :days)
                   AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         sla_row = sla_result.fetchone()
@@ -684,14 +720,16 @@ class ReputationMonitor:
 
         # 按状态分组
         status_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT response_status, COUNT(*)
                 FROM reputation_alerts
                 WHERE tenant_id = :tenant_id
                   AND created_at > NOW() - MAKE_INTERVAL(days => :days)
                   AND is_deleted = false
                 GROUP BY response_status
-            """),
+            """
+            ),
             params,
         )
         by_status = {str(r[0]): int(r[1]) for r in status_result.fetchall()}
@@ -721,7 +759,8 @@ class ReputationMonitor:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     store_id,
                     COUNT(*) AS total_alerts,
@@ -736,7 +775,8 @@ class ReputationMonitor:
                   AND is_deleted = false
                 GROUP BY store_id
                 ORDER BY sla_missed_count DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "days": days},
         )
         rows = result.fetchall()
@@ -747,9 +787,7 @@ class ReputationMonitor:
                 "total_alerts": int(r[1]),
                 "sla_met_count": int(r[2]),
                 "sla_missed_count": int(r[3]),
-                "compliance_rate": round(
-                    int(r[2]) / max(int(r[2]) + int(r[3]), 1) * 100, 1
-                ),
+                "compliance_rate": round(int(r[2]) / max(int(r[2]) + int(r[3]), 1) * 100, 1),
                 "avg_response_sec": round(float(r[4]), 1) if r[4] else None,
             }
             for r in rows
@@ -757,9 +795,7 @@ class ReputationMonitor:
 
     # ── 内部方法 ──
 
-    async def _generate_summary(
-        self, alert_data: dict[str, Any], log: Any
-    ) -> str:
+    async def _generate_summary(self, alert_data: dict[str, Any], log: Any) -> str:
         """调用 tx-brain 生成预警摘要，降级为模板摘要"""
         import httpx
 
@@ -801,10 +837,7 @@ class ReputationMonitor:
         # 降级模板
         if alert_type == "rating_drop":
             drop = trigger_data.get("drop", 0)
-            return (
-                f"品牌在{alert_data.get('platform', '平台')}的评分"
-                f"近24小时下降{drop}分，需关注。"
-            )
+            return f"品牌在{alert_data.get('platform', '平台')}的评分" f"近24小时下降{drop}分，需关注。"
         count = trigger_data.get("negative_count", 0)
         ratio = trigger_data.get("spike_ratio", 0)
         return (
@@ -813,47 +846,57 @@ class ReputationMonitor:
             f"是基线的{ratio}倍。"
         )
 
-    def _build_recommended_actions(
-        self, alert_type: str, severity: str
-    ) -> list[dict[str, Any]]:
+    def _build_recommended_actions(self, alert_type: str, severity: str) -> list[dict[str, Any]]:
         """根据预警类型和级别生成建议动作"""
         actions: list[dict[str, Any]] = []
 
         if alert_type == "negative_spike":
-            actions.append({
-                "action": "查看负面提及详情，识别主要投诉点",
-                "priority": "high",
-                "template": "review_mentions",
-            })
-            actions.append({
-                "action": "在对应平台发布官方回应",
-                "priority": "high",
-                "template": "post_response",
-            })
+            actions.append(
+                {
+                    "action": "查看负面提及详情，识别主要投诉点",
+                    "priority": "high",
+                    "template": "review_mentions",
+                }
+            )
+            actions.append(
+                {
+                    "action": "在对应平台发布官方回应",
+                    "priority": "high",
+                    "template": "post_response",
+                }
+            )
         elif alert_type == "rating_drop":
-            actions.append({
-                "action": "分析近期差评主因，制定改进计划",
-                "priority": "medium",
-                "template": "analyze_reviews",
-            })
+            actions.append(
+                {
+                    "action": "分析近期差评主因，制定改进计划",
+                    "priority": "medium",
+                    "template": "analyze_reviews",
+                }
+            )
         elif alert_type == "crisis":
-            actions.append({
-                "action": "启动危机公关预案，通知品牌负责人",
-                "priority": "critical",
-                "template": "crisis_protocol",
-            })
+            actions.append(
+                {
+                    "action": "启动危机公关预案，通知品牌负责人",
+                    "priority": "critical",
+                    "template": "crisis_protocol",
+                }
+            )
 
         if severity in ("high", "critical"):
-            actions.append({
-                "action": "升级至品牌PR团队",
-                "priority": "high",
-                "template": "escalate_pr",
-            })
+            actions.append(
+                {
+                    "action": "升级至品牌PR团队",
+                    "priority": "high",
+                    "template": "escalate_pr",
+                }
+            )
 
-        actions.append({
-            "action": "持续监测舆情走向，72小时内复查",
-            "priority": "low",
-            "template": "monitor_followup",
-        })
+        actions.append(
+            {
+                "action": "持续监测舆情走向，72小时内复查",
+                "priority": "low",
+                "template": "monitor_followup",
+            }
+        )
 
         return actions

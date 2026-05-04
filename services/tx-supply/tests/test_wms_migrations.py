@@ -21,9 +21,7 @@ from pathlib import Path
 #  常量
 # ──────────────────────────────────────────────────────────────────────────────
 
-MIGRATION_PATH = Path(__file__).parent.parent.parent.parent / (
-    "shared/db-migrations/versions/v064_wms_persistence.py"
-)
+MIGRATION_PATH = Path(__file__).parent.parent.parent.parent / ("shared/db-migrations/versions/v064_wms_persistence.py")
 
 # 必须存在的六张 WMS 表
 REQUIRED_TABLES = [
@@ -58,6 +56,7 @@ RLS_OPERATIONS = ["rls_select", "rls_insert", "rls_update", "rls_delete"]
 #  Fixtures（读取文件内容，所有测试共用）
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _read_migration() -> str:
     """读取迁移文件内容，若文件不存在则返回空字符串。"""
     if MIGRATION_PATH.exists():
@@ -69,14 +68,12 @@ def _read_migration() -> str:
 #  测试：文件存在性
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestMigrationFileExists:
     """验证迁移文件存在且路径正确。"""
 
     def test_file_exists(self) -> None:
-        assert MIGRATION_PATH.exists(), (
-            f"迁移文件不存在: {MIGRATION_PATH}\n"
-            "请确认已创建 v064_wms_persistence.py"
-        )
+        assert MIGRATION_PATH.exists(), f"迁移文件不存在: {MIGRATION_PATH}\n" "请确认已创建 v064_wms_persistence.py"
 
     def test_file_is_python(self) -> None:
         assert MIGRATION_PATH.suffix == ".py", "迁移文件必须是 .py 文件"
@@ -90,33 +87,33 @@ class TestMigrationFileExists:
 #  测试：版本链
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestRevisionChain:
     """验证迁移版本号和 down_revision 正确。"""
 
     def test_revision_is_v064(self) -> None:
         content = _read_migration()
-        assert 'revision: str = "v064"' in content or "revision = 'v064'" in content or (
-            'revision' in content and 'v064' in content
+        assert (
+            'revision: str = "v064"' in content
+            or "revision = 'v064'" in content
+            or ("revision" in content and "v064" in content)
         ), "revision 应为 v064"
 
     def test_down_revision_is_v063(self) -> None:
         content = _read_migration()
-        assert "v063" in content, (
-            "down_revision 必须是 v063，确保此迁移接在 v063 之后"
-        )
+        assert "v063" in content, "down_revision 必须是 v063，确保此迁移接在 v063 之后"
 
     def test_down_revision_assignment(self) -> None:
         content = _read_migration()
         # 确认 down_revision 赋值语句存在且指向 v063
-        pattern = re.compile(r'down_revision\s*[=:][^\n]*v063', re.IGNORECASE)
-        assert pattern.search(content), (
-            "down_revision 赋值应包含 v063"
-        )
+        pattern = re.compile(r"down_revision\s*[=:][^\n]*v063", re.IGNORECASE)
+        assert pattern.search(content), "down_revision 赋值应包含 v063"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  测试：必要表名
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestRequiredTables:
     """验证六张 WMS 表均在迁移文件中出现。"""
@@ -124,10 +121,7 @@ class TestRequiredTables:
     def test_all_required_tables_present(self) -> None:
         content = _read_migration()
         missing = [t for t in REQUIRED_TABLES if t not in content]
-        assert not missing, (
-            f"以下表在迁移文件中缺失: {missing}\n"
-            f"必须包含: {REQUIRED_TABLES}"
-        )
+        assert not missing, f"以下表在迁移文件中缺失: {missing}\n" f"必须包含: {REQUIRED_TABLES}"
 
     def test_stocktakes_table(self) -> None:
         assert "stocktakes" in _read_migration()
@@ -152,6 +146,7 @@ class TestRequiredTables:
 #  测试：RLS 安全规范
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestRLSSecurity:
     """验证 RLS 使用正确的 v056+ 安全模式。"""
 
@@ -165,15 +160,13 @@ class TestRLSSecurity:
     def test_no_forbidden_app_current_store_id(self) -> None:
         content = _read_migration()
         assert "app.current_store_id" not in content, (
-            "禁止使用 'app.current_store_id'（错误变量名）\n"
-            "正确变量名：app.tenant_id"
+            "禁止使用 'app.current_store_id'（错误变量名）\n" "正确变量名：app.tenant_id"
         )
 
     def test_no_forbidden_app_current_tenant(self) -> None:
         content = _read_migration()
         assert "app.current_tenant" not in content, (
-            "禁止使用 'app.current_tenant'（错误变量名）\n"
-            "正确变量名：app.tenant_id"
+            "禁止使用 'app.current_tenant'（错误变量名）\n" "正确变量名：app.tenant_id"
         )
 
     def test_uses_nullif_pattern(self) -> None:
@@ -187,15 +180,12 @@ class TestRLSSecurity:
     def test_force_row_level_security_present(self) -> None:
         content = _read_migration()
         assert "FORCE ROW LEVEL SECURITY" in content, (
-            "必须包含 FORCE ROW LEVEL SECURITY\n"
-            "此指令确保表所有者也受 RLS 约束"
+            "必须包含 FORCE ROW LEVEL SECURITY\n" "此指令确保表所有者也受 RLS 约束"
         )
 
     def test_enable_row_level_security_present(self) -> None:
         content = _read_migration()
-        assert "ENABLE ROW LEVEL SECURITY" in content, (
-            "必须包含 ENABLE ROW LEVEL SECURITY"
-        )
+        assert "ENABLE ROW LEVEL SECURITY" in content, "必须包含 ENABLE ROW LEVEL SECURITY"
 
     def test_all_four_rls_operations(self) -> None:
         content = _read_migration()
@@ -218,19 +208,18 @@ class TestRLSSecurity:
             )
             # 更严格检查：该表名和 rls 同时出现
             table_rls_pattern = re.compile(
-                rf'{re.escape(table)}.*rls|rls.*{re.escape(table)}',
+                rf"{re.escape(table)}.*rls|rls.*{re.escape(table)}",
                 re.IGNORECASE | re.DOTALL,
             )
             if not table_rls_pattern.search(content):
                 missing_rls.append(table)
-        assert not missing_rls, (
-            f"以下表缺少 RLS 策略引用: {missing_rls}"
-        )
+        assert not missing_rls, f"以下表缺少 RLS 策略引用: {missing_rls}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  测试：表结构规范
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestTableStructure:
     """验证表结构符合屯象OS 底层基类规范。"""
@@ -269,59 +258,44 @@ class TestTableStructure:
 
     def test_variance_generated_column(self) -> None:
         content = _read_migration()
-        assert "GENERATED ALWAYS AS" in content, (
-            "stocktake_items.variance 应为 GENERATED ALWAYS AS STORED 计算列"
-        )
-        assert "STORED" in content, (
-            "GENERATED 列必须是 STORED 模式（物化存储，提升查询性能）"
-        )
+        assert "GENERATED ALWAYS AS" in content, "stocktake_items.variance 应为 GENERATED ALWAYS AS STORED 计算列"
+        assert "STORED" in content, "GENERATED 列必须是 STORED 模式（物化存储，提升查询性能）"
 
     def test_supplier_profiles_status_check(self) -> None:
         content = _read_migration()
-        assert "blacklisted" in content, (
-            "supplier_profiles.status 应包含 'blacklisted'"
-        )
-        assert "suspended" in content, (
-            "supplier_profiles.status 应包含 'suspended'"
-        )
+        assert "blacklisted" in content, "supplier_profiles.status 应包含 'blacklisted'"
+        assert "suspended" in content, "supplier_profiles.status 应包含 'suspended'"
 
     def test_supplier_score_composite_score(self) -> None:
         content = _read_migration()
-        assert "composite_score" in content, (
-            "supplier_score_history 必须包含 composite_score 字段（综合分 0-100）"
-        )
+        assert "composite_score" in content, "supplier_score_history 必须包含 composite_score 字段（综合分 0-100）"
 
     def test_supplier_score_ai_insight(self) -> None:
         content = _read_migration()
-        assert "ai_insight" in content, (
-            "supplier_score_history 必须包含 ai_insight 字段（AI 分析文本）"
-        )
+        assert "ai_insight" in content, "supplier_score_history 必须包含 ai_insight 字段（AI 分析文本）"
 
     def test_warehouse_transfer_type_check(self) -> None:
         content = _read_migration()
-        assert "emergency" in content, (
-            "warehouse_transfers.transfer_type 应包含 'emergency'"
-        )
+        assert "emergency" in content, "warehouse_transfers.transfer_type 应包含 'emergency'"
 
     def test_foreign_key_references(self) -> None:
         content = _read_migration()
         # stocktake_items 应引用 stocktakes
-        assert "REFERENCES stocktakes(id)" in content, (
-            "stocktake_items 应有 REFERENCES stocktakes(id) 外键约束"
-        )
+        assert "REFERENCES stocktakes(id)" in content, "stocktake_items 应有 REFERENCES stocktakes(id) 外键约束"
         # warehouse_transfer_items 应引用 warehouse_transfers
-        assert "REFERENCES warehouse_transfers(id)" in content, (
-            "warehouse_transfer_items 应有 REFERENCES warehouse_transfers(id) 外键约束"
-        )
+        assert (
+            "REFERENCES warehouse_transfers(id)" in content
+        ), "warehouse_transfer_items 应有 REFERENCES warehouse_transfers(id) 外键约束"
         # supplier_score_history 应引用 supplier_profiles
-        assert "REFERENCES supplier_profiles(id)" in content, (
-            "supplier_score_history 应有 REFERENCES supplier_profiles(id) 外键约束"
-        )
+        assert (
+            "REFERENCES supplier_profiles(id)" in content
+        ), "supplier_score_history 应有 REFERENCES supplier_profiles(id) 外键约束"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  测试：downgrade 函数
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestDowngrade:
     """验证 downgrade 函数可以正确回滚。"""
@@ -332,12 +306,8 @@ class TestDowngrade:
 
     def test_downgrade_drops_all_tables(self) -> None:
         content = _read_migration()
-        assert "DROP TABLE" in content or "DROP POLICY" in content, (
-            "downgrade() 应包含 DROP TABLE 或 DROP POLICY 语句"
-        )
+        assert "DROP TABLE" in content or "DROP POLICY" in content, "downgrade() 应包含 DROP TABLE 或 DROP POLICY 语句"
 
     def test_downgrade_uses_cascade(self) -> None:
         content = _read_migration()
-        assert "CASCADE" in content, (
-            "DROP TABLE 应使用 CASCADE 以正确级联删除外键依赖"
-        )
+        assert "CASCADE" in content, "DROP TABLE 应使用 CASCADE 以正确级联删除外键依赖"

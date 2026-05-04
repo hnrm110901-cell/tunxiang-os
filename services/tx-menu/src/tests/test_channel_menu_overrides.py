@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # ─── Mock 路由独立运行（无需数据库） ─────────────────────────────────────────────
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from services.tx_menu.src.api.channel_menu_override_routes import MOCK_OVERRIDES, router
 
 _app = FastAPI()
@@ -196,9 +197,9 @@ class TestConflictDetection:
         delivery_price = 13800  # 41% 涨价
 
         diff_rate = (delivery_price - dine_in_price) / dine_in_price
-        assert diff_rate > threshold_rate, (
-            f"新天地店招牌蒸鱼美团价比堂食高 {diff_rate:.1%}，应超过阈值 {threshold_rate:.1%}"
-        )
+        assert (
+            diff_rate > threshold_rate
+        ), f"新天地店招牌蒸鱼美团价比堂食高 {diff_rate:.1%}，应超过阈值 {threshold_rate:.1%}"
 
     def test_no_conflict_below_threshold(self) -> None:
         """外卖价比堂食高 < 30% 时，不应出现在冲突列表（默认阈值30%）。"""

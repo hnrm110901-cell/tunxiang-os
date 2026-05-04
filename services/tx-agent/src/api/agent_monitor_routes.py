@@ -51,7 +51,8 @@ async def get_agent_status(
     today = date.today().isoformat()
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 agent_id,
                 COUNT(*)::int AS total_decisions,
@@ -62,7 +63,8 @@ async def get_agent_status(
             WHERE tenant_id = :tenant_id
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :today
             GROUP BY agent_id
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id, "today": today},
         )
         rows = result.fetchall()
@@ -118,7 +120,8 @@ async def get_recent_decisions(
             params["agent_id"] = agent_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id::text, agent_id, action, decision_type,
                    confidence, reasoning, output_action,
                    constraints_check, created_at
@@ -126,7 +129,8 @@ async def get_recent_decisions(
             {where_clause}
             ORDER BY created_at DESC
             LIMIT :limit
-        """),
+        """
+            ),
             params,
         )
         rows = result.fetchall()

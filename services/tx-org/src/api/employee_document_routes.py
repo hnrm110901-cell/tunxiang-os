@@ -101,7 +101,8 @@ async def get_expiring_documents(
         params["store_id"] = store_id
 
     # 查询健康证和食品安全证到期情况
-    sql = text(f"""
+    sql = text(
+        f"""
         WITH cert_records AS (
             -- 健康证
             SELECT
@@ -160,7 +161,8 @@ async def get_expiring_documents(
         )
         SELECT * FROM cert_records
         ORDER BY days_remaining ASC
-    """)
+    """
+    )
 
     result = await db.execute(sql, params)
     all_items = []
@@ -215,7 +217,8 @@ async def get_document_statistics(
     if store_id:
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             -- 健康证统计
             COUNT(*) FILTER (WHERE e.health_cert_expiry IS NOT NULL) AS health_cert_total,
@@ -237,7 +240,8 @@ async def get_document_statistics(
             COUNT(*) FILTER (WHERE e.food_safety_cert IS NULL) AS no_food_cert
         FROM employees e
         WHERE e.is_deleted = FALSE AND e.status = 'active' {store_filter}
-    """)
+    """
+    )
 
     result = await db.execute(sql, params)
     row = dict(result.fetchone()._mapping)
@@ -286,7 +290,8 @@ async def get_employee_documents(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             e.id::text AS employee_id,
             e.emp_name,
@@ -300,7 +305,8 @@ async def get_employee_documents(
             e.contract_end_date
         FROM employees e
         WHERE e.id = :eid AND e.is_deleted = FALSE
-    """)
+    """
+    )
     result = await db.execute(sql, {"eid": employee_id})
     row = result.fetchone()
 
@@ -444,7 +450,8 @@ async def scan_expiry(
         params["store_id"] = store_id
 
     # 查询所有即将到期或已过期的证照
-    scan_sql = text(f"""
+    scan_sql = text(
+        f"""
         WITH expiring_certs AS (
             -- 健康证
             SELECT
@@ -493,7 +500,8 @@ async def scan_expiry(
               {store_filter}
         )
         SELECT * FROM expiring_certs ORDER BY days_remaining ASC
-    """)
+    """
+    )
 
     result = await db.execute(scan_sql, params)
     rows = result.fetchall()
@@ -508,13 +516,15 @@ async def scan_expiry(
 
         # 检查是否已有未解决的同类预警
         existing = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM compliance_alerts
                 WHERE employee_id = :emp_id
                   AND alert_type = :alert_type
                   AND status IN ('pending', 'acknowledged')
                 LIMIT 1
-            """),
+            """
+            ),
             {"emp_id": str(d["employee_id"]), "alert_type": d["alert_type"]},
         )
         if existing.fetchone():
@@ -524,7 +534,8 @@ async def scan_expiry(
         # 创建预警
         alert_id = str(uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO compliance_alerts (
                     id, tenant_id, employee_id, store_id, alert_type, severity,
                     title, description, status, created_at, updated_at
@@ -532,7 +543,8 @@ async def scan_expiry(
                     :id, :tenant_id, :employee_id, :store_id, :alert_type, :severity,
                     :title, :description, 'pending', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": alert_id,
                 "tenant_id": tenant_id,

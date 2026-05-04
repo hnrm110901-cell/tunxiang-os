@@ -279,14 +279,16 @@ async def get_kpi_configs(
             filters += " AND is_active = :is_active"
             params["is_active"] = is_active
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id::text, tenant_id::text, agent_id, kpi_type,
                        target_value, unit, alert_threshold, is_active,
                        created_at, updated_at
                 FROM agent_kpi_configs
                 {filters}
                 ORDER BY created_at
-            """),
+            """
+            ),
             params,
         )
         for r in result.mappings().all():
@@ -393,14 +395,16 @@ async def create_kpi_config(
             {"tid": x_tenant_id},
         )
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO agent_kpi_configs
                     (id, tenant_id, agent_id, kpi_type, target_value, unit,
                      alert_threshold, is_active, created_at, updated_at)
                 VALUES
                     (:id, :tenant_id, :agent_id, :kpi_type, :target_value, :unit,
                      :alert_threshold, :is_active, :created_at, :updated_at)
-            """),
+            """
+            ),
             {
                 "id": config_id,
                 "tenant_id": x_tenant_id,
@@ -469,7 +473,8 @@ async def update_kpi_config(
             {"tenant_id": x_tenant_id},
         )
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE agent_kpi_configs
                 SET {set_parts}, updated_at = :updated_at
                 WHERE id = :id
@@ -477,7 +482,8 @@ async def update_kpi_config(
                   AND is_deleted = FALSE
                 RETURNING id::text, agent_id, kpi_type, target_value, unit,
                           alert_threshold, is_active, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()
@@ -563,7 +569,8 @@ async def get_kpi_snapshots(
 
         # 分页数据
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT s.id::text, s.agent_id, s.kpi_type,
                        s.measured_value, s.target_value, s.achievement_rate,
                        s.store_id::text AS store_id,
@@ -573,7 +580,8 @@ async def get_kpi_snapshots(
                 {filters}
                 ORDER BY s.snapshot_date DESC, s.agent_id, s.kpi_type
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
 
@@ -662,7 +670,8 @@ async def collect_kpi_snapshots(
     gross_margin_protect: float | None = None
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) FILTER (
                     WHERE total_amount_fen > 0
@@ -673,7 +682,8 @@ async def collect_kpi_snapshots(
             WHERE tenant_id = :tid::uuid
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
               AND status = 'completed'
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date.isoformat()},
         )
         row = r.mappings().fetchone()
@@ -688,7 +698,8 @@ async def collect_kpi_snapshots(
     member_repurchase: float | None = None
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             WITH period AS (
                 SELECT member_id, COUNT(*) AS order_count
                 FROM orders
@@ -703,7 +714,8 @@ async def collect_kpi_snapshots(
                 COUNT(*) FILTER (WHERE order_count >= 2)::float AS repurchase_count,
                 COUNT(*)::float                                  AS total_members
             FROM period
-        """),
+        """
+            ),
             {
                 "tid": x_tenant_id,
                 "d_start": (target_date - timedelta(days=29)).isoformat(),
@@ -721,13 +733,15 @@ async def collect_kpi_snapshots(
     compliance_score: float | None = None
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*)::int AS open_alerts
             FROM compliance_alerts
             WHERE tenant_id = :tid::uuid
               AND status    = 'open'
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') <= :d
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date.isoformat()},
         )
         open_alerts = r.scalar() or 0
@@ -741,7 +755,8 @@ async def collect_kpi_snapshots(
     smart_dispatch_ontime: float | None = None
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 AVG(EXTRACT(EPOCH FROM (served_at - called_at)))::float AS avg_seconds,
                 COUNT(*) FILTER (WHERE promised_at IS NOT NULL AND served_at <= promised_at)::float
@@ -753,7 +768,8 @@ async def collect_kpi_snapshots(
               AND served_at IS NOT NULL
               AND called_at IS NOT NULL
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date.isoformat()},
         )
         row = r.mappings().fetchone()
@@ -767,7 +783,8 @@ async def collect_kpi_snapshots(
     patrol_response: float | None = None
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60)::float AS avg_response_minutes
             FROM compliance_alerts
@@ -775,7 +792,8 @@ async def collect_kpi_snapshots(
               AND status = 'resolved'
               AND resolved_at IS NOT NULL
               AND DATE(resolved_at AT TIME ZONE 'Asia/Shanghai') = :d
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date.isoformat()},
         )
         row = r.mappings().fetchone()
@@ -788,14 +806,16 @@ async def collect_kpi_snapshots(
     stockout_rate: float | None = None
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) FILTER (WHERE is_available = false)::float
                   / GREATEST(COUNT(*), 1)::float * 100 AS stockout_rate_pct
             FROM dishes
             WHERE tenant_id = :tid::uuid
               AND is_deleted = false
-        """),
+        """
+            ),
             {"tid": x_tenant_id},
         )
         row = r.mappings().fetchone()
@@ -863,7 +883,8 @@ async def collect_kpi_snapshots(
         )
         for row in rows_to_insert:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO agent_kpi_snapshots
                         (id, tenant_id, agent_id, kpi_type, measured_value,
                          target_value, achievement_rate, store_id, snapshot_date, metadata)
@@ -873,7 +894,8 @@ async def collect_kpi_snapshots(
                          :store_id, :snapshot_date, :metadata)
                     ON CONFLICT DO NOTHING
                     RETURNING id
-                """),
+                """
+                ),
                 row,
             )
             if result.fetchone():
@@ -1037,7 +1059,8 @@ async def get_roi_report(
             {"tid": x_tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT agent_id,
                        metric_type,
                        SUM(value)::numeric      AS total_value,
@@ -1050,7 +1073,8 @@ async def get_roi_report(
                   AND is_deleted   = FALSE
                 GROUP BY agent_id, metric_type
                 ORDER BY agent_id, metric_type
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "period_start": period_start,

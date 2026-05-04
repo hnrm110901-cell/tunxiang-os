@@ -44,13 +44,15 @@ class BanquetKPIService:
         conversion = round(won_count / max(leads_count, 1) * 100, 1)
         # 宴会
         bq = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount_fen), 0) AS rev,
                    COALESCE(SUM(table_count), 0) AS tables, COALESCE(SUM(guest_count), 0) AS guests,
                    COALESCE(AVG(total_amount_fen / NULLIF(table_count, 0)), 0) AS avg_table
             FROM banquets WHERE store_id = :sid AND tenant_id = :tid AND event_date BETWEEN :df AND :dt
               AND status IN ('completed','settled') AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"sid": store_id, "tid": self.tenant_id, "df": df, "dt": dt},
         )
         b = bq.mappings().first()
@@ -65,12 +67,14 @@ class BanquetKPIService:
 
         sid = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_kpi_snapshots (id, tenant_id, store_id, period, period_date, leads_count, conversion_rate, bookings_count, revenue_fen, avg_per_table_fen, total_tables, total_guests, customer_satisfaction)
             VALUES (:id, :tid, :sid, :period, :pdate, :leads, :conv, :bookings, :rev, :avg, :tables, :guests, :sat)
             ON CONFLICT (tenant_id, store_id, period, period_date) WHERE is_deleted = FALSE
             DO UPDATE SET leads_count = :leads, conversion_rate = :conv, bookings_count = :bookings, revenue_fen = :rev, avg_per_table_fen = :avg, total_tables = :tables, total_guests = :guests, customer_satisfaction = :sat
-        """),
+        """
+            ),
             {
                 "id": sid,
                 "tid": self.tenant_id,
@@ -123,11 +127,13 @@ class BanquetKPIService:
         results = []
         for metric in metrics:
             row = await self.db.execute(
-                text(f"""
+                text(
+                    f"""
                 SELECT AVG({metric}) AS brand_avg, MAX({metric}) AS brand_best
                 FROM banquet_kpi_snapshots
                 WHERE tenant_id = :tid AND period = 'monthly' AND period_date = :d AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {"tid": self.tenant_id, "d": period_date},
             )
             brand = row.mappings().first()
@@ -140,10 +146,12 @@ class BanquetKPIService:
             store_val = store_row.scalar_one_or_none() or 0
             bid = str(uuid.uuid4())
             await self.db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO banquet_competitive_benchmarks (id, tenant_id, store_id, period, period_date, metric_name, store_value, brand_avg, brand_best)
                 VALUES (:id, :tid, :sid, 'monthly', :d, :metric, :sv, :ba, :bb)
-            """),
+            """
+                ),
                 {
                     "id": bid,
                     "tid": self.tenant_id,

@@ -129,14 +129,16 @@ async def create_subscription(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO member_subscriptions
                     (id, tenant_id, plan_id, plan_name, price_fen, period_days,
                      openid, status, started_at, expires_at, out_trade_no, auto_renew)
                 VALUES
                     (:id::uuid, :tid::uuid, :plan_id, :plan_name, :price_fen, :period_days,
                      :openid, 'pending_payment', :started_at, :expires_at, :out_trade_no, TRUE)
-            """),
+            """
+            ),
             {
                 "id": sub_id,
                 "tid": tid,
@@ -207,7 +209,8 @@ async def get_my_subscription(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, plan_id, plan_name, status,
                        started_at, expires_at, auto_renew
                 FROM member_subscriptions
@@ -216,7 +219,8 @@ async def get_my_subscription(
                   AND is_deleted = FALSE
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tid},
         )
         row = result.mappings().first()
@@ -252,7 +256,8 @@ async def cancel_subscription(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE member_subscriptions
                 SET auto_renew = FALSE,
                     cancelled_at = NOW(),
@@ -261,7 +266,8 @@ async def cancel_subscription(
                   AND tenant_id = :tid::uuid
                   AND is_deleted = FALSE
                 RETURNING id::text, auto_renew
-            """),
+            """
+            ),
             {"sid": subscription_id, "tid": tid},
         )
         row = result.mappings().first()

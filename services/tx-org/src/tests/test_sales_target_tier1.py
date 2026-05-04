@@ -80,9 +80,7 @@ sys.modules["shared.events.src.event_types"] = _evt_types_mod
 # 这样 `shared.ontology.src.extensions.sales_targets` 可被正常 import；
 # 但对可能触发真实 DB engine 初始化的 `shared.ontology.src.database`
 # 单独 stub 掉，避免测试去连真实 PG。
-_real_onto_root = os.path.abspath(
-    os.path.join(_ROOT, "shared", "ontology")
-)
+_real_onto_root = os.path.abspath(os.path.join(_ROOT, "shared", "ontology"))
 _real_onto_src = os.path.join(_real_onto_root, "src")
 
 _onto_pkg = types.ModuleType("shared.ontology")
@@ -248,17 +246,9 @@ class FakeDB:
                     "period_end": params["period_end"],
                     "metric_type": params["metric_type"],
                     "target_value": int(params["target_value"]),
-                    "parent_target_id": (
-                        UUID(params["parent_target_id"])
-                        if params.get("parent_target_id")
-                        else None
-                    ),
+                    "parent_target_id": (UUID(params["parent_target_id"]) if params.get("parent_target_id") else None),
                     "notes": params.get("notes"),
-                    "created_by": (
-                        UUID(params["created_by"])
-                        if params.get("created_by")
-                        else None
-                    ),
+                    "created_by": (UUID(params["created_by"]) if params.get("created_by") else None),
                     "created_at": datetime.now(timezone.utc),
                     "updated_at": datetime.now(timezone.utc),
                 }
@@ -275,22 +265,14 @@ class FakeDB:
                     "actual_value": int(params["actual_value"]),
                     "achievement_rate": Decimal(str(params["achievement_rate"])),
                     "snapshot_at": datetime.now(timezone.utc),
-                    "source_event_id": (
-                        UUID(params["source_event_id"])
-                        if params.get("source_event_id")
-                        else None
-                    ),
+                    "source_event_id": (UUID(params["source_event_id"]) if params.get("source_event_id") else None),
                     "created_at": datetime.now(timezone.utc),
                 }
                 self.progress.append(row)
                 return _FakeResult([_FakeRow(row)])
 
         # ── SELECT 1 FROM sales_progress WHERE ... source_event_id ── 幂等检查
-        if (
-            "FROM SALES_PROGRESS" in s
-            and "SOURCE_EVENT_ID = :SOURCE_EVENT_ID" in s
-            and "LIMIT 1" in s
-        ):
+        if "FROM SALES_PROGRESS" in s and "SOURCE_EVENT_ID = :SOURCE_EVENT_ID" in s and "LIMIT 1" in s:
             match = [
                 p
                 for p in self.progress
@@ -316,22 +298,17 @@ class FakeDB:
             rows = [
                 p
                 for p in self.progress
-                if str(p["tenant_id"]) == params["tenant_id"]
-                and str(p["target_id"]) == params["target_id"]
+                if str(p["tenant_id"]) == params["tenant_id"] and str(p["target_id"]) == params["target_id"]
             ]
             rows.sort(key=lambda r: r["snapshot_at"], reverse=True)
             return _FakeResult([_FakeRow(r) for r in rows[:limit]])
 
         # ── SELECT ... FROM sales_targets WHERE tenant_id=... AND target_id=...
-        if (
-            "FROM SALES_TARGETS" in s
-            and "AND TARGET_ID = :TARGET_ID" in s
-        ):
+        if "FROM SALES_TARGETS" in s and "AND TARGET_ID = :TARGET_ID" in s:
             match = [
                 t
                 for t in self.targets
-                if str(t["tenant_id"]) == params["tenant_id"]
-                and str(t["target_id"]) == params["target_id"]
+                if str(t["tenant_id"]) == params["tenant_id"] and str(t["target_id"]) == params["target_id"]
             ]
             return _FakeResult([_FakeRow(t) for t in match])
 
@@ -351,30 +328,23 @@ class FakeDB:
             rows = [
                 t
                 for t in self.targets
-                if str(t["tenant_id"]) == params["tenant_id"]
-                and str(t["employee_id"]) == params["employee_id"]
+                if str(t["tenant_id"]) == params["tenant_id"] and str(t["employee_id"]) == params["employee_id"]
             ]
             if "PERIOD_TYPE = :PERIOD_TYPE" in s:
                 rows = [r for r in rows if r["period_type"] == params["period_type"]]
             if "BETWEEN PERIOD_START AND PERIOD_END" in s:
                 today = params["today"]
-                rows = [
-                    r for r in rows if r["period_start"] <= today <= r["period_end"]
-                ]
+                rows = [r for r in rows if r["period_start"] <= today <= r["period_end"]]
             rows.sort(key=lambda r: r["period_start"], reverse=True)
             return _FakeResult([_FakeRow(r) for r in rows])
 
         # ── SELECT ... FROM sales_targets WHERE tenant_id=... (active_targets 无 employee)
-        if (
-            "FROM SALES_TARGETS" in s
-            and "BETWEEN PERIOD_START AND PERIOD_END" in s
-        ):
+        if "FROM SALES_TARGETS" in s and "BETWEEN PERIOD_START AND PERIOD_END" in s:
             today = params["today"]
             rows = [
                 t
                 for t in self.targets
-                if str(t["tenant_id"]) == params["tenant_id"]
-                and t["period_start"] <= today <= t["period_end"]
+                if str(t["tenant_id"]) == params["tenant_id"] and t["period_start"] <= today <= t["period_end"]
             ]
             if "PERIOD_TYPE = :PERIOD_TYPE" in s:
                 rows = [r for r in rows if r["period_type"] == params["period_type"]]
@@ -397,11 +367,7 @@ class FakeDB:
             # 每个 target 取最新 progress
             rows_out = []
             for t in targets:
-                prog = [
-                    p
-                    for p in self.progress
-                    if p["target_id"] == t["target_id"]
-                ]
+                prog = [p for p in self.progress if p["target_id"] == t["target_id"]]
                 prog.sort(key=lambda r: r["snapshot_at"], reverse=True)
                 latest = prog[0] if prog else None
                 rows_out.append(
@@ -415,9 +381,7 @@ class FakeDB:
                         "period_end": t["period_end"],
                         "target_value": t["target_value"],
                         "actual_value": int(latest["actual_value"]) if latest else 0,
-                        "achievement_rate": (
-                            latest["achievement_rate"] if latest else Decimal("0")
-                        ),
+                        "achievement_rate": (latest["achievement_rate"] if latest else Decimal("0")),
                         "snapshot_at": latest["snapshot_at"] if latest else None,
                     }
                 )
@@ -441,10 +405,8 @@ class FakeDB:
                 and e["occurred_at"] < _ensure_datetime(period_end_exclusive)
             ]
             if "store_id" in params:
-                rows = [
-                    r for r in rows
-                    if str(r.get("store_id", "")) == params["store_id"]
-                ]
+                rows = [r for r in rows if str(r.get("store_id", "")) == params["store_id"]]
+
             # 归属过滤：sales_employee_id 优先，cashier_id 回退
             def _matches_emp(ev):
                 payload = ev.get("payload", {})
@@ -460,17 +422,11 @@ class FakeDB:
             # 执行对应 metric 的聚合
             if "FINAL_AMOUNT_FEN" in s:
                 # revenue_fen
-                total = sum(
-                    int(r["payload"].get("final_amount_fen", 0)) for r in rows
-                )
+                total = sum(int(r["payload"].get("final_amount_fen", 0)) for r in rows)
                 return _FakeResult([_FakeRow({"actual": total})])
             if "COUNT(DISTINCT" in s:
                 # new_customer_count
-                distinct = {
-                    r["payload"].get("customer_id")
-                    for r in rows
-                    if r["payload"].get("customer_id")
-                }
+                distinct = {r["payload"].get("customer_id") for r in rows if r["payload"].get("customer_id")}
                 return _FakeResult([_FakeRow({"actual": len(distinct)})])
             # 默认 COUNT(*)（order_count）
             return _FakeResult([_FakeRow({"actual": len(rows)})])
@@ -577,8 +533,7 @@ async def test_set_target_writes_event(fake_db, service):
     assert len(_EVENT_RECORD) == 1
     ev = _EVENT_RECORD[0]
     assert ev["event_type"] == _SalesTargetEventType.SET or (
-        hasattr(ev["event_type"], "value")
-        and ev["event_type"].value == "sales_target.set"
+        hasattr(ev["event_type"], "value") and ev["event_type"].value == "sales_target.set"
     )
     assert ev["payload"]["target_value"] == 10_000_000
     assert ev["payload"]["metric_type"] == "revenue_fen"
@@ -606,15 +561,12 @@ async def test_decompose_year_to_months_sum_equals_year(fake_db, service):
     days = [c for c in children if c["period_type"] == "day"]
 
     assert len(months) == 12, f"应有 12 个月目标，实际 {len(months)}"
-    assert sum(m["target_value"] for m in months) == 120_000_000, (
-        "12 月加和必须精确等于年目标"
-    )
+    assert sum(m["target_value"] for m in months) == 120_000_000, "12 月加和必须精确等于年目标"
     # 每月内日加和必须等于月目标
     for m in months:
         m_days = [d for d in days if d["parent_target_id"] == m["target_id"]]
         assert sum(d["target_value"] for d in m_days) == m["target_value"], (
-            f"月 {m['period_start']} 日加和 {sum(d['target_value'] for d in m_days)} "
-            f"!= 月目标 {m['target_value']}"
+            f"月 {m['period_start']} 日加和 {sum(d['target_value'] for d in m_days)} " f"!= 月目标 {m['target_value']}"
         )
 
 
@@ -638,17 +590,8 @@ async def test_decompose_month_to_days_workday_weight(fake_db, service):
         year_target_id=year_target["target_id"],
     )
     # 找 2026-02 月
-    feb = next(
-        c
-        for c in children
-        if c["period_type"] == "month" and c["period_start"] == date(2026, 2, 1)
-    )
-    feb_days = [
-        c
-        for c in children
-        if c["period_type"] == "day"
-        and c["parent_target_id"] == feb["target_id"]
-    ]
+    feb = next(c for c in children if c["period_type"] == "month" and c["period_start"] == date(2026, 2, 1))
+    feb_days = [c for c in children if c["period_type"] == "day" and c["parent_target_id"] == feb["target_id"]]
     assert len(feb_days) == 28  # 2026-02 有 28 天
 
     workdays = [d for d in feb_days if d["period_start"].weekday() < 5]
@@ -656,9 +599,7 @@ async def test_decompose_month_to_days_workday_weight(fake_db, service):
     # 每个工作日平均 > 每个周末平均（差异化权重生效）
     avg_work = sum(d["target_value"] for d in workdays) / len(workdays)
     avg_weekend = sum(d["target_value"] for d in weekends) / len(weekends)
-    assert avg_work > avg_weekend, (
-        f"工作日均值 {avg_work} 应 > 周末均值 {avg_weekend}（权重 1.2 vs 0.9）"
-    )
+    assert avg_work > avg_weekend, f"工作日均值 {avg_work} 应 > 周末均值 {avg_weekend}（权重 1.2 vs 0.9）"
     assert sum(d["target_value"] for d in feb_days) == feb["target_value"]
 
 
@@ -688,9 +629,7 @@ async def test_record_progress_updates_achievement_rate(fake_db, service):
     assert progress["achievement_rate"] == Decimal("0.3333")
 
     # 达成率查询
-    ach = await service.get_achievement(
-        fake_db, tenant_id=TENANT_A, target_id=target["target_id"]
-    )
+    ach = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=target["target_id"])
     assert ach["achievement_rate"] == "0.3333"
     assert ach["actual_value"] == 3_333_333
 
@@ -759,11 +698,7 @@ async def test_6_metric_types_all_trackable(fake_db, service):
     ]
     created = []
     for i, (mt, is_store_level) in enumerate(metrics):
-        emp_id = (
-            STORE_LEVEL_SENTINEL_EMPLOYEE_ID
-            if is_store_level
-            else UUID(f"0000000{i}-0000-0000-0000-000000000000")
-        )
+        emp_id = STORE_LEVEL_SENTINEL_EMPLOYEE_ID if is_store_level else UUID(f"0000000{i}-0000-0000-0000-000000000000")
         # 门店级指标会因 UNIQUE 约束碰撞（同 employee/period_start/metric）
         # 但这里每个 metric_type 不同，不会冲突
         t = await service.set_target(
@@ -789,9 +724,7 @@ async def test_6_metric_types_all_trackable(fake_db, service):
         )
 
     for t in created:
-        ach = await service.get_achievement(
-            fake_db, tenant_id=TENANT_A, target_id=t["target_id"]
-        )
+        ach = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t["target_id"])
         assert ach["actual_value"] == 50
         # 每个 metric_type 都有达成率
         assert ach["achievement_rate"] != "0.0000" or t["target_value"] == 0
@@ -862,16 +795,12 @@ async def test_tenant_isolation_rls(fake_db, service):
     )
 
     # A 租户查到自己那条
-    ach_a = await service.get_achievement(
-        fake_db, tenant_id=TENANT_A, target_id=t_a["target_id"]
-    )
+    ach_a = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t_a["target_id"])
     assert ach_a["target_value"] == 1_000_000
 
     # B 租户用 A 的 target_id 查应 → ValueError
     with pytest.raises(ValueError):
-        await service.get_achievement(
-            fake_db, tenant_id=TENANT_B, target_id=t_a["target_id"]
-        )
+        await service.get_achievement(fake_db, tenant_id=TENANT_B, target_id=t_a["target_id"])
 
 
 @pytest.mark.asyncio
@@ -991,31 +920,21 @@ async def test_aggregate_filters_by_employee_id(fake_db, service):
     )
     await _drain_tasks()
 
-    ach_a = await service.get_achievement(
-        fake_db, tenant_id=TENANT_A, target_id=t_a["target_id"]
-    )
-    ach_b = await service.get_achievement(
-        fake_db, tenant_id=TENANT_A, target_id=t_b["target_id"]
-    )
+    ach_a = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t_a["target_id"])
+    ach_b = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t_b["target_id"])
 
     assert int(ach_a["actual_value"]) == 30_000, (
-        "销售经理 A 的 actual 必须只含归属 A 的订单（30,000），"
-        f"实际 {ach_a['actual_value']}"
+        "销售经理 A 的 actual 必须只含归属 A 的订单（30,000），" f"实际 {ach_a['actual_value']}"
     )
     assert int(ach_b["actual_value"]) == 70_000, (
-        "销售经理 B 的 actual 必须只含归属 B 的订单（70,000），"
-        f"实际 {ach_b['actual_value']}"
+        "销售经理 B 的 actual 必须只含归属 B 的订单（70,000），" f"实际 {ach_b['actual_value']}"
     )
     # 关键：两人 actual_value 不能相同（历史 bug 会让两人都=100,000）
-    assert ach_a["actual_value"] != ach_b["actual_value"], (
-        "同店多销售经理不能共享门店全额 actual（P0-2 回归）"
-    )
+    assert ach_a["actual_value"] != ach_b["actual_value"], "同店多销售经理不能共享门店全额 actual（P0-2 回归）"
 
 
 @pytest.mark.asyncio
-async def test_cashier_cannot_have_revenue_target_without_store_level_flag(
-    fake_db, service
-):
+async def test_cashier_cannot_have_revenue_target_without_store_level_flag(fake_db, service):
     """11 P0-2：收银员被误建 revenue 目标时，aggregate 不能分走全门店营收。
 
     场景：收银员老王（EMP_1）被管理员误建了 revenue_fen 目标；
@@ -1075,12 +994,8 @@ async def test_cashier_cannot_have_revenue_target_without_store_level_flag(
     )
     await _drain_tasks()
 
-    ach_laowang = await service.get_achievement(
-        fake_db, tenant_id=TENANT_A, target_id=t_laowang["target_id"]
-    )
-    ach_zhangsan = await service.get_achievement(
-        fake_db, tenant_id=TENANT_A, target_id=t_zhangsan["target_id"]
-    )
+    ach_laowang = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t_laowang["target_id"])
+    ach_zhangsan = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t_zhangsan["target_id"])
 
     # 老王（cashier）不能分走张三的销售业绩
     assert int(ach_laowang["actual_value"]) == 0, (

@@ -426,9 +426,7 @@ async def test_audit_log_writes_non_blocking_via_create_task():
     )
     # 主业务此时立即返回（不 await task）
     main_response_latency_ms = (time.perf_counter() - t0) * 1000
-    assert main_response_latency_ms < 10.0, (
-        f"主业务被审计阻塞 {main_response_latency_ms:.2f}ms，应 < 10ms"
-    )
+    assert main_response_latency_ms < 10.0, f"主业务被审计阻塞 {main_response_latency_ms:.2f}ms，应 < 10ms"
 
     # 等审计后台完成（不影响 SLA 但测试需 join）
     await task
@@ -539,13 +537,7 @@ def test_xujihaixian_rls_with_check_blocks_cross_tenant_insert():
 
     # tests/ → src/ → tx-trade/ → services/ → repo_root
     repo_root = Path(__file__).resolve().parents[4]
-    migration_path = (
-        repo_root
-        / "shared"
-        / "db-migrations"
-        / "versions"
-        / "v274_trade_audit_logs_rls_with_check.py"
-    )
+    migration_path = repo_root / "shared" / "db-migrations" / "versions" / "v274_trade_audit_logs_rls_with_check.py"
     assert migration_path.is_file(), f"v274 迁移文件不存在：{migration_path}"
 
     src = migration_path.read_text(encoding="utf-8")
@@ -560,9 +552,7 @@ def test_xujihaixian_rls_with_check_blocks_cross_tenant_insert():
 
     # 3. WITH CHECK 与 USING 必须用相同 RLS 表达式（NULLIF + current_setting('app.tenant_id'))
     using_count = src.count("tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid")
-    assert using_count >= 2, (
-        f"USING + WITH CHECK 应共出现 >=2 次 RLS 表达式，实际 {using_count}"
-    )
+    assert using_count >= 2, f"USING + WITH CHECK 应共出现 >=2 次 RLS 表达式，实际 {using_count}"
 
     # 4. revision/down_revision 衔接 v273
     assert 'revision = "v274"' in src

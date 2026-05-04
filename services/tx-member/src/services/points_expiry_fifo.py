@@ -124,11 +124,7 @@ def consume_points_fifo(
         raise ValueError("invalid_amount")
 
     # 仅看可消费批次（未清零、有余额）
-    valid = [
-        b
-        for b in batches
-        if not b.get("cleared") and int(b.get("remaining_points", 0) or 0) > 0
-    ]
+    valid = [b for b in batches if not b.get("cleared") and int(b.get("remaining_points", 0) or 0) > 0]
     available = sum(int(b.get("remaining_points", 0) or 0) for b in valid)
     if available < points_to_spend:
         raise ValueError("insufficient_points")

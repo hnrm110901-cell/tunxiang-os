@@ -108,6 +108,7 @@ class _DBOverride:
     def __enter__(self):
         async def _override():
             yield self._mock_db
+
         _app.dependency_overrides[get_db] = _override
         return self._mock_db
 
@@ -120,9 +121,7 @@ class _DBOverride:
 
 @pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as ac:
         yield ac
 
 
@@ -272,8 +271,8 @@ class TestBuildSteps:
         steps = _build_steps(10_000, [d1, d2], rule_map)
 
         assert len(steps) == 2
-        assert steps[0]["type"] == "platform_coupon"   # apply_order=5，先执行
-        assert steps[1]["type"] == "member_discount"   # apply_order=10，后执行
+        assert steps[0]["type"] == "platform_coupon"  # apply_order=5，先执行
+        assert steps[1]["type"] == "member_discount"  # apply_order=10，后执行
 
     def test_steps_before_after_saved(self):
         """每步 before / after / saved 计算正确。"""
@@ -349,7 +348,7 @@ class TestCreateRule:
         data = resp.json()
         assert data["ok"] is True
         assert "rule_id" in data["data"]
-        assert data["data"]["rule_id"]   # 非空
+        assert data["data"]["rule_id"]  # 非空
 
     @pytest.mark.asyncio
     async def test_create_rule_invalid_type(self, client: AsyncClient):
@@ -407,9 +406,11 @@ class TestCalculateDiscount:
         mock_db = _make_db()
         _db_returns_no_rules(mock_db)
 
-        body = self._calc_body([
-            {"type": "member_discount", "rate": 0.9, "member_id": "member-001"},
-        ])
+        body = self._calc_body(
+            [
+                {"type": "member_discount", "rate": 0.9, "member_id": "member-001"},
+            ]
+        )
         with _DBOverride(mock_db):
             resp = await client.post(
                 "/api/v1/discount/calculate",
@@ -445,7 +446,7 @@ class TestCalculateDiscount:
 
         assert resp.status_code == 200
         data = resp.json()["data"]
-        assert data["final_amount_fen"] == 9_000    # 10_000 × 0.9
+        assert data["final_amount_fen"] == 9_000  # 10_000 × 0.9
         assert data["total_saved_fen"] == 1_000
 
     @pytest.mark.asyncio
@@ -455,11 +456,13 @@ class TestCalculateDiscount:
         _db_returns_no_rules(mock_db)
 
         body = self._calc_body(
-            [{
-                "type": "full_reduction",
-                "condition_fen": 10_000,
-                "deduct_fen": 2_000,
-            }],
+            [
+                {
+                    "type": "full_reduction",
+                    "condition_fen": 10_000,
+                    "deduct_fen": 2_000,
+                }
+            ],
             base=10_000,
         )
         with _DBOverride(mock_db):
@@ -513,7 +516,7 @@ class TestCalculateDiscount:
 
         body = self._calc_body(
             [
-                {"type": "member_discount", "rate": 0.9},       # saved=1_000
+                {"type": "member_discount", "rate": 0.9},  # saved=1_000
                 {"type": "manual_discount", "deduct_fen": 3_000},  # saved=3_000（更优）
             ],
             base=10_000,
@@ -530,7 +533,7 @@ class TestCalculateDiscount:
         # 应选 manual_discount（saved=3_000）
         assert data["total_saved_fen"] == 3_000
         assert data["final_amount_fen"] == 7_000
-        assert len(data["conflicts"]) > 0   # 有冲突记录
+        assert len(data["conflicts"]) > 0  # 有冲突记录
 
     @pytest.mark.asyncio
     async def test_calculate_discount_invalid_type(self, client: AsyncClient):
@@ -584,7 +587,7 @@ class TestCalculateDiscount:
 
         body = self._calc_body(
             [
-                {"type": "member_discount", "rate": 0.9},        # 10_000→9_000
+                {"type": "member_discount", "rate": 0.9},  # 10_000→9_000
                 {"type": "platform_coupon", "deduct_fen": 500},  # 9_000→8_500
             ],
             base=10_000,
@@ -601,7 +604,7 @@ class TestCalculateDiscount:
         assert data["final_amount_fen"] == 8_500
         assert data["total_saved_fen"] == 1_500
         assert len(data["applied_steps"]) == 2
-        assert data["conflicts"] == []   # 无冲突
+        assert data["conflicts"] == []  # 无冲突
 
 
 class TestHardConstraintGrossMargin:

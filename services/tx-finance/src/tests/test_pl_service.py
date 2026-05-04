@@ -15,6 +15,7 @@ from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from services.tx_finance.src.services.pl_service import (
     CostBreakdown,
     OperatingExpenses,

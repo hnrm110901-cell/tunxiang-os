@@ -62,7 +62,8 @@ async def _fetch_today_kpi(db: AsyncSession, tenant_id: str, today: str) -> dict
     """今日 KPI：营收/订单数/客单价/成本率"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(total_amount_fen), 0)::bigint AS revenue_fen,
                     COUNT(*)::int AS order_count,
@@ -74,17 +75,20 @@ async def _fetch_today_kpi(db: AsyncSession, tenant_id: str, today: str) -> dict
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :today
                   AND status IN ('paid', 'completed')
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "today": today},
         )
         row = result.fetchone()
 
         cost_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(AVG(cost_rate), 0) AS cost_rate
                 FROM daily_pl_records
                 WHERE tenant_id = :tenant_id AND record_date = :today
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "today": today},
         )
         cost_row = cost_result.fetchone()
@@ -104,7 +108,8 @@ async def _fetch_store_health(db: AsyncSession, tenant_id: str) -> list[dict]:
     """门店健康排名（按今日营收降序，最多 10 条）"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     s.id::text AS store_id,
                     s.name AS store_name,
@@ -121,7 +126,8 @@ async def _fetch_store_health(db: AsyncSession, tenant_id: str) -> list[dict]:
                 GROUP BY s.id, s.name, s.status
                 ORDER BY today_revenue_fen DESC
                 LIMIT 10
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         rows = result.fetchall()
@@ -144,7 +150,8 @@ async def _fetch_recent_decisions(db: AsyncSession, tenant_id: str) -> list[dict
     """最近 5 条 Agent 决策日志"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text,
                     agent_id,
@@ -156,7 +163,8 @@ async def _fetch_recent_decisions(db: AsyncSession, tenant_id: str) -> list[dict
                 WHERE tenant_id = :tenant_id
                 ORDER BY created_at DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         rows = result.fetchall()

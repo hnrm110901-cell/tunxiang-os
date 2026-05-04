@@ -26,8 +26,10 @@ async def create_sandbox(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.sandboxes (tenant_id, app_id, developer_id, status, config)
-                VALUES (:tid, :app_id, :developer_id, 'provisioning', :config::jsonb) RETURNING *"""),
+        text(
+            """INSERT INTO forge.sandboxes (tenant_id, app_id, developer_id, status, config)
+                VALUES (:tid, :app_id, :developer_id, 'provisioning', :config::jsonb) RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body["app_id"],

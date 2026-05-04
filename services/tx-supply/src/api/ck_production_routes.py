@@ -133,13 +133,15 @@ def _row_to_dict(row) -> dict:
 
 async def _fetch_production_order(db: AsyncSession, order_id: str, tenant_id: str) -> Optional[dict]:
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, order_no, store_id, production_date,
                    status, total_items, completed_items, notes,
                    created_at, updated_at
             FROM ck_production_orders
             WHERE id = :oid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     main = row.mappings().first()
@@ -147,13 +149,15 @@ async def _fetch_production_order(db: AsyncSession, order_id: str, tenant_id: st
         return None
 
     items_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_id, dish_name, quantity, unit,
                    bom_id, estimated_cost_fen, actual_cost_fen, status
             FROM ck_production_items
             WHERE order_id = :oid AND tenant_id = :tid
             ORDER BY created_at
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     result = _row_to_dict(main)
@@ -163,13 +167,15 @@ async def _fetch_production_order(db: AsyncSession, order_id: str, tenant_id: st
 
 async def _fetch_distribution_order(db: AsyncSession, dist_id: str, tenant_id: str) -> Optional[dict]:
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, order_no, from_kitchen_id, to_store_id,
                    distribution_date, status, total_items,
                    carrier_name, tracking_no, notes, created_at, updated_at
             FROM ck_distribution_orders
             WHERE id = :did AND tenant_id = :tid
-        """),
+        """
+        ),
         {"did": dist_id, "tid": tenant_id},
     )
     main = row.mappings().first()
@@ -177,13 +183,15 @@ async def _fetch_distribution_order(db: AsyncSession, dist_id: str, tenant_id: s
         return None
 
     items_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_id, dish_name, quantity, unit,
                    bom_id, estimated_cost_fen, actual_received_qty, notes
             FROM ck_distribution_items
             WHERE distribution_id = :did AND tenant_id = :tid
             ORDER BY created_at
-        """),
+        """
+        ),
         {"did": dist_id, "tid": tenant_id},
     )
     result = _row_to_dict(main)
@@ -207,7 +215,8 @@ async def create_production_order(
         order_no = _gen_order_no("CK", body.production_date)
 
         order_row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ck_production_orders
                   (tenant_id, order_no, store_id, production_date,
                    status, total_items, completed_items, notes)
@@ -215,7 +224,8 @@ async def create_production_order(
                   (:tid, :order_no, :store_id, :production_date,
                    'draft', :total_items, 0, :notes)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "order_no": order_no,
@@ -233,12 +243,14 @@ async def create_production_order(
             estimated_cost = item.estimated_cost_fen
             if not bom_id:
                 bom_row = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, total_cost_fen FROM dish_boms
                         WHERE tenant_id = :tid AND dish_id = :dish_id
                           AND is_active = true AND is_deleted = false
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"tid": x_tenant_id, "dish_id": item.dish_id},
                 )
                 bom = bom_row.mappings().first()
@@ -248,14 +260,16 @@ async def create_production_order(
                         estimated_cost = int(float(item.quantity) * (bom["total_cost_fen"] or 0))
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO ck_production_items
                       (tenant_id, order_id, dish_id, dish_name, quantity,
                        unit, bom_id, estimated_cost_fen, status)
                     VALUES
                       (:tid, :order_id, :dish_id, :dish_name, :quantity,
                        :unit, :bom_id, :estimated_cost_fen, 'pending')
-                """),
+                """
+                ),
                 {
                     "tid": x_tenant_id,
                     "order_id": order_id,
@@ -316,7 +330,8 @@ async def list_production_orders(
         total = count_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, order_no, store_id, production_date,
                        status, total_items, completed_items, notes,
                        created_at, updated_at
@@ -324,7 +339,8 @@ async def list_production_orders(
                 WHERE {where}
                 ORDER BY production_date DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_row_to_dict(r) for r in rows.mappings().all()]
@@ -350,10 +366,12 @@ async def update_production_order_status(
         await _set_tenant(db, x_tenant_id)
 
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM ck_production_orders
                 WHERE id = :oid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"oid": order_id, "tid": x_tenant_id},
         )
         order = row.mappings().first()
@@ -372,30 +390,36 @@ async def update_production_order_status(
         # 若转为 completed，同步将 pending/producing 的明细行全部标记为 completed
         if target == "completed":
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE ck_production_items
                     SET status = 'completed'
                     WHERE order_id = :oid AND tenant_id = :tid
                       AND status IN ('pending', 'producing')
-                """),
+                """
+                ),
                 {"oid": order_id, "tid": x_tenant_id},
             )
             # 更新 completed_items 计数
             count_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM ck_production_items
                     WHERE order_id = :oid AND tenant_id = :tid AND status = 'completed'
-                """),
+                """
+                ),
                 {"oid": order_id, "tid": x_tenant_id},
             )
             completed_count = count_row.scalar() or 0
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE ck_production_orders
                     SET status = :target, completed_items = :count,
                         notes = COALESCE(:extra_notes, notes)
                     WHERE id = :oid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {
                     "target": target,
                     "count": completed_count,
@@ -406,12 +430,14 @@ async def update_production_order_status(
             )
         else:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE ck_production_orders
                     SET status = :target,
                         notes = COALESCE(:extra_notes, notes)
                     WHERE id = :oid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"target": target, "extra_notes": body.notes, "oid": order_id, "tid": x_tenant_id},
             )
 
@@ -455,11 +481,13 @@ async def smart_plan(
         await _set_tenant(db, x_tenant_id)
 
         order_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, production_date, status
                 FROM ck_production_orders
                 WHERE id = :oid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"oid": order_id, "tid": x_tenant_id},
         )
         order = order_row.mappings().first()
@@ -476,12 +504,14 @@ async def smart_plan(
         weekend_factor = 1.3 if is_weekend else 1.0
 
         items_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, dish_name, quantity AS planned_qty, unit
                 FROM ck_production_items
                 WHERE order_id = :oid AND tenant_id = :tid
                 ORDER BY created_at
-            """),
+            """
+            ),
             {"oid": order_id, "tid": x_tenant_id},
         )
         items = items_row.mappings().all()
@@ -495,7 +525,8 @@ async def smart_plan(
             avg_qty: float = 0.0
             try:
                 sales_row = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COALESCE(SUM(oi.quantity), 0) / 7.0 AS avg_daily
                         FROM order_items oi
                         JOIN orders o ON o.id = oi.order_id
@@ -505,7 +536,8 @@ async def smart_plan(
                           AND o.created_at >= now() - INTERVAL '7 days'
                           AND o.is_deleted = false
                           AND oi.is_deleted = false
-                    """),
+                    """
+                    ),
                     {
                         "dish_id": dish_id,
                         "tid": x_tenant_id,
@@ -595,7 +627,8 @@ async def list_distribution_orders(
         total = count_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, order_no, from_kitchen_id, to_store_id,
                        distribution_date, status, total_items,
                        carrier_name, tracking_no, notes,
@@ -604,7 +637,8 @@ async def list_distribution_orders(
                 WHERE {where}
                 ORDER BY distribution_date DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_row_to_dict(r) for r in rows.mappings().all()]
@@ -631,7 +665,8 @@ async def create_distribution_order(
         order_no = _gen_order_no("CKD", body.distribution_date)
 
         dist_row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ck_distribution_orders
                   (tenant_id, order_no, from_kitchen_id, to_store_id,
                    distribution_date, status, total_items,
@@ -641,7 +676,8 @@ async def create_distribution_order(
                    :distribution_date, 'pending', :total_items,
                    :carrier_name, :tracking_no, :notes)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "order_no": order_no,
@@ -658,14 +694,16 @@ async def create_distribution_order(
 
         for item in body.items:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO ck_distribution_items
                       (tenant_id, distribution_id, dish_id, dish_name,
                        quantity, unit, bom_id, estimated_cost_fen, notes)
                     VALUES
                       (:tid, :dist_id, :dish_id, :dish_name,
                        :quantity, :unit, :bom_id, :estimated_cost_fen, :notes)
-                """),
+                """
+                ),
                 {
                     "tid": x_tenant_id,
                     "dist_id": dist_id,
@@ -711,10 +749,12 @@ async def receive_distribution_order(
         await _set_tenant(db, x_tenant_id)
 
         dist_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM ck_distribution_orders
                 WHERE id = :did AND tenant_id = :tid
-            """),
+            """
+            ),
             {"did": dist_id, "tid": x_tenant_id},
         )
         dist = dist_row.mappings().first()
@@ -733,12 +773,14 @@ async def receive_distribution_order(
         for recv_item in body.items:
             # 查对应明细行计划数量（用于差异检测）
             plan_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, quantity FROM ck_distribution_items
                     WHERE distribution_id = :did AND tenant_id = :tid
                       AND dish_id = :dish_id
                     LIMIT 1
-                """),
+                """
+                ),
                 {"did": dist_id, "tid": x_tenant_id, "dish_id": recv_item.dish_id},
             )
             plan = plan_row.mappings().first()
@@ -756,12 +798,14 @@ async def receive_distribution_order(
                     item_notes = f"{item_notes} {variance_msg}".strip()
 
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE ck_distribution_items
                     SET actual_received_qty = :qty,
                         notes = :notes
                     WHERE id = :item_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {
                     "qty": str(recv_item.actual_received_qty),
                     "notes": item_notes or None,
@@ -772,12 +816,14 @@ async def receive_distribution_order(
 
         # 更新配送单状态
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ck_distribution_orders
                 SET status = 'received',
                     notes = COALESCE(:extra_notes, notes)
                 WHERE id = :did AND tenant_id = :tid
-            """),
+            """
+            ),
             {"extra_notes": body.notes, "did": dist_id, "tid": x_tenant_id},
         )
 

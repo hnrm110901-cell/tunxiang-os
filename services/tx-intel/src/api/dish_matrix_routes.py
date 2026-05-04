@@ -179,7 +179,8 @@ async def _query_dish_matrix(
         params["store_id"] = store_id
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 d.name                                      AS dish_name,
                 d.id                                        AS dish_id,
@@ -195,7 +196,8 @@ async def _query_dish_matrix(
             GROUP BY d.id, d.name, d.gross_margin_pct
             ORDER BY COUNT(oi.id) DESC
             LIMIT 100
-        """),
+        """
+        ),
         params,
     )
     all_dishes = [

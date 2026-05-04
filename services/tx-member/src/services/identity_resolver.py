@@ -39,12 +39,14 @@ class IdentityResolver:
         """
         # 获取WiFi访问记录
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, mac_hash, first_seen_at, last_seen_at,
                        matched_customer_id
                 FROM wifi_visit_logs
                 WHERE id = :vid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"vid": wifi_visit_id, "tid": tenant_id},
         )
         visit = row.mappings().first()
@@ -64,7 +66,8 @@ class IdentityResolver:
 
         # 策略1: 查找同mac_hash的历史已匹配记录 → phone_hash 精确匹配
         prev = await db.execute(
-            text("""
+            text(
+                """
                 SELECT matched_customer_id
                 FROM wifi_visit_logs
                 WHERE tenant_id = :tid AND mac_hash = :mh
@@ -72,7 +75,8 @@ class IdentityResolver:
                   AND is_deleted = false
                 ORDER BY last_seen_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "mh": mac_hash},
         )
         prev_match = prev.mappings().first()
@@ -104,7 +108,8 @@ class IdentityResolver:
         window_end = first_seen + timedelta(hours=TIME_CORRELATION_WINDOW_HOURS)
 
         corr = await db.execute(
-            text("""
+            text(
+                """
                 SELECT o.customer_id, COUNT(*)::int AS order_count
                 FROM orders o
                 WHERE o.tenant_id = :tid AND o.store_id = :sid
@@ -114,7 +119,8 @@ class IdentityResolver:
                 GROUP BY o.customer_id
                 ORDER BY order_count DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,
@@ -168,11 +174,13 @@ class IdentityResolver:
         解析外部订单的身份 — 通过 phone_hash 与 golden_id 映射精确匹配
         """
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_phone_hash, matched_customer_id, source
                 FROM external_order_imports
                 WHERE id = :iid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"iid": import_id, "tid": tenant_id},
         )
         imp = row.mappings().first()
@@ -192,7 +200,8 @@ class IdentityResolver:
 
         # 通过 golden_id 映射查找 phone_hash 对应的 customer
         cust = await db.execute(
-            text("""
+            text(
+                """
                 SELECT customer_id
                 FROM golden_id_mappings
                 WHERE tenant_id = :tid
@@ -200,20 +209,23 @@ class IdentityResolver:
                   AND channel_openid = :ph
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "ph": phone_hash},
         )
         match = cust.mappings().first()
         if match:
             customer_id = str(match["customer_id"])
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE external_order_imports
                     SET matched_customer_id = :cid,
                         match_confidence = 1.0,
                         updated_at = NOW()
                     WHERE id = :iid
-                """),
+                """
+                ),
                 {"cid": customer_id, "iid": import_id},
             )
             await db.commit()
@@ -246,14 +258,16 @@ class IdentityResolver:
 
         if source == "wifi":
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM wifi_visit_logs
                     WHERE tenant_id = :tid
                       AND matched_customer_id IS NULL
                       AND is_deleted = false
                     ORDER BY created_at DESC
                     LIMIT 1000
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             ids = [str(r["id"]) for r in rows.mappings().all()]
@@ -270,14 +284,16 @@ class IdentityResolver:
 
         elif source == "external":
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM external_order_imports
                     WHERE tenant_id = :tid
                       AND matched_customer_id IS NULL
                       AND is_deleted = false
                     ORDER BY created_at DESC
                     LIMIT 1000
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             ids = [str(r["id"]) for r in rows.mappings().all()]
@@ -309,13 +325,15 @@ class IdentityResolver:
         """各数据源的身份匹配率统计"""
         # WiFi 匹配率
         wifi = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)::int AS total,
                     COUNT(*) FILTER (WHERE matched_customer_id IS NOT NULL)::int AS matched
                 FROM wifi_visit_logs
                 WHERE tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         w = wifi.mappings().first()
@@ -324,14 +342,16 @@ class IdentityResolver:
 
         # 外部订单按 source 分组
         ext = await db.execute(
-            text("""
+            text(
+                """
                 SELECT source,
                     COUNT(*)::int AS total,
                     COUNT(*) FILTER (WHERE matched_customer_id IS NOT NULL)::int AS matched
                 FROM external_order_imports
                 WHERE tenant_id = :tid AND is_deleted = false
                 GROUP BY source
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         ext_rows = ext.mappings().all()
@@ -361,7 +381,8 @@ class IdentityResolver:
         method: str,
     ) -> None:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE wifi_visit_logs
                 SET matched_customer_id = :cid,
                     match_confidence = :conf,
@@ -369,7 +390,8 @@ class IdentityResolver:
                     is_new_visitor = false,
                     updated_at = NOW()
                 WHERE id = :vid
-            """),
+            """
+            ),
             {"cid": customer_id, "conf": confidence, "method": method, "vid": visit_id},
         )
         await db.commit()

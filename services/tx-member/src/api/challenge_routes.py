@@ -11,11 +11,11 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from services.tx_member.src.services import challenge_engine
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_member.src.services import challenge_engine
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/member/challenges", tags=["challenge-engine"])
@@ -94,7 +94,8 @@ async def create_challenge(
     """1. 创建挑战 → INSERT INTO challenges"""
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO challenges (tenant_id, name, description, type,
                                         rules, reward, badge_id,
                                         start_date, end_date,
@@ -106,7 +107,8 @@ async def create_challenge(
                           badge_id, start_date, end_date, max_participants,
                           current_participants, is_active, display_order, icon_url,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "name": req.name,
@@ -160,7 +162,8 @@ async def list_challenges(
     total = int(count_row.scalar() or 0)
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, name, description, type, rules, reward, badge_id,
                    start_date, end_date, max_participants, current_participants,
                    is_active, display_order, icon_url, created_at, updated_at
@@ -168,7 +171,8 @@ async def list_challenges(
             WHERE {where_clause}
             ORDER BY display_order, start_date
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -183,13 +187,15 @@ async def get_challenge(
 ):
     """3. 获取挑战详情 → SELECT ... WHERE id = ..."""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, type, rules, reward, badge_id,
                    start_date, end_date, max_participants, current_participants,
                    is_active, display_order, icon_url, created_at, updated_at
             FROM challenges
             WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": x_tenant_id, "cid": challenge_id},
     )
     ch = row.mappings().first()
@@ -240,14 +246,16 @@ async def update_challenge(
     set_clause = ", ".join(set_parts)
     try:
         row = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE challenges
                 SET {set_clause}
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, name, description, type, rules, reward, badge_id,
                           start_date, end_date, max_participants, current_participants,
                           is_active, display_order, icon_url, created_at, updated_at
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -269,11 +277,13 @@ async def delete_challenge(
     """5. 删除挑战（软删除） → UPDATE challenges SET is_deleted = true"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE challenges
                 SET is_deleted = true, is_active = false, updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "cid": challenge_id},
         )
         await db.commit()

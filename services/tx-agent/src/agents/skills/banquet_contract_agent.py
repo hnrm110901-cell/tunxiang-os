@@ -125,9 +125,7 @@ class BanquetContractAgent(SkillAgent):
             "progress_reminder",
         ]
 
-    async def execute(
-        self, action: str, params: dict[str, Any]
-    ) -> AgentResult:
+    async def execute(self, action: str, params: dict[str, Any]) -> AgentResult:
         dispatch = {
             "generate_contract": self._generate_contract,
             "split_eo": self._split_eo,
@@ -170,16 +168,12 @@ class BanquetContractAgent(SkillAgent):
 
         banquet_type_raw = params.get("banquet_type") or "birthday"
         banquet_type = (
-            banquet_type_raw
-            if isinstance(banquet_type_raw, BanquetType)
-            else BanquetType(str(banquet_type_raw))
+            banquet_type_raw if isinstance(banquet_type_raw, BanquetType) else BanquetType(str(banquet_type_raw))
         )
         tables = int(params.get("tables", 0))
         total_amount_fen = int(params.get("total_amount_fen", 0))
         deposit_ratio = _to_decimal(params.get("deposit_ratio"), Decimal("0.30"))
-        deposit_fen = int(
-            (Decimal(total_amount_fen) * deposit_ratio).quantize(Decimal("1"))
-        )
+        deposit_fen = int((Decimal(total_amount_fen) * deposit_ratio).quantize(Decimal("1")))
         if deposit_fen > total_amount_fen:
             deposit_fen = total_amount_fen
         scheduled_date_raw = params.get("scheduled_date")
@@ -189,15 +183,11 @@ class BanquetContractAgent(SkillAgent):
         # 读 R1 线索数据（HTTP 或注入的客户端；允许 None 表示不强制拉取）
         lead_snapshot: dict[str, Any] = {}
         if self._lead_api is not None:
-            lead_snapshot = await self._lead_api.get_lead(
-                tenant_id=tenant_id, lead_id=lead_id
-            )
+            lead_snapshot = await self._lead_api.get_lead(tenant_id=tenant_id, lead_id=lead_id)
 
         # PDF 生成（placeholder）
         # 动态 import — 避免 tx-agent 对 tx-trade 硬依赖
-        generate_contract_pdf_fn = _import_tx_trade(
-            "services.banquet_pdf_generator", "generate_contract_pdf"
-        )
+        generate_contract_pdf_fn = _import_tx_trade("services.banquet_pdf_generator", "generate_contract_pdf")
         pdf_url, _, generation_ms = generate_contract_pdf_fn(
             contract_id=uuid.uuid4(),  # 仅用于 URL 占位，真 id 由 service 生成
             tenant_id=tenant_id,
@@ -261,8 +251,7 @@ class BanquetContractAgent(SkillAgent):
                 "generation_ms": generation_ms,
             },
             reasoning=(
-                f"合同已生成 tables={tables} total={total_amount_fen/100:.2f}元 "
-                f"deposit_ratio={deposit_ratio}"
+                f"合同已生成 tables={tables} total={total_amount_fen/100:.2f}元 " f"deposit_ratio={deposit_ratio}"
             ),
         )
 
@@ -453,17 +442,13 @@ class BanquetContractAgent(SkillAgent):
             total_match=params_total_fen == total_amount_fen,
             params_banquet_type=(
                 params_banquet_type_raw
-                if params_banquet_type_raw is None
-                or isinstance(params_banquet_type_raw, str)
+                if params_banquet_type_raw is None or isinstance(params_banquet_type_raw, str)
                 else getattr(params_banquet_type_raw, "value", str(params_banquet_type_raw))
             ),
             db_banquet_type=banquet_type.value,
         )
 
-        needs_store_manager = (
-            total_amount_fen >= STORE_MANAGER_THRESHOLD_FEN
-            or banquet_type == BanquetType.WEDDING
-        )
+        needs_store_manager = total_amount_fen >= STORE_MANAGER_THRESHOLD_FEN or banquet_type == BanquetType.WEDDING
         needs_district_manager = total_amount_fen >= DISTRICT_MANAGER_THRESHOLD_FEN
 
         # 构造完整审批链（未决 decided_action=None）
@@ -498,9 +483,7 @@ class BanquetContractAgent(SkillAgent):
                 signature_provider="placeholder",
             )
             final_status = signed.status
-            reasoning = (
-                f"总额 {total_amount_fen/100:.2f}元 < 10W 且非婚宴 → 自动过审"
-            )
+            reasoning = f"总额 {total_amount_fen/100:.2f}元 < 10W 且非婚宴 → 自动过审"
             next_role = None
         else:
             # 若调用方附带 approval_action，则写入一条审批日志并推进下一节点
@@ -511,8 +494,7 @@ class BanquetContractAgent(SkillAgent):
                     # 否则尝试 district_manager
                     existing = await repo.list_approval_logs(contract_id, tenant_id)
                     store_done = any(
-                        log.role == ApprovalRole.STORE_MANAGER
-                        and log.action == ApprovalAction.APPROVE
+                        log.role == ApprovalRole.STORE_MANAGER and log.action == ApprovalAction.APPROVE
                         for log in existing
                     )
                     if not store_done:
@@ -536,9 +518,7 @@ class BanquetContractAgent(SkillAgent):
                 # C-3 修复：通过 service 层 insert（含 UniqueViolation 捕获），
                 # 并发同 role approve/reject 的第二方抛 ApprovalAlreadyRecordedError
                 # → Agent 降级为幂等，读取当前链快照返回。
-                insert_via_service = getattr(
-                    contract_service, "insert_approval_log", None
-                )
+                insert_via_service = getattr(contract_service, "insert_approval_log", None)
                 try:
                     if insert_via_service is not None:
                         await insert_via_service(log)
@@ -554,9 +534,7 @@ class BanquetContractAgent(SkillAgent):
                         )
                         # 并发第二方：读当前链快照返回，不重复推进
                         existing_chain = list(contract.approval_chain or full_chain)
-                        current = await contract_service.get_contract(
-                            contract_id, tenant_id
-                        )
+                        current = await contract_service.get_contract(contract_id, tenant_id)
                         constraint_ctx = _build_constraint_context(
                             total_amount_fen=total_amount_fen,
                             banquet_type=banquet_type,
@@ -564,9 +542,7 @@ class BanquetContractAgent(SkillAgent):
                             scope=self.constraint_scope,
                         )
                         decision_id = _new_decision_id()
-                        reasoning = (
-                            f"{log_role.value} 审批已记录（并发幂等） → 跳过"
-                        )
+                        reasoning = f"{log_role.value} 审批已记录（并发幂等） → 跳过"
                         self._record_decision(
                             decision_id=decision_id,
                             action="route_approval",
@@ -625,9 +601,7 @@ class BanquetContractAgent(SkillAgent):
                     reasoning = f"{log_role.value} 驳回 → 合同退回 draft"
                 else:
                     # approve：检查是否所有环节都已过
-                    remaining = [
-                        e for e in chain_snapshot if e.get("decided_action") is None
-                    ]
+                    remaining = [e for e in chain_snapshot if e.get("decided_action") is None]
                     if not remaining:
                         # 全部审完 → 签约
                         await contract_service.update_status_and_chain(
@@ -748,12 +722,7 @@ class BanquetContractAgent(SkillAgent):
         store_id = _coerce_uuid(params.get("store_id"))
         deposit_paid_fen = int(params.get("deposit_paid_fen", 0))
 
-        if (
-            tenant_id is None
-            or contract_id is None
-            or scheduled_date is None
-            or store_id is None
-        ):
+        if tenant_id is None or contract_id is None or scheduled_date is None or store_id is None:
             return AgentResult(
                 success=False,
                 action="lock_schedule",
@@ -771,16 +740,10 @@ class BanquetContractAgent(SkillAgent):
             limit=1000,
         )
         # 已签约（SIGNED）且订金 > 0 的合同（按 created_at 升序）
-        locked_existing = [
-            c
-            for c in existing
-            if c.status == ContractStatus.SIGNED and c.deposit_fen > 0
-        ]
+        locked_existing = [c for c in existing if c.status == ContractStatus.SIGNED and c.deposit_fen > 0]
         locked_existing.sort(key=lambda c: c.created_at)
 
-        queued: list[str] = [
-            str(c.contract_id) for c in existing if c.contract_id != contract_id
-        ]
+        queued: list[str] = [str(c.contract_id) for c in existing if c.contract_id != contract_id]
 
         locked = False
         schedule_conflict = False  # C-2：DB 层 UNIQUE 冲突命中标记
@@ -809,9 +772,7 @@ class BanquetContractAgent(SkillAgent):
                         )
                     else:
                         raise
-            if not schedule_conflict and (
-                deposit_paid_fen > 0 or contract.deposit_fen > 0
-            ):
+            if not schedule_conflict and (deposit_paid_fen > 0 or contract.deposit_fen > 0):
                 locked = True
         else:
             # 已有人先锁 — 本合同若是该 "first come" 则 locked=True
@@ -843,9 +804,8 @@ class BanquetContractAgent(SkillAgent):
         )
 
         decision_id = _new_decision_id()
-        reasoning = (
-            f"档期 {scheduled_date.isoformat()} 先到先得: locked={locked}"
-            + (" [DB_UNIQUE_CONFLICT]" if schedule_conflict else "")
+        reasoning = f"档期 {scheduled_date.isoformat()} 先到先得: locked={locked}" + (
+            " [DB_UNIQUE_CONFLICT]" if schedule_conflict else ""
         )
         self._record_decision(
             decision_id=decision_id,
@@ -898,8 +858,7 @@ class BanquetContractAgent(SkillAgent):
         reminder_stage = str(params.get("reminder_stage", "T-1d"))
         target_departments_raw = params.get("target_departments") or []
         target_departments: list[EODepartment] = [
-            d if isinstance(d, EODepartment) else EODepartment(str(d))
-            for d in target_departments_raw
+            d if isinstance(d, EODepartment) else EODepartment(str(d)) for d in target_departments_raw
         ]
 
         if tenant_id is None or contract_id is None:
@@ -916,9 +875,7 @@ class BanquetContractAgent(SkillAgent):
             )
 
         eo_service = self._require_eo_service()
-        tickets = await eo_service.list_by_contract(
-            tenant_id=tenant_id, contract_id=contract_id
-        )
+        tickets = await eo_service.list_by_contract(tenant_id=tenant_id, contract_id=contract_id)
 
         if target_departments:
             tickets = [t for t in tickets if t.department in target_departments]
@@ -943,9 +900,7 @@ class BanquetContractAgent(SkillAgent):
                     },
                 )
             # 更新 reminder_sent_at
-            await eo_service.mark_reminder_sent(
-                tenant_id=tenant_id, eo_ticket_id=t.eo_ticket_id
-            )
+            await eo_service.mark_reminder_sent(tenant_id=tenant_id, eo_ticket_id=t.eo_ticket_id)
             notified_ticket_ids.append(str(t.eo_ticket_id))
 
         skipped_reason: Optional[str] = ", ".join(skipped) if skipped else None
@@ -987,23 +942,17 @@ class BanquetContractAgent(SkillAgent):
     # ─────────────────────────────────────────────────────────────────
     def _require_contract_service(self) -> Any:
         if self._contract_service is None:
-            raise RuntimeError(
-                "BanquetContractAgent 未注入 contract_service，请通过构造函数传入"
-            )
+            raise RuntimeError("BanquetContractAgent 未注入 contract_service，请通过构造函数传入")
         return self._contract_service
 
     def _require_eo_service(self) -> Any:
         if self._eo_service is None:
-            raise RuntimeError(
-                "BanquetContractAgent 未注入 eo_service，请通过构造函数传入"
-            )
+            raise RuntimeError("BanquetContractAgent 未注入 eo_service，请通过构造函数传入")
         return self._eo_service
 
     def _require_repo(self) -> Any:
         # 优先使用 contract_service 的 repo
-        if self._contract_service is not None and hasattr(
-            self._contract_service, "_repo"
-        ):
+        if self._contract_service is not None and hasattr(self._contract_service, "_repo"):
             return self._contract_service._repo
         raise RuntimeError("BanquetContractAgent 未能获取 Repository")
 
@@ -1127,9 +1076,7 @@ def _build_constraint_context(
     cost_fen: Optional[int] = None
     if "margin" in scope and total_amount_fen >= 0:
         price_fen = total_amount_fen if total_amount_fen > 0 else 0
-        cost_fen = int(
-            (Decimal(total_amount_fen) * DEFAULT_BANQUET_COST_RATIO).quantize(Decimal("1"))
-        )
+        cost_fen = int((Decimal(total_amount_fen) * DEFAULT_BANQUET_COST_RATIO).quantize(Decimal("1")))
 
     ingredients: Optional[list[IngredientSnapshot]] = None
     if "safety" in scope and purchase_batches:
@@ -1160,9 +1107,7 @@ def _is_schedule_already_locked(exc: BaseException) -> bool:
     tx-agent 硬 import tx-trade service 异常（r2-contracts §8.4）。
     """
     cls_name = type(exc).__name__
-    return cls_name == "ScheduleAlreadyLockedError" or getattr(
-        exc, "code", None
-    ) == "BANQUET_CONTRACT_SCHEDULE_LOCKED"
+    return cls_name == "ScheduleAlreadyLockedError" or getattr(exc, "code", None) == "BANQUET_CONTRACT_SCHEDULE_LOCKED"
 
 
 def _is_approval_already_recorded(exc: BaseException) -> bool:
@@ -1171,9 +1116,10 @@ def _is_approval_already_recorded(exc: BaseException) -> bool:
     同样通过类名 + code 软探测，避免跨 service 硬 import。
     """
     cls_name = type(exc).__name__
-    return cls_name == "ApprovalAlreadyRecordedError" or getattr(
-        exc, "code", None
-    ) == "BANQUET_CONTRACT_APPROVAL_ALREADY_RECORDED"
+    return (
+        cls_name == "ApprovalAlreadyRecordedError"
+        or getattr(exc, "code", None) == "BANQUET_CONTRACT_APPROVAL_ALREADY_RECORDED"
+    )
 
 
 def _import_tx_trade(module_suffix: str, attr: str) -> Any:
@@ -1199,9 +1145,7 @@ def _import_tx_trade(module_suffix: str, attr: str) -> Any:
     except ImportError:
         pass
     # 兜底：python 包的 "-" 在 import 路径里不合法，约定用下划线目录；实际未命中时抛
-    raise ImportError(
-        f"Unable to import {module_suffix}.{attr}; Agent 需在测试 conftest 加 tx-trade/src 到 sys.path"
-    )
+    raise ImportError(f"Unable to import {module_suffix}.{attr}; Agent 需在测试 conftest 加 tx-trade/src 到 sys.path")
 
 
 __all__ = [

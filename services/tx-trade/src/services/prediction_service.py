@@ -274,7 +274,8 @@ async def _get_dish_avg_seconds(
     try:
         from sqlalchemy import text as sa_text
 
-        sql = sa_text("""
+        sql = sa_text(
+            """
             SELECT AVG(EXTRACT(EPOCH FROM (kt.served_at - kt.called_at))) AS avg_seconds,
                    COUNT(*) AS sample_count
             FROM kds_tasks kt
@@ -286,7 +287,8 @@ async def _get_dish_avg_seconds(
               AND kt.served_at IS NOT NULL
               AND kt.served_at > NOW() - INTERVAL '30 days'
               AND kt.status = 'done'
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -316,14 +318,16 @@ async def _get_queue_depth(
     try:
         from sqlalchemy import text as sa_text
 
-        sql = sa_text("""
+        sql = sa_text(
+            """
             SELECT COUNT(*) AS cnt
             FROM kds_tasks
             WHERE dept_id = :dept_id
               AND store_id = :store_id
               AND tenant_id = :tenant_id
               AND status IN ('pending', 'cooking')
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {"dept_id": dept_id, "store_id": store_id, "tenant_id": tenant_id},
@@ -361,7 +365,8 @@ async def _get_avg_dining_minutes(
     try:
         from sqlalchemy import text as sa_text
 
-        sql = sa_text("""
+        sql = sa_text(
+            """
             SELECT AVG(EXTRACT(EPOCH FROM (ds.cleared_at - ds.opened_at)) / 60) AS avg_min,
                    COUNT(*) AS sample_count
             FROM dining_sessions ds
@@ -372,7 +377,8 @@ async def _get_avg_dining_minutes(
               AND t.seats = :seats
               AND ds.cleared_at IS NOT NULL
               AND ds.cleared_at > NOW() - INTERVAL '30 days'
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {"store_id": store_id, "tenant_id": tenant_id, "seats": seats},
@@ -464,14 +470,16 @@ async def predict_order_completion(
         try:
             from sqlalchemy import text as sa_text
 
-            sql = sa_text("""
+            sql = sa_text(
+                """
                 SELECT oi.dish_id, oi.dish_name, oi.dept_id, o.store_id
                 FROM order_items oi
                 JOIN orders o ON o.id = oi.order_id
                 WHERE oi.order_id = :order_id
                   AND o.tenant_id = :tenant_id
                   AND oi.kds_status NOT IN ('done', 'cancelled')
-            """)
+            """
+            )
             result = await db.execute(sql, {"order_id": order_id, "tenant_id": tenant_id})
             rows = result.fetchall()
             pending_items = [
@@ -545,7 +553,8 @@ async def predict_table_turn(
         try:
             from sqlalchemy import text as sa_text
 
-            sql = sa_text("""
+            sql = sa_text(
+                """
                 SELECT
                     EXTRACT(EPOCH FROM (NOW() - o.opened_at)) / 60 AS elapsed_min,
                     t.seats
@@ -554,7 +563,8 @@ async def predict_table_turn(
                 WHERE o.id = :order_id
                   AND o.tenant_id = :tenant_id
                 LIMIT 1
-            """)
+            """
+            )
             result = await db.execute(sql, {"order_id": order_id, "tenant_id": tenant_id})
             row = result.fetchone()
             if row:
@@ -641,7 +651,8 @@ async def get_busy_period_forecast(
         try:
             from sqlalchemy import text as sa_text
 
-            sql = sa_text("""
+            sql = sa_text(
+                """
                 SELECT
                     EXTRACT(HOUR FROM opened_at) AS hour,
                     COUNT(*) AS order_count
@@ -653,7 +664,8 @@ async def get_busy_period_forecast(
                 GROUP BY 1
                 ORDER BY 2 DESC
                 LIMIT 6
-            """)
+            """
+            )
             result = await db.execute(
                 sql,
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": date},

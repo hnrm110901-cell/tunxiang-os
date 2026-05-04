@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from services.repository import InventoryRepository
 
 TENANT_ID = str(uuid.uuid4())

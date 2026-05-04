@@ -100,7 +100,8 @@ async def list_configs(
     await _set_rls(db, tid)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 tpc.id,
                 tpc.table_id,
@@ -127,7 +128,8 @@ async def list_configs(
               AND tpc.is_active = TRUE
               AND tpc.is_deleted = FALSE
             ORDER BY tz.zone_name NULLS LAST, t.table_no NULLS LAST, sms.start_time
-        """),
+        """
+        ),
         {"store_id": str(store_id), "tid": tid},
     )
     rows = result.fetchall()
@@ -180,12 +182,14 @@ async def get_matrix(
 
     # 1. 获取门店市别
     ms_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, start_time, end_time
             FROM store_market_sessions
             WHERE tenant_id = :tid AND store_id = :sid AND is_active = TRUE
             ORDER BY start_time
-        """),
+        """
+        ),
         {"tid": tid, "sid": str(store_id)},
     )
     market_sessions = [
@@ -200,7 +204,8 @@ async def get_matrix(
 
     # 2. 获取门店桌台（按区域分组）
     tables_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT t.id AS table_id, t.table_no, t.seats, t.zone_id,
                    tz.zone_name
             FROM tables t
@@ -209,21 +214,24 @@ async def get_matrix(
               AND t.tenant_id = :tid
               AND t.is_deleted = FALSE
             ORDER BY tz.zone_name NULLS LAST, t.table_no
-        """),
+        """
+        ),
         {"sid": str(store_id), "tid": tid},
     )
     table_rows = tables_result.fetchall()
 
     # 3. 获取所有配置
     cfg_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, table_id, zone_id, market_session_id,
                    is_available, effective_seats, time_limit_min,
                    service_mode_override, pricing_override, target_metrics
             FROM table_period_configs
             WHERE store_id = :sid AND tenant_id = :tid
               AND is_active = TRUE AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": str(store_id), "tid": tid},
     )
     cfg_rows = cfg_result.fetchall()
@@ -307,7 +315,8 @@ async def batch_upsert(
 
         new_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO table_period_configs
                     (id, tenant_id, store_id, table_id, zone_id, market_session_id,
                      is_available, effective_seats, time_limit_min,
@@ -324,7 +333,8 @@ async def batch_upsert(
                     pricing_override = EXCLUDED.pricing_override,
                     target_metrics = EXCLUDED.target_metrics,
                     updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tid,
@@ -362,11 +372,13 @@ async def delete_config(
     await _set_rls(db, tid)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE table_period_configs
             SET is_deleted = TRUE, is_active = FALSE, updated_at = NOW()
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": str(config_id), "tid": tid},
     )
     await db.commit()

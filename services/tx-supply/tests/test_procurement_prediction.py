@@ -71,6 +71,7 @@ def _make_demand(
 #  单元测试：辅助计算函数
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestCalcPurchaseQty:
     """_calc_purchase_qty(demand, stock, safety, lead_days, package_size, safety_factor)"""
 
@@ -149,6 +150,7 @@ class TestCalcPurchaseQty:
 #  集成测试：forecast_ingredient_demand
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestForecastIngredientDemand:
     """forecast_ingredient_demand 集成流程"""
 
@@ -170,17 +172,26 @@ class TestForecastIngredientDemand:
 
         # 模拟阈值列表返回
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-A", ingredient_name="鸡腿",
-                safety_stock=15.0, target_stock=100.0, min_order_qty=5.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-A",
+                ingredient_name="鸡腿",
+                safety_stock=15.0,
+                target_stock=100.0,
+                min_order_qty=5.0,
                 trigger_rule="safety_only",
             ),
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-B", ingredient_name="大葱",
-                safety_stock=5.0, target_stock=50.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-B",
+                ingredient_name="大葱",
+                safety_stock=5.0,
+                target_stock=50.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
         ]
@@ -188,14 +199,22 @@ class TestForecastIngredientDemand:
         with (
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
             patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={"ing-A": 20.0, "ing-B": 8.0})),
-            patch.object(svc, "_fetch_supplier_info", AsyncMock(return_value={
-                "ing-A": {"supplier_id": "sup-001", "lead_days": 1, "package_size": 5.0, "unit_cost_fen": 1200},
-                "ing-B": {"supplier_id": "sup-002", "lead_days": 2, "package_size": 1.0, "unit_cost_fen": 300},
-            })),
+            patch.object(
+                svc,
+                "_fetch_supplier_info",
+                AsyncMock(
+                    return_value={
+                        "ing-A": {"supplier_id": "sup-001", "lead_days": 1, "package_size": 5.0, "unit_cost_fen": 1200},
+                        "ing-B": {"supplier_id": "sup-002", "lead_days": 2, "package_size": 1.0, "unit_cost_fen": 300},
+                    }
+                ),
+            ),
             patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
-            mock_dfs_instance.forecast_next_period = AsyncMock(side_effect=lambda ingredient_id, **kw: mock_forecasts.get(ingredient_id, 0.0))
+            mock_dfs_instance.forecast_next_period = AsyncMock(
+                side_effect=lambda ingredient_id, **kw: mock_forecasts.get(ingredient_id, 0.0)
+            )
 
             result = await svc.forecast_ingredient_demand(
                 store_id=STORE_ID,
@@ -220,11 +239,16 @@ class TestForecastIngredientDemand:
         mock_db = MagicMock()
 
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-C", ingredient_name="食盐",
-                safety_stock=2.0, target_stock=20.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-C",
+                ingredient_name="食盐",
+                safety_stock=2.0,
+                target_stock=20.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
         ]
@@ -233,9 +257,15 @@ class TestForecastIngredientDemand:
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
             # 当前库存 200kg，远超 7 天预测 5kg
             patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={"ing-C": 200.0})),
-            patch.object(svc, "_fetch_supplier_info", AsyncMock(return_value={
-                "ing-C": {"supplier_id": "sup-003", "lead_days": 1, "package_size": 1.0, "unit_cost_fen": 50},
-            })),
+            patch.object(
+                svc,
+                "_fetch_supplier_info",
+                AsyncMock(
+                    return_value={
+                        "ing-C": {"supplier_id": "sup-003", "lead_days": 1, "package_size": 1.0, "unit_cost_fen": 50},
+                    }
+                ),
+            ),
             patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
@@ -258,11 +288,16 @@ class TestForecastIngredientDemand:
         mock_db = MagicMock()
 
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-D", ingredient_name="猪五花",
-                safety_stock=20.0, target_stock=150.0, min_order_qty=5.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-D",
+                ingredient_name="猪五花",
+                safety_stock=20.0,
+                target_stock=150.0,
+                min_order_qty=5.0,
                 trigger_rule="safety_only",
             ),
         ]
@@ -271,14 +306,20 @@ class TestForecastIngredientDemand:
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
             # 当前库存仅 10kg，低于安全库存 20kg
             patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={"ing-D": 10.0})),
-            patch.object(svc, "_fetch_supplier_info", AsyncMock(return_value={
-                "ing-D": {
-                    "supplier_id": "sup-004",
-                    "lead_days": 3,      # 3天交期，需额外储备
-                    "package_size": 5.0,
-                    "unit_cost_fen": 2500,
-                },
-            })),
+            patch.object(
+                svc,
+                "_fetch_supplier_info",
+                AsyncMock(
+                    return_value={
+                        "ing-D": {
+                            "supplier_id": "sup-004",
+                            "lead_days": 3,  # 3天交期，需额外储备
+                            "package_size": 5.0,
+                            "unit_cost_fen": 2500,
+                        },
+                    }
+                ),
+            ),
             patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
@@ -304,6 +345,7 @@ class TestForecastIngredientDemand:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  集成测试：generate_purchase_order_draft
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestGeneratePurchaseOrderDraft:
     """generate_purchase_order_draft：按供应商分组 + AI 摘要条件触发"""
@@ -401,6 +443,7 @@ class TestGeneratePurchaseOrderDraft:
 #  集成测试：get_replenishment_urgency
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestGetReplenishmentUrgency:
     """get_replenishment_urgency：实时低延迟，不走 AI"""
 
@@ -411,35 +454,52 @@ class TestGetReplenishmentUrgency:
         mock_db = MagicMock()
 
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             # 库存 2kg，明日需求 10kg，严重不足
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-E", ingredient_name="生蚝",
-                safety_stock=10.0, target_stock=50.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-E",
+                ingredient_name="生蚝",
+                safety_stock=10.0,
+                target_stock=50.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
             # 库存 50kg，明日需求 5kg，充足
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-F", ingredient_name="食用油",
-                safety_stock=5.0, target_stock=30.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-F",
+                ingredient_name="食用油",
+                safety_stock=5.0,
+                target_stock=30.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
         ]
 
         with (
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
-            patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={
-                "ing-E": 2.0,   # 严重不足
-                "ing-F": 50.0,  # 充足
-            })),
+            patch.object(
+                svc,
+                "_fetch_current_stocks",
+                AsyncMock(
+                    return_value={
+                        "ing-E": 2.0,  # 严重不足
+                        "ing-F": 50.0,  # 充足
+                    }
+                ),
+            ),
             patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
+
             # 明日预计消耗：生蚝10kg，食用油5kg
             async def _daily_forecast(ingredient_id, **kw):
                 return {"ing-E": 10.0, "ing-F": 5.0}.get(ingredient_id, 0.0)
+
             mock_dfs_instance.forecast_next_period = AsyncMock(side_effect=_daily_forecast)
 
             result = await svc.get_replenishment_urgency(
@@ -459,11 +519,16 @@ class TestGetReplenishmentUrgency:
         mock_db = MagicMock()
 
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-G", ingredient_name="辣椒",
-                safety_stock=5.0, target_stock=30.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-G",
+                ingredient_name="辣椒",
+                safety_stock=5.0,
+                target_stock=30.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
         ]
@@ -492,11 +557,16 @@ class TestGetReplenishmentUrgency:
         mock_db = MagicMock()
 
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-H", ingredient_name="虾仁",
-                safety_stock=5.0, target_stock=30.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-H",
+                ingredient_name="虾仁",
+                safety_stock=5.0,
+                target_stock=30.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
         ]
@@ -524,6 +594,7 @@ class TestGetReplenishmentUrgency:
 #  边界值测试
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestEdgeCases:
     """边界值：零库存、负预测、无食材、超大需求"""
 
@@ -546,7 +617,7 @@ class TestEdgeCases:
     def test_negative_forecast_clamped_to_zero(self):
         """负预测量应被钳制到0，不产生负的采购量"""
         qty = _calc_purchase_qty(
-            forecast_demand=-100.0,   # 异常负值
+            forecast_demand=-100.0,  # 异常负值
             current_stock=5.0,
             safety_stock=3.0,
             supplier_lead_days=1,
@@ -580,11 +651,16 @@ class TestEdgeCases:
         mock_db = MagicMock()
 
         from services.smart_replenishment import InventoryThreshold
+
         mock_thresholds = [
             InventoryThreshold(
-                tenant_id=TENANT_ID, store_id=STORE_ID,
-                ingredient_id="ing-I", ingredient_name="测试食材",
-                safety_stock=5.0, target_stock=50.0, min_order_qty=1.0,
+                tenant_id=TENANT_ID,
+                store_id=STORE_ID,
+                ingredient_id="ing-I",
+                ingredient_name="测试食材",
+                safety_stock=5.0,
+                target_stock=50.0,
+                min_order_qty=1.0,
                 trigger_rule="safety_only",
             ),
         ]
@@ -592,9 +668,15 @@ class TestEdgeCases:
         with (
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
             patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={"ing-I": 10.0})),
-            patch.object(svc, "_fetch_supplier_info", AsyncMock(return_value={
-                "ing-I": {"supplier_id": "sup-X", "lead_days": 1, "package_size": 1.0, "unit_cost_fen": 500},
-            })),
+            patch.object(
+                svc,
+                "_fetch_supplier_info",
+                AsyncMock(
+                    return_value={
+                        "ing-I": {"supplier_id": "sup-X", "lead_days": 1, "package_size": 1.0, "unit_cost_fen": 500},
+                    }
+                ),
+            ),
             patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value

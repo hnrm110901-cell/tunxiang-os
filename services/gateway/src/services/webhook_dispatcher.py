@@ -53,14 +53,16 @@ class WebhookDispatcher:
         """
         # 查找订阅该事件的所有active webhook
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, endpoint_url, secret_hash, retry_count
                 FROM api_webhooks
                 WHERE tenant_id = :tenant_id
                   AND is_active = TRUE
                   AND is_deleted = FALSE
                   AND event_types @> :event_type_json::jsonb
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "event_type_json": json.dumps([event_type]),
@@ -117,13 +119,15 @@ class WebhookDispatcher:
             # 异步更新最后推送状态（不阻塞主流程）
             try:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE api_webhooks
                         SET last_triggered_at = NOW(),
                             last_status = :status,
                             updated_at = NOW()
                         WHERE id = :webhook_id
-                    """),
+                    """
+                    ),
                     {"status": status_str, "webhook_id": str(wh["id"])},
                 )
             except Exception as exc:  # noqa: BLE001 — 状态更新失败不阻塞推送结果

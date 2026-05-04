@@ -152,7 +152,8 @@ async def create_job_grade(
     grade_id = str(uuid4())
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO job_grades (
             id, tenant_id, name, category, level,
             min_salary, max_salary, description, requirements,
@@ -163,7 +164,8 @@ async def create_job_grade(
             :sort_order, FALSE, :now, :now
         )
         RETURNING id::text AS grade_id
-    """)
+    """
+    )
 
     result = await db.execute(
         sql,
@@ -197,7 +199,8 @@ async def get_job_grade_statistics(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             jg.id::text AS grade_id,
             jg.name,
@@ -215,7 +218,8 @@ async def get_job_grade_statistics(
         WHERE jg.is_deleted = FALSE
         GROUP BY jg.id, jg.name, jg.category, jg.level, jg.min_salary, jg.max_salary
         ORDER BY jg.level DESC
-    """)
+    """
+    )
 
     result = await db.execute(sql)
     items = []
@@ -252,7 +256,8 @@ async def get_job_grade_detail(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             jg.id::text AS grade_id,
             jg.name,
@@ -270,7 +275,8 @@ async def get_job_grade_detail(
             ) AS employee_count
         FROM job_grades jg
         WHERE jg.id = :grade_id AND jg.is_deleted = FALSE
-    """)
+    """
+    )
 
     result = await db.execute(sql, {"grade_id": grade_id})
     row = result.fetchone()
@@ -361,12 +367,14 @@ async def delete_job_grade(
         raise HTTPException(status_code=400, detail=f"该职级下还有 {emp_count} 名在职员工，请先调整员工职级")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE job_grades
             SET is_deleted = TRUE, updated_at = :now
             WHERE id = :grade_id AND is_deleted = FALSE
             RETURNING id::text AS grade_id
-        """),
+        """
+        ),
         {"grade_id": grade_id, "now": datetime.now(timezone.utc)},
     )
     row = result.fetchone()

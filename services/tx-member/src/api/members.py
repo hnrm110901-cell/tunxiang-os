@@ -8,13 +8,14 @@ from uuid import uuid4
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-from services.repository import WecomRepository
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import MemberEventType
 from shared.ontology.src.database import get_db_with_tenant
+
+from ..services.repository import WecomRepository
 
 logger = structlog.get_logger()
 

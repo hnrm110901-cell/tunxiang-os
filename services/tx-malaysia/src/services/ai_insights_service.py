@@ -11,30 +11,24 @@ AI 驱动的业务优化建议，针对马来西亚餐饮市场特点：
 
 from __future__ import annotations
 
-import math
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from typing import Any
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.tx_agent.src.config.malaysia_holidays import (
-    get_high_impact_periods,
-    get_holidays_by_year,
-    get_holiday_by_name,
-)
 from services.tx_agent.src.config.malaysia_cuisine_profiles import (
-    CUISINE_PROFILES,
     get_cuisine_by_state,
     get_cuisine_profile,
-    MALAYSIA_MEAL_PERIODS,
+)
+from services.tx_agent.src.config.malaysia_holidays import (
+    get_high_impact_periods,
 )
 from services.tx_agent.src.config.malaysia_ingredients import (
     MALAYSIA_INGREDIENTS,
-    get_ingredient,
-    get_perishable_ingredients,
     get_halal_certified_ingredients,
+    get_perishable_ingredients,
 )
 
 logger = structlog.get_logger(__name__)
@@ -123,7 +117,8 @@ class AIInsightsService:
         # 获取最近 30 天的库存消耗数据
         try:
             waste_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         it.ingredient_name,
                         SUM(CASE WHEN it.transaction_type IN ('waste', 'spoilage')
@@ -142,7 +137,8 @@ class AIInsightsService:
                     HAVING SUM(CASE WHEN it.transaction_type IN ('waste', 'spoilage')
                         THEN ABS(it.quantity) ELSE 0 END) > 0
                     ORDER BY wasted_qty DESC
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             waste_data = waste_rows.mappings().fetchall()
@@ -217,7 +213,8 @@ class AIInsightsService:
         # 获取最近营业数据推算人力需求
         try:
             sales_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         EXTRACT(DOW FROM order_time AT TIME ZONE 'Asia/Kuala_Lumpur') AS dow,
                         CASE
@@ -237,7 +234,8 @@ class AIInsightsService:
                       AND is_deleted = FALSE
                     GROUP BY dow, meal_period
                     ORDER BY dow, meal_period
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             sales_data = sales_rows.mappings().fetchall()
@@ -261,15 +259,17 @@ class AIInsightsService:
                 weekend_boost = 1.3 if is_weekend else 1.0
                 staff_needed = max(1, int(round(base_factor * weekend_boost * 3)))
 
-                staffing_predictions.append({
-                    "day_of_week": dow_names[dow],
-                    "dow_index": dow,
-                    "meal_period": period,
-                    "order_count": order_count,
-                    "staff_needed": staff_needed,
-                    "current_staff": None,  # 需从排班表读取
-                    "gap": None,
-                })
+                staffing_predictions.append(
+                    {
+                        "day_of_week": dow_names[dow],
+                        "dow_index": dow,
+                        "meal_period": period,
+                        "order_count": order_count,
+                        "staff_needed": staff_needed,
+                        "current_staff": None,  # 需从排班表读取
+                        "gap": None,
+                    }
+                )
         else:
             # 无数据时的默认排班建议
             for dow_idx in range(7):
@@ -277,20 +277,23 @@ class AIInsightsService:
                 for period_name, factor in STAFFING_FACTORS.items():
                     weekend_boost = 1.3 if is_weekend else 1.0
                     staff_needed = max(1, int(round(factor * weekend_boost * 3)))
-                    staffing_predictions.append({
-                        "day_of_week": dow_names[dow_idx],
-                        "dow_index": dow_idx,
-                        "meal_period": period_name,
-                        "order_count": 0,
-                        "staff_needed": staff_needed,
-                        "current_staff": None,
-                        "gap": None,
-                    })
+                    staffing_predictions.append(
+                        {
+                            "day_of_week": dow_names[dow_idx],
+                            "dow_index": dow_idx,
+                            "meal_period": period_name,
+                            "order_count": 0,
+                            "staff_needed": staff_needed,
+                            "current_staff": None,
+                            "gap": None,
+                        }
+                    )
 
         # 合规检查
         try:
             hours_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(AVG(hours_worked), 0) AS avg_hours_per_week,
                         COALESCE(SUM(overtime_hours), 0) AS total_ot_month
@@ -299,7 +302,8 @@ class AIInsightsService:
                       AND store_id = :sid
                       AND shift_date >= DATE_TRUNC('month', NOW())
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             hr = hours_row.fetchone()
@@ -327,17 +331,17 @@ class AIInsightsService:
             days_until = (h_date - today).days
             if 0 <= days_until <= 90:
                 staff_mult = 1.0 + h.get("dine_in_boost", 0.0)
-                holiday_impacts.append({
-                    "holiday_name": h["name"],
-                    "date": h["date"],
-                    "days_until": days_until,
-                    "staff_multiplier": round(staff_mult, 2),
-                    "suggested_action": (
-                        "增加班次" if staff_mult > 1.15
-                        else "维持正常排班" if staff_mult > 0.95
-                        else "减少排班"
-                    ),
-                })
+                holiday_impacts.append(
+                    {
+                        "holiday_name": h["name"],
+                        "date": h["date"],
+                        "days_until": days_until,
+                        "staff_multiplier": round(staff_mult, 2),
+                        "suggested_action": (
+                            "增加班次" if staff_mult > 1.15 else "维持正常排班" if staff_mult > 0.95 else "减少排班"
+                        ),
+                    }
+                )
 
         # 建议汇总
         recommendations: list[str] = []
@@ -353,10 +357,7 @@ class AIInsightsService:
             f"马来西亚雇佣法要求每周工时 ≤ {EMPLOYMENT_ACT_MAX_HOURS_PER_WEEK}h，"
             f"加班 ≤ {EMPLOYMENT_ACT_MAX_OT_PER_MONTH}h/月"
         )
-        recommendations.append(
-            "法定节假日（Hari Raya/CNY/Deepavali/Christmas等）加班费率3倍，"
-            "建议优先使用自愿加班"
-        )
+        recommendations.append("法定节假日（Hari Raya/CNY/Deepavali/Christmas等）加班费率3倍，" "建议优先使用自愿加班")
 
         result = {
             "store_id": store_id,
@@ -422,7 +423,8 @@ class AIInsightsService:
         # 获取门店当前库存食材
         try:
             inv_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         i.ingredient_name,
                         i.current_quantity,
@@ -435,7 +437,8 @@ class AIInsightsService:
                       AND i.store_id = :sid
                       AND i.is_deleted = FALSE
                     ORDER BY i.current_quantity DESC
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             inventory_data = inv_rows.mappings().fetchall()
@@ -462,12 +465,14 @@ class AIInsightsService:
                 certified_count += 1
             else:
                 risk = "high" if item.get("current_quantity", 0) > 0 else "low"
-                non_certified.append({
-                    "ingredient_name": ing_name,
-                    "supplier": supplier,
-                    "quantity": float(item.get("current_quantity", 0) or 0),
-                    "risk": risk,
-                })
+                non_certified.append(
+                    {
+                        "ingredient_name": ing_name,
+                        "supplier": supplier,
+                        "quantity": float(item.get("current_quantity", 0) or 0),
+                        "risk": risk,
+                    }
+                )
 
             if supplier:
                 if supplier not in supplier_set:
@@ -502,9 +507,7 @@ class AIInsightsService:
             recommendations.append(f"当前 Halal 认证占比 {certified_pct}%，目标 100%")
         recommendations.append("所有食材供应商应每 12 个月更新 JAKIM Halal 认证")
         if "chicken_whole" in [nc["ingredient_name"] for nc in non_certified]:
-            recommendations.append(
-                "鸡肉必须来自 JAKIM 认证供应商（推荐: CP, Leong Hup, Sri Ayamas）"
-            )
+            recommendations.append("鸡肉必须来自 JAKIM 认证供应商（推荐: CP, Leong Hup, Sri Ayamas）")
 
         result = {
             "store_id": store_id,
@@ -576,7 +579,8 @@ class AIInsightsService:
         # 获取门店菜品数据
         try:
             dish_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         d.id AS dish_id,
                         d.name AS dish_name,
@@ -598,7 +602,8 @@ class AIInsightsService:
                     GROUP BY d.id, d.name, d.cuisine_category, d.price_fen, d.cost_fen, d.sst_category
                     ORDER BY total_sales_fen DESC
                     LIMIT 30
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             dish_data = dish_rows.mappings().fetchall()
@@ -663,31 +668,32 @@ class AIInsightsService:
                 risk = "low"
             elif sst_rate > 0 and sst_impact > 0:
                 reason = (
-                    f"SST {int(sst_rate * 100)}% 含税影响约 RM {sst_impact / 100:.2f}，"
-                    f"建议在菜单上明确标注含税价"
+                    f"SST {int(sst_rate * 100)}% 含税影响约 RM {sst_impact / 100:.2f}，" f"建议在菜单上明确标注含税价"
                 )
                 rec_type = "price_increase"
                 suggested_price = price_fen
                 risk = "low"
 
             if reason:
-                recommendations.append({
-                    "recommendation_type": rec_type,
-                    "dish_name": dish_name,
-                    "cuisine_category": cuisine,
-                    "current_price_fen": price_fen,
-                    "current_price_rm": round(price_fen / 100, 2),
-                    "suggested_price_fen": suggested_price,
-                    "suggested_price_rm": round(suggested_price / 100, 2),
-                    "current_margin_pct": round(margin_pct, 1),
-                    "expected_margin_impact_pct": round(
-                        (suggested_price - cost_fen) / suggested_price * 100 - margin_pct, 1
-                    ),
-                    "rationale": reason,
-                    "risk_level": risk,
-                    "sst_category": sst_cat,
-                    "sst_impact_fen": int(round(sst_impact)),
-                })
+                recommendations.append(
+                    {
+                        "recommendation_type": rec_type,
+                        "dish_name": dish_name,
+                        "cuisine_category": cuisine,
+                        "current_price_fen": price_fen,
+                        "current_price_rm": round(price_fen / 100, 2),
+                        "suggested_price_fen": suggested_price,
+                        "suggested_price_rm": round(suggested_price / 100, 2),
+                        "current_margin_pct": round(margin_pct, 1),
+                        "expected_margin_impact_pct": round(
+                            (suggested_price - cost_fen) / suggested_price * 100 - margin_pct, 1
+                        ),
+                        "rationale": reason,
+                        "risk_level": risk,
+                        "sst_category": sst_cat,
+                        "sst_impact_fen": int(round(sst_impact)),
+                    }
+                )
 
         # 按优先级排序
         risk_order = {"high": 0, "medium": 1, "low": 2}
@@ -710,11 +716,13 @@ class AIInsightsService:
         """获取门店基本信息（州、名称等）"""
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT name, city, district, region
                     FROM stores
                     WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"sid": store_id, "tid": tenant_id},
             )
             r = row.fetchone()
@@ -744,7 +752,12 @@ class AIInsightsService:
             shelf_life = ing_profile.get("shelf_life_days", 7)
             is_perishable = ing_profile.get("is_perishable", False)
             storage = ing_profile.get("storage_type", "chilled")
-            monthly_usage = ing_profile.get("typical_monthly_usage_g", 0) or ing_profile.get("typical_monthly_usage_kg", 0) or ing_profile.get("typical_monthly_usage_ml", 0) or 0
+            monthly_usage = (
+                ing_profile.get("typical_monthly_usage_g", 0)
+                or ing_profile.get("typical_monthly_usage_kg", 0)
+                or ing_profile.get("typical_monthly_usage_ml", 0)
+                or 0
+            )
 
             # 季节价格波动分析
             price_factors = ing_profile.get("seasonal_price_fluctuation", {})
@@ -753,11 +766,37 @@ class AIInsightsService:
                 months_range = season_key.split("-")
                 if len(months_range) == 2:
                     try:
-                        start_m = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-                                   "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}[months_range[0][:3]]
-                        end_m = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-                                 "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}[months_range[1][:3]]
-                        if start_m <= this_month <= end_m or (start_m > end_m and (this_month >= start_m or this_month <= end_m)):
+                        start_m = {
+                            "jan": 1,
+                            "feb": 2,
+                            "mar": 3,
+                            "apr": 4,
+                            "may": 5,
+                            "jun": 6,
+                            "jul": 7,
+                            "aug": 8,
+                            "sep": 9,
+                            "oct": 10,
+                            "nov": 11,
+                            "dec": 12,
+                        }[months_range[0][:3]]
+                        end_m = {
+                            "jan": 1,
+                            "feb": 2,
+                            "mar": 3,
+                            "apr": 4,
+                            "may": 5,
+                            "jun": 6,
+                            "jul": 7,
+                            "aug": 8,
+                            "sep": 9,
+                            "oct": 10,
+                            "nov": 11,
+                            "dec": 12,
+                        }[months_range[1][:3]]
+                        if start_m <= this_month <= end_m or (
+                            start_m > end_m and (this_month >= start_m or this_month <= end_m)
+                        ):
                             current_factor = factor
                             break
                     except (KeyError, IndexError):
@@ -774,23 +813,27 @@ class AIInsightsService:
             )
 
             if is_cuisine_relevant or severity != "info":
-                recommendations.append({
-                    "recommendation_type": "overstock" if current_factor > 1.08 else "menu_engineering",
-                    "ingredient_key": ing_key,
-                    "ingredient_name_ms": ing_profile.get("local_names", {}).get("ms", ing_key),
-                    "severity": severity,
-                    "current_waste_pct": round((current_factor - 1.0) * 100, 1),
-                    "suggested_action": (
-                        f"建议减少 {ing_profile.get('local_names', {}).get('ms', ing_key)} 采购量，"
-                        f"当前价格处于季节性高位（×{current_factor}），"
-                        f"保质期 {shelf_life} 天，存储方式: {storage}"
-                        if current_factor > 1.08
-                        else f"监控 {ing_profile.get('local_names', {}).get('ms', ing_key)} 使用量，"
-                             f"保质期 {shelf_life} 天"
-                    ),
-                    "estimated_savings_fen": int(monthly_usage * (current_factor - 1.0) * 10) if current_factor > 1.0 else 0,
-                    "priority": 0,
-                })
+                recommendations.append(
+                    {
+                        "recommendation_type": "overstock" if current_factor > 1.08 else "menu_engineering",
+                        "ingredient_key": ing_key,
+                        "ingredient_name_ms": ing_profile.get("local_names", {}).get("ms", ing_key),
+                        "severity": severity,
+                        "current_waste_pct": round((current_factor - 1.0) * 100, 1),
+                        "suggested_action": (
+                            f"建议减少 {ing_profile.get('local_names', {}).get('ms', ing_key)} 采购量，"
+                            f"当前价格处于季节性高位（×{current_factor}），"
+                            f"保质期 {shelf_life} 天，存储方式: {storage}"
+                            if current_factor > 1.08
+                            else f"监控 {ing_profile.get('local_names', {}).get('ms', ing_key)} 使用量，"
+                            f"保质期 {shelf_life} 天"
+                        ),
+                        "estimated_savings_fen": int(monthly_usage * (current_factor - 1.0) * 10)
+                        if current_factor > 1.0
+                        else 0,
+                        "priority": 0,
+                    }
+                )
 
         return recommendations
 
@@ -823,24 +866,23 @@ class AIInsightsService:
                 savings = int(wasted * 10)  # 粗略估算
             elif waste_pct >= WASTE_MODERATE_THRESHOLD:
                 severity = "moderate"
-                action = (
-                    f"{ing_name} 浪费率 {waste_pct:.1%}。"
-                    f"建议优化库存周转和份量控制"
-                )
+                action = f"{ing_name} 浪费率 {waste_pct:.1%}。" f"建议优化库存周转和份量控制"
                 savings = int(wasted * 5)
             else:
                 continue
 
-            recommendations.append({
-                "recommendation_type": "overstock" if received > consumed * 1.5 else "portion_adjustment",
-                "ingredient_key": ing_name,
-                "ingredient_name_ms": ing_name,
-                "severity": severity,
-                "current_waste_pct": round(waste_pct * 100, 1),
-                "suggested_action": action,
-                "estimated_savings_fen": savings,
-                "priority": 0,
-            })
+            recommendations.append(
+                {
+                    "recommendation_type": "overstock" if received > consumed * 1.5 else "portion_adjustment",
+                    "ingredient_key": ing_name,
+                    "ingredient_name_ms": ing_name,
+                    "severity": severity,
+                    "current_waste_pct": round(waste_pct * 100, 1),
+                    "suggested_action": action,
+                    "estimated_savings_fen": savings,
+                    "priority": 0,
+                }
+            )
 
         return recommendations
 
@@ -867,13 +909,25 @@ class AIInsightsService:
                     if len(parts) == 2:
                         try:
                             month_map = {
-                                "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-                                "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+                                "jan": 1,
+                                "feb": 2,
+                                "mar": 3,
+                                "apr": 4,
+                                "may": 5,
+                                "jun": 6,
+                                "jul": 7,
+                                "aug": 8,
+                                "sep": 9,
+                                "oct": 10,
+                                "nov": 11,
+                                "dec": 12,
                             }
                             start_m = month_map.get(parts[0][:3], 1)
                             end_m = month_map.get(parts[1][:3], 12)
-                            in_range = (start_m <= this_month <= end_m) if start_m <= end_m else (
-                                this_month >= start_m or this_month <= end_m
+                            in_range = (
+                                (start_m <= this_month <= end_m)
+                                if start_m <= end_m
+                                else (this_month >= start_m or this_month <= end_m)
                             )
                             if in_range:
                                 total_factor += factor
@@ -922,10 +976,7 @@ class AIInsightsService:
             },
             "non_certified_ingredients": non_certified_list[:5],
             "supplier_halal_status": [],
-            "warnings": (
-                [f"发现 {len(non_certified_list)} 种食材无 Halal 认证"]
-                if non_certified_list else []
-            ),
+            "warnings": ([f"发现 {len(non_certified_list)} 种食材无 Halal 认证"] if non_certified_list else []),
             "recommendations": [
                 "确认所有食材供应商持有有效的 JAKIM Halal 认证",
                 "对非认证食材建立替换计划",
@@ -954,23 +1005,25 @@ class AIInsightsService:
                 cost_factor = self._get_seasonal_cost_factor(cuisine)
                 suggested_price = int(round(avg_spend * cost_factor))
 
-                recommendations.append({
-                    "recommendation_type": "price_increase" if cost_factor > 1.05 else "menu_reposition",
-                    "dish_name": dish,
-                    "cuisine_category": cuisine,
-                    "current_price_fen": avg_spend,
-                    "current_price_rm": round(avg_spend / 100, 2),
-                    "suggested_price_fen": suggested_price,
-                    "suggested_price_rm": round(suggested_price / 100, 2),
-                    "current_margin_pct": 35.0,
-                    "expected_margin_impact_pct": round((cost_factor - 1.0) * 100, 1),
-                    "rationale": (
-                        f"根据 {cuisine} 菜系客单价（RM {avg_spend / 100:.0f}）和"
-                        f"季节性食材成本（×{cost_factor}）优化定价"
-                    ),
-                    "risk_level": "low",
-                    "sst_category": "standard",
-                    "sst_impact_fen": int(round(avg_spend * 0.06 / 1.06)),
-                })
+                recommendations.append(
+                    {
+                        "recommendation_type": "price_increase" if cost_factor > 1.05 else "menu_reposition",
+                        "dish_name": dish,
+                        "cuisine_category": cuisine,
+                        "current_price_fen": avg_spend,
+                        "current_price_rm": round(avg_spend / 100, 2),
+                        "suggested_price_fen": suggested_price,
+                        "suggested_price_rm": round(suggested_price / 100, 2),
+                        "current_margin_pct": 35.0,
+                        "expected_margin_impact_pct": round((cost_factor - 1.0) * 100, 1),
+                        "rationale": (
+                            f"根据 {cuisine} 菜系客单价（RM {avg_spend / 100:.0f}）和"
+                            f"季节性食材成本（×{cost_factor}）优化定价"
+                        ),
+                        "risk_level": "low",
+                        "sst_category": "standard",
+                        "sst_impact_fen": int(round(avg_spend * 0.06 / 1.06)),
+                    }
+                )
 
         return recommendations

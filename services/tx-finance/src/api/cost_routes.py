@@ -15,9 +15,9 @@ from datetime import date
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from services.tx_finance.src.services.cost_engine import CostEngine
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_finance.src.services.cost_engine import CostEngine
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
@@ -118,7 +118,8 @@ async def get_cost_summary(
 
     try:
         result = await db.execute(
-            __import__("sqlalchemy").text("""
+            __import__("sqlalchemy").text(
+                """
                 SELECT
                     COUNT(DISTINCT cs.order_id)          AS order_count,
                     COALESCE(SUM(cs.raw_material_cost), 0) AS total_raw_cost,
@@ -129,7 +130,8 @@ async def get_cost_summary(
                 WHERE o.store_id = :store_id::UUID
                   AND cs.tenant_id = :tenant_id::UUID
                   AND DATE(cs.computed_at AT TIME ZONE 'UTC') = :biz_date::DATE
-            """),
+            """
+            ),
             {
                 "store_id": str(sid),
                 "tenant_id": str(tid),

@@ -273,9 +273,7 @@ def test_cancel_dispatch_success(client, monkeypatch):
 
 def test_cancel_after_picked_up_returns_409(client, monkeypatch):
     d = _make_dispatch(status="picked_up")
-    monkeypatch.setattr(
-        routes.DeliveryDispatchRepository, "get", AsyncMock(return_value=d)
-    )
+    monkeypatch.setattr(routes.DeliveryDispatchRepository, "get", AsyncMock(return_value=d))
     resp = client.post(
         f"/api/v1/delivery/self/dispatch/{d.dispatch_no}/cancel",
         headers=HEADERS,
@@ -285,9 +283,7 @@ def test_cancel_after_picked_up_returns_409(client, monkeypatch):
 
 
 def test_track_dispatch_not_found_returns_404(client, monkeypatch):
-    monkeypatch.setattr(
-        routes.DeliveryDispatchRepository, "get", AsyncMock(return_value=None)
-    )
+    monkeypatch.setattr(routes.DeliveryDispatchRepository, "get", AsyncMock(return_value=None))
     resp = client.get(
         "/api/v1/delivery/self/dispatch/DSP-NOTEXIST/track",
         headers=HEADERS,
@@ -310,9 +306,7 @@ def test_kds_ready_triggers_notify(client, monkeypatch):
     mark_ready = AsyncMock(return_value=True)
     mark_notified = AsyncMock(return_value=True)
     monkeypatch.setattr(routes.DeliveryDispatchRepository, "mark_kds_ready", mark_ready)
-    monkeypatch.setattr(
-        routes.DeliveryDispatchRepository, "mark_rider_notified", mark_notified
-    )
+    monkeypatch.setattr(routes.DeliveryDispatchRepository, "mark_rider_notified", mark_notified)
 
     resp = client.post(
         "/api/v1/delivery/self/dispatch/kds-ready",

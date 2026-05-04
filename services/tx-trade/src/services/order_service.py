@@ -183,13 +183,15 @@ class OrderService:
         # v150：写入 dining_session_id / order_sequence / is_add_order
         if dining_session_id:
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE orders SET
                         dining_session_id = :dsid,
                         order_sequence    = :seq,
                         is_add_order      = :is_add
                     WHERE id = :oid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {
                     "dsid": uuid.UUID(dining_session_id),
                     "seq": order_sequence,

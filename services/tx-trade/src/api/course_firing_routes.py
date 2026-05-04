@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+
 from ..services.course_firing_service import (
     assign_course,
     check_fire_suggestion,

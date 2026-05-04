@@ -91,7 +91,8 @@ async def create_inbound_record(
     batch_no = body.batch_no or f"B-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{record_id[:8]}"
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_inbound_records (
                     id, tenant_id, store_id, supplier_id, supplier_name,
                     product_name, product_category, batch_no, quantity, unit,
@@ -103,7 +104,8 @@ async def create_inbound_record(
                     :production_date, :expiry_date, :origin_trace_code, :storage_type,
                     :inspection_result, :inspector_id, :inspection_notes, NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tenant_id": x_tenant_id,
@@ -234,7 +236,8 @@ async def create_supplier(
     supplier_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_suppliers (
                     id, tenant_id, supplier_name, license_no, license_type,
                     contact_name, contact_phone, address, valid_until, status, created_at
@@ -242,7 +245,8 @@ async def create_supplier(
                     :id, :tenant_id, :supplier_name, :license_no, :license_type,
                     :contact_name, :contact_phone, :address, :valid_until, 'active', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": supplier_id,
                 "tenant_id": x_tenant_id,
@@ -304,7 +308,8 @@ async def create_coldchain_record(
     record_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_coldchain_records (
                     id, tenant_id, store_id, batch_id, device_id, checkpoint,
                     temperature_c, humidity_pct, operator_id, notes, created_at
@@ -312,7 +317,8 @@ async def create_coldchain_record(
                     :id, :tenant_id, :store_id, :batch_id, :device_id, :checkpoint,
                     :temperature_c, :humidity_pct, :operator_id, :notes, NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tenant_id": x_tenant_id,
@@ -422,7 +428,8 @@ async def submit_trace_data(
         record_count = records.scalar() or 0
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_submissions (
                     id, tenant_id, store_id, domain, record_count,
                     date_from, date_to, status, created_at
@@ -430,7 +437,8 @@ async def submit_trace_data(
                     :id, :tid, :sid, 'traceability', :cnt,
                     :df, :dt, 'pending', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": submission_id,
                 "tid": x_tenant_id,

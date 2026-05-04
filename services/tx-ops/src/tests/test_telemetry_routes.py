@@ -83,6 +83,7 @@ def _override(db_mock: AsyncMock):
 def _override_user(tenant_id: str, user_id: str = "user-A1-test", role: str = "cashier"):
     """A1 安全修复后路由强制 JWT 校验。测试通过 dependency_overrides
     注入与 X-Tenant-ID Header 一致的用户上下文，避免触发 TENANT_MISMATCH。"""
+
     async def _dep():
         return {"user_id": user_id, "tenant_id": tenant_id, "role": role}
 
@@ -386,9 +387,7 @@ class TestXujiSprintA1Extension:
         assert body["ok"] is True
 
         # INSERT 参数含 6 新字段
-        insert_calls = [
-            (s, p) for s, p in captured_params if "INSERT INTO pos_crash_reports" in s
-        ]
+        insert_calls = [(s, p) for s, p in captured_params if "INSERT INTO pos_crash_reports" in s]
         assert len(insert_calls) == 1
         params = insert_calls[0][1]
         assert params["timeout_reason"] == "fetch_timeout"

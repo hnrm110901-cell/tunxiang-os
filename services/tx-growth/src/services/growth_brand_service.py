@@ -37,7 +37,8 @@ class GrowthBrandService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, brand_id, brand_name,
                        growth_enabled, daily_touch_budget,
                        monthly_offer_budget_fen,
@@ -51,7 +52,8 @@ class GrowthBrandService:
                 WHERE brand_id = :brand_id
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"brand_id": str(brand_id)},
         )
         row = result.fetchone()
@@ -100,7 +102,8 @@ class GrowthBrandService:
         margin_floor_pct = data.get("margin_floor_pct", 30)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_brand_configs
                     (id, tenant_id, brand_id, brand_name,
                      growth_enabled, daily_touch_budget,
@@ -132,7 +135,8 @@ class GrowthBrandService:
                     margin_floor_pct = EXCLUDED.margin_floor_pct,
                     updated_at = NOW()
                 RETURNING id, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": config_id,
                 "tenant_id": tenant_id,
@@ -170,7 +174,8 @@ class GrowthBrandService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, brand_id, brand_name, growth_enabled,
                        daily_touch_budget, monthly_offer_budget_fen,
                        max_touch_per_customer_day, max_touch_per_customer_week,
@@ -180,7 +185,8 @@ class GrowthBrandService:
                 FROM growth_brand_configs
                 WHERE is_deleted = FALSE
                 ORDER BY created_at DESC
-            """)
+            """
+            )
         )
         rows = result.fetchall()
         items = []
@@ -222,12 +228,14 @@ class GrowthBrandService:
 
         # 获取配置
         cfg = await db.execute(
-            text("""
+            text(
+                """
                 SELECT daily_touch_budget, monthly_offer_budget_fen
                 FROM growth_brand_configs
                 WHERE brand_id = :brand_id AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"brand_id": str(brand_id)},
         )
         cfg_row = cfg.fetchone()
@@ -246,20 +254,23 @@ class GrowthBrandService:
 
         # 今日触达数
         touch_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM growth_touch_executions
                 WHERE brand_id = :brand_id
                   AND is_deleted = FALSE
                   AND created_at >= CURRENT_DATE
-            """),
+            """
+            ),
             {"brand_id": str(brand_id)},
         )
         daily_used = touch_result.scalar() or 0
 
         # 本月offer金额（attributed_revenue_fen 中有归因的触达总额）
         offer_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(
                     CASE WHEN attributed_order_id IS NOT NULL
                          THEN COALESCE(attributed_revenue_fen, 0)
@@ -270,7 +281,8 @@ class GrowthBrandService:
                 WHERE brand_id = :brand_id
                   AND is_deleted = FALSE
                   AND created_at >= date_trunc('month', CURRENT_DATE)
-            """),
+            """
+            ),
             {"brand_id": str(brand_id)},
         )
         monthly_used_fen = offer_result.scalar() or 0
@@ -308,12 +320,14 @@ class GrowthBrandService:
 
         # 获取配置
         cfg = await db.execute(
-            text("""
+            text(
+                """
                 SELECT max_touch_per_customer_day, max_touch_per_customer_week
                 FROM growth_brand_configs
                 WHERE brand_id = :brand_id AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"brand_id": str(brand_id)},
         )
         cfg_row = cfg.fetchone()
@@ -332,28 +346,32 @@ class GrowthBrandService:
 
         # 今日触达数
         today_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM growth_touch_executions
                 WHERE brand_id = :brand_id
                   AND customer_id = :customer_id
                   AND is_deleted = FALSE
                   AND created_at >= CURRENT_DATE
-            """),
+            """
+            ),
             {"brand_id": str(brand_id), "customer_id": str(customer_id)},
         )
         today_count = today_result.scalar() or 0
 
         # 本周触达数（周一起算）
         week_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM growth_touch_executions
                 WHERE brand_id = :brand_id
                   AND customer_id = :customer_id
                   AND is_deleted = FALSE
                   AND created_at >= date_trunc('week', CURRENT_DATE)
-            """),
+            """
+            ),
             {"brand_id": str(brand_id), "customer_id": str(customer_id)},
         )
         week_count = week_result.scalar() or 0

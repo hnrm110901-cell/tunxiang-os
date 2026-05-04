@@ -19,9 +19,10 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from services.payroll_engine_v3 import PayrollEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.payroll_engine_v3 import PayrollEngine
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/org/payroll", tags=["payroll-engine-v3"])
@@ -147,7 +148,8 @@ async def create_payroll_config(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": x_tenant_id},
     )
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO payroll_configs (
             tenant_id, store_id, employee_role, salary_type,
             base_salary_fen, hourly_rate_fen,
@@ -163,7 +165,8 @@ async def create_payroll_config(
         )
         ON CONFLICT DO NOTHING
         RETURNING id
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -325,10 +328,12 @@ async def get_payroll_record(
     record_row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT * FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+                ),
                 {"id": record_id, "tenant_id": x_tenant_id},
             )
         )
@@ -342,11 +347,13 @@ async def get_payroll_record(
     lines = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT * FROM payroll_line_items
                 WHERE record_id = :record_id AND tenant_id = :tenant_id
                 ORDER BY created_at
-            """),
+            """
+                ),
                 {"record_id": record_id, "tenant_id": x_tenant_id},
             )
         )

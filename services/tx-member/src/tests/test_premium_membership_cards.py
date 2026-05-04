@@ -33,9 +33,9 @@ class TestPurchaseAnnualCard:
     def test_annual_card_discount_rate(self) -> None:
         """年卡 discount_rate 应为 0.88。"""
         product = _PRODUCTS_BY_TYPE["annual"]
-        assert product["benefits"]["discount_rate"] == 0.88, (
-            f"年卡折扣率应为 0.88，实际 {product['benefits']['discount_rate']}"
-        )
+        assert (
+            product["benefits"]["discount_rate"] == 0.88
+        ), f"年卡折扣率应为 0.88，实际 {product['benefits']['discount_rate']}"
 
     def test_annual_card_price_fen(self) -> None:
         """年卡价格应为 88800 分（888元）。"""

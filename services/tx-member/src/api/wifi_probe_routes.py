@@ -13,8 +13,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
-from services.identity_resolver import IdentityResolver
-from services.wifi_probe_service import WiFiProbeService
+
+from ..services.identity_resolver import IdentityResolver
+from ..services.wifi_probe_service import WiFiProbeService
 
 router = APIRouter(prefix="/api/v1/member/wifi", tags=["wifi-probe"])
 

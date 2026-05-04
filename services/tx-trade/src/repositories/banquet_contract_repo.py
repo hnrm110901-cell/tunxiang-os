@@ -41,6 +41,7 @@ class _UniqueViolationSim(Exception):
 
     sqlstate = "23505"
 
+
 # ──────────────────────────────────────────────────────────────────────────
 # 抽象接口
 # ──────────────────────────────────────────────────────────────────────────
@@ -51,20 +52,20 @@ class BanquetContractRepositoryBase(ABC):
 
     # ── 合同主表 ─────────────────────────────────────────────────────
     @abstractmethod
-    async def insert_contract(self, contract: BanquetContract) -> BanquetContract: ...
+    async def insert_contract(self, contract: BanquetContract) -> BanquetContract:
+        ...
 
     @abstractmethod
-    async def get_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetContract]: ...
+    async def get_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetContract]:
+        ...
 
     @abstractmethod
-    async def update_contract(self, contract: BanquetContract) -> BanquetContract: ...
+    async def update_contract(self, contract: BanquetContract) -> BanquetContract:
+        ...
 
     @abstractmethod
-    async def list_contracts_by_lead(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetContract]: ...
+    async def list_contracts_by_lead(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetContract]:
+        ...
 
     @abstractmethod
     async def list_contracts(
@@ -77,39 +78,34 @@ class BanquetContractRepositoryBase(ABC):
         store_id: Optional[uuid.UUID] = None,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetContract], int]: ...
+    ) -> tuple[list[BanquetContract], int]:
+        ...
 
     # ── EO 工单 ─────────────────────────────────────────────────────
     @abstractmethod
-    async def insert_eo_tickets(
-        self, tickets: list[BanquetEOTicket]
-    ) -> list[BanquetEOTicket]: ...
+    async def insert_eo_tickets(self, tickets: list[BanquetEOTicket]) -> list[BanquetEOTicket]:
+        ...
 
     @abstractmethod
-    async def get_eo_ticket(
-        self, eo_ticket_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetEOTicket]: ...
+    async def get_eo_ticket(self, eo_ticket_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetEOTicket]:
+        ...
 
     @abstractmethod
-    async def update_eo_ticket(
-        self, ticket: BanquetEOTicket
-    ) -> BanquetEOTicket: ...
+    async def update_eo_ticket(self, ticket: BanquetEOTicket) -> BanquetEOTicket:
+        ...
 
     @abstractmethod
-    async def list_eo_tickets_by_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetEOTicket]: ...
+    async def list_eo_tickets_by_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetEOTicket]:
+        ...
 
     # ── 审批日志 ────────────────────────────────────────────────────
     @abstractmethod
-    async def insert_approval_log(
-        self, log: BanquetApprovalLog
-    ) -> BanquetApprovalLog: ...
+    async def insert_approval_log(self, log: BanquetApprovalLog) -> BanquetApprovalLog:
+        ...
 
     @abstractmethod
-    async def list_approval_logs(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetApprovalLog]: ...
+    async def list_approval_logs(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetApprovalLog]:
+        ...
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -130,17 +126,13 @@ class InMemoryBanquetContractRepository(BanquetContractRepositoryBase):
         self._contracts[contract.contract_id] = contract
         return contract
 
-    async def get_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetContract]:
+    async def get_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetContract]:
         row = self._contracts.get(contract_id)
         if row is None or row.tenant_id != tenant_id:
             return None
         return row
 
-    async def update_contract(
-        self, contract: BanquetContract
-    ) -> BanquetContract:
+    async def update_contract(self, contract: BanquetContract) -> BanquetContract:
         # C-2 修复：模拟 v283 部分 UNIQUE 索引
         #   (tenant_id, store_id, scheduled_date) WHERE status='signed'
         # 同 (tenant, store, date) 只能有一张 signed 合同。并发场景下
@@ -168,14 +160,8 @@ class InMemoryBanquetContractRepository(BanquetContractRepositoryBase):
         self._contracts[contract.contract_id] = contract
         return contract
 
-    async def list_contracts_by_lead(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetContract]:
-        return [
-            c
-            for c in self._contracts.values()
-            if c.tenant_id == tenant_id and c.lead_id == lead_id
-        ]
+    async def list_contracts_by_lead(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetContract]:
+        return [c for c in self._contracts.values() if c.tenant_id == tenant_id and c.lead_id == lead_id]
 
     async def list_contracts(
         self,
@@ -202,42 +188,28 @@ class InMemoryBanquetContractRepository(BanquetContractRepositoryBase):
         return rows[offset : offset + limit], total
 
     # ── EO 工单 ─────────────────────────────────────────────────────
-    async def insert_eo_tickets(
-        self, tickets: list[BanquetEOTicket]
-    ) -> list[BanquetEOTicket]:
+    async def insert_eo_tickets(self, tickets: list[BanquetEOTicket]) -> list[BanquetEOTicket]:
         for t in tickets:
             self._eo_tickets[t.eo_ticket_id] = t
         return list(tickets)
 
-    async def get_eo_ticket(
-        self, eo_ticket_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetEOTicket]:
+    async def get_eo_ticket(self, eo_ticket_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetEOTicket]:
         row = self._eo_tickets.get(eo_ticket_id)
         if row is None or row.tenant_id != tenant_id:
             return None
         return row
 
-    async def update_eo_ticket(
-        self, ticket: BanquetEOTicket
-    ) -> BanquetEOTicket:
+    async def update_eo_ticket(self, ticket: BanquetEOTicket) -> BanquetEOTicket:
         self._eo_tickets[ticket.eo_ticket_id] = ticket
         return ticket
 
-    async def list_eo_tickets_by_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetEOTicket]:
-        rows = [
-            t
-            for t in self._eo_tickets.values()
-            if t.tenant_id == tenant_id and t.contract_id == contract_id
-        ]
+    async def list_eo_tickets_by_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetEOTicket]:
+        rows = [t for t in self._eo_tickets.values() if t.tenant_id == tenant_id and t.contract_id == contract_id]
         rows.sort(key=lambda t: t.created_at)
         return rows
 
     # ── 审批日志 ────────────────────────────────────────────────────
-    async def insert_approval_log(
-        self, log: BanquetApprovalLog
-    ) -> BanquetApprovalLog:
+    async def insert_approval_log(self, log: BanquetApprovalLog) -> BanquetApprovalLog:
         # C-3 修复：模拟 v283 部分 UNIQUE 索引
         #   (tenant_id, contract_id, role) WHERE action IN ('approve','reject')
         # 同合同同 role 只允许一条终结性决策日志（approve/reject）。
@@ -247,25 +219,21 @@ class InMemoryBanquetContractRepository(BanquetContractRepositoryBase):
                     existing.tenant_id == log.tenant_id
                     and existing.contract_id == log.contract_id
                     and existing.role == log.role
-                    and existing.action in (
+                    and existing.action
+                    in (
                         ApprovalAction.APPROVE,
                         ApprovalAction.REJECT,
                     )
                 ):
                     raise _UniqueViolationSim(
-                        f"approval log already exists for contract_id={log.contract_id} "
-                        f"role={log.role.value}"
+                        f"approval log already exists for contract_id={log.contract_id} " f"role={log.role.value}"
                     )
         self._approval_logs[log.log_id] = log
         return log
 
-    async def list_approval_logs(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetApprovalLog]:
+    async def list_approval_logs(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetApprovalLog]:
         rows = [
-            log
-            for log in self._approval_logs.values()
-            if log.tenant_id == tenant_id and log.contract_id == contract_id
+            log for log in self._approval_logs.values() if log.tenant_id == tenant_id and log.contract_id == contract_id
         ]
         rows.sort(key=lambda log: log.created_at)
         return rows
@@ -466,17 +434,13 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
         )
         return contract
 
-    async def get_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetContract]:
+    async def get_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetContract]:
         row = await self._conn.fetchrow(_SELECT_CONTRACT_SQL, contract_id, tenant_id)
         if row is None:
             return None
         return _row_to_contract(row)
 
-    async def update_contract(
-        self, contract: BanquetContract
-    ) -> BanquetContract:
+    async def update_contract(self, contract: BanquetContract) -> BanquetContract:
         await self._conn.execute(
             _UPDATE_CONTRACT_SQL,
             contract.contract_id,
@@ -498,9 +462,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
         )
         return contract
 
-    async def list_contracts_by_lead(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetContract]:
+    async def list_contracts_by_lead(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetContract]:
         rows = await self._conn.fetch(
             """
             SELECT * FROM banquet_contracts
@@ -557,9 +519,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
         return [_row_to_contract(r) for r in rows], total
 
     # ── EO 工单 ─────────────────────────────────────────────────────
-    async def insert_eo_tickets(
-        self, tickets: list[BanquetEOTicket]
-    ) -> list[BanquetEOTicket]:
+    async def insert_eo_tickets(self, tickets: list[BanquetEOTicket]) -> list[BanquetEOTicket]:
         for t in tickets:
             await self._conn.execute(
                 """
@@ -586,9 +546,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
             )
         return list(tickets)
 
-    async def get_eo_ticket(
-        self, eo_ticket_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetEOTicket]:
+    async def get_eo_ticket(self, eo_ticket_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetEOTicket]:
         row = await self._conn.fetchrow(
             """
             SELECT * FROM banquet_eo_tickets
@@ -601,9 +559,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
             return None
         return _row_to_ticket(row)
 
-    async def update_eo_ticket(
-        self, ticket: BanquetEOTicket
-    ) -> BanquetEOTicket:
+    async def update_eo_ticket(self, ticket: BanquetEOTicket) -> BanquetEOTicket:
         await self._conn.execute(
             """
             UPDATE banquet_eo_tickets
@@ -628,9 +584,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
         )
         return ticket
 
-    async def list_eo_tickets_by_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetEOTicket]:
+    async def list_eo_tickets_by_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetEOTicket]:
         rows = await self._conn.fetch(
             """
             SELECT * FROM banquet_eo_tickets
@@ -643,9 +597,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
         return [_row_to_ticket(r) for r in rows]
 
     # ── 审批日志 ────────────────────────────────────────────────────
-    async def insert_approval_log(
-        self, log: BanquetApprovalLog
-    ) -> BanquetApprovalLog:
+    async def insert_approval_log(self, log: BanquetApprovalLog) -> BanquetApprovalLog:
         await self._conn.execute(
             """
             INSERT INTO banquet_approval_logs (
@@ -665,9 +617,7 @@ class PgBanquetContractRepository(BanquetContractRepositoryBase):
         )
         return log
 
-    async def list_approval_logs(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetApprovalLog]:
+    async def list_approval_logs(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetApprovalLog]:
         rows = await self._conn.fetch(
             """
             SELECT * FROM banquet_approval_logs

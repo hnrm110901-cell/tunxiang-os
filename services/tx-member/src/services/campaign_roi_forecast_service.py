@@ -43,6 +43,7 @@ DEFAULT_MOVING_WINDOW_DAYS = 7
 @dataclass
 class TimeSeriesPoint:
     """一个时间序列点"""
+
     day: date
     revenue_fen: int
 
@@ -50,30 +51,30 @@ class TimeSeriesPoint:
 @dataclass
 class ForecastResult:
     """单次预测的结构化结果"""
-    model: str                        # prophet / moving_average / linear
+
+    model: str  # prophet / moving_average / linear
     model_version: Optional[str] = None
     baseline_fen_by_day: dict = field(default_factory=dict)
     baseline_total_fen: int = 0
-    confidence: float = 0.0           # 0-1
+    confidence: float = 0.0  # 0-1
     training_data_snapshot: dict = field(default_factory=dict)
 
 
 @dataclass
 class BacktestResult:
     """基于实际数据的回测结果（用于算 MAPE）"""
+
     true_revenue_fen: int
-    true_baseline_fen: int            # 从无活动期反推
+    true_baseline_fen: int  # 从无活动期反推
     true_uplift_fen: int
-    mape: float                       # 0-1，>1 表示偏离巨大
+    mape: float  # 0-1，>1 表示偏离巨大
     needs_calibration: bool
 
 
-def mean_absolute_percentage_error(
-    actual: list[float], predicted: list[float]
-) -> float:
+def mean_absolute_percentage_error(actual: list[float], predicted: list[float]) -> float:
     """MAPE = 平均(|actual - predicted| / |actual|)，actual=0 跳过"""
     if not actual or len(actual) != len(predicted):
-        return 1.0   # 数据缺失 → 默认 100% 偏差（触发 calibration）
+        return 1.0  # 数据缺失 → 默认 100% 偏差（触发 calibration）
     pairs = [(a, p) for a, p in zip(actual, predicted) if a != 0]
     if not pairs:
         return 1.0
@@ -105,10 +106,7 @@ def moving_average_forecast(
         std = math.sqrt(variance)
         cv = std / mean if mean > 0 else 1.0
         conf = max(0.2, min(0.85, 1.0 - cv))
-    result = {
-        last_day + timedelta(days=i + 1): int(avg)
-        for i in range(forecast_days)
-    }
+    result = {last_day + timedelta(days=i + 1): int(avg) for i in range(forecast_days)}
     return result, round(conf, 3)
 
 
@@ -132,9 +130,7 @@ def linear_trend_forecast(
 
     # R² 作 confidence
     ss_total = sum((y - mean_y) ** 2 for y in ys)
-    ss_residual = sum(
-        (ys[i] - (slope * xs[i] + intercept)) ** 2 for i in range(n)
-    )
+    ss_residual = sum((ys[i] - (slope * xs[i] + intercept)) ** 2 for i in range(n))
     r2 = 1 - ss_residual / ss_total if ss_total > 0 else 0.0
     conf = max(0.2, min(0.85, r2))
 
@@ -162,10 +158,10 @@ def try_prophet_forecast(
 
     try:
         # 构造 Prophet 输入
-        rows = [{"ds": p.day.isoformat(), "y": p.revenue_fen}
-                for p in sorted(history, key=lambda p: p.day)]
+        rows = [{"ds": p.day.isoformat(), "y": p.revenue_fen} for p in sorted(history, key=lambda p: p.day)]
         # 延迟导入 pandas，避免模块级依赖
         import pandas as pd  # type: ignore
+
         df = pd.DataFrame(rows)
 
         m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=False)
@@ -302,18 +298,14 @@ class CampaignROIForecastService:
         )
 
         if self.sonnet_invoker is None:
-            return self._fallback_analysis(
-                campaign_name=campaign_name, forecast=forecast, backtest=backtest
-            )
+            return self._fallback_analysis(campaign_name=campaign_name, forecast=forecast, backtest=backtest)
 
         try:
             response = await self.sonnet_invoker(prompt, "claude-sonnet-4-6")
             return self._parse_sonnet_response(response, backtest=backtest)
         except Exception as exc:  # noqa: BLE001
             logger.warning("sonnet_analysis_failed error=%s", exc)
-            return self._fallback_analysis(
-                campaign_name=campaign_name, forecast=forecast, backtest=backtest
-            )
+            return self._fallback_analysis(campaign_name=campaign_name, forecast=forecast, backtest=backtest)
 
     # ─── 私有辅助 ────────────────────────────────────────────────
 
@@ -357,9 +349,7 @@ class CampaignROIForecastService:
         return "\n".join(parts)
 
     @staticmethod
-    def _parse_sonnet_response(
-        response: str, backtest: Optional[BacktestResult]
-    ) -> tuple[str, list[dict]]:
+    def _parse_sonnet_response(response: str, backtest: Optional[BacktestResult]) -> tuple[str, list[dict]]:
         """解析 Sonnet 返回。格式约定：首段文本 + 1-3 行 action|lift|priority"""
         actions: list[dict] = []
         analysis_lines: list[str] = []
@@ -367,11 +357,13 @@ class CampaignROIForecastService:
             parts = line.strip().split("|")
             if len(parts) >= 3:
                 try:
-                    actions.append({
-                        "action": parts[0].strip(),
-                        "expected_lift_fen": int(parts[1].strip()),
-                        "priority": parts[2].strip().lower(),
-                    })
+                    actions.append(
+                        {
+                            "action": parts[0].strip(),
+                            "expected_lift_fen": int(parts[1].strip()),
+                            "priority": parts[2].strip().lower(),
+                        }
+                    )
                     continue
                 except ValueError:
                     pass
@@ -432,6 +424,7 @@ class CampaignROIForecastService:
 # DB 持久化辅助
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def save_forecast_to_db(
     db: Any,
     *,
@@ -453,7 +446,9 @@ async def save_forecast_to_db(
     from sqlalchemy import text
 
     record_id = str(uuid.uuid4())
-    await db.execute(text("""
+    await db.execute(
+        text(
+            """
         INSERT INTO campaign_roi_forecasts (
             id, tenant_id, store_id, campaign_id,
             campaign_name, campaign_type,
@@ -478,28 +473,33 @@ async def save_forecast_to_db(
             CAST(:training_snapshot AS jsonb),
             'plan'
         )
-    """), {
-        "id": record_id,
-        "tenant_id": tenant_id,
-        "store_id": store_id,
-        "campaign_id": campaign_id,
-        "campaign_name": campaign_name,
-        "campaign_type": campaign_type,
-        "forecast_start": forecast_start,
-        "forecast_end": forecast_end,
-        "forecast_model": forecast.model,
-        "model_version": forecast.model_version,
-        "baseline_forecast_fen": forecast.baseline_total_fen,
-        "uplift_forecast_fen": uplift_forecast_fen,
-        "forecast_confidence": forecast.confidence,
-        "sonnet_analysis": sonnet_analysis,
-        "recommended_actions": json.dumps(recommended_actions or [], ensure_ascii=False),
-        "training_snapshot": json.dumps(forecast.training_data_snapshot, ensure_ascii=False),
-    })
+    """
+        ),
+        {
+            "id": record_id,
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "campaign_id": campaign_id,
+            "campaign_name": campaign_name,
+            "campaign_type": campaign_type,
+            "forecast_start": forecast_start,
+            "forecast_end": forecast_end,
+            "forecast_model": forecast.model,
+            "model_version": forecast.model_version,
+            "baseline_forecast_fen": forecast.baseline_total_fen,
+            "uplift_forecast_fen": uplift_forecast_fen,
+            "forecast_confidence": forecast.confidence,
+            "sonnet_analysis": sonnet_analysis,
+            "recommended_actions": json.dumps(recommended_actions or [], ensure_ascii=False),
+            "training_snapshot": json.dumps(forecast.training_data_snapshot, ensure_ascii=False),
+        },
+    )
     await db.commit()
     logger.info(
         "campaign_roi_forecast_saved id=%s model=%s baseline_fen=%s",
-        record_id, forecast.model, forecast.baseline_total_fen,
+        record_id,
+        forecast.model,
+        forecast.baseline_total_fen,
     )
     return record_id
 
@@ -518,7 +518,9 @@ async def complete_forecast_with_backtest(
 
     from sqlalchemy import text
 
-    result = await db.execute(text("""
+    result = await db.execute(
+        text(
+            """
         UPDATE campaign_roi_forecasts
         SET status = 'completed',
             actual_revenue_fen = :actual_revenue_fen,
@@ -534,17 +536,20 @@ async def complete_forecast_with_backtest(
           AND status IN ('plan', 'running')
           AND is_deleted = false
         RETURNING id
-    """), {
-        "id": forecast_id,
-        "tenant_id": tenant_id,
-        "actual_revenue_fen": backtest.true_revenue_fen,
-        "actual_baseline_fen": backtest.true_baseline_fen,
-        "true_uplift_fen": backtest.true_uplift_fen,
-        "mape": backtest.mape,
-        "needs_calibration": backtest.needs_calibration,
-        "sonnet_analysis": sonnet_analysis,
-        "recommended_actions": json.dumps(recommended_actions, ensure_ascii=False) if recommended_actions else None,
-    })
+    """
+        ),
+        {
+            "id": forecast_id,
+            "tenant_id": tenant_id,
+            "actual_revenue_fen": backtest.true_revenue_fen,
+            "actual_baseline_fen": backtest.true_baseline_fen,
+            "true_uplift_fen": backtest.true_uplift_fen,
+            "mape": backtest.mape,
+            "needs_calibration": backtest.needs_calibration,
+            "sonnet_analysis": sonnet_analysis,
+            "recommended_actions": json.dumps(recommended_actions, ensure_ascii=False) if recommended_actions else None,
+        },
+    )
     row = result.first()
     await db.commit()
     return row is not None

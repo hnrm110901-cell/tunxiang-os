@@ -94,9 +94,7 @@ def test_100w_revenue_5pct_royalty_no_float_error():
 
     result_fen = RoyaltyCalculator.calculate_fen(revenue_fen, franchisee)
 
-    assert isinstance(result_fen, int), (
-        f"calculate_fen() 必须返回 int（分），实际返回 {type(result_fen).__name__}"
-    )
+    assert isinstance(result_fen, int), f"calculate_fen() 必须返回 int（分），实际返回 {type(result_fen).__name__}"
     assert result_fen == 5_000_000, (
         f"100 万元 × 5% 必须精确等于 5 万元（500 万分），实际 {result_fen} 分。"
         " 任何漂移都会触发对账争议（徐记海鲜验收门槛）。"
@@ -355,7 +353,5 @@ def test_decimal_quantize_used_internally_smoke():
     revenue_fen = 88_888_800  # 88.8888 万元
     result = RoyaltyCalculator.calculate_fen(revenue_fen, franchisee)
     # 88_888_800 × 0.0375 = 3_333_330（精确）
-    expected = int(
-        (Decimal(revenue_fen) * Decimal("0.0375")).quantize(Decimal("1"))
-    )
+    expected = int((Decimal(revenue_fen) * Decimal("0.0375")).quantize(Decimal("1")))
     assert result == expected, f"3.75% 费率精确计算失败，期望 {expected}，实际 {result}"

@@ -11,6 +11,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
@@ -24,10 +28,6 @@ from services.payroll_engine import (
     derive_hourly_rate,
     summarize_payroll,
 )
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/org", tags=["payslips"])
@@ -233,7 +233,8 @@ async def generate_payslips(
                 deductions_fen = summary.get("deductions_fen", 0)
                 net_pay_fen = summary.get("net_pay_fen", 0)
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO payslip_records
                             (tenant_id, store_id, employee_id, pay_period,
                              gross_pay_fen, deductions_fen, net_pay_fen,
@@ -244,7 +245,8 @@ async def generate_payslips(
                              :breakdown::jsonb, :meta::jsonb, 'draft')
                         ON CONFLICT DO NOTHING
                         RETURNING id
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "store_id": slip["store_id"],
@@ -290,19 +292,22 @@ async def list_payslips(
     try:
         await _set_tenant(db, tenant_id)
         count_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM payslip_records
                 WHERE tenant_id = :tenant_id::uuid
                   AND store_id   = :store_id
                   AND pay_period = :pay_period
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "pay_period": month},
         )
         total: int = count_row.scalar_one()
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, employee_id, pay_period,
                        gross_pay_fen, deductions_fen, net_pay_fen,
                        breakdown, meta, status,
@@ -315,7 +320,8 @@ async def list_payslips(
                 ORDER BY created_at DESC
                 LIMIT  :lim
                 OFFSET :off
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -350,7 +356,8 @@ async def get_payslip(
     try:
         await _set_tenant(db, tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, employee_id, pay_period,
                        gross_pay_fen, deductions_fen, net_pay_fen,
                        breakdown, meta, status,
@@ -359,7 +366,8 @@ async def get_payslip(
                 WHERE tenant_id = :tenant_id::uuid
                   AND id        = :pid::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "pid": pid},
         )
         record = row.mappings().first()
@@ -401,7 +409,8 @@ async def update_payslip_status(
     try:
         await _set_tenant(db, tenant_id)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE payslip_records
                    SET status     = :status,
                        updated_at = NOW()
@@ -410,7 +419,8 @@ async def update_payslip_status(
                   AND id         = :pid::uuid
                   AND is_deleted = FALSE
                 RETURNING id, status, updated_at
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "pid": pid, "status": new_status},
         )
         updated = result.mappings().first()

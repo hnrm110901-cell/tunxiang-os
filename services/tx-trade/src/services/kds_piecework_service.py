@@ -45,7 +45,8 @@ class KdsPieceworkService:
         # 幂等：kds_task_id 冲突时走 ON CONFLICT DO NOTHING
         record_id = str(uuid.uuid4())
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kds_piecework_records (
                     tenant_id, id, store_id, employee_id, shift_date,
                     dish_id, dish_name, practice_names, quantity,
@@ -60,7 +61,8 @@ class KdsPieceworkService:
                 ON CONFLICT (kds_task_id) WHERE kds_task_id IS NOT NULL
                 DO NOTHING
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": record_id,
@@ -82,11 +84,13 @@ class KdsPieceworkService:
         if row is None and kds_task_id:
             # 幂等命中：返回已有记录
             existing = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, employee_id, dish_name, quantity, total_commission_fen
                     FROM kds_piecework_records
                     WHERE kds_task_id = :kds_task_id AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"kds_task_id": kds_task_id},
             )
             existing_row = existing.fetchone()
@@ -132,7 +136,8 @@ class KdsPieceworkService:
     ) -> dict:
         """获取员工在日期范围内的计件汇总"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                    AS total_records,
                     COALESCE(SUM(quantity), 0)  AS total_quantity,
@@ -144,7 +149,8 @@ class KdsPieceworkService:
                   AND employee_id = :employee_id
                   AND shift_date BETWEEN :start_date AND :end_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -180,20 +186,23 @@ class KdsPieceworkService:
         offset = (page - 1) * size
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS total
                 FROM kds_piecework_records
                 WHERE tenant_id = :tenant_id
                   AND store_id  = :store_id
                   AND shift_date = :shift_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "shift_date": shift_date},
         )
         total = count_result.scalar() or 0
 
         items_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, dish_id, dish_name, practice_names,
                        quantity, unit_commission_fen, total_commission_fen,
                        confirmed_by, kds_task_id, recorded_at
@@ -204,7 +213,8 @@ class KdsPieceworkService:
                   AND is_deleted = FALSE
                 ORDER BY recorded_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -249,7 +259,8 @@ class KdsPieceworkService:
         """
         # 1) 获取当前有效方案
         schemes_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, scheme_name, scheme_type, rules
                 FROM kds_piecework_schemes
                 WHERE tenant_id = :tenant_id
@@ -259,14 +270,16 @@ class KdsPieceworkService:
                   AND (effective_until IS NULL OR effective_until >= :shift_date)
                   AND is_deleted = FALSE
                 ORDER BY store_id NULLS LAST
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "shift_date": shift_date},
         )
         schemes = schemes_result.fetchall()
 
         # 2) 获取当日计件记录
         records_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, dish_name, practice_names, quantity,
                        unit_commission_fen, total_commission_fen
                 FROM kds_piecework_records
@@ -275,7 +288,8 @@ class KdsPieceworkService:
                   AND employee_id = :employee_id
                   AND shift_date  = :shift_date
                   AND is_deleted  = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -318,7 +332,8 @@ class KdsPieceworkService:
 
         scheme_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kds_piecework_schemes (
                     tenant_id, id, store_id, scheme_name, scheme_type,
                     rules, effective_from, effective_until
@@ -326,7 +341,8 @@ class KdsPieceworkService:
                     :tenant_id, :id, :store_id, :scheme_name, :scheme_type,
                     :rules::JSONB, :effective_from, :effective_until
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": scheme_id,
@@ -373,11 +389,13 @@ class KdsPieceworkService:
             params["effective_until"] = effective_until
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE kds_piecework_schemes
                 SET {", ".join(sets)}
                 WHERE tenant_id = :tenant_id AND id = :scheme_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -388,12 +406,14 @@ class KdsPieceworkService:
     async def get_scheme(db: AsyncSession, tenant_id: str, scheme_id: str) -> Optional[dict]:
         """获取单个方案"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, scheme_name, scheme_type, is_active,
                        rules, effective_from, effective_until, created_at
                 FROM kds_piecework_schemes
                 WHERE tenant_id = :tenant_id AND id = :scheme_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "scheme_id": scheme_id},
         )
         row = result.fetchone()
@@ -441,14 +461,16 @@ class KdsPieceworkService:
         params["limit"] = size
         params["offset"] = offset
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, scheme_name, scheme_type, is_active,
                        effective_from, effective_until, created_at
                 FROM kds_piecework_schemes
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = items_result.fetchall()
@@ -470,11 +492,13 @@ class KdsPieceworkService:
     async def delete_scheme(db: AsyncSession, tenant_id: str, scheme_id: str) -> dict:
         """软删除方案"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE kds_piecework_schemes
                 SET is_deleted = TRUE, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :scheme_id
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "scheme_id": scheme_id},
         )
         await db.commit()

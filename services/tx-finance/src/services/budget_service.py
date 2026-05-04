@@ -446,7 +446,8 @@ class BudgetService:
         cb = uuid.UUID(created_by) if created_by else None
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO budget_plans
                     (tenant_id, store_id, period_type, period, category,
                      budget_fen, note, created_by, status)
@@ -460,7 +461,8 @@ class BudgetService:
                     updated_at = NOW()
                 RETURNING id, store_id, period_type, period, category,
                           budget_fen, note, status, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "sid": sid,
@@ -488,13 +490,15 @@ class BudgetService:
         """查询单个预算计划"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, period_type, period, category,
                        budget_fen, note, created_by, approved_by, approved_at,
                        status, created_at, updated_at
                 FROM budget_plans
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(plan_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -549,12 +553,14 @@ class BudgetService:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE budget_plans
                 SET status = 'approved', approved_by = :approver,
                     approved_at = :now, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "approver": uuid.UUID(approved_by),
                 "now": now,
@@ -590,14 +596,16 @@ class BudgetService:
 
         exec_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO budget_executions
                     (id, tenant_id, budget_plan_id, actual_fen,
                      variance_fen, variance_pct, tracked_at, note)
                 VALUES
                     (:id, :tid, :pid, :actual,
                      :var_fen, :var_pct, :tracked, :note)
-            """),
+            """
+            ),
             {
                 "id": exec_id,
                 "tid": self._tid,
@@ -637,13 +645,15 @@ class BudgetService:
             raise ValueError(f"预算计划 {plan_id} 不存在")
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT actual_fen, variance_fen, variance_pct, tracked_at, note, created_at
                 FROM budget_executions
                 WHERE tenant_id = :tid AND budget_plan_id = :pid
                 ORDER BY tracked_at DESC, created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": self._tid, "pid": uuid.UUID(plan_id)},
         )
         row = result.fetchone()
@@ -697,13 +707,15 @@ class BudgetService:
 
         # 预算计划
         plans_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, category, budget_fen, status
                 FROM budget_plans
                 WHERE tenant_id = :tid AND store_id = :sid
                   AND period_type = :ptype AND period = :period
                 ORDER BY category
-            """),
+            """
+            ),
             {"tid": self._tid, "sid": sid, "ptype": period_type, "period": period},
         )
         plans = {
@@ -725,13 +737,15 @@ class BudgetService:
 
         # 最新执行金额（每个 plan 取最新一条）
         exec_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT ON (budget_plan_id)
                     budget_plan_id, actual_fen, variance_fen, variance_pct, tracked_at
                 FROM budget_executions
                 WHERE tenant_id = :tid AND budget_plan_id = ANY(:pids)
                 ORDER BY budget_plan_id, tracked_at DESC, created_at DESC
-            """),
+            """
+            ),
             {"tid": self._tid, "pids": plan_ids},
         )
         executions = {

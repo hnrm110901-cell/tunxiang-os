@@ -40,24 +40,28 @@ class BanquetGrowthAgent:
         # 查询历史同月数据
         month_num = int(target_month.split("-")[1])
         rows = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT event_type, COUNT(*) AS cnt, SUM(total_amount_fen) AS revenue
             FROM banquets
             WHERE store_id = :sid AND tenant_id = :tid
               AND EXTRACT(MONTH FROM event_date) = :m
               AND status IN ('completed','settled') AND is_deleted = FALSE
             GROUP BY event_type
-        """),
+        """
+            ),
             {"sid": store_id, "tid": self.tenant_id, "m": month_num},
         )
         history = {r["event_type"]: {"count": r["cnt"], "revenue": r["revenue"]} for r in rows.mappings().all()}
         # 查询同月去年总趋势
         total_row = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) AS total FROM banquets
             WHERE store_id = :sid AND tenant_id = :tid AND EXTRACT(MONTH FROM event_date) = :m
               AND status IN ('completed','settled') AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"sid": store_id, "tid": self.tenant_id, "m": month_num},
         )
         hist_total = total_row.scalar_one() or 0
@@ -73,12 +77,14 @@ class BanquetGrowthAgent:
             )
             # 写入预测表
             await self.db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO banquet_demand_forecasts (id, tenant_id, store_id, forecast_month, event_type, predicted_count, predicted_revenue_fen, factors_json)
                 VALUES (:id, :tid, :sid, :month, :etype, :cnt, :rev, :factors::jsonb)
                 ON CONFLICT (tenant_id, store_id, forecast_month, event_type) WHERE is_deleted = FALSE
                 DO UPDATE SET predicted_count = :cnt, predicted_revenue_fen = :rev, updated_at = NOW()
-            """),
+            """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tid": self.tenant_id,
@@ -107,14 +113,16 @@ class BanquetGrowthAgent:
         now = datetime.now(timezone.utc)
         # 去年同月完成的宴会 → 周年复购提醒
         rows = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT b.id, b.banquet_no, b.host_name, b.host_phone, b.event_type, b.event_date, b.total_amount_fen
             FROM banquets b
             WHERE b.store_id = :sid AND b.tenant_id = :tid
               AND b.status IN ('completed','settled') AND b.is_deleted = FALSE
               AND EXTRACT(MONTH FROM b.event_date) = EXTRACT(MONTH FROM CURRENT_DATE)
               AND EXTRACT(YEAR FROM b.event_date) < EXTRACT(YEAR FROM CURRENT_DATE)
-        """),
+        """
+            ),
             {"sid": store_id, "tid": self.tenant_id},
         )
         opportunities = []
@@ -137,7 +145,8 @@ class BanquetGrowthAgent:
         """流失预警: 高价值客户N天未询价"""
         cutoff = datetime.now(timezone.utc) - timedelta(days=days_threshold)
         rows = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT bl.customer_name, bl.phone, bl.company, MAX(bl.created_at) AS last_inquiry,
                    COUNT(*) AS total_inquiries
             FROM banquet_leads bl
@@ -146,7 +155,8 @@ class BanquetGrowthAgent:
             GROUP BY bl.customer_name, bl.phone, bl.company
             HAVING MAX(bl.created_at) < :cutoff AND COUNT(*) >= 2
             ORDER BY MAX(bl.created_at)
-        """),
+        """
+            ),
             {"sid": store_id, "tid": self.tenant_id, "cutoff": cutoff},
         )
         return [

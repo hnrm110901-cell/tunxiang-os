@@ -42,7 +42,8 @@ class GrowthCrossBrandService:
 
         # 各品牌下的增长状态
         brand_profiles = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 cgp.brand_id,
                 gbc.brand_name,
@@ -56,7 +57,8 @@ class GrowthCrossBrandService:
             LEFT JOIN growth_brand_configs gbc
                 ON gbc.brand_id = cgp.brand_id AND gbc.tenant_id = cgp.tenant_id
             WHERE cgp.customer_id = :cid AND cgp.is_deleted = FALSE
-        """),
+        """
+            ),
             {"cid": str(customer_id)},
         )
 
@@ -64,7 +66,8 @@ class GrowthCrossBrandService:
 
         # 统一触达历史（跨品牌合并）
         touch_summary = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 brand_id,
                 COUNT(*) AS total_touches,
@@ -74,7 +77,8 @@ class GrowthCrossBrandService:
             FROM growth_touch_executions
             WHERE customer_id = :cid AND is_deleted = FALSE
             GROUP BY brand_id
-        """),
+        """
+            ),
             {"cid": str(customer_id)},
         )
 
@@ -82,7 +86,8 @@ class GrowthCrossBrandService:
 
         # 跨品牌总计
         total_touch = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE) AS today,
@@ -90,7 +95,8 @@ class GrowthCrossBrandService:
             FROM growth_touch_executions
             WHERE customer_id = :cid AND is_deleted = FALSE
               AND execution_state NOT IN ('blocked','skipped')
-        """),
+        """
+            ),
             {"cid": str(customer_id)},
         )
         tt = total_touch.fetchone()
@@ -114,14 +120,16 @@ class GrowthCrossBrandService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE) AS today,
                 COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS week
             FROM growth_touch_executions
             WHERE customer_id = :cid AND is_deleted = FALSE
               AND execution_state NOT IN ('blocked','skipped')
-        """),
+        """
+            ),
             {"cid": str(customer_id)},
         )
         r = result.fetchone()
@@ -165,7 +173,8 @@ class GrowthCrossBrandService:
 
         # 查在多个品牌下有画像的客户
         result = await db.execute(
-            text("""
+            text(
+                """
             WITH multi_brand_customers AS (
                 SELECT customer_id, COUNT(DISTINCT brand_id) AS brand_count
                 FROM customer_growth_profiles
@@ -201,7 +210,8 @@ class GrowthCrossBrandService:
             GROUP BY customer_id, brand_count
             ORDER BY brand_count DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+            ),
             {"min_brands": min_brands, "size": size, "offset": offset},
         )
 
@@ -237,7 +247,8 @@ class GrowthCrossBrandService:
 
         # 总数
         count_result = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) FROM (
                 SELECT customer_id
                 FROM customer_growth_profiles
@@ -245,7 +256,8 @@ class GrowthCrossBrandService:
                 GROUP BY customer_id
                 HAVING COUNT(DISTINCT brand_id) >= :min_brands
             ) sub
-        """),
+        """
+            ),
             {"min_brands": min_brands},
         )
         total = count_result.scalar() or 0
@@ -269,22 +281,26 @@ class GrowthCrossBrandService:
 
         # 源品牌画像
         source = await db.execute(
-            text("""
+            text(
+                """
             SELECT repurchase_stage, super_user_level, growth_milestone_stage, psych_distance_level
             FROM customer_growth_profiles
             WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"cid": str(customer_id), "bid": str(source_brand_id)},
         )
         src = source.fetchone()
 
         # 目标品牌画像
         target = await db.execute(
-            text("""
+            text(
+                """
             SELECT repurchase_stage, reactivation_priority, psych_distance_level
             FROM customer_growth_profiles
             WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"cid": str(customer_id), "bid": str(target_brand_id)},
         )
         tgt = target.fetchone()

@@ -101,7 +101,8 @@ class TableLayoutService:
     ) -> Optional[TableLayout]:
         """获取指定楼层布局"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, floor_no, floor_name,
                        canvas_width, canvas_height, layout_json,
                        version, published_at
@@ -110,7 +111,8 @@ class TableLayoutService:
                   AND tenant_id = :tenant_id
                   AND floor_no  = :floor_no
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tenant_id": str(tenant_id), "floor_no": floor_no},
         )
         record = row.mappings().first()
@@ -132,7 +134,8 @@ class TableLayoutService:
         """创建或更新布局（自动递增版本号）"""
         now = datetime.now(timezone.utc)
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO table_layouts
                     (tenant_id, store_id, floor_no, floor_name,
                      layout_json, version, published_at, published_by,
@@ -152,7 +155,8 @@ class TableLayoutService:
                 RETURNING id, store_id, floor_no, floor_name,
                           canvas_width, canvas_height, layout_json,
                           version, published_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -176,7 +180,8 @@ class TableLayoutService:
     ) -> list[TableLayoutSummary]:
         """获取门店所有楼层列表（不含完整 layout_json）"""
         rows = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT floor_no,
                        COALESCE(floor_name, '') AS floor_name,
                        jsonb_array_length(layout_json->'tables') AS table_count,
@@ -185,7 +190,8 @@ class TableLayoutService:
                 WHERE store_id  = :store_id
                   AND tenant_id = :tenant_id
                 ORDER BY floor_no
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tenant_id": str(tenant_id)},
         )
         return [
@@ -207,7 +213,8 @@ class TableLayoutService:
     ) -> list[TableStatus]:
         """获取所有桌台实时状态（用于图形化着色）"""
         rows = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     t.id            AS table_db_id,
                     t.table_number,
@@ -227,7 +234,8 @@ class TableLayoutService:
                 WHERE t.store_id  = :store_id
                   AND t.tenant_id = :tenant_id
                 ORDER BY t.table_number
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tenant_id": str(tenant_id)},
         )
         result: list[TableStatus] = []
@@ -261,11 +269,13 @@ class TableLayoutService:
         """换台：将订单从一张桌转移到另一张桌"""
         # 查询目标桌台状态
         to_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, table_number, status
                 FROM tables
                 WHERE id = :table_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"table_id": str(to_table_id), "tenant_id": str(tenant_id)},
         )
         to_table = to_row.mappings().first()
@@ -276,11 +286,13 @@ class TableLayoutService:
 
         # 查询来源桌台
         from_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, table_number, store_id
                 FROM tables
                 WHERE id = :table_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"table_id": str(from_table_id), "tenant_id": str(tenant_id)},
         )
         from_table = from_row.mappings().first()
@@ -291,13 +303,15 @@ class TableLayoutService:
 
         # 更新订单桌号
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE orders
                 SET table_number = :to_table_number,
                     updated_at   = NOW()
                 WHERE id        = :order_id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "to_table_number": to_table["table_number"],
                 "order_id": str(order_id),
@@ -307,25 +321,29 @@ class TableLayoutService:
 
         # 更新目标桌台状态为 occupied
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables
                 SET status     = 'occupied',
                     updated_at = NOW()
                 WHERE id        = :table_id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"table_id": str(to_table_id), "tenant_id": str(tenant_id)},
         )
 
         # 释放来源桌台
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables
                 SET status     = 'available',
                     updated_at = NOW()
                 WHERE id        = :table_id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"table_id": str(from_table_id), "tenant_id": str(tenant_id)},
         )
 

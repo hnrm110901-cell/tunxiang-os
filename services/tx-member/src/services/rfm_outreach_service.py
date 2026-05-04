@@ -41,9 +41,9 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────────────────────────────
 
 # Recency：距最近一次到店的天数
-R_BUCKETS = [7, 30, 90, 180]           # ≤7(S1) ≤30(S2) ≤90(S3) ≤180(S4) >180(S5)
+R_BUCKETS = [7, 30, 90, 180]  # ≤7(S1) ≤30(S2) ≤90(S3) ≤180(S4) >180(S5)
 # Frequency：最近 12 个月到店次数
-F_BUCKETS = [12, 6, 3, 1]              # ≥12(S1) ≥6(S2) ≥3(S3) ≥1(S4) 0(S5)
+F_BUCKETS = [12, 6, 3, 1]  # ≥12(S1) ≥6(S2) ≥3(S3) ≥1(S4) 0(S5)
 # Monetary：最近 12 个月累计消费（分）
 M_BUCKETS = [500000, 200000, 80000, 20000]  # ≥5000元(S1) ≥2000(S2) ≥800(S3) ≥200(S4) <200(S5)
 
@@ -52,13 +52,15 @@ M_BUCKETS = [500000, 200000, 80000, 20000]  # ≥5000元(S1) ≥2000(S2) ≥800(
 # 数据结构
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CustomerSnapshot:
     """单客户的 RFM + 消费偏好快照"""
+
     customer_id: str
-    recency_days: int               # 距上次到店天数
-    frequency: int                  # 最近 12 月次数
-    monetary_fen: int               # 最近 12 月总消费（分）
+    recency_days: int  # 距上次到店天数
+    frequency: int  # 最近 12 月次数
+    monetary_fen: int  # 最近 12 月总消费（分）
     preferred_items: list[str] = field(default_factory=list)
     name: Optional[str] = None
 
@@ -66,17 +68,19 @@ class CustomerSnapshot:
 @dataclass
 class OutreachCandidate:
     """CF + 文案生成后的触达候选（1 客户 1 条）"""
+
     customer_id: str
-    segment: str                    # S1-S5
-    cf_score: float                 # 0-1，召回倾向
+    segment: str  # S1-S5
+    cf_score: float  # 0-1，召回倾向
     top_items: list[str] = field(default_factory=list)
     outreach_message: Optional[str] = None
-    estimated_uplift_fen: int = 0   # 预估增量消费
+    estimated_uplift_fen: int = 0  # 预估增量消费
 
 
 @dataclass
 class OutreachPlan:
     """完整的一次触达规划（一条 rfm_outreach_campaigns 记录）"""
+
     campaign_id: str
     tenant_id: str
     store_id: Optional[str]
@@ -97,6 +101,7 @@ class OutreachPlan:
 # ──────────────────────────────────────────────────────────────────────
 # RFM 分层
 # ──────────────────────────────────────────────────────────────────────
+
 
 def score_rfm(value: int, buckets: list[int], higher_better: bool) -> int:
     """单维度 RFM 打分：返回 1-5（1 最差/5 最好）。
@@ -128,12 +133,13 @@ def segment_for(snap: CustomerSnapshot) -> str:
     f = score_rfm(snap.frequency, F_BUCKETS, higher_better=True)
     m = score_rfm(snap.monetary_fen, M_BUCKETS, higher_better=True)
     worst = min(r, f, m)
-    return f"S{6 - worst}"   # 分数 5 → S1 / 分数 1 → S5
+    return f"S{6 - worst}"  # 分数 5 → S1 / 分数 1 → S5
 
 
 # ──────────────────────────────────────────────────────────────────────
 # CF 协同过滤（item-item）
 # ──────────────────────────────────────────────────────────────────────
+
 
 def cosine_similarity(a: set[str], b: set[str]) -> float:
     """集合版 cosine：|A∩B| / sqrt(|A|*|B|)。空集返回 0。"""
@@ -192,6 +198,7 @@ def score_cf_candidate(
 # 服务主体
 # ──────────────────────────────────────────────────────────────────────
 
+
 class RFMOutreachService:
     """D3a RFM 触达规划服务。
 
@@ -240,13 +247,15 @@ class RFMOutreachService:
             cf_score, top_items = score_cf_candidate(cand, active_peers)
             # 预估增量：cf_score × 人均客单 20000 分（200元），保守估计
             est_uplift = int(cf_score * 20000)
-            filtered.append(OutreachCandidate(
-                customer_id=cand.customer_id,
-                segment=seg,
-                cf_score=cf_score,
-                top_items=top_items,
-                estimated_uplift_fen=est_uplift,
-            ))
+            filtered.append(
+                OutreachCandidate(
+                    customer_id=cand.customer_id,
+                    segment=seg,
+                    cf_score=cf_score,
+                    top_items=top_items,
+                    estimated_uplift_fen=est_uplift,
+                )
+            )
 
         # 为 cf_score > 0 的候选生成 Haiku 文案
         for outreach in filtered:
@@ -295,7 +304,9 @@ class RFMOutreachService:
             return await self.haiku_invoker(prompt, "claude-haiku-4-5")
         except Exception as exc:  # noqa: BLE001 — LLM 失败不应阻断规划
             logger.warning(
-                "haiku_invoke_failed customer=%s error=%s", customer_id, exc,
+                "haiku_invoke_failed customer=%s error=%s",
+                customer_id,
+                exc,
             )
             return self._fallback_message(segment=segment, top_items=top_items)
 
@@ -336,6 +347,7 @@ class RFMOutreachService:
 # 数据库工具（供 API 调用）
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def save_plan_to_db(db: Any, plan: OutreachPlan, confirmed_by: Optional[str] = None) -> dict:
     """把 OutreachPlan 写入 rfm_outreach_campaigns 表。
 
@@ -372,7 +384,9 @@ async def save_plan_to_db(db: Any, plan: OutreachPlan, confirmed_by: Optional[st
     # 首条候选人的文案作为模板写入
     template = plan.candidates[0].outreach_message if plan.candidates else ""
 
-    await db.execute(text("""
+    await db.execute(
+        text(
+            """
         INSERT INTO rfm_outreach_campaigns (
             id, tenant_id, store_id, campaign_name, rfm_segment,
             target_customer_ids, target_count, cf_scoring_snapshot,
@@ -390,29 +404,36 @@ async def save_plan_to_db(db: Any, plan: OutreachPlan, confirmed_by: Optional[st
             CAST(:confirmed_by AS uuid), :confirmed_at,
             CAST(:roi_summary AS jsonb)
         )
-    """), {
-        "id": plan.campaign_id,
-        "tenant_id": plan.tenant_id,
-        "store_id": plan.store_id,
-        "campaign_name": plan.campaign_name,
-        "rfm_segment": plan.segment,
-        "target_ids": [c.customer_id for c in plan.candidates],
-        "target_count": plan.target_count,
-        "cf_snapshot": _to_json_str(cf_snapshot),
-        "message_template": template,
-        "message_model": plan.model_id,
-        "status": status,
-        "confirmed_by": confirmed_by,
-        "confirmed_at": confirmed_at,
-        "roi_summary": _to_json_str({
-            "estimated_revenue_fen": plan.estimated_revenue_fen,
-            "candidate_count": plan.target_count,
-        }),
-    })
+    """
+        ),
+        {
+            "id": plan.campaign_id,
+            "tenant_id": plan.tenant_id,
+            "store_id": plan.store_id,
+            "campaign_name": plan.campaign_name,
+            "rfm_segment": plan.segment,
+            "target_ids": [c.customer_id for c in plan.candidates],
+            "target_count": plan.target_count,
+            "cf_snapshot": _to_json_str(cf_snapshot),
+            "message_template": template,
+            "message_model": plan.model_id,
+            "status": status,
+            "confirmed_by": confirmed_by,
+            "confirmed_at": confirmed_at,
+            "roi_summary": _to_json_str(
+                {
+                    "estimated_revenue_fen": plan.estimated_revenue_fen,
+                    "candidate_count": plan.target_count,
+                }
+            ),
+        },
+    )
     await db.commit()
     logger.info(
         "rfm_outreach_plan_saved campaign_id=%s status=%s count=%d",
-        plan.campaign_id, status, plan.target_count,
+        plan.campaign_id,
+        status,
+        plan.target_count,
     )
     return {"campaign_id": plan.campaign_id, "status": status}
 
@@ -420,6 +441,7 @@ async def save_plan_to_db(db: Any, plan: OutreachPlan, confirmed_by: Optional[st
 def _to_json_str(payload: dict) -> str:
     """dict → JSON string（JSONB 传参需要字符串）。"""
     import json
+
     return json.dumps(payload, ensure_ascii=False, default=str)
 
 

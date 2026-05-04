@@ -298,7 +298,8 @@ class WeatherService:
         """从 weather_cache 读取缓存"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT forecast_data
                     FROM weather_cache
                     WHERE city = :city
@@ -306,7 +307,8 @@ class WeatherService:
                       AND expires_at > NOW()
                     ORDER BY created_at DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"city": city, "tenant_id": tenant_id},
             )
             row = result.fetchone()
@@ -328,14 +330,16 @@ class WeatherService:
 
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO weather_cache (tenant_id, city, forecast_data, expires_at)
                     VALUES (:tenant_id::uuid, :city, :data::jsonb, NOW() + INTERVAL ':ttl hours')
                     ON CONFLICT (tenant_id, city)
                     DO UPDATE SET forecast_data = EXCLUDED.forecast_data,
                                   expires_at = EXCLUDED.expires_at,
                                   updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "city": city,

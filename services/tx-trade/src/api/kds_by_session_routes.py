@@ -64,7 +64,8 @@ async def get_kds_session_board(
         params["dept_id"] = dept_id
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             WITH session_kds AS (
                 -- 聚合：每个会话的 KDS 任务汇总
                 SELECT
@@ -124,7 +125,8 @@ async def get_kds_session_board(
                 EXTRACT(EPOCH FROM (NOW() - oldest_pending_at)) / 60 AS wait_minutes
             FROM prioritized p
             ORDER BY priority_score DESC, oldest_pending_at ASC NULLS LAST
-        """),
+        """
+        ),
         params,
     )
     sessions = [dict(r) for r in result.mappings().all()]
@@ -146,7 +148,8 @@ async def get_session_dish_progress(
     tid = _get_tenant_id(request)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 kt.id          AS task_id,
                 kt.status      AS kds_status,
@@ -184,7 +187,8 @@ async def get_session_dish_progress(
                 kt.status,               -- pending → cooking → done
                 o.order_sequence,        -- 主单先于加菜单
                 kt.created_at
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": tid},
     )
     dishes = [dict(r) for r in result.mappings().all()]
@@ -226,7 +230,8 @@ async def rush_all_pending_for_session(
 
     # 将该会话所有 pending/cooking 任务标记为 is_rushed
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE kds_tasks kt
             SET is_rushed = TRUE,
                 updated_at = :now
@@ -237,7 +242,8 @@ async def rush_all_pending_for_session(
               AND kt.status NOT IN ('done', 'cancelled')
               AND kt.tenant_id = :tenant_id
             RETURNING kt.id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": tid, "now": now},
     )
     rushed_ids = [str(r["id"]) for r in result.mappings().all()]
@@ -252,14 +258,16 @@ async def rush_all_pending_for_session(
         store = store_row.mappings().one_or_none()
         if store:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO service_calls
                         (id, tenant_id, store_id, table_session_id,
                          call_type, content, status, called_by, called_at, created_at, updated_at)
                     VALUES
                         (gen_random_uuid(), :tenant_id, :store_id, :session_id,
                          'urge_dish', '催全桌菜品', 'pending', 'pos', :now, :now, :now)
-                """),
+                """
+                ),
                 {
                     "tenant_id": tid,
                     "store_id": store["store_id"],

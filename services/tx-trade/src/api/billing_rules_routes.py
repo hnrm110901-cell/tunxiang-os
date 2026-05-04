@@ -132,14 +132,16 @@ async def get_billing_rules(
 
     rows = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT id, store_id, rule_type, calc_method, threshold_fen,
                    service_fee_rate, exempt_member_tiers, exempt_agreement_units,
                    is_active, created_at, updated_at
             FROM billing_rules
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
             ORDER BY rule_type, created_at
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
     ).fetchall()
@@ -197,11 +199,13 @@ async def set_billing_rules(
 
     # 软删除现有规则
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE billing_rules
             SET is_deleted = true, updated_at = NOW()
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "sid": store_id},
     )
 
@@ -212,7 +216,8 @@ async def set_billing_rules(
         # 将 service_fee_rate float 转为 Decimal-safe string for Numeric column
         rate_str = f"{rule.service_fee_rate:.4f}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO billing_rules
                     (id, tenant_id, store_id, rule_type, calc_method,
                      threshold_fen, service_fee_rate,
@@ -221,7 +226,8 @@ async def set_billing_rules(
                     (:id, :tid, :sid, :rtype, :method,
                      :threshold, :rate::numeric,
                      :exempt_tiers::jsonb, :exempt_units::jsonb, :active)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tenant_id,
@@ -282,14 +288,16 @@ async def apply_billing_rules(
     # 拉取该门店所有启用规则
     rows = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT id, rule_type, calc_method, threshold_fen, service_fee_rate,
                    exempt_member_tiers, exempt_agreement_units
             FROM billing_rules
             WHERE tenant_id = :tid AND store_id = :sid
               AND is_active = true AND is_deleted = false
             ORDER BY rule_type, id
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": body.store_id},
         )
     ).fetchall()

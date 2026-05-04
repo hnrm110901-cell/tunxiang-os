@@ -180,12 +180,12 @@ async def get_recommendations(
         period_end=end,
     )
 
-    total_saving_fen = sum(
-        r.get("expected_saving_fen", 0) for r in recommendations
-    )
+    total_saving_fen = sum(r.get("expected_saving_fen", 0) for r in recommendations)
 
-    return _ok({
-        "recommendations": recommendations,
-        "count": len(recommendations),
-        "total_expected_saving_fen": total_saving_fen,
-    })
+    return _ok(
+        {
+            "recommendations": recommendations,
+            "count": len(recommendations),
+            "total_expected_saving_fen": total_saving_fen,
+        }
+    )

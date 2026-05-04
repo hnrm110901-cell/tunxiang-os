@@ -69,10 +69,12 @@ class BanquetExecutionService:
         checkpoints = SOP_TEMPLATES.get(banquet["event_type"], WEDDING_SOP)
         plan_id = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_execution_plans (id, tenant_id, banquet_id, store_id, checkpoints_json, total_checkpoints, status)
             VALUES (:id, :tid, :bid, :sid, :cp::jsonb, :total, 'planned')
-        """),
+        """
+            ),
             {
                 "id": plan_id,
                 "tid": self.tenant_id,
@@ -84,10 +86,12 @@ class BanquetExecutionService:
         )
         for i, cp in enumerate(checkpoints):
             await self.db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO banquet_execution_logs (id, tenant_id, plan_id, checkpoint_index, checkpoint_name, checkpoint_type, scheduled_time, status)
                 VALUES (:id, :tid, :pid, :idx, :name, :ctype, :stime, 'pending')
-            """),
+            """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tid": self.tenant_id,
@@ -134,11 +138,13 @@ class BanquetExecutionService:
             sched = datetime.combine(local_now.date(), log["scheduled_time"])
             delay_min = max(0, int((local_now - sched).total_seconds() / 60))
         await self.db.execute(
-            text("""
+            text(
+                """
             UPDATE banquet_execution_logs SET status = 'completed', actual_time = :now, delay_min = :delay,
                 executor_id = :eid, executor_name = :ename, issue_note = :note, updated_at = :now
             WHERE id = :id AND tenant_id = :tid
-        """),
+        """
+            ),
             {
                 "id": log_id,
                 "tid": self.tenant_id,

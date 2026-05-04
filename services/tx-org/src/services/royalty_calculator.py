@@ -200,9 +200,7 @@ class RoyaltyCalculator:
 
         for i, tier in enumerate(tiers):
             lower = _yuan_to_fen_decimal(tier.min_revenue)
-            upper: Optional[Decimal] = (
-                _yuan_to_fen_decimal(tiers[i + 1].min_revenue) if i + 1 < len(tiers) else None
-            )
+            upper: Optional[Decimal] = _yuan_to_fen_decimal(tiers[i + 1].min_revenue) if i + 1 < len(tiers) else None
             segments.append((lower, upper, _to_decimal_rate(tier.rate)))
 
         # 累加各段贡献：段宽 × 段费率

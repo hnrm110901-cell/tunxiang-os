@@ -46,7 +46,8 @@ async def _svc_auto_award_monthly(
 
     try:
         # 全勤检查
-        q_attendance = text(f"""
+        q_attendance = text(
+            f"""
             SELECT e.id::text AS employee_id, e.emp_name,
                    COUNT(DISTINCT da.date) FILTER (WHERE da.status = 'present') AS present_days,
                    COUNT(DISTINCT da.date) FILTER (WHERE da.status = 'absent') AS absent_days
@@ -64,7 +65,8 @@ async def _svc_auto_award_monthly(
             HAVING COUNT(DISTINCT da.date) FILTER (WHERE da.status = 'absent') = 0
                AND COUNT(DISTINCT da.date) FILTER (WHERE da.status = 'present') >= 20
             LIMIT 500
-        """)
+        """
+        )
         result = await db.execute(q_attendance, params)
         for row in result.mappings():
             awards.append(
@@ -107,7 +109,8 @@ async def _svc_generate_race_report(
     }
 
     try:
-        q = text(f"""
+        q = text(
+            f"""
             WITH this_week AS (
                 SELECT pt.employee_id, e.emp_name,
                        COALESCE(SUM(pt.points), 0) AS week_points
@@ -138,7 +141,8 @@ async def _svc_generate_race_report(
             LEFT JOIN last_week lw ON lw.employee_id = tw.employee_id
             ORDER BY tw.week_points DESC
             LIMIT 20
-        """)
+        """
+        )
         result = await db.execute(q, params)
         rows = [dict(r) for r in result.mappings()]
     except (OperationalError, ProgrammingError) as exc:
@@ -185,7 +189,8 @@ async def _svc_suggest_incentive(
 
     try:
         # 低积分员工：建议关注
-        q_low = text(f"""
+        q_low = text(
+            f"""
             SELECT pt.employee_id, e.emp_name,
                    COALESCE(SUM(pt.points), 0) AS total_points
             FROM point_transactions pt
@@ -197,7 +202,8 @@ async def _svc_suggest_incentive(
             HAVING COALESCE(SUM(pt.points), 0) < 100
             ORDER BY total_points ASC
             LIMIT 10
-        """)
+        """
+        )
         result = await db.execute(q_low, params)
         low_employees = [dict(r) for r in result.mappings()]
 
@@ -214,7 +220,8 @@ async def _svc_suggest_incentive(
             )
 
         # 近30天无积分变动的员工
-        q_inactive = text(f"""
+        q_inactive = text(
+            f"""
             SELECT e.id::text AS employee_id, e.emp_name
             FROM employees e
             WHERE e.tenant_id = CAST(:tenant_id AS uuid)
@@ -227,7 +234,8 @@ async def _svc_suggest_incentive(
                   AND pt.created_at >= :days_30 AND pt.is_deleted = false
               )
             LIMIT 20
-        """)
+        """
+        )
         result2 = await db.execute(q_inactive, params)
         inactive = [dict(r) for r in result2.mappings()]
 

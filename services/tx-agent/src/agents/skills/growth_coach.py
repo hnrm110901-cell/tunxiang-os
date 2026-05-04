@@ -214,7 +214,8 @@ async def _load_employee_skills(
     employee_id: str,
 ) -> Optional[dict[str, Any]]:
     """读取员工技能标签和岗位信息。"""
-    q = text("""
+    q = text(
+        """
         SELECT e.id::text AS employee_id, e.emp_name, e.role,
                e.skill_tags, e.grade_level, e.training_completed,
                e.performance_score, e.seniority_months,
@@ -224,7 +225,8 @@ async def _load_employee_skills(
           AND e.id = CAST(:employee_id AS uuid)
           AND e.is_deleted = false
         LIMIT 1
-    """)
+    """
+    )
     try:
         result = await db.execute(q, {"tenant_id": tenant_id, "employee_id": employee_id})
         row = result.mappings().first()
@@ -240,7 +242,8 @@ async def _load_training_courses(
 ) -> list[dict[str, Any]]:
     """从 training_courses 表查培训课程，降级为内置课程库。"""
     try:
-        q = text("""
+        q = text(
+            """
             SELECT id::text, name, skills, duration_hours, level
             FROM training_courses
             WHERE tenant_id = CAST(:tenant_id AS uuid)
@@ -248,7 +251,8 @@ async def _load_training_courses(
               AND COALESCE(is_active, true) = true
             ORDER BY level, name
             LIMIT 50
-        """)
+        """
+        )
         result = await db.execute(q, {"tenant_id": tenant_id})
         rows = [dict(r) for r in result.mappings()]
         if rows:
@@ -604,7 +608,8 @@ class GrowthCoachAgent(SkillAgent):
                 store_filter = "AND e.store_id = ANY(CAST(:store_ids AS uuid[]))"
                 params["store_ids"] = store_ids
 
-            q = text(f"""
+            q = text(
+                f"""
                 SELECT e.store_id::text, s.store_name,
                        e.id::text AS employee_id, e.emp_name,
                        e.skill_tags, e.role
@@ -616,7 +621,8 @@ class GrowthCoachAgent(SkillAgent):
                   AND COALESCE(e.is_active, true) = true
                   {store_filter}
                 ORDER BY s.store_name, e.emp_name
-            """)
+            """
+            )
             try:
                 result = await self._db.execute(q, params)
                 rows = [dict(r) for r in result.mappings()]

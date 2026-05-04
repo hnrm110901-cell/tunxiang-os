@@ -23,7 +23,6 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -152,9 +151,7 @@ async def get_active_journeys(
     tenant_id = _parse_tenant(x_tenant_id)
 
     try:
-        journeys = await _journey_svc.get_active_journeys(
-            db=db, store_id=store_id, tenant_id=tenant_id
-        )
+        journeys = await _journey_svc.get_active_journeys(db=db, store_id=store_id, tenant_id=tenant_id)
         return _ok({"journeys": journeys, "count": len(journeys)})
     except SQLAlchemyError as e:
         log.error("active_journeys_db_error", error=str(e))
@@ -176,9 +173,7 @@ async def get_sla_violations(
     tenant_id = _parse_tenant(x_tenant_id)
 
     try:
-        violations = await _journey_svc.check_sla_violations(
-            db=db, store_id=store_id, tenant_id=tenant_id
-        )
+        violations = await _journey_svc.check_sla_violations(db=db, store_id=store_id, tenant_id=tenant_id)
         return _ok({"violations": violations, "count": len(violations)})
     except SQLAlchemyError as e:
         log.error("sla_violations_db_error", error=str(e))

@@ -46,20 +46,24 @@ class MaterialService:
         # 验证 parent_id 存在性
         if parent_id:
             check = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM material_groups
                     WHERE id = :parent_id AND tenant_id = :tenant_id AND is_deleted = false
-                """),
+                """
+                ),
                 {"parent_id": parent_id, "tenant_id": tenant_id},
             )
             if check.fetchone() is None:
                 return {"success": False, "error": "父分组不存在"}
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO material_groups (id, tenant_id, group_name, parent_id, icon, sort_order, created_at, updated_at)
                 VALUES (:id, :tenant_id, :group_name, :parent_id, :icon, :sort_order, :created_at, :updated_at)
-            """),
+            """
+            ),
             {
                 "id": group_id,
                 "tenant_id": tenant_id,
@@ -88,7 +92,8 @@ class MaterialService:
     ) -> list[dict[str, Any]]:
         """查询素材分组（递归 CTE 构建树结构）"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 WITH RECURSIVE group_tree AS (
                     SELECT id, group_name, parent_id, icon, sort_order, 0 AS depth
                     FROM material_groups
@@ -102,7 +107,8 @@ class MaterialService:
                 SELECT id, group_name, parent_id, icon, sort_order, depth
                 FROM group_tree
                 ORDER BY depth, sort_order, group_name
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         rows = result.mappings().all()
@@ -162,11 +168,13 @@ class MaterialService:
             params["sort_order"] = sort_order
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE material_groups
                 SET {", ".join(sets)}
                 WHERE id = :group_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -187,10 +195,12 @@ class MaterialService:
 
         # 检查存在
         check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM material_groups
                 WHERE id = :group_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"group_id": group_id, "tenant_id": tenant_id},
         )
         if check.fetchone() is None:
@@ -198,28 +208,34 @@ class MaterialService:
 
         # 子分组的 parent_id 置空
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE material_groups SET parent_id = NULL, updated_at = :now
                 WHERE parent_id = :group_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"group_id": group_id, "tenant_id": tenant_id, "now": now},
         )
 
         # 关联素材的 group_id 置空
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE material_library SET group_id = NULL, updated_at = :now
                 WHERE group_id = :group_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"group_id": group_id, "tenant_id": tenant_id, "now": now},
         )
 
         # 软删除分组
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE material_groups SET is_deleted = true, updated_at = :now
                 WHERE id = :group_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"group_id": group_id, "tenant_id": tenant_id, "now": now},
         )
         await db.commit()
@@ -258,7 +274,8 @@ class MaterialService:
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO material_library (
                     id, tenant_id, group_id, title, material_type,
                     content, media_url, thumbnail_url, link_url, link_title,
@@ -270,7 +287,8 @@ class MaterialService:
                     :miniapp_appid, :miniapp_path, :metadata::jsonb, :time_slots::jsonb, :tags::jsonb,
                     :is_template, :sort_order, :created_by, :created_at, :updated_at
                 )
-            """),
+            """
+            ),
             {
                 "id": mat_id,
                 "tenant_id": tenant_id,
@@ -348,11 +366,13 @@ class MaterialService:
             return {"success": False, "error": "无可更新字段"}
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE material_library
                 SET {", ".join(sets)}
                 WHERE id = :material_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -369,7 +389,8 @@ class MaterialService:
     ) -> dict[str, Any] | None:
         """获取素材详情"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, group_id, title, material_type,
                        content, media_url, thumbnail_url, link_url, link_title,
                        miniapp_appid, miniapp_path, metadata, time_slots, tags,
@@ -377,7 +398,8 @@ class MaterialService:
                        created_at, updated_at
                 FROM material_library
                 WHERE id = :material_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"material_id": material_id, "tenant_id": tenant_id},
         )
         row = result.mappings().fetchone()
@@ -425,7 +447,8 @@ class MaterialService:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, group_id, title, material_type,
                        content, media_url, thumbnail_url, link_url, link_title,
                        miniapp_appid, miniapp_path, metadata, time_slots, tags,
@@ -435,7 +458,8 @@ class MaterialService:
                 WHERE {conditions}
                 ORDER BY sort_order, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -450,11 +474,13 @@ class MaterialService:
     ) -> dict[str, Any]:
         """删除素材（软删除）"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE material_library
                 SET is_deleted = true, updated_at = :now
                 WHERE id = :material_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"material_id": material_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
         )
         await db.commit()
@@ -494,7 +520,8 @@ class MaterialService:
 
         # 匹配：time_slots 为空数组（全天）或当前时间落在某 slot 内
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, group_id, title, material_type,
                        content, media_url, thumbnail_url, link_url, link_title,
                        miniapp_appid, miniapp_path, metadata, time_slots, tags,
@@ -512,7 +539,8 @@ class MaterialService:
                   )
                 ORDER BY sort_order, usage_count DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -530,12 +558,14 @@ class MaterialService:
     ) -> dict[str, Any]:
         """素材使用次数 +1"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE material_library
                 SET usage_count = usage_count + 1, updated_at = :now
                 WHERE id = :material_id AND tenant_id = :tenant_id AND is_deleted = false
                 RETURNING usage_count
-            """),
+            """
+            ),
             {"material_id": material_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
         )
         row = result.fetchone()

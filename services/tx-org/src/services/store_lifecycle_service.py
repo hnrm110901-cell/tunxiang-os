@@ -100,7 +100,11 @@ class StoreLifecycleService:
 
         # 经营数据修正
         adjusted_stage = await self._adjust_stage_by_performance(
-            db, tenant_id, store_id, initial_stage, months,
+            db,
+            tenant_id,
+            store_id,
+            initial_stage,
+            months,
         )
 
         # 构建基准线
@@ -119,7 +123,8 @@ class StoreLifecycleService:
 
         baseline_json = json.dumps(health_baseline, ensure_ascii=False)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE store_lifecycle_stages
                 SET current_stage = :stage,
                     stage_entered_at = :entered,
@@ -127,7 +132,8 @@ class StoreLifecycleService:
                     next_review_date = :nr,
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "stage": adjusted_stage,
                 "entered": stage_entered_at,
@@ -153,7 +159,9 @@ class StoreLifecycleService:
             "months_since_opening": months,
             "current_stage": adjusted_stage,
             "stage_description": rule["description"],
-            "stage_entered_at": stage_entered_at.isoformat() if hasattr(stage_entered_at, "isoformat") else str(stage_entered_at),
+            "stage_entered_at": stage_entered_at.isoformat()
+            if hasattr(stage_entered_at, "isoformat")
+            else str(stage_entered_at),
             "health_baseline": health_baseline,
             "next_review_date": next_review.isoformat(),
             "stage_changed": stage_changed,
@@ -169,12 +177,14 @@ class StoreLifecycleService:
         await _set_tenant(db, tenant_id)
 
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT current_stage, health_baseline, opened_date,
                        months_since_opening, stage_entered_at
                 FROM store_lifecycle_stages
                 WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
         r = row.mappings().first()
@@ -193,8 +203,11 @@ class StoreLifecycleService:
             "current_stage": stage,
             "stage_description": rule["description"],
             "months_since_opening": int(r["months_since_opening"] or 0),
-            "opened_date": r["opened_date"].isoformat() if hasattr(r["opened_date"], "isoformat") else str(r["opened_date"]),
-            "health_baseline": baseline or {
+            "opened_date": r["opened_date"].isoformat()
+            if hasattr(r["opened_date"], "isoformat")
+            else str(r["opened_date"]),
+            "health_baseline": baseline
+            or {
                 "revenue_target_pct": rule["revenue_target_pct"],
                 "profit_margin_min": rule["profit_margin_min"],
                 "turnover_min": rule["turnover_min"],
@@ -222,7 +235,8 @@ class StoreLifecycleService:
         await _set_tenant(db, tenant_id)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT s.id AS store_id, s.store_name,
                        sl.opened_date, sl.months_since_opening,
                        sl.current_stage, sl.stage_entered_at,
@@ -233,7 +247,8 @@ class StoreLifecycleService:
                     AND sl.is_deleted = FALSE
                 WHERE s.tenant_id = :tid AND s.is_deleted = FALSE
                 ORDER BY sl.months_since_opening DESC NULLS LAST, s.store_name
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
 
@@ -246,17 +261,27 @@ class StoreLifecycleService:
             if isinstance(baseline, str):
                 baseline = json.loads(baseline)
 
-            items.append({
-                "store_id": str(r["store_id"]),
-                "store_name": r["store_name"],
-                "opened_date": r["opened_date"].isoformat() if r["opened_date"] and hasattr(r["opened_date"], "isoformat") else None,
-                "months_since_opening": int(r["months_since_opening"]) if r["months_since_opening"] is not None else None,
-                "current_stage": stage,
-                "stage_description": rule.get("description", "未知"),
-                "stage_entered_at": r["stage_entered_at"].isoformat() if r["stage_entered_at"] and hasattr(r["stage_entered_at"], "isoformat") else None,
-                "health_baseline": baseline,
-                "next_review_date": r["next_review_date"].isoformat() if r["next_review_date"] and hasattr(r["next_review_date"], "isoformat") else None,
-            })
+            items.append(
+                {
+                    "store_id": str(r["store_id"]),
+                    "store_name": r["store_name"],
+                    "opened_date": r["opened_date"].isoformat()
+                    if r["opened_date"] and hasattr(r["opened_date"], "isoformat")
+                    else None,
+                    "months_since_opening": int(r["months_since_opening"])
+                    if r["months_since_opening"] is not None
+                    else None,
+                    "current_stage": stage,
+                    "stage_description": rule.get("description", "未知"),
+                    "stage_entered_at": r["stage_entered_at"].isoformat()
+                    if r["stage_entered_at"] and hasattr(r["stage_entered_at"], "isoformat")
+                    else None,
+                    "health_baseline": baseline,
+                    "next_review_date": r["next_review_date"].isoformat()
+                    if r["next_review_date"] and hasattr(r["next_review_date"], "isoformat")
+                    else None,
+                }
+            )
 
         return items
 
@@ -284,7 +309,8 @@ class StoreLifecycleService:
         new_id = uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_lifecycle_stages
                     (id, tenant_id, store_id, opened_date, current_stage,
                      stage_entered_at, health_baseline, next_review_date)
@@ -299,7 +325,8 @@ class StoreLifecycleService:
                     health_baseline = EXCLUDED.health_baseline,
                     next_review_date = EXCLUDED.next_review_date,
                     updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tenant_id,
@@ -337,12 +364,14 @@ class StoreLifecycleService:
     ) -> dict[str, Any] | None:
         """获取生命周期记录，不存在则从 stores 表 created_at 自动创建"""
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT opened_date, current_stage, stage_entered_at,
                        health_baseline, months_since_opening
                 FROM store_lifecycle_stages
                 WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
         r = row.mappings().first()
@@ -351,11 +380,13 @@ class StoreLifecycleService:
 
         # 尝试从 stores 表获取开业日期
         store_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(opened_at, created_at)::date AS opened_date
                 FROM stores
                 WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": store_id, "tid": tenant_id},
         )
         sr = store_row.mappings().first()
@@ -397,7 +428,8 @@ class StoreLifecycleService:
         try:
             # 查询最近3个月的营收趋势
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT TO_CHAR(created_at, 'YYYY-MM') AS mon,
                            COALESCE(SUM(final_amount_fen), 0) AS revenue_fen
                     FROM orders
@@ -407,7 +439,8 @@ class StoreLifecycleService:
                     GROUP BY TO_CHAR(created_at, 'YYYY-MM')
                     ORDER BY mon DESC
                     LIMIT 3
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
             monthly_rev = [int(r["revenue_fen"] or 0) for r in rows.mappings().fetchall()]
@@ -432,11 +465,7 @@ class StoreLifecycleService:
                 return "plateau"
 
             if initial_stage == "plateau" and declining_months >= 2:
-                decline_pct = (
-                    (monthly_rev[-1] - monthly_rev[0]) / max(monthly_rev[0], 1)
-                    if monthly_rev[-1] > 0
-                    else 0
-                )
+                decline_pct = (monthly_rev[-1] - monthly_rev[0]) / max(monthly_rev[0], 1) if monthly_rev[-1] > 0 else 0
                 if abs(decline_pct) > 0.15:
                     log.info(
                         "lifecycle.early_decline",

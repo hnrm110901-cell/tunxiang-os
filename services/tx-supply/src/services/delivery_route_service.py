@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import and_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.tx_supply.src.models.central_kitchen import (
     DeliveryItemORM,
     DeliveryTripORM,
@@ -25,8 +28,6 @@ from services.tx_supply.src.models.central_kitchen import (
 from services.tx_supply.src.services.production_plan_service import (
     _store_geo,
 )
-from sqlalchemy import and_, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 

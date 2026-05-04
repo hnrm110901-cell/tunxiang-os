@@ -50,7 +50,8 @@ async def find_available_employees(
     await _set_tenant(db, tenant_id)
 
     # ── 优先级1：本店有排班但目标时段空闲 ──
-    sql_with_schedule = text("""
+    sql_with_schedule = text(
+        """
         SELECT DISTINCT e.id AS employee_id,
                e.emp_name,
                e.role,
@@ -77,7 +78,8 @@ async def find_available_employees(
                 AND us2.start_time < :time_end
                 AND us2.end_time > :time_start
           )
-    """)
+    """
+    )
     result1 = await db.execute(
         sql_with_schedule,
         {
@@ -91,7 +93,8 @@ async def find_available_employees(
     rows_on_shift = result1.mappings().all()
 
     # ── 优先级2：本店在职但今日无排班 ──
-    sql_no_schedule = text("""
+    sql_no_schedule = text(
+        """
         SELECT e.id AS employee_id,
                e.emp_name,
                e.role,
@@ -118,7 +121,8 @@ async def find_available_employees(
                 AND lr.start_date <= :target_date
                 AND lr.end_date >= :target_date
           )
-    """)
+    """
+    )
     result2 = await db.execute(
         sql_no_schedule,
         {
@@ -232,13 +236,15 @@ async def create_fill_schedule(
     await _set_tenant(db, tenant_id)
 
     # 查询缺口详情
-    gap_sql = text("""
+    gap_sql = text(
+        """
         SELECT id, store_id, schedule_date, position, shift_template_id
         FROM shift_gaps
         WHERE id = CAST(:gap_id AS uuid)
           AND tenant_id = CAST(:tid AS uuid)
           AND status = 'open'
-    """)
+    """
+    )
     gap_result = await db.execute(gap_sql, {"gap_id": gap_id, "tid": tenant_id})
     gap_row = gap_result.mappings().first()
     if not gap_row:
@@ -248,11 +254,13 @@ async def create_fill_schedule(
     start_time = time(8, 0)
     end_time = time(17, 0)
     if gap_row["shift_template_id"]:
-        tmpl_sql = text("""
+        tmpl_sql = text(
+            """
             SELECT start_time, end_time FROM shift_templates
             WHERE id = CAST(:tmpl_id AS uuid)
               AND tenant_id = CAST(:tid AS uuid)
-        """)
+        """
+        )
         tmpl_result = await db.execute(
             tmpl_sql,
             {
@@ -268,7 +276,8 @@ async def create_fill_schedule(
     schedule_id = str(uuid.uuid4())
 
     # 插入新排班
-    insert_sql = text("""
+    insert_sql = text(
+        """
         INSERT INTO unified_schedules
             (id, tenant_id, store_id, employee_id, schedule_date,
              shift_template_id, start_time, end_time, position,
@@ -279,7 +288,8 @@ async def create_fill_schedule(
              :tmpl_id, :start_time, :end_time, :position,
              'scheduled', :source, :notes)
         RETURNING id
-    """)
+    """
+    )
     source_label = {
         "internal_transfer": "fill_internal",
         "cross_store": "fill_cross_store",
@@ -304,14 +314,16 @@ async def create_fill_schedule(
     )
 
     # 更新缺口状态
-    update_gap_sql = text("""
+    update_gap_sql = text(
+        """
         UPDATE shift_gaps
         SET status = 'filled',
             claimed_by = CAST(:emp_id AS uuid),
             filled_at = NOW()
         WHERE id = CAST(:gap_id AS uuid)
           AND tenant_id = CAST(:tid AS uuid)
-    """)
+    """
+    )
     await db.execute(
         update_gap_sql,
         {

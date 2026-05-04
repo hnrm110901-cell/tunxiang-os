@@ -64,6 +64,7 @@ _STORE_LEVEL_ONLY_METRICS = frozenset(
 class SalesTargetValidationError(ValueError):
     """销售目标业务规则校验失败（如给个人建门店级指标）。"""
 
+
 # 工作日（周一=0 ~ 周五=4）权重
 _WORKDAY_WEIGHT = Decimal("1.2")
 # 周末（周六=5 / 周日=6）权重
@@ -90,9 +91,7 @@ def _clamp_rate(raw: Decimal) -> Decimal:
     return raw.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
-def _distribute_int_by_weights(
-    total: int, weights: list[Decimal]
-) -> list[int]:
+def _distribute_int_by_weights(total: int, weights: list[Decimal]) -> list[int]:
     """把整数 total 按权重列表分配到 len(weights) 个整数分量，严格保持加和一致。
 
     算法：
@@ -188,25 +187,14 @@ class SalesTargetService:
         if target_value < 0:
             raise ValueError("target_value 必须 >= 0")
 
-        pt_value = (
-            period_type.value
-            if isinstance(period_type, PeriodType)
-            else str(period_type)
-        )
-        mt_value = (
-            metric_type.value
-            if isinstance(metric_type, MetricType)
-            else str(metric_type)
-        )
+        pt_value = period_type.value if isinstance(period_type, PeriodType) else str(period_type)
+        mt_value = metric_type.value if isinstance(metric_type, MetricType) else str(metric_type)
         if mt_value not in _METRIC_VALUES:
             raise ValueError(f"未知 metric_type: {mt_value}")
 
         # P0-2 防御性校验：门店级指标（桌数/单均/人均）不能给单个员工建目标
         # 必须用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 标识为门店级目标。
-        if (
-            mt_value in _STORE_LEVEL_ONLY_METRICS
-            and employee_id != STORE_LEVEL_SENTINEL_EMPLOYEE_ID
-        ):
+        if mt_value in _STORE_LEVEL_ONLY_METRICS and employee_id != STORE_LEVEL_SENTINEL_EMPLOYEE_ID:
             raise SalesTargetValidationError(
                 f"metric_type={mt_value!r} 是门店级指标，"
                 f"不能给单个员工建目标；请使用 "
@@ -242,9 +230,7 @@ class SalesTargetService:
                     "period_end": period_end.isoformat(),
                     "metric_type": mt_value,
                     "target_value": int(target_value),
-                    "parent_target_id": (
-                        str(parent_target_id) if parent_target_id else None
-                    ),
+                    "parent_target_id": (str(parent_target_id) if parent_target_id else None),
                 },
                 store_id=store_id,
                 source_service=source_service,
@@ -271,9 +257,7 @@ class SalesTargetService:
 
         返回所有新创建的子目标（月 + 日）列表，按 period_start 升序。
         """
-        year_target = await self._repo.get_by_id(
-            db, tenant_id=tenant_id, target_id=year_target_id
-        )
+        year_target = await self._repo.get_by_id(db, tenant_id=tenant_id, target_id=year_target_id)
         if year_target is None:
             raise ValueError(f"年目标不存在：{year_target_id}")
 
@@ -282,9 +266,7 @@ class SalesTargetService:
         if hasattr(period_type, "value"):
             period_type = period_type.value
         if period_type != PeriodType.YEAR.value:
-            raise ValueError(
-                f"decompose_target 仅支持 period_type=year，当前：{period_type}"
-            )
+            raise ValueError(f"decompose_target 仅支持 period_type=year，当前：{period_type}")
 
         period_start: date = year_target["period_start"]
         period_end: date = year_target["period_end"]
@@ -328,19 +310,13 @@ class SalesTargetService:
                 d_list.append(_weight_of(d_cursor))
                 d_cursor += timedelta(days=1)
             month_day_weights.append(d_list)
-            month_total_weights.append(
-                sum(d_list) if d_list else Decimal("0")
-            )
+            month_total_weights.append(sum(d_list) if d_list else Decimal("0"))
 
-        month_values = _distribute_int_by_weights(
-            total_value, month_total_weights
-        )
+        month_values = _distribute_int_by_weights(total_value, month_total_weights)
 
         # ── 三、写 12 个月子目标，并对每个月继续分解到天 ──
         children: list[dict] = []
-        for idx, ((first, last), m_value, d_weights) in enumerate(
-            zip(months, month_values, month_day_weights)
-        ):
+        for idx, ((first, last), m_value, d_weights) in enumerate(zip(months, month_values, month_day_weights)):
             if not d_weights:
                 continue
 
@@ -381,9 +357,7 @@ class SalesTargetService:
             )
 
             # ── 月内按日权重分解 ──
-            day_values = _distribute_int_by_weights(
-                int(m_value), d_weights
-            )
+            day_values = _distribute_int_by_weights(int(m_value), d_weights)
             d_cursor = first
             month_target_id_raw = month_target["target_id"]
             if isinstance(month_target_id_raw, str):
@@ -403,10 +377,7 @@ class SalesTargetService:
                     target_value=int(day_value),
                     store_id=store_id,
                     parent_target_id=month_parent_uuid,
-                    notes=(
-                        f"auto: decomposed from month_target "
-                        f"{month_target_id_raw}"
-                    ),
+                    notes=(f"auto: decomposed from month_target " f"{month_target_id_raw}"),
                 )
                 children.append(day_target)
                 d_cursor += timedelta(days=1)
@@ -436,9 +407,7 @@ class SalesTargetService:
         if actual_value < 0:
             raise ValueError("actual_value 必须 >= 0")
 
-        target = await self._repo.get_by_id(
-            db, tenant_id=tenant_id, target_id=target_id
-        )
+        target = await self._repo.get_by_id(db, tenant_id=tenant_id, target_id=target_id)
         if target is None:
             raise ValueError(f"目标不存在：{target_id}")
 
@@ -451,9 +420,7 @@ class SalesTargetService:
                 source_event_id=source_event_id,
             )
             if already:
-                existing = await self._repo.get_latest_progress(
-                    db, tenant_id=tenant_id, target_id=target_id
-                )
+                existing = await self._repo.get_latest_progress(db, tenant_id=tenant_id, target_id=target_id)
                 if existing is not None:
                     return existing
                 # 理论不会到这（existed 但无最新），兜底重写
@@ -496,9 +463,7 @@ class SalesTargetService:
                         if hasattr(target["metric_type"], "value")
                         else target["metric_type"]
                     ),
-                    "source_event_id": (
-                        str(source_event_id) if source_event_id else None
-                    ),
+                    "source_event_id": (str(source_event_id) if source_event_id else None),
                 },
                 store_id=store_id,
                 source_service=source_service,
@@ -523,11 +488,7 @@ class SalesTargetService:
         返回新写入的 progress 记录列表。
         源 event_id 用自动生成的 UUID（定时轮询场景不关联业务事件）。
         """
-        pt_value = (
-            period_type.value
-            if isinstance(period_type, PeriodType)
-            else str(period_type)
-        )
+        pt_value = period_type.value if isinstance(period_type, PeriodType) else str(period_type)
 
         # 列出当前生效目标（today=period_start 起点）
         targets = await self._repo.list_active_targets(
@@ -563,11 +524,7 @@ class SalesTargetService:
             progress = await self.record_progress(
                 db,
                 tenant_id=tenant_id,
-                target_id=(
-                    t["target_id"]
-                    if isinstance(t["target_id"], UUID)
-                    else UUID(str(t["target_id"]))
-                ),
+                target_id=(t["target_id"] if isinstance(t["target_id"], UUID) else UUID(str(t["target_id"]))),
                 actual_value=int(actual),
                 source_event_id=uuid4(),
                 source_service="tx-org.aggregator",
@@ -584,14 +541,10 @@ class SalesTargetService:
         tenant_id: UUID,
         target_id: UUID,
     ) -> dict:
-        target = await self._repo.get_by_id(
-            db, tenant_id=tenant_id, target_id=target_id
-        )
+        target = await self._repo.get_by_id(db, tenant_id=tenant_id, target_id=target_id)
         if target is None:
             raise ValueError(f"目标不存在：{target_id}")
-        latest = await self._repo.get_latest_progress(
-            db, tenant_id=tenant_id, target_id=target_id
-        )
+        latest = await self._repo.get_latest_progress(db, tenant_id=tenant_id, target_id=target_id)
         if latest is None:
             return {
                 "target_id": str(target_id),
@@ -627,16 +580,8 @@ class SalesTargetService:
         today: date | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        pt_value = (
-            period_type.value
-            if isinstance(period_type, PeriodType)
-            else str(period_type)
-        )
-        mt_value = (
-            metric_type.value
-            if isinstance(metric_type, MetricType)
-            else str(metric_type)
-        )
+        pt_value = period_type.value if isinstance(period_type, PeriodType) else str(period_type)
+        mt_value = metric_type.value if isinstance(metric_type, MetricType) else str(metric_type)
         rows = await self._repo.leaderboard_by_period(
             db,
             tenant_id=tenant_id,
@@ -655,25 +600,13 @@ class SalesTargetService:
                     "target_id": str(r["target_id"]),
                     "employee_id": str(r["employee_id"]),
                     "store_id": str(r["store_id"]) if r.get("store_id") else None,
-                    "metric_type": (
-                        r["metric_type"].value
-                        if hasattr(r["metric_type"], "value")
-                        else r["metric_type"]
-                    ),
-                    "period_type": (
-                        r["period_type"].value
-                        if hasattr(r["period_type"], "value")
-                        else r["period_type"]
-                    ),
+                    "metric_type": (r["metric_type"].value if hasattr(r["metric_type"], "value") else r["metric_type"]),
+                    "period_type": (r["period_type"].value if hasattr(r["period_type"], "value") else r["period_type"]),
                     "period_start": (
-                        r["period_start"].isoformat()
-                        if hasattr(r["period_start"], "isoformat")
-                        else r["period_start"]
+                        r["period_start"].isoformat() if hasattr(r["period_start"], "isoformat") else r["period_start"]
                     ),
                     "period_end": (
-                        r["period_end"].isoformat()
-                        if hasattr(r["period_end"], "isoformat")
-                        else r["period_end"]
+                        r["period_end"].isoformat() if hasattr(r["period_end"], "isoformat") else r["period_end"]
                     ),
                     "target_value": int(r["target_value"] or 0),
                     "actual_value": int(r.get("actual_value") or 0),

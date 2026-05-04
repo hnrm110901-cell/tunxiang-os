@@ -60,9 +60,7 @@ def emitted() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def service(
-    repo: InMemoryBanquetLeadRepository, emitted: list[dict[str, Any]]
-) -> BanquetLeadService:
+def service(repo: InMemoryBanquetLeadRepository, emitted: list[dict[str, Any]]) -> BanquetLeadService:
     """BanquetLeadService 实例，事件发射 patch 为 in-memory 记录。"""
 
     async def _fake_emit(**kwargs: Any) -> str:
@@ -183,9 +181,7 @@ class TestStageTransitions:
         ]
 
     @pytest.mark.asyncio
-    async def test_invalid_stage_transition_raises(
-        self, service: BanquetLeadService
-    ):
+    async def test_invalid_stage_transition_raises(self, service: BanquetLeadService):
         """order 阶段不能倒退回 opportunity（销售不能反悔）。"""
         lead = await service.create_lead(
             customer_id=uuid.uuid4(),
@@ -221,9 +217,7 @@ class TestStageTransitions:
             )
 
     @pytest.mark.asyncio
-    async def test_invalid_without_reason_raises(
-        self, service: BanquetLeadService
-    ):
+    async def test_invalid_without_reason_raises(self, service: BanquetLeadService):
         """置失效时必填 invalidation_reason（用于Agent分析流失原因）。"""
         lead = await service.create_lead(
             customer_id=uuid.uuid4(),
@@ -280,9 +274,7 @@ class TestStageTransitions:
         )
         assert lead2.stage == lead1.stage
         assert lead2.lead_id == lead1.lead_id
-        assert len(emitted) == n_events_after_first, (
-            "幂等：重复 transition 到同一 stage 不应重复发射事件"
-        )
+        assert len(emitted) == n_events_after_first, "幂等：重复 transition 到同一 stage 不应重复发射事件"
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -292,9 +284,7 @@ class TestStageTransitions:
 
 class TestConversionRate:
     @pytest.mark.asyncio
-    async def test_conversion_rate_by_sales_employee(
-        self, service: BanquetLeadService
-    ):
+    async def test_conversion_rate_by_sales_employee(self, service: BanquetLeadService):
         """
         徐记海鲜：4 个销售员共 10 个样本商机，统计各员工漏斗。
 
@@ -373,9 +363,7 @@ class TestConversionRate:
 
 class TestSourceAttribution:
     @pytest.mark.asyncio
-    async def test_source_attribution_7_channels(
-        self, service: BanquetLeadService
-    ):
+    async def test_source_attribution_7_channels(self, service: BanquetLeadService):
         """
         8 个渠道各造 1 个 order 阶段商机，验证归因表覆盖所有渠道。
         """
@@ -410,9 +398,7 @@ class TestSourceAttribution:
 
         assert isinstance(result, list)
         channel_keys = {row["source_channel"] for row in result}
-        assert channel_keys == {c.value for c in all_channels}, (
-            "归因表必须覆盖 8 个渠道"
-        )
+        assert channel_keys == {c.value for c in all_channels}, "归因表必须覆盖 8 个渠道"
 
         # 每个渠道 total=1, converted=1, conversion_rate=1.0
         for row in result:
@@ -428,9 +414,7 @@ class TestSourceAttribution:
 
 class TestTenantIsolation:
     @pytest.mark.asyncio
-    async def test_tenant_isolation_rls(
-        self, service: BanquetLeadService
-    ):
+    async def test_tenant_isolation_rls(self, service: BanquetLeadService):
         """
         租户 A 的漏斗查询绝对不含租户 B 的数据。
         场景：尝在一起 tenant_A 与最黔线 tenant_B 共用同一份部署。
@@ -468,9 +452,7 @@ class TestTenantIsolation:
         meituan_rows = [row for row in result_a if row["source_channel"] == "meituan"]
         assert len(meituan_rows) == 1
         assert meituan_rows[0]["total"] == 1
-        assert meituan_rows[0]["estimated_amount_fen_total"] == 1_000_000, (
-            "RLS 隔离失败：租户 A 看到了租户 B 的金额"
-        )
+        assert meituan_rows[0]["estimated_amount_fen_total"] == 1_000_000, "RLS 隔离失败：租户 A 看到了租户 B 的金额"
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -492,9 +474,9 @@ class TestDepositRefundInvalidates:
         emitted: list[dict[str, Any]],
     ):
         """deposit 退款事件 → handle_deposit_refunded →
-          - lead.stage = invalid
-          - invalidation_reason 包含"订金退款"前缀 + 原因
-          - causation_id 关联到 deposit_event_id
+        - lead.stage = invalid
+        - invalidation_reason 包含"订金退款"前缀 + 原因
+        - causation_id 关联到 deposit_event_id
         """
         # 场景：客户已付订金 5 万（订单已转到 order 阶段）
         lead = await service.create_lead(
@@ -541,18 +523,12 @@ class TestDepositRefundInvalidates:
         assert "新郎新娘取消婚礼" in result.invalidation_reason
 
         # 断言 3：最后一条 lead_stage_changed 事件的 causation_id == deposit_event_id
-        stage_changed_events = [
-            e
-            for e in emitted
-            if e["event_type"].value == "banquet.lead_stage_changed"
-        ]
-        assert len(stage_changed_events) >= 1, (
-            "应至少发射一条 lead_stage_changed（order→invalid）"
-        )
+        stage_changed_events = [e for e in emitted if e["event_type"].value == "banquet.lead_stage_changed"]
+        assert len(stage_changed_events) >= 1, "应至少发射一条 lead_stage_changed（order→invalid）"
         last_change = stage_changed_events[-1]
-        assert last_change["causation_id"] == deposit_event_id, (
-            "独立验证 P1-3：lead_stage_changed.causation_id 必须等于 deposit_event_id"
-        )
+        assert (
+            last_change["causation_id"] == deposit_event_id
+        ), "独立验证 P1-3：lead_stage_changed.causation_id 必须等于 deposit_event_id"
         assert last_change["payload"]["next_stage"] == "invalid"
 
     @pytest.mark.asyncio
@@ -594,18 +570,11 @@ class TestDepositRefundInvalidates:
         )
 
         # 因果链：必须有且仅有一条 lead_stage_changed 事件，且 causation_id 精确匹配
-        stage_events = [
-            e
-            for e in emitted
-            if e["event_type"].value == "banquet.lead_stage_changed"
-        ]
-        assert len(stage_events) == 1, (
-            "单次 deposit 退款只应触发一次 stage_changed（幂等）"
-        )
+        stage_events = [e for e in emitted if e["event_type"].value == "banquet.lead_stage_changed"]
+        assert len(stage_events) == 1, "单次 deposit 退款只应触发一次 stage_changed（幂等）"
         stage_evt = stage_events[0]
         assert stage_evt["causation_id"] == deposit_event_id, (
-            f"causation_id 不匹配：expected {deposit_event_id}, "
-            f"got {stage_evt['causation_id']}"
+            f"causation_id 不匹配：expected {deposit_event_id}, " f"got {stage_evt['causation_id']}"
         )
         # stream_id 是 lead_id，payload.next_stage=invalid
         assert stage_evt["stream_id"] == str(lead.lead_id)
@@ -620,6 +589,4 @@ class TestDepositRefundInvalidates:
             deposit_event_id=uuid.uuid4(),  # 即便换新 event_id 也不应再改动
             refund_reason="重复退款请求",
         )
-        assert emitted == [], (
-            "lead 已 invalid 后再收 deposit.refunded 应幂等短路，不重发事件"
-        )
+        assert emitted == [], "lead 已 invalid 后再收 deposit.refunded 应幂等短路，不重发事件"

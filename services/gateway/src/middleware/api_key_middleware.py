@@ -15,7 +15,6 @@
 """
 
 import os
-from typing import Optional
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -118,13 +117,15 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
 
             async with async_session_factory() as session:
                 result = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id::text, tenant_id::text, name, permissions,
                                rate_limit_rps, status
                         FROM api_keys
                         WHERE key_hash = :key_hash AND is_deleted = FALSE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"key_hash": key_hash},
                 )
                 row = result.mappings().first()
@@ -166,13 +167,15 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
 
             async with async_session_factory() as session:
                 result = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, tenant_id::text, app_name, scopes,
                                rate_limit_per_min, status
                         FROM api_applications
                         WHERE app_key = :app_key AND status = 'active'
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"app_key": api_key},
                 )
                 row = result.mappings().first()

@@ -76,7 +76,8 @@ async def create_license(
     license_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_licenses (
                     id, tenant_id, store_id, license_type, license_no,
                     license_name, issue_date, expiry_date, issuing_authority,
@@ -86,7 +87,8 @@ async def create_license(
                     :lname, :idate, :edate, :auth,
                     :docs, :scope, :alert_days, 'active', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": license_id,
                 "tid": x_tenant_id,
@@ -154,14 +156,16 @@ async def list_expiring_licenses(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM civic_licenses
                 WHERE tenant_id = :tid AND is_deleted = FALSE
                     AND expiry_date IS NOT NULL
                     AND expiry_date <= CURRENT_DATE + :days * INTERVAL '1 day'
                     AND expiry_date >= CURRENT_DATE
                 ORDER BY expiry_date ASC
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "days": days},
         )
         items = [dict(r._mapping) for r in rows]
@@ -216,7 +220,8 @@ async def create_health_cert(
     cert_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_health_certs (
                     id, tenant_id, store_id, employee_id, employee_name,
                     cert_no, issue_date, expiry_date, issuing_authority,
@@ -226,7 +231,8 @@ async def create_health_cert(
                     :cno, :idate, :edate, :auth,
                     :doc_url, 'active', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": cert_id,
                 "tid": x_tenant_id,
@@ -259,13 +265,15 @@ async def list_expiring_health_certs(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM civic_health_certs
                 WHERE tenant_id = :tid AND is_deleted = FALSE
                     AND expiry_date <= CURRENT_DATE + :days * INTERVAL '1 day'
                     AND expiry_date >= CURRENT_DATE
                 ORDER BY expiry_date ASC
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "days": days},
         )
         items = [dict(r._mapping) for r in rows]

@@ -25,13 +25,11 @@ import api.payroll_engine_routes as _payroll_engine_mod
 import api.tax_filing_routes as _tax_filing_mod
 from api.admin_routes import router as admin_router
 from api.ai_alert_routes import router as ai_alert_router
+from api.ai_salary_advisor_routes import router as ai_salary_advisor_router
 from api.alert_aggregation_routes import router as alert_aggregation_router
 from api.approval_engine_routes import router as approval_engine_router
 from api.approval_router import router as approval_router
 from api.attendance_compliance_routes import router as attendance_compliance_router
-from api.daily_scorecard_routes import bonus_router as bonus_router
-from api.daily_scorecard_routes import lifecycle_router as lifecycle_router
-from api.daily_scorecard_routes import router as daily_scorecard_router
 from api.attendance_routes import router as attendance_router
 from api.brand_management_routes import router as brand_management_router
 from api.certification_routes import router as certification_router
@@ -40,6 +38,9 @@ from api.commission_v3_routes import router as commission_v3_router
 from api.compliance_alert_routes import router as compliance_alert_router
 from api.compliance_routes import router as compliance_router
 from api.contribution_routes import router as contribution_router
+from api.daily_scorecard_routes import bonus_router as bonus_router
+from api.daily_scorecard_routes import lifecycle_router as lifecycle_router
+from api.daily_scorecard_routes import router as daily_scorecard_router
 from api.device_routes import router as device_router
 from api.dri_workorder_routes import router as dri_workorder_router
 from api.e_signature_routes import router as e_signature_router
@@ -91,12 +92,10 @@ from api.store_ops_routes import router as store_ops_router
 from api.store_readiness_routes import router as store_readiness_router
 from api.task_routes import router as task_router  # Sprint R1 Track B: 统一任务引擎（v265）
 from api.tax_filing_routes import router as tax_filing_router
-from api.ai_salary_advisor_routes import router as ai_salary_advisor_router
 from api.tenant_systems_routes import router as tenant_systems_router
 from api.transfer_routes import router as transfer_db_router
 from api.transfers import router as transfer_router
 from api.unified_schedule_routes import router as unified_schedule_router
-from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from shared.ontology.src.database import get_db as _shared_get_db
@@ -196,7 +195,7 @@ app.include_router(approval_engine_router, prefix="/api/v1/approval-engine")
 # franchise_router(v1) 仅保留 /franchisees/{id}/assign-store、/bills/*、/overdue-alerts。
 app.include_router(franchise_v5_router)  # 加盟商管理闭环 V5（v240表，模块3.2）— 唯一 /franchisees CRUD
 app.include_router(franchise_v2_router)  # V2 残留：/franchisees/{id}*、/royalty/*、/audits
-app.include_router(franchise_router)     # PB.1 残留：assign-store、bills/*、overdue-alerts
+app.include_router(franchise_router)  # PB.1 残留：assign-store、bills/*、overdue-alerts
 app.include_router(approval_router, prefix="/api/v1")
 app.include_router(patrol_router, prefix="/api/v1")
 app.include_router(franchise_settlement_router)
@@ -250,15 +249,15 @@ app.include_router(e_signature_router)  # 电子签约模块（v252表）合同�
 app.include_router(points_router)  # 员工积分+赛马（v253表）积分流水+兑换+赛季
 app.include_router(tax_filing_router)  # 薪税申报对接（v256表）个税申报生成+提交+查询
 app.include_router(attendance_compliance_router)  # 考勤深度合规审计（v255表）GPS/代打/加班超时
-app.include_router(ai_salary_advisor_router)   # AI 薪资推荐（v257）岗位档位+区域系数+工龄曲线
+app.include_router(ai_salary_advisor_router)  # AI 薪资推荐（v257）岗位档位+区域系数+工龄曲线
 app.include_router(daily_scorecard_router)  # 日KPI得分卡（v378表）Sprint G5
 app.include_router(bonus_router)  # 绩效奖金计算（v378表）Sprint G5
 app.include_router(lifecycle_router)  # 门店生命周期（v378表）Sprint G5
 from api.franchise_fee_routes import router as franchise_fee_router
+from api.store_health_routes import router as store_health_router
 
 # ── Task 2.3/2.4: 门店配置模板 + 门店健康监控 ──
 from api.store_template_routes import router as store_template_router
-from api.store_health_routes import router as store_health_router
 
 app.include_router(franchise_fee_router)  # 加盟收费闭环（天财对标）账单/收款/出账规则/报表
 app.include_router(sales_target_router)  # 销售目标管理（Sprint R1 Track C，v266表）年/月/员工目标+进度追踪

@@ -154,7 +154,8 @@ async def get_pending_members_summary(
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*)                          AS total_count,
                     COALESCE(SUM(stored_value_fen), 0) AS total_balance_fen,
@@ -165,7 +166,8 @@ async def get_pending_members_summary(
                 WHERE tenant_id = :tid
                   AND status = 'pending_review'
                   AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {"tid": tenant_id},
             )
 
@@ -223,7 +225,8 @@ async def list_pending_members(
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
             rows = await db.execute(
-                text(f"""
+                text(
+                    f"""
                 SELECT id, phone, display_name, external_id_tiancai,
                        stored_value_fen, points, tier_name, status,
                        reviewed_by, reviewed_at, review_notes, created_at
@@ -233,15 +236,18 @@ async def list_pending_members(
                   AND is_deleted = FALSE
                 ORDER BY {order_sql}
                 LIMIT :size OFFSET :offset
-            """),
+            """
+                ),
                 {"tid": tenant_id, "status": status, "size": size, "offset": offset},
             )
 
             total_row = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT COUNT(*) FROM member_migration_pending
                 WHERE tenant_id = :tid AND status = :status AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {"tid": tenant_id, "status": status},
             )
             total = int(total_row.scalar() or 0)
@@ -306,11 +312,13 @@ async def approve_pending_member(
 
             # 读取 pending 记录
             row = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT id, phone, display_name, stored_value_fen, points, status
                 FROM member_migration_pending
                 WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {"rid": record_id, "tid": tenant_id},
             )
             record = row.fetchone()
@@ -329,13 +337,15 @@ async def approve_pending_member(
 
             # 将储值余额写入 customers 表（仅更新储值字段）
             await db.execute(
-                text("""
+                text(
+                    """
                 UPDATE customers
                 SET stored_value_fen = stored_value_fen + :balance,
                     points           = points + :pts,
                     updated_at       = NOW()
                 WHERE tenant_id = :tid AND phone = :phone AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {
                     "tid": tenant_id,
                     "phone": phone,
@@ -346,7 +356,8 @@ async def approve_pending_member(
 
             # 更新 pending 状态
             await db.execute(
-                text("""
+                text(
+                    """
                 UPDATE member_migration_pending
                 SET status       = 'migrated',
                     reviewed_by  = :reviewer,
@@ -355,7 +366,8 @@ async def approve_pending_member(
                     migrated_at  = :now,
                     updated_at   = :now
                 WHERE id = :rid AND tenant_id = :tid
-            """),
+            """
+                ),
                 {
                     "rid": record_id,
                     "tid": tenant_id,
@@ -416,7 +428,8 @@ async def reject_pending_member(
             await db.execute(text("SET app.tenant_id = :tid"), {"tid": tenant_id})
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                 UPDATE member_migration_pending
                 SET status       = 'rejected',
                     reviewed_by  = :reviewer,
@@ -427,7 +440,8 @@ async def reject_pending_member(
                   AND status = 'pending_review'
                   AND is_deleted = FALSE
                 RETURNING id, phone
-            """),
+            """
+                ),
                 {
                     "rid": record_id,
                     "tid": tenant_id,

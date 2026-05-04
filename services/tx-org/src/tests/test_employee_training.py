@@ -91,9 +91,14 @@ async def test_training_records_list():
     for record in MOCK_TRAINING_RECORDS:
         assert "training_type" in record, f"记录 {record.get('id')} 缺少 training_type"
         assert "passed" in record, f"记录 {record.get('id')} 缺少 passed"
-        assert record["training_type"] in ("onboarding", "food_safety", "service", "skills", "compliance", "other"), (
-            f"training_type 值不合法: {record['training_type']}"
-        )
+        assert record["training_type"] in (
+            "onboarding",
+            "food_safety",
+            "service",
+            "skills",
+            "compliance",
+            "other",
+        ), f"training_type 值不合法: {record['training_type']}"
 
 
 # ── Test 2: 即将到期证书 ─────────────────────────────────────────────────────
@@ -122,9 +127,9 @@ async def test_expiring_certificates():
 
     # 验证到期日期有效且在 30 天窗口内
     assert days_remaining >= 0, f"证书已过期（剩余 {days_remaining} 天），测试数据需更新"
-    assert days_remaining <= 30, (
-        f"王收银消防证书剩余 {days_remaining} 天，超过 30 天预警窗口。今日 {today}，到期日 {exp_date_str}"
-    )
+    assert (
+        days_remaining <= 30
+    ), f"王收银消防证书剩余 {days_remaining} 天，超过 30 天预警窗口。今日 {today}，到期日 {exp_date_str}"
 
     cert_status = _cert_status(days_remaining)
     assert cert_status in ("warning", "critical"), f"证书状态应为 warning/critical，实际为 {cert_status}"
@@ -236,12 +241,16 @@ async def test_performance_stats():
     assert 0.0 <= needs_improvement_rate <= 100.0
 
     # 3. 评级分布结构正确
-    assert set(grade_dist.keys()) == {"A", "B", "C", "D", "E"}, (
-        f"grade_distribution 键应为 A/B/C/D/E，实际 {set(grade_dist.keys())}"
-    )
+    assert set(grade_dist.keys()) == {
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+    }, f"grade_distribution 键应为 A/B/C/D/E，实际 {set(grade_dist.keys())}"
     assert sum(grade_dist.values()) == len(all_scores), "各评级人数之和应等于总人数"
 
     # 4. 百分率合计不超过 100%（优秀率 + 待改进率 <= 总参与率100%）
-    assert excellent_rate + needs_improvement_rate <= 100.0 + 0.1, (
-        f"优秀率{excellent_rate} + 待改进率{needs_improvement_rate} > 100%"
-    )
+    assert (
+        excellent_rate + needs_improvement_rate <= 100.0 + 0.1
+    ), f"优秀率{excellent_rate} + 待改进率{needs_improvement_rate} > 100%"

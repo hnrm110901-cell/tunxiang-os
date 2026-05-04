@@ -103,8 +103,11 @@ class TestResponseTemplate:
 
     def test_suggested_refund_fen_none_when_no_ratio(self):
         t = ResponseTemplate(
-            template_id="t", dispute_type="other", title="t",
-            content="x", recommended_action="dispute",
+            template_id="t",
+            dispute_type="other",
+            title="t",
+            content="x",
+            recommended_action="dispute",
         )
         assert t.suggested_refund_fen(10000) is None
 
@@ -116,8 +119,12 @@ class TestResponseTemplate:
         t = self._template()
         d = t.to_dict()
         for key in (
-            "template_id", "dispute_type", "title", "content",
-            "recommended_action", "suggested_refund_ratio",
+            "template_id",
+            "dispute_type",
+            "title",
+            "content",
+            "recommended_action",
+            "suggested_refund_ratio",
         ):
             assert key in d
 
@@ -286,9 +293,7 @@ class TestInputValidation:
 
     def test_merchant_response_rejects_unknown_action(self):
         with pytest.raises(DisputeError, match="action"):
-            MerchantResponseInput(
-                action="unknown", response_text="x"
-            )
+            MerchantResponseInput(action="unknown", response_text="x")
 
     def test_merchant_response_rejects_empty_text(self):
         with pytest.raises(DisputeError, match="response_text"):
@@ -363,9 +368,7 @@ class TestStateMachine:
             "resolved_merchant_win",
             "withdrawn",
         ):
-            assert ALLOWED_TRANSITIONS[terminal] == set(), (
-                f"终态 {terminal} 不应有转出"
-            )
+            assert ALLOWED_TRANSITIONS[terminal] == set(), f"终态 {terminal} 不应有转出"
 
     def test_terminal_statuses_constant(self):
         assert "resolved_refund_full" in TERMINAL_STATUSES
@@ -390,13 +393,7 @@ class TestStateMachine:
 class TestV288Migration:
     @pytest.fixture
     def migration_source(self) -> str:
-        path = (
-            ROOT
-            / "shared"
-            / "db-migrations"
-            / "versions"
-            / "v288_delivery_disputes.py"
-        )
+        path = ROOT / "shared" / "db-migrations" / "versions" / "v288_delivery_disputes.py"
         return path.read_text(encoding="utf-8")
 
     def test_revision_chain(self, migration_source):
@@ -462,14 +459,8 @@ class TestV288Migration:
         assert "ux_delivery_disputes_platform_id" in migration_source
 
     def test_rls_both_tables(self, migration_source):
-        assert (
-            "ALTER TABLE delivery_disputes ENABLE ROW LEVEL SECURITY"
-            in migration_source
-        )
-        assert (
-            "ALTER TABLE delivery_dispute_messages ENABLE ROW LEVEL SECURITY"
-            in migration_source
-        )
+        assert "ALTER TABLE delivery_disputes ENABLE ROW LEVEL SECURITY" in migration_source
+        assert "ALTER TABLE delivery_dispute_messages ENABLE ROW LEVEL SECURITY" in migration_source
 
     def test_pending_sla_queue_index(self, migration_source):
         """运营必需的队列索引"""

@@ -139,14 +139,16 @@ async def push_menu_to_platform(
     items_json = json.dumps([item.model_dump() for item in body.items])
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO delivery_menu_sync_tasks
                 (id, tenant_id, store_id, platform, sync_mode, items_count,
                  items_snapshot, status, created_at)
             VALUES
                 (:id, :tid, :sid, :platform, :mode, :cnt,
                  :items::jsonb, 'pending', :now)
-        """),
+        """
+        ),
         {
             "id": task_id,
             "tid": tenant_id,
@@ -209,14 +211,16 @@ async def get_menu_sync_status(
     where = " AND ".join(conds)
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT DISTINCT ON (platform)
                 id, store_id, platform, sync_mode, items_count,
                 status, error_message, created_at, completed_at
             FROM delivery_menu_sync_tasks
             WHERE {where}
             ORDER BY platform, created_at DESC
-        """),
+        """
+        ),
         params,
     )
     results = rows.fetchall()
@@ -282,14 +286,16 @@ async def sync_soldout_to_platforms(
         items_json = json.dumps(body.soldout_items)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO delivery_soldout_sync_log
                     (id, tenant_id, store_id, platform, batch_id,
                      soldout_items, items_count, status, created_at)
                 VALUES
                     (:id, :tid, :sid, :platform, :bid,
                      :items::jsonb, :cnt, 'pending', :now)
-            """),
+            """
+            ),
             {
                 "id": log_id,
                 "tid": tenant_id,
@@ -372,14 +378,16 @@ async def get_soldout_sync_log(
     ).scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, store_id, platform, batch_id, items_count,
                    status, error_message, created_at, completed_at
             FROM delivery_soldout_sync_log
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = []
@@ -441,7 +449,8 @@ async def get_reconciliation_overview(
     where = " AND ".join(conds)
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 platform,
                 COUNT(*) AS total_orders,
@@ -459,7 +468,8 @@ async def get_reconciliation_overview(
             WHERE {where}
             GROUP BY platform
             ORDER BY platform
-        """),
+        """
+        ),
         params,
     )
 

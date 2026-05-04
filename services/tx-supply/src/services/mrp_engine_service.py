@@ -280,7 +280,8 @@ class MRPEngineService:
         params = {**DEFAULT_PARAMETERS, **plan_data.parameters}
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO mrp_forecast_plans
                     (tenant_id, store_id, plan_name, plan_type, status,
                      forecast_date_from, forecast_date_to, parameters, created_by)
@@ -288,7 +289,8 @@ class MRPEngineService:
                     (:tenant_id, :store_id, :plan_name, :plan_type, 'draft',
                      :date_from, :date_to, :parameters::jsonb, :created_by)
                 RETURNING id, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": plan_data.store_id,
@@ -336,13 +338,15 @@ class MRPEngineService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, plan_name, plan_type, status,
                        forecast_date_from, forecast_date_to, parameters,
                        created_by, approved_by, approved_at, created_at, updated_at
                 FROM mrp_forecast_plans
                 WHERE id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         row = result.mappings().fetchone()
@@ -384,7 +388,8 @@ class MRPEngineService:
 
         # 查列表
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, plan_name, plan_type, status,
                        forecast_date_from, forecast_date_to, parameters,
                        created_by, approved_by, approved_at, created_at, updated_at
@@ -392,7 +397,8 @@ class MRPEngineService:
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().fetchall()
@@ -456,11 +462,13 @@ class MRPEngineService:
 
         # 更新状态为 calculating
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE mrp_forecast_plans
                 SET status = 'calculating', updated_at = NOW()
                 WHERE id = :plan_id
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
 
@@ -508,11 +516,13 @@ class MRPEngineService:
             if not ingredient_ids:
                 _log.info("mrp.calculate.no_demand")
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE mrp_forecast_plans
                         SET status = 'calculated', updated_at = NOW()
                         WHERE id = :plan_id
-                    """),
+                    """
+                    ),
                     {"plan_id": plan_id},
                 )
                 await db.commit()
@@ -546,7 +556,8 @@ class MRPEngineService:
                 net_req = max(0, forecast_qty + safety_qty - current_qty - transit_qty)
 
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO mrp_demand_lines
                             (tenant_id, plan_id, ingredient_id, ingredient_name, unit,
                              forecast_demand_qty, safety_stock_qty, current_stock_qty,
@@ -556,7 +567,8 @@ class MRPEngineService:
                              :forecast_qty, :safety_qty, :current_qty,
                              :transit_qty, :net_req, :source)
                         RETURNING id
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "plan_id": plan_id,
@@ -591,11 +603,13 @@ class MRPEngineService:
 
             # 更新状态为 calculated
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE mrp_forecast_plans
                     SET status = 'calculated', updated_at = NOW()
                     WHERE id = :plan_id
-                """),
+                """
+                ),
                 {"plan_id": plan_id},
             )
             await db.commit()
@@ -606,11 +620,13 @@ class MRPEngineService:
         except Exception:  # noqa: BLE001 — MRP计算事务回滚，任何异常都需回退状态
             # 计算失败，回退状态为 draft
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE mrp_forecast_plans
                     SET status = 'draft', updated_at = NOW()
                     WHERE id = :plan_id
-                """),
+                """
+                ),
                 {"plan_id": plan_id},
             )
             await db.commit()
@@ -638,7 +654,8 @@ class MRPEngineService:
             params["store_id"] = store_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     ingredient_id,
                     MAX(ingredient_name) AS ingredient_name,
@@ -651,7 +668,8 @@ class MRPEngineService:
                   {store_filter}
                 GROUP BY ingredient_id
                 HAVING SUM(ABS(quantity)) > 0
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().fetchall()
@@ -690,7 +708,8 @@ class MRPEngineService:
 
         # 查询近N天菜品销售量
         dish_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     oi.dish_id,
                     SUM(oi.quantity) AS total_sold
@@ -702,7 +721,8 @@ class MRPEngineService:
                   {store_filter}
                 GROUP BY oi.dish_id
                 HAVING SUM(oi.quantity) > 0
-            """),
+            """
+            ),
             params,
         )
         dish_rows = dish_result.mappings().fetchall()
@@ -715,7 +735,8 @@ class MRPEngineService:
 
         # 查询BOM配方
         bom_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     bi.dish_id,
                     bi.ingredient_id,
@@ -726,7 +747,8 @@ class MRPEngineService:
                 FROM bom_items bi
                 WHERE bi.dish_id = ANY(:dish_ids::uuid[])
                   AND bi.is_deleted = false
-            """),
+            """
+            ),
             {"dish_ids": dish_ids, "default_waste": DEFAULT_WASTE_RATE},
         )
         bom_rows = bom_result.mappings().fetchall()
@@ -773,14 +795,16 @@ class MRPEngineService:
             params["store_id"] = store_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT ingredient_id, COALESCE(SUM(quantity), 0) AS qty
                 FROM inventory_stocks
                 WHERE ingredient_id = ANY(:ids::uuid[])
                   AND is_deleted = false
                   {store_filter}
                 GROUP BY ingredient_id
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().fetchall()
@@ -803,7 +827,8 @@ class MRPEngineService:
             params["store_id"] = store_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     poi.ingredient_id,
                     COALESCE(SUM(poi.quantity), 0) AS qty
@@ -814,7 +839,8 @@ class MRPEngineService:
                   AND po.is_deleted = false
                   {store_filter}
                 GROUP BY poi.ingredient_id
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().fetchall()
@@ -854,12 +880,14 @@ class MRPEngineService:
 
         # 清理旧的生产建议（先清领料单）
         await db.execute(
-            text("""
+            text(
+                """
                 DELETE FROM mrp_planned_issues
                 WHERE production_suggestion_id IN (
                     SELECT id FROM mrp_production_suggestions WHERE plan_id = :plan_id
                 )
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         await db.execute(
@@ -870,7 +898,8 @@ class MRPEngineService:
         # 查询需求行中有BOM且为自产的原料/半成品
         # 自产标识: bom_recipes 表中 production_type = 'self'
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     dl.ingredient_id,
                     dl.ingredient_name,
@@ -885,7 +914,8 @@ class MRPEngineService:
                 WHERE dl.plan_id = :plan_id
                   AND dl.net_requirement_qty > 0
                   AND dl.is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         rows = result.mappings().fetchall()
@@ -913,7 +943,8 @@ class MRPEngineService:
                 priority = "low"
 
             ins_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO mrp_production_suggestions
                         (tenant_id, plan_id, product_id, product_name, suggested_qty,
                          unit, bom_id, required_date, priority, status)
@@ -921,7 +952,8 @@ class MRPEngineService:
                         (:tenant_id, :plan_id, :product_id, :product_name, :suggested_qty,
                          :unit, :bom_id, :required_date, :priority, 'suggested')
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "plan_id": plan_id,
@@ -1003,7 +1035,8 @@ class MRPEngineService:
 
         # 查询需要外购的需求行（排除有自产BOM的）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     dl.ingredient_id,
                     dl.ingredient_name,
@@ -1017,7 +1050,8 @@ class MRPEngineService:
                   AND dl.net_requirement_qty > 0
                   AND dl.is_deleted = false
                   AND br.id IS NULL
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         demand_rows = result.mappings().fetchall()
@@ -1062,7 +1096,8 @@ class MRPEngineService:
             estimated_cost_fen = int(net_qty * unit_price_fen)
 
             ins_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO mrp_procurement_suggestions
                         (tenant_id, plan_id, ingredient_id, ingredient_name,
                          suggested_qty, unit, supplier_id, supplier_name,
@@ -1072,7 +1107,8 @@ class MRPEngineService:
                          :suggested_qty, :unit, :supplier_id, :supplier_name,
                          :estimated_cost_fen, :required_date, :lead_time_days, 'suggested')
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "plan_id": plan_id,
@@ -1129,7 +1165,8 @@ class MRPEngineService:
             return {}
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT ON (si.ingredient_id)
                     si.ingredient_id,
                     s.id AS supplier_id,
@@ -1142,7 +1179,8 @@ class MRPEngineService:
                 WHERE si.ingredient_id = ANY(:ids::uuid[])
                   AND si.is_deleted = false
                 ORDER BY si.ingredient_id, COALESCE(ss.total_score, 60) DESC
-            """),
+            """
+            ),
             {"ids": ingredient_ids},
         )
         rows = result.mappings().fetchall()
@@ -1166,12 +1204,14 @@ class MRPEngineService:
             return {}
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_id, min_order_qty
                 FROM inventory_thresholds
                 WHERE ingredient_id = ANY(:ids::uuid[])
                   AND min_order_qty > 0
-            """),
+            """
+            ),
             {"ids": ingredient_ids},
         )
         rows = result.mappings().fetchall()
@@ -1188,7 +1228,8 @@ class MRPEngineService:
             return {}
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT ON (ingredient_id)
                     ingredient_id,
                     unit_price_fen
@@ -1196,7 +1237,8 @@ class MRPEngineService:
                 WHERE ingredient_id = ANY(:ids::uuid[])
                   AND is_deleted = false
                 ORDER BY ingredient_id, created_at DESC
-            """),
+            """
+            ),
             {"ids": ingredient_ids},
         )
         rows = result.mappings().fetchall()
@@ -1231,34 +1273,40 @@ class MRPEngineService:
         self._validate_transition(plan.status, "approved")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE mrp_forecast_plans
                 SET status = 'approved',
                     approved_by = :approved_by,
                     approved_at = NOW(),
                     updated_at = NOW()
                 WHERE id = :plan_id
-            """),
+            """
+            ),
             {"plan_id": plan_id, "approved_by": approved_by},
         )
 
         # 同步审批生产建议和采购建议
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE mrp_production_suggestions
                 SET status = 'approved', updated_at = NOW()
                 WHERE plan_id = :plan_id AND status = 'suggested'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE mrp_procurement_suggestions
                 SET status = 'approved', updated_at = NOW()
                 WHERE plan_id = :plan_id AND status = 'suggested'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
 
@@ -1299,7 +1347,8 @@ class MRPEngineService:
 
         # 查询选中的采购建议
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, ingredient_id, ingredient_name, suggested_qty, unit,
                        supplier_id, supplier_name, estimated_cost_fen, required_date,
                        lead_time_days, status
@@ -1308,7 +1357,8 @@ class MRPEngineService:
                   AND plan_id = :plan_id
                   AND status = 'approved'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"ids": suggestion_ids, "plan_id": plan_id},
         )
         rows = result.mappings().fetchall()
@@ -1332,7 +1382,8 @@ class MRPEngineService:
 
             # 创建采购订单
             po_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO purchase_orders
                         (tenant_id, order_no, supplier_id, supplier_name,
                          status, total_amount_fen, source, notes)
@@ -1340,7 +1391,8 @@ class MRPEngineService:
                         (:tenant_id, :order_no, :supplier_id, :supplier_name,
                          'draft', :total_fen, 'mrp', :notes)
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "order_no": po_no,
@@ -1356,14 +1408,16 @@ class MRPEngineService:
             # 创建采购订单行
             for item in items:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO purchase_order_items
                             (tenant_id, purchase_order_id, ingredient_id,
                              ingredient_name, quantity, unit, unit_price_fen)
                         VALUES
                             (:tenant_id, :po_id, :ingredient_id,
                              :ingredient_name, :quantity, :unit, :unit_price_fen)
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "po_id": po_id,
@@ -1377,13 +1431,15 @@ class MRPEngineService:
 
                 # 更新采购建议状态
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE mrp_procurement_suggestions
                         SET status = 'ordered',
                             purchase_order_id = :po_id,
                             updated_at = NOW()
                         WHERE id = :sug_id
-                    """),
+                    """
+                    ),
                     {"po_id": po_id, "sug_id": str(item["id"])},
                 )
 
@@ -1431,7 +1487,8 @@ class MRPEngineService:
             raise ValueError("生产建议ID列表不能为空")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, product_id, product_name, suggested_qty, unit,
                        bom_id, required_date, priority, status
                 FROM mrp_production_suggestions
@@ -1439,7 +1496,8 @@ class MRPEngineService:
                   AND plan_id = :plan_id
                   AND status = 'approved'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"ids": suggestion_ids, "plan_id": plan_id},
         )
         rows = result.mappings().fetchall()
@@ -1454,7 +1512,8 @@ class MRPEngineService:
             task_no = f"MRP-PT{now_str}{uuid.uuid4().hex[:4].upper()}"
 
             task_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO production_tasks
                         (tenant_id, task_no, product_id, product_name,
                          planned_qty, unit, bom_id, required_date,
@@ -1464,7 +1523,8 @@ class MRPEngineService:
                          :planned_qty, :unit, :bom_id, :required_date,
                          :priority, 'pending', 'mrp')
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "task_no": task_no,
@@ -1481,11 +1541,13 @@ class MRPEngineService:
 
             # 更新生产建议状态
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE mrp_production_suggestions
                     SET status = 'scheduled', updated_at = NOW()
                     WHERE id = :sug_id
-                """),
+                """
+                ),
                 {"sug_id": str(row["id"])},
             )
 
@@ -1531,11 +1593,13 @@ class MRPEngineService:
 
         # 查询生产建议
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, product_id, product_name, suggested_qty, bom_id, status
                 FROM mrp_production_suggestions
                 WHERE id = :sug_id AND is_deleted = false
-            """),
+            """
+            ),
             {"sug_id": production_suggestion_id},
         )
         sug_row = result.mappings().fetchone()
@@ -1553,16 +1617,19 @@ class MRPEngineService:
 
         # 清理旧的领料单
         await db.execute(
-            text("""
+            text(
+                """
                 DELETE FROM mrp_planned_issues
                 WHERE production_suggestion_id = :sug_id
-            """),
+            """
+            ),
             {"sug_id": production_suggestion_id},
         )
 
         # 查询BOM明细
         bom_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ingredient_id,
                     ingredient_name,
@@ -1571,7 +1638,8 @@ class MRPEngineService:
                     COALESCE(waste_rate, :default_waste) AS waste_rate
                 FROM bom_items
                 WHERE bom_id = :bom_id AND is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": str(bom_id), "default_waste": DEFAULT_WASTE_RATE},
         )
         bom_rows = bom_result.mappings().fetchall()
@@ -1588,7 +1656,8 @@ class MRPEngineService:
             planned_qty = round(production_qty * bom_qty * (1 + waste_rate), 3)
 
             ins_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO mrp_planned_issues
                         (tenant_id, production_suggestion_id, ingredient_id,
                          ingredient_name, planned_qty, unit, status)
@@ -1596,7 +1665,8 @@ class MRPEngineService:
                         (:tenant_id, :sug_id, :ingredient_id,
                          :ingredient_name, :planned_qty, :unit, 'planned')
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "sug_id": production_suggestion_id,
@@ -1658,12 +1728,14 @@ class MRPEngineService:
 
         # 查询领料单
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, production_suggestion_id, ingredient_id, ingredient_name,
                        planned_qty, unit, status
                 FROM mrp_planned_issues
                 WHERE id = :issue_id AND is_deleted = false
-            """),
+            """
+            ),
             {"issue_id": planned_issue_id},
         )
         row = result.mappings().fetchone()
@@ -1686,7 +1758,8 @@ class MRPEngineService:
             new_status = "partial" if actual_qty < planned_qty else "issued"
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE mrp_planned_issues
                 SET actual_qty = :actual_qty,
                     issued_at = NOW(),
@@ -1695,7 +1768,8 @@ class MRPEngineService:
                     variance_qty = :variance,
                     updated_at = NOW()
                 WHERE id = :issue_id
-            """),
+            """
+            ),
             {
                 "actual_qty": actual_qty,
                 "issued_by": issued_by,
@@ -1744,16 +1818,19 @@ class MRPEngineService:
         await self._set_tenant(db, tenant_id)
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM mrp_demand_lines
                 WHERE plan_id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, plan_id, ingredient_id, ingredient_name, unit,
                        forecast_demand_qty, safety_stock_qty, current_stock_qty,
                        in_transit_qty, net_requirement_qty, source
@@ -1761,7 +1838,8 @@ class MRPEngineService:
                 WHERE plan_id = :plan_id AND is_deleted = false
                 ORDER BY net_requirement_qty DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"plan_id": plan_id, "limit": size, "offset": (page - 1) * size},
         )
         rows = result.mappings().fetchall()
@@ -1796,16 +1874,19 @@ class MRPEngineService:
         await self._set_tenant(db, tenant_id)
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM mrp_production_suggestions
                 WHERE plan_id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, plan_id, product_id, product_name, suggested_qty, unit,
                        bom_id, required_date, priority, status
                 FROM mrp_production_suggestions
@@ -1817,7 +1898,8 @@ class MRPEngineService:
                     END,
                     required_date ASC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"plan_id": plan_id, "limit": size, "offset": (page - 1) * size},
         )
         rows = result.mappings().fetchall()
@@ -1851,16 +1933,19 @@ class MRPEngineService:
         await self._set_tenant(db, tenant_id)
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM mrp_procurement_suggestions
                 WHERE plan_id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, plan_id, ingredient_id, ingredient_name, suggested_qty,
                        unit, supplier_id, supplier_name, estimated_cost_fen,
                        required_date, lead_time_days, status, purchase_order_id
@@ -1868,7 +1953,8 @@ class MRPEngineService:
                 WHERE plan_id = :plan_id AND is_deleted = false
                 ORDER BY estimated_cost_fen DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"plan_id": plan_id, "limit": size, "offset": (page - 1) * size},
         )
         rows = result.mappings().fetchall()
@@ -1910,48 +1996,55 @@ class MRPEngineService:
 
         # 需求行汇总
         demand_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS cnt,
                     COALESCE(SUM(forecast_demand_qty), 0) AS total_forecast,
                     COALESCE(SUM(net_requirement_qty), 0) AS total_net
                 FROM mrp_demand_lines
                 WHERE plan_id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         d = demand_result.mappings().fetchone()
 
         # 生产建议汇总
         prod_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS cnt,
                     COUNT(*) FILTER (WHERE status = 'completed') AS completed
                 FROM mrp_production_suggestions
                 WHERE plan_id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         p = prod_result.mappings().fetchone()
 
         # 采购建议汇总
         proc_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS cnt,
                     COUNT(*) FILTER (WHERE status = 'ordered') AS ordered,
                     COALESCE(SUM(estimated_cost_fen), 0) AS total_cost
                 FROM mrp_procurement_suggestions
                 WHERE plan_id = :plan_id AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         pr = proc_result.mappings().fetchone()
 
         # 领料汇总
         issue_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS cnt,
                     COUNT(*) FILTER (WHERE status = 'issued') AS issued
@@ -1960,7 +2053,8 @@ class MRPEngineService:
                     SELECT id FROM mrp_production_suggestions WHERE plan_id = :plan_id
                 )
                 AND is_deleted = false
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         i = issue_result.mappings().fetchone()
@@ -1996,7 +2090,8 @@ class MRPEngineService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     pi.ingredient_id,
                     pi.ingredient_name,
@@ -2009,7 +2104,8 @@ class MRPEngineService:
                   AND pi.is_deleted = false
                 GROUP BY pi.ingredient_id, pi.ingredient_name
                 ORDER BY ABS(SUM(COALESCE(pi.actual_qty, 0)) - SUM(pi.planned_qty)) DESC
-            """),
+            """
+            ),
             {"plan_id": plan_id},
         )
         rows = result.mappings().fetchall()

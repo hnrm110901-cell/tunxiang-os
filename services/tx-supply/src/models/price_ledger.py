@@ -46,11 +46,11 @@ from shared.ontology.src.base import TenantBase
 
 ALERT_RULE_TYPES: tuple[str, ...] = (
     "ABSOLUTE_HIGH",  # 当前单价 >= 阈值（分）
-    "ABSOLUTE_LOW",   # 当前单价 <= 阈值（分）
-    "PERCENT_RISE",   # 相对基准窗口均价的涨幅 >= 阈值（百分点）
-    "PERCENT_FALL",   # 跌幅 >= 阈值
-    "YOY_RISE",       # 同比上一年同窗口的涨幅 >= 阈值
-    "YOY_FALL",       # 同比下跌幅
+    "ABSOLUTE_LOW",  # 当前单价 <= 阈值（分）
+    "PERCENT_RISE",  # 相对基准窗口均价的涨幅 >= 阈值（百分点）
+    "PERCENT_FALL",  # 跌幅 >= 阈值
+    "YOY_RISE",  # 同比上一年同窗口的涨幅 >= 阈值
+    "YOY_FALL",  # 同比下跌幅
 )
 
 ALERT_SEVERITIES: tuple[str, ...] = ("INFO", "WARNING", "CRITICAL")
@@ -69,29 +69,17 @@ class SupplierPriceHistoryORM(TenantBase):
 
     __tablename__ = "supplier_price_history"
 
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=False, index=True
-    )
-    supplier_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=False, index=True
-    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    supplier_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
     unit_price_fen: Mapped[int] = mapped_column(BigInteger, nullable=False)
     quantity_unit: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
-    captured_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     source_doc_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    source_doc_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
+    source_doc_id: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     source_doc_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    store_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
+    store_id: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class PriceAlertRuleORM(TenantBase):
@@ -99,18 +87,12 @@ class PriceAlertRuleORM(TenantBase):
 
     __tablename__ = "price_alert_rules"
 
-    ingredient_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True, index=True
-    )
+    ingredient_id: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True, index=True)
     rule_type: Mapped[str] = mapped_column(String(16), nullable=False)
     threshold_value: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
-    baseline_window_days: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=30
-    )
+    baseline_window_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class PriceAlertORM(TenantBase):
@@ -123,34 +105,16 @@ class PriceAlertORM(TenantBase):
         ForeignKey("price_alert_rules.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=False
-    )
-    supplier_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
-    triggered_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    supplier_id: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    triggered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     current_price_fen: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    baseline_price_fen: Mapped[Optional[int]] = mapped_column(
-        BigInteger, nullable=True
-    )
-    breach_value: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(12, 4), nullable=True
-    )
-    severity: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="WARNING"
-    )
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="ACTIVE"
-    )
-    acked_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
-    acked_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    baseline_price_fen: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    breach_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, default="WARNING")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
+    acked_by: Mapped[Optional[uuid.UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    acked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     ack_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
@@ -234,9 +198,7 @@ class SupplierCompareOut(BaseModel):
 class AlertRuleIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    ingredient_id: Optional[str] = Field(
-        default=None, description="NULL 表示该规则适用于全部食材"
-    )
+    ingredient_id: Optional[str] = Field(default=None, description="NULL 表示该规则适用于全部食材")
     rule_type: str
     threshold_value: Decimal
     baseline_window_days: int = Field(default=30, ge=1, le=365)

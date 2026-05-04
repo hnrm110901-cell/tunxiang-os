@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+
 from ..services.kds_soldout_sync import get_active_soldout, mark_soldout, restore_soldout
 
 router = APIRouter(prefix="/api/v1/kds/soldout", tags=["kds-soldout"])

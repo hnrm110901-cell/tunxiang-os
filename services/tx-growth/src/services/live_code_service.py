@@ -61,7 +61,8 @@ class LiveCodeService:
         """创建活码"""
         code_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO live_codes (
                     id, tenant_id, store_id, code_name, code_type,
                     wecom_config_id, welcome_msg, welcome_media_url,
@@ -77,7 +78,8 @@ class LiveCodeService:
                     :auto_tag_ids::jsonb, :channel_source, :qr_image_url,
                     :expires_at, :created_by
                 )
-            """),
+            """
+            ),
             {
                 "id": str(code_id),
                 "tenant_id": str(tenant_id),
@@ -109,10 +111,12 @@ class LiveCodeService:
     ) -> dict:
         """获取活码详情"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM live_codes
                 WHERE tenant_id = :tenant_id AND id = :code_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "code_id": str(code_id)},
         )
         row = result.mappings().first()
@@ -211,10 +215,12 @@ class LiveCodeService:
     ) -> dict:
         """软删除活码"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_codes SET is_deleted = TRUE, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :code_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "code_id": str(code_id)},
         )
         if result.rowcount == 0:
@@ -230,11 +236,13 @@ class LiveCodeService:
     ) -> dict:
         """暂停活码"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_codes SET status = 'paused', updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :code_id
                   AND is_deleted = FALSE AND status = 'active'
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "code_id": str(code_id)},
         )
         if result.rowcount == 0:
@@ -249,11 +257,13 @@ class LiveCodeService:
     ) -> dict:
         """恢复活码"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_codes SET status = 'active', updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :code_id
                   AND is_deleted = FALSE AND status = 'paused'
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "code_id": str(code_id)},
         )
         if result.rowcount == 0:
@@ -320,11 +330,13 @@ class LiveCodeService:
         # 4. 每日限额检查
         today = date.today()
         daily_count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM live_code_scans
                 WHERE live_code_id = :code_id AND result = 'success'
                   AND created_at::date = :today AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"code_id": str(code_id), "today": today},
         )
         daily_count = daily_count_result.scalar() or 0
@@ -346,10 +358,12 @@ class LiveCodeService:
         # 5. 总量限额检查
         if code.get("total_add_limit"):
             total_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM live_code_scans
                     WHERE live_code_id = :code_id AND result = 'success' AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"code_id": str(code_id)},
             )
             total_count = total_result.scalar() or 0
@@ -431,7 +445,8 @@ class LiveCodeService:
         """记录扫码"""
         scan_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO live_code_scans (
                     id, tenant_id, live_code_id, store_id,
                     customer_id, wecom_external_userid,
@@ -443,7 +458,8 @@ class LiveCodeService:
                     :scan_source, :latitude, :longitude,
                     :matched_store_id, :result, :device_info::jsonb
                 )
-            """),
+            """
+            ),
             {
                 "id": str(scan_id),
                 "tenant_id": str(tenant_id),
@@ -476,7 +492,8 @@ class LiveCodeService:
     ) -> Optional[dict]:
         """Haversine公式匹配最近门店"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id, latitude, longitude,
                     (6371000 * acos(
                         LEAST(1.0, cos(radians(:lat)) * cos(radians(latitude))
@@ -492,7 +509,8 @@ class LiveCodeService:
                   AND longitude IS NOT NULL
                 ORDER BY distance_meters ASC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "code_id": str(code_id),
@@ -635,7 +653,8 @@ class LiveCodeService:
         """每日统计聚合（定时任务调用）"""
         # 聚合当日扫码数据到 channel_stats 表
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO live_code_channel_stats (
                     tenant_id, live_code_id, store_id, stat_date,
                     scan_count, success_count
@@ -656,7 +675,8 @@ class LiveCodeService:
                     scan_count = EXCLUDED.scan_count,
                     success_count = EXCLUDED.success_count,
                     updated_at = now()
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "stat_date": stat_date},
         )
         log.info("live_code_daily_stats_aggregated", tenant_id=str(tenant_id), date=str(stat_date))
@@ -681,7 +701,8 @@ class LiveCodeService:
         """绑定门店到活码"""
         binding_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO live_code_store_bindings (
                     id, tenant_id, live_code_id, store_id,
                     group_chat_id, wecom_userid, latitude, longitude
@@ -696,7 +717,8 @@ class LiveCodeService:
                     longitude = EXCLUDED.longitude,
                     is_active = TRUE,
                     updated_at = now()
-            """),
+            """
+            ),
             {
                 "id": str(binding_id),
                 "tenant_id": str(tenant_id),
@@ -720,14 +742,16 @@ class LiveCodeService:
     ) -> dict:
         """解绑门店"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_code_store_bindings
                 SET is_active = FALSE, updated_at = now()
                 WHERE tenant_id = :tenant_id
                   AND live_code_id = :code_id
                   AND store_id = :store_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "code_id": str(code_id),
@@ -746,13 +770,15 @@ class LiveCodeService:
     ) -> list[dict]:
         """查询活码的门店绑定列表"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM live_code_store_bindings
                 WHERE tenant_id = :tenant_id
                   AND live_code_id = :code_id
                   AND is_deleted = FALSE
                 ORDER BY is_active DESC, created_at DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "code_id": str(code_id)},
         )
         return [dict(r) for r in result.mappings().all()]

@@ -107,9 +107,9 @@ class TestToolRegistryByAgent:
     @pytest.mark.parametrize("agent_id,expected_count", EXPECTED_COUNTS.items())
     def test_agent_tool_count(self, agent_id: str, expected_count: int) -> None:
         tools = get_tools_by_agent(agent_id)
-        assert len(tools) == expected_count, (
-            f"{agent_id}: expected {expected_count} tools, got {len(tools)}: {list(tools.keys())}"
-        )
+        assert (
+            len(tools) == expected_count
+        ), f"{agent_id}: expected {expected_count} tools, got {len(tools)}: {list(tools.keys())}"
 
     def test_all_9_skill_agents_present(self) -> None:
         skill_agents = {

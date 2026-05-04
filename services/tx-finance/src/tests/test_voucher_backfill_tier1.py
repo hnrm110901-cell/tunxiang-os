@@ -23,7 +23,6 @@ from __future__ import annotations
 import os
 import sys
 import uuid
-from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -35,7 +34,6 @@ from services.voucher_backfill_service import (  # type: ignore  # noqa: E402
     VoucherBackfillService,
 )
 
-
 # ─── entries 解析: 多格式 + 边界 ────────────────────────────────────
 
 
@@ -45,11 +43,15 @@ class TestEntriesParser:
     def test_format_a_direction_debit(self):
         """格式 A: {direction: 'debit', amount_fen, ...}."""
         svc = VoucherBackfillService()
-        entries = [{
-            "direction": "debit", "account_code": "1001",
-            "account_name": "现金", "amount_fen": 10000,
-            "summary": "堂食现金",
-        }]
+        entries = [
+            {
+                "direction": "debit",
+                "account_code": "1001",
+                "account_name": "现金",
+                "amount_fen": 10000,
+                "summary": "堂食现金",
+            }
+        ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert len(parsed) == 1
         assert parsed[0]["debit_fen"] == 10000
@@ -59,10 +61,14 @@ class TestEntriesParser:
 
     def test_format_a_direction_credit(self):
         svc = VoucherBackfillService()
-        entries = [{
-            "direction": "credit", "account_code": "6001",
-            "account_name": "主营业务收入", "amount_fen": 10000,
-        }]
+        entries = [
+            {
+                "direction": "credit",
+                "account_code": "6001",
+                "account_name": "主营业务收入",
+                "amount_fen": 10000,
+            }
+        ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert parsed[0]["debit_fen"] == 0
         assert parsed[0]["credit_fen"] == 10000
@@ -70,10 +76,14 @@ class TestEntriesParser:
     def test_format_a_negative_credit_flips_to_debit(self):
         """格式 A 里的折扣: credit=-1000 (减少收入) → debit=+1000."""
         svc = VoucherBackfillService()
-        entries = [{
-            "direction": "credit", "account_code": "6001.99",
-            "account_name": "折扣抵减", "amount_fen": -1000,
-        }]
+        entries = [
+            {
+                "direction": "credit",
+                "account_code": "6001.99",
+                "account_name": "折扣抵减",
+                "amount_fen": -1000,
+            }
+        ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert parsed[0]["debit_fen"] == 1000
         assert parsed[0]["credit_fen"] == 0
@@ -81,10 +91,13 @@ class TestEntriesParser:
     def test_format_a_amount_yuan_fallback(self):
         """amount_fen 缺失时回退 amount_yuan * 100."""
         svc = VoucherBackfillService()
-        entries = [{
-            "direction": "debit", "account_code": "1001",
-            "amount_yuan": 100.00,  # 无 amount_fen
-        }]
+        entries = [
+            {
+                "direction": "debit",
+                "account_code": "1001",
+                "amount_yuan": 100.00,  # 无 amount_fen
+            }
+        ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert parsed[0]["debit_fen"] == 10000
 
@@ -92,10 +105,8 @@ class TestEntriesParser:
         """格式 B: W1.3 风格 {debit: 100.00, credit: 0, ...}."""
         svc = VoucherBackfillService()
         entries = [
-            {"account_code": "1001", "account_name": "现金",
-             "debit": 100.00, "credit": 0, "summary": "堂食"},
-            {"account_code": "6001", "account_name": "主营业务收入",
-             "debit": 0, "credit": 100.00, "summary": "收入"},
+            {"account_code": "1001", "account_name": "现金", "debit": 100.00, "credit": 0, "summary": "堂食"},
+            {"account_code": "6001", "account_name": "主营业务收入", "debit": 0, "credit": 100.00, "summary": "收入"},
         ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert len(parsed) == 2
@@ -106,9 +117,13 @@ class TestEntriesParser:
         """格式 B: 浮点精度 round(x * 100) 避免 IEEE 754 坑."""
         svc = VoucherBackfillService()
         # 0.1 + 0.2 = 0.30000000000000004 (float)
-        entries = [{
-            "account_code": "1001", "debit": 0.3, "credit": 0,
-        }]
+        entries = [
+            {
+                "account_code": "1001",
+                "debit": 0.3,
+                "credit": 0,
+            }
+        ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert parsed[0]["debit_fen"] == 30  # 正好 30 分
 
@@ -143,10 +158,8 @@ class TestEntriesParser:
         """同一 entries list 里混合格式 A + B."""
         svc = VoucherBackfillService()
         entries = [
-            {"direction": "debit", "account_code": "1001",
-             "amount_fen": 10000, "account_name": "现金"},  # A
-            {"account_code": "6001", "account_name": "主营业务收入",
-             "debit": 0, "credit": 100.00},  # B
+            {"direction": "debit", "account_code": "1001", "amount_fen": 10000, "account_name": "现金"},  # A
+            {"account_code": "6001", "account_name": "主营业务收入", "debit": 0, "credit": 100.00},  # B
         ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert len(parsed) == 2
@@ -156,9 +169,13 @@ class TestEntriesParser:
     def test_account_name_fallback_to_code(self):
         """account_name 缺省时回退 account_code 作名字."""
         svc = VoucherBackfillService()
-        entries = [{
-            "direction": "debit", "account_code": "1001", "amount_fen": 10000,
-        }]
+        entries = [
+            {
+                "direction": "debit",
+                "account_code": "1001",
+                "amount_fen": 10000,
+            }
+        ]
         parsed = svc._parse_entries_to_fen_pairs(entries, "V_TEST")
         assert parsed[0]["account_name"] == "1001"
 
@@ -169,9 +186,7 @@ class TestEntriesParser:
 def _mock_vouchers_query(rows: list[dict]) -> AsyncMock:
     """构造 session.execute 返回, 支持 .mappings().all()."""
     mock_result = MagicMock()
-    mock_result.mappings = MagicMock(return_value=MagicMock(
-        all=MagicMock(return_value=rows)
-    ))
+    mock_result.mappings = MagicMock(return_value=MagicMock(all=MagicMock(return_value=rows)))
     return AsyncMock(return_value=mock_result)
 
 
@@ -182,17 +197,24 @@ class TestBackfillBatch:
     async def test_backfill_normal_voucher(self):
         svc = VoucherBackfillService()
         session = AsyncMock()
-        session.execute = _mock_vouchers_query([{
-            "id": uuid.uuid4(),
-            "tenant_id": uuid.uuid4(),
-            "voucher_no": "V_TEST_001",
-            "entries": [
-                {"direction": "debit", "account_code": "1001",
-                 "amount_fen": 10000, "account_name": "现金"},
-                {"direction": "credit", "account_code": "6001",
-                 "amount_fen": 10000, "account_name": "主营业务收入"},
-            ],
-        }])
+        session.execute = _mock_vouchers_query(
+            [
+                {
+                    "id": uuid.uuid4(),
+                    "tenant_id": uuid.uuid4(),
+                    "voucher_no": "V_TEST_001",
+                    "entries": [
+                        {"direction": "debit", "account_code": "1001", "amount_fen": 10000, "account_name": "现金"},
+                        {
+                            "direction": "credit",
+                            "account_code": "6001",
+                            "amount_fen": 10000,
+                            "account_name": "主营业务收入",
+                        },
+                    ],
+                }
+            ]
+        )
         session.flush = AsyncMock()
 
         report = await svc.backfill_batch(session=session, batch_size=10)
@@ -210,15 +232,19 @@ class TestBackfillBatch:
         """dry_run=True 不调 session.add."""
         svc = VoucherBackfillService()
         session = AsyncMock()
-        session.execute = _mock_vouchers_query([{
-            "id": uuid.uuid4(),
-            "tenant_id": uuid.uuid4(),
-            "voucher_no": "V_DRY",
-            "entries": [
-                {"direction": "debit", "account_code": "1001", "amount_fen": 10000},
-                {"direction": "credit", "account_code": "6001", "amount_fen": 10000},
-            ],
-        }])
+        session.execute = _mock_vouchers_query(
+            [
+                {
+                    "id": uuid.uuid4(),
+                    "tenant_id": uuid.uuid4(),
+                    "voucher_no": "V_DRY",
+                    "entries": [
+                        {"direction": "debit", "account_code": "1001", "amount_fen": 10000},
+                        {"direction": "credit", "account_code": "6001", "amount_fen": 10000},
+                    ],
+                }
+            ]
+        )
 
         report = await svc.backfill_batch(session=session, dry_run=True)
         assert report.dry_run is True
@@ -233,24 +259,28 @@ class TestBackfillBatch:
         bad_id = uuid.uuid4()
         good_id = uuid.uuid4()
         session = AsyncMock()
-        session.execute = _mock_vouchers_query([
-            {
-                "id": bad_id, "tenant_id": uuid.uuid4(),
-                "voucher_no": "V_BAD",
-                "entries": [
-                    {"direction": "debit", "account_code": "1001", "amount_fen": 10000},
-                    {"direction": "credit", "account_code": "6001", "amount_fen": 9900},  # 少 1 分
-                ],
-            },
-            {
-                "id": good_id, "tenant_id": uuid.uuid4(),
-                "voucher_no": "V_GOOD",
-                "entries": [
-                    {"direction": "debit", "account_code": "1001", "amount_fen": 5000},
-                    {"direction": "credit", "account_code": "6001", "amount_fen": 5000},
-                ],
-            },
-        ])
+        session.execute = _mock_vouchers_query(
+            [
+                {
+                    "id": bad_id,
+                    "tenant_id": uuid.uuid4(),
+                    "voucher_no": "V_BAD",
+                    "entries": [
+                        {"direction": "debit", "account_code": "1001", "amount_fen": 10000},
+                        {"direction": "credit", "account_code": "6001", "amount_fen": 9900},  # 少 1 分
+                    ],
+                },
+                {
+                    "id": good_id,
+                    "tenant_id": uuid.uuid4(),
+                    "voucher_no": "V_GOOD",
+                    "entries": [
+                        {"direction": "debit", "account_code": "1001", "amount_fen": 5000},
+                        {"direction": "credit", "account_code": "6001", "amount_fen": 5000},
+                    ],
+                },
+            ]
+        )
         session.flush = AsyncMock()
 
         report = await svc.backfill_batch(session=session, strict=False)
@@ -267,14 +297,19 @@ class TestBackfillBatch:
         """strict=True: 借贷不平衡 raise ValueError, 中断批次."""
         svc = VoucherBackfillService()
         session = AsyncMock()
-        session.execute = _mock_vouchers_query([{
-            "id": uuid.uuid4(), "tenant_id": uuid.uuid4(),
-            "voucher_no": "V_BAD",
-            "entries": [
-                {"direction": "debit", "account_code": "1001", "amount_fen": 10000},
-                {"direction": "credit", "account_code": "6001", "amount_fen": 9900},
-            ],
-        }])
+        session.execute = _mock_vouchers_query(
+            [
+                {
+                    "id": uuid.uuid4(),
+                    "tenant_id": uuid.uuid4(),
+                    "voucher_no": "V_BAD",
+                    "entries": [
+                        {"direction": "debit", "account_code": "1001", "amount_fen": 10000},
+                        {"direction": "credit", "account_code": "6001", "amount_fen": 9900},
+                    ],
+                }
+            ]
+        )
 
         with pytest.raises(ValueError, match="借贷不平衡"):
             await svc.backfill_batch(session=session, strict=True)
@@ -284,13 +319,18 @@ class TestBackfillBatch:
         """entries 全无效 (零金额) 时跳过."""
         svc = VoucherBackfillService()
         session = AsyncMock()
-        session.execute = _mock_vouchers_query([{
-            "id": uuid.uuid4(), "tenant_id": uuid.uuid4(),
-            "voucher_no": "V_EMPTY",
-            "entries": [
-                {"account_code": "1001", "debit": 0, "credit": 0},  # 零金额
-            ],
-        }])
+        session.execute = _mock_vouchers_query(
+            [
+                {
+                    "id": uuid.uuid4(),
+                    "tenant_id": uuid.uuid4(),
+                    "voucher_no": "V_EMPTY",
+                    "entries": [
+                        {"account_code": "1001", "debit": 0, "credit": 0},  # 零金额
+                    ],
+                }
+            ]
+        )
         session.flush = AsyncMock()
 
         report = await svc.backfill_batch(session=session)
@@ -301,9 +341,12 @@ class TestBackfillBatch:
     async def test_backfill_report_summary(self):
         """BackfillReport.summary() 输出关键指标."""
         r = BackfillReport(
-            total_scanned=5, backfilled=3,
-            skipped_existing=1, skipped_unbalanced=1,
-            errors=[], dry_run=False,
+            total_scanned=5,
+            backfilled=3,
+            skipped_existing=1,
+            skipped_unbalanced=1,
+            errors=[],
+            dry_run=False,
         )
         s = r.summary()
         assert "scanned=5" in s
@@ -321,7 +364,9 @@ class TestBackfillBatch:
 
         tenant = uuid.uuid4()
         await svc.backfill_batch(
-            session=session, tenant_id=tenant, batch_size=100,
+            session=session,
+            tenant_id=tenant,
+            batch_size=100,
         )
 
         # 检 session.execute 被调用, params 含 tid

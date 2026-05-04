@@ -84,14 +84,16 @@ async def generate_tax_declaration(
     month_norm = f"{year}-{month_num:02d}"
 
     store_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_name
             FROM stores
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:store_id AS uuid)
               AND is_deleted = FALSE
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tid, "store_id": sid},
     )
     store_row = store_r.mappings().one_or_none()
@@ -100,7 +102,8 @@ async def generate_tax_declaration(
     store_name = str(store_row["store_name"] or "")
 
     rows_r = await db.execute(
-        text("""
+        text(
+            """
             WITH ranked AS (
                 SELECT
                     p.employee_id,
@@ -150,7 +153,8 @@ async def generate_tax_declaration(
             FROM ranked
             WHERE period_month = :month
             ORDER BY emp_name ASC
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,
@@ -191,7 +195,8 @@ async def generate_tax_declaration(
     }
 
     ins = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO tax_declarations (
                 id, tenant_id, store_id, month, employee_count, total_tax_fen,
                 declaration_data, status
@@ -206,7 +211,8 @@ async def generate_tax_declaration(
                 'generated'
             )
             RETURNING id
-        """),
+        """
+        ),
         {
             "decl_id": str(uuid4()),
             "tenant_id": tid,
@@ -262,13 +268,15 @@ async def submit_to_tax_bureau(
 
     # 读取申报数据
     sel = await db.execute(
-        text("""
+        text(
+            """
             SELECT month, declaration_data, status
             FROM tax_declarations
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:declaration_id AS uuid)
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tid, "declaration_id": did},
     )
     row = sel.mappings().one_or_none()
@@ -291,7 +299,8 @@ async def submit_to_tax_bureau(
     status = "submitted" if sdk_result["status"] == "accepted" else sdk_result["status"]
 
     upd = await db.execute(
-        text("""
+        text(
+            """
             UPDATE tax_declarations
             SET status = :status,
                 receipt_no = :receipt_no,
@@ -299,7 +308,8 @@ async def submit_to_tax_bureau(
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:declaration_id AS uuid)
             RETURNING id
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "declaration_id": did,
@@ -340,13 +350,15 @@ async def check_filing_status(
     did = str(declaration_id)
 
     sel = await db.execute(
-        text("""
+        text(
+            """
             SELECT status, receipt_no, submitted_at
             FROM tax_declarations
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:declaration_id AS uuid)
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tid, "declaration_id": did},
     )
     r = sel.mappings().one_or_none()
@@ -428,14 +440,16 @@ async def get_annual_summary(
         raise ValueError(f"年度越界: {year}")
 
     emp_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT emp_name
             FROM employees
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:employee_id AS uuid)
               AND is_deleted = FALSE
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tid, "employee_id": eid},
     )
     emp_row = emp_r.mappings().one_or_none()
@@ -444,7 +458,8 @@ async def get_annual_summary(
     emp_name = str(emp_row.get("emp_name") or "")
 
     pr_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 period_month,
                 gross_salary_fen,
@@ -457,7 +472,8 @@ async def get_annual_summary(
               AND period_year = :year
               AND is_deleted = FALSE
             ORDER BY period_month ASC
-        """),
+        """
+        ),
         {"tenant_id": tid, "employee_id": eid, "year": year},
     )
     by_month: dict[int, dict[str, int]] = {}
@@ -521,13 +537,15 @@ async def retry_filing(
     did = str(declaration_id)
 
     sel = await db.execute(
-        text("""
+        text(
+            """
             SELECT month, declaration_data, status
             FROM tax_declarations
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:declaration_id AS uuid)
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tid, "declaration_id": did},
     )
     row = sel.mappings().one_or_none()
@@ -548,14 +566,16 @@ async def retry_filing(
     new_status = "submitted" if sdk_result["status"] == "accepted" else sdk_result["status"]
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE tax_declarations
             SET status = :status,
                 receipt_no = :receipt_no,
                 submitted_at = :submitted_at
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND id = CAST(:declaration_id AS uuid)
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "declaration_id": did,
@@ -591,7 +611,8 @@ async def get_filing_stats(
     current_year = year or datetime.now(timezone.utc).year
 
     res = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(DISTINCT month)      AS filed_months,
                 COALESCE(SUM(total_tax_fen), 0) AS total_tax_fen,
@@ -600,7 +621,8 @@ async def get_filing_stats(
             WHERE tenant_id = CAST(:tenant_id AS uuid)
               AND month LIKE :year_prefix
               AND status IN ('submitted', 'accepted', 'completed')
-        """),
+        """
+        ),
         {"tenant_id": tid, "year_prefix": f"{current_year}-%"},
     )
     row = res.mappings().one()

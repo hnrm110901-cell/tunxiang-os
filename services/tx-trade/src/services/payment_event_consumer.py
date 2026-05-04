@@ -205,9 +205,7 @@ class PaymentEventHandlers:
                         ),
                         {
                             "new_status": (
-                                PAYMENT_STATUS_REFUNDED
-                                if is_full_refund
-                                else PAYMENT_STATUS_PARTIAL_REFUND
+                                PAYMENT_STATUS_REFUNDED if is_full_refund else PAYMENT_STATUS_PARTIAL_REFUND
                             ),
                             "payment_id": payment_id,
                         },
@@ -269,7 +267,7 @@ def create_payment_event_consumer(
 
 async def start_payment_event_consumer(
     consumer: EventConsumer,
-    session_factory: async_sessionfactory[AsyncSession] | None = None,
+    session_factory: async_session_factory[AsyncSession] | None = None,
 ) -> asyncio.Task:
     """在后台 task 中启动支付事件消费者。
 

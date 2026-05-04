@@ -43,14 +43,16 @@ class AffinityWorker:
         try:
             # 查询所有有订单数据的tenant+store组合
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT DISTINCT o.tenant_id, o.store_id
                     FROM orders o
                     WHERE o.status = 'paid'
                       AND o.is_deleted = FALSE
                       AND o.created_at >= NOW() - INTERVAL '90 days'
                     ORDER BY o.tenant_id, o.store_id
-                """),
+                """
+                ),
             )
             combos = result.mappings().all()
 

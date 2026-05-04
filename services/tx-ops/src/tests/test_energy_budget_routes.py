@@ -20,9 +20,10 @@ import uuid
 from unittest.mock import patch
 
 import pytest
-import services.tx_ops.src.api.energy_routes as energy_module
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+import services.tx_ops.src.api.energy_routes as energy_module
 
 from ..api.energy_routes import router as energy_router
 

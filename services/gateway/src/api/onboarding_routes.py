@@ -559,7 +559,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
             if printers:
                 for idx, p in enumerate(printers):
                     await db.execute(
-                        text("""
+                        text(
+                            """
                         INSERT INTO printer_configs
                           (tenant_id, name, printer_type, protocol, connection,
                            ip, is_default, auto_cut, copies, created_at, updated_at)
@@ -571,7 +572,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                           printer_type = EXCLUDED.printer_type,
                           is_default   = EXCLUDED.is_default,
                           updated_at   = NOW()
-                    """),
+                    """
+                        ),
                         {
                             "tid": tenant_id,
                             "name": p.get("name", f"打印机{idx + 1}"),
@@ -591,7 +593,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
             if shifts:
                 for s in shifts:
                     await db.execute(
-                        text("""
+                        text(
+                            """
                         INSERT INTO shift_configs
                           (tenant_id, shift_name, start_time, end_time,
                            is_overnight, settlement_cutoff, created_at, updated_at)
@@ -604,7 +607,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                           end_time            = EXCLUDED.end_time,
                           settlement_cutoff   = EXCLUDED.settlement_cutoff,
                           updated_at          = NOW()
-                    """),
+                    """
+                        ),
                         {
                             "tid": tenant_id,
                             "name": s.get("shift_name"),
@@ -620,7 +624,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
             agent_policies = pkg.get("agent_policies", {})
             billing_rules = pkg.get("billing_rules", {})
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO tenant_agent_configs
                   (tenant_id, agent_policies, billing_rules,
                    restaurant_type, onboarding_session_id,
@@ -635,7 +640,8 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
                   restaurant_type      = EXCLUDED.restaurant_type,
                   onboarding_session_id = EXCLUDED.onboarding_session_id,
                   updated_at           = NOW()
-            """),
+            """
+                ),
                 {
                     "tid": tenant_id,
                     "policies": json.dumps(agent_policies, ensure_ascii=False),

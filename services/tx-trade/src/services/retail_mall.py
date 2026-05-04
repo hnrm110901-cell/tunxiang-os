@@ -714,7 +714,8 @@ async def _legacy_create_product(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO retail_products
                 (id, tenant_id, name, category, cover_image, description,
                  price_fen, original_price_fen, stock, tags, origin, shelf_life,
@@ -723,7 +724,8 @@ async def _legacy_create_product(
                 (:id, :tid, :name, :cat, :cover, :desc,
                  :price, :orig_price, :stock, :tags::jsonb, :origin, :shelf,
                  'draft', :now, :now)
-        """),
+        """
+        ),
         {
             "id": product_id,
             "tid": uuid.UUID(tenant_id),
@@ -764,12 +766,14 @@ async def update_product_status(
         raise ValueError(f"invalid_status:{status}, valid: {VALID_PRODUCT_STATUSES}")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE retail_products
             SET status = :status, updated_at = NOW()
             WHERE id = :id AND tenant_id = :tid AND is_deleted = false
             RETURNING id, name, status
-        """),
+        """
+        ),
         {
             "id": uuid.UUID(product_id),
             "tid": uuid.UUID(tenant_id),

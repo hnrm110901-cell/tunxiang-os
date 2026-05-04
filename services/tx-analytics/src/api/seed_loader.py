@@ -18,7 +18,8 @@ from ..seed_p0_reports import P0_REPORTS
 
 logger = structlog.get_logger(__name__)
 
-_INSERT_SQL = text("""
+_INSERT_SQL = text(
+    """
 INSERT INTO report_configs
     (id, tenant_id, name, description, category, sql_template,
      default_params, dimensions, metrics, filters, is_system, is_active)
@@ -27,7 +28,8 @@ VALUES
      :default_params::jsonb, :dimensions::jsonb, :metrics::jsonb, :filters::jsonb,
      TRUE, TRUE)
 ON CONFLICT (id) DO NOTHING
-""")
+"""
+)
 
 # 系统级种子使用固定的 "system" 租户 UUID（全零）
 _SYSTEM_TENANT_ID = "00000000-0000-0000-0000-000000000000"

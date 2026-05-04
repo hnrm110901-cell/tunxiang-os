@@ -24,8 +24,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from services.tx_supply.src.api.food_safety_routes import router as food_safety_router
 
+from services.tx_supply.src.api.food_safety_routes import router as food_safety_router
 from shared.ontology.src.database import get_db
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────
@@ -444,20 +444,21 @@ class TestReportFoodSafetyEvent:
         mock_db.execute = AsyncMock(return_value=MagicMock())
         app.dependency_overrides[get_db] = _override_get_db(mock_db)
 
-        with patch(_EMIT_PATCH, new=AsyncMock()) as mock_publish, \
-             patch("asyncio.create_task") as mock_task:
+        with patch(_EMIT_PATCH, new=AsyncMock()) as mock_publish, patch("asyncio.create_task") as mock_task:
             mock_task.side_effect = lambda coro: None  # 不真正执行协程
 
             with patch(
                 "services.tx_supply.src.services.food_safety.report_food_safety_event",
-                new=AsyncMock(return_value={
-                    "event_id": event_id,
-                    "store_id": STORE_ID,
-                    "event_type": "food_poisoning",
-                    "severity": "critical",
-                    "status": "open",
-                    "auto_notified": True,
-                }),
+                new=AsyncMock(
+                    return_value={
+                        "event_id": event_id,
+                        "store_id": STORE_ID,
+                        "event_type": "food_poisoning",
+                        "severity": "critical",
+                        "status": "open",
+                        "auto_notified": True,
+                    }
+                ),
             ):
                 with TestClient(app) as client:
                     resp = client.post(
@@ -532,9 +533,7 @@ class TestGetResponsibilityChain:
         mock_result = {
             "event_id": "evt_unknown",
             "chain": [],
-            "responsibility": {
-                "procurement": [], "receiving": [], "requisition": [], "production": []
-            },
+            "responsibility": {"procurement": [], "receiving": [], "requisition": [], "production": []},
         }
         app.dependency_overrides[get_db] = _override_get_db()
 

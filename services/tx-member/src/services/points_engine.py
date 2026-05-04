@@ -267,22 +267,26 @@ async def earn_points(
 
     # 更新积分余额
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points + :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pts": amount, "cid": card_id, "tid": tenant_id, "now": now},
     )
 
     # 记录积分流水
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'earn', :src, :pts, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -358,21 +362,25 @@ async def spend_points(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points - :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pts": amount, "cid": card_id, "tid": tenant_id, "now": now},
     )
 
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'spend', :src, :pts, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -430,10 +438,12 @@ async def set_earn_rules(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET earn_rules = :rules::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -480,10 +490,12 @@ async def set_spend_rules(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET spend_rules = :rules::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -535,10 +547,12 @@ async def set_multiplier(
     config = {"multiplier": multiplier, "conditions": conditions}
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET multiplier_config = :cfg::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -592,11 +606,13 @@ async def manage_growth_value(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET growth_value = growth_value + :amt, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"amt": amount, "cid": card_id, "tid": tenant_id, "now": now},
     )
     await db.flush()
@@ -635,11 +651,13 @@ async def get_points_balance(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT points, growth_value
             FROM member_cards
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     result = row.mappings().first()
@@ -678,13 +696,15 @@ async def get_points_history(
 
     # 明细
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, direction, source, points, created_at
             FROM points_log
             WHERE card_id = :cid AND tenant_id = :tid
             ORDER BY created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id, "lim": size, "off": offset},
     )
     items = [
@@ -736,7 +756,8 @@ async def cross_store_settlement(
 
     # 按门店汇总获取积分
     earn_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT pl.source AS store_context, SUM(pl.points) AS total_earned
             FROM points_log pl
             WHERE pl.tenant_id = :tid
@@ -744,14 +765,16 @@ async def cross_store_settlement(
               AND pl.created_at >= :start::timestamptz
               AND pl.created_at < :end::timestamptz
             GROUP BY pl.source
-        """),
+        """
+        ),
         {"tid": tenant_id, "start": start_date, "end": end_date},
     )
     earn_by_source = {r["store_context"]: int(r["total_earned"]) for r in earn_rows.mappings().all()}
 
     # 按门店汇总消耗积分
     spend_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT pl.source AS store_context, SUM(pl.points) AS total_spent
             FROM points_log pl
             WHERE pl.tenant_id = :tid
@@ -759,7 +782,8 @@ async def cross_store_settlement(
               AND pl.created_at >= :start::timestamptz
               AND pl.created_at < :end::timestamptz
             GROUP BY pl.source
-        """),
+        """
+        ),
         {"tid": tenant_id, "start": start_date, "end": end_date},
     )
     spend_by_source = {r["store_context"]: int(r["total_spent"]) for r in spend_rows.mappings().all()}

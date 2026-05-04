@@ -128,9 +128,7 @@ async def dishes_by_category(
     is_available: bool = Query(False),
     tenant_id: str = Header(alias="X-Tenant-ID"),
 ):
-    data = await tv_menu_service.get_dishes_by_category(
-        store_id, category_id, is_available, tenant_id, db=None
-    )
+    data = await tv_menu_service.get_dishes_by_category(store_id, category_id, is_available, tenant_id, db=None)
     return {"ok": True, "data": data}
 
 

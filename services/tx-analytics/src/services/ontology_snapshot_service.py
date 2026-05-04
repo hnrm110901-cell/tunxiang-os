@@ -82,7 +82,8 @@ async def _compute_customer_metrics(
     # （实际项目中 customers 表无 brand_id/store_id 直接字段，集团级聚合全部顾客）
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*)                                                                    AS total_count,
             COUNT(*) FILTER (WHERE last_order_at >= :active_threshold)                  AS active_count,
@@ -99,7 +100,8 @@ async def _compute_customer_metrics(
           AND is_deleted = FALSE
           AND is_merged = FALSE
         {store_filter}
-    """),
+    """
+        ),
         params,
     )
     r = row.mappings().one()
@@ -137,7 +139,8 @@ async def _compute_dish_metrics(
         params["store_id"] = str(store_id)
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*) FILTER (WHERE status = 'active')                   AS active_count,
             AVG(profit_margin) FILTER (WHERE status = 'active')         AS avg_profit_margin,
@@ -153,7 +156,8 @@ async def _compute_dish_metrics(
           AND is_deleted = FALSE
           {brand_filter}
           {store_filter}
-    """),
+    """
+        ),
         params,
     )
     r = row.mappings().one()
@@ -192,7 +196,8 @@ async def _compute_order_metrics(
         params["store_id"] = str(store_id)
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*)                                                        AS total_count,
             SUM(final_amount_fen)                                           AS total_revenue_fen,
@@ -211,7 +216,8 @@ async def _compute_order_metrics(
           AND o.created_at < :next_day
           {brand_filter}
           {store_filter}
-    """),
+    """
+        ),
         params,
     )
     r = row.mappings().one()
@@ -244,7 +250,8 @@ async def _compute_ingredient_metrics(
         params["store_id"] = str(store_id)
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*)                                                            AS total_sku_count,
             COUNT(*) FILTER (WHERE current_quantity < min_quantity
@@ -256,7 +263,8 @@ async def _compute_ingredient_metrics(
         WHERE tenant_id = :tenant_id
           AND is_deleted = FALSE
           {store_filter}
-    """),
+    """
+        ),
         params,
     )
     r = row.mappings().one()
@@ -293,7 +301,8 @@ async def _compute_employee_metrics(
         params["store_id"] = str(store_id)
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*)                                                            AS total_count,
             COUNT(*) FILTER (WHERE employment_status = 'active')                AS active_count,
@@ -311,7 +320,8 @@ async def _compute_employee_metrics(
           AND is_deleted = FALSE
           {brand_filter}
           {store_filter}
-    """),
+    """
+        ),
         params,
     )
     r = row.mappings().one()
@@ -353,7 +363,8 @@ async def _compute_store_metrics(
         params["store_id"] = str(store_id)
 
     store_row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             COUNT(*)                                                        AS total_store_count,
             COUNT(*) FILTER (WHERE operation_mode = '直营')                  AS direct_count,
@@ -366,13 +377,15 @@ async def _compute_store_metrics(
           AND is_deleted = FALSE
           {brand_filter_store}
           {store_filter_store}
-    """),
+    """
+        ),
         params,
     )
     sr = store_row.mappings().one()
 
     order_row = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT
             AVG(daily_rev.rev)      AS avg_daily_revenue_fen,
             MAX(daily_rev.rev)      AS top_store_revenue_fen
@@ -387,7 +400,8 @@ async def _compute_store_metrics(
               {store_filter_order}
             GROUP BY o.store_id
         ) daily_rev
-    """),
+    """
+        ),
         params,
     )
     orr = order_row.mappings().one()
@@ -444,7 +458,8 @@ class OntologySnapshotService:
         """插入或覆盖更新一条快照记录（ON CONFLICT DO UPDATE）。"""
         now = datetime.now(tz=timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO ontology_snapshots
                 (tenant_id, brand_id, store_id, snapshot_date, snapshot_type,
                  entity_type, metrics, computed_at, is_deleted, created_at, updated_at)
@@ -457,7 +472,8 @@ class OntologySnapshotService:
                 computed_at = EXCLUDED.computed_at,
                 updated_at  = EXCLUDED.updated_at,
                 is_deleted  = FALSE
-        """),
+        """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "brand_id": str(brand_id) if brand_id else None,
@@ -625,7 +641,8 @@ class OntologySnapshotService:
             params["store_id"] = str(store_id)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT snapshot_date, metrics
             FROM ontology_snapshots
             WHERE tenant_id = :tenant_id
@@ -636,7 +653,8 @@ class OntologySnapshotService:
               {brand_clause}
               {store_clause}
             ORDER BY snapshot_date ASC
-        """),
+        """
+            ),
             params,
         )
 
@@ -666,7 +684,8 @@ class OntologySnapshotService:
             raise ValueError(f"不支持的实体类型: {entity_type}，合法值: {ENTITY_TYPES}")
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 brand_id,
                 (metrics->>:metric_key)::NUMERIC   AS metric_value
@@ -680,7 +699,8 @@ class OntologySnapshotService:
               AND is_deleted = FALSE
               AND metrics ? :metric_key
             ORDER BY metric_value DESC NULLS LAST
-        """),
+        """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "entity_type": entity_type,
@@ -714,7 +734,8 @@ class OntologySnapshotService:
             raise ValueError(f"不支持的实体类型: {entity_type}，合法值: {ENTITY_TYPES}")
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT snapshot_date, snapshot_type, metrics
             FROM ontology_snapshots
             WHERE tenant_id = :tenant_id
@@ -724,7 +745,8 @@ class OntologySnapshotService:
               AND is_deleted = FALSE
             ORDER BY snapshot_date DESC, computed_at DESC
             LIMIT 1
-        """),
+        """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "entity_type": entity_type,

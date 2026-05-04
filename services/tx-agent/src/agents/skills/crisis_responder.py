@@ -3,7 +3,6 @@
 舆情危机评估、AI生成回应草稿、SLA临期自动升级。
 """
 
-import json
 from typing import Any
 
 import structlog
@@ -52,8 +51,7 @@ class CrisisResponderAgent(SkillAgent):
     # 纯舆情PR分析，不触发毛利/食安/客户体验业务约束
     constraint_scope = set()
     constraint_waived_reason = (
-        "危机响应Agent纯舆情PR分析与回应生成，输出回应草稿供运营审核，"
-        "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "危机响应Agent纯舆情PR分析与回应生成，输出回应草稿供运营审核，" "不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:
@@ -90,13 +88,13 @@ class CrisisResponderAgent(SkillAgent):
 
         # 2. 基于平台影响力
         platform_weight = {
-            "weibo": 1.5,       # 微博传播力强
-            "xiaohongshu": 1.3, # 小红书种草影响大
-            "douyin": 1.4,      # 抖音短视频传播快
-            "dianping": 1.2,    # 大众点评直接影响到店
-            "meituan": 1.1,     # 美团影响外卖
-            "wechat": 1.0,      # 微信私域传播
-            "google": 0.8,      # Google 国内影响较小
+            "weibo": 1.5,  # 微博传播力强
+            "xiaohongshu": 1.3,  # 小红书种草影响大
+            "douyin": 1.4,  # 抖音短视频传播快
+            "dianping": 1.2,  # 大众点评直接影响到店
+            "meituan": 1.1,  # 美团影响外卖
+            "wechat": 1.0,  # 微信私域传播
+            "google": 0.8,  # Google 国内影响较小
         }
         score *= platform_weight.get(platform, 1.0)
 
@@ -186,8 +184,7 @@ class CrisisResponderAgent(SkillAgent):
                 "brand_name": brand_name,
             },
             reasoning=(
-                f"为{brand_name}在{platform}的{alert_type_desc}生成{tone}回应草稿，"
-                f"共{len(response_draft)}字"
+                f"为{brand_name}在{platform}的{alert_type_desc}生成{tone}回应草稿，" f"共{len(response_draft)}字"
             ),
             confidence=0.8,
         )

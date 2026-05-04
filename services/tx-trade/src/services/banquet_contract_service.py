@@ -222,19 +222,13 @@ class BanquetContractService:
     # ─────────────────────────────────────────────────────────────────
     # 查询
     # ─────────────────────────────────────────────────────────────────
-    async def get_contract(
-        self, contract_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> BanquetContract:
+    async def get_contract(self, contract_id: uuid.UUID, tenant_id: uuid.UUID) -> BanquetContract:
         contract = await self._repo.get_contract(contract_id, tenant_id)
         if contract is None:
-            raise BanquetContractNotFoundError(
-                f"contract_id={contract_id} not found for tenant={tenant_id}"
-            )
+            raise BanquetContractNotFoundError(f"contract_id={contract_id} not found for tenant={tenant_id}")
         return contract
 
-    async def list_by_lead(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> list[BanquetContract]:
+    async def list_by_lead(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> list[BanquetContract]:
         return await self._repo.list_contracts_by_lead(lead_id, tenant_id)
 
     async def list_contracts(
@@ -289,18 +283,13 @@ class BanquetContractService:
         if contract.status == ContractStatus.SIGNED:
             return contract
         if not _is_valid_transition(contract.status, ContractStatus.SIGNED):
-            raise InvalidContractTransitionError(
-                f"cannot sign contract in status={contract.status.value}"
-            )
+            raise InvalidContractTransitionError(f"cannot sign contract in status={contract.status.value}")
         if not signature_provider:
             raise SignatureRequiredError("signature_provider is required")
 
         # C-2 修复：InMemory 层原子检查同档期是否已被 signed 合同锁定。
         # 生产 Pg 实现依赖 v283 部分 UNIQUE 索引 + asyncpg UniqueViolationError。
-        if (
-            contract.store_id is not None
-            and contract.scheduled_date is not None
-        ):
+        if contract.store_id is not None and contract.scheduled_date is not None:
             existing_signed, _ = await self._repo.list_contracts(
                 tenant_id=tenant_id,
                 status=ContractStatus.SIGNED,
@@ -308,13 +297,9 @@ class BanquetContractService:
                 store_id=contract.store_id,
                 limit=1,
             )
-            conflict = [
-                c for c in existing_signed if c.contract_id != contract_id
-            ]
+            conflict = [c for c in existing_signed if c.contract_id != contract_id]
             if conflict:
-                raise ScheduleAlreadyLockedError(
-                    f"schedule already locked by contract_id={conflict[0].contract_id}"
-                )
+                raise ScheduleAlreadyLockedError(f"schedule already locked by contract_id={conflict[0].contract_id}")
 
         now = signed_at or datetime.now(timezone.utc)
         updated = contract.model_copy(
@@ -378,9 +363,7 @@ class BanquetContractService:
         if contract.status == ContractStatus.CANCELLED:
             return contract
         if not _is_valid_transition(contract.status, ContractStatus.CANCELLED):
-            raise InvalidContractTransitionError(
-                f"cannot cancel contract in status={contract.status.value}"
-            )
+            raise InvalidContractTransitionError(f"cannot cancel contract in status={contract.status.value}")
         now = datetime.now(timezone.utc)
         updated = contract.model_copy(
             update={
@@ -413,8 +396,7 @@ class BanquetContractService:
         except Exception as exc:  # noqa: BLE001
             if _is_unique_violation(exc):
                 raise ApprovalAlreadyRecordedError(
-                    f"approval already recorded for contract_id={log.contract_id} "
-                    f"role={log.role.value}"
+                    f"approval already recorded for contract_id={log.contract_id} " f"role={log.role.value}"
                 ) from exc
             raise
 
@@ -430,9 +412,7 @@ class BanquetContractService:
         approval_chain: Optional[list[dict[str, Any]]] = None,
     ) -> BanquetContract:
         contract = await self.get_contract(contract_id, tenant_id)
-        if new_status != contract.status and not _is_valid_transition(
-            contract.status, new_status
-        ):
+        if new_status != contract.status and not _is_valid_transition(contract.status, new_status):
             raise InvalidContractTransitionError(
                 f"transition {contract.status.value} -> {new_status.value} not allowed"
             )

@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db
 from shared.security.src.error_handler import safe_http_exception
 
-from ..db import get_db
 from ..services.service_bell_service import (
     create_call,
     get_call_history,

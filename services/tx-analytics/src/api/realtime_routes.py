@@ -56,7 +56,8 @@ async def get_today_realtime(
             summary_row = (
                 (
                     await session.execute(
-                        text(f"""
+                        text(
+                            f"""
                     SELECT
                         COALESCE(SUM(o.final_amount_fen), 0)  AS revenue_fen,
                         COUNT(*) AS order_count,
@@ -69,7 +70,8 @@ async def get_today_realtime(
                       AND o.status NOT IN ('cancelled', 'voided')
                       AND o.is_deleted = false
                       {store_filter}
-                """),
+                """
+                        ),
                         params,
                     )
                 )
@@ -86,13 +88,15 @@ async def get_today_realtime(
             # 新增会员数（今日注册）
             new_members: int = (
                 await session.execute(
-                    text("""
+                    text(
+                        """
                     SELECT COUNT(*) FROM customers
                     WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                       AND created_at >= :start
                       AND created_at <= :end
                       AND is_deleted = false
-                """),
+                """
+                    ),
                     {"start": today_start, "end": today_end},
                 )
             ).scalar() or 0
@@ -101,7 +105,8 @@ async def get_today_realtime(
             top_dishes_rows = (
                 (
                     await session.execute(
-                        text(f"""
+                        text(
+                            f"""
                     SELECT oi.item_name, SUM(oi.quantity) AS cnt
                     FROM order_items oi
                     JOIN orders o ON o.id = oi.order_id
@@ -115,7 +120,8 @@ async def get_today_realtime(
                     GROUP BY oi.item_name
                     ORDER BY cnt DESC
                     LIMIT 5
-                """),
+                """
+                        ),
                         params,
                     )
                 )
@@ -188,7 +194,8 @@ async def get_hourly_trend(
             rows = (
                 (
                     await session.execute(
-                        text(f"""
+                        text(
+                            f"""
                     SELECT
                         EXTRACT(HOUR FROM o.order_time AT TIME ZONE 'Asia/Shanghai') AS hour,
                         COALESCE(SUM(o.final_amount_fen), 0)                          AS revenue_fen,
@@ -202,7 +209,8 @@ async def get_hourly_trend(
                       {store_filter}
                     GROUP BY hour
                     ORDER BY hour
-                """),
+                """
+                        ),
                         params,
                     )
                 )
@@ -241,7 +249,8 @@ async def get_store_comparison(
             rows = (
                 (
                     await session.execute(
-                        text("""
+                        text(
+                            """
                     SELECT
                         s.store_name,
                         COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen,
@@ -258,7 +267,8 @@ async def get_store_comparison(
                     GROUP BY s.id, s.store_name
                     ORDER BY revenue_fen DESC
                     LIMIT 20
-                """),
+                """
+                        ),
                         {"start": today_start, "end": today_end},
                     )
                 )
@@ -300,7 +310,8 @@ async def get_realtime_alerts(
             rows = (
                 (
                     await session.execute(
-                        text("""
+                        text(
+                            """
                     SELECT
                         aa.severity   AS level,
                         aa.alert_type AS type,
@@ -315,7 +326,8 @@ async def get_realtime_alerts(
                       AND aa.is_deleted = false
                     ORDER BY aa.severity DESC, aa.created_at DESC
                     LIMIT 50
-                """),
+                """
+                        ),
                         {"today_start": today_start},
                     )
                 )

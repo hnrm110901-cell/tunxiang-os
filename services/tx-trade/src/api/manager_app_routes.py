@@ -90,7 +90,8 @@ async def get_realtime_kpi(
             params["store_id"] = store_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COALESCE(SUM(final_amount_fen), 0)   AS revenue_fen,
                     COUNT(*)                              AS order_count,
@@ -100,7 +101,8 @@ async def get_realtime_kpi(
                   AND is_deleted = FALSE
                   AND order_time >= :since
                   {store_clause}
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().one_or_none()
@@ -149,14 +151,16 @@ async def approve_discount(
     try:
         await _set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE manager_discount_requests
                 SET status       = :status,
                     manager_reason = :reason,
                     updated_at   = NOW()
                 WHERE id = :rid AND is_deleted = FALSE
                 RETURNING id, status
-            """),
+            """
+            ),
             {
                 "rid": body.request_id,
                 "status": new_status,
@@ -194,13 +198,15 @@ async def get_staff_online(
             params["store_id"] = store_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, emp_name, role
                 FROM employees
                 WHERE is_active = TRUE AND is_deleted = FALSE
                 {store_clause}
                 ORDER BY role, emp_name
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -267,7 +273,8 @@ async def get_discount_requests(
         where_clause = " AND ".join(clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, applicant, applicant_role, table_label,
                        discount_type, discount_amount, reason,
                        status, manager_reason, created_at
@@ -275,7 +282,8 @@ async def get_discount_requests(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT 50
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()

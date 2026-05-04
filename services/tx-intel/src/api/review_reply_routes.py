@@ -18,11 +18,11 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from services.review_replier import ReviewReplier
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.review_replier import ReviewReplier
 from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
@@ -166,17 +166,20 @@ async def list_auto_replies(
 
         # 查询总数
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) FROM review_auto_replies
                 WHERE tenant_id = :tenant_id AND is_deleted = false {filters}
-            """),
+            """
+            ),
             params,
         )
         total = int(count_result.scalar() or 0)
 
         # 查询列表
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, review_id, platform, original_rating, original_text,
                        generated_reply, brand_voice_config, model_used, status,
                        approved_by, approved_at, posted_at, failure_reason,
@@ -185,7 +188,8 @@ async def list_auto_replies(
                 WHERE tenant_id = :tenant_id AND is_deleted = false {filters}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -245,7 +249,8 @@ async def update_brand_voice_config(
 
         # UPSERT品牌语调配置
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO brand_strategy (id, tenant_id, config_key, config_value)
                 VALUES (gen_random_uuid(), :tenant_id, 'brand_voice', :config_value::jsonb)
                 ON CONFLICT (tenant_id, config_key)
@@ -253,7 +258,8 @@ async def update_brand_voice_config(
                 DO UPDATE SET
                     config_value = :config_value::jsonb,
                     updated_at = NOW()
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "config_value": config_value},
         )
         await db.commit()

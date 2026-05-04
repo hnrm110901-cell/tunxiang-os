@@ -96,7 +96,8 @@ class ForgeAppService:
 
         # ── 插入应用 ──
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_apps
                     (id, tenant_id, app_id, developer_id, app_name, category,
                      description, icon_url, screenshots, pricing_model, price_fen,
@@ -109,7 +110,8 @@ class ForgeAppService:
                      :price_display, :permissions::jsonb, :api_endpoints::jsonb, :webhook_urls::jsonb,
                      'pending_review', :version)
                 RETURNING app_id, app_name, developer_id, category, status, created_at
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "developer_id": developer_id,
@@ -131,14 +133,16 @@ class ForgeAppService:
 
         # ── 插入首个版本记录 ──
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_app_versions
                     (id, tenant_id, app_id, version, changelog, package_url,
                      package_hash, status, submitted_at)
                 VALUES
                     (gen_random_uuid(), current_setting('app.tenant_id')::uuid,
                      :app_id, :version, '初始版本', '', '', 'submitted', NOW())
-            """),
+            """
+            ),
             {"app_id": app_id, "version": version},
         )
 
@@ -197,14 +201,16 @@ class ForgeAppService:
         filtered["aid"] = app_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_apps
                 SET {set_clause}, updated_at = NOW()
                 WHERE app_id = :aid AND is_deleted = false
                 RETURNING app_id, app_name, category, description, icon_url,
                           pricing_model, price_fen, price_display, status,
                           updated_at
-            """),
+            """
+            ),
             filtered,
         )
         row = result.mappings().first()
@@ -244,7 +250,8 @@ class ForgeAppService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT a.app_id, a.app_name, a.category, a.description,
                        a.icon_url, a.pricing_model, a.price_display,
                        a.rating, a.install_count, a.status, a.created_at
@@ -252,7 +259,8 @@ class ForgeAppService:
                 {where}
                 ORDER BY {order}
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -261,7 +269,8 @@ class ForgeAppService:
     # ── 应用详情 ─────────────────────────────────────────────
     async def get_app_detail(self, db: AsyncSession, app_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     a.app_id, a.app_name, a.developer_id, a.category,
                     a.description, a.icon_url, a.screenshots,
@@ -274,7 +283,8 @@ class ForgeAppService:
                 LEFT JOIN forge_developers d ON d.developer_id = a.developer_id
                     AND d.is_deleted = false
                 WHERE a.app_id = :aid AND a.is_deleted = false
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         row = result.mappings().first()
@@ -285,12 +295,14 @@ class ForgeAppService:
 
         # 版本历史
         versions_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT version, changelog, status, submitted_at, published_at
                 FROM forge_app_versions
                 WHERE app_id = :aid AND is_deleted = false
                 ORDER BY submitted_at DESC
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         app_dict["versions"] = [dict(v) for v in versions_result.mappings().all()]
@@ -325,7 +337,8 @@ class ForgeAppService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT a.app_id, a.app_name, a.category, a.description,
                        a.icon_url, a.pricing_model, a.price_display,
                        a.rating, a.install_count, a.status
@@ -333,7 +346,8 @@ class ForgeAppService:
                 {where}
                 ORDER BY a.install_count DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]

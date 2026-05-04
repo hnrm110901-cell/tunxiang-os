@@ -18,7 +18,6 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -122,9 +121,7 @@ async def api_ceo_cockpit_anomalies(
 ) -> dict:
     """异常高亮 — 只显示偏离基线(±20%/±35%)的指标"""
     try:
-        data = await _svc._detect_anomalies(
-            db=db, store_id=store_id, tenant_id=x_tenant_id, target_date=date.today()
-        )
+        data = await _svc._detect_anomalies(db=db, store_id=store_id, tenant_id=x_tenant_id, target_date=date.today())
         return {
             "ok": True,
             "data": {
@@ -169,9 +166,7 @@ async def api_ceo_cockpit_overview(
 ) -> dict:
     """多店概览（总部视角）— 门店排行+失血门店"""
     try:
-        data = await _svc.get_multi_store_cockpit(
-            db=db, tenant_id=x_tenant_id, brand_id=brand_id
-        )
+        data = await _svc.get_multi_store_cockpit(db=db, tenant_id=x_tenant_id, brand_id=brand_id)
         return {"ok": True, "data": data}
     except (OperationalError, SQLAlchemyError) as exc:
         log.error("api_ceo_cockpit_overview.error", tenant_id=x_tenant_id, exc_info=True)

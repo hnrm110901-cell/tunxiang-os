@@ -150,14 +150,16 @@ async def list_waitlist(
             params["status"] = status
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, queue_no, name, phone, party_size, table_type,
                        member_id, priority, status, called_at, call_count,
                        seated_at, expired_at, estimated_wait_min, created_at
                 FROM waitlist_entries
                 WHERE store_id = :store_id {status_clause}
                 ORDER BY priority DESC, created_at ASC
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -201,12 +203,14 @@ async def create_waitlist_entry(
 
         # 获取下一个队列号
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(MAX(queue_no), 100) + 1 AS next_no
                 FROM waitlist_entries
                 WHERE store_id = :store_id
                   AND DATE(created_at) = CURRENT_DATE
-            """),
+            """
+            ),
             {"store_id": body.store_id},
         )
         row = result.mappings().one_or_none()
@@ -223,14 +227,16 @@ async def create_waitlist_entry(
         priority = _MEMBER_LEVEL_PRIORITY.get(body.member_level or "", 0) if body.member_level else 0
 
         insert_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO waitlist_entries
                     (tenant_id, store_id, queue_no, name, phone, party_size,
                      table_type, member_id, priority, status, estimated_wait_min)
                 VALUES (:tenant_id, :store_id, :queue_no, :name, :phone, :party_size,
                         :table_type, :member_id, :priority, 'waiting', :estimated_wait_min)
                 RETURNING id, queue_no, estimated_wait_min, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": body.store_id,
@@ -288,21 +294,25 @@ async def call_entry(
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE waitlist_entries
                 SET status = 'called', called_at = :now,
                     call_count = call_count + 1, updated_at = :now
                 WHERE id = :eid
-            """),
+            """
+            ),
             {"eid": entry_id, "now": now},
         )
 
         # 写叫号日志
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO waitlist_call_logs (tenant_id, entry_id, channel, called_by)
                 VALUES (:tid, :eid, :channel, :called_by)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "eid": entry_id,
@@ -355,11 +365,13 @@ async def seat_entry(
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE waitlist_entries
                 SET status = 'seated', seated_at = :now, updated_at = :now
                 WHERE id = :eid
-            """),
+            """
+            ),
             {"eid": entry_id, "now": now},
         )
 
@@ -378,7 +390,8 @@ async def seat_entry(
             store_id = str(entry["store_id"])
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO orders
                         (id, tenant_id, store_id, order_no, table_number,
                          order_type, status, total_amount_fen, final_amount_fen,
@@ -387,7 +400,8 @@ async def seat_entry(
                         (:id, :tid::uuid, :sid::uuid, :ono, :tbl,
                          'dine_in', 'active', :total, :total,
                          NOW(), NOW())
-                """),
+                """
+                ),
                 {
                     "id": order_id,
                     "tid": tenant_id,
@@ -399,14 +413,16 @@ async def seat_entry(
             )
             for idx, item in enumerate(pre_order_items):
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO order_items
                             (id, tenant_id, order_id, dish_id, item_name,
                              quantity, unit_price_fen, subtotal_fen, sort_order, created_at)
                         VALUES
                             (:id, :tid::uuid, :oid, :did, :name,
                              :qty, :price, :sub, :sort, NOW())
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid4()),
                         "tid": tenant_id,
@@ -498,11 +514,13 @@ async def cancel_entry(
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE waitlist_entries
                 SET status = 'cancelled', updated_at = :now
                 WHERE id = :eid
-            """),
+            """
+            ),
             {"eid": entry_id, "now": now},
         )
         await db.commit()
@@ -529,7 +547,8 @@ async def expire_overdue(
 
         timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=_EXPIRE_TIMEOUT_MIN)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE waitlist_entries
                 SET status = 'expired', expired_at = NOW(),
                     priority = GREATEST(-10, priority - 10),
@@ -538,7 +557,8 @@ async def expire_overdue(
                   AND status = 'called'
                   AND called_at < :threshold
                 RETURNING id, member_id, coupon_issued_on_timeout
-            """),
+            """
+            ),
             {"store_id": store_id, "threshold": timeout_threshold},
         )
         expired_entries = result.mappings().all()
@@ -575,10 +595,12 @@ async def expire_overdue(
 
                     # 标记已发券
                     await db.execute(
-                        text("""
+                        text(
+                            """
                         UPDATE waitlist_entries SET coupon_issued_on_timeout = TRUE, updated_at = NOW()
                         WHERE id = :eid
-                    """),
+                    """
+                        ),
                         {"eid": str(entry["id"])},
                     )
 
@@ -614,7 +636,8 @@ async def get_stats(
         await _set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'waiting')  AS waiting_count,
                     COUNT(*) FILTER (WHERE status = 'called')   AS called_count,
@@ -625,7 +648,8 @@ async def get_stats(
                 FROM waitlist_entries
                 WHERE store_id = :store_id
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
-            """),
+            """
+            ),
             {"store_id": store_id},
         )
         row = result.mappings().one_or_none()
@@ -698,13 +722,15 @@ async def add_pre_order(
         # 4. UPDATE
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE waitlist_entries
                 SET pre_order_items = :items::jsonb,
                     pre_order_total_fen = :total_fen,
                     updated_at = :now
                 WHERE id = :eid
-            """),
+            """
+            ),
             {
                 "eid": entry_id,
                 "items": json.dumps(existing_items, ensure_ascii=False),
@@ -814,13 +840,15 @@ async def remove_pre_order_item(
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE waitlist_entries
                 SET pre_order_items = :items::jsonb,
                     pre_order_total_fen = :total_fen,
                     updated_at = :now
                 WHERE id = :eid
-            """),
+            """
+            ),
             {
                 "eid": entry_id,
                 "items": json.dumps(updated_items, ensure_ascii=False),

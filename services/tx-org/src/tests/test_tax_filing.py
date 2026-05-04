@@ -23,6 +23,8 @@ from uuid import uuid4
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+
+from services import tax_filing_service as tfs
 from services.tax_filing_service import (
     TAX_FILING_STATUS,
     _iso_utc,
@@ -36,8 +38,6 @@ from services.tax_filing_service import (
     retry_filing,
     submit_to_tax_bureau,
 )
-
-from services import tax_filing_service as tfs
 
 TENANT_ID = str(uuid4())
 STORE_ID = str(uuid4())

@@ -17,6 +17,7 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
+
 from services.referral_service import ReferralError, ReferralService
 
 log = structlog.get_logger(__name__)

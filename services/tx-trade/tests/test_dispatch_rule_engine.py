@@ -25,6 +25,7 @@ import pytest
 
 # ─── 测试工具 ───
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
 
@@ -34,14 +35,14 @@ TENANT_B = _uid()
 STORE_1 = _uid()
 STORE_2 = _uid()
 
-DEPT_A = uuid.uuid4()   # 堂食默认A档口
-DEPT_B = uuid.uuid4()   # 外卖B档口
+DEPT_A = uuid.uuid4()  # 堂食默认A档口
+DEPT_B = uuid.uuid4()  # 外卖B档口
 DEPT_BRAND_X = uuid.uuid4()  # 品牌X专属档口
-DEPT_ROAST = uuid.uuid4()    # 烤鸭炉档口
+DEPT_ROAST = uuid.uuid4()  # 烤鸭炉档口
 
-DISH_KUNG_PAO = _uid()   # 宫保鸡丁
-DISH_DUCK = _uid()       # 烤鸭
-DISH_SALAD = _uid()      # 凉菜（无规则）
+DISH_KUNG_PAO = _uid()  # 宫保鸡丁
+DISH_DUCK = _uid()  # 烤鸭
+DISH_SALAD = _uid()  # 凉菜（无规则）
 
 BRAND_X = _uid()
 PRINTER_B = uuid.uuid4()
@@ -68,11 +69,17 @@ def _make_rule(
     rule.id = uuid.uuid4()
     rule.name = f"规则-p{priority}"
     rule.priority = priority
-    rule.match_dish_id = (match_dish_id if isinstance(match_dish_id, uuid.UUID)
-                          else uuid.UUID(match_dish_id) if match_dish_id else None)
+    rule.match_dish_id = (
+        match_dish_id if isinstance(match_dish_id, uuid.UUID) else uuid.UUID(match_dish_id) if match_dish_id else None
+    )
     rule.match_dish_category = match_dish_category
-    rule.match_brand_id = (match_brand_id if isinstance(match_brand_id, uuid.UUID)
-                           else uuid.UUID(match_brand_id) if match_brand_id else None)
+    rule.match_brand_id = (
+        match_brand_id
+        if isinstance(match_brand_id, uuid.UUID)
+        else uuid.UUID(match_brand_id)
+        if match_brand_id
+        else None
+    )
     rule.match_channel = match_channel
     rule.match_time_start = match_time_start
     rule.match_time_end = match_time_end
@@ -115,6 +122,7 @@ def _make_db_with_rules(rules):
 
 
 # ─── 测试 1: 外卖单宫保鸡丁路由到B窗口 ───
+
 
 @pytest.mark.asyncio
 async def test_takeaway_kung_pao_routes_to_dept_b():
@@ -159,6 +167,7 @@ async def test_takeaway_kung_pao_routes_to_dept_b():
 
 # ─── 测试 2: 品牌X订单路由到X专属档口 ───
 
+
 @pytest.mark.asyncio
 async def test_brand_x_routes_to_dedicated_dept():
     """品牌X的订单应路由到X专属档口。"""
@@ -191,6 +200,7 @@ async def test_brand_x_routes_to_dedicated_dept():
 
 
 # ─── 测试 3: 午高峰烤鸭路由到专门的烤鸭炉档口 ───
+
 
 @pytest.mark.asyncio
 async def test_peak_hour_duck_routes_to_roast_dept():
@@ -253,6 +263,7 @@ async def test_off_peak_duck_no_rule_match():
 
 # ─── 测试 4: 无匹配规则时fallback到DishDeptMapping ───
 
+
 @pytest.mark.asyncio
 async def test_no_rule_match_fallback_to_dish_dept_mapping():
     """无匹配规则时应fallback到DishDeptMapping默认值。"""
@@ -289,13 +300,16 @@ async def test_no_rule_match_fallback_to_dish_dept_mapping():
                     class S:
                         def all(self):
                             return [rule_brand_x]
+
                     return S()
+
             return R()
         else:
             # fallback到DishDeptMapping
             class R2:
                 def one_or_none(self):
                     return FakeRow(fallback_dept_id, fallback_printer_id)
+
             return R2()
 
     db.execute = mock_execute
@@ -320,6 +334,7 @@ async def test_no_rule_match_fallback_to_dish_dept_mapping():
 
 
 # ─── 测试 5: 规则优先级 ───
+
 
 @pytest.mark.asyncio
 async def test_higher_priority_rule_wins():
@@ -356,6 +371,7 @@ async def test_higher_priority_rule_wins():
 
 # ─── 测试 6: tenant_id隔离 ───
 
+
 @pytest.mark.asyncio
 async def test_tenant_isolation():
     """不同租户的规则列表互不影响（缓存按 tenant_id:store_id 隔离）。"""
@@ -382,6 +398,7 @@ async def test_tenant_isolation():
 
 # ─── 测试 7: 缓存失效 ───
 
+
 def test_invalidate_store_cache_clears_only_target():
     """缓存失效只影响目标门店，不影响其他门店。"""
     from services.tx_trade.src.services.dispatch_rule_engine import _cache_key, _rule_cache, invalidate_store_cache
@@ -401,6 +418,7 @@ def test_invalidate_store_cache_clears_only_target():
 
 
 # ─── 测试 8: 通配条件（NULL字段） ───
+
 
 def test_null_conditions_are_wildcards():
     """规则中 None 的匹配条件应视为通配，不阻止匹配。"""
@@ -423,6 +441,7 @@ def test_null_conditions_are_wildcards():
 
 
 # ─── 测试 9: 渠道不匹配时跳过规则 ───
+
 
 def test_channel_mismatch_skips_rule():
     """渠道条件不匹配时规则不应生效。"""
@@ -448,6 +467,7 @@ def test_channel_mismatch_skips_rule():
 
 # ─── 测试 10: test_rule 管理员测试接口 ───
 
+
 @pytest.mark.asyncio
 async def test_rule_test_interface_matched():
     """test_rule 接口对匹配的规则返回 matched=True。"""
@@ -463,9 +483,7 @@ async def test_rule_test_interface_matched():
     )
 
     db = AsyncMock()
-    db.execute = AsyncMock(return_value=MagicMock(
-        scalar_one_or_none=MagicMock(return_value=rule)
-    ))
+    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=rule)))
 
     result = await engine.test_rule(
         rule_id=str(rule.id),
@@ -493,13 +511,11 @@ async def test_rule_test_interface_not_matched():
     )
 
     db = AsyncMock()
-    db.execute = AsyncMock(return_value=MagicMock(
-        scalar_one_or_none=MagicMock(return_value=rule)
-    ))
+    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=rule)))
 
     result = await engine.test_rule(
         rule_id=str(rule.id),
-        test_context={"channel": "dine_in"},   # 堂食，不匹配外卖规则
+        test_context={"channel": "dine_in"},  # 堂食，不匹配外卖规则
         tenant_id=TENANT_A,
         db=db,
     )
@@ -509,6 +525,7 @@ async def test_rule_test_interface_not_matched():
 
 
 # ─── 测试 11: 跨午夜时段匹配 ───
+
 
 def test_cross_midnight_time_window():
     """时段匹配支持跨午夜（如 22:00-02:00）。"""
@@ -536,6 +553,7 @@ def test_cross_midnight_time_window():
 
 
 # ─── 测试 12: 工作日类型匹配 ───
+
 
 def test_weekday_rule_only_matches_weekday():
     """weekday 规则只在工作日匹配，周末不匹配。"""

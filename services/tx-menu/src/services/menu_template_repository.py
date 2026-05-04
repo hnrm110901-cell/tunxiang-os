@@ -56,10 +56,12 @@ class MenuTemplateRepository:
         template_id = uuid.uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_templates (id, tenant_id, name, rules, status)
                 VALUES (:id, :tid, :name, :rules::jsonb, 'draft')
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tid": self._tid,
@@ -73,7 +75,8 @@ class MenuTemplateRepository:
             if not dish_id_str:
                 continue
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO menu_template_dishes
                         (id, tenant_id, template_id, dish_id, sort_order, dish_data)
                     VALUES
@@ -81,7 +84,8 @@ class MenuTemplateRepository:
                     ON CONFLICT (tenant_id, template_id, dish_id) DO UPDATE
                         SET sort_order = EXCLUDED.sort_order,
                             dish_data  = EXCLUDED.dish_data
-                """),
+                """
+                ),
                 {
                     "id": uuid.uuid4(),
                     "tid": self._tid,
@@ -105,11 +109,13 @@ class MenuTemplateRepository:
         tid_uuid = uuid.UUID(template_id)
 
         row_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, rules, status, created_at, updated_at
                 FROM menu_templates
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": tid_uuid, "tid": self._tid},
         )
         row = row_result.fetchone()
@@ -117,12 +123,14 @@ class MenuTemplateRepository:
             return None
 
         dishes_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT dish_id, sort_order, dish_data
                 FROM menu_template_dishes
                 WHERE template_id = :tid_val AND tenant_id = :tid
                 ORDER BY sort_order
-            """),
+            """
+            ),
             {"tid_val": tid_uuid, "tid": self._tid},
         )
         dishes = []
@@ -135,10 +143,12 @@ class MenuTemplateRepository:
 
         # 查询已发布门店列表
         pub_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id FROM store_menu_publishes
                 WHERE template_id = :tid_val AND tenant_id = :tid AND status = 'active'
-            """),
+            """
+            ),
             {"tid_val": tid_uuid, "tid": self._tid},
         )
         published_stores = [str(r.store_id) for r in pub_result.fetchall()]
@@ -160,7 +170,8 @@ class MenuTemplateRepository:
         await self._set_tenant()
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT t.id, t.name, t.rules, t.status, t.created_at, t.updated_at,
                        COUNT(d.id) AS dish_count
                 FROM menu_templates t
@@ -169,7 +180,8 @@ class MenuTemplateRepository:
                 WHERE t.tenant_id = :tid AND t.is_deleted = false
                 GROUP BY t.id, t.name, t.rules, t.status, t.created_at, t.updated_at
                 ORDER BY t.created_at DESC
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         rows = result.fetchall()
@@ -199,10 +211,12 @@ class MenuTemplateRepository:
 
         # 确认模板存在
         check = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name FROM menu_templates
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": tid_uuid, "tid": self._tid},
         )
         tpl_row = check.fetchone()
@@ -211,7 +225,8 @@ class MenuTemplateRepository:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_menu_publishes
                     (id, tenant_id, store_id, template_id, published_at, status)
                 VALUES
@@ -220,7 +235,8 @@ class MenuTemplateRepository:
                     SET template_id  = EXCLUDED.template_id,
                         published_at = EXCLUDED.published_at,
                         status       = 'active'
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -232,11 +248,13 @@ class MenuTemplateRepository:
 
         # 将模板状态更新为 published
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE menu_templates
                 SET status = 'published', updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": tid_uuid, "tid": self._tid},
         )
 
@@ -269,10 +287,12 @@ class MenuTemplateRepository:
 
         # 查找当前发布的模板
         pub_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT template_id FROM store_menu_publishes
                 WHERE store_id = :store_id AND tenant_id = :tid AND status = 'active'
-            """),
+            """
+            ),
             {"store_id": store_uuid, "tid": self._tid},
         )
         pub_row = pub_result.fetchone()
@@ -283,12 +303,14 @@ class MenuTemplateRepository:
 
         # 查询模板菜品
         dishes_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT dish_id, sort_order, dish_data
                 FROM menu_template_dishes
                 WHERE template_id = :tid_val AND tenant_id = :tid
                 ORDER BY sort_order
-            """),
+            """
+            ),
             {"tid_val": template_id, "tid": self._tid},
         )
         dish_rows = dishes_result.fetchall()
@@ -298,11 +320,13 @@ class MenuTemplateRepository:
         # 批量查渠道差异价
         dish_ids = [r.dish_id for r in dish_rows]
         prices_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT dish_id, price_fen FROM menu_channel_prices
                 WHERE tenant_id = :tid AND channel = :channel
                   AND dish_id = ANY(:dish_ids)
-            """),
+            """
+            ),
             {"tid": self._tid, "channel": channel, "dish_ids": dish_ids},
         )
         channel_prices = {str(r.dish_id): r.price_fen for r in prices_result.fetchall()}
@@ -329,13 +353,15 @@ class MenuTemplateRepository:
         await self._set_tenant()
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_channel_prices (id, tenant_id, dish_id, channel, price_fen, updated_at)
                 VALUES (:id, :tid, :dish_id, :channel, :price_fen, :now)
                 ON CONFLICT (tenant_id, dish_id, channel) DO UPDATE
                     SET price_fen  = EXCLUDED.price_fen,
                         updated_at = EXCLUDED.updated_at
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -365,7 +391,8 @@ class MenuTemplateRepository:
         now = datetime.now(timezone.utc)
         store_uuid = uuid.UUID(store_id)
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_seasonal_menus
                     (id, tenant_id, store_id, season, dishes, dish_count, status, updated_at)
                 VALUES
@@ -375,7 +402,8 @@ class MenuTemplateRepository:
                         dish_count = EXCLUDED.dish_count,
                         status     = 'active',
                         updated_at = EXCLUDED.updated_at
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -404,11 +432,13 @@ class MenuTemplateRepository:
         """获取门店季节菜单"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id, season, dishes, dish_count, status, updated_at
                 FROM store_seasonal_menus
                 WHERE store_id = :store_id AND season = :season AND tenant_id = :tid
-            """),
+            """
+            ),
             {"store_id": uuid.UUID(store_id), "season": season, "tid": self._tid},
         )
         row = result.fetchone()
@@ -434,7 +464,8 @@ class MenuTemplateRepository:
         now = datetime.now(timezone.utc)
         store_uuid = uuid.UUID(store_id)
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_room_menus
                     (id, tenant_id, store_id, room_type, dishes, dish_count, status, updated_at)
                 VALUES
@@ -444,7 +475,8 @@ class MenuTemplateRepository:
                         dish_count = EXCLUDED.dish_count,
                         status     = 'active',
                         updated_at = EXCLUDED.updated_at
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -473,11 +505,13 @@ class MenuTemplateRepository:
         """获取门店包厢菜单"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id, room_type, dishes, dish_count, status, updated_at
                 FROM store_room_menus
                 WHERE store_id = :store_id AND room_type = :room_type AND tenant_id = :tid
-            """),
+            """
+            ),
             {"store_id": uuid.UUID(store_id), "room_type": room_type, "tid": self._tid},
         )
         row = result.fetchone()

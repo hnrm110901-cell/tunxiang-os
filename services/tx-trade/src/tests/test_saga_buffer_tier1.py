@@ -78,9 +78,7 @@ async def buffer(tmp_buffer_path: Path):
         await buf.close()
 
 
-async def _make_buffer(
-    tmp_buffer_path: Path, *, clock=None, device_id: str = POS_DEVICE_A
-) -> SagaBuffer:
+async def _make_buffer(tmp_buffer_path: Path, *, clock=None, device_id: str = POS_DEVICE_A) -> SagaBuffer:
     """测试辅助：构造并初始化 SagaBuffer。测试自己负责 await buf.close()。"""
     buf = SagaBuffer(device_id=device_id, db_path=tmp_buffer_path, clock=clock)
     await buf.initialize()
@@ -113,9 +111,7 @@ async def test_xujihaixian_network_drop_100_orders_buffered_to_sqlite(
             orders.append((ikey, saga_id))
 
         stats = await buf.stats(tenant_id=XUJI_CHANGSHA_TENANT)
-        assert stats.pending_count == 100, (
-            f"expect 100 pending, got {stats.pending_count}"
-        )
+        assert stats.pending_count == 100, f"expect 100 pending, got {stats.pending_count}"
         assert stats.dead_letter_count == 0
         assert stats.sent_count == 0
 
@@ -267,6 +263,7 @@ async def test_xujihaixian_200_concurrent_checkout_buffer_p99_under_200ms(
     验证 aiosqlite 异步不阻塞主业务。"""
     buf = await _make_buffer(tmp_buffer_path)
     try:
+
         async def one_checkout(i: int) -> float:
             t0 = time.perf_counter()
             await buf.enqueue(
@@ -281,9 +278,7 @@ async def test_xujihaixian_200_concurrent_checkout_buffer_p99_under_200ms(
             return (time.perf_counter() - t0) * 1000  # ms
 
         # 200 并发
-        durations = await asyncio.gather(
-            *(one_checkout(i) for i in range(200))
-        )
+        durations = await asyncio.gather(*(one_checkout(i) for i in range(200)))
         durations.sort()
         p99_idx = int(len(durations) * 0.99)
         p99 = durations[p99_idx]
@@ -332,9 +327,7 @@ async def test_xujihaixian_saga_id_consistency_front_to_back(tmp_buffer_path: Pa
 
         # saga_id 必须与初次一致，retry payload 不覆盖
         assert e1.saga_id == saga_id_initial
-        assert e2.saga_id == saga_id_initial, (
-            "重试必须复用首次 saga_id（防双扣费）"
-        )
+        assert e2.saga_id == saga_id_initial, "重试必须复用首次 saga_id（防双扣费）"
         assert e2.state == SagaBufferState.FLUSHING  # 状态保持
 
         # 通过 get 再次确认持久化的值
@@ -384,9 +377,9 @@ async def test_xujihaixian_cross_tenant_buffer_isolation(tmp_buffer_path: Path):
 
         # get 跨租户必须返回 None
         a_key = "settle:A-0"
-        assert await buf.get(a_key, tenant_id=XUJI_SHAOSHAN_TENANT) is None, (
-            "tenant_B 不得读取 tenant_A 条目（行级隔离铁律）"
-        )
+        assert (
+            await buf.get(a_key, tenant_id=XUJI_SHAOSHAN_TENANT) is None
+        ), "tenant_B 不得读取 tenant_A 条目（行级隔离铁律）"
         assert await buf.get(a_key, tenant_id=XUJI_CHANGSHA_TENANT) is not None
 
         # stats 租户独立
@@ -411,9 +404,7 @@ def test_flag_off_legacy_direct_write():
     # 解析 edge_flags.yaml 并定位该 flag
     import yaml
 
-    flag_file = (
-        _ROOT / "flags" / "edge" / "edge_flags.yaml"
-    )
+    flag_file = _ROOT / "flags" / "edge" / "edge_flags.yaml"
     data = yaml.safe_load(flag_file.read_text(encoding="utf-8"))
     names = {f["name"]: f for f in data["flags"]}
     assert EdgeFlags.PAYMENT_SAGA_BUFFER in names, "flag 未注册到 edge_flags.yaml"
@@ -500,16 +491,10 @@ async def test_xujihaixian_flushing_reset_on_initialize_after_crash(
     try:
         # warning 必须被调用，且 event 名匹配，count == 2
         reset_events = [
-            (event, kw)
-            for (event, kw) in captured_warnings
-            if event == "saga_buffer.flushing_reset_on_startup"
+            (event, kw) for (event, kw) in captured_warnings if event == "saga_buffer.flushing_reset_on_startup"
         ]
-        assert len(reset_events) == 1, (
-            f"启动复位 warning 必须打且只打一次，实际 events={captured_warnings}"
-        )
-        assert reset_events[0][1]["count"] == 2, (
-            f"应复位 2 条 flushing，实际 count={reset_events[0][1].get('count')}"
-        )
+        assert len(reset_events) == 1, f"启动复位 warning 必须打且只打一次，实际 events={captured_warnings}"
+        assert reset_events[0][1]["count"] == 2, f"应复位 2 条 flushing，实际 count={reset_events[0][1].get('count')}"
 
         # 复位后两条都应回到 pending，flush_ready 必须捞到（否则就是死单泄漏）
         ready = await buf2.flush_ready(tenant_id=XUJI_CHANGSHA_TENANT)
@@ -599,9 +584,7 @@ async def test_xujihaixian_flushing_stuck_self_check_resets_after_5min(
         )
         assert reset_for_b == 0, "跨租户自检必须 0 命中（行级隔离铁律）"
         entry_b_check = await buf.get(ikey, tenant_id=XUJI_CHANGSHA_TENANT)
-        assert entry_b_check.state == SagaBufferState.FLUSHING, (
-            "tenant_B 自检不能复位 tenant_A 的条目"
-        )
+        assert entry_b_check.state == SagaBufferState.FLUSHING, "tenant_B 自检不能复位 tenant_A 的条目"
     finally:
         await buf.close()
 
@@ -695,22 +678,14 @@ async def test_xujihaixian_flush_401_skips_dead_letter_no_attempt_increment(
         assert result["sent"] == 0
         assert result["failed"] == 0
         assert result["dead_letter"] == 0
-        assert result["jwt_expired_skip"] == 1, (
-            f"401 必须计入 jwt_expired_skip，实际 result={result}"
-        )
+        assert result["jwt_expired_skip"] == 1, f"401 必须计入 jwt_expired_skip，实际 result={result}"
 
         # 状态机断言
         e = await buf.get(ikey, tenant_id=XUJI_CHANGSHA_TENANT)
         assert e is not None
-        assert e.state == SagaBufferState.PENDING, (
-            "401 后必须复位 pending（不能停留 flushing 否则下一轮永远死单）"
-        )
-        assert e.attempts == 0, (
-            f"401 不增 attempts，实际 attempts={e.attempts}"
-        )
-        assert e.last_error is None, (
-            "401 不写 last_error（不是业务失败，是凭证过期）"
-        )
+        assert e.state == SagaBufferState.PENDING, "401 后必须复位 pending（不能停留 flushing 否则下一轮永远死单）"
+        assert e.attempts == 0, f"401 不增 attempts，实际 attempts={e.attempts}"
+        assert e.last_error is None, "401 不写 last_error（不是业务失败，是凭证过期）"
 
         # token_refresher 必须被调用一次
         assert refresh_calls["count"] == 1
@@ -719,25 +694,19 @@ async def test_xujihaixian_flush_401_skips_dead_letter_no_attempt_increment(
         fake_now[0] += 5  # +5s，仍在 30s 内
         result2 = await flusher.flush_once()
         assert result2["jwt_expired_skip"] == 1, "风暴窗口内仍计 skip"
-        assert len(http.calls) == 1, (
-            f"30s 风暴窗口内不应再发 POST，实际 calls={len(http.calls)}"
-        )
+        assert len(http.calls) == 1, f"30s 风暴窗口内不应再发 POST，实际 calls={len(http.calls)}"
 
         # 轮 3：30s 窗口结束 + 模拟 JWT 已刷新 → 200 sent
         fake_now[0] += 30  # 累计 +35s 超过 backoff
         result3 = await flusher.flush_once()
         assert result3["sent"] == 1
-        assert len(http.calls) == 2, (
-            "30s 窗口外应重新 POST"
-        )
+        assert len(http.calls) == 2, "30s 窗口外应重新 POST"
 
         e_final = await buf.get(ikey, tenant_id=XUJI_CHANGSHA_TENANT)
         assert e_final is not None
         assert e_final.state == SagaBufferState.SENT
         # 全程 attempts 不增（凭证问题不消耗预算）
-        assert e_final.attempts == 0, (
-            f"成功 sent 时 attempts 仍应为 0，实际={e_final.attempts}"
-        )
+        assert e_final.attempts == 0, f"成功 sent 时 attempts 仍应为 0，实际={e_final.attempts}"
     finally:
         await buf.close()
 
@@ -765,9 +734,7 @@ async def test_xujihaixian_flush_403_business_rejection_marks_dead_letter(
             payload={"amount_fen": 9800},
         )
 
-        http = _FakeHttpClient(
-            [_FakeResponse(403, {"detail": "ROLE_FORBIDDEN"})]
-        )
+        http = _FakeHttpClient([_FakeResponse(403, {"detail": "ROLE_FORBIDDEN"})])
         flusher = SagaFlusher(
             buffer=buf,
             tenant_id=XUJI_SHAOSHAN_TENANT,
@@ -776,20 +743,14 @@ async def test_xujihaixian_flush_403_business_rejection_marks_dead_letter(
         )
 
         result = await flusher.flush_once()
-        assert result["dead_letter"] == 1, (
-            f"403 必须直接 dead_letter，实际 result={result}"
-        )
-        assert result["jwt_expired_skip"] == 0, (
-            "403 不应被误判为 401 路径"
-        )
+        assert result["dead_letter"] == 1, f"403 必须直接 dead_letter，实际 result={result}"
+        assert result["jwt_expired_skip"] == 0, "403 不应被误判为 401 路径"
         assert result["sent"] == 0
         assert result["failed"] == 0
 
         e = await buf.get(ikey, tenant_id=XUJI_SHAOSHAN_TENANT)
         assert e is not None
-        assert e.state == SagaBufferState.DEAD_LETTER, (
-            "403 业务拒绝必须 dead_letter（与 401 凭证过期分路）"
-        )
+        assert e.state == SagaBufferState.DEAD_LETTER, "403 业务拒绝必须 dead_letter（与 401 凭证过期分路）"
         assert e.last_error is not None and "403" in e.last_error
     finally:
         await buf.close()
@@ -841,9 +802,7 @@ async def test_xujihaixian_memory_mode_disk_recovery_replays_to_sqlite(
     # 第 3 步：触发 replay
     replayed = await buf_mem.try_replay_memory_to_disk()
     assert replayed == 2, f"应 replay 2 条，实际 {replayed}"
-    assert buf_mem.is_memory_mode is False, (
-        "replay 成功后必须退出 memory 模式"
-    )
+    assert buf_mem.is_memory_mode is False, "replay 成功后必须退出 memory 模式"
     assert buf_mem._memory_rows == {}, "内存字典必须清空"
 
     # 第 4 步：当前 buf 仍可读到这两条（已切到 sqlite 模式）
@@ -867,14 +826,9 @@ async def test_xujihaixian_memory_mode_disk_recovery_replays_to_sqlite(
     await buf_restart.initialize()
     try:
         assert buf_restart.is_memory_mode is False
-        ready = await buf_restart.flush_ready(
-            tenant_id=XUJI_CHANGSHA_TENANT, limit=10
-        )
+        ready = await buf_restart.flush_ready(tenant_id=XUJI_CHANGSHA_TENANT, limit=10)
         keys = sorted(e.idempotency_key for e in ready)
-        assert keys == [ikey1, ikey2], (
-            f"重启后必须能从 SQLite 取回两条 replay 数据（防数据丢失），"
-            f"实际 keys={keys}"
-        )
+        assert keys == [ikey1, ikey2], f"重启后必须能从 SQLite 取回两条 replay 数据（防数据丢失），" f"实际 keys={keys}"
     finally:
         await buf_restart.close()
 
@@ -903,12 +857,8 @@ async def test_xujihaixian_memory_mode_disk_still_full_stays_in_memory():
 
         # 磁盘仍不可写：replay 必须返回 0 + 保持 memory 模式
         replayed = await buf.try_replay_memory_to_disk()
-        assert replayed == 0, (
-            f"磁盘仍不可写时 replay 必须 0 命中，实际 {replayed}"
-        )
-        assert buf.is_memory_mode is True, (
-            "replay 失败后必须保持 memory 模式（绝不能丢数据）"
-        )
+        assert replayed == 0, f"磁盘仍不可写时 replay 必须 0 命中，实际 {replayed}"
+        assert buf.is_memory_mode is True, "replay 失败后必须保持 memory 模式（绝不能丢数据）"
 
         # 数据仍然在内存里，可继续 flush_ready
         ready = await buf.flush_ready(tenant_id=XUJI_CHANGSHA_TENANT)

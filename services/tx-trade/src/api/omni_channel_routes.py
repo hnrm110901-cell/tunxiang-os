@@ -502,7 +502,8 @@ async def _enrich_order_with_mappings(
             continue
 
         mapping_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT dish_id
                 FROM platform_dish_mappings
                 WHERE tenant_id       = :tid
@@ -511,7 +512,8 @@ async def _enrich_order_with_mappings(
                   AND platform_item_id = :platform_item_id
                   AND is_active       = true
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "sid": sid,
@@ -528,7 +530,8 @@ async def _enrich_order_with_mappings(
             # 未映射：upsert 占位记录（is_active=false，待人工处理）
             try:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO platform_dish_mappings
                             (tenant_id, store_id, platform, platform_item_id,
                              platform_item_name, dish_id, is_active, updated_at)
@@ -543,7 +546,8 @@ async def _enrich_order_with_mappings(
                             ),
                             updated_at = NOW()
                         WHERE platform_dish_mappings.dish_id IS NULL
-                    """),
+                    """
+                    ),
                     {
                         "tid": tid,
                         "sid": sid,
@@ -589,7 +593,8 @@ async def get_unmapped_items(
     all_unmapped: list[dict] = []
     for plat in platforms_to_check:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT platform_item_id, platform_item_name, created_at, updated_at
                 FROM platform_dish_mappings
                 WHERE tenant_id = :tid
@@ -597,7 +602,8 @@ async def get_unmapped_items(
                   AND platform  = :platform
                   AND dish_id IS NULL
                 ORDER BY updated_at DESC
-            """),
+            """
+            ),
             {"tid": tid, "sid": sid, "platform": plat},
         )
         for row in result.fetchall():
@@ -616,7 +622,8 @@ async def get_unmapped_items(
     if include_suggestions and all_unmapped:
         # 获取内部菜品候选
         dish_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_name
                 FROM dishes
                 WHERE tenant_id = :tid
@@ -624,7 +631,8 @@ async def get_unmapped_items(
                   AND is_available = true
                   AND is_deleted = false
                 ORDER BY dish_name
-            """),
+            """
+            ),
             {"tid": tid, "sid": sid},
         )
         dish_rows = dish_result.fetchall()

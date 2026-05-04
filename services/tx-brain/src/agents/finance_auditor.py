@@ -428,7 +428,8 @@ class FinanceAuditor:
 
                 # 查询最新 P&L
                 pnl_result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT
                             store_id,
                             stat_date,
@@ -446,14 +447,16 @@ class FinanceAuditor:
                         {store_clause}
                         ORDER BY stat_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     params,
                 )
                 pnl_row = pnl_result.mappings().one_or_none()
 
                 # 查询渠道毛利（最新日期）
                 channel_result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT
                             channel,
                             gross_margin_rate,
@@ -467,7 +470,8 @@ class FinanceAuditor:
                             WHERE tenant_id = :tenant_id {store_clause}
                         )
                         ORDER BY net_revenue_fen DESC
-                    """),
+                    """
+                    ),
                     params,
                 )
                 channel_rows = channel_result.mappings().all()

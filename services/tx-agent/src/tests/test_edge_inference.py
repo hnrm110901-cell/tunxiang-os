@@ -25,6 +25,7 @@ if _src not in sys.path:
 import httpx
 import pytest
 import respx
+
 from services.edge_inference import EdgeInferenceClient
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────

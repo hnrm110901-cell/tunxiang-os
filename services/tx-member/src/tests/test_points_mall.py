@@ -18,6 +18,7 @@ from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
+
 from services.points_mall import (
     ACHIEVEMENT_DEFINITIONS,
     check_birthday_privilege,

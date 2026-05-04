@@ -107,12 +107,8 @@ class TestCalcWeightedHealthScore:
 
     def test_ingredient_weight_dominates(self):
         """食材权重最高（0.45）：食材差时综合分拉低更多"""
-        score_ingredient_bad = calc_weighted_health_score(
-            ingredient_score=20.0, labor_score=100.0, waste_score=100.0
-        )
-        score_labor_bad = calc_weighted_health_score(
-            ingredient_score=100.0, labor_score=20.0, waste_score=100.0
-        )
+        score_ingredient_bad = calc_weighted_health_score(ingredient_score=20.0, labor_score=100.0, waste_score=100.0)
+        score_labor_bad = calc_weighted_health_score(ingredient_score=100.0, labor_score=20.0, waste_score=100.0)
         # 食材差 → 综合分更低
         assert score_ingredient_bad < score_labor_bad
 
@@ -211,15 +207,28 @@ class TestStoreCostHealthReport:
     def test_invalid_health_level_raises(self):
         with pytest.raises(ValueError):
             StoreCostHealthReport(
-                store_id="s1", store_name="X", brand_id="b1", tenant_id="t1",
+                store_id="s1",
+                store_name="X",
+                brand_id="b1",
+                tenant_id="t1",
                 period_days=30,
-                ingredient_cost_rate=0.3, labor_cost_rate=0.2, waste_rate=0.05,
-                ingredient_score=70.0, labor_score=70.0, waste_score=70.0,
+                ingredient_cost_rate=0.3,
+                labor_cost_rate=0.2,
+                waste_rate=0.05,
+                ingredient_score=70.0,
+                labor_score=70.0,
+                waste_score=70.0,
                 health_score=70.0,
                 health_level="unknown_level",  # 非法值
-                benchmark_ingredient=0.3, benchmark_labor=0.25, benchmark_waste=0.05,
-                ingredient_deviation=0.0, labor_deviation=0.0, waste_deviation=0.0,
-                is_ingredient_anomaly=False, is_labor_anomaly=False, is_waste_anomaly=False,
+                benchmark_ingredient=0.3,
+                benchmark_labor=0.25,
+                benchmark_waste=0.05,
+                ingredient_deviation=0.0,
+                labor_deviation=0.0,
+                waste_deviation=0.0,
+                is_ingredient_anomaly=False,
+                is_labor_anomaly=False,
+                is_waste_anomaly=False,
             )
 
 
@@ -278,42 +287,64 @@ class TestCalcStoreCostHealth:
         revenue_fen = 10_000_000  # 10万
         food_cost_fen = 2_800_000  # 28%
         labor_cost_fen = 2_200_000  # 22%
-        waste_cost_fen = 300_000    # 3%
+        waste_cost_fen = 300_000  # 3%
 
         # mock SQL 查询
-        mock_db.execute = AsyncMock(side_effect=[
-            # 1. 营收 + 食材成本
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "net_revenue_fen": revenue_fen,
-                "food_cost_fen": food_cost_fen,
-            })),
-            # 2. 人力成本
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "labor_cost_fen": labor_cost_fen,
-            })),
-            # 3. 损耗成本
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "waste_cost_fen": waste_cost_fen,
-                "total_purchase_fen": 10_000_000,
-            })),
-            # 4. 品牌基准（同品牌门店聚合）
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "median_ingredient": 0.30,
-                "median_labor": 0.25,
-                "median_waste": 0.05,
-                "mean_ingredient": 0.30,
-                "mean_labor": 0.25,
-                "mean_waste": 0.05,
-                "p25_ingredient": 0.27,
-                "p75_ingredient": 0.33,
-                "store_count": 4,
-            })),
-            # 5. 门店信息（store_name、brand_id）
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "store_name": "测试门店",
-                "brand_id": "brand-001",
-            })),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                # 1. 营收 + 食材成本
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "net_revenue_fen": revenue_fen,
+                            "food_cost_fen": food_cost_fen,
+                        }
+                    )
+                ),
+                # 2. 人力成本
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "labor_cost_fen": labor_cost_fen,
+                        }
+                    )
+                ),
+                # 3. 损耗成本
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "waste_cost_fen": waste_cost_fen,
+                            "total_purchase_fen": 10_000_000,
+                        }
+                    )
+                ),
+                # 4. 品牌基准（同品牌门店聚合）
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "median_ingredient": 0.30,
+                            "median_labor": 0.25,
+                            "median_waste": 0.05,
+                            "mean_ingredient": 0.30,
+                            "mean_labor": 0.25,
+                            "mean_waste": 0.05,
+                            "p25_ingredient": 0.27,
+                            "p75_ingredient": 0.33,
+                            "store_count": 4,
+                        }
+                    )
+                ),
+                # 5. 门店信息（store_name、brand_id）
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "store_name": "测试门店",
+                            "brand_id": "brand-001",
+                        }
+                    )
+                ),
+            ]
+        )
 
         report = await engine.calc_store_cost_health(
             store_id="store-001",
@@ -331,38 +362,60 @@ class TestCalcStoreCostHealth:
     async def test_critical_store(self, engine, mock_db):
         """食材成本率55%、人力40%、损耗15% → 应为 critical"""
         revenue_fen = 10_000_000
-        food_cost_fen = 5_500_000   # 55%
+        food_cost_fen = 5_500_000  # 55%
         labor_cost_fen = 4_000_000  # 40%
         waste_cost_fen = 1_500_000  # 15%
 
-        mock_db.execute = AsyncMock(side_effect=[
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "net_revenue_fen": revenue_fen,
-                "food_cost_fen": food_cost_fen,
-            })),
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "labor_cost_fen": labor_cost_fen,
-            })),
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "waste_cost_fen": waste_cost_fen,
-                "total_purchase_fen": 10_000_000,
-            })),
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "median_ingredient": 0.30,
-                "median_labor": 0.25,
-                "median_waste": 0.05,
-                "mean_ingredient": 0.30,
-                "mean_labor": 0.25,
-                "mean_waste": 0.05,
-                "p25_ingredient": 0.27,
-                "p75_ingredient": 0.33,
-                "store_count": 4,
-            })),
-            MagicMock(mappings=lambda: MagicMock(first=lambda: {
-                "store_name": "问题门店",
-                "brand_id": "brand-001",
-            })),
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "net_revenue_fen": revenue_fen,
+                            "food_cost_fen": food_cost_fen,
+                        }
+                    )
+                ),
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "labor_cost_fen": labor_cost_fen,
+                        }
+                    )
+                ),
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "waste_cost_fen": waste_cost_fen,
+                            "total_purchase_fen": 10_000_000,
+                        }
+                    )
+                ),
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "median_ingredient": 0.30,
+                            "median_labor": 0.25,
+                            "median_waste": 0.05,
+                            "mean_ingredient": 0.30,
+                            "mean_labor": 0.25,
+                            "mean_waste": 0.05,
+                            "p25_ingredient": 0.27,
+                            "p75_ingredient": 0.33,
+                            "store_count": 4,
+                        }
+                    )
+                ),
+                MagicMock(
+                    mappings=lambda: MagicMock(
+                        first=lambda: {
+                            "store_name": "问题门店",
+                            "brand_id": "brand-001",
+                        }
+                    )
+                ),
+            ]
+        )
 
         report = await engine.calc_store_cost_health(
             store_id="store-002",
@@ -383,19 +436,23 @@ class TestGetBrandCostBenchmark:
     @pytest.mark.asyncio
     async def test_brand_benchmark(self, engine, mock_db):
         """品牌5家门店聚合基准"""
-        mock_db.execute = AsyncMock(return_value=MagicMock(
-            mappings=lambda: MagicMock(first=lambda: {
-                "store_count": 5,
-                "median_ingredient": 0.29,
-                "median_labor": 0.24,
-                "median_waste": 0.04,
-                "mean_ingredient": 0.295,
-                "mean_labor": 0.245,
-                "mean_waste": 0.042,
-                "p25_ingredient": 0.26,
-                "p75_ingredient": 0.32,
-            })
-        ))
+        mock_db.execute = AsyncMock(
+            return_value=MagicMock(
+                mappings=lambda: MagicMock(
+                    first=lambda: {
+                        "store_count": 5,
+                        "median_ingredient": 0.29,
+                        "median_labor": 0.24,
+                        "median_waste": 0.04,
+                        "mean_ingredient": 0.295,
+                        "mean_labor": 0.245,
+                        "mean_waste": 0.042,
+                        "p25_ingredient": 0.26,
+                        "p75_ingredient": 0.32,
+                    }
+                )
+            )
+        )
 
         benchmark = await engine.get_brand_cost_benchmark(
             brand_id="brand-001",
@@ -411,9 +468,11 @@ class TestGetBrandCostBenchmark:
     @pytest.mark.asyncio
     async def test_brand_no_data_returns_defaults(self, engine, mock_db):
         """无门店数据时返回行业默认基准"""
-        mock_db.execute = AsyncMock(return_value=MagicMock(
-            mappings=lambda: MagicMock(first=lambda: None)  # 无数据
-        ))
+        mock_db.execute = AsyncMock(
+            return_value=MagicMock(
+                mappings=lambda: MagicMock(first=lambda: None)  # 无数据
+            )
+        )
 
         benchmark = await engine.get_brand_cost_benchmark(
             brand_id="brand-empty",
@@ -435,30 +494,62 @@ class TestGetGroupCostHeatmap:
         """热力图按 health_score 升序（高风险门店优先）"""
         # 模拟两家门店
         store_list_row = MagicMock()
-        store_list_row.mappings = lambda: MagicMock(all=lambda: [
-            {"store_id": "s1", "store_name": "门店A", "brand_id": "b1"},
-            {"store_id": "s2", "store_name": "门店B", "brand_id": "b1"},
-        ])
+        store_list_row.mappings = lambda: MagicMock(
+            all=lambda: [
+                {"store_id": "s1", "store_name": "门店A", "brand_id": "b1"},
+                {"store_id": "s2", "store_name": "门店B", "brand_id": "b1"},
+            ]
+        )
 
         with patch.object(engine, "calc_store_cost_health", new_callable=AsyncMock) as mock_calc:
             mock_calc.side_effect = [
                 StoreCostHealthReport(
-                    store_id="s1", store_name="门店A", brand_id="b1", tenant_id="t1",
-                    period_days=30, ingredient_cost_rate=0.28, labor_cost_rate=0.22,
-                    waste_rate=0.03, ingredient_score=90.0, labor_score=85.0, waste_score=88.0,
-                    health_score=88.0, health_level="healthy",
-                    benchmark_ingredient=0.30, benchmark_labor=0.25, benchmark_waste=0.05,
-                    ingredient_deviation=0.0, labor_deviation=0.0, waste_deviation=0.0,
-                    is_ingredient_anomaly=False, is_labor_anomaly=False, is_waste_anomaly=False,
+                    store_id="s1",
+                    store_name="门店A",
+                    brand_id="b1",
+                    tenant_id="t1",
+                    period_days=30,
+                    ingredient_cost_rate=0.28,
+                    labor_cost_rate=0.22,
+                    waste_rate=0.03,
+                    ingredient_score=90.0,
+                    labor_score=85.0,
+                    waste_score=88.0,
+                    health_score=88.0,
+                    health_level="healthy",
+                    benchmark_ingredient=0.30,
+                    benchmark_labor=0.25,
+                    benchmark_waste=0.05,
+                    ingredient_deviation=0.0,
+                    labor_deviation=0.0,
+                    waste_deviation=0.0,
+                    is_ingredient_anomaly=False,
+                    is_labor_anomaly=False,
+                    is_waste_anomaly=False,
                 ),
                 StoreCostHealthReport(
-                    store_id="s2", store_name="门店B", brand_id="b1", tenant_id="t1",
-                    period_days=30, ingredient_cost_rate=0.48, labor_cost_rate=0.38,
-                    waste_rate=0.12, ingredient_score=30.0, labor_score=25.0, waste_score=20.0,
-                    health_score=26.0, health_level="critical",
-                    benchmark_ingredient=0.30, benchmark_labor=0.25, benchmark_waste=0.05,
-                    ingredient_deviation=0.60, labor_deviation=0.52, waste_deviation=1.40,
-                    is_ingredient_anomaly=True, is_labor_anomaly=True, is_waste_anomaly=True,
+                    store_id="s2",
+                    store_name="门店B",
+                    brand_id="b1",
+                    tenant_id="t1",
+                    period_days=30,
+                    ingredient_cost_rate=0.48,
+                    labor_cost_rate=0.38,
+                    waste_rate=0.12,
+                    ingredient_score=30.0,
+                    labor_score=25.0,
+                    waste_score=20.0,
+                    health_score=26.0,
+                    health_level="critical",
+                    benchmark_ingredient=0.30,
+                    benchmark_labor=0.25,
+                    benchmark_waste=0.05,
+                    ingredient_deviation=0.60,
+                    labor_deviation=0.52,
+                    waste_deviation=1.40,
+                    is_ingredient_anomaly=True,
+                    is_labor_anomaly=True,
+                    is_waste_anomaly=True,
                 ),
             ]
             mock_db.execute = AsyncMock(return_value=store_list_row)
@@ -479,19 +570,38 @@ class TestGetGroupCostHeatmap:
         """集团热力图能正确识别 critical 门店"""
         with patch.object(engine, "calc_store_cost_health", new_callable=AsyncMock) as mock_calc:
             mock_calc.return_value = StoreCostHealthReport(
-                store_id="s3", store_name="高风险店", brand_id="b1", tenant_id="t1",
-                period_days=30, ingredient_cost_rate=0.50, labor_cost_rate=0.35,
-                waste_rate=0.10, ingredient_score=10.0, labor_score=20.0, waste_score=15.0,
-                health_score=14.75, health_level="critical",
-                benchmark_ingredient=0.30, benchmark_labor=0.25, benchmark_waste=0.05,
-                ingredient_deviation=0.67, labor_deviation=0.40, waste_deviation=1.0,
-                is_ingredient_anomaly=True, is_labor_anomaly=True, is_waste_anomaly=True,
+                store_id="s3",
+                store_name="高风险店",
+                brand_id="b1",
+                tenant_id="t1",
+                period_days=30,
+                ingredient_cost_rate=0.50,
+                labor_cost_rate=0.35,
+                waste_rate=0.10,
+                ingredient_score=10.0,
+                labor_score=20.0,
+                waste_score=15.0,
+                health_score=14.75,
+                health_level="critical",
+                benchmark_ingredient=0.30,
+                benchmark_labor=0.25,
+                benchmark_waste=0.05,
+                ingredient_deviation=0.67,
+                labor_deviation=0.40,
+                waste_deviation=1.0,
+                is_ingredient_anomaly=True,
+                is_labor_anomaly=True,
+                is_waste_anomaly=True,
             )
-            mock_db.execute = AsyncMock(return_value=MagicMock(
-                mappings=lambda: MagicMock(all=lambda: [
-                    {"store_id": "s3", "store_name": "高风险店", "brand_id": "b1"},
-                ])
-            ))
+            mock_db.execute = AsyncMock(
+                return_value=MagicMock(
+                    mappings=lambda: MagicMock(
+                        all=lambda: [
+                            {"store_id": "s3", "store_name": "高风险店", "brand_id": "b1"},
+                        ]
+                    )
+                )
+            )
 
             reports = await engine.get_group_cost_heatmap("tenant-001", 30, mock_db)
 
@@ -509,25 +619,49 @@ class TestGenerateCostOptimizationSuggestion:
         engine = CostHealthEngine()
 
         critical_report = StoreCostHealthReport(
-            store_id="s1", store_name="问题店", brand_id="b1", tenant_id="t1",
-            period_days=30, ingredient_cost_rate=0.48, labor_cost_rate=0.35,
-            waste_rate=0.10, ingredient_score=30.0, labor_score=40.0, waste_score=35.0,
-            health_score=34.0, health_level="critical",
-            benchmark_ingredient=0.30, benchmark_labor=0.25, benchmark_waste=0.05,
-            ingredient_deviation=0.60, labor_deviation=0.40, waste_deviation=1.0,
-            is_ingredient_anomaly=True, is_labor_anomaly=True, is_waste_anomaly=True,
+            store_id="s1",
+            store_name="问题店",
+            brand_id="b1",
+            tenant_id="t1",
+            period_days=30,
+            ingredient_cost_rate=0.48,
+            labor_cost_rate=0.35,
+            waste_rate=0.10,
+            ingredient_score=30.0,
+            labor_score=40.0,
+            waste_score=35.0,
+            health_score=34.0,
+            health_level="critical",
+            benchmark_ingredient=0.30,
+            benchmark_labor=0.25,
+            benchmark_waste=0.05,
+            ingredient_deviation=0.60,
+            labor_deviation=0.40,
+            waste_deviation=1.0,
+            is_ingredient_anomaly=True,
+            is_labor_anomaly=True,
+            is_waste_anomaly=True,
         )
 
         benchmark = BrandCostBenchmark(
-            brand_id="b1", tenant_id="t1", period_days=30, store_count=4,
-            median_ingredient_cost_rate=0.30, median_labor_cost_rate=0.25,
-            median_waste_rate=0.05, mean_ingredient_cost_rate=0.30,
-            mean_labor_cost_rate=0.25, mean_waste_rate=0.05,
-            p25_ingredient_cost_rate=0.27, p75_ingredient_cost_rate=0.33,
+            brand_id="b1",
+            tenant_id="t1",
+            period_days=30,
+            store_count=4,
+            median_ingredient_cost_rate=0.30,
+            median_labor_cost_rate=0.25,
+            median_waste_rate=0.05,
+            mean_ingredient_cost_rate=0.30,
+            mean_labor_cost_rate=0.25,
+            mean_waste_rate=0.05,
+            p25_ingredient_cost_rate=0.27,
+            p75_ingredient_cost_rate=0.33,
         )
 
         mock_router = AsyncMock()
-        mock_router.complete = AsyncMock(return_value="建议：1. 优化食材采购合同降低单价；2. 减少高损耗食材用量；3. 优化排班减少人力浪费。")
+        mock_router.complete = AsyncMock(
+            return_value="建议：1. 优化食材采购合同降低单价；2. 减少高损耗食材用量；3. 优化排班减少人力浪费。"
+        )
 
         suggestion = await engine.generate_cost_optimization_suggestion(
             store_report=critical_report,
@@ -545,21 +679,43 @@ class TestGenerateCostOptimizationSuggestion:
         engine = CostHealthEngine()
 
         healthy_report = StoreCostHealthReport(
-            store_id="s2", store_name="优质店", brand_id="b1", tenant_id="t1",
-            period_days=30, ingredient_cost_rate=0.27, labor_cost_rate=0.20,
-            waste_rate=0.03, ingredient_score=95.0, labor_score=90.0, waste_score=92.0,
-            health_score=92.25, health_level="healthy",
-            benchmark_ingredient=0.30, benchmark_labor=0.25, benchmark_waste=0.05,
-            ingredient_deviation=-0.10, labor_deviation=-0.20, waste_deviation=-0.40,
-            is_ingredient_anomaly=False, is_labor_anomaly=False, is_waste_anomaly=False,
+            store_id="s2",
+            store_name="优质店",
+            brand_id="b1",
+            tenant_id="t1",
+            period_days=30,
+            ingredient_cost_rate=0.27,
+            labor_cost_rate=0.20,
+            waste_rate=0.03,
+            ingredient_score=95.0,
+            labor_score=90.0,
+            waste_score=92.0,
+            health_score=92.25,
+            health_level="healthy",
+            benchmark_ingredient=0.30,
+            benchmark_labor=0.25,
+            benchmark_waste=0.05,
+            ingredient_deviation=-0.10,
+            labor_deviation=-0.20,
+            waste_deviation=-0.40,
+            is_ingredient_anomaly=False,
+            is_labor_anomaly=False,
+            is_waste_anomaly=False,
         )
 
         benchmark = BrandCostBenchmark(
-            brand_id="b1", tenant_id="t1", period_days=30, store_count=4,
-            median_ingredient_cost_rate=0.30, median_labor_cost_rate=0.25,
-            median_waste_rate=0.05, mean_ingredient_cost_rate=0.30,
-            mean_labor_cost_rate=0.25, mean_waste_rate=0.05,
-            p25_ingredient_cost_rate=0.27, p75_ingredient_cost_rate=0.33,
+            brand_id="b1",
+            tenant_id="t1",
+            period_days=30,
+            store_count=4,
+            median_ingredient_cost_rate=0.30,
+            median_labor_cost_rate=0.25,
+            median_waste_rate=0.05,
+            mean_ingredient_cost_rate=0.30,
+            mean_labor_cost_rate=0.25,
+            mean_waste_rate=0.05,
+            p25_ingredient_cost_rate=0.27,
+            p75_ingredient_cost_rate=0.33,
         )
 
         mock_router = AsyncMock()
@@ -580,21 +736,43 @@ class TestGenerateCostOptimizationSuggestion:
         engine = CostHealthEngine()
 
         warning_report = StoreCostHealthReport(
-            store_id="s3", store_name="边界店", brand_id="b1", tenant_id="t1",
-            period_days=30, ingredient_cost_rate=0.35, labor_cost_rate=0.28,
-            waste_rate=0.07, ingredient_score=60.0, labor_score=65.0, waste_score=70.0,
-            health_score=64.0, health_level="critical",
-            benchmark_ingredient=0.30, benchmark_labor=0.25, benchmark_waste=0.05,
-            ingredient_deviation=0.167, labor_deviation=0.12, waste_deviation=0.40,
-            is_ingredient_anomaly=True, is_labor_anomaly=False, is_waste_anomaly=False,
+            store_id="s3",
+            store_name="边界店",
+            brand_id="b1",
+            tenant_id="t1",
+            period_days=30,
+            ingredient_cost_rate=0.35,
+            labor_cost_rate=0.28,
+            waste_rate=0.07,
+            ingredient_score=60.0,
+            labor_score=65.0,
+            waste_score=70.0,
+            health_score=64.0,
+            health_level="critical",
+            benchmark_ingredient=0.30,
+            benchmark_labor=0.25,
+            benchmark_waste=0.05,
+            ingredient_deviation=0.167,
+            labor_deviation=0.12,
+            waste_deviation=0.40,
+            is_ingredient_anomaly=True,
+            is_labor_anomaly=False,
+            is_waste_anomaly=False,
         )
 
         benchmark = BrandCostBenchmark(
-            brand_id="b1", tenant_id="t1", period_days=30, store_count=4,
-            median_ingredient_cost_rate=0.30, median_labor_cost_rate=0.25,
-            median_waste_rate=0.05, mean_ingredient_cost_rate=0.30,
-            mean_labor_cost_rate=0.25, mean_waste_rate=0.05,
-            p25_ingredient_cost_rate=0.27, p75_ingredient_cost_rate=0.33,
+            brand_id="b1",
+            tenant_id="t1",
+            period_days=30,
+            store_count=4,
+            median_ingredient_cost_rate=0.30,
+            median_labor_cost_rate=0.25,
+            median_waste_rate=0.05,
+            mean_ingredient_cost_rate=0.30,
+            mean_labor_cost_rate=0.25,
+            mean_waste_rate=0.05,
+            p25_ingredient_cost_rate=0.27,
+            p75_ingredient_cost_rate=0.33,
         )
 
         mock_router = AsyncMock()

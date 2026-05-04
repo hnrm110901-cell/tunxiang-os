@@ -9,9 +9,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from fastapi import Query
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -643,7 +642,9 @@ async def update_incident(
     """更新 Incident（状态/优先级/指挥官）"""
     try:
         data = await hub_service.hub_update_incident(
-            db, incident_id, body.model_dump(exclude_none=True),
+            db,
+            incident_id,
+            body.model_dump(exclude_none=True),
         )
         if not data:
             raise HTTPException(status_code=404, detail=f"Incident {incident_id} 不存在")
@@ -900,7 +901,10 @@ async def run_playbook(
     """触发 Playbook 执行"""
     try:
         data = await hub_service.hub_run_playbook(
-            db, playbook_id, body.target_id, body.target_type,
+            db,
+            playbook_id,
+            body.target_id,
+            body.target_type,
         )
         if not data:
             raise HTTPException(status_code=404, detail=f"Playbook {playbook_id} 不存在")

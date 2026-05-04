@@ -11,9 +11,10 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from services.identity_resolver import IdentityResolver
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..services.identity_resolver import IdentityResolver
 
 logger = structlog.get_logger(__name__)
 
@@ -30,13 +31,15 @@ class IdentityResolutionWorker:
         """
         # 获取所有活跃租户
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT tenant_id FROM wifi_visit_logs
                 WHERE is_deleted = false AND matched_customer_id IS NULL
                 UNION
                 SELECT DISTINCT tenant_id FROM external_order_imports
                 WHERE is_deleted = false AND matched_customer_id IS NULL
-            """),
+            """
+            ),
         )
         tenant_ids = [str(r[0]) for r in result.fetchall()]
 

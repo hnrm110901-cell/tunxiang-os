@@ -152,11 +152,13 @@ class LifecycleService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, lifecycle_stage, first_order_at, last_order_at
                 FROM customers
                 WHERE id = :mid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"mid": member_id, "tid": tenant_id},
         )
         row = result.fetchone()
@@ -464,11 +466,13 @@ class LifecycleService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, lifecycle_stage, first_order_at, last_order_at
                 FROM customers
                 WHERE tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         rows = result.fetchall()
@@ -493,12 +497,14 @@ class LifecycleService:
         from sqlalchemy import text
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customers
                 SET lifecycle_stage = :stage,
                     updated_at = NOW()
                 WHERE id = :mid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"stage": new_stage, "mid": member_id, "tid": tenant_id},
         )
         await db.commit()
@@ -540,13 +546,15 @@ class LifecycleService:
         from sqlalchemy import text
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO lifecycle_events
                     (tenant_id, member_id, from_stage, to_stage,
                      trigger_reason, action_taken)
                 VALUES
                     (:tid, :mid, :from_s, :to_s, :reason, :action)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "mid": member_id,
@@ -573,14 +581,16 @@ class LifecycleService:
         )
 
         where_store = "AND store_id = :store_id" if store_id else ""
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT lifecycle_stage, count(*) AS cnt
             FROM customers
             WHERE tenant_id = :tid
               AND is_deleted = FALSE
               {where_store}
             GROUP BY lifecycle_stage
-        """)
+        """
+        )
         params: dict[str, Any] = {"tid": tenant_id}
         if store_id:
             params["store_id"] = store_id
@@ -621,12 +631,14 @@ class LifecycleService:
         from sqlalchemy import text
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT auto_action, coupon_template_id, message_template, is_active
                 FROM lifecycle_configs
                 WHERE tenant_id = :tid AND stage = :stage AND is_active = TRUE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "stage": stage},
         )
         row = result.fetchone()

@@ -121,7 +121,8 @@ async def list_upsell_prompts(
         params["size"] = size
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     up.id, up.trigger_dish_id, up.suggest_dish_id,
                     up.prompt_text, up.prompt_type, up.is_enabled,
@@ -139,7 +140,8 @@ async def list_upsell_prompts(
                 WHERE {where_clause}
                 ORDER BY up.impression_count DESC, up.created_at DESC
                 OFFSET :offset LIMIT :size
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()

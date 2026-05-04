@@ -94,7 +94,8 @@ async def get_my_stamp_card(
         cid = uuid.UUID(customer_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT i.id, i.template_id, i.stamp_count, i.target_stamps,
                        i.status, i.expired_at, i.completed_at, i.reward_issued,
                        t.name, t.description, t.reward_type, t.reward_config,
@@ -110,7 +111,8 @@ async def get_my_stamp_card(
                          ELSE 2 END,
                     i.created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tid, "cid": cid},
         )
         row = result.fetchone()
@@ -119,12 +121,14 @@ async def get_my_stamp_card(
 
         # 获取盖章记录
         stamps_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT stamp_no, order_id, store_id, stamped_at
                 FROM stamp_card_stamps
                 WHERE tenant_id = :tid AND instance_id = :iid AND is_deleted = false
                 ORDER BY stamp_no ASC
-            """),
+            """
+            ),
             {"tid": tid, "iid": row.id},
         )
         stamps = [
@@ -189,7 +193,8 @@ async def stamp(
         # ① 找到 active 的实例（未过期）
         now = datetime.now(timezone.utc)
         instance_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT i.id, i.stamp_count, i.target_stamps, t.min_order_fen, t.name
                 FROM stamp_card_instances i
                 JOIN stamp_card_templates t ON t.id = i.template_id AND t.tenant_id = i.tenant_id
@@ -201,7 +206,8 @@ async def stamp(
                 ORDER BY i.created_at ASC
                 LIMIT 1
                 FOR UPDATE
-            """),
+            """
+            ),
             {"tid": tid, "cid": cid, "now": now},
         )
         instance = instance_result.fetchone()
@@ -223,12 +229,14 @@ async def stamp(
 
         # ④ 写入盖章记录
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stamp_card_stamps
                     (id, tenant_id, instance_id, order_id, store_id, stamp_no, stamped_at)
                 VALUES
                     (:id, :tid, :iid, :oid, :sid, :stamp_no, :now)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": tid,
@@ -248,14 +256,16 @@ async def stamp(
             completed_at_val = now
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stamp_card_instances
                 SET stamp_count = stamp_count + 1,
                     status = :status,
                     completed_at = COALESCE(:completed_at, completed_at),
                     updated_at = NOW()
                 WHERE id = :iid AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "iid": instance.id,
                 "tid": tid,
@@ -312,13 +322,15 @@ async def get_prizes(
             params["tmpl_id"] = uuid.UUID(template_id)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, description, target_stamps, reward_type,
                        reward_config, min_order_fen
                 FROM stamp_card_templates
                 WHERE {where}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -367,14 +379,16 @@ async def exchange_prize(
 
         # ① 查找实例
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT i.id, i.status, i.reward_issued, i.customer_id,
                        t.name, t.reward_type, t.reward_config
                 FROM stamp_card_instances i
                 JOIN stamp_card_templates t ON t.id = i.template_id AND t.tenant_id = i.tenant_id
                 WHERE i.id = :iid AND i.tenant_id = :tid AND i.is_deleted = false
                 FOR UPDATE
-            """),
+            """
+            ),
             {"iid": card_id, "tid": tid},
         )
         row = result.fetchone()
@@ -393,23 +407,27 @@ async def exchange_prize(
         # ② 标记已兑换
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stamp_card_instances
                 SET reward_issued = true, updated_at = :now
                 WHERE id = :iid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"iid": card_id, "tid": tid, "now": now},
         )
 
         # ③ 递增模板 completed_count
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stamp_card_templates
                 SET completed_count = completed_count + 1, updated_at = NOW()
                 WHERE id = (
                     SELECT template_id FROM stamp_card_instances WHERE id = :iid
                 ) AND tenant_id = :tid
-            """),
+            """
+            ),
             {"iid": card_id, "tid": tid},
         )
 

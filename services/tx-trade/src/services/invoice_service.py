@@ -76,7 +76,8 @@ async def create_invoice_request(
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO invoice_requests (
                     tenant_id,
                     order_id,
@@ -109,7 +110,8 @@ async def create_invoice_request(
                     'pending'
                 )
                 RETURNING id, invoice_no, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "order_id": order_id,
@@ -184,11 +186,13 @@ async def submit_to_tax_platform(
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, status, invoice_type
                 FROM invoice_requests
                 WHERE id = :bid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"bid": invoice_id, "tid": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -221,7 +225,8 @@ async def submit_to_tax_platform(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoice_requests
                 SET status = 'issued',
                     submitted_at = :now,
@@ -230,7 +235,8 @@ async def submit_to_tax_platform(
                     pdf_url = :pdf_url,
                     updated_at = :now
                 WHERE id = :bid AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "now": now,
                 "tax_code": tax_code,
@@ -279,13 +285,15 @@ async def get_invoice_status(
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, invoice_no, status, invoice_type, amount_fen,
                        tax_platform_code, pdf_url, issued_at, error_message,
                        tenant_id
                 FROM invoice_requests
                 WHERE id = :bid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"bid": invoice_id, "tid": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -382,14 +390,16 @@ async def get_invoice_ledger(
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, invoice_no, invoice_type, amount_fen, status, created_at
                 FROM invoice_requests
                 WHERE tenant_id = :tid
                   AND is_deleted = FALSE
                   AND created_at BETWEEN :start_date AND :end_date
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "start_date": start_date,

@@ -40,6 +40,7 @@ try:
         SubmitForApprovalPayload,
         WriteoffPayload,
     )
+
     from services.stocktake_loss_service import (  # type: ignore[no-redef]
         ApprovalPermissionError,
         CaseNotFoundError,
@@ -436,5 +437,3 @@ async def writeoff_route(
         raise _fail(409, str(exc))
     except CaseValidationError as exc:
         raise _fail(400, str(exc))
-
-

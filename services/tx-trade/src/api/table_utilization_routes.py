@@ -88,7 +88,8 @@ async def get_dashboard(
         date_from = date_to - timedelta(days=7)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 zone_id,
                 zone_type,
@@ -107,7 +108,8 @@ async def get_dashboard(
               AND biz_date BETWEEN :d_from AND :d_to
             GROUP BY zone_id, zone_type, zone_name
             ORDER BY zone_name NULLS LAST
-        """),
+        """
+        ),
         {"sid": str(store_id), "tid": tid, "d_from": date_from, "d_to": date_to},
     )
     rows = result.fetchall()
@@ -171,7 +173,8 @@ async def get_heatmap(
         date_from = date_to - timedelta(days=7)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 mv.table_id,
                 mv.zone_id,
@@ -196,7 +199,8 @@ async def get_heatmap(
                 mv.market_session_id, sms.name,
                 t.table_no, t.seats
             ORDER BY mv.zone_name NULLS LAST, t.table_no, sms.name
-        """),
+        """
+        ),
         {"sid": str(store_id), "tid": tid, "d_from": date_from, "d_to": date_to},
     )
     rows = result.fetchall()
@@ -279,7 +283,8 @@ async def get_recommendations(
     days_count = max((date_to - date_from).days, 1)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 table_id,
                 zone_name,
@@ -293,7 +298,8 @@ async def get_recommendations(
               AND tenant_id = :tid
               AND biz_date BETWEEN :d_from AND :d_to
             GROUP BY table_id, zone_name, market_session_id
-        """),
+        """
+        ),
         {"sid": str(store_id), "tid": tid, "d_from": date_from, "d_to": date_to},
     )
     rows = result.fetchall()

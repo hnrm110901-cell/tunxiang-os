@@ -15,11 +15,10 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import structlog
 from sqlalchemy import text
@@ -69,13 +68,15 @@ class DeliveryKDSBridge:
         for dept_id, dept_items in dept_tasks.items():
             task_id = uuid.uuid4()
             await self._db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO kds_tasks
                         (id, store_id, tenant_id, order_id, dept_id,
                          platform, items, status, push_mode, created_at)
                     VALUES (:id, :sid, :tid, :oid, :dept, :platform,
                             :items::jsonb, 'pending', :mode, :now)
-                """),
+                """
+                ),
                 {
                     "id": task_id,
                     "sid": self._store_id,
@@ -88,11 +89,13 @@ class DeliveryKDSBridge:
                     "now": now,
                 },
             )
-            created_tasks.append({
-                "task_id": str(task_id),
-                "dept_id": dept_id,
-                "item_count": len(dept_items),
-            })
+            created_tasks.append(
+                {
+                    "task_id": str(task_id),
+                    "dept_id": dept_id,
+                    "item_count": len(dept_items),
+                }
+            )
 
         await self._db.flush()
 
@@ -108,16 +111,15 @@ class DeliveryKDSBridge:
         return {
             "order_id": order_id,
             "kds_task_count": len(created_tasks),
-            "dept_breakdown": {
-                dept: len(items) for dept, items in dept_tasks.items()
-            },
+            "dept_breakdown": {dept: len(items) for dept, items in dept_tasks.items()},
             "push_mode": push_mode,
         }
 
     async def cancel_kds_tasks(self, order_id: str, reason: str = "订单取消") -> int:
         """外卖退款/取消时，取消未开始的 KDS 任务"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE kds_tasks
                 SET status = 'cancelled',
                     cancel_reason = :reason,
@@ -126,7 +128,8 @@ class DeliveryKDSBridge:
                   AND store_id = :sid
                   AND tenant_id = :tid
                   AND status IN ('pending', 'cooking')
-            """),
+            """
+            ),
             {
                 "oid": order_id,
                 "sid": self._store_id,
@@ -158,14 +161,16 @@ class DeliveryKDSBridge:
         到骑手 App（达达/顺丰/自有骑手）。失败不影响 KDS 标记主流程。
         """
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS total,
                        SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done
                 FROM kds_tasks
                 WHERE order_id = :oid
                   AND store_id = :sid
                   AND tenant_id = :tid
-            """),
+            """
+            ),
             {"oid": order_id, "sid": self._store_id, "tid": self._tenant_id},
         )
         row = result.fetchone()
@@ -189,15 +194,11 @@ class DeliveryKDSBridge:
         )
 
         try:
-            dispatch = await DeliveryDispatchRepository.get_by_order(
-                self._db, order_id, self._tenant_id
-            )
+            dispatch = await DeliveryDispatchRepository.get_by_order(self._db, order_id, self._tenant_id)
             if dispatch is None or dispatch.kds_ready_at is not None:
                 return
 
-            await DeliveryDispatchRepository.mark_kds_ready(
-                self._db, dispatch.dispatch_no, self._tenant_id
-            )
+            await DeliveryDispatchRepository.mark_kds_ready(self._db, dispatch.dispatch_no, self._tenant_id)
 
             # 用空 snapshot + DB 里实际配置（如有）— 这里走轻量路径，配置缺失时仍能 mock 推送
             snapshot = ProviderConfigSnapshot(
@@ -211,9 +212,7 @@ class DeliveryKDSBridge:
                 dispatch.dispatch_no,
             )
             if notified:
-                await DeliveryDispatchRepository.mark_rider_notified(
-                    self._db, dispatch.dispatch_no, self._tenant_id
-                )
+                await DeliveryDispatchRepository.mark_rider_notified(self._db, dispatch.dispatch_no, self._tenant_id)
             logger.info(
                 "delivery_kds_bridge.pickup_ready_pushed",
                 order_id=order_id,
@@ -233,10 +232,12 @@ class DeliveryKDSBridge:
 
     async def _get_push_mode(self) -> str:
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT push_mode FROM store_push_configs
                 WHERE store_id = :sid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"sid": self._store_id, "tid": self._tenant_id},
         )
         row = result.fetchone()
@@ -246,12 +247,14 @@ class DeliveryKDSBridge:
         """根据菜品 ID 或名称匹配档口"""
         if dish_id:
             result = await self._db.execute(
-                text("""
+                text(
+                    """
                     SELECT dept_id FROM dispatch_rules
                     WHERE (match_dish_id = :did OR match_dish_category IS NOT NULL)
                       AND store_id = :sid
                     ORDER BY priority ASC LIMIT 1
-                """),
+                """
+                ),
                 {"did": dish_id, "sid": self._store_id},
             )
             row = result.fetchone()

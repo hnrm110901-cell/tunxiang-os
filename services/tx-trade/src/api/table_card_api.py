@@ -130,14 +130,16 @@ async def get_statistics(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID", description="Tenant ID"),
 ):
     """Aggregate table counts by status."""
-    sql = text("""
+    sql = text(
+        """
         SELECT status, COUNT(*) AS cnt
         FROM tables
         WHERE store_id = :sid::uuid
           AND tenant_id = :tid::uuid
           AND is_deleted = FALSE
         GROUP BY status
-    """)
+    """
+    )
     try:
         async for db in get_db_with_tenant(x_tenant_id):
             result = await db.execute(sql, {"sid": store_id, "tid": x_tenant_id})
@@ -229,7 +231,8 @@ async def list_tables(
 
     where_clause = " AND ".join(filters)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT t.id::text AS table_id,
                t.table_no,
                t.area,
@@ -248,21 +251,26 @@ async def list_tables(
         WHERE {where_clause}
         ORDER BY t.table_no
         LIMIT :lim OFFSET :off
-    """)
+    """
+    )
 
-    count_sql = text(f"""
+    count_sql = text(
+        f"""
         SELECT COUNT(*) FROM tables t
         WHERE {where_clause}
-    """)
+    """
+    )
 
-    stat_sql = text("""
+    stat_sql = text(
+        """
         SELECT status, COUNT(*) AS cnt
         FROM tables
         WHERE store_id = :sid::uuid
           AND tenant_id = :tid::uuid
           AND is_deleted = FALSE
         GROUP BY status
-    """)
+    """
+    )
 
     params_page = {**params, "lim": limit, "off": offset}
 
@@ -324,7 +332,8 @@ async def get_table_detail(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID", description="Tenant ID"),
 ):
     """Return a single table with its current guest count."""
-    sql = text("""
+    sql = text(
+        """
         SELECT t.id::text AS table_id,
                t.table_no,
                t.area,
@@ -344,7 +353,8 @@ async def get_table_detail(
           AND t.store_id = :sid::uuid
           AND t.tenant_id = :tid::uuid
           AND t.is_deleted = FALSE
-    """)
+    """
+    )
     try:
         async for db in get_db_with_tenant(x_tenant_id):
             result = await db.execute(sql, {"table_id": table_id, "sid": store_id, "tid": x_tenant_id})
@@ -423,7 +433,8 @@ async def update_table_status(
             detail=f"Invalid status '{body.status}'. Must be one of: {sorted(VALID_STATUSES)}",
         )
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE tables
         SET status = :status, updated_at = NOW()
         WHERE id = :table_id::uuid
@@ -431,7 +442,8 @@ async def update_table_status(
           AND tenant_id = :tid::uuid
           AND is_deleted = FALSE
         RETURNING id::text AS table_id, table_no, status, updated_at
-    """)
+    """
+    )
 
     try:
         async for db in get_db_with_tenant(x_tenant_id):

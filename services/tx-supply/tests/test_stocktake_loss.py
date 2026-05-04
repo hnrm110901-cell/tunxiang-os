@@ -27,9 +27,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "..")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from models.stocktake_loss import (  # noqa: E402
@@ -39,6 +37,7 @@ from models.stocktake_loss import (  # noqa: E402
     LossItemInput,
     ResponsiblePartyType,
 )
+
 from services.stocktake_loss_service import (  # noqa: E402
     LARGE_AMOUNT_THRESHOLD_FEN,
     SMALL_AMOUNT_THRESHOLD_FEN,
@@ -367,9 +366,7 @@ async def test_submit_for_approval_chain_3_nodes_for_high_amount():
     db.queue.append(("ROW", None))
     db.queue.append(("ROW", None))
 
-    result = await submit_for_approval(
-        case_id=case_id, tenant_id=TENANT_A, db=db, submitted_by=USER_ID
-    )
+    result = await submit_for_approval(case_id=case_id, tenant_id=TENANT_A, db=db, submitted_by=USER_ID)
 
     assert result["case_status"] == "PENDING_APPROVAL"
     assert result["approval_chain"] == [
@@ -396,9 +393,7 @@ async def test_submit_for_approval_chain_1_node_for_low_amount():
     db.queue.append(("ROW", None))  # UPDATE
     db.queue.append(("ROW", None))  # INSERT 节点 x 1
 
-    result = await submit_for_approval(
-        case_id=case_id, tenant_id=TENANT_A, db=db, submitted_by=USER_ID
-    )
+    result = await submit_for_approval(case_id=case_id, tenant_id=TENANT_A, db=db, submitted_by=USER_ID)
 
     assert result["approval_chain"] == ["STORE_MANAGER"]
 
@@ -773,7 +768,7 @@ async def test_auto_create_uses_decimal_precision():
             [
                 {
                     "ingredient_id": uuid.UUID(ing1),
-                    "expected_qty": "200.000",   # 字符串模拟 NUMERIC 行为
+                    "expected_qty": "200.000",  # 字符串模拟 NUMERIC 行为
                     "actual_qty": "100.000",
                     "cost_price": "12.3456",
                 },

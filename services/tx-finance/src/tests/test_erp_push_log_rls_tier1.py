@@ -30,9 +30,7 @@ class TestV274ErpPushLogRLSMigration:
     @pytest.fixture(autouse=True)
     def _load_migration(self):
         path = (
-            Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
-            / "v274_erp_push_log_rls.py"
+            Path(__file__).resolve().parents[4] / "shared" / "db-migrations" / "versions" / "v274_erp_push_log_rls.py"
         )
         assert path.exists(), f"v274 迁移不存在: {path}"
         self.migration_src = path.read_text(encoding="utf-8")
@@ -48,21 +46,24 @@ class TestV274ErpPushLogRLSMigration:
         """CREATE TABLE IF NOT EXISTS — 幂等, 生产表已存在不破坏."""
         assert re.search(
             r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+erp_push_log",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_tenant_id_not_null(self):
         """tenant_id UUID NOT NULL (RLS 必需)."""
         assert re.search(
             r"tenant_id\s+UUID\s+NOT\s+NULL",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_enable_rls(self):
         """ALTER TABLE ENABLE ROW LEVEL SECURITY (幂等)."""
         assert re.search(
             r"ALTER\s+TABLE\s+erp_push_log\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_policy_has_using_and_with_check(self):
@@ -72,14 +73,16 @@ class TestV274ErpPushLogRLSMigration:
             r"CREATE POLICY.*erp_push_log_tenant.*"
             r"USING\s*\(.*app\.tenant_id.*\).*"
             r"WITH\s+CHECK\s*\(.*app\.tenant_id.*\)",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         ), "POLICY 必须显式 USING 和 WITH CHECK 双声明"
 
     def test_drop_policy_if_exists_before_create(self):
         """DROP POLICY IF EXISTS 在 CREATE 前 (幂等重跑)."""
         assert re.search(
             r"DROP\s+POLICY\s+IF\s+EXISTS\s+erp_push_log_tenant",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_three_indexes(self):
@@ -92,21 +95,19 @@ class TestV274ErpPushLogRLSMigration:
         """失败重试队列快查: partial index WHERE status='failed'."""
         assert re.search(
             r"CREATE\s+INDEX.*ix_erp_push_log_status_failed.*WHERE\s+status\s*=\s*'failed'",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         )
 
     def test_downgrade_keeps_table(self):
         """downgrade 只关 RLS + 删 POLICY, 不删表 (保历史数据)."""
-        m = re.search(r"def downgrade\(\) -> None:(.*?)(?=\Z|^def )",
-                      self.migration_src, re.S | re.M)
+        m = re.search(r"def downgrade\(\) -> None:(.*?)(?=\Z|^def )", self.migration_src, re.S | re.M)
         assert m is not None
         body = m.group(1)
         # 只 DROP POLICY + DISABLE RLS, 不 DROP TABLE
         assert "DROP POLICY" in body.upper()
         assert "DISABLE ROW LEVEL SECURITY" in body.upper()
-        assert not re.search(r"DROP\s+TABLE\s+erp_push_log", body, re.I), (
-            "downgrade 不应 DROP TABLE (保历史审计数据)"
-        )
+        assert not re.search(r"DROP\s+TABLE\s+erp_push_log", body, re.I), "downgrade 不应 DROP TABLE (保历史审计数据)"
 
     def test_raise_notice_markers(self):
         """3 步 RAISE NOTICE 观测性."""

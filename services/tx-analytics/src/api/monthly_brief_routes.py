@@ -70,7 +70,8 @@ async def _month_metrics(db: AsyncSession, tenant_id: str, year: int, month: int
     start, end = _month_range(year, month)
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(SUM(total_amount_fen), 0)::bigint     AS revenue_fen,
                 COUNT(*)                                        AS order_count,
@@ -83,7 +84,8 @@ async def _month_metrics(db: AsyncSession, tenant_id: str, year: int, month: int
               AND status    = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         row = dict(r.mappings().fetchone() or {})
@@ -125,7 +127,8 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
     prev_start, _ = _month_range(*_prev_month(year, month))
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) FILTER (WHERE member_id IS NOT NULL) AS member_orders,
                 COUNT(*) FILTER (WHERE member_id IS NULL)     AS guest_orders,
@@ -135,7 +138,8 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         row = dict(r.mappings().fetchone() or {})
@@ -144,7 +148,8 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
 
         # 复购率：当月有2次+消费的会员
         rep_r = await db.execute(
-            text("""
+            text(
+                """
             WITH m AS (
                 SELECT member_id, COUNT(*) AS cnt
                 FROM orders
@@ -159,7 +164,8 @@ async def _month_member_metrics(db: AsyncSession, tenant_id: str, year: int, mon
                 COUNT(*) FILTER (WHERE cnt >= 2)::float AS repurchase_members,
                 COUNT(*)::float                          AS total_members
             FROM m
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         rep_row = dict(rep_r.mappings().fetchone() or {})
@@ -184,14 +190,16 @@ async def _month_compliance_score(db: AsyncSession, tenant_id: str, year: int, m
     try:
         # 日结合规率（已完成日结的天数 / 营业天数）
         settle_r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(DISTINCT settlement_date)::int AS settled_days
             FROM daily_settlements
             WHERE tenant_id   = :tid::uuid
               AND status       = 'completed'
               AND settlement_date >= :s_date
               AND settlement_date <  :e_date
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "s_date": start.date(),
@@ -203,7 +211,8 @@ async def _month_compliance_score(db: AsyncSession, tenant_id: str, year: int, m
 
         # 折扣纪律：超过 30% 折扣率的订单占比
         disc_r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) FILTER (
                     WHERE total_amount_fen > 0
@@ -215,7 +224,8 @@ async def _month_compliance_score(db: AsyncSession, tenant_id: str, year: int, m
               AND status    = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         disc_row = dict(disc_r.mappings().fetchone() or {})
@@ -528,7 +538,8 @@ async def get_group_monthly_brief(
 
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(store_id::text, 'unknown') AS store_id,
                 COALESCE(SUM(total_amount_fen), 0)::bigint   AS revenue_fen,
@@ -542,20 +553,23 @@ async def get_group_monthly_brief(
               AND created_at <  :end
             GROUP BY store_id
             ORDER BY revenue_fen DESC
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         store_rows = r.mappings().all()
 
         lm_r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(total_amount_fen), 0)::bigint AS revenue_fen
             FROM orders
             WHERE tenant_id  = :tid::uuid
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": pstart, "end": pend},
         )
         lm_rev = int((lm_r.scalar() or 0))

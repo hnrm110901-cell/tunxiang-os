@@ -37,8 +37,8 @@ from typing import Awaitable, Callable, Optional
 from uuid import UUID
 
 import structlog
-from services.task_dispatch_service import TaskDispatchService
 
+from services.task_dispatch_service import TaskDispatchService
 from shared.ontology.src.extensions.tasks import Task, TaskType
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -121,10 +121,7 @@ class TaskAutoGenerator:
 
         results: list[Task] = []
         # 各 provider 互不依赖，并发扫描
-        provider_tasks = [
-            self._run_one(name, provider, tenant_id, now)
-            for name, provider in providers.items()
-        ]
+        provider_tasks = [self._run_one(name, provider, tenant_id, now) for name, provider in providers.items()]
         gathered = await asyncio.gather(*provider_tasks, return_exceptions=True)
         for item in gathered:
             if isinstance(item, Exception):

@@ -22,12 +22,13 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from models.group_config import BrandGroup
 from pydantic import BaseModel, Field
-from services.group_analytics import GroupAnalyticsService
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_session
+
+from ..services.group_analytics import GroupAnalyticsService
 
 logger = structlog.get_logger(__name__)
 

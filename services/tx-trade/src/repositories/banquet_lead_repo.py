@@ -39,15 +39,16 @@ class BanquetLeadRepositoryBase(ABC):
     """宴会商机 Repository 抽象接口。"""
 
     @abstractmethod
-    async def insert(self, lead: BanquetLead) -> BanquetLead: ...
+    async def insert(self, lead: BanquetLead) -> BanquetLead:
+        ...
 
     @abstractmethod
-    async def get_by_id(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetLead]: ...
+    async def get_by_id(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetLead]:
+        ...
 
     @abstractmethod
-    async def update(self, lead: BanquetLead) -> BanquetLead: ...
+    async def update(self, lead: BanquetLead) -> BanquetLead:
+        ...
 
     @abstractmethod
     async def list_by_sales_employee(
@@ -58,7 +59,8 @@ class BanquetLeadRepositoryBase(ABC):
         stage: Optional[LeadStage] = None,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetLead], int]: ...
+    ) -> tuple[list[BanquetLead], int]:
+        ...
 
     @abstractmethod
     async def list_by_stage(
@@ -68,7 +70,8 @@ class BanquetLeadRepositoryBase(ABC):
         *,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetLead], int]: ...
+    ) -> tuple[list[BanquetLead], int]:
+        ...
 
     @abstractmethod
     async def list_by_source_channel(
@@ -78,7 +81,8 @@ class BanquetLeadRepositoryBase(ABC):
         *,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetLead], int]: ...
+    ) -> tuple[list[BanquetLead], int]:
+        ...
 
     @abstractmethod
     async def bulk_funnel_counts(
@@ -87,7 +91,8 @@ class BanquetLeadRepositoryBase(ABC):
         period_start: datetime,
         period_end: datetime,
         group_by: str,
-    ) -> list[dict[str, Any]]: ...
+    ) -> list[dict[str, Any]]:
+        ...
 
     @abstractmethod
     async def bulk_source_attribution(
@@ -95,7 +100,8 @@ class BanquetLeadRepositoryBase(ABC):
         tenant_id: uuid.UUID,
         period_start: datetime,
         period_end: datetime,
-    ) -> list[dict[str, Any]]: ...
+    ) -> list[dict[str, Any]]:
+        ...
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -113,9 +119,7 @@ class InMemoryBanquetLeadRepository(BanquetLeadRepositoryBase):
         self._rows[lead.lead_id] = lead
         return lead
 
-    async def get_by_id(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetLead]:
+    async def get_by_id(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetLead]:
         row = self._rows.get(lead_id)
         if row is None or row.tenant_id != tenant_id:
             return None
@@ -140,8 +144,7 @@ class InMemoryBanquetLeadRepository(BanquetLeadRepositoryBase):
         rows = [
             r
             for r in self._tenant_rows(tenant_id)
-            if r.sales_employee_id == sales_employee_id
-            and (stage is None or r.stage == stage)
+            if r.sales_employee_id == sales_employee_id and (stage is None or r.stage == stage)
         ]
         total = len(rows)
         return rows[offset : offset + limit], total
@@ -166,11 +169,7 @@ class InMemoryBanquetLeadRepository(BanquetLeadRepositoryBase):
         offset: int = 0,
         limit: int = 50,
     ) -> tuple[list[BanquetLead], int]:
-        rows = [
-            r
-            for r in self._tenant_rows(tenant_id)
-            if r.source_channel == source_channel
-        ]
+        rows = [r for r in self._tenant_rows(tenant_id) if r.source_channel == source_channel]
         total = len(rows)
         return rows[offset : offset + limit], total
 
@@ -182,9 +181,7 @@ class InMemoryBanquetLeadRepository(BanquetLeadRepositoryBase):
         group_by: str,
     ) -> list[dict[str, Any]]:
         if group_by not in ("sales_employee_id", "source_channel"):
-            raise ValueError(
-                f"group_by must be 'sales_employee_id' or 'source_channel', got {group_by}"
-            )
+            raise ValueError(f"group_by must be 'sales_employee_id' or 'source_channel', got {group_by}")
 
         groups: dict[str, dict[str, Any]] = {}
         for r in self._tenant_rows(tenant_id):
@@ -346,9 +343,7 @@ def _row_to_lead(row: Any) -> BanquetLead:
         estimated_tables=row["estimated_tables"],
         scheduled_date=row["scheduled_date"],
         stage_changed_at=row["stage_changed_at"],
-        previous_stage=(
-            LeadStage(row["previous_stage"]) if row["previous_stage"] else None
-        ),
+        previous_stage=(LeadStage(row["previous_stage"]) if row["previous_stage"] else None),
         invalidation_reason=row["invalidation_reason"],
         converted_reservation_id=row["converted_reservation_id"],
         metadata=metadata or {},
@@ -392,9 +387,7 @@ class BanquetLeadRepository(BanquetLeadRepositoryBase):
         )
         return lead
 
-    async def get_by_id(
-        self, lead_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[BanquetLead]:
+    async def get_by_id(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetLead]:
         row = await self._conn.fetchrow(_SELECT_BY_ID_SQL, lead_id, tenant_id)
         if row is None:
             return None
@@ -517,9 +510,7 @@ class BanquetLeadRepository(BanquetLeadRepositoryBase):
         group_by: str,
     ) -> list[dict[str, Any]]:
         if group_by not in ("sales_employee_id", "source_channel"):
-            raise ValueError(
-                f"group_by must be 'sales_employee_id' or 'source_channel', got {group_by}"
-            )
+            raise ValueError(f"group_by must be 'sales_employee_id' or 'source_channel', got {group_by}")
 
         # 静态白名单，group_by 已校验，下面拼接安全
         group_col = group_by

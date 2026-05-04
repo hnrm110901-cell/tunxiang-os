@@ -190,7 +190,8 @@ async def list_units(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT u.id, u.name, u.short_name, u.contact_name, u.contact_phone,
                        u.credit_limit_fen, u.settlement_cycle, u.settlement_day,
                        u.status, u.notes, u.created_at, u.updated_at,
@@ -204,7 +205,8 @@ async def list_units(
                 WHERE {where_sql}
                 ORDER BY u.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -245,7 +247,8 @@ async def create_unit(
         async with db.begin():
             # 创建档案
             unit_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO agreement_units (
                         tenant_id, name, short_name, contact_name, contact_phone,
                         credit_limit_fen, settlement_cycle, settlement_day, status, notes
@@ -254,7 +257,8 @@ async def create_unit(
                         :credit_limit_fen, :settlement_cycle, :settlement_day, 'active', :notes
                     )
                     RETURNING id, created_at
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tid),
                     "name": body.name,
@@ -272,10 +276,12 @@ async def create_unit(
 
             # 同步初始化账户
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO agreement_accounts (tenant_id, unit_id)
                     VALUES (:tenant_id::UUID, :unit_id::UUID)
-                """),
+                """
+                ),
                 {"tenant_id": str(tid), "unit_id": unit_id},
             )
     except (OperationalError, SQLAlchemyError) as exc:
@@ -309,7 +315,8 @@ async def aging_report(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     u.id AS unit_id,
                     u.name AS unit_name,
@@ -343,7 +350,8 @@ async def aging_report(
                   AND u.status != 'closed'
                 GROUP BY u.id, u.name, u.contact_name, a.credit_used_fen
                 ORDER BY total_owed_fen DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tid)},
         )
         items = [_serialize_row(dict(row)) for row in result.mappings().all()]
@@ -384,13 +392,15 @@ async def monthly_statement(
     try:
         # 单位信息
         unit_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.id, u.name, u.credit_limit_fen,
                        COALESCE(a.balance_fen, 0) AS balance_fen
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = unit_result.mappings().first()
@@ -399,14 +409,16 @@ async def monthly_statement(
 
         # 流水明细
         txns_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, type, amount_fen, order_id, repay_method, notes, created_at
                 FROM agreement_transactions
                 WHERE tenant_id = :tenant_id::UUID
                   AND unit_id = :unit_id::UUID
                   AND DATE_TRUNC('month', created_at) = MAKE_DATE(:year, :month, 1)::DATE
                 ORDER BY created_at ASC
-            """),
+            """
+            ),
             {"tenant_id": str(tid), "unit_id": str(uid), "year": year, "month": month},
         )
         transactions = [_serialize_row(dict(row)) for row in txns_result.mappings().all()]
@@ -452,7 +464,8 @@ async def get_unit(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.id, u.name, u.short_name, u.contact_name, u.contact_phone,
                        u.credit_limit_fen, u.settlement_cycle, u.settlement_day,
                        u.status, u.notes, u.created_at, u.updated_at,
@@ -465,7 +478,8 @@ async def get_unit(
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -519,12 +533,14 @@ async def update_unit(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE agreement_units
                 SET {set_clauses}, updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                 RETURNING id, updated_at
-            """),
+            """
+            ),
             updates,
         )
         row = result.mappings().first()
@@ -564,13 +580,15 @@ async def toggle_suspend(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE agreement_units
                 SET status = :new_status, updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                   AND status = :from_status
                 RETURNING id, status
-            """),
+            """
+            ),
             {
                 "new_status": new_status,
                 "from_status": from_status,
@@ -645,14 +663,16 @@ async def list_transactions(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, type, amount_fen, order_id, operator_id,
                        repay_method, notes, created_at
                 FROM agreement_transactions
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -689,14 +709,16 @@ async def manual_charge(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.id, u.name, u.credit_limit_fen, u.status,
                        COALESCE(a.credit_used_fen, 0) AS credit_used_fen,
                        a.id AS account_id
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
@@ -725,7 +747,8 @@ async def manual_charge(
         async with db.begin():
             # 写流水
             txn_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO agreement_transactions (
                         tenant_id, unit_id, account_id, type, amount_fen,
                         order_id, operator_id, notes
@@ -736,7 +759,8 @@ async def manual_charge(
                         :order_id, :operator_id::UUID, :notes
                     )
                     RETURNING id, created_at
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tid),
                     "unit_id": str(uid),
@@ -751,7 +775,8 @@ async def manual_charge(
 
             # 更新账户
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE agreement_accounts
                     SET credit_used_fen = :new_credit_used,
                         balance_fen = balance_fen - :amount_fen,
@@ -759,7 +784,8 @@ async def manual_charge(
                         last_transaction_at = NOW(),
                         updated_at = NOW()
                     WHERE unit_id = :unit_id::UUID AND tenant_id = :tenant_id::UUID
-                """),
+                """
+                ),
                 {
                     "new_credit_used": new_credit_used,
                     "amount_fen": body.amount_fen,
@@ -833,14 +859,16 @@ async def repay(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.id, u.name, u.status,
                        COALESCE(a.credit_used_fen, 0) AS credit_used_fen,
                        a.id AS account_id
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
@@ -869,14 +897,16 @@ async def repay(
         # 计算指定流水的总金额
         try:
             sum_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(amount_fen), 0) AS total
                     FROM agreement_transactions
                     WHERE id = ANY(:ids::UUID[])
                       AND unit_id = :unit_id::UUID
                       AND tenant_id = :tenant_id::UUID
                       AND type IN ('charge', 'manual_charge')
-                """),
+                """
+                ),
                 {
                     "ids": body.transaction_ids,
                     "unit_id": str(uid),
@@ -897,7 +927,8 @@ async def repay(
         async with db.begin():
             # 写还款流水
             txn_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO agreement_transactions (
                         tenant_id, unit_id, account_id, type, amount_fen,
                         operator_id, repay_method, notes
@@ -908,7 +939,8 @@ async def repay(
                         :operator_id::UUID, :repay_method, :notes
                     )
                     RETURNING id, created_at
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tid),
                     "unit_id": str(uid),
@@ -923,7 +955,8 @@ async def repay(
 
             # 更新账户
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE agreement_accounts
                     SET credit_used_fen = :new_credit_used,
                         balance_fen = balance_fen + :pay_amount,
@@ -931,7 +964,8 @@ async def repay(
                         last_transaction_at = NOW(),
                         updated_at = NOW()
                     WHERE unit_id = :unit_id::UUID AND tenant_id = :tenant_id::UUID
-                """),
+                """
+                ),
                 {
                     "new_credit_used": new_credit_used,
                     "pay_amount": pay_amount,
@@ -992,12 +1026,14 @@ async def prepaid_recharge(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.id, a.id AS account_id
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
@@ -1013,7 +1049,8 @@ async def prepaid_recharge(
     try:
         async with db.begin():
             rec_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO prepaid_records (
                         tenant_id, unit_id, account_id, type, amount_fen,
                         operator_id, notes
@@ -1022,7 +1059,8 @@ async def prepaid_recharge(
                         'recharge', :amount_fen, :operator_id::UUID, :notes
                     )
                     RETURNING id, created_at
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tid),
                     "unit_id": str(uid),
@@ -1036,13 +1074,15 @@ async def prepaid_recharge(
 
             # 预付充值增加余额
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE agreement_accounts
                     SET balance_fen = balance_fen + :amount_fen,
                         last_transaction_at = NOW(),
                         updated_at = NOW()
                     WHERE unit_id = :unit_id::UUID AND tenant_id = :tenant_id::UUID
-                """),
+                """
+                ),
                 {
                     "amount_fen": body.amount_fen,
                     "unit_id": str(uid),
@@ -1084,14 +1124,16 @@ async def prepaid_refund(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.id, u.name,
                        COALESCE(a.balance_fen, 0) AS balance_fen,
                        a.id AS account_id
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         unit = fetch.mappings().first()
@@ -1113,7 +1155,8 @@ async def prepaid_refund(
     try:
         async with db.begin():
             rec_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO prepaid_records (
                         tenant_id, unit_id, account_id, type, amount_fen,
                         operator_id, notes
@@ -1122,7 +1165,8 @@ async def prepaid_refund(
                         'refund', :amount_fen, :operator_id::UUID, :notes
                     )
                     RETURNING id, created_at
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tid),
                     "unit_id": str(uid),
@@ -1135,13 +1179,15 @@ async def prepaid_refund(
             rec_row = rec_result.mappings().first()
 
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE agreement_accounts
                     SET balance_fen = balance_fen - :amount_fen,
                         last_transaction_at = NOW(),
                         updated_at = NOW()
                     WHERE unit_id = :unit_id::UUID AND tenant_id = :tenant_id::UUID
-                """),
+                """
+                ),
                 {
                     "amount_fen": body.amount_fen,
                     "unit_id": str(uid),
@@ -1180,7 +1226,8 @@ async def prepaid_balance(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT u.name,
                        COALESCE(a.balance_fen, 0) AS balance_fen,
                        COALESCE(
@@ -1196,7 +1243,8 @@ async def prepaid_balance(
                 FROM agreement_units u
                 LEFT JOIN agreement_accounts a ON a.unit_id = u.id
                 WHERE u.id = :id::UUID AND u.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(uid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()

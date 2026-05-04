@@ -307,14 +307,16 @@ async def manage_training(
     if action == "assign":
         training_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO employee_trainings
                     (id, tenant_id, employee_id, course_id, course_name, category,
                      status, pass_threshold, assigned_at, created_at, updated_at)
                 VALUES
                     (:id, :tid, :eid, :course_id, :course_name, :category,
                      'pending', :pass_threshold, :now, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": training_id,
                 "tid": tid,
@@ -342,13 +344,15 @@ async def manage_training(
 
     # 查找已有培训记录
     row_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, pass_threshold, score, course_name
             FROM employee_trainings
             WHERE tenant_id = :tid AND employee_id = :eid AND course_id = :course_id
             ORDER BY assigned_at DESC
             LIMIT 1
-        """),
+        """
+        ),
         {"tid": tid, "eid": eid, "course_id": course_id},
     )
     existing = row_result.fetchone()
@@ -372,11 +376,13 @@ async def manage_training(
             else f"培训未通过: {existing.course_name}, 得分{score}, 及格线{pass_threshold}"
         )
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE employee_trainings
                 SET status = :status, score = :score, completed_at = :now, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"status": new_status, "score": score, "now": now, "id": existing.id, "tid": tid},
         )
         # 更新 Employee 的 training_completed 列表
@@ -402,11 +408,13 @@ async def manage_training(
     elif action == "certify":
         cert_id = training_plan.get("certificate_id", str(uuid.uuid4()))
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE employee_trainings
                 SET status = 'completed', certificate_id = :cert_id, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cert_id": cert_id, "now": now, "id": existing.id, "tid": tid},
         )
         await db.flush()
@@ -449,14 +457,16 @@ async def get_training_progress(
     tid = _to_uuid(tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, course_id, course_name, category, status,
                    pass_threshold, score, certificate_id,
                    assigned_at, started_at, completed_at
             FROM employee_trainings
             WHERE tenant_id = :tid AND employee_id = :eid
             ORDER BY assigned_at DESC
-        """),
+        """
+        ),
         {"tid": tid, "eid": eid},
     )
     rows = result.fetchall()

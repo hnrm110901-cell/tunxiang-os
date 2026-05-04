@@ -48,11 +48,10 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
+from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 
 # 前向引用: AccountingPeriodService (W1.4b 接入). 本 service 允许不注入,
 # 构造时传 period_service=None 即跳过账期校验 (向前兼容 / 历史回填路径).
@@ -76,6 +75,7 @@ class TenantContextMismatchError(ValueError):
     独立于普通 ValueError 抛出, 审计日志 / 告警系统可以区分
     "输入错误" vs "潜在安全事件".
     """
+
     def __init__(self, payload_tenant, session_tenant: str | None) -> None:
         self.payload_tenant = payload_tenant
         self.session_tenant = session_tenant
@@ -92,6 +92,7 @@ class TenantContextMismatchError(ValueError):
 @dataclass
 class VoucherLineInput:
     """分录输入. 借贷互斥非负 — 与 v266 DB CHECK 对应."""
+
     account_code: str
     account_name: str
     debit_fen: int = 0
@@ -101,15 +102,13 @@ class VoucherLineInput:
     def __post_init__(self) -> None:
         if self.debit_fen < 0 or self.credit_fen < 0:
             raise ValueError(
-                f"分录 {self.account_code} 借贷必须非负 "
-                f"(debit={self.debit_fen}, credit={self.credit_fen})"
+                f"分录 {self.account_code} 借贷必须非负 " f"(debit={self.debit_fen}, credit={self.credit_fen})"
             )
         both_zero = self.debit_fen == 0 and self.credit_fen == 0
         both_nonzero = self.debit_fen > 0 and self.credit_fen > 0
         if both_zero or both_nonzero:
             raise ValueError(
-                f"分录 {self.account_code} 借贷互斥 "
-                f"(debit={self.debit_fen}, credit={self.credit_fen})"
+                f"分录 {self.account_code} 借贷互斥 " f"(debit={self.debit_fen}, credit={self.credit_fen})"
             )
 
 
@@ -121,6 +120,7 @@ class VoucherCreateInput:
       同 (tenant_id, event_type, event_id) 只生成一张凭证 (partial UNIQUE).
       event_id=None 跳过幂等, 靠 voucher_no UNIQUE 兜底 (不推荐).
     """
+
     tenant_id: uuid.UUID
     voucher_no: str  # 应用层按规则生成 V{store_short}{YYYYMMDD}{SEQ}
     voucher_date: date
@@ -204,12 +204,9 @@ class FinancialVoucherService:
         # [BLOCKER-B3] event_id 非空时 event_type 必填
         # 理由: uq_fv_tenant_event partial UNIQUE 的 WHERE 条件要求两者都非空,
         # 应用层显式校验比 DB 层错误消息更友好 + 防误用.
-        if payload.event_id is not None and (
-            payload.event_type is None or not str(payload.event_type).strip()
-        ):
+        if payload.event_id is not None and (payload.event_type is None or not str(payload.event_type).strip()):
             raise ValueError(
-                "event_id 非空时 event_type 必填 "
-                "(幂等键需要 (tenant_id, event_type, event_id) 完整三元组)"
+                "event_id 非空时 event_type 必填 " "(幂等键需要 (tenant_id, event_type, event_id) 完整三元组)"
             )
 
         # [BLOCKER-B5] 租户上下文断言
@@ -221,16 +218,14 @@ class FinancialVoucherService:
         # 修复: 显式断言, 不一致抛 TenantContextMismatchError (独立异常类型,
         #   审计/告警系统可区分"配置错误" vs "横向越权尝试").
         await self._assert_tenant_matches_session(
-            session=session, payload_tenant_id=payload.tenant_id,
+            session=session,
+            payload_tenant_id=payload.tenant_id,
         )
 
         total_debit_fen = sum(l.debit_fen for l in payload.lines)
         total_credit_fen = sum(l.credit_fen for l in payload.lines)
         if total_debit_fen != total_credit_fen:
-            raise ValueError(
-                f"借贷不平衡 (fen 整数零容忍): "
-                f"debit={total_debit_fen} != credit={total_credit_fen}"
-            )
+            raise ValueError(f"借贷不平衡 (fen 整数零容忍): " f"debit={total_debit_fen} != credit={total_credit_fen}")
         if total_debit_fen == 0:
             raise ValueError("凭证借贷总额均为 0, 无会计意义")
 
@@ -313,9 +308,7 @@ class FinancialVoucherService:
                 )
                 if winner is None:
                     # 理论不可能 — 如果 UNIQUE 冲突了, 那行必然存在
-                    raise RuntimeError(
-                        f"幂等冲突但 refetch 未找到 event_id={payload.event_id}"
-                    ) from exc
+                    raise RuntimeError(f"幂等冲突但 refetch 未找到 event_id={payload.event_id}") from exc
                 return winner
             raise  # 其他 UNIQUE 冲突 (voucher_no 等) 直接上抛
 
@@ -355,7 +348,9 @@ class FinancialVoucherService:
                 防 Oracle 攻击通过错误消息差异探测 UUID 存在性).
         """
         voucher = await self._load_voucher_tenant_scoped(
-            session=session, voucher_id=voucher_id, tenant_id=tenant_id,
+            session=session,
+            voucher_id=voucher_id,
+            tenant_id=tenant_id,
         )
 
         # ORM 层方法已内置所有守护 (is_voidable 检查)
@@ -414,7 +409,9 @@ class FinancialVoucherService:
         # ── 1. 前置校验 ────────────────────────────────────────────────
         # [W2.E] tenant 作用域加载, 统一错误消息防 Oracle 攻击
         original = await self._load_voucher_tenant_scoped(
-            session=session, voucher_id=voucher_id, tenant_id=tenant_id,
+            session=session,
+            voucher_id=voucher_id,
+            tenant_id=tenant_id,
         )
 
         if not reason or not reason.strip():
@@ -426,18 +423,13 @@ class FinancialVoucherService:
                 f"只有 exported 凭证需要红冲 (draft/confirmed 请直接 void)"
             )
         if original.voided:
-            raise ValueError(
-                f"凭证 {original.voucher_no} 已作废, 不能再红冲"
-            )
+            raise ValueError(f"凭证 {original.voucher_no} 已作废, 不能再红冲")
         if original.has_been_red_flushed:
             raise ValueError(
-                f"凭证 {original.voucher_no} 已被红冲 "
-                f"(→ {original.red_flushed_by_voucher_id}), 不可重复红冲"
+                f"凭证 {original.voucher_no} 已被红冲 " f"(→ {original.red_flushed_by_voucher_id}), 不可重复红冲"
             )
         if original.is_red_flush_voucher:
-            raise ValueError(
-                f"凭证 {original.voucher_no} 本身是红冲凭证, 不能再被红冲 (防递归)"
-            )
+            raise ValueError(f"凭证 {original.voucher_no} 本身是红冲凭证, 不能再被红冲 (防递归)")
 
         # ── 2. 构造红字凭证 — 借贷对调, 金额保持正 (DB CHECK) ────────
         red_voucher_no = new_voucher_no or f"{original.voucher_no}-R"
@@ -450,10 +442,7 @@ class FinancialVoucherService:
             voucher_type=original.voucher_type,
             # 凭证级金额取负 (红字显示), 分录级仍正
             total_amount_fen=-(original.total_amount_fen or 0),
-            total_amount=(
-                -float(original.total_amount)
-                if original.total_amount is not None else None
-            ),
+            total_amount=(-float(original.total_amount) if original.total_amount is not None else None),
             entries=self._reverse_entries_jsonb(original.entries),
             source_type=original.source_type,
             source_id=original.source_id,
@@ -471,7 +460,7 @@ class FinancialVoucherService:
                 line_no=idx + 1,
                 account_code=orig_line.account_code,
                 account_name=orig_line.account_name,
-                debit_fen=orig_line.credit_fen,   # 交换
+                debit_fen=orig_line.credit_fen,  # 交换
                 credit_fen=orig_line.debit_fen,
                 summary=f"红冲: {orig_line.summary or ''}".strip(),
             )
@@ -481,9 +470,13 @@ class FinancialVoucherService:
         # ── 3. 双向 link ──────────────────────────────────────────────
         # [W2.D] pre-check: 若已有红字凭证指向 original (孤儿场景), 拒绝再建
         # 配合 v276 UNIQUE partial 索引 (DB 层兜底). 应用层早拒消息更清晰.
-        pre_check_stmt = select(FinancialVoucher).where(
-            FinancialVoucher.red_flush_of_voucher_id == original.id,
-        ).limit(1)
+        pre_check_stmt = (
+            select(FinancialVoucher)
+            .where(
+                FinancialVoucher.red_flush_of_voucher_id == original.id,
+            )
+            .limit(1)
+        )
         pre_check_result = await session.execute(pre_check_stmt)
         existing_red = pre_check_result.scalar_one_or_none()
         if existing_red is not None:
@@ -535,13 +528,15 @@ class FinancialVoucherService:
         """
         reversed_entries: list[dict[str, Any]] = []
         for e in original_entries:
-            reversed_entries.append({
-                "account_code": e.get("account_code"),
-                "account_name": e.get("account_name"),
-                "debit": e.get("credit", 0),   # 交换
-                "credit": e.get("debit", 0),
-                "summary": f"红冲: {e.get('summary', '')}".strip(),
-            })
+            reversed_entries.append(
+                {
+                    "account_code": e.get("account_code"),
+                    "account_name": e.get("account_name"),
+                    "debit": e.get("credit", 0),  # 交换
+                    "credit": e.get("debit", 0),
+                    "summary": f"红冲: {e.get('summary', '')}".strip(),
+                }
+            )
         return reversed_entries
 
     # ── 以前年度损益调整 (W2.A) ──────────────────────────────────────
@@ -582,21 +577,13 @@ class FinancialVoucherService:
             )
 
         if not (2020 <= payload.source_period_year <= 2100):
-            raise ValueError(
-                f"source_period_year 越界: {payload.source_period_year} "
-                f"(应在 2020-2100)"
-            )
+            raise ValueError(f"source_period_year 越界: {payload.source_period_year} " f"(应在 2020-2100)")
         if not (1 <= payload.source_period_month <= 12):
-            raise ValueError(
-                f"source_period_month 越界: {payload.source_period_month} "
-                f"(应在 1-12)"
-            )
+            raise ValueError(f"source_period_month 越界: {payload.source_period_month} " f"(应在 1-12)")
 
         # 2. 源期间必须在过去 — 语义正确性防护
         # 允许源期间 = 当前凭证月份的场景 (同期内补录) 作为边界, 但禁止源期间 > 当期
-        source_first_day = _date(
-            payload.source_period_year, payload.source_period_month, 1
-        )
+        source_first_day = _date(payload.source_period_year, payload.source_period_month, 1)
         if source_first_day > payload.voucher_date:
             raise ValueError(
                 f"以前年度损益调整要求 source_period 在过去: "
@@ -656,9 +643,7 @@ class FinancialVoucherService:
         """
         from sqlalchemy import text as _text
 
-        result = await session.execute(
-            _text("SELECT NULLIF(current_setting('app.tenant_id', true), '')")
-        )
+        result = await session.execute(_text("SELECT NULLIF(current_setting('app.tenant_id', true), '')"))
         session_tid_str = result.scalar()
 
         # 豁免: session 未 SET, 视为特权/管理员路径 (RLS 会拒, 不在这里叠加拒绝)
@@ -711,10 +696,14 @@ class FinancialVoucherService:
 
         if tenant_id is not None:
             # 显式 tenant 过滤 — 主路径
-            stmt = _select(FinancialVoucher).where(
-                FinancialVoucher.id == voucher_id,
-                FinancialVoucher.tenant_id == tenant_id,
-            ).limit(1)
+            stmt = (
+                _select(FinancialVoucher)
+                .where(
+                    FinancialVoucher.id == voucher_id,
+                    FinancialVoucher.tenant_id == tenant_id,
+                )
+                .limit(1)
+            )
             result = await session.execute(stmt)
             voucher = result.scalar_one_or_none()
         else:
@@ -722,9 +711,7 @@ class FinancialVoucherService:
             voucher = await session.get(FinancialVoucher, voucher_id)
 
         if voucher is None:
-            raise ValueError(
-                f"凭证不存在或无权限: {voucher_id}"
-            )
+            raise ValueError(f"凭证不存在或无权限: {voucher_id}")
         return voucher
 
     async def _find_by_event(

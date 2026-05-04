@@ -195,14 +195,17 @@ async def get_supplier_score_history(
 
     offset = (page - 1) * size
 
-    count_sql = text("""
+    count_sql = text(
+        """
         SELECT COUNT(*) AS total
         FROM supplier_score_history
         WHERE tenant_id = :tenant_id
           AND supplier_id = :supplier_id::UUID
           AND is_deleted = FALSE
-    """)
-    list_sql = text("""
+    """
+    )
+    list_sql = text(
+        """
         SELECT
             id::TEXT,
             period_start, period_end,
@@ -217,7 +220,8 @@ async def get_supplier_score_history(
           AND is_deleted = FALSE
         ORDER BY period_start DESC
         LIMIT :size OFFSET :offset
-    """)
+    """
+    )
 
     params = {
         "tenant_id": x_tenant_id,
@@ -280,7 +284,8 @@ async def get_supplier_ranking(
     )
 
     # 按每个供应商取最新一期评分
-    ranking_sql = text("""
+    ranking_sql = text(
+        """
         WITH latest_scores AS (
             SELECT DISTINCT ON (sh.supplier_id)
                 sh.supplier_id::TEXT,
@@ -308,7 +313,8 @@ async def get_supplier_ranking(
         WHERE (:tier IS NULL OR tier = :tier)
         ORDER BY composite_score DESC
         LIMIT :limit
-    """)
+    """
+    )
 
     try:
         rows = (

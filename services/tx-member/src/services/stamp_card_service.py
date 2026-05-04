@@ -56,7 +56,8 @@ async def create_template(
     tid = uuid.UUID(tenant_id)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stamp_card_templates
                 (id, tenant_id, name, target_stamps, reward_type, reward_config,
                  validity_days, min_order_fen, applicable_stores, status,
@@ -65,7 +66,8 @@ async def create_template(
                 (:id, :tid, :name, :target, :rtype, :rconfig::jsonb,
                  :vdays, :min_order, :stores::jsonb, 'active',
                  :now, :now)
-        """),
+        """
+        ),
         {
             "id": template_id,
             "tid": tid,
@@ -156,7 +158,8 @@ async def auto_stamp(
 
     # 查用户活跃集点卡（含模板信息）
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT i.id AS instance_id, i.stamp_count, i.target_stamps,
                    t.min_order_fen, t.applicable_stores, t.reward_type, t.reward_config
             FROM stamp_card_instances i
@@ -166,7 +169,8 @@ async def auto_stamp(
               AND i.status = 'active'
               AND i.expired_at > :now
               AND i.is_deleted = false
-        """),
+        """
+        ),
         {"tid": tid, "uid": uid, "now": now},
     )
     instances = rows.fetchall()
@@ -199,12 +203,14 @@ async def auto_stamp(
 
         stamp_no = new_count
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stamp_card_stamps
                     (id, tenant_id, instance_id, order_id, store_id, stamp_no, stamped_at)
                 VALUES
                     (:id, :tid, :iid, :oid, :sid, :sno, :now)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": tid,
@@ -228,12 +234,14 @@ async def auto_stamp(
 
         if completed:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE stamp_card_templates
                     SET completed_count = completed_count + 1, updated_at = NOW()
                     WHERE id = (SELECT template_id FROM stamp_card_instances WHERE id = :iid)
                       AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"iid": instance_id, "tid": tid},
             )
 
@@ -264,13 +272,15 @@ async def _auto_issue_card(
 ) -> Optional[Any]:
     """自动为用户发放活跃模板的新集点卡"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, target_stamps, validity_days, min_order_fen,
                    applicable_stores, reward_type, reward_config
             FROM stamp_card_templates
             WHERE tenant_id = :tid AND status = 'active' AND is_deleted = false
             ORDER BY created_at DESC LIMIT 1
-        """),
+        """
+        ),
         {"tid": tid},
     )
     template = row.fetchone()
@@ -279,11 +289,13 @@ async def _auto_issue_card(
 
     # 检查是否已有同模板的活跃卡
     dup = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM stamp_card_instances
             WHERE tenant_id = :tid AND customer_id = :uid
               AND template_id = :tmpl AND status = 'active' AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tid, "uid": uid, "tmpl": template.id},
     )
     if dup.fetchone():
@@ -293,13 +305,15 @@ async def _auto_issue_card(
     expired_at = now + timedelta(days=template.validity_days)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stamp_card_instances
                 (id, tenant_id, template_id, customer_id, stamp_count,
                  target_stamps, status, expired_at, created_at, updated_at)
             VALUES
                 (:id, :tid, :tmpl, :uid, 0, :target, 'active', :exp, :now, :now)
-        """),
+        """
+        ),
         {
             "id": instance_id,
             "tid": tid,
@@ -311,11 +325,13 @@ async def _auto_issue_card(
         },
     )
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stamp_card_templates
             SET issued_count = issued_count + 1, updated_at = NOW()
             WHERE id = :tmpl AND tenant_id = :tid
-        """),
+        """
+        ),
         {"tmpl": template.id, "tid": tid},
     )
     await db.flush()
@@ -339,7 +355,8 @@ async def get_my_cards(
     uid = uuid.UUID(customer_id)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT i.id, i.stamp_count, i.target_stamps, i.status,
                    i.expired_at, i.completed_at, i.reward_issued,
                    t.name, t.reward_type, t.reward_config
@@ -347,7 +364,8 @@ async def get_my_cards(
             JOIN stamp_card_templates t ON t.id = i.template_id
             WHERE i.tenant_id = :tid AND i.customer_id = :uid AND i.is_deleted = false
             ORDER BY i.created_at DESC
-        """),
+        """
+        ),
         {"tid": tid, "uid": uid},
     )
     return [
@@ -377,14 +395,16 @@ async def redeem_card(
     tid = uuid.UUID(tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT i.id, i.status, i.reward_issued, i.stamp_count, i.target_stamps,
                    t.reward_type, t.reward_config
             FROM stamp_card_instances i
             JOIN stamp_card_templates t ON t.id = i.template_id
             WHERE i.id = :iid AND i.tenant_id = :tid
               AND i.customer_id = :uid AND i.is_deleted = false
-        """),
+        """
+        ),
         {"iid": uuid.UUID(instance_id), "tid": tid, "uid": uuid.UUID(customer_id)},
     )
     inst = row.fetchone()
@@ -402,11 +422,13 @@ async def redeem_card(
         reward = json.loads(reward)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stamp_card_instances
             SET reward_issued = true, updated_at = NOW()
             WHERE id = :iid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"iid": uuid.UUID(instance_id), "tid": tid},
     )
     await db.flush()

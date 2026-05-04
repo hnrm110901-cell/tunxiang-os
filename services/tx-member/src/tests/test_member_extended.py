@@ -351,9 +351,7 @@ def test_group_interop_invalid_operator_id():
     db = make_mock_db()
 
     set_cfg_result = MagicMock()
-    db.execute = AsyncMock(
-        side_effect=[set_cfg_result, _membership_ok_result(GROUP_ID)]
-    )
+    db.execute = AsyncMock(side_effect=[set_cfg_result, _membership_ok_result(GROUP_ID)])
 
     group_app.dependency_overrides[get_db_session] = override_db(db)
     client = TestClient(group_app)

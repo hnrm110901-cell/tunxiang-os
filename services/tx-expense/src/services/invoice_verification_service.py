@@ -823,7 +823,8 @@ async def process_invoice_upload(
     # ── Step 1: 创建 Invoice 记录（ocr_status=PENDING）──────────────────────
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO invoices (
                     id, tenant_id, brand_id, store_id, uploader_id,
                     application_id, file_name, file_type, file_url, file_size,
@@ -833,7 +834,8 @@ async def process_invoice_upload(
                     :application_id, :file_name, :file_type, :file_url, :file_size,
                     :ocr_status, :verify_status, FALSE, NOW(), NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": str(invoice_id),
                 "tenant_id": str(tenant_id),
@@ -905,7 +907,8 @@ async def process_invoice_upload(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoices SET
                     ocr_status = :ocr_status,
                     ocr_provider = :ocr_provider,
@@ -927,7 +930,8 @@ async def process_invoice_upload(
                     verify_response = :verify_response,
                     updated_at = NOW()
                 WHERE id = :invoice_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "ocr_status": ocr_status,
                 "ocr_provider": ocr_result.get("provider"),
@@ -1041,14 +1045,16 @@ async def process_invoice_upload(
     # ── Step 8: 更新最终状态 ─────────────────────────────────────────────────
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoices SET
                     compliance_issues = :compliance_issues,
                     needs_manual_review = :needs_manual_review,
                     suggested_category_id = :suggested_category_id,
                     updated_at = NOW()
                 WHERE id = :invoice_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "compliance_issues": json.dumps(compliance_issues, ensure_ascii=False),
                 "needs_manual_review": needs_manual_review,
@@ -1086,7 +1092,8 @@ async def process_invoice_upload(
                 warning_note = f"[集团去重警告] {group_dedup_result.get('message', '跨品牌重复发票')}"
                 try:
                     await db.execute(
-                        text("""
+                        text(
+                            """
                             UPDATE invoices SET
                                 notes = CASE
                                     WHEN notes IS NULL OR notes = '' THEN :note
@@ -1094,7 +1101,8 @@ async def process_invoice_upload(
                                 END,
                                 updated_at = NOW()
                             WHERE id = :invoice_id AND tenant_id = :tenant_id
-                        """),
+                        """
+                        ),
                         {
                             "note": warning_note,
                             "invoice_id": str(invoice_id),
@@ -1171,13 +1179,15 @@ async def reverify_invoices(
 
     # 查询需要核验的发票信息
     ids_str = ",".join(f"'{str(iid)}'" for iid in invoice_ids)
-    query = text(f"""
+    query = text(
+        f"""
         SELECT id, invoice_code, invoice_number, invoice_date, total_amount, buyer_tax_id
         FROM invoices
         WHERE tenant_id = :tenant_id
           AND id IN ({ids_str})
           AND is_deleted = FALSE
-    """)
+    """
+    )
     try:
         result = await db.execute(query, {"tenant_id": str(tenant_id)})
         rows = result.mappings().all()
@@ -1206,13 +1216,15 @@ async def reverify_invoices(
                 new_status = verify_result["status"]
 
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE invoices SET
                             verify_status = :status,
                             verify_response = :response,
                             updated_at = NOW()
                         WHERE id = :iid AND tenant_id = :tenant_id
-                    """),
+                    """
+                    ),
                     {
                         "status": new_status,
                         "response": json.dumps(verify_result.get("raw_response", {}), ensure_ascii=False),
@@ -1273,14 +1285,16 @@ async def _fetch_categories(db: AsyncSession, tenant_id: UUID) -> list[dict]:
     """查询租户科目列表，用于科目建议。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, name, code
                 FROM expense_categories
                 WHERE tenant_id = :tenant_id
                   AND is_active = TRUE
                   AND is_deleted = FALSE
                 ORDER BY sort_order ASC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id)},
         )
         return [{"id": row["id"], "name": row["name"], "code": row["code"]} for row in result.mappings().all()]
@@ -1302,7 +1316,8 @@ async def _create_invoice_items(
         item_id = uuid.uuid4()
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO invoice_items (
                         id, tenant_id, invoice_id, name, amount, tax_rate,
                         is_deleted, created_at, updated_at
@@ -1310,7 +1325,8 @@ async def _create_invoice_items(
                         :id, :tenant_id, :invoice_id, :name, :amount, :tax_rate,
                         FALSE, NOW(), NOW()
                     )
-                """),
+                """
+                ),
                 {
                     "id": str(item_id),
                     "tenant_id": str(tenant_id),

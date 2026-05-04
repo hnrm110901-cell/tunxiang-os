@@ -104,9 +104,7 @@ class InvalidStateTransition(Exception):
     def __init__(self, current: CaseStatus, target: CaseStatus):
         self.current = current
         self.target = target
-        super().__init__(
-            f"Invalid state transition: {current.value} → {target.value}"
-        )
+        super().__init__(f"Invalid state transition: {current.value} → {target.value}")
 
 
 def assert_can_transition(current: CaseStatus, target: CaseStatus) -> None:
@@ -125,15 +123,9 @@ class StocktakeLossCaseORM(TenantBase):
 
     __tablename__ = "stocktake_loss_cases"
 
-    stocktake_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, comment="关联 stocktakes.id"
-    )
-    store_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, comment="门店 ID"
-    )
-    case_no: Mapped[str] = mapped_column(
-        String(32), nullable=False, comment="案件号 LOSS-YYYYMMDD-NNNN"
-    )
+    stocktake_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, comment="关联 stocktakes.id")
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, comment="门店 ID")
+    case_no: Mapped[str] = mapped_column(String(32), nullable=False, comment="案件号 LOSS-YYYYMMDD-NNNN")
     total_loss_amount_fen: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=0, comment="盘亏总金额（分）"
     )
@@ -146,26 +138,14 @@ class StocktakeLossCaseORM(TenantBase):
         nullable=True,
         comment="净亏损 = total_loss - total_gain（DB 生成列）",
     )
-    responsible_party_type: Mapped[Optional[str]] = mapped_column(
-        String(16), nullable=True
-    )
-    responsible_party_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    responsible_party_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    responsible_party_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     responsible_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    case_status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=CaseStatus.DRAFT.value
-    )
+    case_status: Mapped[str] = mapped_column(String(16), nullable=False, default=CaseStatus.DRAFT.value)
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    submitted_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    final_approved_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    written_off_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    final_approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    written_off_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     items: Mapped[list[StocktakeLossItemORM]] = relationship(
         "StocktakeLossItemORM",
@@ -207,24 +187,18 @@ class StocktakeLossItemORM(TenantBase):
         ForeignKey("stocktake_loss_cases.id", ondelete="CASCADE"),
         nullable=False,
     )
-    ingredient_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     batch_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     expected_qty: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False)
     actual_qty: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False)
     # 生成列
     diff_qty: Mapped[Optional[float]] = mapped_column(Numeric(14, 3), nullable=True)
     unit_cost_fen: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    diff_amount_fen: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, default=0
-    )
+    diff_amount_fen: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     reason_code: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
     reason_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    case: Mapped[StocktakeLossCaseORM] = relationship(
-        "StocktakeLossCaseORM", back_populates="items"
-    )
+    case: Mapped[StocktakeLossCaseORM] = relationship("StocktakeLossCaseORM", back_populates="items")
 
     __table_args__ = (
         Index("idx_stl_items_tenant_case", "tenant_id", "case_id"),
@@ -244,23 +218,15 @@ class StocktakeLossApprovalORM(TenantBase):
     )
     approval_node_seq: Mapped[int] = mapped_column(Integer, nullable=False)
     approver_role: Mapped[str] = mapped_column(String(32), nullable=False)
-    approver_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    approver_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     decision: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    approved_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    case: Mapped[StocktakeLossCaseORM] = relationship(
-        "StocktakeLossCaseORM", back_populates="approvals"
-    )
+    case: Mapped[StocktakeLossCaseORM] = relationship("StocktakeLossCaseORM", back_populates="approvals")
 
     __table_args__ = (
-        UniqueConstraint(
-            "case_id", "approval_node_seq", name="uq_stl_approvals_case_seq"
-        ),
+        UniqueConstraint("case_id", "approval_node_seq", name="uq_stl_approvals_case_seq"),
         Index(
             "idx_stl_approvals_tenant_case_seq",
             "tenant_id",
@@ -282,21 +248,13 @@ class StocktakeLossWriteoffORM(TenantBase):
     )
     writeoff_voucher_no: Mapped[str] = mapped_column(String(64), nullable=False)
     writeoff_amount_fen: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    accounting_subject: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True
-    )
-    writeoff_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    finance_user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False
-    )
+    accounting_subject: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    writeoff_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finance_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     attachment_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    case: Mapped[StocktakeLossCaseORM] = relationship(
-        "StocktakeLossCaseORM", back_populates="writeoffs"
-    )
+    case: Mapped[StocktakeLossCaseORM] = relationship("StocktakeLossCaseORM", back_populates="writeoffs")
 
     __table_args__ = (
         UniqueConstraint(
@@ -376,9 +334,7 @@ class WriteoffPayload(BaseModel):
 
     writeoff_voucher_no: str = Field(..., min_length=1, max_length=64)
     writeoff_amount_fen: int = Field(..., gt=0)
-    accounting_subject: Optional[str] = Field(
-        default="管理费用-存货损失", max_length=64
-    )
+    accounting_subject: Optional[str] = Field(default="管理费用-存货损失", max_length=64)
     finance_user_id: str
     attachment_url: Optional[str] = None
     comment: Optional[str] = None

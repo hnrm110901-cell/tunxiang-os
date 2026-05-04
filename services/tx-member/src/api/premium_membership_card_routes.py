@@ -209,7 +209,8 @@ async def purchase_card(
     card_no = _generate_card_no()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_membership_cards (
                 tenant_id, card_no, member_id, card_type, price_fen,
                 start_date, end_date, status, benefits,
@@ -220,7 +221,8 @@ async def purchase_card(
                 :purchase_channel, :auto_renew, :notes
             )
             RETURNING id, card_no, created_at
-        """),
+        """
+        ),
         {
             "tid": _tid,
             "card_no": card_no,
@@ -290,11 +292,13 @@ async def renew_card(
     await _set_rls(db, tenant_id)
 
     card_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, card_type, end_date, status
             FROM premium_membership_cards
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": _cid, "tid": _tid},
     )
     card = card_result.fetchone()
@@ -319,11 +323,13 @@ async def renew_card(
     new_end_date = base_date + timedelta(days=product["duration_days"])
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE premium_membership_cards
             SET end_date = :new_end, status = 'active', updated_at = NOW()
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": _cid, "tid": _tid, "new_end": new_end_date},
     )
     await db.commit()
@@ -366,11 +372,13 @@ async def refund_card(
     await _set_rls(db, tenant_id)
 
     card_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, card_type, price_fen, start_date, end_date, status, refund_amount_fen
             FROM premium_membership_cards
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": _cid, "tid": _tid},
     )
     card = card_result.fetchone()
@@ -407,14 +415,16 @@ async def refund_card(
     refund_fen = int(_price_fen * remaining_days / total_days)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE premium_membership_cards
             SET status = 'cancelled',
                 refund_amount_fen = :refund_fen,
                 refunded_at = NOW(),
                 updated_at = NOW()
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": _cid, "tid": _tid, "refund_fen": refund_fen},
     )
     await db.commit()
@@ -467,7 +477,8 @@ async def check_premium_member(
 
     today = date.today()
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, card_no, card_type, end_date, status, benefits, start_date
             FROM premium_membership_cards
             WHERE tenant_id = :tid
@@ -483,7 +494,8 @@ async def check_premium_member(
                     ELSE 5
                 END
             LIMIT 1
-        """),
+        """
+        ),
         {"tid": _tid, "mid": _mid, "today": today},
     )
     card = result.fetchone()
@@ -580,7 +592,8 @@ async def list_cards(
     total = count_result.scalar() or 0
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, card_no, member_id, card_type, price_fen,
                    start_date, end_date, status, benefits,
                    purchase_channel, auto_renew, created_at
@@ -588,7 +601,8 @@ async def list_cards(
             WHERE {where_clause}
             ORDER BY created_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {**params, "size": size, "offset": offset},
     )
     rows = result.fetchall()
@@ -647,7 +661,8 @@ async def get_stats(
     warn_deadline = today + timedelta(days=7)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE status = 'active')                                 AS active_count,
                 COUNT(*) FILTER (
@@ -665,7 +680,8 @@ async def get_stats(
                 COUNT(*) FILTER (WHERE card_type = 'lifetime'  AND status = 'active')    AS lifetime_active
             FROM premium_membership_cards
             WHERE tenant_id = :tid
-        """),
+        """
+        ),
         {"tid": _tid, "today": today, "warn_deadline": warn_deadline, "month_start": month_start},
     )
     r = result.fetchone()
@@ -711,7 +727,8 @@ async def get_expiring_cards(
     deadline = today + timedelta(days=days_ahead)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, card_no, member_id, card_type, end_date, status, auto_renew
             FROM premium_membership_cards
             WHERE tenant_id = :tid
@@ -719,7 +736,8 @@ async def get_expiring_cards(
               AND end_date IS NOT NULL
               AND end_date BETWEEN :today AND :deadline
             ORDER BY end_date ASC
-        """),
+        """
+        ),
         {"tid": _tid, "today": today, "deadline": deadline},
     )
     rows = result.fetchall()

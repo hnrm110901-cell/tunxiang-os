@@ -12,17 +12,17 @@ from typing import Any, Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
 # 餐饮行业平均转化率（用于对标）
 _INDUSTRY_BENCHMARK: dict[str, float] = {
-    "visit_rate": 15.0,    # 曝光 → 到店 15%
-    "order_rate": 90.0,    # 到店 → 消费 90%
-    "member_rate": 25.0,   # 消费 → 加会员 25%
-    "repeat_rate": 35.0,   # 会员 → 复购 35%
+    "visit_rate": 15.0,  # 曝光 → 到店 15%
+    "order_rate": 90.0,  # 到店 → 消费 90%
+    "member_rate": 25.0,  # 消费 → 加会员 25%
+    "repeat_rate": 35.0,  # 会员 → 复购 35%
 }
 
 
@@ -58,7 +58,8 @@ class ConversionFunnelService:
 
         # 2) 到店: 当日有订单的独立客户数
         visit_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT customer_id) AS cnt
                 FROM orders
                 WHERE store_id = :store_id
@@ -66,7 +67,8 @@ class ConversionFunnelService:
                   AND biz_date = :target_date
                   AND customer_id IS NOT NULL
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -77,7 +79,8 @@ class ConversionFunnelService:
 
         # 3) 订单数
         order_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM orders
                 WHERE store_id = :store_id
@@ -85,7 +88,8 @@ class ConversionFunnelService:
                   AND biz_date = :target_date
                   AND status IN ('paid', 'completed')
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -96,14 +100,16 @@ class ConversionFunnelService:
 
         # 4) 当日新增会员
         member_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM members
                 WHERE store_id = :store_id
                   AND tenant_id = :tenant_id
                   AND DATE(created_at) = :target_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -114,7 +120,8 @@ class ConversionFunnelService:
 
         # 5) 30 日内复购（当日消费且 30 日前也消费过的客户数）
         repeat_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT o1.customer_id) AS cnt
                 FROM orders o1
                 WHERE o1.store_id = :store_id
@@ -133,7 +140,8 @@ class ConversionFunnelService:
                         AND o2.status IN ('paid', 'completed')
                         AND o2.is_deleted = FALSE
                   )
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -145,7 +153,8 @@ class ConversionFunnelService:
 
         # UPSERT 到 conversion_funnel_daily
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO conversion_funnel_daily
                     (tenant_id, store_id, funnel_date,
                      exposure_count, visit_count, order_count,
@@ -162,7 +171,8 @@ class ConversionFunnelService:
                     member_count   = EXCLUDED.member_count,
                     repeat_count   = EXCLUDED.repeat_count,
                     updated_at     = NOW()
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -178,7 +188,8 @@ class ConversionFunnelService:
 
         # 读回含 GENERATED 列的完整数据
         funnel_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     exposure_count, visit_count, order_count,
                     member_count, repeat_count,
@@ -188,7 +199,8 @@ class ConversionFunnelService:
                   AND tenant_id = :tenant_id
                   AND funnel_date = :funnel_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -200,7 +212,8 @@ class ConversionFunnelService:
         # 上月同期对比
         last_month_date = target_date - timedelta(days=30)
         lm_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     exposure_count, visit_count, order_count,
                     member_count, repeat_count,
@@ -210,7 +223,8 @@ class ConversionFunnelService:
                   AND tenant_id = :tenant_id
                   AND funnel_date = :funnel_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -292,13 +306,15 @@ class ConversionFunnelService:
         """统计曝光数（WiFi 探针去重 MAC）。"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(DISTINCT mac_hash) AS cnt
                     FROM wifi_visit_logs
                     WHERE store_id = :store_id
                       AND tenant_id = :tenant_id
                       AND visit_date = :target_date
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -341,7 +357,8 @@ class ConversionFunnelService:
 
         # 聚合期间数据
         agg_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(exposure_count), 0)  AS total_exposure,
                     COALESCE(SUM(visit_count), 0)     AS total_visit,
@@ -354,7 +371,8 @@ class ConversionFunnelService:
                   AND tenant_id = :tenant_id
                   AND funnel_date BETWEEN :date_from AND :date_to
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -389,14 +407,16 @@ class ConversionFunnelService:
         for key, label, actual in stage_rates:
             benchmark = _INDUSTRY_BENCHMARK[key]
             gap = round(benchmark - actual, 2)
-            gaps.append({
-                "stage": key,
-                "label": label,
-                "actual_rate": actual,
-                "benchmark_rate": benchmark,
-                "gap": gap,
-                "status": "below" if gap > 5 else ("at" if gap > -5 else "above"),
-            })
+            gaps.append(
+                {
+                    "stage": key,
+                    "label": label,
+                    "actual_rate": actual,
+                    "benchmark_rate": benchmark,
+                    "gap": gap,
+                    "status": "below" if gap > 5 else ("at" if gap > -5 else "above"),
+                }
+            )
 
         # 最大漏损环节
         max_gap = max(gaps, key=lambda x: x["gap"])
@@ -406,7 +426,8 @@ class ConversionFunnelService:
 
         # 每日趋势
         trend_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     funnel_date,
                     exposure_count, visit_count, order_count,
@@ -418,7 +439,8 @@ class ConversionFunnelService:
                   AND funnel_date BETWEEN :date_from AND :date_to
                   AND is_deleted = FALSE
                 ORDER BY funnel_date
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -513,10 +535,12 @@ class ConversionFunnelService:
             if gap_item["gap"] > 0:
                 stage_suggestions = suggestion_map.get(gap_item["stage"], [])
                 for s in stage_suggestions[:2]:  # 每个环节最多 2 条
-                    suggestions.append({
-                        "stage": gap_item["label"],
-                        "priority": "high" if gap_item["gap"] > 10 else "medium",
-                        **s,
-                    })
+                    suggestions.append(
+                        {
+                            "stage": gap_item["label"],
+                            "priority": "high" if gap_item["gap"] > 10 else "medium",
+                            **s,
+                        }
+                    )
 
         return suggestions[:6]  # 最多返回 6 条建议

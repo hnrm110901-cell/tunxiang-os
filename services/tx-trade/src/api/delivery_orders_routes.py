@@ -321,7 +321,8 @@ async def _fetch_dish_items_from_db(
     from sqlalchemy import text as _text  # noqa: PLC0415
 
     try:
-        sql = _text("""
+        sql = _text(
+            """
             SELECT DISTINCT elem->>'name' AS name,
                    (elem->>'price_fen')::int AS price_fen,
                    COALESCE(elem->>'spec', '') AS spec
@@ -334,7 +335,8 @@ async def _fetch_dish_items_from_db(
               AND elem->>'name' IS NOT NULL
               AND (elem->>'price_fen')::int > 0
             LIMIT 50
-        """)
+        """
+        )
         result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
         rows = result.fetchall()
     except Exception as exc:  # noqa: BLE001 — 菜品查询失败时生成空订单
@@ -374,7 +376,8 @@ async def _fetch_customer_sample_from_db(
     from sqlalchemy import text as _text  # noqa: PLC0415
 
     try:
-        sql = _text("""
+        sql = _text(
+            """
             SELECT customer_name, customer_phone, delivery_address
             FROM delivery_orders
             WHERE store_id = :store_id
@@ -382,7 +385,8 @@ async def _fetch_customer_sample_from_db(
               AND customer_name IS NOT NULL
             ORDER BY RANDOM()
             LIMIT 1
-        """)
+        """
+        )
         result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
         row = result.fetchone()
         if row:

@@ -86,7 +86,8 @@ async def _get_shortage_alerts(store_id: str, tenant_id: str, db: Any) -> List[d
         {"tid": tenant_id},
     )
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 kt.dish_id::text AS dish_id,
                 COALESCE(oi.item_name, kt.dish_name, '') AS dish_name,
@@ -101,7 +102,8 @@ async def _get_shortage_alerts(store_id: str, tenant_id: str, db: Any) -> List[d
               AND kt.is_deleted = FALSE
             GROUP BY kt.dish_id, oi.item_name, kt.dish_name
             ORDER BY shortage_count DESC, latest_at DESC
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -131,7 +133,8 @@ async def _get_remake_tasks(store_id: str, tenant_id: str, db: Any) -> List[dict
         {"tid": tenant_id},
     )
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 kt.id::text AS task_id,
                 o.table_number AS table_no,
@@ -147,7 +150,8 @@ async def _get_remake_tasks(store_id: str, tenant_id: str, db: Any) -> List[dict
               AND kt.created_at >= :today_start
               AND kt.is_deleted = FALSE
             ORDER BY kt.created_at DESC
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -184,7 +188,8 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
 
     # 超时工单（按创建时间统计已超时的）
     result_overtime = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM oi.created_at AT TIME ZONE 'UTC')::int AS hour,
                    COUNT(*) AS cnt
             FROM order_items oi
@@ -196,7 +201,8 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
               AND o.is_deleted = FALSE
             GROUP BY hour
             ORDER BY hour
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -207,7 +213,8 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
 
     # 沽清
     result_shortage = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC')::int AS hour,
                    COUNT(*) AS cnt
             FROM kds_tasks
@@ -218,7 +225,8 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
               AND is_deleted = FALSE
             GROUP BY hour
             ORDER BY hour
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -229,7 +237,8 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
 
     # 退菜
     result_remake = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC')::int AS hour,
                    COUNT(*) AS cnt
             FROM kds_tasks
@@ -240,7 +249,8 @@ async def _get_hourly_trend(store_id: str, tenant_id: str, db: Any) -> List[dict
               AND is_deleted = FALSE
             GROUP BY hour
             ORDER BY hour
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,

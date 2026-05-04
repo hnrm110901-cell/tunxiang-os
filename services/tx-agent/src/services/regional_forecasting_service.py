@@ -5,8 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
@@ -176,9 +175,7 @@ class RegionalForecastingService:
 
     # ── 跨市场菜系推荐 ────────────────────────────────────────────────────
 
-    def get_cuisine_recommendations(
-        self, market: str, season: Optional[str] = None
-    ) -> list[dict[str, Any]]:
+    def get_cuisine_recommendations(self, market: str, season: Optional[str] = None) -> list[dict[str, Any]]:
         """获取面向特定市场的菜系优化推荐。"""
         profiles = {
             "MY": [

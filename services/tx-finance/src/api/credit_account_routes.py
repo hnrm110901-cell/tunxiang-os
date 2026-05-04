@@ -127,7 +127,8 @@ async def create_agreement(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_credit_agreements (
                     tenant_id, brand_id, company_name, company_tax_no,
                     credit_limit_fen, used_amount_fen,
@@ -140,7 +141,8 @@ async def create_agreement(
                     :created_by::UUID, :remark
                 )
                 RETURNING id, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "brand_id": str(body.brand_id),
@@ -247,7 +249,8 @@ async def list_agreements(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, brand_id, company_name, company_tax_no,
                        credit_limit_fen, used_amount_fen,
                        (credit_limit_fen - used_amount_fen) AS available_fen,
@@ -257,7 +260,8 @@ async def list_agreements(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -287,7 +291,8 @@ async def get_agreement(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, brand_id, company_name, company_tax_no,
                        credit_limit_fen, used_amount_fen,
                        (credit_limit_fen - used_amount_fen) AS available_fen,
@@ -297,7 +302,8 @@ async def get_agreement(
                        created_at, updated_at
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(aid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -332,11 +338,13 @@ async def charge_credit(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, company_name, credit_limit_fen, used_amount_fen, status
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(aid), "tenant_id": str(tid)},
         )
         agreement = fetch.mappings().first()
@@ -365,18 +373,21 @@ async def charge_credit(
     try:
         # 更新已用额度
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_agreements
                 SET used_amount_fen = :new_used,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"new_used": new_used, "id": str(aid), "tenant_id": str(tid)},
         )
 
         # 写消费记录
         charge_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_credit_charges (
                     tenant_id, agreement_id, order_id, store_id,
                     charged_amount_fen, charged_at, operator_id, remark
@@ -385,7 +396,8 @@ async def charge_credit(
                     :charged_amount_fen, NOW(), :operator_id::UUID, :remark
                 )
                 RETURNING id, charged_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),
@@ -485,7 +497,8 @@ async def suspend_agreement(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_agreements
                 SET status = 'suspended',
                     remark = COALESCE(:remark, remark),
@@ -493,7 +506,8 @@ async def suspend_agreement(
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                   AND status = 'active'
                 RETURNING id, status, updated_at
-            """),
+            """
+            ),
             {
                 "remark": body.remark,
                 "id": str(aid),
@@ -570,7 +584,8 @@ async def list_bills(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, bill_no, period_start, period_end,
                        total_amount_fen, paid_amount_fen,
                        (total_amount_fen - paid_amount_fen) AS unpaid_fen,
@@ -579,7 +594,8 @@ async def list_bills(
                 WHERE {where_sql}
                 ORDER BY period_start DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -612,13 +628,15 @@ async def pay_bill(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT b.id, b.agreement_id, b.total_amount_fen, b.paid_amount_fen, b.status,
                        a.used_amount_fen, a.credit_limit_fen
                 FROM biz_credit_bills b
                 JOIN biz_credit_agreements a ON a.id = b.agreement_id
                 WHERE b.id = :id::UUID AND b.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(bid), "tenant_id": str(tid)},
         )
         bill = fetch.mappings().first()
@@ -646,14 +664,16 @@ async def pay_bill(
     try:
         # 更新账单
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_bills
                 SET paid_amount_fen = :new_paid,
                     status = :new_status,
                     paid_at = CASE WHEN :new_status = 'paid' THEN NOW() ELSE paid_at END,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {
                 "new_paid": new_paid,
                 "new_status": new_bill_status,
@@ -664,12 +684,14 @@ async def pay_bill(
 
         # 还款后减少协议已用额度
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_agreements
                 SET used_amount_fen = :new_used,
                     updated_at = NOW()
                 WHERE id = :agreement_id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {
                 "new_used": new_used,
                 "agreement_id": str(bill["agreement_id"]),
@@ -749,11 +771,13 @@ async def get_statement(
     try:
         # 协议信息
         agr_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, company_name, credit_limit_fen, billing_cycle, status
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(aid), "tenant_id": str(tid)},
         )
         agreement = agr_result.mappings().first()
@@ -762,13 +786,15 @@ async def get_statement(
 
         # 消费明细
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM biz_credit_charges
                 WHERE tenant_id = :tenant_id::UUID
                   AND agreement_id = :agreement_id::UUID
                   AND charged_at >= :start_date::DATE
                   AND charged_at < (:end_date::DATE + INTERVAL '1 day')
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),
@@ -779,7 +805,8 @@ async def get_statement(
         total = count_result.scalar()
 
         charges_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, order_id, store_id, charged_amount_fen, charged_at,
                        operator_id, remark
                 FROM biz_credit_charges
@@ -789,7 +816,8 @@ async def get_statement(
                   AND charged_at < (:end_date::DATE + INTERVAL '1 day')
                 ORDER BY charged_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),
@@ -803,7 +831,8 @@ async def get_statement(
 
         # 汇总
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(charged_amount_fen), 0) AS total_charged_fen,
                        COUNT(*) AS total_transactions
                 FROM biz_credit_charges
@@ -811,7 +840,8 @@ async def get_statement(
                   AND agreement_id = :agreement_id::UUID
                   AND charged_at >= :start_date::DATE
                   AND charged_at < (:end_date::DATE + INTERVAL '1 day')
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),

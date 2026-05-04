@@ -26,14 +26,14 @@ class InsufficientHistoricalDataError(ValueError):
 # ─── 活动类型枚举 ────────────────────────────────────────────────────────────
 
 ActivityType = Literal[
-    "full_reduction",       # 满减（满 100 减 20 等）
-    "member_day",           # 会员日折扣
-    "douyin_groupon",       # 抖音团购
-    "xiaohongshu_coupon",   # 小红书优惠券种草
-    "wechat_groupon",       # 微信小程序团购
-    "second_half_off",      # 第二份半价
-    "free_dish",            # 满赠菜品
-    "limited_time_special", # 限时特价单品
+    "full_reduction",  # 满减（满 100 减 20 等）
+    "member_day",  # 会员日折扣
+    "douyin_groupon",  # 抖音团购
+    "xiaohongshu_coupon",  # 小红书优惠券种草
+    "wechat_groupon",  # 微信小程序团购
+    "second_half_off",  # 第二份半价
+    "free_dish",  # 满赠菜品
+    "limited_time_special",  # 限时特价单品
 ]
 
 
@@ -55,9 +55,7 @@ class ActivityROIRequest(BaseModel):
     start_at: datetime = Field(..., description="活动开始时间（含时区）")
     end_at: datetime = Field(..., description="活动结束时间（含时区）")
     cost_budget_fen: int = Field(..., gt=0, description="活动预算（分）")
-    target_audience_size: int | None = Field(
-        default=None, ge=0, description="目标触达人群规模（None 表示未限定）"
-    )
+    target_audience_size: int | None = Field(default=None, ge=0, description="目标触达人群规模（None 表示未限定）")
     historical_baseline_days: int = Field(
         default=30,
         ge=14,
@@ -113,20 +111,12 @@ class ActivityROIResponse(BaseModel):
 
     request_id: UUID
     predicted_total_lift_gmv_fen: int = Field(..., description="累计增量 GMV（分）")
-    predicted_lift_gross_margin_fen: int = Field(
-        ..., description="累计增量毛利（分），可能为负"
-    )
-    predicted_roi_ratio: float = Field(
-        ..., description="增量毛利 / 活动成本，>1 即正 ROI"
-    )
-    confidence_interval: tuple[float, float] = Field(
-        ..., description="ROI 80% 置信区间（low, high）"
-    )
+    predicted_lift_gross_margin_fen: int = Field(..., description="累计增量毛利（分），可能为负")
+    predicted_roi_ratio: float = Field(..., description="增量毛利 / 活动成本，>1 即正 ROI")
+    confidence_interval: tuple[float, float] = Field(..., description="ROI 80% 置信区间（low, high）")
     daily_predictions: list[ActivityROIPredictionPoint]
     narrative_zh: str = Field(..., min_length=1, description="Sonnet 生成的中文叙述")
-    mape_estimate: float = Field(
-        ..., ge=0.0, description="历史回测 MAPE 估计（如 0.18 表示 18%）"
-    )
+    mape_estimate: float = Field(..., ge=0.0, description="历史回测 MAPE 估计（如 0.18 表示 18%）")
     cache_hit_ratio: float | None = Field(
         default=None,
         ge=0.0,

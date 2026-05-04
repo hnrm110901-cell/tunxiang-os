@@ -239,7 +239,8 @@ async def calculate_performance(
 
                 if body.recalculate:
                     # UPSERT：强制重算时始终覆盖
-                    upsert_sql = text("""
+                    upsert_sql = text(
+                        """
                         INSERT INTO staff_performance_records (
                             tenant_id, store_id, stat_date, employee_id, employee_name,
                             role, orders_handled, revenue_generated_fen,
@@ -264,10 +265,12 @@ async def calculate_performance(
                             updated_at            = EXCLUDED.updated_at
                         RETURNING id::text,
                             (xmax = 0) AS was_inserted
-                    """)
+                    """
+                    )
                 else:
                     # INSERT only（已存在则跳过）
-                    upsert_sql = text("""
+                    upsert_sql = text(
+                        """
                         INSERT INTO staff_performance_records (
                             tenant_id, store_id, stat_date, employee_id, employee_name,
                             role, orders_handled, revenue_generated_fen,
@@ -283,7 +286,8 @@ async def calculate_performance(
                         DO NOTHING
                         RETURNING id::text,
                             true AS was_inserted
-                    """)
+                    """
+                    )
 
                 row = await db.execute(
                     upsert_sql,

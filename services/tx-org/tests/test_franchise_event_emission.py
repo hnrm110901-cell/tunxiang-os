@@ -87,9 +87,7 @@ class TestFranchiseV5RoutesEvents:
             "services.tx_org.src.api.franchise_v5_routes.asyncio.create_task",
             side_effect=_patched_create_task,
         ):
-            result = await create_franchisee_v5(
-                body=body, x_tenant_id=TENANT_ID, db=db
-            )
+            result = await create_franchisee_v5(body=body, x_tenant_id=TENANT_ID, db=db)
 
         assert result["ok"] is True
         # 由于 create_task 被同步替换，emit_event 被同步调用一次
@@ -114,9 +112,7 @@ class TestFranchiseV5RoutesEvents:
             ("terminated", "franchise.franchisee_terminated"),
         ],
     )
-    async def test_update_franchisee_status_emits_lifecycle_event(
-        self, status_value, expected_event
-    ):
+    async def test_update_franchisee_status_emits_lifecycle_event(self, status_value, expected_event):
         """PUT /franchisees/{id} 含 status 字段 → emit 对应生命周期事件"""
         from services.tx_org.src.api.franchise_v5_routes import (
             FranchiseeUpdateV5,
@@ -299,10 +295,9 @@ class TestFranchiseFeeRoutesEvents:
         assert "franchise.fee_billed" in events
         assert "franchise.fee_overdue" in events
 
-        overdue_call = [
-            c for c in mock_emit.call_args_list
-            if c.kwargs["event_type"].value == "franchise.fee_overdue"
-        ][0]
+        overdue_call = [c for c in mock_emit.call_args_list if c.kwargs["event_type"].value == "franchise.fee_overdue"][
+            0
+        ]
         assert overdue_call.kwargs["payload"]["unpaid_fen"] == 100_000
         assert overdue_call.kwargs["payload"]["reason"] == "due_date_in_past_at_creation"
 
@@ -317,16 +312,17 @@ class TestFranchiseFeeRoutesEvents:
         db = AsyncMock()
         # _set_rls -> execute；_fetch_bill 内 db.execute -> fetchone
         bill_row_values = (
-            uuid.UUID(BILL_ID),       # id
+            uuid.UUID(BILL_ID),  # id
             uuid.UUID(FRANCHISEE_ID),  # franchise_id
-            "测试加盟商",              # franchise_name
-            "royalty",                # bill_type
-            500_000,                  # amount_fen
-            0,                        # paid_fen
-            "pending",                # status
-            date(2099, 12, 31),       # due_date
-            "2026-04",                # billing_period
-            None, None,               # created_at, updated_at
+            "测试加盟商",  # franchise_name
+            "royalty",  # bill_type
+            500_000,  # amount_fen
+            0,  # paid_fen
+            "pending",  # status
+            date(2099, 12, 31),  # due_date
+            "2026-04",  # billing_period
+            None,
+            None,  # created_at, updated_at
         )
         bill_row = MagicMock()
         bill_row.__getitem__ = lambda self, idx: bill_row_values[idx]
@@ -336,7 +332,7 @@ class TestFranchiseFeeRoutesEvents:
         # 顺序：_set_rls / _fetch_bill / INSERT payment / UPDATE bill
         db.execute.side_effect = [
             MagicMock(),  # set_config
-            bill_res,     # SELECT bill detail
+            bill_res,  # SELECT bill detail
             MagicMock(),  # INSERT payment
             MagicMock(),  # UPDATE bill
         ]
@@ -387,9 +383,17 @@ class TestFranchiseFeeRoutesEvents:
 
         db = AsyncMock()
         bill_row_values = (
-            uuid.UUID(BILL_ID), uuid.UUID(FRANCHISEE_ID), "测试加盟商",
-            "royalty", 500_000, 0, "pending",
-            date(2099, 12, 31), "2026-04", None, None,
+            uuid.UUID(BILL_ID),
+            uuid.UUID(FRANCHISEE_ID),
+            "测试加盟商",
+            "royalty",
+            500_000,
+            0,
+            "pending",
+            date(2099, 12, 31),
+            "2026-04",
+            None,
+            None,
         )
         bill_row = MagicMock()
         bill_row.__getitem__ = lambda self, idx: bill_row_values[idx]
@@ -513,19 +517,24 @@ class TestRoyaltyCalculatorEvents:
         db = AsyncMock()
 
         with patch.object(
-            RoyaltyCalculator, "_fetch_active_franchisees",
+            RoyaltyCalculator,
+            "_fetch_active_franchisees",
             return_value=[franchisee],
         ), patch.object(
-            RoyaltyCalculator, "_fetch_franchisee_store_ids",
+            RoyaltyCalculator,
+            "_fetch_franchisee_store_ids",
             return_value=[uuid4()],
         ), patch.object(
-            RoyaltyCalculator, "_sum_store_revenue_fen",
+            RoyaltyCalculator,
+            "_sum_store_revenue_fen",
             return_value=10_000_000,  # 10 万元营业额（分）
         ), patch.object(
-            RoyaltyCalculator, "_find_existing_bill",
+            RoyaltyCalculator,
+            "_find_existing_bill",
             return_value=None,  # 无已有账单
         ), patch.object(
-            RoyaltyCalculator, "_insert_royalty_bill",
+            RoyaltyCalculator,
+            "_insert_royalty_bill",
             return_value=None,
         ), patch(
             "services.tx_org.src.services.royalty_calculator.emit_event",
@@ -579,16 +588,20 @@ class TestRoyaltyCalculatorEvents:
         db = AsyncMock()
         existing_id = uuid4()
         with patch.object(
-            RoyaltyCalculator, "_fetch_active_franchisees",
+            RoyaltyCalculator,
+            "_fetch_active_franchisees",
             return_value=[franchisee],
         ), patch.object(
-            RoyaltyCalculator, "_fetch_franchisee_store_ids",
+            RoyaltyCalculator,
+            "_fetch_franchisee_store_ids",
             return_value=[uuid4()],
         ), patch.object(
-            RoyaltyCalculator, "_sum_store_revenue_fen",
+            RoyaltyCalculator,
+            "_sum_store_revenue_fen",
             return_value=10_000_000,
         ), patch.object(
-            RoyaltyCalculator, "_find_existing_bill",
+            RoyaltyCalculator,
+            "_find_existing_bill",
             return_value=existing_id,  # 命中已有账单
         ), patch(
             "services.tx_org.src.services.royalty_calculator.emit_event",
@@ -648,7 +661,9 @@ class TestFranchiseSettlementServiceEvents:
         db.execute.return_value = MagicMock()
 
         with patch.object(
-            service, "_fetch_franchisee", return_value=franchisee,
+            service,
+            "_fetch_franchisee",
+            return_value=franchisee,
         ), patch(
             "services.tx_org.src.services.franchise_settlement_service.emit_event",
             new_callable=AsyncMock,
@@ -737,6 +752,7 @@ class TestFranchiseEventTypeRegistry:
 
     def test_franchise_event_type_has_11_members(self):
         from shared.events.src.event_types import FranchiseEventType
+
         assert len(list(FranchiseEventType)) == 11
 
     def test_franchise_event_type_in_all_event_enums(self):
@@ -744,6 +760,7 @@ class TestFranchiseEventTypeRegistry:
             ALL_EVENT_ENUMS,
             FranchiseEventType,
         )
+
         assert FranchiseEventType in ALL_EVENT_ENUMS
 
     def test_franchise_domain_in_stream_maps(self):
@@ -753,6 +770,7 @@ class TestFranchiseEventTypeRegistry:
             resolve_stream_key,
             resolve_stream_type,
         )
+
         assert DOMAIN_STREAM_MAP["franchise"] == "tx_franchise_events"
         assert DOMAIN_STREAM_TYPE_MAP["franchise"] == "franchise"
         assert resolve_stream_key("franchise.fee_paid") == "tx_franchise_events"

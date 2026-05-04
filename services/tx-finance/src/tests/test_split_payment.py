@@ -280,9 +280,9 @@ async def test_preview_amounts_are_integers():
     assert resp.status_code == 200
     d = resp.json()["data"]
     for item in d["preview_items"]:
-        assert isinstance(item["amount_fen"], int), (
-            f"amount_fen 不是整数: {item['amount_fen']} ({type(item['amount_fen'])})"
-        )
+        assert isinstance(
+            item["amount_fen"], int
+        ), f"amount_fen 不是整数: {item['amount_fen']} ({type(item['amount_fen'])})"
     total = sum(item["amount_fen"] for item in d["preview_items"])
     assert total == 10001, f"余数处理后总和 {total} != 10001"
     assert d["amounts_are_integers"] is True

@@ -108,14 +108,16 @@ async def create_self_pickup_order(
     for _ in range(3):
         candidate = _gen_pickup_code()
         conflict = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM orders
                 WHERE store_id = :store_id
                   AND pickup_code = :code
                   AND DATE(created_at AT TIME ZONE 'UTC') = CURRENT_DATE
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": body.store_id, "code": candidate},
         )
         if conflict.one_or_none() is None:
@@ -129,7 +131,8 @@ async def create_self_pickup_order(
     order_id = uuid.uuid4()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO orders (
                 id, tenant_id, store_id, order_no, order_type,
                 customer_id, status, total_amount_fen, discount_amount_fen,
@@ -141,7 +144,8 @@ async def create_self_pickup_order(
                 :total_amount_fen, :notes, :pickup_code, :pickup_channel,
                 'self_pickup', :now, :now, FALSE
             )
-        """),
+        """
+        ),
         {
             "id": order_id,
             "tenant_id": tid,
@@ -189,7 +193,8 @@ async def get_pickup_queue(
     where_clause = "AND pickup_confirmed_at IS NOT NULL" if include_confirmed else "AND pickup_confirmed_at IS NULL"
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 id, order_no, pickup_code, pickup_channel,
                 total_amount_fen, status, notes,
@@ -209,7 +214,8 @@ async def get_pickup_queue(
             ORDER BY
                 CASE WHEN pickup_ready_at IS NOT NULL AND pickup_confirmed_at IS NULL THEN 0 ELSE 1 END,
                 created_at ASC
-        """),
+        """
+        ),
         {"tenant_id": tid, "store_id": store_id},
     )
     rows = [dict(r) for r in result.mappings()]
@@ -243,7 +249,8 @@ async def mark_ready(
     now = _now_utc()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE orders
             SET pickup_ready_at = :now, updated_at = :now
             WHERE id = :order_id
@@ -252,7 +259,8 @@ async def mark_ready(
               AND pickup_ready_at IS NULL
               AND is_deleted = false
             RETURNING id, order_no, pickup_code
-        """),
+        """
+        ),
         {"now": now, "order_id": order_id, "tenant_id": tid},
     )
     row = result.mappings().one_or_none()
@@ -288,12 +296,14 @@ async def confirm_pickup(
     now = _now_utc()
 
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, order_no, pickup_code, pickup_ready_at
             FROM orders
             WHERE id = :order_id AND tenant_id = :tenant_id
               AND order_type = 'self_pickup' AND is_deleted = false
-        """),
+        """
+        ),
         {"order_id": order_id, "tenant_id": tid},
     )
     row = check.mappings().one_or_none()
@@ -303,11 +313,13 @@ async def confirm_pickup(
         _err("备餐尚未完成，无法确认取货", code=422)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE orders
             SET pickup_confirmed_at = :now, updated_at = :now
             WHERE id = :order_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"now": now, "order_id": order_id, "tenant_id": tid},
     )
     await db.commit()

@@ -116,7 +116,8 @@ async def _fetch_swaps_from_db(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": tenant_id},
     )
-    sql = text("""
+    sql = text(
+        """
         SELECT
             id::text                                        AS id,
             from_date,
@@ -130,7 +131,8 @@ async def _fetch_swaps_from_db(
           AND (:status IS NULL OR status = :status)
         ORDER BY created_at DESC
         LIMIT 50
-    """)
+    """
+    )
     result = await db.execute(sql, {"crew_id": crew_id, "status": status})
     rows = result.mappings().all()
     items = []

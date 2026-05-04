@@ -279,12 +279,14 @@ async def _clone_tables(
     cloned = 0
     for tbl in source_items:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO tables (id, tenant_id, store_id, table_no, area, floor, seats,
                     min_consume_fen, status, sort_order, is_active, config)
                 VALUES (:id, :tid::uuid, :sid::uuid, :table_no, :area, :floor, :seats,
                     :min_consume_fen, 'free', :sort_order, :is_active, :config)
-            """),
+            """
+            ),
             {
                 "id": _new_id(),
                 "tid": tenant_id,
@@ -317,10 +319,12 @@ async def _clone_production_depts(
     cloned = 0
     for dept in source_items:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO production_depts (id, tenant_id, dept_name, dept_code, brand_id, fixed_fee_type, sort_order)
                 VALUES (:id, :tid::uuid, :dept_name, :dept_code, :brand_id::uuid, :fixed_fee_type, :sort_order)
-            """),
+            """
+            ),
             {
                 "id": _new_id(),
                 "tid": tenant_id,
@@ -345,12 +349,14 @@ async def _clone_receipt_templates(
     cloned = 0
     for tmpl in source_items:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO receipt_templates (id, tenant_id, store_id, template_name, print_type,
                     template_content, paper_width, is_default, is_active)
                 VALUES (:id, :tid::uuid, :sid::uuid, :template_name, :print_type,
                     :template_content, :paper_width, :is_default, :is_active)
-            """),
+            """
+            ),
             {
                 "id": _new_id(),
                 "tid": tenant_id,
@@ -380,7 +386,8 @@ async def _clone_attendance_rules(
     today = datetime.now().strftime("%Y-%m-%d")
     for rule in source_items:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO attendance_rules (id, tenant_id, store_id, rule_name,
                     grace_period_minutes, early_leave_grace_minutes, overtime_min_minutes,
                     max_hours_week, max_overtime_month_hours, late_deduction_fen,
@@ -391,7 +398,8 @@ async def _clone_attendance_rules(
                     :max_week, :max_ot_month, :late_ded,
                     :early_ded, :bonus,
                     :clock_methods, :effective_from, NULL, true)
-            """),
+            """
+            ),
             {
                 "id": _new_id(),
                 "tid": tenant_id,
@@ -423,10 +431,12 @@ async def _clone_shift_configs(
     cloned = 0
     for shift in source_items:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO shift_configs (id, tenant_id, store_id, shift_name, start_time, end_time, color, is_active)
                 VALUES (:id, :tid::uuid, :sid::uuid, :shift_name, :start_time, :end_time, :color, :is_active)
-            """),
+            """
+            ),
             {
                 "id": _new_id(),
                 "tid": tenant_id,
@@ -456,14 +466,16 @@ async def _clone_dispatch_rules(
     cloned = 0
     for rule in source_items:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dispatch_rules (id, tenant_id, name, priority, match_dish_id,
                     match_dish_category, match_brand_id, match_channel, match_time_start,
                     match_time_end, match_day_type, target_dept_id, target_printer_id)
                 VALUES (:id, :tid::uuid, :name, :priority, :match_dish_id,
                     :match_dish_category, :match_brand_id, :match_channel, :match_time_start,
                     :match_time_end, :match_day_type, :target_dept_id, NULL)
-            """),
+            """
+            ),
             {
                 "id": _new_id(),
                 "tid": tenant_id,
@@ -494,11 +506,13 @@ async def _clone_store_push_configs(
         return CloneItemResult(status="skipped", cloned=0)
     cfg = source_items[0]
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO store_push_configs (id, tenant_id, store_id, push_mode)
             VALUES (:id, :tid::uuid, :sid::uuid, :push_mode)
             ON CONFLICT (tenant_id, store_id) DO UPDATE SET push_mode = EXCLUDED.push_mode
-        """),
+        """
+        ),
         {
             "id": _new_id(),
             "tid": tenant_id,

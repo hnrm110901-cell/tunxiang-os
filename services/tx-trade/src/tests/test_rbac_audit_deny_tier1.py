@@ -480,9 +480,9 @@ async def test_forged_x_tenant_id_does_not_pollute_victim_audit_table(
     # tenant_id 走 NIL — 不写到 victim 租户表
     assert call["tenant_id"] == NIL_TENANT_UUID
     # forged 值保留在 reason 中作为证据
-    assert "probed_tenant" in call["reason"], (
-        f"forged X-Tenant-ID must be preserved in reason for forensics; got reason={call['reason']!r}"
-    )
+    assert (
+        "probed_tenant" in call["reason"]
+    ), f"forged X-Tenant-ID must be preserved in reason for forensics; got reason={call['reason']!r}"
     assert XUJI_CHANGSHA_TENANT in call["reason"]
 
 
@@ -543,9 +543,9 @@ async def test_audit_deny_internal_defense_for_empty_tenant_id(stub_db):
     )
 
     # set_config 必须收到 NIL UUID，不是空串
-    assert NIL_TENANT_UUID in captured_tids, (
-        f"audit_deny must defensively coerce empty tenant_id to NIL UUID; got captured tids={captured_tids}"
-    )
+    assert (
+        NIL_TENANT_UUID in captured_tids
+    ), f"audit_deny must defensively coerce empty tenant_id to NIL UUID; got captured tids={captured_tids}"
     assert "" not in captured_tids
 
 
@@ -653,9 +653,9 @@ async def test_pg_integration_unauthenticated_audit_actually_persists():
             assert row.result == "deny"
             assert "probed_tenant" in row.reason
             # 第二轮 §19 复审追加：user_id 列必须是 NIL UUID（不能是 "(unauthenticated)" 字符串）
-            assert str(row.user_id) == "00000000-0000-0000-0000-000000000000", (
-                f"user_id 应是 NIL UUID 兜底；得到 {row.user_id!r}"
-            )
+            assert (
+                str(row.user_id) == "00000000-0000-0000-0000-000000000000"
+            ), f"user_id 应是 NIL UUID 兜底；得到 {row.user_id!r}"
             assert row.user_role == "(unauthenticated)"
     finally:
         await engine.dispose()
@@ -703,9 +703,9 @@ async def test_audit_deny_empty_user_id_uses_nil_uuid_not_string_sentinel(stub_d
     assert len(insert_params) == 1
     p = insert_params[0]
     # user_id 必须是合法 UUID 格式（NIL UUID）
-    assert p["user_id"] == NIL_TENANT_UUID, (
-        f"user_id 必须用 NIL UUID 兜底；得到 {p['user_id']!r}（这会让 PG cast 失败）"
-    )
+    assert (
+        p["user_id"] == NIL_TENANT_UUID
+    ), f"user_id 必须用 NIL UUID 兜底；得到 {p['user_id']!r}（这会让 PG cast 失败）"
     # user_role 列保留 "(unauthenticated)" 语义（TEXT 列无 cast 限制）
     assert p["user_role"] == "(unauthenticated)"
 

@@ -56,9 +56,7 @@ class FakeDashboard:
             time_window=tw,
             variant_subjects={"control": ["u1", "u2"], "variant_a": ["u3", "u4"]},
             cells=[
-                VariantMetricCell(
-                    variant="control", metric_key="payment_success_rate", n=2, mean=0.99
-                ),
+                VariantMetricCell(variant="control", metric_key="payment_success_rate", n=2, mean=0.99),
                 VariantMetricCell(
                     variant="variant_a",
                     metric_key="payment_success_rate",
@@ -118,9 +116,7 @@ class FakeBreaker:
         )
 
     async def reset(self, *, tenant_id: str, experiment_key: str, actor: str) -> None:
-        self.reset_calls.append(
-            {"tenant_id": tenant_id, "experiment_key": experiment_key, "actor": actor}
-        )
+        self.reset_calls.append({"tenant_id": tenant_id, "experiment_key": experiment_key, "actor": actor})
 
 
 # ── 测试 fixture ──────────────────────────────────────────────────────

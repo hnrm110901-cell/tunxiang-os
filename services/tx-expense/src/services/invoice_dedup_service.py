@@ -112,13 +112,15 @@ class InvoiceDedupService:
 
         # ── Step 1：查询是否存在 ─────────────────────────────────────────────
         try:
-            select_stmt = text("""
+            select_stmt = text(
+                """
                 SELECT group_id, first_tenant_id, first_invoice_id,
                        first_reported_at, total_usage_count, is_suspicious
                 FROM invoice_dedup_groups
                 WHERE group_id = :group_key
                 FOR UPDATE
-            """)
+            """
+            )
             result = await db.execute(select_stmt, {"group_key": group_key})
             row = result.mappings().one_or_none()
         except SQLAlchemyError as exc:
@@ -143,7 +145,8 @@ class InvoiceDedupService:
             # ── Step 2：首次使用，创建组记录 ─────────────────────────────────
             try:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO invoice_dedup_groups (
                             group_id, first_tenant_id, first_invoice_id,
                             first_reported_at, total_usage_count, is_suspicious,
@@ -154,7 +157,8 @@ class InvoiceDedupService:
                             :now, :now
                         )
                         ON CONFLICT (group_id) DO NOTHING
-                    """),
+                    """
+                    ),
                     {
                         "group_key": group_key,
                         "tenant_id": str(tenant_id),
@@ -198,13 +202,15 @@ class InvoiceDedupService:
 
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE invoice_dedup_groups SET
                         total_usage_count = :new_count,
                         is_suspicious = is_suspicious OR :is_cross_brand,
                         updated_at = :now
                     WHERE group_id = :group_key
-                """),
+                """
+                ),
                 {
                     "new_count": new_usage_count,
                     "is_cross_brand": is_cross_brand,
@@ -272,7 +278,8 @@ class InvoiceDedupService:
         """幂等插入 group_invoice_cross_ref（ON CONFLICT DO NOTHING）。"""
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO group_invoice_cross_ref (
                         group_id, tenant_id, invoice_id,
                         expense_application_id, reported_at
@@ -281,7 +288,8 @@ class InvoiceDedupService:
                         :expense_application_id, :now
                     )
                     ON CONFLICT (group_id, tenant_id, invoice_id) DO NOTHING
-                """),
+                """
+                ),
                 {
                     "group_key": group_key,
                     "tenant_id": str(tenant_id),
@@ -510,11 +518,13 @@ class InvoiceDedupService:
             LookupError: group_id 不存在时抛出（路由层转 404）
             ValueError: 已经处理过时抛出（路由层转 400）
         """
-        check_sql = text("""
+        check_sql = text(
+            """
             SELECT group_id, resolved_at
             FROM invoice_dedup_groups
             WHERE group_id = :group_id
-        """)
+        """
+        )
         try:
             check_result = await db.execute(check_sql, {"group_id": group_id})
             row = check_result.mappings().one_or_none()
@@ -536,14 +546,16 @@ class InvoiceDedupService:
         now = _now_utc()
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE invoice_dedup_groups SET
                         resolved_at = :resolved_at,
                         resolved_by = :resolved_by,
                         resolve_note = :note,
                         updated_at = :now
                     WHERE group_id = :group_id
-                """),
+                """
+                ),
                 {
                     "resolved_at": now,
                     "resolved_by": str(resolved_by),

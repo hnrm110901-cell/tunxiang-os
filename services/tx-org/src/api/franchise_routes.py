@@ -72,7 +72,9 @@ class RoyaltyTierReq(BaseModel):
     - 二选一：传 _fen 优先；都未传时取 0；都传时以 _fen 为准
     """
 
-    min_revenue: Optional[float] = Field(default=None, ge=0, description="[DEPRECATED] 元（float），改用 min_revenue_fen")
+    min_revenue: Optional[float] = Field(
+        default=None, ge=0, description="[DEPRECATED] 元（float），改用 min_revenue_fen"
+    )
     min_revenue_fen: Optional[int] = Field(default=None, ge=0, description="分（int，推荐）")
     rate: float = Field(..., gt=0, lt=1)
 

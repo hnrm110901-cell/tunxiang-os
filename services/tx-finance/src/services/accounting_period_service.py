@@ -23,20 +23,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Iterable
 
 import structlog
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from models.accounting_period import (  # type: ignore
     STATUS_CLOSED,
-    STATUS_LOCKED,
     STATUS_OPEN,
     AccountingPeriod,
     month_range,
 )
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 
@@ -120,9 +117,7 @@ class AccountingPeriodService:
                     month=month,
                 )
                 if winner is None:
-                    raise RuntimeError(
-                        f"ensure_period race refetch miss: {year}-{month:02d}"
-                    ) from exc
+                    raise RuntimeError(f"ensure_period race refetch miss: {year}-{month:02d}") from exc
                 return winner
             raise
 
@@ -148,7 +143,10 @@ class AccountingPeriodService:
     ) -> AccountingPeriod:
         """月结: open → closed. Period 不存在则报错."""
         period = await self._require_period(
-            session=session, tenant_id=tenant_id, year=year, month=month,
+            session=session,
+            tenant_id=tenant_id,
+            year=year,
+            month=month,
         )
         period.close(operator_id=operator_id, reason=reason, closed_at=closed_at)
         await session.flush()
@@ -173,10 +171,15 @@ class AccountingPeriodService:
     ) -> AccountingPeriod:
         """重开: closed → open. locked 拒."""
         period = await self._require_period(
-            session=session, tenant_id=tenant_id, year=year, month=month,
+            session=session,
+            tenant_id=tenant_id,
+            year=year,
+            month=month,
         )
         period.reopen(
-            operator_id=operator_id, reason=reason, reopened_at=reopened_at,
+            operator_id=operator_id,
+            reason=reason,
+            reopened_at=reopened_at,
         )
         await session.flush()
         log.info(
@@ -200,7 +203,10 @@ class AccountingPeriodService:
     ) -> AccountingPeriod:
         """年结锁定: closed → locked. 必须先月结."""
         period = await self._require_period(
-            session=session, tenant_id=tenant_id, year=year, month=month,
+            session=session,
+            tenant_id=tenant_id,
+            year=year,
+            month=month,
         )
         period.lock(operator_id=operator_id, reason=reason, locked_at=locked_at)
         await session.flush()
@@ -226,12 +232,12 @@ class AccountingPeriodService:
         前置: 12 张 period 全部必须是 closed 状态.
         """
         periods = await self._find_year_periods(
-            session=session, tenant_id=tenant_id, year=year,
+            session=session,
+            tenant_id=tenant_id,
+            year=year,
         )
         if len(periods) != 12:
-            raise ValueError(
-                f"{year} 年度只找到 {len(periods)} 个 period, 需要先全部月结才能年结"
-            )
+            raise ValueError(f"{year} 年度只找到 {len(periods)} 个 period, 需要先全部月结才能年结")
         not_closed = [p for p in periods if p.status != STATUS_CLOSED]
         if not_closed:
             raise ValueError(
@@ -281,7 +287,10 @@ class AccountingPeriodService:
     ) -> AccountingPeriod | None:
         """按 (year, month) 查 period. 不存在返回 None."""
         return await self._find_period(
-            session=session, tenant_id=tenant_id, year=year, month=month,
+            session=session,
+            tenant_id=tenant_id,
+            year=year,
+            month=month,
         )
 
     async def list_open_periods(
@@ -321,7 +330,9 @@ class AccountingPeriodService:
           - period 存在且 closed/locked: 不可写
         """
         period = await self.find_period_for_date(
-            tenant_id=tenant_id, biz_date=biz_date, session=session,
+            tenant_id=tenant_id,
+            biz_date=biz_date,
+            session=session,
         )
         if period is None:
             if auto_ensure:
@@ -385,10 +396,11 @@ class AccountingPeriodService:
         month: int,
     ) -> AccountingPeriod:
         period = await self._find_period(
-            session=session, tenant_id=tenant_id, year=year, month=month,
+            session=session,
+            tenant_id=tenant_id,
+            year=year,
+            month=month,
         )
         if period is None:
-            raise ValueError(
-                f"账期 {year}-{month:02d} 不存在 (需先 ensure_period)"
-            )
+            raise ValueError(f"账期 {year}-{month:02d} 不存在 (需先 ensure_period)")
         return period

@@ -151,7 +151,8 @@ async def list_campaigns(
 
         where_clause = " AND ".join(conditions)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, name, campaign_type, status,
                        start_at, end_at, budget_fen, used_fen,
                        target_audience, rules, applicable_stores,
@@ -161,7 +162,8 @@ async def list_campaigns(
                 WHERE {where_clause}
                 ORDER BY priority DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [_row_to_dict(r) for r in result.fetchall()]
@@ -212,7 +214,8 @@ async def check_conflicts(
             params["exclude_id"] = uuid.UUID(exclude_id)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, status, start_at, end_at
                 FROM campaigns
                 WHERE is_deleted = false
@@ -222,7 +225,8 @@ async def check_conflicts(
                   AND end_at > :start_at
                   {extra_cond}
                 ORDER BY start_at
-            """),
+            """
+            ),
             params,
         )
         conflicts = [_row_to_dict(r) for r in result.fetchall()]
@@ -243,7 +247,8 @@ async def get_campaign(
     try:
         await _set_tenant(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, name, campaign_type, status,
                        start_at, end_at, budget_fen, used_fen,
                        target_audience, rules, applicable_stores,
@@ -251,7 +256,8 @@ async def get_campaign(
                        created_by, created_at, updated_at
                 FROM campaigns
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": uuid.UUID(campaign_id)},
         )
         row = result.fetchone()
@@ -290,7 +296,8 @@ async def create_campaign(
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaigns (
                     id, tenant_id, name, campaign_type, status,
                     start_at, end_at, budget_fen, used_fen,
@@ -304,7 +311,8 @@ async def create_campaign(
                     :priority, :max_per_member, 0,
                     :now, :now, false
                 )
-            """),
+            """
+            ),
             {
                 "id": campaign_id,
                 "tenant_id": uuid.UUID(x_tenant_id),
@@ -593,12 +601,14 @@ async def apply_campaign(
         await _set_tenant(db, x_tenant_id)
 
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, rules, target_audience, budget_fen, used_fen,
                        max_per_member, campaign_type
                 FROM campaigns
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": uuid.UUID(campaign_id)},
         )
         row = cur.fetchone()
@@ -647,11 +657,13 @@ async def apply_campaign(
         max_per_member = camp["max_per_member"]
         if max_per_member is not None:
             count_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM campaign_participants
                     WHERE campaign_id = :cid
                       AND (member_id = :mid OR customer_id = :mid_uuid)
-                """),
+                """
+                ),
                 {"cid": uuid.UUID(campaign_id), "mid": req.member_id, "mid_uuid": _try_uuid(req.member_id)},
             )
             participation_count = count_result.scalar() or 0
@@ -676,7 +688,8 @@ async def apply_campaign(
         store_uuid = _try_uuid(req.store_id) if req.store_id else None
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaign_participants (
                     id, tenant_id, campaign_id, customer_id,
                     member_id, order_id, participation_type,
@@ -688,7 +701,8 @@ async def apply_campaign(
                     :discount_applied_fen, 0, :store_id,
                     :now
                 )
-            """),
+            """
+            ),
             {
                 "id": participant_id,
                 "tenant_id": uuid.UUID(x_tenant_id),
@@ -704,14 +718,16 @@ async def apply_campaign(
 
         # 原子更新 used_fen / total_participants
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE campaigns
                 SET used_fen = used_fen + :discount,
                     total_participants = total_participants + 1,
                     participant_count = participant_count + 1,
                     updated_at = NOW()
                 WHERE id = :id
-            """),
+            """
+            ),
             {"discount": discount_fen, "id": uuid.UUID(campaign_id)},
         )
 
@@ -752,12 +768,14 @@ async def get_campaign_stats(
         await _set_tenant(db, x_tenant_id)
 
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, status, budget_fen, used_fen, total_participants,
                        participant_count, total_cost_fen
                 FROM campaigns
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": uuid.UUID(campaign_id)},
         )
         row = cur.fetchone()
@@ -768,14 +786,16 @@ async def get_campaign_stats(
 
         # 从 campaign_participants 汇总实际折扣总额
         agg = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS participant_count,
                     COALESCE(SUM(discount_applied_fen), 0) AS total_discount_fen,
                     COALESCE(SUM(points_earned), 0) AS total_points_earned
                 FROM campaign_participants
                 WHERE campaign_id = :cid
-            """),
+            """
+            ),
             {"cid": uuid.UUID(campaign_id)},
         )
         agg_row = _row_to_dict(agg.fetchone())

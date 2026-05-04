@@ -289,7 +289,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
             stat_date: date = date.fromisoformat(stat_date_str) if stat_date_str else date.today()
 
             row = await self._db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         total_orders,
                         discounted_orders,
@@ -303,7 +304,8 @@ class DiscountGuardAgent(EdgeAwareMixin, SkillAgent):
                     WHERE tenant_id = :tid
                       AND store_id = :sid
                       AND stat_date = :dt
-                """),
+                """
+                ),
                 {
                     "tid": self.tenant_id,
                     "sid": store_id,

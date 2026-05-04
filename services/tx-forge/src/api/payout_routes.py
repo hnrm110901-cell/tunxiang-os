@@ -25,8 +25,10 @@ async def request_payout(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.payouts (tenant_id, developer_id, amount, currency, status)
-                VALUES (:tid, :developer_id, :amount, :currency, 'pending') RETURNING *"""),
+        text(
+            """INSERT INTO forge.payouts (tenant_id, developer_id, amount, currency, status)
+                VALUES (:tid, :developer_id, :amount, :currency, 'pending') RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "developer_id": body["developer_id"],

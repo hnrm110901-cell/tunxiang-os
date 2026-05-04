@@ -78,7 +78,8 @@ async def create_banner(
     )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO banners
                 (tenant_id, title, banner_type, image_url, link_url,
                  target_segment, display_order, start_at, end_at,
@@ -90,7 +91,8 @@ async def create_banner(
             RETURNING id, tenant_id, title, banner_type, image_url, link_url,
                       target_segment, display_order, start_at, end_at,
                       is_active, impression_count, click_count, created_at, updated_at
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "title": title,
@@ -148,14 +150,16 @@ async def list_banners(
 
     where = " AND ".join(conditions)
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, title, banner_type, image_url, link_url,
                    target_segment, display_order, start_at, end_at,
                    is_active, impression_count, click_count, created_at, updated_at
             FROM banners
             WHERE {where}
             ORDER BY display_order ASC, created_at DESC
-        """),
+        """
+        ),
         params,
     )
     rows = result.mappings().all()
@@ -181,14 +185,16 @@ async def record_impression(
         {"tid": tenant_id},
     )
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE banners
             SET impression_count = impression_count + 1,
                 updated_at = NOW()
             WHERE id = :banner_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"banner_id": banner_id, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -212,14 +218,16 @@ async def record_click(
         {"tid": tenant_id},
     )
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE banners
             SET click_count = click_count + 1,
                 updated_at = NOW()
             WHERE id = :banner_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"banner_id": banner_id, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -246,14 +254,16 @@ async def get_banner_stats(
         {"tid": tenant_id},
     )
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, title, banner_type, impression_count, click_count,
                    is_active, created_at, updated_at
             FROM banners
             WHERE id = :banner_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"banner_id": banner_id, "tenant_id": tenant_id},
     )
     row = result.mappings().one_or_none()
@@ -288,14 +298,16 @@ async def disable_banner(
         {"tid": tenant_id},
     )
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE banners
             SET is_active = FALSE, updated_at = NOW()
             WHERE id = :banner_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
             RETURNING id
-        """),
+        """
+        ),
         {"banner_id": banner_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()

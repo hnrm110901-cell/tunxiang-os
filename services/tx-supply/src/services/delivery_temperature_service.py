@@ -47,7 +47,7 @@ CONTINUITY_GAP_SECONDS = 120
 
 # 严重性升级阈值（持续秒数）
 SEVERITY_CRITICAL_SECONDS = 600  # 持续超限 ≥10 分钟升 CRITICAL
-SEVERITY_WARNING_SECONDS = 60    # 持续超限 ≥1 分钟升 WARNING
+SEVERITY_WARNING_SECONDS = 60  # 持续超限 ≥1 分钟升 WARNING
 
 
 def _uuid(val: str | uuid.UUID) -> uuid.UUID:
@@ -95,11 +95,7 @@ async def create_threshold(
         raise ValueError(f"非法 scope_type: {scope_type}")
     if min_temp_celsius is None and max_temp_celsius is None:
         raise ValueError("min_temp_celsius / max_temp_celsius 不能同时为空")
-    if (
-        min_temp_celsius is not None
-        and max_temp_celsius is not None
-        and max_temp_celsius < min_temp_celsius
-    ):
+    if min_temp_celsius is not None and max_temp_celsius is not None and max_temp_celsius < min_temp_celsius:
         raise ValueError("max_temp_celsius 必须 >= min_temp_celsius")
     if alert_min_seconds < 1:
         raise ValueError("alert_min_seconds 必须 >= 1")
@@ -176,7 +172,11 @@ async def get_applicable_threshold(
             ScopeType.GLOBAL.value: None,
         }.get(row.scope_type)
 
-        if row.scope_type == ScopeType.GLOBAL.value or match_value is not None and (row.scope_value or "").lower() == match_value.lower():
+        if (
+            row.scope_type == ScopeType.GLOBAL.value
+            or match_value is not None
+            and (row.scope_value or "").lower() == match_value.lower()
+        ):
             candidates.append((SCOPE_PRIORITY[row.scope_type], row))
 
     if not candidates:
@@ -784,12 +784,8 @@ def _serialize_alert(a: DeliveryTemperatureAlert) -> dict:
         "peak_temperature_celsius": float(a.peak_temperature_celsius)
         if a.peak_temperature_celsius is not None
         else None,
-        "threshold_min_celsius": float(a.threshold_min_celsius)
-        if a.threshold_min_celsius is not None
-        else None,
-        "threshold_max_celsius": float(a.threshold_max_celsius)
-        if a.threshold_max_celsius is not None
-        else None,
+        "threshold_min_celsius": float(a.threshold_min_celsius) if a.threshold_min_celsius is not None else None,
+        "threshold_max_celsius": float(a.threshold_max_celsius) if a.threshold_max_celsius is not None else None,
         "severity": a.severity,
         "status": a.status,
         "handle_action": a.handle_action,

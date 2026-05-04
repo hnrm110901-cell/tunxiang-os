@@ -75,7 +75,8 @@ class StoredValueSplitService:
             safe_store_ids = [str(uuid.UUID(s)) for s in store_ids]
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stored_value_split_rules
                     (id, tenant_id, rule_name,
                      recharge_store_ratio, consume_store_ratio, hq_ratio,
@@ -86,7 +87,8 @@ class StoredValueSplitService:
                      :r_ratio, :c_ratio, :h_ratio,
                      :scope, :store_ids::UUID[], :is_default,
                      :eff_from, :eff_to)
-            """),
+            """
+            ),
             {
                 "id": rule_id,
                 "tid": self._tid,
@@ -125,7 +127,8 @@ class StoredValueSplitService:
             safe_store_ids = [str(uuid.UUID(s)) for s in store_ids]
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE stored_value_split_rules
                 SET rule_name               = :name,
                     recharge_store_ratio    = :r_ratio,
@@ -138,7 +141,8 @@ class StoredValueSplitService:
                     effective_to           = :eff_to,
                     updated_at             = NOW()
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "id": uuid.UUID(rule_id),
                 "tid": self._tid,
@@ -163,13 +167,15 @@ class StoredValueSplitService:
         """查询单条规则"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, rule_name, recharge_store_ratio, consume_store_ratio,
                        hq_ratio, scope_type, applicable_store_ids, is_default,
                        effective_from, effective_to, created_at, updated_at
                 FROM stored_value_split_rules
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": uuid.UUID(rule_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -222,7 +228,8 @@ class StoredValueSplitService:
 
         # 先查包含消费店或充值店的自定义规则
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, rule_name, recharge_store_ratio, consume_store_ratio,
                        hq_ratio, scope_type, applicable_store_ids, is_default,
                        effective_from, effective_to, created_at, updated_at
@@ -237,7 +244,8 @@ class StoredValueSplitService:
                   )
                 ORDER BY created_at ASC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "today": today,
@@ -251,7 +259,8 @@ class StoredValueSplitService:
 
         # 再查默认规则
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, rule_name, recharge_store_ratio, consume_store_ratio,
                        hq_ratio, scope_type, applicable_store_ids, is_default,
                        effective_from, effective_to, created_at, updated_at
@@ -263,7 +272,8 @@ class StoredValueSplitService:
                   AND (effective_to   IS NULL OR effective_to   >= :today)
                 ORDER BY created_at ASC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": self._tid, "today": today},
         )
         row = result.fetchone()
@@ -300,7 +310,8 @@ class StoredValueSplitService:
 
         ledger_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stored_value_split_ledger
                     (id, tenant_id, transaction_id, rule_id,
                      recharge_store_id, consume_store_id,
@@ -313,7 +324,8 @@ class StoredValueSplitService:
                      :total, :r_amount,
                      :c_amount, :h_amount,
                      'pending')
-            """),
+            """
+            ),
             {
                 "id": ledger_id,
                 "tid": self._tid,
@@ -368,7 +380,8 @@ class StoredValueSplitService:
 
         # 查原始分账记录
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT rule_id, recharge_store_id, consume_store_id,
                        total_amount_fen, recharge_store_amount_fen,
                        consume_store_amount_fen, hq_amount_fen
@@ -377,7 +390,8 @@ class StoredValueSplitService:
                   AND transaction_id = :txn_id
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": self._tid, "txn_id": uuid.UUID(original_transaction_id)},
         )
         orig = result.fetchone()
@@ -395,7 +409,8 @@ class StoredValueSplitService:
 
         ledger_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stored_value_split_ledger
                     (id, tenant_id, transaction_id, rule_id,
                      recharge_store_id, consume_store_id,
@@ -408,7 +423,8 @@ class StoredValueSplitService:
                      :total, :r_amount,
                      :c_amount, :h_amount,
                      'pending')
-            """),
+            """
+            ),
             {
                 "id": ledger_id,
                 "tid": self._tid,
@@ -525,7 +541,8 @@ class StoredValueSplitService:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT l.id, l.transaction_id, l.rule_id,
                        l.recharge_store_id, l.consume_store_id,
                        l.total_amount_fen, l.recharge_store_amount_fen,
@@ -538,7 +555,8 @@ class StoredValueSplitService:
                 {where}
                 ORDER BY l.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [self._ledger_to_dict(row) for row in result.fetchall()]
@@ -566,7 +584,8 @@ class StoredValueSplitService:
             params["ed"] = end_date
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) AS total_records,
                     COALESCE(SUM(ABS(total_amount_fen)), 0) AS total_amount_fen,
@@ -591,7 +610,8 @@ class StoredValueSplitService:
                         AS settled_amount_fen
                 FROM stored_value_split_ledger
                 {where}
-            """),
+            """
+            ),
             params,
         )
         row = result.fetchone()

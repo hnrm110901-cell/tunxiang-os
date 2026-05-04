@@ -13,10 +13,10 @@ from datetime import date, timedelta
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from services.pnl_engine import PnLEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.pnl_engine import PnLEngine
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
@@ -74,7 +74,8 @@ async def get_daily_revenue(
 
     # 按渠道聚合（从 revenue_records 表）
     channel_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 channel,
                 COUNT(*) AS order_count,
@@ -90,7 +91,8 @@ async def get_daily_revenue(
               AND is_deleted = FALSE
             GROUP BY channel
             ORDER BY net_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -102,7 +104,8 @@ async def get_daily_revenue(
     # 若 revenue_records 无数据，尝试从 orders 直接查（实时）
     if not channel_rows:
         channel_result_fallback = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     channel,
                     COUNT(*) AS order_count,
@@ -117,7 +120,8 @@ async def get_daily_revenue(
                   AND is_deleted = FALSE
                 GROUP BY channel
                 ORDER BY net_fen DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "store_id": str(sid),
@@ -159,7 +163,8 @@ async def get_daily_revenue(
 
     # 按支付方式聚合
     payment_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 payment_method,
                 COUNT(*) AS cnt,
@@ -171,7 +176,8 @@ async def get_daily_revenue(
               AND is_deleted = FALSE
             GROUP BY payment_method
             ORDER BY net_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -222,7 +228,8 @@ async def get_channel_mix_trend(
     start_date = end_date - timedelta(days=days - 1)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 record_date,
                 channel,
@@ -234,7 +241,8 @@ async def get_channel_mix_trend(
               AND is_deleted = FALSE
             GROUP BY record_date, channel
             ORDER BY record_date ASC, net_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -310,7 +318,8 @@ async def get_hourly_revenue(
     biz_date = _parse_date_param(revenue_date)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 EXTRACT(HOUR FROM order_time AT TIME ZONE 'Asia/Shanghai')::INT AS hour,
                 COUNT(*) AS order_count,
@@ -324,7 +333,8 @@ async def get_hourly_revenue(
               AND is_deleted = FALSE
             GROUP BY hour
             ORDER BY hour ASC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),

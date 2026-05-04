@@ -140,7 +140,8 @@ class PaymentSaga:
     ) -> None:
         """更新 Saga 步骤到 DB（用于崩溃恢复）"""
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO payment_sagas (
                     id, tenant_id, order_id, step, amount_fen,
                     method, payment_id, trade_no, idempotency_key,
@@ -155,7 +156,8 @@ class PaymentSaga:
                     payment_id = COALESCE(EXCLUDED.payment_id, payment_sagas.payment_id),
                     trade_no = COALESCE(EXCLUDED.trade_no, payment_sagas.trade_no),
                     updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "saga_id": saga_id,
                 "tenant_id": request.tenant_id,
@@ -178,12 +180,14 @@ class PaymentSaga:
         """
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=_PENDING_TIMEOUT_MINUTES)
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, order_id, step, payment_id, trade_no, method, amount_fen
                 FROM payment_sagas
                 WHERE step IN (:s_executing, :s_confirming)
                   AND updated_at < :cutoff
-            """),
+            """
+            ),
             {
                 "s_executing": SagaStep.EXECUTING,
                 "s_confirming": SagaStep.CONFIRMING,

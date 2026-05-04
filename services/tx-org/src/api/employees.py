@@ -223,7 +223,8 @@ async def create_employee(
     employee_id = str(uuid4())
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO employees (
             id, tenant_id, emp_name, phone, id_card_number, gender, birth_date,
             store_id, department_id, job_grade_id, position, employment_type,
@@ -242,7 +243,8 @@ async def create_employee(
             :now, :now, FALSE
         )
         RETURNING id::text AS employee_id
-    """)
+    """
+    )
 
     result = await db.execute(
         sql,
@@ -362,7 +364,8 @@ async def batch_import_employees(
     for idx, emp in enumerate(req.employees):
         try:
             employee_id = str(uuid4())
-            sql = text("""
+            sql = text(
+                """
                 INSERT INTO employees (
                     id, tenant_id, emp_name, phone, id_card_number, gender, birth_date,
                     store_id, department_id, job_grade_id, position, employment_type,
@@ -380,7 +383,8 @@ async def batch_import_employees(
                     :emergency_contact, :emergency_phone, :avatar_url, :status,
                     :now, :now, FALSE
                 )
-            """)
+            """
+            )
             await db.execute(
                 sql,
                 {
@@ -438,7 +442,8 @@ async def get_employee_detail(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             e.id::text AS employee_id,
             e.emp_name,
@@ -474,7 +479,8 @@ async def get_employee_detail(
         LEFT JOIN departments d ON d.id = e.department_id AND d.is_active = TRUE
         LEFT JOIN job_grades jg ON jg.id = e.job_grade_id AND jg.is_deleted = FALSE
         WHERE e.id = :eid AND e.is_deleted = FALSE
-    """)
+    """
+    )
     result = await db.execute(sql, {"eid": employee_id})
     row = result.fetchone()
 
@@ -578,12 +584,14 @@ async def delete_employee(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE employees
             SET status = 'inactive', is_deleted = TRUE, updated_at = :now
             WHERE id = :eid AND is_deleted = FALSE
             RETURNING id::text AS employee_id
-        """),
+        """
+        ),
         {"eid": employee_id, "now": datetime.now(timezone.utc)},
     )
     row = result.fetchone()
@@ -607,7 +615,8 @@ async def get_employee_profile_tabs(
     await _set_tenant(db, tenant_id)
 
     # Tab 1: 基本信息（含部门/岗位）
-    basic_sql = text("""
+    basic_sql = text(
+        """
         SELECT
             e.id::text AS employee_id, e.emp_name, e.phone, e.id_card_number,
             e.gender, e.birth_date, e.store_id::text, e.department_id::text,
@@ -619,7 +628,8 @@ async def get_employee_profile_tabs(
         LEFT JOIN departments d ON d.id = e.department_id AND d.is_active = TRUE
         LEFT JOIN job_grades jg ON jg.id = e.job_grade_id AND jg.is_deleted = FALSE
         WHERE e.id = :eid AND e.is_deleted = FALSE
-    """)
+    """
+    )
     basic_result = await db.execute(basic_sql, {"eid": employee_id})
     basic_row = basic_result.fetchone()
     if not basic_row:
@@ -646,7 +656,8 @@ async def get_employee_profile_tabs(
     }
 
     # Tab 4: 考勤记录（近30天）
-    attendance_sql = text("""
+    attendance_sql = text(
+        """
         SELECT
             date, status, clock_in_time, clock_out_time,
             is_late, is_early_leave, is_absent, overtime_hours,
@@ -656,7 +667,8 @@ async def get_employee_profile_tabs(
           AND date >= CURRENT_DATE - INTERVAL '30 days'
         ORDER BY date DESC
         LIMIT 30
-    """)
+    """
+    )
     attendance_result = await db.execute(attendance_sql, {"eid": employee_id})
     attendance_items = []
     for r in attendance_result.fetchall():
@@ -667,7 +679,8 @@ async def get_employee_profile_tabs(
         attendance_items.append(d)
 
     # Tab 5: 请假记录（近6个月）
-    leave_sql = text("""
+    leave_sql = text(
+        """
         SELECT
             id::text AS leave_id, leave_type, start_date, end_date,
             days, status, reason, created_at
@@ -676,7 +689,8 @@ async def get_employee_profile_tabs(
           AND created_at >= CURRENT_DATE - INTERVAL '6 months'
         ORDER BY created_at DESC
         LIMIT 20
-    """)
+    """
+    )
     leave_result = await db.execute(leave_sql, {"eid": employee_id})
     leave_items = []
     for r in leave_result.fetchall():
@@ -687,7 +701,8 @@ async def get_employee_profile_tabs(
         leave_items.append(d)
 
     # Tab 6: 薪资记录（近6个月）
-    payroll_sql = text("""
+    payroll_sql = text(
+        """
         SELECT
             id::text AS payroll_id, period_year, period_month,
             base_salary, overtime_pay, bonus, deductions,
@@ -697,7 +712,8 @@ async def get_employee_profile_tabs(
           AND status != 'cancelled'
         ORDER BY period_year DESC, period_month DESC
         LIMIT 6
-    """)
+    """
+    )
     payroll_result = await db.execute(payroll_sql, {"eid": employee_id})
     payroll_items = []
     for r in payroll_result.fetchall():
@@ -707,7 +723,8 @@ async def get_employee_profile_tabs(
         payroll_items.append(d)
 
     # Tab 7: 绩效记录
-    perf_sql = text("""
+    perf_sql = text(
+        """
         SELECT
             id::text AS performance_id, period_year, period_month,
             score, level, review_note, reviewer_id::text, created_at
@@ -715,7 +732,8 @@ async def get_employee_profile_tabs(
         WHERE employee_id = :eid
         ORDER BY period_year DESC, period_month DESC
         LIMIT 12
-    """)
+    """
+    )
     perf_result = await db.execute(perf_sql, {"eid": employee_id})
     perf_items = []
     for r in perf_result.fetchall():

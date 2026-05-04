@@ -1,6 +1,6 @@
 """LHDN MyInvois e-Invoice API 路由"""
 
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field

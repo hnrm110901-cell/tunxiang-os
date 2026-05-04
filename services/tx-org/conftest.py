@@ -14,8 +14,8 @@ import sys
 import types
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SVC_DIR = os.path.dirname(__file__)       # services/tx-org/
-SRC_DIR = os.path.join(SVC_DIR, "src")    # services/tx-org/src/
+SVC_DIR = os.path.dirname(__file__)  # services/tx-org/
+SRC_DIR = os.path.join(SVC_DIR, "src")  # services/tx-org/src/
 
 for p in [ROOT, SRC_DIR]:
     if p not in sys.path:
@@ -35,8 +35,8 @@ def _ensure_ns(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-_ensure_ns("services.tx_org",       SVC_DIR)
-_ensure_ns("services.tx_org.src",   SRC_DIR)
+_ensure_ns("services.tx_org", SVC_DIR)
+_ensure_ns("services.tx_org.src", SRC_DIR)
 
 for _sub in ("api", "models", "services", "repositories", "tests", "routers", "workers"):
     _sub_path = os.path.join(SRC_DIR, _sub)

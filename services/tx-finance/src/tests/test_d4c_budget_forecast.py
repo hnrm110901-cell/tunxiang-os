@@ -137,10 +137,7 @@ class TestCachedPromptBuilder:
         msg = CachedPromptBuilder.build_messages(_bundle())
         assert msg["model"] == "claude-sonnet-4-7"
         assert len(msg["system"]) == 2
-        assert all(
-            b.get("cache_control", {}).get("type") == "ephemeral"
-            for b in msg["system"]
-        )
+        assert all(b.get("cache_control", {}).get("type") == "ephemeral" for b in msg["system"])
 
     def test_stable_system_declares_schema(self):
         sys_txt = CachedPromptBuilder.STABLE_SYSTEM
@@ -293,11 +290,7 @@ class TestFallbackRules:
             for i in range(12)
         ]
         result = fallback_forecast(_bundle(history=history))
-        overrun = [
-            r
-            for r in result.variance_risks
-            if r.line_item == "food_cost" and r.risk_type == "cost_overrun"
-        ]
+        overrun = [r for r in result.variance_risks if r.line_item == "food_cost" and r.risk_type == "cost_overrun"]
         assert overrun, "成本突增未触发"
 
     def test_rule_engine_model_id_marker(self):
@@ -330,9 +323,7 @@ class TestRiskSorting:
         assert first.legal_flag is True
         # 所有 legal_flag=True 在 legal_flag=False 前
         legal_positions = [i for i, r in enumerate(result.variance_risks) if r.legal_flag]
-        non_legal_positions = [
-            i for i, r in enumerate(result.variance_risks) if not r.legal_flag
-        ]
+        non_legal_positions = [i for i, r in enumerate(result.variance_risks) if not r.legal_flag]
         if non_legal_positions:
             assert max(legal_positions) < min(non_legal_positions)
 
@@ -530,13 +521,7 @@ class TestInvoker:
 class TestV281Migration:
     @pytest.fixture
     def migration_source(self):
-        path = (
-            ROOT
-            / "shared"
-            / "db-migrations"
-            / "versions"
-            / "v281_budget_forecast_analyses.py"
-        )
+        path = ROOT / "shared" / "db-migrations" / "versions" / "v281_budget_forecast_analyses.py"
         return path.read_text(encoding="utf-8")
 
     def test_revision_chain(self, migration_source):
@@ -582,13 +567,7 @@ class TestV281Migration:
 
 class TestModelRouterRegistration:
     def test_budget_forecast_registered_as_complex(self):
-        router_src = (
-            ROOT
-            / "services"
-            / "tunxiang-api"
-            / "src"
-            / "shared"
-            / "core"
-            / "model_router.py"
-        ).read_text(encoding="utf-8")
+        router_src = (ROOT / "services" / "tunxiang-api" / "src" / "shared" / "core" / "model_router.py").read_text(
+            encoding="utf-8"
+        )
         assert '"budget_forecast_analysis": TaskComplexity.COMPLEX' in router_src

@@ -26,8 +26,10 @@ async def submit_review(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.reviews (tenant_id, app_id, reviewer_id, decision, comment)
-                VALUES (:tid, :app_id, :reviewer_id, :decision, :comment) RETURNING *"""),
+        text(
+            """INSERT INTO forge.reviews (tenant_id, app_id, reviewer_id, decision, comment)
+                VALUES (:tid, :app_id, :reviewer_id, :decision, :comment) RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body["app_id"],

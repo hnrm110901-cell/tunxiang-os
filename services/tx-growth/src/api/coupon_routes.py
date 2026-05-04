@@ -117,7 +117,8 @@ async def list_available_coupons(
         await _set_tenant(db, x_tenant_id)
         today = date.today()
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, coupon_type, discount_rate, cash_amount_fen,
                        min_order_fen, max_claim_per_user, total_quantity,
                        claimed_count, expiry_days, start_date, end_date
@@ -129,7 +130,8 @@ async def list_available_coupons(
                   AND end_date >= :today
                   AND (total_quantity IS NULL OR claimed_count < total_quantity)
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tid": uuid.UUID(x_tenant_id), "today": today},
         )
         rows = result.fetchall()
@@ -166,14 +168,16 @@ async def claim_coupon(
 
         # ① 幂等检查：是否已领取
         dup_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM customer_coupons
                 WHERE tenant_id = :tid
                   AND coupon_id = :cid
                   AND customer_id = :uid
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tid, "cid": coupon_id, "uid": customer_id},
         )
         if dup_result.fetchone():
@@ -181,14 +185,16 @@ async def claim_coupon(
 
         # ② 查询优惠券基础信息
         coupon_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, coupon_type, discount_rate, cash_amount_fen,
                        min_order_fen, max_claim_per_user, total_quantity,
                        claimed_count, expiry_days, start_date, end_date, is_active
                 FROM coupons
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"cid": coupon_id, "tid": tid},
         )
         coupon = coupon_result.fetchone()
@@ -211,11 +217,13 @@ async def claim_coupon(
         # ④ 单用户领取上限检查
         if coupon.max_claim_per_user:
             user_claim_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM customer_coupons
                     WHERE tenant_id = :tid AND coupon_id = :cid AND customer_id = :uid
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "cid": coupon_id, "uid": customer_id},
             )
             user_count = user_claim_result.scalar() or 0
@@ -233,14 +241,16 @@ async def claim_coupon(
         # ⑥ 创建 customer_coupon
         new_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_coupons
                     (id, tenant_id, coupon_id, customer_id, status,
                      claimed_at, expire_at, created_at, updated_at)
                 VALUES
                     (:id, :tid, :cid, :uid, 'unused',
                      :now, :expire_at, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tid,
@@ -253,11 +263,13 @@ async def claim_coupon(
 
         # ⑦ 原子递增 claimed_count
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE coupons
                 SET claimed_count = claimed_count + 1, updated_at = NOW()
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cid": coupon_id, "tid": tid},
         )
 
@@ -313,7 +325,8 @@ async def verify_coupon(
 
         # ① 查找持有券记录
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT cc.id, cc.coupon_id, cc.customer_id, cc.status, cc.expire_at,
                        c.name AS coupon_name, c.cash_amount_fen, c.discount_rate, c.coupon_type
                 FROM customer_coupons cc
@@ -322,7 +335,8 @@ async def verify_coupon(
                   AND cc.tenant_id = :tid
                   AND cc.is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"cc_id": cc_id, "tid": tid},
         )
         row = result.fetchone()
@@ -345,11 +359,13 @@ async def verify_coupon(
 
         # ⑤ 更新状态为 used
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_coupons
                 SET status = 'used', used_at = :now, updated_at = :now
                 WHERE id = :cc_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cc_id": cc_id, "tid": tid, "now": now},
         )
 
@@ -428,7 +444,8 @@ async def apply_coupon(
 
         # ① 查询该优惠券（联表取折扣金额与门槛）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT cc.id AS cc_id,
                        cc.customer_id,
                        cc.status,
@@ -445,7 +462,8 @@ async def apply_coupon(
                   AND cc.is_deleted = false
                 ORDER BY cc.created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"cid": cid, "tid": tid},
         )
         row = result.fetchone()
@@ -489,7 +507,8 @@ async def apply_coupon(
             store_id = None
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_coupons
                 SET status = 'used',
                     used_at = :now,
@@ -497,7 +516,8 @@ async def apply_coupon(
                     order_id = :order_id,
                     store_id = :store_id
                 WHERE id = :cc_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "cc_id": row.cc_id,
                 "tid": tid,

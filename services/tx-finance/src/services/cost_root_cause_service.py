@@ -56,9 +56,11 @@ COST_OVERRUN_TRIGGER_PCT = 0.05  # 超预算 5% 触发
 # 成本信号数据结构（从多域拉取）
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class RawMaterialPriceChange:
     """原料采购价格变动（近 30 天）"""
+
     ingredient_name: str
     old_price_fen: int
     new_price_fen: int
@@ -69,27 +71,30 @@ class RawMaterialPriceChange:
 @dataclass
 class WasteEvent:
     """浪费登记"""
+
     ingredient_name: str
     quantity: float
     unit: str
     loss_fen: int
-    reason: str        # expired / prep_waste / customer_waste / other
+    reason: str  # expired / prep_waste / customer_waste / other
     recorded_at: datetime
 
 
 @dataclass
 class BOMDeviation:
     """BOM 实际用量偏差"""
+
     dish_name: str
     ingredient_name: str
     standard_qty: float
     actual_qty: float
-    deviation_pct: float    # (actual - standard) / standard
+    deviation_pct: float  # (actual - standard) / standard
 
 
 @dataclass
 class CostSignalBundle:
     """某店某月的成本异常信号包（喂给 Sonnet 的 user prompt 数据）"""
+
     store_id: str
     store_name: str
     analysis_month: date
@@ -121,9 +126,7 @@ class CostSignalBundle:
             ],
             "waste_events_summary": {
                 "total_count": len(self.waste_events),
-                "total_loss_yuan": round(
-                    sum(w.loss_fen for w in self.waste_events) / 100, 2
-                ),
+                "total_loss_yuan": round(sum(w.loss_fen for w in self.waste_events) / 100, 2),
                 "by_reason": self._group_waste_by_reason(),
             },
             "bom_deviations": [
@@ -132,7 +135,8 @@ class CostSignalBundle:
                     "ingredient": d.ingredient_name,
                     "deviation_pct": round(d.deviation_pct, 4),
                 }
-                for d in self.bom_deviations if abs(d.deviation_pct) > 0.05
+                for d in self.bom_deviations
+                if abs(d.deviation_pct) > 0.05
             ],
             "supplier_changes": self.supplier_changes,
         }
@@ -143,25 +147,22 @@ class CostSignalBundle:
             g = groups.setdefault(w.reason, {"count": 0, "loss_fen": 0})
             g["count"] += 1
             g["loss_fen"] += w.loss_fen
-        return {
-            r: {"count": v["count"], "loss_yuan": round(v["loss_fen"] / 100, 2)}
-            for r, v in groups.items()
-        }
+        return {r: {"count": v["count"], "loss_yuan": round(v["loss_fen"] / 100, 2)} for r, v in groups.items()}
 
 
 @dataclass
 class RootCause:
-    cause_type: str       # price_hike / waste_spike / bom_deviation / supplier_switch / other
-    confidence: float     # 0-1
+    cause_type: str  # price_hike / waste_spike / bom_deviation / supplier_switch / other
+    confidence: float  # 0-1
     evidence: str
-    impact_fen: int       # 此原因贡献的成本超支金额
-    priority: str         # high / medium / low
+    impact_fen: int  # 此原因贡献的成本超支金额
+    priority: str  # high / medium / low
 
 
 @dataclass
 class RemediationAction:
     action: str
-    owner_role: str       # store_manager / supply_chain / head_chef
+    owner_role: str  # store_manager / supply_chain / head_chef
     deadline_days: int
     expected_savings_fen: int
 
@@ -181,11 +182,7 @@ class RootCauseAnalysisResult:
     @property
     def cache_hit_rate(self) -> float:
         """cache_read / (cache_read + cache_create + non_cached_input)"""
-        total_input = (
-            self.cache_read_tokens
-            + self.cache_creation_tokens
-            + self.input_tokens
-        )
+        total_input = self.cache_read_tokens + self.cache_creation_tokens + self.input_tokens
         if total_input == 0:
             return 0.0
         return round(self.cache_read_tokens / total_input, 4)
@@ -194,6 +191,7 @@ class RootCauseAnalysisResult:
 # ──────────────────────────────────────────────────────────────────────
 # Cached Prompt Builder（核心）
 # ──────────────────────────────────────────────────────────────────────
+
 
 class CachedPromptBuilder:
     """构造 Anthropic Messages API 的 request，带 cache_control 标记。
@@ -316,6 +314,7 @@ class CachedPromptBuilder:
 # 响应解析
 # ──────────────────────────────────────────────────────────────────────
 
+
 def parse_sonnet_response(
     response: dict,
 ) -> tuple[str, list[RootCause], list[RemediationAction], dict]:
@@ -394,6 +393,7 @@ def parse_sonnet_response(
 # Service
 # ──────────────────────────────────────────────────────────────────────
 
+
 class CostRootCauseService:
     """D4a 成本根因分析服务。
 
@@ -456,73 +456,89 @@ class CostRootCauseService:
                 int((p.new_price_fen - p.old_price_fen) * 100)  # 粗估
                 for p in hikes
             )
-            causes.append(RootCause(
-                cause_type="price_hike",
-                confidence=0.55,
-                evidence=f"{len(hikes)} 项原料涨价 ≥5%，影响估算 {total_hike_impact / 100:.0f} 元",
-                impact_fen=total_hike_impact,
-                priority="high" if len(hikes) >= 3 else "medium",
-            ))
-            actions.append(RemediationAction(
-                action="谈判价格 / 切换备选供应商",
-                owner_role="supply_chain",
-                deadline_days=14,
-                expected_savings_fen=int(total_hike_impact * 0.5),
-            ))
+            causes.append(
+                RootCause(
+                    cause_type="price_hike",
+                    confidence=0.55,
+                    evidence=f"{len(hikes)} 项原料涨价 ≥5%，影响估算 {total_hike_impact / 100:.0f} 元",
+                    impact_fen=total_hike_impact,
+                    priority="high" if len(hikes) >= 3 else "medium",
+                )
+            )
+            actions.append(
+                RemediationAction(
+                    action="谈判价格 / 切换备选供应商",
+                    owner_role="supply_chain",
+                    deadline_days=14,
+                    expected_savings_fen=int(total_hike_impact * 0.5),
+                )
+            )
 
         # 2. 浪费
         total_waste_fen = sum(w.loss_fen for w in b.waste_events)
         if total_waste_fen > 0 and b.food_cost_fen > 0:
             waste_rate = total_waste_fen / b.food_cost_fen
             if waste_rate > 0.05:
-                causes.append(RootCause(
-                    cause_type="waste_spike",
-                    confidence=0.60,
-                    evidence=f"浪费率 {waste_rate:.1%} 超 5% 预警线",
-                    impact_fen=total_waste_fen,
-                    priority="high" if waste_rate > 0.08 else "medium",
-                ))
-                actions.append(RemediationAction(
-                    action="培训备料 SOP + 加密临期盘点",
-                    owner_role="head_chef",
-                    deadline_days=7,
-                    expected_savings_fen=int(total_waste_fen * 0.6),
-                ))
+                causes.append(
+                    RootCause(
+                        cause_type="waste_spike",
+                        confidence=0.60,
+                        evidence=f"浪费率 {waste_rate:.1%} 超 5% 预警线",
+                        impact_fen=total_waste_fen,
+                        priority="high" if waste_rate > 0.08 else "medium",
+                    )
+                )
+                actions.append(
+                    RemediationAction(
+                        action="培训备料 SOP + 加密临期盘点",
+                        owner_role="head_chef",
+                        deadline_days=7,
+                        expected_savings_fen=int(total_waste_fen * 0.6),
+                    )
+                )
 
         # 3. BOM 偏差
         big_dev = [d for d in b.bom_deviations if abs(d.deviation_pct) > 0.05]
         if big_dev:
-            causes.append(RootCause(
-                cause_type="bom_deviation",
-                confidence=0.50,
-                evidence=f"{len(big_dev)} 道菜 BOM 偏差 >±5%",
-                impact_fen=int(b.food_cost_fen * 0.02),
-                priority="medium",
-            ))
-            actions.append(RemediationAction(
-                action="校准电子秤 / 后厨抽查标准做法",
-                owner_role="head_chef",
-                deadline_days=10,
-                expected_savings_fen=int(b.food_cost_fen * 0.01),
-            ))
+            causes.append(
+                RootCause(
+                    cause_type="bom_deviation",
+                    confidence=0.50,
+                    evidence=f"{len(big_dev)} 道菜 BOM 偏差 >±5%",
+                    impact_fen=int(b.food_cost_fen * 0.02),
+                    priority="medium",
+                )
+            )
+            actions.append(
+                RemediationAction(
+                    action="校准电子秤 / 后厨抽查标准做法",
+                    owner_role="head_chef",
+                    deadline_days=10,
+                    expected_savings_fen=int(b.food_cost_fen * 0.01),
+                )
+            )
 
         # 排名
         causes.sort(key=lambda c: c.impact_fen, reverse=True)
 
         if not causes:
-            causes = [RootCause(
-                cause_type="other",
-                confidence=0.3,
-                evidence="信号稀疏，无法定位具体原因",
-                impact_fen=0,
-                priority="low",
-            )]
-            actions = [RemediationAction(
-                action="补齐 30 天原料采购/浪费/BOM 数据",
-                owner_role="store_manager",
-                deadline_days=14,
-                expected_savings_fen=0,
-            )]
+            causes = [
+                RootCause(
+                    cause_type="other",
+                    confidence=0.3,
+                    evidence="信号稀疏，无法定位具体原因",
+                    impact_fen=0,
+                    priority="low",
+                )
+            ]
+            actions = [
+                RemediationAction(
+                    action="补齐 30 天原料采购/浪费/BOM 数据",
+                    owner_role="store_manager",
+                    deadline_days=14,
+                    expected_savings_fen=0,
+                )
+            ]
 
         text = (
             f"{b.store_name} {b.analysis_month.isoformat()[:7]} 成本超预算 "
@@ -540,6 +556,7 @@ class CostRootCauseService:
 # DB 持久化
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def save_analysis_to_db(
     db: Any,
     *,
@@ -551,7 +568,9 @@ async def save_analysis_to_db(
     from sqlalchemy import text
 
     record_id = str(uuid.uuid4())
-    await db.execute(text("""
+    await db.execute(
+        text(
+            """
         INSERT INTO cost_root_cause_analyses (
             id, tenant_id, store_id, analysis_month, analysis_type,
             food_cost_fen, food_cost_budget_fen, cost_overrun_pct,
@@ -585,48 +604,51 @@ async def save_analysis_to_db(
             output_tokens = EXCLUDED.output_tokens,
             updated_at = NOW()
         RETURNING id
-    """), {
-        "id": record_id,
-        "tenant_id": tenant_id,
-        "store_id": signal_bundle.store_id,
-        "analysis_month": signal_bundle.analysis_month,
-        "analysis_type": analysis_type,
-        "food_cost_fen": signal_bundle.food_cost_fen,
-        "food_cost_budget_fen": signal_bundle.food_cost_budget_fen,
-        "cost_overrun_pct": signal_bundle.cost_overrun_pct,
-        "signals": json.dumps(signal_bundle.to_json_dict(), ensure_ascii=False),
-        "causes": json.dumps(
-            [
-                {
-                    "cause_type": c.cause_type,
-                    "confidence": c.confidence,
-                    "evidence": c.evidence,
-                    "impact_fen": c.impact_fen,
-                    "priority": c.priority,
-                }
-                for c in result.ranked_causes
-            ],
-            ensure_ascii=False,
+    """
         ),
-        "actions": json.dumps(
-            [
-                {
-                    "action": a.action,
-                    "owner_role": a.owner_role,
-                    "deadline_days": a.deadline_days,
-                    "expected_savings_fen": a.expected_savings_fen,
-                }
-                for a in result.remediation_actions
-            ],
-            ensure_ascii=False,
-        ),
-        "sonnet_analysis": result.sonnet_analysis,
-        "model_id": result.model_id,
-        "cache_read": result.cache_read_tokens,
-        "cache_creation": result.cache_creation_tokens,
-        "input_tokens": result.input_tokens,
-        "output_tokens": result.output_tokens,
-    })
+        {
+            "id": record_id,
+            "tenant_id": tenant_id,
+            "store_id": signal_bundle.store_id,
+            "analysis_month": signal_bundle.analysis_month,
+            "analysis_type": analysis_type,
+            "food_cost_fen": signal_bundle.food_cost_fen,
+            "food_cost_budget_fen": signal_bundle.food_cost_budget_fen,
+            "cost_overrun_pct": signal_bundle.cost_overrun_pct,
+            "signals": json.dumps(signal_bundle.to_json_dict(), ensure_ascii=False),
+            "causes": json.dumps(
+                [
+                    {
+                        "cause_type": c.cause_type,
+                        "confidence": c.confidence,
+                        "evidence": c.evidence,
+                        "impact_fen": c.impact_fen,
+                        "priority": c.priority,
+                    }
+                    for c in result.ranked_causes
+                ],
+                ensure_ascii=False,
+            ),
+            "actions": json.dumps(
+                [
+                    {
+                        "action": a.action,
+                        "owner_role": a.owner_role,
+                        "deadline_days": a.deadline_days,
+                        "expected_savings_fen": a.expected_savings_fen,
+                    }
+                    for a in result.remediation_actions
+                ],
+                ensure_ascii=False,
+            ),
+            "sonnet_analysis": result.sonnet_analysis,
+            "model_id": result.model_id,
+            "cache_read": result.cache_read_tokens,
+            "cache_creation": result.cache_creation_tokens,
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+        },
+    )
     await db.commit()
     logger.info(
         "cost_root_cause_saved",

@@ -228,6 +228,7 @@ class TestKingdeeAdapter:
     @pytest.fixture()
     def adapter(self):
         from shared.adapters.erp.src.kingdee_adapter import KingdeeAdapter
+
         a = KingdeeAdapter()
         yield a
 
@@ -293,9 +294,7 @@ class TestKingdeeAdapter:
         """网络错误时 health_check 返回 False（不抛异常）"""
         import httpx
 
-        adapter._client.head = AsyncMock(
-            side_effect=httpx.ConnectError("connection refused")
-        )
+        adapter._client.head = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
         ok = await adapter.health_check()
         assert ok is False
 
@@ -304,9 +303,7 @@ class TestKingdeeAdapter:
         """HTTP 错误时降级返回内置默认科目表"""
         import httpx
 
-        adapter._client.get = AsyncMock(
-            side_effect=httpx.ConnectError("no route to host")
-        )
+        adapter._client.get = AsyncMock(side_effect=httpx.ConnectError("no route to host"))
         accounts = await adapter.sync_chart_of_accounts()
         assert len(accounts) > 0
         codes = [a.code for a in accounts]
@@ -333,6 +330,7 @@ class TestYonyouAdapterOfflineBuffer:
     @pytest.fixture()
     def adapter(self):
         from shared.adapters.erp.src.yonyou_adapter import YonyouAdapter
+
         return YonyouAdapter()
 
     @pytest.mark.asyncio
@@ -341,9 +339,7 @@ class TestYonyouAdapterOfflineBuffer:
         import httpx
 
         # Mock token 获取和推送均失败
-        adapter._client.post = AsyncMock(
-            side_effect=httpx.ConnectError("connection refused")
-        )
+        adapter._client.post = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
         voucher = _make_purchase_voucher(5000)
         result = await adapter.push_voucher(voucher)
 
@@ -363,9 +359,7 @@ class TestYonyouAdapterOfflineBuffer:
         """queue_size 正确反映队列条目数"""
         import httpx
 
-        adapter._client.post = AsyncMock(
-            side_effect=httpx.ConnectError("connection refused")
-        )
+        adapter._client.post = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
         v1 = _make_purchase_voucher(1000)
         v2 = _make_purchase_voucher(2000)
         await adapter.push_voucher(v1)
@@ -379,9 +373,7 @@ class TestYonyouAdapterOfflineBuffer:
         import httpx
 
         # 第一次 post（获取 token）抛错 → 入队
-        adapter._client.post = AsyncMock(
-            side_effect=httpx.ConnectError("connection refused")
-        )
+        adapter._client.post = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
         voucher = _make_purchase_voucher(3000)
         await adapter.push_voucher(voucher)
         assert adapter.queue_size() == 1
@@ -424,9 +416,7 @@ class TestYonyouAdapterOfflineBuffer:
         """drain_queue 失败的条目保留在队列中"""
         import httpx
 
-        adapter._client.post = AsyncMock(
-            side_effect=httpx.ConnectError("connection refused")
-        )
+        adapter._client.post = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
         voucher = _make_purchase_voucher(4000)
         await adapter.push_voucher(voucher)
         assert adapter.queue_size() == 1
@@ -456,14 +446,12 @@ class TestAccountMappingOverride:
         # Mock DB 返回自定义映射
         custom_mapping = {
             "purchase_payment": {
-                "debit":  {"code": "9901", "name": "自定义原材料"},
+                "debit": {"code": "9901", "name": "自定义原材料"},
                 "credit": {"code": "9902", "name": "自定义应付"},
             }
         }
         mock_result = MagicMock()
-        mock_result.mappings.return_value.first.return_value = {
-            "config_value": custom_mapping
-        }
+        mock_result.mappings.return_value.first.return_value = {"config_value": custom_mapping}
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=mock_result)
 
@@ -515,6 +503,7 @@ class TestVoucherGeneratorWithMockDB:
     @pytest.fixture()
     def generator(self):
         from services.voucher_generator import VoucherGenerator
+
         return VoucherGenerator()
 
     def _mock_db_for_purchase(self, total_fen: int = 12000):
@@ -627,9 +616,9 @@ class TestVoucherGeneratorWithMockDB:
         store_id = str(uuid.uuid4())
 
         payment_rows = [
-            {"pay_method": "cash",    "amount_fen": 2000, "pay_count": 5},
-            {"pay_method": "wechat",  "amount_fen": 6000, "pay_count": 15},
-            {"pay_method": "alipay",  "amount_fen": 2000, "pay_count": 8},
+            {"pay_method": "cash", "amount_fen": 2000, "pay_count": 5},
+            {"pay_method": "wechat", "amount_fen": 6000, "pay_count": 15},
+            {"pay_method": "alipay", "amount_fen": 2000, "pay_count": 8},
         ]
 
         config_result = MagicMock()

@@ -77,7 +77,8 @@ async def submit_refund(
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO refund_requests
                     (tenant_id, order_id, refund_type, refund_amount_fen,
                      reasons, description, items, image_urls, status)
@@ -85,7 +86,8 @@ async def submit_refund(
                     (:tenant_id, :order_id, :refund_type, :refund_amount_fen,
                      :reasons::jsonb, :description, :items::jsonb, :image_urls::jsonb, 'pending')
                 RETURNING id, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "order_id": str(req.order_id),
@@ -178,12 +180,14 @@ async def get_refund_status(
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, order_id, status, refund_amount_fen, refund_type,
                        review_note, reviewed_at, created_at
                 FROM refund_requests
                 WHERE id = :rid AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"rid": refund_id, "tenant_id": tenant_id},
         )
         row = result.mappings().one_or_none()

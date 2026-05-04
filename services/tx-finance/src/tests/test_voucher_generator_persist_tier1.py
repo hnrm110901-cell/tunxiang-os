@@ -30,6 +30,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # shared.adapters.erp 走 repo root sys.path
 sys.path.insert(0, "/Users/lichun/Documents/GitHub/zhilian-os")
 
+from services.financial_voucher_service import (  # type: ignore  # noqa: E402
+    FinancialVoucherService,
+)
+from services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
 from shared.adapters.erp.src.base import (  # type: ignore  # noqa: E402
     ERPPushResult,
     ERPType,
@@ -38,11 +42,6 @@ from shared.adapters.erp.src.base import (  # type: ignore  # noqa: E402
     PushStatus,
     VoucherType,
 )
-from services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
-from services.financial_voucher_service import (  # type: ignore  # noqa: E402
-    FinancialVoucherService,
-)
-
 
 # ─── 构造辅助 ───────────────────────────────────────────────────────
 
@@ -59,12 +58,16 @@ def _build_erp_voucher(
         business_date=date(2026, 4, 19),
         entries=[
             ERPVoucherEntry(
-                account_code="1001", account_name="现金",
-                debit_fen=10000, summary="堂食现金",
+                account_code="1001",
+                account_name="现金",
+                debit_fen=10000,
+                summary="堂食现金",
             ),
             ERPVoucherEntry(
-                account_code="6001", account_name="主营业务收入",
-                credit_fen=10000, summary="营业收入",
+                account_code="6001",
+                account_name="主营业务收入",
+                credit_fen=10000,
+                summary="营业收入",
             ),
         ],
         source_type=source_type,
@@ -83,18 +86,22 @@ class TestVoucherTypeMapping:
 
     def test_receipt_maps_to_receipt(self):
         from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+
         assert _VOUCHER_TYPE_ERP_TO_DB["收"] == "receipt"
 
     def test_payment_maps_to_payment(self):
         from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+
         assert _VOUCHER_TYPE_ERP_TO_DB["付"] == "payment"
 
     def test_memo_maps_to_cost(self):
         from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+
         assert _VOUCHER_TYPE_ERP_TO_DB["记"] == "cost"
 
     def test_transfer_maps_to_cost(self):
         from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+
         assert _VOUCHER_TYPE_ERP_TO_DB["转"] == "cost"
 
 
@@ -148,7 +155,9 @@ class TestPersistToDb:
         session.flush = AsyncMock()
 
         result = await gen.persist_to_db(
-            erp, voucher_service=voucher_svc, session=session,
+            erp,
+            voucher_service=voucher_svc,
+            session=session,
         )
         assert result.voucher_no.startswith("AUTO_")
         assert len(result.voucher_no) == len("AUTO_") + 8  # 8 位 hex 前缀
@@ -163,7 +172,9 @@ class TestPersistToDb:
         session.flush = AsyncMock()
 
         result = await gen.persist_to_db(
-            erp, voucher_service=voucher_svc, session=session,
+            erp,
+            voucher_service=voucher_svc,
+            session=session,
             voucher_no="V_XJ_20260419_001",
         )
         assert result.voucher_no == "V_XJ_20260419_001"
@@ -179,7 +190,9 @@ class TestPersistToDb:
         session.flush = AsyncMock()
 
         result = await gen.persist_to_db(
-            erp, voucher_service=voucher_svc, session=session,
+            erp,
+            voucher_service=voucher_svc,
+            session=session,
         )
         assert result.source_id is None
 
@@ -210,8 +223,11 @@ class TestPersistToDb:
         event_id = uuid.uuid4()
 
         result = await gen.persist_to_db(
-            erp, voucher_service=voucher_svc, session=session,
-            event_type="daily_revenue", event_id=event_id,
+            erp,
+            voucher_service=voucher_svc,
+            session=session,
+            event_type="daily_revenue",
+            event_id=event_id,
         )
         # 命中: 不 add, 不 flush
         assert result is existing
@@ -267,10 +283,7 @@ class TestRecordPushResultNoCommit:
 
         source = _inspect.getsource(_VG._record_push_result)
         # 去掉 # 开头的注释行 (Python 行注释)
-        code_only_lines = [
-            line for line in source.splitlines()
-            if not line.strip().startswith("#")
-        ]
+        code_only_lines = [line for line in source.splitlines() if not line.strip().startswith("#")]
         code_only = "\n".join(code_only_lines)
 
         # 检查: 实际调用 (await db.commit() / await session.commit() 等)
@@ -297,13 +310,15 @@ class TestPersistAndPush:
         session.commit = AsyncMock()
 
         # mock push_to_erp 成功
-        gen.push_to_erp = AsyncMock(return_value=ERPPushResult(
-            voucher_id=erp.voucher_id,
-            status=PushStatus.SUCCESS,
-            erp_type=ERPType.KINGDEE,
-            erp_voucher_id="kingdee_001",
-            pushed_at=datetime.now(timezone.utc),
-        ))
+        gen.push_to_erp = AsyncMock(
+            return_value=ERPPushResult(
+                voucher_id=erp.voucher_id,
+                status=PushStatus.SUCCESS,
+                erp_type=ERPType.KINGDEE,
+                erp_voucher_id="kingdee_001",
+                pushed_at=datetime.now(timezone.utc),
+            )
+        )
 
         financial_voucher, push_result = await gen.persist_and_push(
             erp,
@@ -326,13 +341,15 @@ class TestPersistAndPush:
         session = AsyncMock()
         session.flush = AsyncMock()
 
-        gen.push_to_erp = AsyncMock(return_value=ERPPushResult(
-            voucher_id=erp.voucher_id,
-            status=PushStatus.FAILED,
-            erp_type=ERPType.KINGDEE,
-            error_message="HTTP timeout",
-            pushed_at=datetime.now(timezone.utc),
-        ))
+        gen.push_to_erp = AsyncMock(
+            return_value=ERPPushResult(
+                voucher_id=erp.voucher_id,
+                status=PushStatus.FAILED,
+                erp_type=ERPType.KINGDEE,
+                error_message="HTTP timeout",
+                pushed_at=datetime.now(timezone.utc),
+            )
+        )
 
         financial_voucher, push_result = await gen.persist_and_push(
             erp,
@@ -356,12 +373,14 @@ class TestPersistAndPush:
         session = AsyncMock()
         session.flush = AsyncMock()
 
-        gen.push_to_erp = AsyncMock(return_value=ERPPushResult(
-            voucher_id=erp.voucher_id,
-            status=PushStatus.QUEUED,
-            erp_type=ERPType.YONYOU,
-            pushed_at=datetime.now(timezone.utc),
-        ))
+        gen.push_to_erp = AsyncMock(
+            return_value=ERPPushResult(
+                voucher_id=erp.voucher_id,
+                status=PushStatus.QUEUED,
+                erp_type=ERPType.YONYOU,
+                pushed_at=datetime.now(timezone.utc),
+            )
+        )
 
         financial_voucher, push_result = await gen.persist_and_push(
             erp,
@@ -387,8 +406,10 @@ class TestPersistAndPush:
 
         with pytest.raises(ValueError, match="模拟 DB 持久化失败"):
             await gen.persist_and_push(
-                erp, voucher_service=voucher_svc,
-                erp_type="kingdee", session=session,
+                erp,
+                voucher_service=voucher_svc,
+                erp_type="kingdee",
+                session=session,
             )
 
         # DB 失败 → ERP 推送未被调用
@@ -405,17 +426,24 @@ class TestPersistRespectsPeriodCheck:
     async def test_persist_rejects_when_period_closed(self):
         """注入 period_service, closed 月 → persist 拒."""
         from unittest.mock import AsyncMock as AM
+
+        from models.accounting_period import STATUS_CLOSED, AccountingPeriod
+
         from services.accounting_period_service import AccountingPeriodService
-        from models.accounting_period import AccountingPeriod, STATUS_CLOSED
 
         period_svc = AM(spec=AccountingPeriodService)
         period_svc.is_date_writable = AM(return_value=False)
-        period_svc.find_period_for_date = AM(return_value=AccountingPeriod(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            period_year=2026, period_month=4,
-            period_start=date(2026, 4, 1), period_end=date(2026, 4, 30),
-            status=STATUS_CLOSED,
-        ))
+        period_svc.find_period_for_date = AM(
+            return_value=AccountingPeriod(
+                id=uuid.uuid4(),
+                tenant_id=uuid.uuid4(),
+                period_year=2026,
+                period_month=4,
+                period_start=date(2026, 4, 1),
+                period_end=date(2026, 4, 30),
+                status=STATUS_CLOSED,
+            )
+        )
 
         voucher_svc = FinancialVoucherService(period_service=period_svc)
         gen = VoucherGenerator()
@@ -425,7 +453,9 @@ class TestPersistRespectsPeriodCheck:
 
         with pytest.raises(ValueError, match="账期.*closed"):
             await gen.persist_to_db(
-                erp, voucher_service=voucher_svc, session=session,
+                erp,
+                voucher_service=voucher_svc,
+                session=session,
             )
 
 

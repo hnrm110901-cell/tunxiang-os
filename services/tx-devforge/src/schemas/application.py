@@ -20,9 +20,7 @@ class ApplicationCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     resource_type: str = Field(
         ...,
-        description=(
-            "资源类型：backend_service / frontend_app / edge_image / adapter / data_asset"
-        ),
+        description=("资源类型：backend_service / frontend_app / edge_image / adapter / data_asset"),
     )
     owner: str | None = Field(default=None, max_length=200)
     repo_path: str | None = Field(default=None, max_length=500)
@@ -34,9 +32,7 @@ class ApplicationCreate(BaseModel):
     @classmethod
     def _check_resource_type(cls, value: str) -> str:
         if value not in VALID_RESOURCE_TYPES:
-            raise ValueError(
-                f"resource_type must be one of {VALID_RESOURCE_TYPES}, got {value!r}"
-            )
+            raise ValueError(f"resource_type must be one of {VALID_RESOURCE_TYPES}, got {value!r}")
         return value
 
 
@@ -59,9 +55,7 @@ class ApplicationUpdate(BaseModel):
         if value is None:
             return None
         if value not in VALID_RESOURCE_TYPES:
-            raise ValueError(
-                f"resource_type must be one of {VALID_RESOURCE_TYPES}, got {value!r}"
-            )
+            raise ValueError(f"resource_type must be one of {VALID_RESOURCE_TYPES}, got {value!r}")
         return value
 
 

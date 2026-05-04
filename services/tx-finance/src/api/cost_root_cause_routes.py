@@ -45,6 +45,7 @@ router = APIRouter(
 
 # ── 请求模型 ─────────────────────────────────────────────────────
 
+
 class PriceChangeInput(BaseModel):
     ingredient_name: str
     old_price_fen: int = Field(ge=0)
@@ -79,9 +80,7 @@ class AnalyzeRequest(BaseModel):
     analysis_month: date_cls = Field(..., description="YYYY-MM-01")
     food_cost_fen: int = Field(ge=0)
     food_cost_budget_fen: int = Field(ge=0)
-    cost_overrun_pct: float = Field(
-        ..., description="(actual - budget) / budget，≥0.05 触发分析"
-    )
+    cost_overrun_pct: float = Field(..., description="(actual - budget) / budget，≥0.05 触发分析")
     price_changes: list[PriceChangeInput] = Field(default_factory=list)
     waste_events: list[WasteEventInput] = Field(default_factory=list)
     bom_deviations: list[BOMDeviationInput] = Field(default_factory=list)
@@ -98,6 +97,7 @@ class ReviewRequest(BaseModel):
 
 # ── 端点 ─────────────────────────────────────────────────────────
 
+
 @router.post("/analyze", response_model=dict)
 async def analyze_cost_root_cause(
     req: AnalyzeRequest,
@@ -111,9 +111,7 @@ async def analyze_cost_root_cause(
     _parse_uuid(x_tenant_id, "X-Tenant-ID")
     _parse_uuid(req.store_id, "store_id")
 
-    if req.analysis_type not in (
-        "monthly_cost_overrun", "sudden_cost_spike", "manual"
-    ):
+    if req.analysis_type not in ("monthly_cost_overrun", "sudden_cost_spike", "manual"):
         raise HTTPException(status_code=400, detail=f"未知 analysis_type: {req.analysis_type}")
 
     bundle = CostSignalBundle(
@@ -243,7 +241,9 @@ async def review_analysis(
         )
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             UPDATE cost_root_cause_analyses
             SET status = :new_status,
                 reviewed_by = CAST(:op AS uuid),
@@ -254,12 +254,15 @@ async def review_analysis(
               AND status = 'analyzed'
               AND is_deleted = false
             RETURNING id, status
-        """), {
-            "id": analysis_id,
-            "tenant_id": x_tenant_id,
-            "op": x_operator_id,
-            "new_status": new_status,
-        })
+        """
+            ),
+            {
+                "id": analysis_id,
+                "tenant_id": x_tenant_id,
+                "op": x_operator_id,
+                "new_status": new_status,
+            },
+        )
         row = result.mappings().first()
         await db.commit()
     except SQLAlchemyError as exc:
@@ -288,7 +291,9 @@ async def cost_root_cause_summary(
         raise HTTPException(status_code=400, detail="months_back ∈ [1, 12]")
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT
                 status,
                 COUNT(*)                            AS total,
@@ -303,7 +308,10 @@ async def cost_root_cause_summary(
               AND created_at >= CURRENT_DATE - (:months_back || ' months')::interval
             GROUP BY status
             ORDER BY status
-        """), {"tenant_id": x_tenant_id, "months_back": str(months_back)})
+        """
+            ),
+            {"tenant_id": x_tenant_id, "months_back": str(months_back)},
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("cost_root_cause_summary_failed")
@@ -314,9 +322,7 @@ async def cost_root_cause_summary(
     total_input = sum(int(r.get("input_sum") or 0) for r in rows)
     total_output = sum(int(r.get("output_sum") or 0) for r in rows)
     total_input_all = total_cache_read + total_cache_create + total_input
-    cache_hit_rate = (
-        round(total_cache_read / total_input_all, 4) if total_input_all > 0 else 0.0
-    )
+    cache_hit_rate = round(total_cache_read / total_input_all, 4) if total_input_all > 0 else 0.0
 
     for r in rows:
         if r.get("avg_overrun_pct") is not None:
@@ -342,10 +348,9 @@ async def cost_root_cause_summary(
 
 # ── 辅助 ─────────────────────────────────────────────────────────
 
+
 def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

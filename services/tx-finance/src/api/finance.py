@@ -10,14 +10,14 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.pnl_engine import PnLEngine
 from services.report_engine import ReportEngine
 from services.revenue_engine import RevenueEngine
 from services.store_pnl import StorePnLService
 from services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from shared.ontology.src.database import get_db_with_tenant
 from shared.ontology.src.entities import Order, OrderItem, Store
 from shared.security.src.error_handler import safe_http_exception

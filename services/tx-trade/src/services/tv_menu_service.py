@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -264,12 +264,7 @@ def compute_dish_display_score(
     权重: 毛利0.4 + 销量0.3 + 好评0.2 + 新品0.1
     得分前20%=大图Hero, 20-50%=中图, 50-80%=小图, 80%+=文字
     """
-    score = (
-        margin_rate * 0.4
-        + min(sales_count / 100, 1.0) * 0.3
-        + (rating / 5.0) * 0.2
-        + (0.1 if is_new else 0.0)
-    )
+    score = margin_rate * 0.4 + min(sales_count / 100, 1.0) * 0.3 + (rating / 5.0) * 0.2 + (0.1 if is_new else 0.0)
     return round(score, 4)
 
 
@@ -532,7 +527,12 @@ async def get_sales_today(store_id: str, tenant_id: str, db: Any) -> dict:
             )
         ],
         "recent_orders": [
-            {"id": f"T20260504-{200 - i}", "time": f"20:{35 - i * 3:02d}", "items": "示例 等3道", "amount": 528 - i * 30}
+            {
+                "id": f"T20260504-{200 - i}",
+                "time": f"20:{35 - i * 3:02d}",
+                "items": "示例 等3道",
+                "amount": 528 - i * 30,
+            }
             for i in range(8)
         ],
         "reviews": [

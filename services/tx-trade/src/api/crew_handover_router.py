@@ -94,7 +94,8 @@ async def submit_handover(
             {"tid": x_tenant_id},
         )
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE crew_shifts
                    SET end_at = NOW(),
                        notes = :notes,
@@ -102,7 +103,8 @@ async def submit_handover(
                  WHERE crew_id = :crew_id
                    AND end_at IS NULL
                    AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "crew_id": payload.crew_id,
                 "notes": payload.notes or "",

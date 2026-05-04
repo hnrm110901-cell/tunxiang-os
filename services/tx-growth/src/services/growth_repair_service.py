@@ -80,11 +80,13 @@ class GrowthRepairService:
     async def _get_case_state(self, case_id: UUID, tenant_id: str, db: AsyncSession) -> dict:
         """查case当前状态"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, repair_state
                 FROM growth_service_repair_cases
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(case_id)},
         )
         row = result.fetchone()
@@ -102,13 +104,15 @@ class GrowthRepairService:
     ) -> None:
         """同步更新customer_growth_profiles.service_repair_status"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET service_repair_status = :status,
                     service_repair_case_id = :case_id,
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": customer_id,
@@ -144,7 +148,8 @@ class GrowthRepairService:
 
         case_id = str(uuid4())
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_service_repair_cases
                     (id, tenant_id, customer_id, source_type, source_ref_id,
                      severity, summary, owner_type, repair_state)
@@ -154,7 +159,8 @@ class GrowthRepairService:
                 RETURNING id, tenant_id, customer_id, source_type, source_ref_id,
                           severity, summary, owner_type, repair_state,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": case_id,
                 "tenant_id": tenant_id,
@@ -206,14 +212,16 @@ class GrowthRepairService:
         self._validate_transition(current["repair_state"], "acknowledged")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_service_repair_cases
                 SET repair_state = 'acknowledged',
                     emotion_ack_at = NOW(),
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, customer_id, repair_state, emotion_ack_at, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(case_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -254,7 +262,8 @@ class GrowthRepairService:
         import json
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_service_repair_cases
                 SET repair_state = 'compensating',
                     compensation_plan_json = :plan_json::jsonb,
@@ -263,7 +272,8 @@ class GrowthRepairService:
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, customer_id, repair_state, compensation_plan_json,
                           selected_compensation, updated_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": str(case_id),
@@ -323,14 +333,16 @@ class GrowthRepairService:
         observe_until = datetime.now(timezone.utc) + timedelta(hours=window_hours)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_service_repair_cases
                 SET repair_state = 'observing',
                     observe_until = :observe_until,
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, customer_id, repair_state, observe_until, updated_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": str(case_id),
@@ -381,12 +393,14 @@ class GrowthRepairService:
         self._validate_transition(current["repair_state"], "recovered")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_service_repair_cases
                 SET repair_state = 'recovered', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, customer_id, repair_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(case_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -427,12 +441,14 @@ class GrowthRepairService:
         self._validate_transition(current["repair_state"], "failed")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_service_repair_cases
                 SET repair_state = 'failed', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, customer_id, repair_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(case_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -464,12 +480,14 @@ class GrowthRepairService:
         self._validate_transition(current["repair_state"], "closed")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_service_repair_cases
                 SET repair_state = 'closed', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
                 RETURNING id, customer_id, repair_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(case_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -567,7 +585,8 @@ class GrowthRepairService:
         params["lim"] = size
         params["off"] = offset
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, customer_id, source_type, source_ref_id,
                        severity, summary, owner_type, repair_state,
                        emotion_ack_at, compensation_plan_json, selected_compensation,
@@ -576,7 +595,8 @@ class GrowthRepairService:
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows_result.fetchall()]
@@ -587,14 +607,16 @@ class GrowthRepairService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, customer_id, source_type, source_ref_id,
                        severity, summary, owner_type, repair_state,
                        emotion_ack_at, compensation_plan_json, selected_compensation,
                        observe_until, created_at, updated_at
                 FROM growth_service_repair_cases
                 WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(case_id)},
         )
         row = result.fetchone()

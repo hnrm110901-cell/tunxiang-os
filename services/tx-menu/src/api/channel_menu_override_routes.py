@@ -145,17 +145,20 @@ async def list_overrides(
     offset = (page - 1) * size
 
     count_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*)
             FROM channel_menu_overrides cmo
             WHERE {where_clause}
-        """),
+        """
+        ),
         params,
     )
     total = count_result.scalar() or 0
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 cmo.id,
                 cmo.store_id,
@@ -174,7 +177,8 @@ async def list_overrides(
             WHERE {where_clause}
             ORDER BY cmo.updated_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {**params, "size": size, "offset": offset},
     )
     rows = result.fetchall()
@@ -240,7 +244,8 @@ async def upsert_override(
             raise HTTPException(status_code=400, detail=f"approved_by 格式错误: {exc}") from exc
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO channel_menu_overrides (
                 tenant_id, store_id, dish_id, channel,
                 price_fen, is_available, available_from, available_until,
@@ -264,7 +269,8 @@ async def upsert_override(
                 is_deleted      = false,
                 updated_at      = NOW()
             RETURNING id, created_at, updated_at
-        """),
+        """
+        ),
         {
             "tid": _tid,
             "sid": _sid,
@@ -328,12 +334,14 @@ async def delete_override(
         raise HTTPException(status_code=400, detail=f"UUID 格式错误: {exc}") from exc
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE channel_menu_overrides
             SET is_deleted = true, updated_at = NOW()
             WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
             RETURNING id, store_id, dish_id, channel
-        """),
+        """
+        ),
         {"oid": _oid, "tid": _tid},
     )
     row = result.fetchone()
@@ -391,7 +399,8 @@ async def get_effective_menu(
 
     # 查询品牌菜单（基准），联合该门店该渠道的有效覆盖
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 d.id                                      AS dish_id,
                 d.dish_name,
@@ -415,7 +424,8 @@ async def get_effective_menu(
             WHERE d.tenant_id  = :tid
               AND d.is_deleted = false
             ORDER BY d.dish_name
-        """),
+        """
+        ),
         {"tid": _tid, "sid": _sid, "channel": channel, "today": today},
     )
     rows = result.fetchall()
@@ -528,7 +538,8 @@ async def batch_set_overrides(
     for _sid in store_uuids:
         for _did in dish_uuids:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO channel_menu_overrides (
                         tenant_id, store_id, dish_id, channel,
                         price_fen, is_available, override_reason, is_deleted
@@ -542,7 +553,8 @@ async def batch_set_overrides(
                         override_reason = EXCLUDED.override_reason,
                         is_deleted      = false,
                         updated_at      = NOW()
-                """),
+                """
+                ),
                 {
                     "tid": _tid,
                     "sid": _sid,
@@ -616,7 +628,8 @@ async def detect_conflicts(
         # 查询每个 (store_id, dish_id) 跨渠道的有效价格
         # effective_price = override price_fen 若有，否则用 brand price_fen
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     cmo.store_id::text,
                     cmo.dish_id::text,
@@ -635,7 +648,8 @@ async def detect_conflicts(
                   AND (cmo.expires_date IS NULL OR cmo.expires_date >= CURRENT_DATE)
                   {store_filter_sql}
                 ORDER BY cmo.store_id, cmo.dish_id, cmo.channel
-            """),
+            """
+            ),
             store_filter_params,
         )
         rows = result.fetchall()
@@ -724,7 +738,8 @@ async def get_override_stats(
 
     # 各渠道覆盖数量统计
     channel_stats_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 channel,
                 COUNT(*) FILTER (WHERE is_available = true)  AS available_count,
@@ -736,7 +751,8 @@ async def get_override_stats(
               AND is_deleted = false
             GROUP BY channel
             ORDER BY channel
-        """),
+        """
+        ),
         {"tid": _tid},
     )
     channel_rows = channel_stats_result.fetchall()
@@ -754,7 +770,8 @@ async def get_override_stats(
 
     # 总体统计
     total_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*)                                                  AS total_overrides,
                 COUNT(DISTINCT store_id)                                  AS store_count,
@@ -764,7 +781,8 @@ async def get_override_stats(
             FROM channel_menu_overrides
             WHERE tenant_id = :tid
               AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": _tid},
     )
     t = total_result.fetchone()

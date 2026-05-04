@@ -13,7 +13,6 @@ LHDN Phase 合规时间表：
   Phase 4 (2026-01): 所有开票方
 """
 
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 

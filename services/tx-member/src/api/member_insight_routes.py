@@ -100,7 +100,8 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
 
 # ─── DB 查询 ────────────────────────────────────────────────
 
-_MEMBER_SQL = text("""
+_MEMBER_SQL = text(
+    """
     SELECT id, primary_phone, display_name, total_order_count,
            total_order_amount_fen, last_order_at, rfm_level, tags, dietary_restrictions
     FROM customers
@@ -108,9 +109,11 @@ _MEMBER_SQL = text("""
       AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
       AND is_deleted = false
     LIMIT 1
-""")
+"""
+)
 
-_ORDERS_SQL = text("""
+_ORDERS_SQL = text(
+    """
     SELECT o.id::text AS order_id, o.final_amount_fen,
            o.created_at::text AS order_date,
            json_agg(json_build_object('dish_name', oi.dish_name, 'quantity', oi.quantity)) AS items
@@ -123,7 +126,8 @@ _ORDERS_SQL = text("""
     GROUP BY o.id
     ORDER BY o.created_at DESC
     LIMIT 20
-""")
+"""
+)
 
 
 # ─── Claude context 构建 ────────────────────────────────────
@@ -452,7 +456,8 @@ async def generate_member_insight(
         async def _log_decision() -> None:
             try:
                 await db.execute(
-                    _text("""
+                    _text(
+                        """
                         INSERT INTO agent_decision_logs
                             (tenant_id, agent_id, decision_type, input_context,
                              reasoning, output_action, constraints_check, confidence)
@@ -460,7 +465,8 @@ async def generate_member_insight(
                             (:tid::uuid, 'member_insight', 'insight_generated',
                              :input_ctx::jsonb, :reasoning, :output_action::jsonb,
                              '{"passed": true}'::jsonb, :confidence)
-                    """),
+                    """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "input_ctx": json.dumps(

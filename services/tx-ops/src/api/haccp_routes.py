@@ -149,14 +149,16 @@ async def list_plans(
         count_sql = text(f"SELECT COUNT(*) FROM haccp_check_plans WHERE {where}")
         total = (await db.execute(count_sql, params)).scalar() or 0
 
-        select_sql = text(f"""
+        select_sql = text(
+            f"""
             SELECT id, tenant_id, store_id, plan_name, check_type, frequency,
                    responsible_role, checklist, is_active, created_at, updated_at
             FROM haccp_check_plans
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """)
+        """
+        )
         rows = await db.execute(select_sql, params)
         plans = [_serialize_row(dict(r._mapping)) for r in rows]
 
@@ -184,7 +186,8 @@ async def create_plan(
     checklist_data = [item.model_dump() for item in req.checklist]
 
     try:
-        insert_sql = text("""
+        insert_sql = text(
+            """
             INSERT INTO haccp_check_plans (
                 id, tenant_id, store_id, plan_name, check_type, frequency,
                 responsible_role, checklist, is_active, created_at, updated_at
@@ -192,7 +195,8 @@ async def create_plan(
                 :id, :tenant_id, :store_id, :plan_name, :check_type, :frequency,
                 :responsible_role, :checklist::jsonb, :is_active, :now, :now
             )
-        """)
+        """
+        )
         await db.execute(
             insert_sql,
             {
@@ -272,11 +276,13 @@ async def update_plan(
         return {"ok": False, "error": {"message": "无可更新字段", "code": "NO_FIELDS"}}
 
     try:
-        update_sql = text(f"""
+        update_sql = text(
+            f"""
             UPDATE haccp_check_plans
             SET {", ".join(set_parts)}
             WHERE id = :plan_id AND {_SAFE_TENANT}
-        """)
+        """
+        )
         result = await db.execute(update_sql, params)
         if result.rowcount == 0:
             return {"ok": False, "error": {"message": "检查计划不存在", "code": "NOT_FOUND"}}
@@ -338,7 +344,8 @@ async def list_records(
         count_sql = text(f"SELECT COUNT(*) FROM haccp_check_records WHERE {where}")
         total = (await db.execute(count_sql, params)).scalar() or 0
 
-        select_sql = text(f"""
+        select_sql = text(
+            f"""
             SELECT id, tenant_id, store_id, plan_id, operator_id,
                    check_date, results, overall_passed, critical_failures,
                    corrective_actions, created_at
@@ -346,7 +353,8 @@ async def list_records(
             WHERE {where}
             ORDER BY check_date DESC, created_at DESC
             LIMIT :limit OFFSET :offset
-        """)
+        """
+        )
         rows = await db.execute(select_sql, params)
         records = [_serialize_row(dict(r._mapping)) for r in rows]
 
@@ -375,10 +383,12 @@ async def create_record(
     # 查询计划的 checklist，获取关键控制点标记
     plan_checklist: list[dict] = []
     try:
-        plan_sql = text(f"""
+        plan_sql = text(
+            f"""
             SELECT checklist FROM haccp_check_plans
             WHERE id = :plan_id AND {_SAFE_TENANT}
-        """)
+        """
+        )
         plan_row = await db.execute(plan_sql, {"plan_id": req.plan_id, "tid": tenant_id})
         plan_record = plan_row.mappings().first()
         if plan_record and plan_record["checklist"]:
@@ -395,7 +405,8 @@ async def create_record(
     overall_passed = all(r.passed for r in req.results) if req.results else None
 
     try:
-        insert_sql = text("""
+        insert_sql = text(
+            """
             INSERT INTO haccp_check_records (
                 id, tenant_id, store_id, plan_id, operator_id,
                 check_date, results, overall_passed, critical_failures,
@@ -405,7 +416,8 @@ async def create_record(
                 :check_date, :results::jsonb, :overall_passed, :critical_failures,
                 :corrective_actions, :now
             )
-        """)
+        """
+        )
         await db.execute(
             insert_sql,
             {
@@ -506,7 +518,8 @@ async def get_record(
     """获取单条HACCP检查记录详情，包含检查计划基本信息。"""
     await _set_rls(db, tenant_id)
     try:
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 r.id, r.tenant_id, r.store_id, r.plan_id, r.operator_id,
                 r.check_date, r.results, r.overall_passed, r.critical_failures,
@@ -515,7 +528,8 @@ async def get_record(
             FROM haccp_check_records r
             LEFT JOIN haccp_check_plans p ON r.plan_id = p.id
             WHERE r.id = :record_id AND r.{_SAFE_TENANT}
-        """)
+        """
+        )
         row = await db.execute(sql, {"record_id": record_id, "tid": tenant_id})
         record = row.mappings().first()
         if not record:
@@ -549,7 +563,8 @@ async def get_stats(
         where = " AND ".join(conditions)
 
         # 按检查类型分组汇总
-        type_sql = text(f"""
+        type_sql = text(
+            f"""
             SELECT
                 p.check_type,
                 COUNT(*) AS total_checks,
@@ -564,7 +579,8 @@ async def get_stats(
             WHERE {where}
             GROUP BY p.check_type
             ORDER BY p.check_type
-        """)
+        """
+        )
         type_rows = await db.execute(type_sql, params)
         by_type = []
         for row in type_rows:
@@ -576,7 +592,8 @@ async def get_stats(
             by_type.append(rd)
 
         # 汇总总计
-        summary_sql = text(f"""
+        summary_sql = text(
+            f"""
             SELECT
                 COUNT(*) AS total_checks,
                 COUNT(*) FILTER (WHERE r.overall_passed = true) AS passed_checks,
@@ -587,7 +604,8 @@ async def get_stats(
                 SUM(r.critical_failures) AS total_critical_failures
             FROM haccp_check_records r
             WHERE {where}
-        """)
+        """
+        )
         summary_row = (await db.execute(summary_sql, params)).mappings().first()
         summary: dict = {}
         if summary_row:
@@ -637,7 +655,8 @@ async def get_overdue(
         where = " AND ".join(conditions)
 
         # 查找每个计划最近一次执行日期，筛选出逾期的
-        overdue_sql = text(f"""
+        overdue_sql = text(
+            f"""
             SELECT
                 p.id AS plan_id,
                 p.store_id,
@@ -667,7 +686,8 @@ async def get_overdue(
                     ELSE :today
                 END
             ORDER BY p.frequency, p.plan_name
-        """)
+        """
+        )
         rows = await db.execute(overdue_sql, params)
         overdue_plans = []
         for row in rows:

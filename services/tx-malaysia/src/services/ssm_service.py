@@ -16,7 +16,7 @@ SSM = 马来西亚公司委员会，负责企业注册与商业登记。
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -238,13 +238,15 @@ class SSMService:
             results = []
             for reg_no, company in _MOCK_DATA.items():
                 if kw in company["company_name"].lower() or kw in reg_no:
-                    results.append({
-                        "registration_no": company["registration_no"],
-                        "company_name": company["company_name"],
-                        "status": company["status"],
-                        "company_type": company["company_type"],
-                        "incorporation_date": company["incorporation_date"],
-                    })
+                    results.append(
+                        {
+                            "registration_no": company["registration_no"],
+                            "company_name": company["company_name"],
+                            "status": company["status"],
+                            "company_type": company["company_type"],
+                            "incorporation_date": company["incorporation_date"],
+                        }
+                    )
 
             total = len(results)
             start = (page - 1) * size

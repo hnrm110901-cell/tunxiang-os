@@ -114,9 +114,9 @@ def test_realtime_member_check_suspicious():
 
     # recommendation 包含"审批"或"拒绝"（二选一均可）
     recommendation: str = data["recommendation"]
-    assert "审批" in recommendation or "拒绝" in recommendation, (
-        f"recommendation 应包含'审批'或'拒绝'，实际：{recommendation}"
-    )
+    assert (
+        "审批" in recommendation or "拒绝" in recommendation
+    ), f"recommendation 应包含'审批'或'拒绝'，实际：{recommendation}"
 
     # reason 说明超出阈值
     reason: str = data["reason"]
@@ -213,9 +213,10 @@ def test_table_pattern_anomaly():
         assert "employee_id" in emp
         assert "discount_count" in emp
 
-    assert data["alert_level"] in ("warning", "critical"), (
-        f"alert_level 应为 warning 或 critical，实际 {data['alert_level']}"
-    )
+    assert data["alert_level"] in (
+        "warning",
+        "critical",
+    ), f"alert_level 应为 warning 或 critical，实际 {data['alert_level']}"
     assert data["alert_message"], "alert_message 不应为空"
 
     # 业务字段完整性

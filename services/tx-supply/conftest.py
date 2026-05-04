@@ -15,8 +15,8 @@ import sys
 import types
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SVC_DIR = os.path.dirname(__file__)            # services/tx-supply/
-SRC_DIR = os.path.join(SVC_DIR, "src")          # services/tx-supply/src/
+SVC_DIR = os.path.dirname(__file__)  # services/tx-supply/
+SRC_DIR = os.path.join(SVC_DIR, "src")  # services/tx-supply/src/
 
 # 1. ROOT + SRC 入 path
 for p in [ROOT, SRC_DIR]:

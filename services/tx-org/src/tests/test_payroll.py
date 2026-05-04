@@ -23,6 +23,7 @@ from uuid import uuid4
 
 import pytest
 from models.payroll_record import PayrollRecordStatus
+
 from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine_v2 import PayrollEngine
 from services.social_insurance import SocialInsuranceCalculator

@@ -70,11 +70,13 @@ class VoucherRedeemService:
         """获取区域券核销配置"""
         await self._set_tenant()
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT coupon_config, service_mode
                 FROM table_zones
                 WHERE id = :zid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"zid": zone_id, "tid": self._tenant_id},
         )
         info = row.mappings().one_or_none()
@@ -149,14 +151,16 @@ class VoucherRedeemService:
         当前实现：查询 platform_voucher_records 表验证券码有效性并标记已核销
         """
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, platform, voucher_name, amount_fen, status
                 FROM platform_voucher_records
                 WHERE voucher_code = :code
                   AND tenant_id = :tid
                   AND status = 'active'
                 LIMIT 1
-            """),
+            """
+            ),
             {"code": voucher_code, "tid": self._tenant_id},
         )
         voucher = result.mappings().one_or_none()
@@ -165,11 +169,13 @@ class VoucherRedeemService:
 
         # 标记核销
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE platform_voucher_records
                 SET status = 'redeemed', redeemed_order_id = :oid, redeemed_at = NOW()
                 WHERE id = :vid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"vid": voucher["id"], "oid": order_id, "tid": self._tenant_id},
         )
 
@@ -197,7 +203,8 @@ class VoucherRedeemService:
         查询 coupons 表（tx-member 发行的代金券），验证并标记核销。
         """
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, coupon_name, discount_value_fen, status, expires_at
                 FROM coupons
                 WHERE coupon_code = :code
@@ -205,7 +212,8 @@ class VoucherRedeemService:
                   AND status = 'active'
                   AND (expires_at IS NULL OR expires_at > NOW())
                 LIMIT 1
-            """),
+            """
+            ),
             {"code": voucher_code, "tid": self._tenant_id},
         )
         coupon = result.mappings().one_or_none()
@@ -213,11 +221,13 @@ class VoucherRedeemService:
             return {"redeemed": False, "deduct_amount_fen": 0, "error": "代金券无效、已使用或已过期"}
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE coupons
                 SET status = 'used', used_order_id = :oid, used_at = NOW()
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cid": coupon["id"], "oid": order_id, "tid": self._tenant_id},
         )
 
@@ -361,14 +371,16 @@ class VoucherRedeemService:
 
         # 4. 记录核销到订单元数据
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE orders
                 SET order_metadata = COALESCE(order_metadata, '{}'::jsonb) || :meta,
                     discount_amount_fen = discount_amount_fen + :deduct,
                     final_amount_fen = GREATEST(final_amount_fen - :deduct, 0),
                     updated_at = NOW()
                 WHERE id = :oid AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "oid": order_id,
                 "tid": self._tenant_id,

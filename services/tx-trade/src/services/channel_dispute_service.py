@@ -287,9 +287,7 @@ class ChannelDisputeService:
             SQLAlchemyError: DB 异常
         """
         if str(req.tenant_id) != self._tenant_id:
-            raise ValueError(
-                f"req.tenant_id {req.tenant_id} != service tenant {self._tenant_id}"
-            )
+            raise ValueError(f"req.tenant_id {req.tenant_id} != service tenant {self._tenant_id}")
 
         # 幂等命中
         existing = await self._repo.get_by_external(
@@ -308,8 +306,7 @@ class ChannelDisputeService:
 
         # 决定初始状态（决策点 #5）
         is_auto_acceptable = (
-            req.dispute_type not in NON_AUTO_ACCEPT_TYPES
-            and req.claimed_amount_fen <= auto_accept_threshold_fen
+            req.dispute_type not in NON_AUTO_ACCEPT_TYPES and req.claimed_amount_fen <= auto_accept_threshold_fen
         )
         initial_state = "auto_accepted" if is_auto_acceptable else "pending"
 
@@ -415,9 +412,7 @@ class ChannelDisputeService:
         if existing is None:
             raise DisputeNotFoundError(str(dispute_id))
         if existing["state"] not in _RESOLVABLE_STATES:
-            raise DisputeAlreadyResolvedError(
-                f"dispute {dispute_id} state={existing['state']} not resolvable"
-            )
+            raise DisputeAlreadyResolvedError(f"dispute {dispute_id} state={existing['state']} not resolvable")
 
         try:
             row = await self._repo.resolve(
@@ -437,9 +432,7 @@ class ChannelDisputeService:
 
         if row is None:
             # 并发：刚刚还能裁决，UPDATE 时被别人抢先
-            raise DisputeAlreadyResolvedError(
-                f"dispute {dispute_id} concurrently resolved"
-            )
+            raise DisputeAlreadyResolvedError(f"dispute {dispute_id} concurrently resolved")
 
         record = DisputeRecord(**row)
         asyncio.create_task(  # noqa: RUF006
@@ -486,9 +479,7 @@ class ChannelDisputeService:
             size = 20
         if page < 1:
             page = 1
-        items, total = await self._repo.list_pending(
-            store_id=store_id, states=states, page=page, size=size
-        )
+        items, total = await self._repo.list_pending(store_id=store_id, states=states, page=page, size=size)
         return [DisputeRecord(**r) for r in items], total
 
     async def get(self, dispute_id: UUID | str) -> Optional[DisputeRecord]:

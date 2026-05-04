@@ -102,7 +102,8 @@ class HQBrandAnalyticsService:
             brand_filter_sql = "AND brand_id = ANY(:brand_ids::uuid[])"
 
         # ── 从 ontology_snapshots 聚合 order 快照（按品牌）──────────────────
-        order_sql = text(f"""
+        order_sql = text(
+            f"""
             SELECT
                 brand_id,
                 SUM((metrics->>'total_revenue_fen')::BIGINT)        AS revenue_fen,
@@ -120,10 +121,12 @@ class HQBrandAnalyticsService:
               AND is_deleted = FALSE
               {brand_filter_sql}
             GROUP BY brand_id
-        """)
+        """
+        )
 
         # ── 从 ontology_snapshots 聚合 store 快照（门店数）───────────────────
-        store_sql = text(f"""
+        store_sql = text(
+            f"""
             SELECT
                 brand_id,
                 AVG((metrics->>'total_store_count')::NUMERIC)   AS store_count,
@@ -138,7 +141,8 @@ class HQBrandAnalyticsService:
               AND is_deleted = FALSE
               {brand_filter_sql}
             GROUP BY brand_id
-        """)
+        """
+        )
 
         # ── 上一周期营收（环比基准）──────────────────────────────────────────
         period_days = (end_date - start_date).days + 1
@@ -152,7 +156,8 @@ class HQBrandAnalyticsService:
         if brand_ids:
             prev_params["brand_ids"] = [str(b) for b in brand_ids]
 
-        prev_sql = text(f"""
+        prev_sql = text(
+            f"""
             SELECT
                 brand_id,
                 SUM((metrics->>'total_revenue_fen')::BIGINT) AS prev_revenue_fen
@@ -166,7 +171,8 @@ class HQBrandAnalyticsService:
               AND is_deleted = FALSE
               {brand_filter_sql}
             GROUP BY brand_id
-        """)
+        """
+        )
 
         try:
             order_result = await db.execute(order_sql, params)
@@ -281,7 +287,8 @@ class HQBrandAnalyticsService:
             "snapshot_date": prev_date.isoformat(),
         }
 
-        today_sql = text("""
+        today_sql = text(
+            """
             SELECT
                 store_id,
                 metrics
@@ -293,9 +300,11 @@ class HQBrandAnalyticsService:
               AND store_id IS NOT NULL
               AND snapshot_date = :snapshot_date
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
-        prev_sql = text("""
+        prev_sql = text(
+            """
             SELECT
                 store_id,
                 (metrics->>'avg_daily_revenue_fen')::BIGINT AS prev_revenue_fen
@@ -307,16 +316,19 @@ class HQBrandAnalyticsService:
               AND store_id IS NOT NULL
               AND snapshot_date = :snapshot_date
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
         # 该品牌门店目标营收（从 stores 表，缺失时为 0）
-        target_sql = text("""
+        target_sql = text(
+            """
             SELECT id AS store_id, daily_revenue_target_fen
             FROM stores
             WHERE tenant_id = ANY(:tenant_ids::uuid[])
               AND brand_id = :brand_id
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
         try:
             today_result = await db.execute(today_sql, params)
@@ -450,7 +462,8 @@ class HQBrandAnalyticsService:
         }
 
         # 聚合：各品牌 order 快照（期间汇总）
-        agg_sql = text("""
+        agg_sql = text(
+            """
             SELECT
                 brand_id,
                 SUM((metrics->>'total_revenue_fen')::BIGINT)     AS revenue_fen,
@@ -465,10 +478,12 @@ class HQBrandAnalyticsService:
               AND snapshot_date BETWEEN :start_date AND :end_date
               AND is_deleted = FALSE
             GROUP BY brand_id
-        """)
+        """
+        )
 
         # 期间内各品牌门店数（取最新一天的快照）
-        store_count_sql = text("""
+        store_count_sql = text(
+            """
             SELECT DISTINCT ON (brand_id)
                 brand_id,
                 (metrics->>'total_store_count')::NUMERIC AS store_count
@@ -481,11 +496,13 @@ class HQBrandAnalyticsService:
               AND snapshot_date BETWEEN :start_date AND :end_date
               AND is_deleted = FALSE
             ORDER BY brand_id, snapshot_date DESC
-        """)
+        """
+        )
 
         # 趋势：最近7天每天每品牌营收
         trend_start = end_date - timedelta(days=6)
-        trend_sql = text("""
+        trend_sql = text(
+            """
             SELECT
                 brand_id,
                 snapshot_date,
@@ -500,7 +517,8 @@ class HQBrandAnalyticsService:
               AND is_deleted = FALSE
             GROUP BY brand_id, snapshot_date
             ORDER BY snapshot_date ASC
-        """)
+        """
+        )
         trend_params = {**params, "trend_start": trend_start.isoformat(), "trend_end": end_date.isoformat()}
 
         try:
@@ -620,7 +638,8 @@ class HQBrandAnalyticsService:
         }
 
         # 品牌汇总（按 brand_id 聚合 mv_store_pnl）
-        brand_summary_sql = text("""
+        brand_summary_sql = text(
+            """
             SELECT
                 SUM(gross_revenue_fen)      AS revenue_fen,
                 SUM(cogs_fen)               AS cost_fen,
@@ -631,10 +650,12 @@ class HQBrandAnalyticsService:
             WHERE tenant_id = ANY(:tenant_ids::uuid[])
               AND brand_id = :brand_id::uuid
               AND stat_date BETWEEN :start_date AND :end_date
-        """)
+        """
+        )
 
         # 各门店明细
-        store_detail_sql = text("""
+        store_detail_sql = text(
+            """
             SELECT
                 store_id,
                 SUM(gross_revenue_fen)      AS revenue_fen,
@@ -649,7 +670,8 @@ class HQBrandAnalyticsService:
               AND stat_date BETWEEN :start_date AND :end_date
             GROUP BY store_id
             ORDER BY SUM(gross_revenue_fen) DESC
-        """)
+        """
+        )
 
         try:
             summary_result = await db.execute(brand_summary_sql, params)

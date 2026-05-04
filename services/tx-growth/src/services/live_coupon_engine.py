@@ -100,7 +100,8 @@ class LiveCouponEngine:
             coupon_ids.append(str(coupon_id))
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO live_coupons (
                         id, tenant_id, live_event_id, coupon_batch_id,
                         coupon_name, discount_desc, total_quantity,
@@ -112,7 +113,8 @@ class LiveCouponEngine:
                         :claim_code, 'available', :expires_at,
                         :now, :now
                     )
-                """),
+                """
+                ),
                 {
                     "id": str(coupon_id),
                     "tenant_id": str(tenant_id),
@@ -167,7 +169,8 @@ class LiveCouponEngine:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_coupons
                 SET status = 'claimed',
                     claimed_by = :customer_id,
@@ -185,7 +188,8 @@ class LiveCouponEngine:
                     FOR UPDATE SKIP LOCKED
                 )
                 RETURNING id, claim_code, coupon_name, discount_desc
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -242,7 +246,8 @@ class LiveCouponEngine:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_coupons
                 SET status = 'redeemed',
                     redeemed_order_id = :order_id,
@@ -254,7 +259,8 @@ class LiveCouponEngine:
                   AND status = 'claimed'
                   AND is_deleted = false
                 RETURNING id, live_event_id
-            """),
+            """
+            ),
             {
                 "coupon_id": str(coupon_id),
                 "tenant_id": str(tenant_id),
@@ -303,7 +309,8 @@ class LiveCouponEngine:
             [{coupon_id, claim_code, coupon_name, status, claimed_by, ...}]
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id, coupon_name, discount_desc, claim_code,
                     status, claimed_by, claimed_at,
@@ -314,7 +321,8 @@ class LiveCouponEngine:
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
                 ORDER BY created_at ASC
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -355,7 +363,8 @@ class LiveCouponEngine:
             {total, available, claimed, redeemed, expired, total_revenue_fen}
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                                AS total,
                     COUNT(*) FILTER (WHERE status = 'available')            AS available,
@@ -367,7 +376,8 @@ class LiveCouponEngine:
                 WHERE live_event_id = :event_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),

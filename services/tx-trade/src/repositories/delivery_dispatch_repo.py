@@ -308,9 +308,7 @@ class DeliveryProviderConfigRepository:
         update_secret_only_if_provided=True 时：app_key/app_secret 仅在显式
         提供（非 None）才覆盖，避免脱敏返回的 ****掩码 回写后破坏凭据。
         """
-        existing = await DeliveryProviderConfigRepository.get_one(
-            db, tenant_id, store_id, provider
-        )
+        existing = await DeliveryProviderConfigRepository.get_one(db, tenant_id, store_id, provider)
         now = datetime.now(timezone.utc)
         if existing is not None:
             existing.enabled = enabled

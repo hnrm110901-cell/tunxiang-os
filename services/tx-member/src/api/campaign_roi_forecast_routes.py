@@ -42,6 +42,7 @@ router = APIRouter(
 
 # ── 请求/响应模型 ────────────────────────────────────────────────
 
+
 class HistoryPoint(BaseModel):
     day: date_cls
     revenue_fen: int = Field(ge=0)
@@ -49,6 +50,7 @@ class HistoryPoint(BaseModel):
 
 class ForecastRequest(BaseModel):
     """规划期生成 ROI 预测"""
+
     campaign_name: str = Field(..., max_length=200)
     campaign_type: str = Field(..., description="seasonal/referral/offpeak/new_customer/dormant_recall/banquet")
     forecast_start: date_cls
@@ -58,21 +60,19 @@ class ForecastRequest(BaseModel):
         min_length=2,
         description="至少 2 点历史营收数据；< 30 点走 linear/moving_average",
     )
-    uplift_estimate_fen: int = Field(
-        default=0, description="活动预期增量（可为负）。业务方可提供 Sonnet 参考"
-    )
+    uplift_estimate_fen: int = Field(default=0, description="活动预期增量（可为负）。业务方可提供 Sonnet 参考")
     store_id: Optional[str] = None
     campaign_id: Optional[str] = None
 
 
 class CompleteRequest(BaseModel):
     """活动结束回填实际数据"""
-    actual_by_day: dict[str, int] = Field(
-        ..., description="{YYYY-MM-DD: 分}，活动期实际营收"
-    )
+
+    actual_by_day: dict[str, int] = Field(..., description="{YYYY-MM-DD: 分}，活动期实际营收")
 
 
 # ── 端点 ────────────────────────────────────────────────────────
+
 
 @router.post("/forecast", response_model=dict)
 async def create_forecast(
@@ -157,7 +157,9 @@ async def complete_forecast(
 
     # 读取原 baseline
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT baseline_forecast_fen, forecast_start, forecast_end,
                    campaign_name, campaign_type
             FROM campaign_roi_forecasts
@@ -165,7 +167,10 @@ async def complete_forecast(
               AND tenant_id = CAST(:tenant_id AS uuid)
               AND is_deleted = false
             LIMIT 1
-        """), {"id": forecast_id, "tenant_id": x_tenant_id})
+        """
+            ),
+            {"id": forecast_id, "tenant_id": x_tenant_id},
+        )
         row = result.mappings().first()
     except SQLAlchemyError as exc:
         logger.exception("campaign_roi_load_failed")
@@ -202,6 +207,7 @@ async def complete_forecast(
 
     # Sonnet 解读（backtest 已有）
     from ..services.campaign_roi_forecast_service import ForecastResult
+
     proxy_forecast = ForecastResult(
         model="prophet",  # 读自 DB，此处作占位
         baseline_total_fen=row["baseline_forecast_fen"],
@@ -262,7 +268,9 @@ async def roi_summary(
         raise HTTPException(status_code=400, detail="months_back 必须在 [1, 36]")
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT
                 campaign_type,
                 COUNT(*)                                     AS total_campaigns,
@@ -278,7 +286,10 @@ async def roi_summary(
               AND created_at >= CURRENT_DATE - (:months_back || ' months')::interval
             GROUP BY campaign_type
             ORDER BY true_uplift_sum_fen DESC
-        """), {"tenant_id": x_tenant_id, "months_back": str(months_back)})
+        """
+            ),
+            {"tenant_id": x_tenant_id, "months_back": str(months_back)},
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("campaign_roi_summary_failed")
@@ -302,10 +313,7 @@ async def roi_summary(
                 "total_uplift_fen": total_uplift_fen,
                 "total_uplift_yuan": round(total_uplift_fen / 100, 2),
                 "total_baseline_fen": total_baseline_fen,
-                "roi_multiplier": (
-                    round(total_uplift_fen / total_baseline_fen, 3)
-                    if total_baseline_fen > 0 else None
-                ),
+                "roi_multiplier": (round(total_uplift_fen / total_baseline_fen, 3) if total_baseline_fen > 0 else None),
             },
         },
     }
@@ -313,10 +321,9 @@ async def roi_summary(
 
 # ── 辅助 ────────────────────────────────────────────────────────
 
+
 def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

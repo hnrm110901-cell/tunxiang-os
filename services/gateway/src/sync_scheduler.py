@@ -81,7 +81,8 @@ async def _write_sync_log(
     try:
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sync_logs (
                     id, tenant_id, merchant_code, sync_type, status,
                     records_synced, error_msg, error_detail,
@@ -93,7 +94,8 @@ async def _write_sync_log(
                     :retry_count, :next_retry_at,
                     :started_at, :finished_at
                 )
-            """),
+            """
+            ),
             {
                 "id": log_id,
                 "tenant_id": tenant_id,

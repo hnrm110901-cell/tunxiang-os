@@ -98,9 +98,7 @@ async def settle_retry(
     request: Request,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(
-        require_role("cashier", "store_manager", "admin")
-    ),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin")),
 ) -> SettleRetryResponse:
     """Mac mini Flusher 补发入口。
 
@@ -185,10 +183,7 @@ async def settle_retry(
                 data={
                     "status": "done",
                     "saga_id": str(existing["saga_id"]),
-                    "payment_id": (
-                        str(existing["payment_id"])
-                        if existing["payment_id"] else None
-                    ),
+                    "payment_id": (str(existing["payment_id"]) if existing["payment_id"] else None),
                     "source": "idempotency_replay",
                 },
             )
@@ -204,10 +199,7 @@ async def settle_retry(
                 data={
                     "status": step,
                     "saga_id": str(existing["saga_id"]),
-                    "payment_id": (
-                        str(existing["payment_id"])
-                        if existing["payment_id"] else None
-                    ),
+                    "payment_id": (str(existing["payment_id"]) if existing["payment_id"] else None),
                     "reason": existing.get("compensation_reason"),
                     "source": "idempotency_replay",
                 },

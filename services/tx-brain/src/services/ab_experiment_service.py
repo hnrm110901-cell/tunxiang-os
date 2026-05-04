@@ -85,9 +85,7 @@ class CreateExperimentInput:
             raise DisputeValidationError("arms 不能为空")
         control_count = sum(1 for a in self.arms if a.is_control)
         if control_count != 1:
-            raise DisputeValidationError(
-                f"arms 必须有且只有 1 个 control，当前 {control_count} 个"
-            )
+            raise DisputeValidationError(f"arms 必须有且只有 1 个 control，当前 {control_count} 个")
         if len({a.arm_key for a in self.arms}) != len(self.arms):
             raise DisputeValidationError("arms 的 arm_key 不能重复")
 
@@ -119,12 +117,8 @@ class RecordEventInput:
     idempotency_key: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if self.event_type not in (
-            "exposure", "conversion", "revenue", "metric_value", "error"
-        ):
-            raise DisputeValidationError(
-                f"event_type 非法: {self.event_type!r}"
-            )
+        if self.event_type not in ("exposure", "conversion", "revenue", "metric_value", "error"):
+            raise DisputeValidationError(f"event_type 非法: {self.event_type!r}")
         if self.metadata is None:
             self.metadata = {}
         if self.event_at is None:
@@ -145,13 +139,12 @@ class ABExperimentService:
 
     # ── 1. 创建实验 ──
 
-    async def create_experiment(
-        self, inp: CreateExperimentInput
-    ) -> dict[str, Any]:
+    async def create_experiment(self, inp: CreateExperimentInput) -> dict[str, Any]:
         """创建新实验（draft 状态）"""
         # 1. 插入主表
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ab_experiments (
                     tenant_id, experiment_key, name, description,
                     primary_metric, primary_metric_goal,
@@ -170,7 +163,8 @@ class ABExperimentService:
                     'draft', CAST(:created_by AS uuid)
                 )
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "experiment_key": inp.experiment_key,
@@ -197,7 +191,8 @@ class ABExperimentService:
         arm_ids: list[str] = []
         for arm in inp.arms:
             arm_row = await self._db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO ab_experiment_arms (
                         tenant_id, experiment_id, arm_key, name, description,
                         is_control, traffic_weight, parameters
@@ -207,7 +202,8 @@ class ABExperimentService:
                         :is_control, :traffic_weight, CAST(:parameters AS jsonb)
                     )
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": self._tenant_id,
                     "experiment_id": experiment_id,
@@ -232,9 +228,7 @@ class ABExperimentService:
 
     # ── 2. 生命周期转换 ──
 
-    async def start_experiment(
-        self, experiment_id: str, started_by: Optional[str] = None
-    ) -> dict[str, Any]:
+    async def start_experiment(self, experiment_id: str, started_by: Optional[str] = None) -> dict[str, Any]:
         """draft → running"""
         return await self._transition_status(
             experiment_id,
@@ -243,11 +237,11 @@ class ABExperimentService:
             extra_columns={"started_at": "NOW()"},
         )
 
-    async def pause_experiment(
-        self, experiment_id: str
-    ) -> dict[str, Any]:
+    async def pause_experiment(self, experiment_id: str) -> dict[str, Any]:
         return await self._transition_status(
-            experiment_id, expected=["running"], target="paused",
+            experiment_id,
+            expected=["running"],
+            target="paused",
         )
 
     async def terminate_experiment(
@@ -258,30 +252,23 @@ class ABExperimentService:
         winner_arm_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """手动终止，target 依 reason 决定"""
-        target = (
-            "terminated_winner" if winner_arm_id else "terminated_no_winner"
-        )
+        target = "terminated_winner" if winner_arm_id else "terminated_no_winner"
         return await self._transition_status(
             experiment_id,
             expected=["running", "paused"],
             target=target,
             extra_columns={"ended_at": "NOW()"},
             extra_params={"winner_arm_id": winner_arm_id},
-            extra_sets="winner_arm_id = CAST(:winner_arm_id AS uuid)"
-            if winner_arm_id else "",
+            extra_sets="winner_arm_id = CAST(:winner_arm_id AS uuid)" if winner_arm_id else "",
         )
 
     # ── 3. Assignment ──
 
-    async def assign(
-        self, *, experiment_key: str, entity_id: str
-    ) -> AssignResult:
+    async def assign(self, *, experiment_key: str, entity_id: str) -> AssignResult:
         """稳定分配 entity 到 arm；幂等"""
         exp = await self._fetch_experiment_by_key(experiment_key)
         if exp is None:
-            raise DisputeValidationError(
-                f"找不到实验 experiment_key={experiment_key!r}"
-            )
+            raise DisputeValidationError(f"找不到实验 experiment_key={experiment_key!r}")
 
         if exp["status"] != "running":
             return AssignResult(
@@ -352,7 +339,8 @@ class ABExperimentService:
 
         # 持久化
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ab_experiment_assignments (
                     tenant_id, experiment_id, arm_id, entity_type, entity_id,
                     assignment_hash
@@ -364,7 +352,8 @@ class ABExperimentService:
                 ON CONFLICT (tenant_id, experiment_id, entity_type, entity_id)
                 DO UPDATE SET assigned_at = ab_experiment_assignments.assigned_at
                 RETURNING id, (xmax = 0) AS was_new
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "experiment_id": str(exp["id"]),
@@ -390,15 +379,11 @@ class ABExperimentService:
 
     # ── 4. 事件摄入 ──
 
-    async def record_event(
-        self, *, experiment_key: str, inp: RecordEventInput
-    ) -> dict[str, Any]:
+    async def record_event(self, *, experiment_key: str, inp: RecordEventInput) -> dict[str, Any]:
         """按 entity_id 找 assignment + 写事件 + 增量更新 arm 累计"""
         exp = await self._fetch_experiment_by_key(experiment_key)
         if exp is None:
-            raise DisputeValidationError(
-                f"找不到实验 experiment_key={experiment_key!r}"
-            )
+            raise DisputeValidationError(f"找不到实验 experiment_key={experiment_key!r}")
 
         assignment = await self._fetch_existing_assignment(
             experiment_id=str(exp["id"]),
@@ -414,7 +399,8 @@ class ABExperimentService:
 
         # 插入事件（幂等）
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ab_experiment_events (
                     tenant_id, experiment_id, arm_id, entity_type, entity_id,
                     event_type, revenue_fen, numeric_value, metadata,
@@ -429,7 +415,8 @@ class ABExperimentService:
                 WHERE idempotency_key IS NOT NULL
                 DO NOTHING
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "experiment_id": str(exp["id"]),
@@ -463,11 +450,13 @@ class ABExperimentService:
         # 若 assignment.first_exposed_at 为空且 event_type=exposure，回填
         if inp.event_type == "exposure":
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE ab_experiment_assignments
                     SET first_exposed_at = COALESCE(first_exposed_at, NOW())
                     WHERE id = CAST(:id AS uuid)
-                """),
+                """
+                ),
                 {"id": str(assignment["id"])},
             )
 
@@ -480,9 +469,7 @@ class ABExperimentService:
 
     # ── 5. 显著性评估 ──
 
-    async def evaluate_significance(
-        self, experiment_id: str, *, use_bayesian: bool = False
-    ) -> dict[str, Any]:
+    async def evaluate_significance(self, experiment_id: str, *, use_bayesian: bool = False) -> dict[str, Any]:
         """评估实验当前显著性（不改 status，仅返回）"""
         exp = await self._fetch_experiment_by_id(experiment_id)
         if exp is None:
@@ -501,7 +488,8 @@ class ABExperimentService:
                 continue
             treatment_stats = _db_row_to_arm_stats(arm)
             sig = frequentist_significance(
-                control_stats, treatment_stats,
+                control_stats,
+                treatment_stats,
                 metric=exp["primary_metric"],
                 alpha=float(exp["significance_level"]),
             )
@@ -517,12 +505,8 @@ class ABExperimentService:
             }
             if use_bayesian and exp["primary_metric"] == "conversion_rate":
                 bayes = bayesian_posterior(control_stats, treatment_stats)
-                arm_result["bayesian_prob_beats_control"] = (
-                    bayes.prob_treatment_beats_control
-                )
-                arm_result["bayesian_expected_loss"] = (
-                    bayes.expected_loss_pct
-                )
+                arm_result["bayesian_prob_beats_control"] = bayes.prob_treatment_beats_control
+                arm_result["bayesian_expected_loss"] = bayes.expected_loss_pct
             results.append(arm_result)
 
         return {
@@ -544,7 +528,8 @@ class ABExperimentService:
     ) -> list[dict[str, Any]]:
         """扫所有 running + 熔断启用的实验，触发熔断时转 terminated_circuit_breaker"""
         rows = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, experiment_key, primary_metric, primary_metric_goal,
                        circuit_breaker_threshold, circuit_breaker_min_samples
                 FROM ab_experiments
@@ -553,7 +538,8 @@ class ABExperimentService:
                   AND status = 'running'
                   AND circuit_breaker_enabled = true
                   AND circuit_breaker_tripped = false
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id},
         )
         experiments = [dict(r) for r in rows.mappings()]
@@ -570,25 +556,20 @@ class ABExperimentService:
             }
             if decision.should_trip:
                 await self._trip_circuit_breaker(
-                    str(exp["id"]), reason=decision.reason or "auto-trip",
+                    str(exp["id"]),
+                    reason=decision.reason or "auto-trip",
                 )
             results.append(result)
 
         return results
 
-    async def _evaluate_single_circuit_breaker(
-        self, exp: dict[str, Any]
-    ) -> CircuitBreakerDecision:
+    async def _evaluate_single_circuit_breaker(self, exp: dict[str, Any]) -> CircuitBreakerDecision:
         arms = await self._fetch_arms(str(exp["id"]))
         control = next((a for a in arms if a["is_control"]), None)
         if control is None:
             return CircuitBreakerDecision(should_trip=False)
         control_stats = _db_row_to_arm_stats(control, is_control=True)
-        treatments = [
-            (a["arm_key"], _db_row_to_arm_stats(a))
-            for a in arms
-            if not a["is_control"]
-        ]
+        treatments = [(a["arm_key"], _db_row_to_arm_stats(a)) for a in arms if not a["is_control"]]
         return evaluate_circuit_breaker(
             control_stats,
             treatments,
@@ -602,11 +583,10 @@ class ABExperimentService:
     # 内部工具
     # ─────────────────────────────────────────────────────────────
 
-    async def _fetch_experiment_by_key(
-        self, experiment_key: str
-    ) -> Optional[dict[str, Any]]:
+    async def _fetch_experiment_by_key(self, experiment_key: str) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, experiment_key, name, status, entity_type,
                        traffic_percentage, primary_metric, primary_metric_goal,
                        significance_level
@@ -615,22 +595,23 @@ class ABExperimentService:
                   AND experiment_key = :key
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id, "key": experiment_key},
         )
         rec = row.mappings().first()
         return dict(rec) if rec else None
 
-    async def _fetch_experiment_by_id(
-        self, experiment_id: str
-    ) -> Optional[dict[str, Any]]:
+    async def _fetch_experiment_by_id(self, experiment_id: str) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM ab_experiments
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"id": experiment_id, "tenant_id": self._tenant_id},
         )
         rec = row.mappings().first()
@@ -638,7 +619,8 @@ class ABExperimentService:
 
     async def _fetch_arms(self, experiment_id: str) -> list[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, arm_key, name, is_control, traffic_weight,
                        parameters, exposure_count, conversion_count,
                        revenue_sum_fen, numeric_metric_sum, numeric_metric_ssq
@@ -646,7 +628,8 @@ class ABExperimentService:
                 WHERE experiment_id = CAST(:experiment_id AS uuid)
                   AND is_deleted = false
                 ORDER BY is_control DESC, arm_key
-            """),
+            """
+            ),
             {"experiment_id": experiment_id},
         )
         return [dict(r) for r in row.mappings()]
@@ -655,7 +638,8 @@ class ABExperimentService:
         self, *, experiment_id: str, entity_type: str, entity_id: str
     ) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT a.id, a.arm_id, a.assigned_at, a.first_exposed_at,
                        arm.arm_key, arm.parameters
                 FROM ab_experiment_assignments a
@@ -664,7 +648,8 @@ class ABExperimentService:
                   AND a.entity_type = :entity_type
                   AND a.entity_id = :entity_id
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "experiment_id": experiment_id,
                 "entity_type": entity_type,
@@ -701,7 +686,8 @@ class ABExperimentService:
             params.update(extra_params)
 
         row = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE ab_experiments SET
                     {', '.join(set_clauses)}
                 WHERE id = CAST(:id AS uuid)
@@ -709,15 +695,14 @@ class ABExperimentService:
                   AND is_deleted = false
                   AND status = ANY(:expected)
                 RETURNING id, status
-            """),
+            """
+            ),
             params,
         )
         rec = row.mappings().first()
         await self._db.commit()
         if not rec:
-            raise DisputeValidationError(
-                f"状态转换失败：实验不存在或状态不在 {expected}"
-            )
+            raise DisputeValidationError(f"状态转换失败：实验不存在或状态不在 {expected}")
         return {"experiment_id": experiment_id, "status": target}
 
     async def _increment_arm_stats(
@@ -745,9 +730,7 @@ class ABExperimentService:
         elif event_type == "metric_value":
             if numeric_value is not None:
                 updates.append("numeric_metric_sum = numeric_metric_sum + :nv")
-                updates.append(
-                    "numeric_metric_ssq = numeric_metric_ssq + (:nv * :nv)"
-                )
+                updates.append("numeric_metric_ssq = numeric_metric_ssq + (:nv * :nv)")
                 params["nv"] = numeric_value
         # error 事件不增计数
 
@@ -755,20 +738,21 @@ class ABExperimentService:
             return  # 只有 updated_at 则不动
 
         await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE ab_experiment_arms SET
                     {', '.join(updates)},
                     last_stats_refreshed_at = NOW()
                 WHERE id = CAST(:arm_id AS uuid)
-            """),
+            """
+            ),
             params,
         )
 
-    async def _trip_circuit_breaker(
-        self, experiment_id: str, *, reason: str
-    ) -> None:
+    async def _trip_circuit_breaker(self, experiment_id: str, *, reason: str) -> None:
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE ab_experiments SET
                     status = 'terminated_circuit_breaker',
                     circuit_breaker_tripped = true,
@@ -778,7 +762,8 @@ class ABExperimentService:
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
-            """),
+            """
+            ),
             {
                 "id": experiment_id,
                 "tenant_id": self._tenant_id,
@@ -793,9 +778,7 @@ class ABExperimentService:
 # ─────────────────────────────────────────────────────────────
 
 
-def _db_row_to_arm_stats(
-    row: dict[str, Any], *, is_control: bool = False
-) -> ArmStats:
+def _db_row_to_arm_stats(row: dict[str, Any], *, is_control: bool = False) -> ArmStats:
     return ArmStats(
         exposure=int(row.get("exposure_count") or 0),
         conversion=int(row.get("conversion_count") or 0),

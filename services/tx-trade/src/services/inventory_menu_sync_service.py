@@ -65,7 +65,8 @@ async def _fetch_dish_ingredients_by_ingredient(
     联查 dish_ingredients（BOM）+ dishes 获取菜品名称。
     ingredient_id 字段在 dish_ingredients 中为 String(50)，存储原始 ID 字符串。
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             di.dish_id::text    AS dish_id,
             d.dish_name         AS dish_name,
@@ -78,7 +79,8 @@ async def _fetch_dish_ingredients_by_ingredient(
         WHERE di.ingredient_id = :ingredient_id
           AND di.is_deleted = false
           AND d.is_deleted = false
-    """)
+    """
+    )
     try:
         result = await db.execute(sql, {"ingredient_id": ingredient_id})
         rows = result.mappings().all()
@@ -114,7 +116,8 @@ async def _fetch_all_ingredient_stocks(
       current_quantity — 当前库存量
       min_quantity     — 预警下限（alert threshold）
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             id::text            AS ingredient_id,
             ingredient_name,
@@ -125,7 +128,8 @@ async def _fetch_all_ingredient_stocks(
         WHERE store_id = :store_id::uuid
           AND is_deleted = false
         ORDER BY ingredient_name
-    """)
+    """
+    )
     try:
         result = await db.execute(sql, {"store_id": store_id})
         rows = result.mappings().all()

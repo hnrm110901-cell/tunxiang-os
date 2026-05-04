@@ -211,7 +211,8 @@ def _get_latest_purchase_price(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT unit_cost_fen
             FROM ingredient_transactions
             WHERE ingredient_id = :ingredient_id
@@ -221,7 +222,8 @@ def _get_latest_purchase_price(
               AND is_deleted = FALSE
             ORDER BY transaction_time DESC
             LIMIT 1
-        """),
+        """
+            ),
             {"ingredient_id": ingredient_id, "tenant_id": tenant_id},
         )
         row = result.scalar_one_or_none()
@@ -242,13 +244,15 @@ def _get_ledger_price(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT unit_price_fen
             FROM ingredients
             WHERE id = :ingredient_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"ingredient_id": ingredient_id, "tenant_id": tenant_id},
         )
         row = result.scalar_one_or_none()
@@ -271,14 +275,16 @@ def _get_dish_bom_items(
         now = datetime.now(timezone.utc)
         # 先取 BOM 模板
         bom_result = db.execute(
-            text("""
+            text(
+                """
             SELECT id FROM bom_templates
             WHERE dish_id = :dish_id AND tenant_id = :tenant_id
               AND is_active = TRUE AND is_deleted = FALSE
               AND effective_date <= :now
               AND (expiry_date IS NULL OR expiry_date > :now)
             ORDER BY effective_date DESC LIMIT 1
-        """),
+        """
+            ),
             {"dish_id": dish_id, "tenant_id": tenant_id, "now": now},
         )
         bom_row = bom_result.scalar_one_or_none()
@@ -287,13 +293,15 @@ def _get_dish_bom_items(
 
         # 取原料行
         items_result = db.execute(
-            text("""
+            text(
+                """
             SELECT ingredient_id, standard_qty, unit, unit_cost_fen,
                    waste_factor, is_optional, item_action
             FROM bom_items
             WHERE bom_id = :bom_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE AND item_action != 'REMOVE'
-        """),
+        """
+            ),
             {"bom_id": bom_row, "tenant_id": tenant_id},
         )
         return [dict(row) for row in items_result.mappings().all()]
@@ -314,7 +322,8 @@ def _sum_daily_usage_transactions(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(ABS(total_cost_fen)), 0) as total
             FROM ingredient_transactions
             WHERE store_id = :store_id
@@ -322,7 +331,8 @@ def _sum_daily_usage_transactions(
               AND transaction_type = 'usage'
               AND DATE(transaction_time) = :target_date
               AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         return result.scalar_one_or_none() or 0
@@ -343,7 +353,8 @@ def _get_daily_sold_dishes(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id, d.dish_name, SUM(oi.quantity) as quantity_sold
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -355,7 +366,8 @@ def _get_daily_sold_dishes(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         return [dict(row) for row in result.mappings().all()]

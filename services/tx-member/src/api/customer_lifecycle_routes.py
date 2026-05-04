@@ -23,6 +23,7 @@ from shared.ontology.src.database import get_db
 
 try:
     from repositories.customer_lifecycle_repo import CustomerLifecycleRepository
+
     from services.customer_lifecycle_fsm import CustomerLifecycleFSM
 except ImportError:  # pragma: no cover
     from ..repositories.customer_lifecycle_repo import (  # type: ignore[no-redef]
@@ -85,9 +86,7 @@ async def _set_rls(db: AsyncSession, tenant_id: uuid.UUID) -> None:
 
 @router.get("/summary")
 async def get_lifecycle_summary(
-    flow_window_days: int = Query(
-        30, ge=1, le=365, description="流量窗口天数（默认近 30 天）"
-    ),
+    flow_window_days: int = Query(30, ge=1, le=365, description="流量窗口天数（默认近 30 天）"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -166,15 +165,11 @@ async def get_lifecycle_for_customer(
             "customer_id": str(record.customer_id),
             "tenant_id": str(record.tenant_id),
             "state": record.state.value,
-            "previous_state": (
-                record.previous_state.value if record.previous_state else None
-            ),
+            "previous_state": (record.previous_state.value if record.previous_state else None),
             "since_ts": record.since_ts.isoformat(),
             "transition_count": record.transition_count,
             "last_transition_event_id": (
-                str(record.last_transition_event_id)
-                if record.last_transition_event_id
-                else None
+                str(record.last_transition_event_id) if record.last_transition_event_id else None
             ),
             "updated_at": record.updated_at.isoformat(),
         },
@@ -243,9 +238,7 @@ async def recompute_lifecycle(
         "data": {
             "customer_id": str(record.customer_id),
             "state": record.state.value,
-            "previous_state": (
-                record.previous_state.value if record.previous_state else None
-            ),
+            "previous_state": (record.previous_state.value if record.previous_state else None),
             "transition_count": record.transition_count,
             "since_ts": record.since_ts.isoformat(),
             "updated_at": record.updated_at.isoformat(),

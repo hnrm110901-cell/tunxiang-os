@@ -17,6 +17,7 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
+
 from services.photo_reviewer import PhotoReviewer, PhotoReviewError
 from services.ugc_service import UGCError, UGCService
 from services.viral_tracker import ViralTracker, ViralTrackerError
@@ -163,10 +164,12 @@ async def trigger_review(
 
     row = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT media_urls FROM ugc_submissions
             WHERE id = :ugc_id AND tenant_id = :tenant_id AND is_deleted = false
-        """),
+        """
+            ),
             {"ugc_id": str(ugc_id), "tenant_id": str(tenant_id)},
         )
     ).fetchone()

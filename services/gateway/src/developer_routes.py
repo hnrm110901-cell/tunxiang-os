@@ -4,15 +4,15 @@
 需要 JWT 认证（管理员或开发者角色）。
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.apikeys.src.key_service import APIKeyNotFoundError, APIKeyPermissionError, APIKeyService
 from shared.ontology.src.database import get_async_session
-from shared.apikeys.src.key_service import APIKeyService, APIKeyNotFoundError, APIKeyPermissionError
 
 logger = structlog.get_logger(__name__)
 
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/v1/developer", tags=["developer"])
 
 
 # ── 依赖注入 ──────────────────────────────────────────────────────────────
+
 
 async def _get_tenant_id() -> str:
     """从请求上下文获取 tenant_id（由网关 AuthMiddleware 注入）。"""
@@ -49,11 +50,7 @@ async def create_api_key(
             name=body.get("name", "My App"),
             permissions=body.get("permissions"),
             rate_limit_rps=body.get("rate_limit_rps", 10),
-            expires_at=(
-                datetime.fromisoformat(body["expires_at"])
-                if body.get("expires_at")
-                else None
-            ),
+            expires_at=(datetime.fromisoformat(body["expires_at"]) if body.get("expires_at") else None),
         )
         return {"ok": True, "data": result, "error": None}
     except APIKeyPermissionError as exc:
@@ -103,9 +100,7 @@ async def create_webhook(
         url=body["url"],
         events=body.get("events", ["*"]),
         secret=body.get("secret"),
-        api_key_id=(
-            uuid.UUID(body["api_key_id"]) if body.get("api_key_id") else None
-        ),
+        api_key_id=(uuid.UUID(body["api_key_id"]) if body.get("api_key_id") else None),
         retry_count=body.get("retry_count", 3),
         timeout_ms=body.get("timeout_ms", 5000),
     )

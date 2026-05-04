@@ -146,9 +146,7 @@ class TestChannelCanonicalServiceTier2:
         svc = ChannelCanonicalService(db, tenant_id=TENANT_A)
 
         # 模拟仓储：第一次幂等命中
-        with patch.object(
-            svc._repo, "get_by_external", AsyncMock(return_value=existing_row)
-        ) as mock_get, patch.object(
+        with patch.object(svc._repo, "get_by_external", AsyncMock(return_value=existing_row)) as mock_get, patch.object(
             svc._repo, "insert", AsyncMock()
         ) as mock_insert, patch(
             "src.services.channel_canonical_service.emit_event",
@@ -178,16 +176,13 @@ class TestChannelCanonicalServiceTier2:
             emitted.update(kwargs)
             return "evt-id-mock"
 
-        with patch.object(
-            svc._repo, "get_by_external", AsyncMock(return_value=None)
-        ), patch.object(
+        with patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)), patch.object(
             svc._repo, "insert", AsyncMock(return_value=new_row)
-        ), patch(
-            "src.services.channel_canonical_service.emit_event", new=fake_emit
-        ):
+        ), patch("src.services.channel_canonical_service.emit_event", new=fake_emit):
             record, created = await svc.ingest(req)
             # 等所有 fire-and-forget 任务完成
             import asyncio as _aio
+
             pending = [t for t in _aio.all_tasks() if t is not _aio.current_task()]
             await _aio.gather(*pending, return_exceptions=True)
 
@@ -216,13 +211,9 @@ class TestChannelCanonicalServiceTier2:
         db = _make_db()
         svc = ChannelCanonicalService(db, tenant_id=TENANT_A)
 
-        with patch.object(
-            svc._repo, "get_by_external", AsyncMock(return_value=None)
-        ), patch.object(
+        with patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)), patch.object(
             svc._repo, "insert", AsyncMock(return_value=new_row)
-        ), patch(
-            "src.services.channel_canonical_service.emit_event", AsyncMock()
-        ):
+        ), patch("src.services.channel_canonical_service.emit_event", AsyncMock()):
             record, _ = await svc.ingest(req)
 
         assert record.settlement_fen == expected_settlement
@@ -293,9 +284,7 @@ class TestChannelCanonicalRouterTier2:
 
         records = [CanonicalOrderRecord(**r) for r in sample_records]
 
-        with patch(
-            "src.api.channel_canonical_routes.ChannelCanonicalService"
-        ) as svc_cls:
+        with patch("src.api.channel_canonical_routes.ChannelCanonicalService") as svc_cls:
             instance = MagicMock()
             instance.list_recent = AsyncMock(return_value=(records, 42))
             svc_cls.return_value = instance
@@ -336,8 +325,13 @@ class TestChannelCanonicalMigrationStatic:
         migration_path = os.path.abspath(
             os.path.join(
                 _TESTS_DIR,
-                "..", "..", "..", "..",
-                "shared", "db-migrations", "versions",
+                "..",
+                "..",
+                "..",
+                "..",
+                "shared",
+                "db-migrations",
+                "versions",
                 "v276_channel_canonical_orders.py",
             )
         )

@@ -74,9 +74,7 @@ class FoodpandaAdapter(BaseDeliveryAdapter):
             eta_str: Optional[str] = raw.get("estimated_delivery_time")
             if eta_str:
                 try:
-                    estimated_delivery_at = datetime.fromisoformat(
-                        eta_str.replace("Z", "+00:00")
-                    )
+                    estimated_delivery_at = datetime.fromisoformat(eta_str.replace("Z", "+00:00"))
                 except ValueError:
                     pass
 

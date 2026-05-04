@@ -31,10 +31,12 @@ async def record_token_usage(
     """记录Token使用."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.token_usage
+        text(
+            """INSERT INTO forge.token_usage
                 (tenant_id, app_id, input_tokens, output_tokens, cost_fen)
                 VALUES (:tid, :app_id, :input_tokens, :output_tokens, :cost_fen)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body.app_id,
@@ -72,7 +74,8 @@ async def get_token_usage(
 
     where = " AND ".join(clauses)
     row = await db.execute(
-        text(f"""SELECT
+        text(
+            f"""SELECT
                     :app_id AS app_id,
                     COALESCE(:period_type, 'all') AS period_type,
                     COALESCE(:period_key, 'all') AS period_key,
@@ -81,16 +84,19 @@ async def get_token_usage(
                     COALESCE(SUM(tu.input_tokens + tu.output_tokens), 0) AS total_tokens,
                     COALESCE(SUM(tu.cost_fen), 0) AS cost_fen
                 FROM forge.token_usage tu
-                WHERE {where}"""),
+                WHERE {where}"""
+        ),
         {**params, "period_type": period_type or "all", "period_key": period_key or "all"},
     )
     data = dict(row.mappings().one())
 
     # Fetch budget info
     budget_row = await db.execute(
-        text("""SELECT budget_fen FROM forge.token_budgets
+        text(
+            """SELECT budget_fen FROM forge.token_budgets
                 WHERE tenant_id = :tid AND app_id = :app_id
-                LIMIT 1"""),
+                LIMIT 1"""
+        ),
         {"tid": x_tenant_id, "app_id": app_id},
     )
     b = budget_row.mappings().first()
@@ -113,7 +119,8 @@ async def token_usage_trend(
     """Token使用趋势."""
     await _set_tenant(db, x_tenant_id)
     rows = await db.execute(
-        text("""SELECT DATE(created_at) AS day,
+        text(
+            """SELECT DATE(created_at) AS day,
                     SUM(input_tokens) AS input_tokens,
                     SUM(output_tokens) AS output_tokens,
                     SUM(input_tokens + output_tokens) AS total_tokens,
@@ -121,7 +128,8 @@ async def token_usage_trend(
                 FROM forge.token_usage
                 WHERE tenant_id = :tid AND app_id = :app_id
                   AND created_at >= NOW() - INTERVAL '1 day' * :days
-                GROUP BY DATE(created_at) ORDER BY day"""),
+                GROUP BY DATE(created_at) ORDER BY day"""
+        ),
         {"tid": x_tenant_id, "app_id": app_id, "days": days},
     )
     return [dict(r) for r in rows.mappings().all()]
@@ -139,7 +147,8 @@ async def set_token_pricing(
     """设置Token定价."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.token_pricing
+        text(
+            """INSERT INTO forge.token_pricing
                 (tenant_id, app_id, input_price_per_1k_fen, output_price_per_1k_fen, markup_rate)
                 VALUES (:tid, :app_id, :input_price, :output_price, :markup_rate)
                 ON CONFLICT (tenant_id, app_id) DO UPDATE SET
@@ -147,7 +156,8 @@ async def set_token_pricing(
                     output_price_per_1k_fen = EXCLUDED.output_price_per_1k_fen,
                     markup_rate = EXCLUDED.markup_rate,
                     updated_at = NOW()
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body.app_id,
@@ -171,11 +181,13 @@ async def list_token_alerts(
     """预算预警列表."""
     await _set_tenant(db, x_tenant_id)
     rows = await db.execute(
-        text("""SELECT ta.app_id, ta.period_key, ta.total_tokens,
+        text(
+            """SELECT ta.app_id, ta.period_key, ta.total_tokens,
                     ta.budget_fen, ta.usage_pct, ta.alert_threshold
                 FROM forge.token_alerts ta
                 WHERE ta.tenant_id = :tid AND ta.resolved = false
-                ORDER BY ta.usage_pct DESC"""),
+                ORDER BY ta.usage_pct DESC"""
+        ),
         {"tid": x_tenant_id},
     )
     return [dict(r) for r in rows.mappings().all()]

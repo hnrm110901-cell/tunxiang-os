@@ -35,14 +35,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import select, text
+from models.voucher import FinancialVoucherLine  # type: ignore
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore
 
 log = structlog.get_logger(__name__)
 
@@ -56,11 +54,11 @@ class BackfillError:
 
 @dataclass
 class BackfillReport:
-    total_scanned: int = 0       # 本批扫了多少张凭证
-    backfilled: int = 0           # 成功生成 lines 的凭证数
-    skipped_existing: int = 0     # 已有 lines 跳过的
-    skipped_empty: int = 0        # entries 为空或无有效分录的
-    skipped_unbalanced: int = 0   # 借贷不平衡跳过的
+    total_scanned: int = 0  # 本批扫了多少张凭证
+    backfilled: int = 0  # 成功生成 lines 的凭证数
+    skipped_existing: int = 0  # 已有 lines 跳过的
+    skipped_empty: int = 0  # entries 为空或无有效分录的
+    skipped_unbalanced: int = 0  # 借贷不平衡跳过的
     errors: list[BackfillError] = field(default_factory=list)
     dry_run: bool = False
 
@@ -106,7 +104,8 @@ class VoucherBackfillService:
         # 关键: WHERE NOT EXISTS (lines) 防重复回填.
         # FOR UPDATE SKIP LOCKED: 并行 worker 不争锁.
         where_tenant = "AND fv.tenant_id = :tid" if tenant_id else ""
-        query_sql = text(f"""
+        query_sql = text(
+            f"""
             SELECT fv.id, fv.tenant_id, fv.voucher_no, fv.entries
               FROM financial_vouchers fv
              WHERE jsonb_array_length(fv.entries) > 0
@@ -118,7 +117,8 @@ class VoucherBackfillService:
              ORDER BY fv.created_at ASC
              LIMIT :n
              FOR UPDATE OF fv SKIP LOCKED
-        """)
+        """
+        )
         params: dict[str, Any] = {"n": batch_size}
         if tenant_id is not None:
             params["tid"] = tenant_id
@@ -143,11 +143,13 @@ class VoucherBackfillService:
             except Exception as exc:
                 if strict:
                     raise
-                report.errors.append(BackfillError(
-                    voucher_id=str(row["id"]),
-                    voucher_no=row["voucher_no"],
-                    error=f"{type(exc).__name__}: {exc}",
-                ))
+                report.errors.append(
+                    BackfillError(
+                        voucher_id=str(row["id"]),
+                        voucher_no=row["voucher_no"],
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
+                )
                 log.warning(
                     "voucher.backfill.row_error",
                     voucher_id=str(row["id"]),
@@ -187,18 +189,17 @@ class VoucherBackfillService:
         total_debit = sum(p["debit_fen"] for p in valid_parsed)
         total_credit = sum(p["credit_fen"] for p in valid_parsed)
         if total_debit != total_credit:
-            msg = (
-                f"借贷不平衡: debit_fen={total_debit} "
-                f"!= credit_fen={total_credit}"
-            )
+            msg = f"借贷不平衡: debit_fen={total_debit} " f"!= credit_fen={total_credit}"
             if strict:
                 raise ValueError(msg)
             report.skipped_unbalanced += 1
-            report.errors.append(BackfillError(
-                voucher_id=str(voucher_id),
-                voucher_no=voucher_no,
-                error=msg,
-            ))
+            report.errors.append(
+                BackfillError(
+                    voucher_id=str(voucher_id),
+                    voucher_no=voucher_no,
+                    error=msg,
+                )
+            )
             return
 
         # 3. 生成 lines (dry_run 时不 add)
@@ -263,21 +264,25 @@ class VoucherBackfillService:
                     direction = "credit" if direction == "debit" else "debit"
 
                 if direction == "debit":
-                    parsed.append({
-                        "account_code": account_code,
-                        "account_name": account_name or account_code,
-                        "debit_fen": amount_fen,
-                        "credit_fen": 0,
-                        "summary": e.get("summary"),
-                    })
+                    parsed.append(
+                        {
+                            "account_code": account_code,
+                            "account_name": account_name or account_code,
+                            "debit_fen": amount_fen,
+                            "credit_fen": 0,
+                            "summary": e.get("summary"),
+                        }
+                    )
                 else:
-                    parsed.append({
-                        "account_code": account_code,
-                        "account_name": account_name or account_code,
-                        "debit_fen": 0,
-                        "credit_fen": amount_fen,
-                        "summary": e.get("summary"),
-                    })
+                    parsed.append(
+                        {
+                            "account_code": account_code,
+                            "account_name": account_name or account_code,
+                            "debit_fen": 0,
+                            "credit_fen": amount_fen,
+                            "summary": e.get("summary"),
+                        }
+                    )
                 continue
 
             # 格式 B: debit / credit 元字段
@@ -299,12 +304,14 @@ class VoucherBackfillService:
             if debit_fen < 0 or credit_fen < 0:
                 continue
 
-            parsed.append({
-                "account_code": account_code,
-                "account_name": account_name or account_code,
-                "debit_fen": debit_fen,
-                "credit_fen": credit_fen,
-                "summary": e.get("summary"),
-            })
+            parsed.append(
+                {
+                    "account_code": account_code,
+                    "account_name": account_name or account_code,
+                    "debit_fen": debit_fen,
+                    "credit_fen": credit_fen,
+                    "summary": e.get("summary"),
+                }
+            )
 
         return parsed

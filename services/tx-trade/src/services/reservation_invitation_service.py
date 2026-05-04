@@ -62,9 +62,7 @@ _VALID_TRANSITIONS: dict[InvitationStatus, set[InvitationStatus]] = {
 }
 
 
-def _is_valid_transition(
-    current: InvitationStatus, target: InvitationStatus
-) -> bool:
+def _is_valid_transition(current: InvitationStatus, target: InvitationStatus) -> bool:
     return target in _VALID_TRANSITIONS.get(current, set())
 
 
@@ -161,8 +159,7 @@ class ReservationInvitationService:
         record = await self._load(invitation_id, tenant_id)
         if not _is_valid_transition(record.status, InvitationStatus.SENT):
             raise InvalidInvitationTransitionError(
-                f"invitation {invitation_id} in status {record.status.value} "
-                f"cannot transition to sent"
+                f"invitation {invitation_id} in status {record.status.value} " f"cannot transition to sent"
             )
         now = sent_at or datetime.now(timezone.utc)
         updated = record.model_copy(
@@ -211,8 +208,7 @@ class ReservationInvitationService:
         record = await self._load(invitation_id, tenant_id)
         if not _is_valid_transition(record.status, InvitationStatus.CONFIRMED):
             raise InvalidInvitationTransitionError(
-                f"invitation {invitation_id} in status {record.status.value} "
-                f"cannot transition to confirmed"
+                f"invitation {invitation_id} in status {record.status.value} " f"cannot transition to confirmed"
             )
         now = confirmed_at or datetime.now(timezone.utc)
         updated = record.model_copy(
@@ -251,8 +247,7 @@ class ReservationInvitationService:
         record = await self._load(invitation_id, tenant_id)
         if not _is_valid_transition(record.status, InvitationStatus.FAILED):
             raise InvalidInvitationTransitionError(
-                f"invitation {invitation_id} in status {record.status.value} "
-                f"cannot transition to failed"
+                f"invitation {invitation_id} in status {record.status.value} " f"cannot transition to failed"
             )
         now = datetime.now(timezone.utc)
         updated = record.model_copy(
@@ -292,14 +287,10 @@ class ReservationInvitationService:
     # 内部工具
     # ─────────────────────────────────────────────────────────────────
 
-    async def _load(
-        self, invitation_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> InvitationRecord:
+    async def _load(self, invitation_id: uuid.UUID, tenant_id: uuid.UUID) -> InvitationRecord:
         record = await self._repo.get_by_id(invitation_id, tenant_id)
         if record is None:
-            raise InvitationNotFoundError(
-                f"invitation_id={invitation_id} not found for tenant={tenant_id}"
-            )
+            raise InvitationNotFoundError(f"invitation_id={invitation_id} not found for tenant={tenant_id}")
         return record
 
     async def _fire_event(

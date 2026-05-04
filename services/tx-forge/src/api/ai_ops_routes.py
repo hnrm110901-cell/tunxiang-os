@@ -50,8 +50,10 @@ async def agent_detail(
     if not agent:
         raise HTTPException(404, "Agent not found")
     stats = await db.execute(
-        text("""SELECT COUNT(*) AS total_traces, AVG(latency_ms) AS avg_latency
-                FROM forge.ai_traces WHERE agent_id = :id AND tenant_id = :tid AND created_at >= now() - make_interval(days => :days)"""),
+        text(
+            """SELECT COUNT(*) AS total_traces, AVG(latency_ms) AS avg_latency
+                FROM forge.ai_traces WHERE agent_id = :id AND tenant_id = :tid AND created_at >= now() - make_interval(days => :days)"""
+        ),
         {"id": str(agent_id), "tid": x_tenant_id, "days": days},
     )
     return {**dict(agent), "stats": dict(stats.mappings().one())}
@@ -126,9 +128,11 @@ async def model_registry(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     rows = await db.execute(
-        text("""SELECT model_name, COUNT(*) AS call_count, AVG(latency_ms) AS avg_latency, SUM(cost) AS total_cost
+        text(
+            """SELECT model_name, COUNT(*) AS call_count, AVG(latency_ms) AS avg_latency, SUM(cost) AS total_cost
                 FROM forge.ai_llm_calls WHERE tenant_id = :tid AND created_at >= now() - make_interval(days => :days)
-                GROUP BY model_name ORDER BY call_count DESC"""),
+                GROUP BY model_name ORDER BY call_count DESC"""
+        ),
         {"tid": x_tenant_id, "days": days},
     )
     return {"items": [dict(r) for r in rows.mappings().all()]}
@@ -144,9 +148,11 @@ async def cost_dashboard(
     await _set_tenant(db, x_tenant_id)
     trunc = "day" if group_by == "day" else "week" if group_by == "week" else "month"
     rows = await db.execute(
-        text("""SELECT date_trunc(:trunc, created_at) AS period, model_name, SUM(cost) AS total_cost, COUNT(*) AS call_count
+        text(
+            """SELECT date_trunc(:trunc, created_at) AS period, model_name, SUM(cost) AS total_cost, COUNT(*) AS call_count
                  FROM forge.ai_llm_calls WHERE tenant_id = :tid AND created_at >= now() - make_interval(days => :days)
-                 GROUP BY period, model_name ORDER BY period DESC"""),
+                 GROUP BY period, model_name ORDER BY period DESC"""
+        ),
         {"tid": x_tenant_id, "days": days, "trunc": trunc},
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "group_by": group_by}
@@ -166,10 +172,12 @@ async def latency_stats(
         where += " AND model_name = :model"
         params["model"] = model
     row = await db.execute(
-        text(f"""SELECT AVG(latency_ms) AS avg_latency, percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS p50,
+        text(
+            f"""SELECT AVG(latency_ms) AS avg_latency, percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS p50,
                         percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95,
                         percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms) AS p99, COUNT(*) AS total
-                 FROM forge.ai_llm_calls WHERE {where}"""),
+                 FROM forge.ai_llm_calls WHERE {where}"""
+        ),
         params,
     )
     return dict(row.mappings().one())

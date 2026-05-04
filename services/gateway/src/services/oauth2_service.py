@@ -48,7 +48,8 @@ class OAuth2Service:
         secret_hash = self._hash_secret(app_secret)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO api_applications
                     (tenant_id, app_name, app_key, app_secret_hash,
                      description, scopes, rate_limit_per_min,
@@ -58,7 +59,8 @@ class OAuth2Service:
                      :description, :scopes::jsonb, :rate_limit_per_min,
                      :contact_email, :created_by)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "app_name": app_name,
@@ -93,7 +95,8 @@ class OAuth2Service:
     async def get_application(self, app_id: UUID, tenant_id: UUID, db: AsyncSession) -> dict | None:
         """获取应用详情（不含secret哈希）"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, app_name, app_key, description,
                        status, scopes, rate_limit_per_min, webhook_url,
                        contact_email, created_by, last_active_at, created_at, updated_at
@@ -101,7 +104,8 @@ class OAuth2Service:
                 WHERE id = :app_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"app_id": str(app_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().fetchone()
@@ -123,7 +127,8 @@ class OAuth2Service:
             params["status"] = status
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, app_name, app_key, status, scopes,
                        rate_limit_per_min, contact_email, last_active_at, created_at
                 FROM api_applications
@@ -132,16 +137,19 @@ class OAuth2Service:
                   {where_extra}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().fetchall()]
 
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) FROM api_applications
                 WHERE tenant_id = :tenant_id AND is_deleted = FALSE {where_extra}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar_one()
@@ -150,14 +158,16 @@ class OAuth2Service:
     async def revoke_application(self, app_id: UUID, tenant_id: UUID, db: AsyncSession) -> bool:
         """吊销应用，同时吊销所有关联token"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE api_applications
                 SET status = 'revoked', updated_at = NOW()
                 WHERE id = :app_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"app_id": str(app_id), "tenant_id": str(tenant_id)},
         )
         if not result.fetchone():
@@ -165,13 +175,15 @@ class OAuth2Service:
 
         # 吊销所有关联的有效token
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE api_access_tokens
                 SET revoked_at = NOW()
                 WHERE app_id = :app_id
                   AND revoked_at IS NULL
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"app_id": str(app_id)},
         )
         await db.commit()
@@ -195,11 +207,13 @@ class OAuth2Service:
         """
         # 1. 查app_key
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, app_secret_hash, status, scopes, rate_limit_per_min
                 FROM api_applications
                 WHERE app_key = :app_key AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"app_key": app_key},
         )
         row = result.mappings().fetchone()
@@ -242,14 +256,16 @@ class OAuth2Service:
 
         # 6. 存token_hash，返回明文token
         token_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO api_access_tokens
                     (tenant_id, app_id, token_hash, token_prefix, scopes, expires_at)
                 VALUES
                     (:tenant_id, :app_id, :token_hash, :token_prefix,
                      :scopes::jsonb, :expires_at)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": str(row["tenant_id"]),
                 "app_id": str(row["id"]),
@@ -263,11 +279,13 @@ class OAuth2Service:
 
         # 更新last_active_at
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE api_applications
                 SET last_active_at = NOW(), updated_at = NOW()
                 WHERE id = :app_id
-            """),
+            """
+            ),
             {"app_id": str(row["id"])},
         )
         await db.commit()
@@ -304,13 +322,15 @@ class OAuth2Service:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT t.id, t.tenant_id, t.app_id, t.scopes,
                        t.expires_at, t.revoked_at
                 FROM api_access_tokens t
                 WHERE t.token_hash = :token_hash
                   AND t.is_deleted = FALSE
-            """),
+            """
+            ),
             {"token_hash": token_hash},
         )
         row = result.mappings().fetchone()
@@ -342,11 +362,13 @@ class OAuth2Service:
         # 异步更新last_active_at（非阻塞，不等结果）
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE api_applications
                     SET last_active_at = NOW()
                     WHERE id = :app_id
-                """),
+                """
+                ),
                 {"app_id": str(row["app_id"])},
             )
             await db.commit()
@@ -365,14 +387,16 @@ class OAuth2Service:
         token_hash = self._hash_secret(token)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE api_access_tokens
                 SET revoked_at = NOW()
                 WHERE token_hash = :token_hash
                   AND revoked_at IS NULL
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"token_hash": token_hash},
         )
         row = result.fetchone()
@@ -390,13 +414,15 @@ class OAuth2Service:
         """
         # 验证应用存在且属于该租户
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM api_applications
                 WHERE id = :app_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                   AND status != 'revoked'
-            """),
+            """
+            ),
             {"app_id": str(app_id), "tenant_id": str(tenant_id)},
         )
         if not result.fetchone():
@@ -407,24 +433,28 @@ class OAuth2Service:
 
         # 更新secret哈希
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE api_applications
                 SET app_secret_hash = :new_hash, updated_at = NOW()
                 WHERE id = :app_id
-            """),
+            """
+            ),
             {"new_hash": new_secret_hash, "app_id": str(app_id)},
         )
 
         # 吊销所有现存有效token
         revoke_result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE api_access_tokens
                 SET revoked_at = NOW()
                 WHERE app_id = :app_id
                   AND revoked_at IS NULL
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"app_id": str(app_id)},
         )
         revoked_count = len(revoke_result.fetchall())

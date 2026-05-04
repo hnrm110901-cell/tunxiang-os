@@ -96,7 +96,8 @@ async def get_live_dashboard(
 
         # 2. 今日订单汇总（按门店）
         orders_agg_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     store_id,
                     COUNT(*)                                            AS order_count,
@@ -109,7 +110,8 @@ async def get_live_dashboard(
                   AND status = 'paid'
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
                 GROUP BY store_id
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         orders_by_store: Dict[str, Any] = {}
@@ -123,7 +125,8 @@ async def get_live_dashboard(
 
         # 3. 活跃就餐会话（dining_sessions — seated/ordering/dining/add_ordering/billing）
         active_sessions_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     store_id,
                     COUNT(*)          AS active_sessions,
@@ -134,7 +137,8 @@ async def get_live_dashboard(
                   AND status NOT IN ('paid', 'clearing', 'disabled')
                   AND is_deleted = FALSE
                 GROUP BY store_id
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         sessions_by_store: Dict[str, Any] = {}
@@ -146,14 +150,16 @@ async def get_live_dashboard(
 
         # 4. 桌台总座位数（tables per store）
         tables_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT store_id, COUNT(*) AS table_count, SUM(seats) AS total_seats
                 FROM tables
                 WHERE tenant_id = :tid
                   AND store_id::text IN ({store_id_list})
                   AND is_deleted = FALSE AND is_active = TRUE
                 GROUP BY store_id
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         tables_by_store: Dict[str, Any] = {}
@@ -165,7 +171,8 @@ async def get_live_dashboard(
 
         # 5. 今日已完成桌台会话数（用于翻台率）
         closed_sessions_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT store_id, COUNT(*) AS closed_count
                 FROM dining_sessions
                 WHERE tenant_id = :tid
@@ -174,7 +181,8 @@ async def get_live_dashboard(
                   AND DATE(opened_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
                   AND is_deleted = FALSE
                 GROUP BY store_id
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         closed_by_store: Dict[str, Any] = {}
@@ -183,14 +191,16 @@ async def get_live_dashboard(
 
         # 6. 未处理告警（compliance_alerts）
         alerts_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT store_id, severity, title, created_at
                 FROM compliance_alerts
                 WHERE tenant_id = :tid
                   AND status = 'open'
                   AND store_id::text IN ({store_id_list})
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         alerts_by_store: Dict[str, List[Dict[str, Any]]] = {}

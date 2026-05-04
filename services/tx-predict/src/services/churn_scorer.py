@@ -90,7 +90,8 @@ class ChurnScorer:
         # 写入churn_scores
         score_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO churn_scores (
                     id, tenant_id, customer_id, score, risk_tier,
                     signals, root_cause, scored_at,
@@ -100,7 +101,8 @@ class ChurnScorer:
                     :signals::jsonb, :root_cause, NOW(),
                     :previous_score, :score_delta, 'v1_expert_weights'
                 )
-            """),
+            """
+            ),
             {
                 "id": str(score_id),
                 "tenant_id": str(tenant_id),
@@ -144,7 +146,8 @@ class ChurnScorer:
         """批量评分所有活跃会员"""
         # 获取有订单记录的会员列表
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT m.id AS customer_id
                 FROM members m
                 WHERE m.tenant_id = :tenant_id
@@ -152,7 +155,8 @@ class ChurnScorer:
                   AND m.lifecycle_stage != 'new'
                 ORDER BY m.id
                 LIMIT :limit
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "limit": limit},
         )
         customer_ids = [row["customer_id"] for row in result.mappings().all()]
@@ -178,7 +182,8 @@ class ChurnScorer:
     ) -> dict:
         """获取流失风险大盘"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     risk_tier,
                     COUNT(*) AS count,
@@ -193,7 +198,8 @@ class ChurnScorer:
                 ) latest_cs ON cs.customer_id = latest_cs.customer_id AND cs.scored_at = latest_cs.latest
                 WHERE cs.tenant_id = :tenant_id AND cs.is_deleted = FALSE
                 GROUP BY risk_tier
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id)},
         )
         tiers = {}
@@ -226,7 +232,8 @@ class ChurnScorer:
     ) -> dict:
         """从会员表和订单表收集评分信号"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     EXTRACT(DAY FROM NOW() - MAX(o.created_at))::int AS days_since_last,
                     COUNT(*) FILTER (WHERE o.created_at > NOW() - INTERVAL '30 days') AS orders_30d,
@@ -242,7 +249,8 @@ class ChurnScorer:
                 WHERE o.tenant_id = :tenant_id
                   AND o.customer_id = :customer_id
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "customer_id": str(customer_id)},
         )
         row = result.mappings().first()
@@ -271,14 +279,16 @@ class ChurnScorer:
 
         # 查询投诉数（从order_reviews或public_opinion_mentions）
         complaint_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM order_reviews
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
                   AND overall_rating <= 2
                   AND created_at > NOW() - INTERVAL '90 days'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "customer_id": str(customer_id)},
         )
         complaint_count = complaint_result.scalar() or 0
@@ -380,7 +390,8 @@ class ChurnScorer:
         db: Any,
     ) -> Optional[dict]:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT score, risk_tier, scored_at
                 FROM churn_scores
                 WHERE tenant_id = :tenant_id
@@ -388,7 +399,8 @@ class ChurnScorer:
                   AND is_deleted = FALSE
                 ORDER BY scored_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "customer_id": str(customer_id)},
         )
         row = result.mappings().first()

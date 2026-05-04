@@ -138,7 +138,8 @@ async def get_incidents_summary(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 alert_type,
                 severity,
@@ -149,7 +150,8 @@ async def get_incidents_summary(
                 resolved_at
             FROM compliance_alerts
             ORDER BY created_at DESC
-        """)
+        """
+            )
         )
         rows = result.mappings().all()
     except SQLAlchemyError:
@@ -266,7 +268,8 @@ async def list_incidents(
 
         offset = (page - 1) * size
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, alert_type, severity, title,
                        status, detail, created_at, updated_at,
                        resolved_at, resolution_note
@@ -274,7 +277,8 @@ async def list_incidents(
                 {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {**params, "limit": size, "offset": offset},
         )
         rows = rows_result.mappings().all()
@@ -323,14 +327,16 @@ async def report_incident(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO compliance_alerts
                 (id, tenant_id, store_id, alert_type, severity, title,
                  detail, status, source, created_at, updated_at)
             VALUES
                 (:id, :tenant_id, :store_id, :alert_type, :severity, :title,
                  :detail::jsonb, 'open', 'manual', :now, :now)
-        """),
+        """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -394,13 +400,15 @@ async def update_incident_status(
 
     try:
         row_result = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, store_id, alert_type, severity, title,
                    status, detail, created_at, updated_at,
                    resolved_at, resolution_note
             FROM compliance_alerts
             WHERE id = :incident_id
-        """),
+        """
+            ),
             {"incident_id": incident_id},
         )
         row = row_result.mappings().first()
@@ -436,7 +444,8 @@ async def update_incident_status(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE compliance_alerts
             SET status = :db_status,
                 detail = :detail::jsonb,
@@ -444,7 +453,8 @@ async def update_incident_status(
                 resolved_at = :resolved_at,
                 updated_at = :now
             WHERE id = :incident_id
-        """),
+        """
+            ),
             {
                 "db_status": db_status,
                 "detail": __import__("json").dumps(detail, ensure_ascii=False),

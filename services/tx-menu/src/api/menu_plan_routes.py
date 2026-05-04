@@ -74,11 +74,13 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> uuid.UUID:
 async def _fetch_scheme(db: AsyncSession, sid: uuid.UUID, tid: uuid.UUID) -> dict:
     """查询方案基本信息，不存在则 404。"""
     res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, status, published_at
             FROM menu_schemes
             WHERE id = :sid AND tenant_id = :tid AND is_deleted IS NOT TRUE
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     row = res.fetchone()
@@ -154,14 +156,16 @@ async def list_plan_versions(
     total = count_res.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, version_number, change_summary, published_by, created_at,
                    jsonb_array_length(snapshot_json) AS item_count
             FROM menu_plan_versions
             WHERE scheme_id = :sid AND tenant_id = :tid
             ORDER BY version_number DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid, "limit": size, "offset": (page - 1) * size},
     )
     items = [
@@ -199,17 +203,20 @@ async def create_plan_version(
 
     # 获取当前最大版本号
     max_ver_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(MAX(version_number), 0) FROM menu_plan_versions
             WHERE scheme_id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     next_ver = (max_ver_res.scalar() or 0) + 1
 
     # 生成菜品快照
     items_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT jsonb_agg(jsonb_build_object(
                 'dish_id', dish_id::text,
                 'price_fen', price_fen,
@@ -219,18 +226,21 @@ async def create_plan_version(
             ) ORDER BY sort_order)
             FROM menu_scheme_items
             WHERE scheme_id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     snapshot = items_res.scalar() or "[]"
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO menu_plan_versions
               (tenant_id, scheme_id, version_number, change_summary, snapshot_json, published_by)
             VALUES (:tid, :sid, :ver, :summary, :snapshot::jsonb, :operator)
             RETURNING id, version_number, created_at
-        """),
+        """
+        ),
         {
             "tid": tid,
             "sid": sid,
@@ -271,10 +281,12 @@ async def rollback_plan_version(
     await _fetch_scheme(db, sid, tid)
 
     ver_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, snapshot_json FROM menu_plan_versions
             WHERE scheme_id = :sid AND version_number = :ver AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "ver": version_number, "tid": tid},
     )
     ver_row = ver_res.fetchone()
@@ -295,7 +307,8 @@ async def rollback_plan_version(
             log.warning("rollback.invalid_dish_id", dish_id=item.get("dish_id"))
             continue
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_scheme_items
                   (tenant_id, scheme_id, dish_id, price_fen, is_available, sort_order, notes)
                 VALUES (:tid, :sid, :dish_id, :price_fen, :is_available, :sort_order, :notes)
@@ -304,7 +317,8 @@ async def rollback_plan_version(
                   is_available = EXCLUDED.is_available,
                   sort_order   = EXCLUDED.sort_order,
                   notes        = EXCLUDED.notes
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "sid": sid,
@@ -385,14 +399,16 @@ async def get_distribute_log(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, store_id, version_number, status, error_message,
                    distributed_by, distributed_at
             FROM menu_distribute_log
             {where}
             ORDER BY distributed_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -447,7 +463,8 @@ async def list_store_overrides(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT smo.id, smo.dish_id, d.dish_name, smo.scheme_id,
                    smo.override_price_fen, smo.override_available,
                    msi.price_fen AS scheme_price_fen, msi.is_available AS scheme_available,
@@ -459,7 +476,8 @@ async def list_store_overrides(
             {where}
             ORDER BY smo.updated_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -504,7 +522,8 @@ async def batch_upsert_store_overrides(
             continue
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_menu_overrides
                   (tenant_id, store_id, dish_id, scheme_id,
                    override_price_fen, override_available, updated_at)
@@ -514,7 +533,8 @@ async def batch_upsert_store_overrides(
                   override_price_fen = EXCLUDED.override_price_fen,
                   override_available = EXCLUDED.override_available,
                   updated_at         = now()
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "store_id": store_uuid,
@@ -569,10 +589,12 @@ async def reset_store_overrides(
         extra_where = " AND scheme_id = :scheme_id"
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             DELETE FROM store_menu_overrides
             WHERE store_id = :store_id AND tenant_id = :tid{extra_where}
-        """),
+        """
+        ),
         params,
     )
     await db.commit()
@@ -615,16 +637,19 @@ async def get_pending_updates(
 
     # 查询最近 7 天内下发但尚未确认的记录（从 distribute_log 查 pending 状态）
     count_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM menu_distribute_log
             WHERE store_id = :store_id AND tenant_id = :tid AND status = 'pending'
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tid": tid},
     )
     total = count_res.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT dl.id, dl.scheme_id, ms.name AS scheme_name, dl.version_number,
                    dl.distributed_at, dl.distributed_by
             FROM menu_distribute_log dl
@@ -632,7 +657,8 @@ async def get_pending_updates(
             WHERE dl.store_id = :store_id AND dl.tenant_id = :tid AND dl.status = 'pending'
             ORDER BY dl.distributed_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tid": tid, "limit": size, "offset": (page - 1) * size},
     )
     items = [
@@ -670,11 +696,13 @@ async def reorder_categories(
             log.warning("reorder_categories.invalid_id", category_id=item.category_id)
             continue
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_categories
                 SET sort_order = :sort_order, updated_at = now()
                 WHERE id = :cat_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"sort_order": item.sort_order, "cat_id": cat_uuid, "tid": tid},
         )
         if result.rowcount > 0:
@@ -706,11 +734,13 @@ async def batch_toggle_items(
             log.warning("batch_toggle.invalid_dish_id", dish_id=dish_id_str)
             continue
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE menu_scheme_items
                 SET is_available = :is_available
                 WHERE scheme_id = :sid AND dish_id = :dish_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"is_available": req.is_available, "sid": sid, "dish_id": dish_uuid, "tid": tid},
         )
         if result.rowcount > 0:
@@ -748,11 +778,13 @@ async def batch_assign_category(
             log.warning("batch_assign.invalid_dish_id", dish_id=dish_id_str)
             continue
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dishes
                 SET category_id = :cat_id, updated_at = now()
                 WHERE id = :dish_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cat_id": cat_uuid, "dish_id": dish_uuid, "tid": tid},
         )
         if result.rowcount > 0:

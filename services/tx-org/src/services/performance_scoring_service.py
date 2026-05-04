@@ -590,14 +590,16 @@ async def create_review_cycle(
     cycle_id = uuid4()
     dims_json = json.dumps(data.get("dimensions", []), ensure_ascii=False)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO review_cycles
                 (id, tenant_id, cycle_name, cycle_type, start_date, end_date,
                  scoring_deadline, status, scope_type, scope_id, dimensions, created_by)
             VALUES
                 (:id, :tid, :name, :ctype, :start, :end,
                  :deadline, 'draft', :scope_type, :scope_id, CAST(:dims AS jsonb), :created_by)
-        """),
+        """
+        ),
         {
             "id": cycle_id,
             "tid": tenant_id,
@@ -645,7 +647,8 @@ async def list_review_cycles(
     params["limit"] = size
     params["offset"] = offset
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, cycle_name, cycle_type, start_date, end_date,
                    scoring_deadline, status, scope_type, scope_id,
                    dimensions, created_by, created_at
@@ -653,7 +656,8 @@ async def list_review_cycles(
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items: list[dict[str, Any]] = []
@@ -686,10 +690,12 @@ async def update_cycle_status(
         raise ValueError(f"无效状态: {new_status}")
     await _set_tenant(db, tenant_id)
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT status FROM review_cycles
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": cycle_id, "tid": tenant_id},
     )
     current = row.scalar()
@@ -699,11 +705,13 @@ async def update_cycle_status(
     if new_status not in allowed:
         raise ValueError(f"不能从 {current} 转换到 {new_status}，允许: {allowed}")
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE review_cycles
             SET status = :status, updated_at = NOW()
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"status": new_status, "cid": cycle_id, "tid": tenant_id},
     )
     log.info(
@@ -724,13 +732,15 @@ async def get_cycle_detail(
     """获取评审周期详情。"""
     await _set_tenant(db, tenant_id)
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, cycle_name, cycle_type, start_date, end_date,
                    scoring_deadline, status, scope_type, scope_id,
                    dimensions, created_by, created_at, updated_at
             FROM review_cycles
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": cycle_id, "tid": tenant_id},
     )
     r = row.mappings().first()
@@ -751,14 +761,16 @@ async def get_cycle_detail(
             d[dt_field] = val.isoformat()
     # 附加打分统计
     stats_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(DISTINCT employee_id) AS scored_employees,
                 COUNT(*) AS total_scores
             FROM review_scores
             WHERE cycle_id = :cid AND tenant_id = :tid AND is_deleted = FALSE
                   AND status IN ('submitted', 'calibrated')
-        """),
+        """
+        ),
         {"cid": cycle_id, "tid": tenant_id},
     )
     stats = stats_row.mappings().first()
@@ -784,10 +796,12 @@ async def submit_review_score(
     await _set_tenant(db, tenant_id)
     # 获取周期维度配置
     cycle_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT status, dimensions FROM review_cycles
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": cycle_id, "tid": tenant_id},
     )
     cycle = cycle_row.mappings().first()
@@ -830,7 +844,8 @@ async def submit_review_score(
     score_id = uuid4()
     dim_json = json.dumps(dimension_scores, ensure_ascii=False)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO review_scores
                 (id, tenant_id, cycle_id, employee_id, employee_name, store_id,
                  reviewer_id, reviewer_name, reviewer_role,
@@ -851,7 +866,8 @@ async def submit_review_score(
                 status = 'submitted',
                 submitted_at = NOW(),
                 updated_at = NOW()
-        """),
+        """
+        ),
         {
             "id": score_id,
             "tid": tenant_id,
@@ -911,7 +927,8 @@ async def get_employee_scores(
     params["limit"] = size
     params["offset"] = offset
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, employee_id, employee_name, store_id,
                    reviewer_id, reviewer_name, reviewer_role,
                    dimension_scores, total_score, weighted_score,
@@ -921,7 +938,8 @@ async def get_employee_scores(
             WHERE {where}
             ORDER BY submitted_at DESC NULLS LAST
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items: list[dict[str, Any]] = []
@@ -964,7 +982,8 @@ async def aggregate_cycle_scores(
         params["sid"] = store_id
     where = " AND ".join(conds)
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 rs.employee_id,
                 MAX(rs.employee_name) AS employee_name,
@@ -975,7 +994,8 @@ async def aggregate_cycle_scores(
             WHERE {where}
             GROUP BY rs.employee_id, rs.store_id
             ORDER BY avg_score DESC NULLS LAST, rs.employee_id
-        """),
+        """
+        ),
         params,
     )
     items: list[dict[str, Any]] = []
@@ -1013,10 +1033,12 @@ async def calibrate_score(
     await _set_tenant(db, tenant_id)
     # 校验周期状态
     cycle_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT status FROM review_cycles
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": cycle_id, "tid": tenant_id},
     )
     cycle_status = cycle_row.scalar()
@@ -1024,7 +1046,8 @@ async def calibrate_score(
         raise ValueError(f"当前周期状态为 {cycle_status}，仅 calibrating/scoring 状态可校准")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE review_scores
             SET calibrated_score = :cscore,
                 calibrated_by = :cby,
@@ -1034,7 +1057,8 @@ async def calibrate_score(
             WHERE tenant_id = :tid AND cycle_id = :cid AND employee_id = :eid
                   AND is_deleted = FALSE
             RETURNING id
-        """),
+        """
+        ),
         {
             "cscore": calibrated_score,
             "cby": calibrator_id,
@@ -1078,7 +1102,8 @@ async def get_review_stats(
     await _set_tenant(db, tenant_id)
     # 已评
     scored_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(DISTINCT employee_id) AS scored_count,
                 AVG(COALESCE(calibrated_score, weighted_score))::numeric(5,2) AS avg_score,
@@ -1088,7 +1113,8 @@ async def get_review_stats(
             FROM review_scores
             WHERE tenant_id = :tid AND cycle_id = :cid AND is_deleted = FALSE
                   AND status IN ('submitted', 'calibrated')
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": cycle_id},
     )
     s = scored_row.mappings().first()
@@ -1100,7 +1126,8 @@ async def get_review_stats(
 
     # 分数分布（按10分段）
     dist_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 CASE
                     WHEN score >= 90 THEN '90-100'
@@ -1118,7 +1145,8 @@ async def get_review_stats(
             ) sub
             GROUP BY bucket
             ORDER BY bucket DESC
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": cycle_id},
     )
     distribution: dict[str, int] = {}
@@ -1127,11 +1155,13 @@ async def get_review_stats(
 
     # draft 状态打分数
     draft_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS c FROM review_scores
             WHERE tenant_id = :tid AND cycle_id = :cid AND is_deleted = FALSE
                   AND status = 'draft'
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": cycle_id},
     )
     draft_count = int(draft_row.scalar() or 0)

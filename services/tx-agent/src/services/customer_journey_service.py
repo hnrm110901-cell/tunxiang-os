@@ -122,7 +122,8 @@ class CustomerJourneyService:
         template_id = uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_journey_templates (
                     id, tenant_id, template_name, description, trigger_type,
                     trigger_config, audience_filter, is_active, priority,
@@ -132,7 +133,8 @@ class CustomerJourneyService:
                     :trigger_config, :audience_filter, :is_active, :priority,
                     :max_concurrent, :created_by
                 )
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": tid,
@@ -204,14 +206,16 @@ class CustomerJourneyService:
 
         set_clause = ", ".join(sets)
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE customer_journey_templates
                 SET {set_clause}
                 WHERE id = :template_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id, template_name, trigger_type, is_active
-            """),
+            """
+            ),
             params,
         )
         row = result.fetchone()
@@ -242,7 +246,8 @@ class CustomerJourneyService:
         tpl_id = UUID(template_id)
 
         tpl_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, template_name, description, trigger_type,
                        trigger_config, audience_filter, is_active, priority,
                        max_concurrent, created_by, created_at, updated_at
@@ -250,7 +255,8 @@ class CustomerJourneyService:
                 WHERE id = :template_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         tpl = tpl_result.fetchone()
@@ -259,7 +265,8 @@ class CustomerJourneyService:
 
         # 获取步骤
         steps_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, step_order, step_name, delay_minutes, channel,
                        content_template, condition, skip_if_responded
                 FROM customer_journey_steps
@@ -267,7 +274,8 @@ class CustomerJourneyService:
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 ORDER BY step_order
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         steps = [
@@ -326,19 +334,22 @@ class CustomerJourneyService:
             params["is_active"] = is_active
 
         count_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS total
                 FROM customer_journey_templates
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = FALSE
                   {filters}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_name, description, trigger_type,
                        trigger_config, is_active, priority, max_concurrent,
                        created_at, updated_at
@@ -348,7 +359,8 @@ class CustomerJourneyService:
                   {filters}
                 ORDER BY priority DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [
@@ -379,14 +391,16 @@ class CustomerJourneyService:
         tpl_id = UUID(template_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_templates
                 SET is_deleted = TRUE, updated_at = NOW()
                 WHERE id = :template_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         if result.fetchone() is None:
@@ -394,12 +408,14 @@ class CustomerJourneyService:
 
         # 同时软删除步骤
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_steps
                 SET is_deleted = TRUE, updated_at = NOW()
                 WHERE template_id = :template_id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         await self.db.flush()
@@ -421,14 +437,16 @@ class CustomerJourneyService:
         tpl_id = UUID(template_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_templates
                 SET is_active = NOT is_active, updated_at = NOW()
                 WHERE id = :template_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id, is_active
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         row = result.fetchone()
@@ -469,19 +487,22 @@ class CustomerJourneyService:
         # 自动计算step_order
         if step_order is None:
             max_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(MAX(step_order), -1) + 1 AS next_order
                     FROM customer_journey_steps
                     WHERE template_id = :template_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"template_id": tpl_id, "tenant_id": tid},
             )
             step_order = max_result.scalar() or 0
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_journey_steps (
                     id, tenant_id, template_id, step_order, step_name,
                     delay_minutes, channel, content_template, condition,
@@ -491,7 +512,8 @@ class CustomerJourneyService:
                     :delay_minutes, :channel, :content_template, :condition,
                     :skip_if_responded
                 )
-            """),
+            """
+            ),
             {
                 "id": step_id,
                 "tenant_id": tid,
@@ -564,14 +586,16 @@ class CustomerJourneyService:
 
         set_clause = ", ".join(sets)
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE customer_journey_steps
                 SET {set_clause}
                 WHERE id = :step_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id, step_name, step_order, channel
-            """),
+            """
+            ),
             params,
         )
         row = result.fetchone()
@@ -596,14 +620,16 @@ class CustomerJourneyService:
         sid = UUID(step_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_steps
                 SET is_deleted = TRUE, updated_at = NOW()
                 WHERE id = :step_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"step_id": sid, "tenant_id": tid},
         )
         if result.fetchone() is None:
@@ -624,14 +650,16 @@ class CustomerJourneyService:
 
         for order, sid in enumerate(step_ids):
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE customer_journey_steps
                     SET step_order = :step_order, updated_at = NOW()
                     WHERE id = :step_id
                       AND template_id = :template_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "step_order": order,
                     "step_id": UUID(sid),
@@ -676,7 +704,8 @@ class CustomerJourneyService:
 
         # 1. 查匹配模板
         templates_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, template_name, trigger_type, trigger_config,
                        audience_filter, max_concurrent, priority
                 FROM customer_journey_templates
@@ -685,7 +714,8 @@ class CustomerJourneyService:
                   AND is_active = TRUE
                   AND is_deleted = FALSE
                 ORDER BY priority DESC
-            """),
+            """
+            ),
             {"tenant_id": tid, "trigger_type": trigger_type},
         )
         templates = templates_result.fetchall()
@@ -722,7 +752,8 @@ class CustomerJourneyService:
 
             # 3. 检查max_concurrent
             active_count_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS cnt
                     FROM customer_journey_enrollments
                     WHERE tenant_id = :tenant_id
@@ -730,7 +761,8 @@ class CustomerJourneyService:
                       AND customer_id = :customer_id
                       AND status = 'active'
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "tenant_id": tid,
                     "template_id": tpl.id,
@@ -750,7 +782,8 @@ class CustomerJourneyService:
 
             # 4. 获取第一个步骤
             first_step_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, delay_minutes
                     FROM customer_journey_steps
                     WHERE template_id = :template_id
@@ -758,7 +791,8 @@ class CustomerJourneyService:
                       AND is_deleted = FALSE
                     ORDER BY step_order
                     LIMIT 1
-                """),
+                """
+                ),
                 {"template_id": tpl.id, "tenant_id": tid},
             )
             first_step = first_step_result.fetchone()
@@ -775,7 +809,8 @@ class CustomerJourneyService:
             # 5. 创建enrollment
             enrollment_id = uuid4()
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO customer_journey_enrollments (
                         id, tenant_id, template_id, customer_id, store_id,
                         trigger_event, current_step_id, status,
@@ -785,7 +820,8 @@ class CustomerJourneyService:
                         :trigger_event, :current_step_id, 'active',
                         :next_action_at, :started_at
                     )
-                """),
+                """
+                ),
                 {
                     "id": enrollment_id,
                     "tenant_id": tid,
@@ -836,7 +872,8 @@ class CustomerJourneyService:
         now = datetime.now(timezone.utc)
 
         pending_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT e.id AS enrollment_id, e.template_id, e.customer_id,
                        e.store_id, e.current_step_id, e.trigger_event,
                        s.step_name, s.channel, s.content_template,
@@ -850,7 +887,8 @@ class CustomerJourneyService:
                   AND s.is_deleted = FALSE
                 ORDER BY e.next_action_at
                 LIMIT 100
-            """),
+            """
+            ),
             {"tenant_id": tid, "now": now},
         )
         pending = pending_result.fetchall()
@@ -896,7 +934,8 @@ class CustomerJourneyService:
         # 检查skip_if_responded: 是否已有responded日志
         if enrollment.skip_if_responded:
             responded_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT 1
                     FROM customer_journey_step_logs
                     WHERE enrollment_id = :enrollment_id
@@ -904,7 +943,8 @@ class CustomerJourneyService:
                       AND send_status = 'responded'
                       AND is_deleted = FALSE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"enrollment_id": enrollment_id, "tenant_id": tid},
             )
             if responded_result.fetchone() is not None:
@@ -990,7 +1030,8 @@ class CustomerJourneyService:
         """推进到下一步骤或标记完成"""
         # 查询下一步骤
         next_step_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, delay_minutes
                 FROM customer_journey_steps
                 WHERE template_id = :template_id
@@ -999,7 +1040,8 @@ class CustomerJourneyService:
                   AND is_deleted = FALSE
                 ORDER BY step_order
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "template_id": enrollment.template_id,
                 "tenant_id": tid,
@@ -1011,7 +1053,8 @@ class CustomerJourneyService:
         if next_step is None:
             # 旅程完成
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE customer_journey_enrollments
                     SET status = 'completed',
                         current_step_id = NULL,
@@ -1020,7 +1063,8 @@ class CustomerJourneyService:
                         updated_at = :now
                     WHERE id = :enrollment_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "enrollment_id": enrollment.enrollment_id,
                     "tenant_id": tid,
@@ -1031,14 +1075,16 @@ class CustomerJourneyService:
             # 推进到下一步
             next_action_at = now + timedelta(minutes=next_step.delay_minutes)
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE customer_journey_enrollments
                     SET current_step_id = :next_step_id,
                         next_action_at = :next_action_at,
                         updated_at = :now
                     WHERE id = :enrollment_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "next_step_id": next_step.id,
                     "next_action_at": next_action_at,
@@ -1065,7 +1111,8 @@ class CustomerJourneyService:
         sent_at = now if send_status in ("sent", "delivered") else None
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_journey_step_logs (
                     id, tenant_id, enrollment_id, step_id, channel,
                     content_sent, send_status, failure_reason, sent_at
@@ -1073,7 +1120,8 @@ class CustomerJourneyService:
                     :id, :tenant_id, :enrollment_id, :step_id, :channel,
                     :content_sent, :send_status, :failure_reason, :sent_at
                 )
-            """),
+            """
+            ),
             {
                 "id": log_id,
                 "tenant_id": tid,
@@ -1168,11 +1216,13 @@ class CustomerJourneyService:
         try:
             # 基础会员信息检查
             member_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT level, rfm_segment, total_spend_fen, last_visit_at
                     FROM members
                     WHERE id = :cid AND tenant_id = :tid AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"cid": customer_id, "tid": tenant_id},
             )
             member = member_result.fetchone()
@@ -1214,13 +1264,15 @@ class CustomerJourneyService:
             if "tags" in criteria:
                 required_tags = criteria["tags"]
                 tag_result = await self.db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT tag_name FROM member_tags
                         WHERE member_id = :cid
                           AND tenant_id = :tid
                           AND tag_name = ANY(:tags)
                           AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {
                         "cid": customer_id,
                         "tid": tenant_id,
@@ -1318,7 +1370,8 @@ class CustomerJourneyService:
         eid = UUID(enrollment_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_enrollments
                 SET status = 'paused', updated_at = NOW()
                 WHERE id = :enrollment_id
@@ -1326,7 +1379,8 @@ class CustomerJourneyService:
                   AND status = 'active'
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"enrollment_id": eid, "tenant_id": tid},
         )
         if result.fetchone() is None:
@@ -1350,7 +1404,8 @@ class CustomerJourneyService:
         now = datetime.now(timezone.utc)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_enrollments
                 SET status = 'active',
                     next_action_at = :now,
@@ -1360,7 +1415,8 @@ class CustomerJourneyService:
                   AND status = 'paused'
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"enrollment_id": eid, "tenant_id": tid, "now": now},
         )
         if result.fetchone() is None:
@@ -1383,7 +1439,8 @@ class CustomerJourneyService:
         eid = UUID(enrollment_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_journey_enrollments
                 SET status = 'cancelled',
                     next_action_at = NULL,
@@ -1393,7 +1450,8 @@ class CustomerJourneyService:
                   AND status IN ('active', 'paused')
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"enrollment_id": eid, "tenant_id": tid},
         )
         if result.fetchone() is None:
@@ -1440,19 +1498,22 @@ class CustomerJourneyService:
             params["status"] = status
 
         count_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS total
                 FROM customer_journey_enrollments e
                 WHERE e.tenant_id = :tenant_id
                   AND e.is_deleted = FALSE
                   {filters}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT e.id, e.template_id, e.customer_id, e.store_id,
                        e.status, e.next_action_at, e.started_at, e.completed_at,
                        t.template_name, t.trigger_type
@@ -1463,7 +1524,8 @@ class CustomerJourneyService:
                   {filters}
                 ORDER BY e.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [
@@ -1495,7 +1557,8 @@ class CustomerJourneyService:
 
         # 基础信息
         e_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT e.id, e.template_id, e.customer_id, e.store_id,
                        e.trigger_event, e.current_step_id, e.status,
                        e.next_action_at, e.started_at, e.completed_at,
@@ -1505,7 +1568,8 @@ class CustomerJourneyService:
                 WHERE e.id = :enrollment_id
                   AND e.tenant_id = :tenant_id
                   AND e.is_deleted = FALSE
-            """),
+            """
+            ),
             {"enrollment_id": eid, "tenant_id": tid},
         )
         e = e_result.fetchone()
@@ -1514,7 +1578,8 @@ class CustomerJourneyService:
 
         # 步骤日志
         logs_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT l.id, l.step_id, l.channel, l.content_sent,
                        l.send_status, l.failure_reason,
                        l.sent_at, l.delivered_at, l.read_at, l.responded_at,
@@ -1525,7 +1590,8 @@ class CustomerJourneyService:
                   AND l.tenant_id = :tenant_id
                   AND l.is_deleted = FALSE
                 ORDER BY s.step_order, l.created_at
-            """),
+            """
+            ),
             {"enrollment_id": eid, "tenant_id": tid},
         )
         logs = [
@@ -1577,7 +1643,8 @@ class CustomerJourneyService:
 
         # 总体统计
         overall_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'active') AS active,
@@ -1589,7 +1656,8 @@ class CustomerJourneyService:
                 WHERE tenant_id = :tenant_id
                   AND template_id = :template_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tid, "template_id": tpl_id},
         )
         overall = overall_result.fetchone()
@@ -1600,7 +1668,8 @@ class CustomerJourneyService:
 
         # 各步骤执行统计
         step_stats_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     s.id AS step_id,
                     s.step_name,
@@ -1621,7 +1690,8 @@ class CustomerJourneyService:
                   AND s.is_deleted = FALSE
                 GROUP BY s.id, s.step_name, s.step_order
                 ORDER BY s.step_order
-            """),
+            """
+            ),
             {"tenant_id": tid, "template_id": tpl_id},
         )
         step_stats = [

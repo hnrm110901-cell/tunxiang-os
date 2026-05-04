@@ -145,7 +145,8 @@ async def list_zones(
     """列出计件区域（集团通用 + 指定门店）。"""
     try:
         await _set_rls(db, x_tenant_id)
-        q = text("""
+        q = text(
+            """
             SELECT id, tenant_id, store_id, name, description, is_active,
                    created_at, updated_at
             FROM piecework_zones
@@ -153,7 +154,8 @@ async def list_zones(
               AND is_active = :active
               AND (:store_id IS NULL OR store_id = :store_id OR store_id IS NULL)
             ORDER BY name
-        """)
+        """
+        )
         rows = await db.execute(
             q,
             {
@@ -181,11 +183,13 @@ async def create_zone(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO piecework_zones
                 (id, tenant_id, store_id, name, description, is_active)
             VALUES (:id, :tid, :store_id, :name, :desc, :active)
-        """),
+        """
+            ),
             {
                 "id": str(zone_id),
                 "tid": x_tenant_id,
@@ -298,7 +302,8 @@ async def list_schemes(
     """列出计件方案。"""
     try:
         await _set_rls(db, x_tenant_id)
-        q = text("""
+        q = text(
+            """
             SELECT s.id, s.tenant_id, s.zone_id, z.name AS zone_name,
                    s.name, s.calc_type, s.applicable_role,
                    s.effective_date, s.is_active, s.created_at, s.updated_at
@@ -309,7 +314,8 @@ async def list_schemes(
               AND (:zone_id IS NULL OR s.zone_id = :zone_id)
               AND (:role IS NULL OR s.applicable_role = :role)
             ORDER BY s.created_at DESC
-        """)
+        """
+        )
         rows = await db.execute(
             q,
             {
@@ -338,13 +344,15 @@ async def create_scheme(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO piecework_schemes
                 (id, tenant_id, zone_id, name, calc_type, applicable_role,
                  effective_date, is_active)
             VALUES (:id, :tid, :zone_id, :name, :calc_type, :role,
                     :eff_date, :active)
-        """),
+        """
+            ),
             {
                 "id": str(scheme_id),
                 "tid": x_tenant_id,
@@ -359,13 +367,15 @@ async def create_scheme(
 
         for item in body.items:
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO piecework_scheme_items
                     (id, tenant_id, scheme_id, dish_id, method_id,
                      dish_name, unit_fee_fen, min_qty)
                 VALUES (gen_random_uuid(), :tid, :scheme_id, :dish_id, :method_id,
                         :dish_name, :unit_fee_fen, :min_qty)
-            """),
+            """
+                ),
                 {
                     "tid": x_tenant_id,
                     "scheme_id": str(scheme_id),
@@ -397,14 +407,16 @@ async def get_scheme(
     try:
         await _set_rls(db, x_tenant_id)
         scheme_row = await db.execute(
-            text("""
+            text(
+                """
             SELECT s.id, s.tenant_id, s.zone_id, z.name AS zone_name,
                    s.name, s.calc_type, s.applicable_role,
                    s.effective_date, s.is_active, s.created_at, s.updated_at
             FROM piecework_schemes s
             LEFT JOIN piecework_zones z ON z.id = s.zone_id
             WHERE s.id = :sid AND s.tenant_id = :tid
-        """),
+        """
+            ),
             {"sid": str(scheme_id), "tid": x_tenant_id},
         )
         scheme = scheme_row.fetchone()
@@ -412,12 +424,14 @@ async def get_scheme(
             raise _err("方案不存在", 404)
 
         items_row = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, dish_id, method_id, dish_name, unit_fee_fen, min_qty, created_at
             FROM piecework_scheme_items
             WHERE scheme_id = :sid AND tenant_id = :tid
             ORDER BY created_at
-        """),
+        """
+            ),
             {"sid": str(scheme_id), "tid": x_tenant_id},
         )
         items = [_serialize_row(r) for r in items_row]
@@ -501,14 +515,16 @@ async def create_record(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO piecework_records
                 (id, tenant_id, store_id, employee_id, zone_id, scheme_id,
                  dish_id, dish_name, method_name, quantity, unit_fee_fen, order_id)
             VALUES (:id, :tid, :store_id, :employee_id, :zone_id, :scheme_id,
                     :dish_id, :dish_name, :method_name, :quantity, :unit_fee_fen,
                     :order_id)
-        """),
+        """
+            ),
             {
                 "id": str(record_id),
                 "tid": x_tenant_id,
@@ -562,7 +578,8 @@ async def stats_store(
     try:
         await _set_rls(db, x_tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 employee_id,
                 SUM(total_fee_fen)  AS total_fee_fen,
@@ -575,7 +592,8 @@ async def stats_store(
               AND recorded_at <  :end_dt + INTERVAL '1 day'
             GROUP BY employee_id
             ORDER BY total_fee_fen DESC
-        """),
+        """
+            ),
             {
                 "tid": x_tenant_id,
                 "store_id": str(store_id),
@@ -611,7 +629,8 @@ async def stats_employee(
     try:
         await _set_rls(db, x_tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 dish_name,
                 SUM(quantity)       AS total_quantity,
@@ -624,7 +643,8 @@ async def stats_employee(
               AND recorded_at <  :end_dt + INTERVAL '1 day'
             GROUP BY dish_name, unit_fee_fen
             ORDER BY total_fee_fen DESC
-        """),
+        """
+            ),
             {
                 "tid": x_tenant_id,
                 "employee_id": str(employee_id),
@@ -660,7 +680,8 @@ async def stats_by_dish(
     try:
         await _set_rls(db, x_tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 dish_name,
                 SUM(quantity)       AS total_quantity,
@@ -672,7 +693,8 @@ async def stats_by_dish(
               AND recorded_at::date = :query_date
             GROUP BY dish_name
             ORDER BY total_quantity DESC
-        """),
+        """
+            ),
             {
                 "tid": x_tenant_id,
                 "store_id": str(store_id),
@@ -705,7 +727,8 @@ async def daily_report(
     try:
         await _set_rls(db, x_tenant_id)
         summary_row = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(SUM(total_fee_fen), 0)  AS total_fee_fen,
                 COALESCE(SUM(quantity), 0)       AS total_quantity,
@@ -714,13 +737,15 @@ async def daily_report(
             WHERE tenant_id  = :tid
               AND store_id   = :store_id
               AND recorded_at::date = :report_date
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date},
         )
         summary = summary_row.fetchone()
 
         top5_rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 employee_id,
                 SUM(total_fee_fen)  AS total_fee_fen,
@@ -733,7 +758,8 @@ async def daily_report(
             GROUP BY employee_id
             ORDER BY total_fee_fen DESC
             LIMIT 5
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "store_id": str(store_id), "report_date": report_date},
         )
         top5 = [_serialize_row(r) for r in top5_rows]

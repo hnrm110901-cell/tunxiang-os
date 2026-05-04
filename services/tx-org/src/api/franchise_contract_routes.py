@@ -156,7 +156,8 @@ async def get_expiring_contracts(
     """即将到期合同列表（end_date <= today + days）。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_no, contract_type, franchisee_id, franchisee_name,
                        sign_date, start_date, end_date, contract_amount_fen,
                        file_url, status, alert_days_before, notes, created_by,
@@ -167,7 +168,8 @@ async def get_expiring_contracts(
                   AND status = 'active'
                   AND (end_date - CURRENT_DATE) BETWEEN 0 AND :days
                 ORDER BY (end_date - CURRENT_DATE) ASC
-            """),
+            """
+            ),
             {"days": days},
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -211,7 +213,8 @@ async def list_contracts(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, contract_no, contract_type, franchisee_id, franchisee_name,
                        sign_date, start_date, end_date, contract_amount_fen,
                        file_url, status, alert_days_before, notes, created_by,
@@ -221,7 +224,8 @@ async def list_contracts(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -249,7 +253,8 @@ async def get_contract(
     """合同详情。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_no, contract_type, franchisee_id, franchisee_name,
                        sign_date, start_date, end_date, contract_amount_fen,
                        file_url, status, alert_days_before, notes, created_by,
@@ -257,7 +262,8 @@ async def get_contract(
                        (end_date - CURRENT_DATE) AS days_to_expire
                 FROM franchise_contracts
                 WHERE id = :contract_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"contract_id": contract_id},
         )
         row = result.mappings().first()
@@ -288,7 +294,8 @@ async def create_contract(
         new_id = str(uuid.uuid4())
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_contracts
                     (id, tenant_id, contract_no, contract_type, franchisee_id,
                      franchisee_name, sign_date, start_date, end_date,
@@ -297,7 +304,8 @@ async def create_contract(
                     (:id, :tenant_id, :contract_no, :contract_type, :franchisee_id,
                      :franchisee_name, :sign_date, :start_date, :end_date,
                      :contract_amount_fen, :file_url, :alert_days_before, :notes)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -318,14 +326,16 @@ async def create_contract(
 
         # 回读
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_no, contract_type, franchisee_id, franchisee_name,
                        sign_date, start_date, end_date, contract_amount_fen,
                        file_url, status, alert_days_before, notes, created_by,
                        is_deleted, created_at, updated_at,
                        (end_date - CURRENT_DATE) AS days_to_expire
                 FROM franchise_contracts WHERE id = :id
-            """),
+            """
+            ),
             {"id": new_id},
         )
         row = result.mappings().first()
@@ -380,14 +390,16 @@ async def update_contract(
         await db.commit()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_no, contract_type, franchisee_id, franchisee_name,
                        sign_date, start_date, end_date, contract_amount_fen,
                        file_url, status, alert_days_before, notes, created_by,
                        is_deleted, created_at, updated_at,
                        (end_date - CURRENT_DATE) AS days_to_expire
                 FROM franchise_contracts WHERE id = :id
-            """),
+            """
+            ),
             {"id": contract_id},
         )
         row = result.mappings().first()
@@ -417,12 +429,14 @@ async def send_contract_alert(
     """触发到期提醒（模拟发送企微通知）。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_no, franchisee_id, franchisee_name, end_date,
                        (end_date - CURRENT_DATE) AS days_to_expire
                 FROM franchise_contracts
                 WHERE id = :contract_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"contract_id": contract_id},
         )
         row = result.mappings().first()
@@ -484,11 +498,13 @@ async def set_fee_schedule(
     try:
         # 验证合同存在
         contract_check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, franchisee_id, franchisee_name
                 FROM franchise_contracts
                 WHERE id = :contract_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"contract_id": contract_id},
         )
         contract = contract_check.mappings().first()
@@ -502,14 +518,16 @@ async def set_fee_schedule(
         for item in body.items:
             fee_id = str(uuid.uuid4())
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO franchise_fee_records
                         (id, tenant_id, contract_id, franchisee_id, franchisee_name,
                          fee_type, amount_fen, period_start, period_end, due_date, notes)
                     VALUES
                         (:id, :tenant_id, :contract_id, :franchisee_id, :franchisee_name,
                          :fee_type, :amount_fen, :period_start, :period_end, :due_date, :notes)
-                """),
+                """
+                ),
                 {
                     "id": fee_id,
                     "tenant_id": x_tenant_id,
@@ -578,7 +596,8 @@ async def get_contract_fees(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, contract_id, franchisee_id, franchisee_name,
                        fee_type, period_start, period_end, amount_fen, paid_fen,
                        due_date, status, receipt_no, receipt_url, notes,
@@ -587,7 +606,8 @@ async def get_contract_fees(
                 WHERE {where_sql}
                 ORDER BY due_date ASC NULLS LAST, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -600,12 +620,14 @@ async def get_contract_fees(
 
         # 汇总
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(amount_fen), 0) AS total_amount_fen,
                        COALESCE(SUM(paid_fen), 0) AS total_paid_fen
                 FROM franchise_fee_records
                 WHERE contract_id = :contract_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"contract_id": contract_id},
         )
         summary = summary_result.mappings().first()
@@ -639,11 +661,13 @@ async def collect_fee(
     try:
         # 验证收费记录存在且属于该合同
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_id, amount_fen, paid_fen, status, fee_type
                 FROM franchise_fee_records
                 WHERE id = :fee_id AND contract_id = :contract_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"fee_id": body.fee_id, "contract_id": contract_id},
         )
         fee = result.mappings().first()
@@ -694,12 +718,14 @@ async def collect_fee(
 
         # 回读
         updated = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_id, franchisee_id, franchisee_name,
                        fee_type, amount_fen, paid_fen, status, receipt_no, receipt_url,
                        notes, updated_at
                 FROM franchise_fee_records WHERE id = :fee_id
-            """),
+            """
+            ),
             {"fee_id": body.fee_id},
         )
         row = updated.mappings().first()
@@ -745,7 +771,8 @@ async def get_fee_summary(
 
         # 总计
         total_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COALESCE(SUM(amount_fen), 0) AS total_amount_fen,
                        COALESCE(SUM(paid_fen), 0) AS total_paid_fen,
                        COALESCE(SUM(CASE WHEN status = 'overdue' THEN amount_fen - paid_fen ELSE 0 END), 0)
@@ -753,14 +780,16 @@ async def get_fee_summary(
                        COUNT(*) AS total_records
                 FROM franchise_fee_records
                 WHERE {where_sql}
-            """),
+            """
+            ),
             params,
         )
         totals = dict(total_result.mappings().first())
 
         # 按费用类型汇总
         by_type_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT fee_type,
                        SUM(amount_fen) AS amount_fen,
                        SUM(paid_fen) AS paid_fen,
@@ -770,14 +799,16 @@ async def get_fee_summary(
                 WHERE {where_sql}
                 GROUP BY fee_type
                 ORDER BY fee_type
-            """),
+            """
+            ),
             params,
         )
         by_type = [dict(r) for r in by_type_result.mappings().all()]
 
         # 按加盟商汇总
         by_franchisee_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT franchisee_id, franchisee_name,
                        SUM(amount_fen) AS amount_fen,
                        SUM(paid_fen) AS paid_fen,
@@ -787,7 +818,8 @@ async def get_fee_summary(
                 WHERE {where_sql}
                 GROUP BY franchisee_id, franchisee_name
                 ORDER BY overdue_fen DESC
-            """),
+            """
+            ),
             params,
         )
         by_franchisee = [dict(r) for r in by_franchisee_result.mappings().all()]
@@ -834,7 +866,8 @@ async def get_overdue_fees(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, contract_id, franchisee_id, franchisee_name,
                        fee_type, period_start, period_end, amount_fen, paid_fen,
                        due_date, status, receipt_no, receipt_url, notes,
@@ -842,7 +875,8 @@ async def get_overdue_fees(
                 FROM franchise_fee_records
                 WHERE {where_sql}
                 ORDER BY due_date ASC
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -887,20 +921,23 @@ async def get_fee_stats(
         where_sql = " AND ".join(where_clauses)
 
         total_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COALESCE(SUM(amount_fen), 0) AS total_amount_fen,
                        COALESCE(SUM(paid_fen), 0) AS total_paid_fen,
                        COALESCE(SUM(CASE WHEN status = 'overdue' THEN amount_fen - paid_fen ELSE 0 END), 0)
                            AS total_overdue_fen
                 FROM franchise_fee_records
                 WHERE {where_sql}
-            """),
+            """
+            ),
             params,
         )
         totals = dict(total_result.mappings().first())
 
         by_type_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT fee_type,
                        SUM(amount_fen) AS amount_fen,
                        SUM(paid_fen) AS paid_fen,
@@ -909,7 +946,8 @@ async def get_fee_stats(
                 WHERE {where_sql}
                 GROUP BY fee_type
                 ORDER BY fee_type
-            """),
+            """
+            ),
             params,
         )
         by_type = [dict(r) for r in by_type_result.mappings().all()]
@@ -959,7 +997,8 @@ async def list_fees(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, contract_id, franchisee_id, franchisee_name,
                        fee_type, period_start, period_end, amount_fen, paid_fen,
                        due_date, status, receipt_no, receipt_url, notes,
@@ -968,7 +1007,8 @@ async def list_fees(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -998,14 +1038,16 @@ async def create_fee_record(
         new_id = str(uuid.uuid4())
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_fee_records
                     (id, tenant_id, franchisee_id, franchisee_name, contract_id,
                      fee_type, period_start, period_end, amount_fen, due_date, notes)
                 VALUES
                     (:id, :tenant_id, :franchisee_id, :franchisee_name, :contract_id,
                      :fee_type, :period_start, :period_end, :amount_fen, :due_date, :notes)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -1023,13 +1065,15 @@ async def create_fee_record(
         await db.commit()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_id, franchisee_id, franchisee_name,
                        fee_type, period_start, period_end, amount_fen, paid_fen,
                        due_date, status, receipt_no, receipt_url, notes,
                        created_at, updated_at
                 FROM franchise_fee_records WHERE id = :id
-            """),
+            """
+            ),
             {"id": new_id},
         )
         row = result.mappings().first()
@@ -1059,11 +1103,13 @@ async def pay_fee_record(
     """标记付款：更新 paid_fen / status / receipt_no。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, amount_fen, paid_fen, status
                 FROM franchise_fee_records
                 WHERE id = :fee_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"fee_id": fee_id},
         )
         fee = result.mappings().first()
@@ -1113,12 +1159,14 @@ async def pay_fee_record(
         await db.commit()
 
         updated = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, contract_id, franchisee_id, franchisee_name,
                        fee_type, amount_fen, paid_fen, due_date, status,
                        receipt_no, receipt_url, notes, created_at, updated_at
                 FROM franchise_fee_records WHERE id = :fee_id
-            """),
+            """
+            ),
             {"fee_id": fee_id},
         )
         row = updated.mappings().first()

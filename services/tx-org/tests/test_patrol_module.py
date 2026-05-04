@@ -186,10 +186,10 @@ async def test_start_patrol_success():
     }
 
     db.execute.side_effect = [
-        make_rows_result([template_row]),   # 查询模板
-        make_rows_result(items_rows),       # 查询检查项
+        make_rows_result([template_row]),  # 查询模板
+        make_rows_result(items_rows),  # 查询检查项
         make_returning_result(record_row),  # INSERT record
-        MagicMock(),                        # INSERT record_items batch
+        MagicMock(),  # INSERT record_items batch
     ]
 
     result = await PatrolService.start_patrol(
@@ -267,12 +267,12 @@ async def test_submit_patrol_calculates_total_score():
     updated_record = {**record_row, "status": "submitted", "total_score": 70.0}
 
     db.execute.side_effect = [
-        make_rows_result([record_row]),     # 查询 record
-        make_rows_result(item_results),     # 查询 record_items
-        MagicMock(),                        # UPDATE record_items（item 1）
-        MagicMock(),                        # UPDATE record_items（item 2）
-        MagicMock(),                        # UPDATE record status + total_score
-        make_rows_result([updated_record]), # 查询更新后的 record（用于自动整改）
+        make_rows_result([record_row]),  # 查询 record
+        make_rows_result(item_results),  # 查询 record_items
+        MagicMock(),  # UPDATE record_items（item 1）
+        MagicMock(),  # UPDATE record_items（item 2）
+        MagicMock(),  # UPDATE record status + total_score
+        make_rows_result([updated_record]),  # 查询更新后的 record（用于自动整改）
     ]
 
     submit_items = [
@@ -504,7 +504,7 @@ async def test_get_store_patrol_ranking():
     ranking_rows = [
         {"store_id": str(uuid4()), "avg_score": 92.5, "patrol_count": 8, "rank": 1},
         {"store_id": str(uuid4()), "avg_score": 85.0, "patrol_count": 6, "rank": 2},
-        {"store_id": STORE_ID,     "avg_score": 70.0, "patrol_count": 4, "rank": 3},
+        {"store_id": STORE_ID, "avg_score": 70.0, "patrol_count": 4, "rank": 3},
     ]
 
     db.execute.return_value = make_rows_result(ranking_rows)
@@ -566,8 +566,8 @@ async def test_update_issue_status_to_resolved():
     }
 
     db.execute.side_effect = [
-        MagicMock(),                        # UPDATE
-        make_rows_result([resolved_row]),   # SELECT 更新后
+        MagicMock(),  # UPDATE
+        make_rows_result([resolved_row]),  # SELECT 更新后
     ]
 
     result = await PatrolService.update_issue_status(

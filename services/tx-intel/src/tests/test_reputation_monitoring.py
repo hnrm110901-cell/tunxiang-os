@@ -8,12 +8,12 @@
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from services.reputation_monitor import ReputationMonitor
 
+from services.reputation_monitor import ReputationMonitor
 
 # ═══════════════════════════════════════
 # ReputationMonitor 测试
@@ -55,9 +55,7 @@ class TestReputationMonitor:
 
         db.execute = AsyncMock(side_effect=mock_execute)
 
-        result = await self.monitor.detect_negative_spike(
-            self.tenant_id, self.store_id, db
-        )
+        result = await self.monitor.detect_negative_spike(self.tenant_id, self.store_id, db)
         assert result is None
 
     @pytest.mark.asyncio
@@ -106,9 +104,7 @@ class TestReputationMonitor:
         db.commit = AsyncMock()
 
         with patch.object(self.monitor, "_generate_summary", return_value="负面激增预警摘要"):
-            result = await self.monitor.detect_negative_spike(
-                self.tenant_id, self.store_id, db
-            )
+            result = await self.monitor.detect_negative_spike(self.tenant_id, self.store_id, db)
 
         assert result is not None
         assert result["alert_type"] == "negative_spike"
@@ -186,9 +182,7 @@ class TestReputationMonitor:
         db.commit = AsyncMock()
 
         alert_id = uuid.uuid4()
-        result = await self.monitor.respond_to_alert(
-            self.tenant_id, alert_id, "已处理此问题", db
-        )
+        result = await self.monitor.respond_to_alert(self.tenant_id, alert_id, "已处理此问题", db)
 
         assert result["sla_met"] is True
         assert result["response_time_sec"] <= 1800
@@ -227,9 +221,7 @@ class TestReputationMonitor:
         db.commit = AsyncMock()
 
         alert_id = uuid.uuid4()
-        result = await self.monitor.respond_to_alert(
-            self.tenant_id, alert_id, "延迟处理", db
-        )
+        result = await self.monitor.respond_to_alert(self.tenant_id, alert_id, "延迟处理", db)
 
         assert result["sla_met"] is False
         assert result["response_time_sec"] > 1800
@@ -328,9 +320,7 @@ class TestReputationMonitor:
 
         alert_id = uuid.uuid4()
         assigned_to = uuid.uuid4()
-        result = await self.monitor.acknowledge_alert(
-            self.tenant_id, alert_id, assigned_to, db
-        )
+        result = await self.monitor.acknowledge_alert(self.tenant_id, alert_id, assigned_to, db)
         assert result["status"] == "acknowledged"
 
     @pytest.mark.asyncio
@@ -377,12 +367,15 @@ class TestCrisisResponder:
     @pytest.mark.asyncio
     async def test_assess_crisis_critical(self) -> None:
         """critical级别+微博平台 → P0优先级"""
-        result = await self.agent.execute("assess_crisis", {
-            "alert_type": "crisis",
-            "severity": "critical",
-            "platform": "weibo",
-            "trigger_data": {"spike_ratio": 6.0},
-        })
+        result = await self.agent.execute(
+            "assess_crisis",
+            {
+                "alert_type": "crisis",
+                "severity": "critical",
+                "platform": "weibo",
+                "trigger_data": {"spike_ratio": 6.0},
+            },
+        )
 
         assert result.success is True
         assert result.data["priority"] == "P0"
@@ -392,12 +385,15 @@ class TestCrisisResponder:
     @pytest.mark.asyncio
     async def test_assess_crisis_low(self) -> None:
         """low级别+wechat → P3优先级"""
-        result = await self.agent.execute("assess_crisis", {
-            "alert_type": "rating_drop",
-            "severity": "low",
-            "platform": "wechat",
-            "trigger_data": {"spike_ratio": 1.0},
-        })
+        result = await self.agent.execute(
+            "assess_crisis",
+            {
+                "alert_type": "rating_drop",
+                "severity": "low",
+                "platform": "wechat",
+                "trigger_data": {"spike_ratio": 1.0},
+            },
+        )
 
         assert result.success is True
         assert result.data["priority"] in ("P2", "P3")
@@ -405,18 +401,24 @@ class TestCrisisResponder:
     @pytest.mark.asyncio
     async def test_assess_crisis_platform_weight(self) -> None:
         """不同平台权重影响评分"""
-        result_weibo = await self.agent.execute("assess_crisis", {
-            "severity": "medium",
-            "platform": "weibo",
-            "alert_type": "negative_spike",
-            "trigger_data": {},
-        })
-        result_google = await self.agent.execute("assess_crisis", {
-            "severity": "medium",
-            "platform": "google",
-            "alert_type": "negative_spike",
-            "trigger_data": {},
-        })
+        result_weibo = await self.agent.execute(
+            "assess_crisis",
+            {
+                "severity": "medium",
+                "platform": "weibo",
+                "alert_type": "negative_spike",
+                "trigger_data": {},
+            },
+        )
+        result_google = await self.agent.execute(
+            "assess_crisis",
+            {
+                "severity": "medium",
+                "platform": "google",
+                "alert_type": "negative_spike",
+                "trigger_data": {},
+            },
+        )
 
         assert result_weibo.data["crisis_score"] > result_google.data["crisis_score"]
 
@@ -426,13 +428,16 @@ class TestCrisisResponder:
         mock_response = "非常抱歉给您带来不好的体验，我们已立即整改。"
 
         with patch.object(self.agent, "_call_brain", return_value=mock_response):
-            result = await self.agent.execute("generate_response_draft", {
-                "brand_name": "尝在一起",
-                "severity": "high",
-                "alert_type": "negative_spike",
-                "platform": "dianping",
-                "summary": "多条差评反映菜品口味下降",
-            })
+            result = await self.agent.execute(
+                "generate_response_draft",
+                {
+                    "brand_name": "尝在一起",
+                    "severity": "high",
+                    "alert_type": "negative_spike",
+                    "platform": "dianping",
+                    "summary": "多条差评反映菜品口味下降",
+                },
+            )
 
         assert result.success is True
         assert result.data["response_draft"] == mock_response
@@ -442,13 +447,16 @@ class TestCrisisResponder:
     @pytest.mark.asyncio
     async def test_generate_response_draft_fallback(self) -> None:
         """AI不可用时使用降级模板"""
-        result = await self.agent.execute("generate_response_draft", {
-            "brand_name": "测试品牌",
-            "severity": "medium",
-            "alert_type": "crisis",
-            "platform": "weibo",
-            "summary": "食品安全问题",
-        })
+        result = await self.agent.execute(
+            "generate_response_draft",
+            {
+                "brand_name": "测试品牌",
+                "severity": "medium",
+                "alert_type": "crisis",
+                "platform": "weibo",
+                "summary": "食品安全问题",
+            },
+        )
 
         assert result.success is True
         assert len(result.data["response_draft"]) > 0
@@ -475,10 +483,13 @@ class TestCrisisResponder:
             },
         ]
 
-        result = await self.agent.execute("monitor_sla", {
-            "pending_alerts": pending_alerts,
-            "current_time_iso": now.isoformat(),
-        })
+        result = await self.agent.execute(
+            "monitor_sla",
+            {
+                "pending_alerts": pending_alerts,
+                "current_time_iso": now.isoformat(),
+            },
+        )
 
         assert result.success is True
         assert len(result.data["breached_sla"]) == 1
@@ -498,10 +509,13 @@ class TestCrisisResponder:
             },
         ]
 
-        result = await self.agent.execute("monitor_sla", {
-            "pending_alerts": pending_alerts,
-            "current_time_iso": now.isoformat(),
-        })
+        result = await self.agent.execute(
+            "monitor_sla",
+            {
+                "pending_alerts": pending_alerts,
+                "current_time_iso": now.isoformat(),
+            },
+        )
 
         assert result.success is True
         assert len(result.data["approaching_sla"]) == 1

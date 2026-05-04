@@ -11,11 +11,11 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from services.tx_member.src.services import badge_engine
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_member.src.services import badge_engine
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/member/badges", tags=["badge-engine"])
@@ -80,7 +80,8 @@ async def create_badge(
     """1. 创建徽章定义 → INSERT INTO badges"""
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO badges (tenant_id, name, description, category,
                                     unlock_rule, rarity, points_reward,
                                     icon_url, display_order)
@@ -89,7 +90,8 @@ async def create_badge(
                 RETURNING id, tenant_id, name, description, category,
                           unlock_rule, rarity, points_reward, icon_url,
                           display_order, is_active, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "name": req.name,
@@ -142,13 +144,15 @@ async def get_badge(
 ):
     """3. 获取徽章详情 → SELECT ... WHERE id = ..."""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, category, unlock_rule, rarity,
                    points_reward, icon_url, display_order, is_active,
                    created_at, updated_at
             FROM badges
             WHERE tenant_id = :tid AND id = :bid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": x_tenant_id, "bid": badge_id},
     )
     badge = row.mappings().first()
@@ -196,14 +200,16 @@ async def update_badge(
     set_clause = ", ".join(set_parts)
     try:
         row = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE badges
                 SET {set_clause}
                 WHERE tenant_id = :tid AND id = :bid AND is_deleted = false
                 RETURNING id, name, description, category, unlock_rule, rarity,
                           points_reward, icon_url, display_order, is_active,
                           created_at, updated_at
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -225,11 +231,13 @@ async def delete_badge(
     """5. 删除徽章（软删除） → UPDATE badges SET is_deleted = true"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE badges
                 SET is_deleted = true, is_active = false, updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :bid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "bid": badge_id},
         )
         await db.commit()

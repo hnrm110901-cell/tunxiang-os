@@ -140,12 +140,12 @@ async def test_prophet_baseline_forecasts_with_synthetic_data():
     assert all(p.baseline_gmv_fen < 200_000_00 for p in points)
 
     # 周末（周六/周日）应高于周内（周一到周五），季节性被学到了
-    weekday_avg = sum(
-        p.baseline_gmv_fen for p in points if p.date.weekday() < 5
-    ) / max(1, sum(1 for p in points if p.date.weekday() < 5))
-    weekend_avg = sum(
-        p.baseline_gmv_fen for p in points if p.date.weekday() >= 5
-    ) / max(1, sum(1 for p in points if p.date.weekday() >= 5))
+    weekday_avg = sum(p.baseline_gmv_fen for p in points if p.date.weekday() < 5) / max(
+        1, sum(1 for p in points if p.date.weekday() < 5)
+    )
+    weekend_avg = sum(p.baseline_gmv_fen for p in points if p.date.weekday() >= 5) / max(
+        1, sum(1 for p in points if p.date.weekday() >= 5)
+    )
     assert weekend_avg > weekday_avg, "fallback Holt-Winters 必须学到周季节"
 
 

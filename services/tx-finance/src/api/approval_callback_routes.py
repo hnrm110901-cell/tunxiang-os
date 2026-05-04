@@ -77,11 +77,13 @@ async def approval_callback(
     # 查询协议，确认存在且处于待审批状态
     try:
         select_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, company_name, credit_limit_fen
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(id), "tenant_id": str(tid)},
         )
     except Exception as exc:
@@ -103,13 +105,15 @@ async def approval_callback(
         new_status = "active"
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE biz_credit_agreements
                     SET status = 'active',
                         approved_by = :approver_id::UUID,
                         updated_at = NOW()
                     WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-                """),
+                """
+                ),
                 {
                     "id": str(id),
                     "tenant_id": str(tid),
@@ -135,12 +139,14 @@ async def approval_callback(
         new_status = "terminated"
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE biz_credit_agreements
                     SET status = 'terminated',
                         updated_at = NOW()
                     WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-                """),
+                """
+                ),
                 {"id": str(id), "tenant_id": str(tid)},
             )
             await db.commit()

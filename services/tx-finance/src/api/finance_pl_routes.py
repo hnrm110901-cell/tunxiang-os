@@ -23,9 +23,9 @@ from datetime import date
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from services.tx_finance.src.services.pl_service import PLService
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.tx_finance.src.services.pl_service import PLService
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)

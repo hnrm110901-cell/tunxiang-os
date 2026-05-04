@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
+
 from services.legal_entity import (
     assign_store_to_company,
     create_company,

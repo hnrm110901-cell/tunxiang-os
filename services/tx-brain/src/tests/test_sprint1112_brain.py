@@ -205,9 +205,9 @@ async def test_voice_multi_turn_dialog(orchestrator: VoiceOrchestrator, session_
 async def test_voice_all_intents(orchestrator: VoiceOrchestrator, text: str, expected_intent: str) -> None:
     """测试所有16种意图识别"""
     nlu = await orchestrator.understand(text)
-    assert nlu["intent"] == expected_intent, (
-        f"Text '{text}' expected intent '{expected_intent}' but got '{nlu['intent']}'"
-    )
+    assert (
+        nlu["intent"] == expected_intent
+    ), f"Text '{text}' expected intent '{expected_intent}' but got '{nlu['intent']}'"
     assert nlu["confidence"] > 0
 
 

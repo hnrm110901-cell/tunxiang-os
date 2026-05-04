@@ -50,11 +50,11 @@ class SignerRole(str, Enum):
 
 
 class DamageType(str, Enum):
-    BROKEN = "BROKEN"          # 包装/产品破损
-    SPOILED = "SPOILED"        # 变质腐败
+    BROKEN = "BROKEN"  # 包装/产品破损
+    SPOILED = "SPOILED"  # 变质腐败
     WRONG_SPEC = "WRONG_SPEC"  # 规格错误
-    WRONG_QTY = "WRONG_QTY"    # 数量短少
-    EXPIRED = "EXPIRED"        # 临期/过期
+    WRONG_QTY = "WRONG_QTY"  # 数量短少
+    EXPIRED = "EXPIRED"  # 临期/过期
     OTHER = "OTHER"
 
 
@@ -66,9 +66,9 @@ class Severity(str, Enum):
 
 class ResolutionStatus(str, Enum):
     PENDING = "PENDING"
-    RETURNED = "RETURNED"          # 整批退回供应商（触发红字凭证事件）
-    COMPENSATED = "COMPENSATED"    # 供应商赔偿/补货
-    ACCEPTED = "ACCEPTED"          # 门店接受（自行消化）
+    RETURNED = "RETURNED"  # 整批退回供应商（触发红字凭证事件）
+    COMPENSATED = "COMPENSATED"  # 供应商赔偿/补货
+    ACCEPTED = "ACCEPTED"  # 门店接受（自行消化）
 
 
 class EntityType(str, Enum):
@@ -78,6 +78,7 @@ class EntityType(str, Enum):
 
 class DamageResolveAction(str, Enum):
     """损坏处理动作（resolve_action 字段建议值）"""
+
     RETURN_TO_SUPPLIER = "RETURN_TO_SUPPLIER"
     REQUEST_COMPENSATION = "REQUEST_COMPENSATION"
     REQUEST_REPLACEMENT = "REQUEST_REPLACEMENT"
@@ -95,7 +96,8 @@ class DeliveryReceipt(TenantBase):
     __tablename__ = "delivery_receipts"
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "delivery_id",
+            "tenant_id",
+            "delivery_id",
             name="uq_delivery_receipts_tenant_delivery",
         ),
     )
@@ -106,14 +108,18 @@ class DeliveryReceipt(TenantBase):
     signer_role: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     signer_phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     signed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(),
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
     signature_image_url: Mapped[str] = mapped_column(Text, nullable=False)
     signature_location_lat: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(10, 7), nullable=True,
+        Numeric(10, 7),
+        nullable=True,
     )
     signature_location_lng: Mapped[Optional[Decimal]] = mapped_column(
-        Numeric(10, 7), nullable=True,
+        Numeric(10, 7),
+        nullable=True,
     )
     device_info: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -127,7 +133,8 @@ class DeliveryDamageRecord(TenantBase):
     delivery_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     item_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     ingredient_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
     )
     batch_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     damage_type: Mapped[str] = mapped_column(String(24), nullable=False)
@@ -136,30 +143,38 @@ class DeliveryDamageRecord(TenantBase):
     damage_amount_fen: Mapped[Optional[int]] = mapped_column(
         BigInteger,
         Computed(
-            "CASE WHEN unit_cost_fen IS NULL THEN NULL "
-            "ELSE (damaged_qty * unit_cost_fen)::BIGINT END",
+            "CASE WHEN unit_cost_fen IS NULL THEN NULL " "ELSE (damaged_qty * unit_cost_fen)::BIGINT END",
             persisted=True,
         ),
         nullable=True,
     )
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     severity: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default="MINOR",
+        String(16),
+        nullable=False,
+        server_default="MINOR",
     )
     reported_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
     )
     reported_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(),
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
     resolution_status: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default="PENDING",
+        String(16),
+        nullable=False,
+        server_default="PENDING",
     )
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
     )
     resolved_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True,
+        DateTime(timezone=True),
+        nullable=True,
     )
     resolve_action: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     resolve_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -178,15 +193,19 @@ class DeliveryAttachment(TenantBase):
     file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     thumbnail_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     captured_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True,
+        DateTime(timezone=True),
+        nullable=True,
     )
     gps_lat: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 7), nullable=True)
     gps_lng: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 7), nullable=True)
     uploaded_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
     )
     uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(),
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
 
 
@@ -203,6 +222,7 @@ class DeviceInfo(BaseModel):
 
 class SignatureSubmitIn(BaseModel):
     """POST /sign 入参"""
+
     model_config = ConfigDict(use_enum_values=True)
 
     signer_name: str = Field(min_length=1, max_length=64)
@@ -220,6 +240,7 @@ class SignatureSubmitIn(BaseModel):
 
 class DamageRecordIn(BaseModel):
     """POST /damage 入参"""
+
     model_config = ConfigDict(use_enum_values=True)
 
     item_id: Optional[uuid.UUID] = None
@@ -235,6 +256,7 @@ class DamageRecordIn(BaseModel):
 
 class AttachmentIn(BaseModel):
     """POST /damage/{id}/attachment 入参"""
+
     model_config = ConfigDict(use_enum_values=True)
 
     entity_type: EntityType
@@ -251,6 +273,7 @@ class AttachmentIn(BaseModel):
 
 class ResolveDamageIn(BaseModel):
     """POST /damage/{id}/resolve 入参"""
+
     model_config = ConfigDict(use_enum_values=True)
 
     action: ResolutionStatus = Field(

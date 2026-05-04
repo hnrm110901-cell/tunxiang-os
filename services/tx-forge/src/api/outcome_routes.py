@@ -35,13 +35,15 @@ async def create_outcome_definition(
     """创建结果定义."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.outcome_definitions
+        text(
+            """INSERT INTO forge.outcome_definitions
                 (tenant_id, app_id, outcome_type, outcome_name, description,
                  measurement_method, price_fen_per_outcome, attribution_window_hours,
                  verification_method)
                 VALUES (:tid, :app_id, :outcome_type, :outcome_name, :description,
                         :measurement_method, :price_fen, :window_hours, :verification_method)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body.app_id,
@@ -101,12 +103,14 @@ async def record_outcome_event(
     """记录结果事件."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.outcome_events
+        text(
+            """INSERT INTO forge.outcome_events
                 (tenant_id, outcome_id, app_id, store_id, agent_id,
                  decision_log_id, outcome_data)
                 VALUES (:tid, :outcome_id, :app_id, :store_id, :agent_id,
                         :decision_log_id, :outcome_data::jsonb)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "outcome_id": body.outcome_id,
@@ -134,10 +138,12 @@ async def verify_outcome_event(
     """验证结果事件."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""UPDATE forge.outcome_events
+        text(
+            """UPDATE forge.outcome_events
                 SET verified = :verified, verified_at = NOW(), updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :event_id
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {"tid": x_tenant_id, "event_id": event_id, "verified": body.verified},
     )
     await db.commit()
@@ -165,49 +171,57 @@ async def outcome_dashboard(
         params["app_id"] = app_id
 
     summary = await db.execute(
-        text(f"""SELECT
+        text(
+            f"""SELECT
                     COUNT(*) AS total_outcomes,
                     COUNT(*) FILTER (WHERE oe.verified = true) AS verified_outcomes,
                     COALESCE(SUM(oe.revenue_fen) FILTER (WHERE oe.verified = true), 0) AS total_revenue_fen
                 FROM forge.outcome_events oe
                 WHERE oe.tenant_id = :tid
                   AND oe.created_at >= NOW() - INTERVAL '1 day' * :days
-                  {app_filter}"""),
+                  {app_filter}"""
+        ),
         params,
     )
     s = dict(summary.mappings().one())
 
     by_type = await db.execute(
-        text(f"""SELECT od.outcome_type, COUNT(*) AS count,
+        text(
+            f"""SELECT od.outcome_type, COUNT(*) AS count,
                     COALESCE(SUM(oe.revenue_fen), 0) AS revenue_fen
                 FROM forge.outcome_events oe
                 JOIN forge.outcome_definitions od ON od.outcome_id = oe.outcome_id
                 WHERE oe.tenant_id = :tid
                   AND oe.created_at >= NOW() - INTERVAL '1 day' * :days
                   {app_filter}
-                GROUP BY od.outcome_type"""),
+                GROUP BY od.outcome_type"""
+        ),
         params,
     )
 
     daily = await db.execute(
-        text(f"""SELECT DATE(oe.created_at) AS day, COUNT(*) AS count,
+        text(
+            f"""SELECT DATE(oe.created_at) AS day, COUNT(*) AS count,
                     COALESCE(SUM(oe.revenue_fen), 0) AS revenue_fen
                 FROM forge.outcome_events oe
                 WHERE oe.tenant_id = :tid
                   AND oe.created_at >= NOW() - INTERVAL '1 day' * :days
                   {app_filter}
-                GROUP BY DATE(oe.created_at) ORDER BY day"""),
+                GROUP BY DATE(oe.created_at) ORDER BY day"""
+        ),
         params,
     )
 
     agents = await db.execute(
-        text(f"""SELECT oe.agent_id, COUNT(*) AS count,
+        text(
+            f"""SELECT oe.agent_id, COUNT(*) AS count,
                     COALESCE(SUM(oe.revenue_fen), 0) AS revenue_fen
                 FROM forge.outcome_events oe
                 WHERE oe.tenant_id = :tid AND oe.agent_id IS NOT NULL
                   AND oe.created_at >= NOW() - INTERVAL '1 day' * :days
                   {app_filter}
-                GROUP BY oe.agent_id ORDER BY revenue_fen DESC LIMIT 10"""),
+                GROUP BY oe.agent_id ORDER BY revenue_fen DESC LIMIT 10"""
+        ),
         params,
     )
 

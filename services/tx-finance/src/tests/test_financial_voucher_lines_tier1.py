@@ -36,7 +36,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore  # noqa: E402
 
-
 # ─── 真实场景 #1: 销售凭证 2 分录 (借: 应收 / 贷: 主营业务收入) ──────────
 
 
@@ -108,15 +107,33 @@ class TestSalesVoucherLinesScenario:
             entries=[],
         )
         voucher.lines = [
-            FinancialVoucherLine(tenant_id=tenant_id, voucher_id=voucher.id,
-                                 line_no=1, account_code="5401", account_name="主营成本",
-                                 debit_fen=10000, credit_fen=0),
-            FinancialVoucherLine(tenant_id=tenant_id, voucher_id=voucher.id,
-                                 line_no=2, account_code="5602", account_name="管理费用",
-                                 debit_fen=5000, credit_fen=0),
-            FinancialVoucherLine(tenant_id=tenant_id, voucher_id=voucher.id,
-                                 line_no=3, account_code="1002", account_name="银行存款",
-                                 debit_fen=0, credit_fen=15000),
+            FinancialVoucherLine(
+                tenant_id=tenant_id,
+                voucher_id=voucher.id,
+                line_no=1,
+                account_code="5401",
+                account_name="主营成本",
+                debit_fen=10000,
+                credit_fen=0,
+            ),
+            FinancialVoucherLine(
+                tenant_id=tenant_id,
+                voucher_id=voucher.id,
+                line_no=2,
+                account_code="5602",
+                account_name="管理费用",
+                debit_fen=5000,
+                credit_fen=0,
+            ),
+            FinancialVoucherLine(
+                tenant_id=tenant_id,
+                voucher_id=voucher.id,
+                line_no=3,
+                account_code="1002",
+                account_name="银行存款",
+                debit_fen=0,
+                credit_fen=15000,
+            ),
         ]
         assert voucher.is_balanced_from_lines() is True
 
@@ -132,12 +149,24 @@ class TestSalesVoucherLinesScenario:
             entries=[],
         )
         voucher.lines = [
-            FinancialVoucherLine(tenant_id=tenant_id, voucher_id=voucher.id,
-                                 line_no=1, account_code="1122", account_name="应收账款",
-                                 debit_fen=10000, credit_fen=0),
-            FinancialVoucherLine(tenant_id=tenant_id, voucher_id=voucher.id,
-                                 line_no=2, account_code="6001", account_name="主营业务收入",
-                                 debit_fen=0, credit_fen=9900),  # 少 1 分!
+            FinancialVoucherLine(
+                tenant_id=tenant_id,
+                voucher_id=voucher.id,
+                line_no=1,
+                account_code="1122",
+                account_name="应收账款",
+                debit_fen=10000,
+                credit_fen=0,
+            ),
+            FinancialVoucherLine(
+                tenant_id=tenant_id,
+                voucher_id=voucher.id,
+                line_no=2,
+                account_code="6001",
+                account_name="主营业务收入",
+                debit_fen=0,
+                credit_fen=9900,
+            ),  # 少 1 分!
         ]
         assert voucher.is_balanced_from_lines() is False
 
@@ -154,7 +183,9 @@ class TestVoucherLinesConstraints:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v266_financial_voucher_lines.py"
         )
         assert path.exists(), f"v266 迁移文件不存在: {path}"
@@ -189,8 +220,7 @@ class TestVoucherLinesConstraints:
             self.migration_src,
         )
         assert len(exclusive_clauses) >= 2, (
-            "互斥 CHECK 需要至少两个分支 '借=0 AND 贷>0' 和 '借>0 AND 贷=0', "
-            "两个分支都含 '> 0' 才能拒 0/0"
+            "互斥 CHECK 需要至少两个分支 '借=0 AND 贷>0' 和 '借>0 AND 贷=0', " "两个分支都含 '> 0' 才能拒 0/0"
         )
         for clause in exclusive_clauses[:2]:
             assert ">" in clause, f"分支 {clause} 缺少 > 0 条件, 不能拒 0/0"
@@ -201,7 +231,8 @@ class TestVoucherLinesConstraints:
         # UniqueConstraint 调用里要同时见到两个列
         uq_block = re.search(
             r"UniqueConstraint\(\s*(.*?)\s*name=.uq_fvl_voucher_line_no.",
-            self.migration_src, re.S,
+            self.migration_src,
+            re.S,
         )
         assert uq_block is not None, "UniqueConstraint(voucher_id, line_no) 缺失"
         cols = uq_block.group(1)
@@ -210,9 +241,9 @@ class TestVoucherLinesConstraints:
     def test_fk_voucher_id_cascade(self):
         """FK voucher_id ON DELETE CASCADE — voucher 删则 lines 自动清."""
         assert re.search(
-            r'ForeignKeyConstraint\(\s*\[.voucher_id.\]\s*,\s*'
-            r'\[.financial_vouchers\.id.\]\s*,\s*'
-            r'ondelete\s*=\s*.CASCADE.',
+            r"ForeignKeyConstraint\(\s*\[.voucher_id.\]\s*,\s*"
+            r"\[.financial_vouchers\.id.\]\s*,\s*"
+            r"ondelete\s*=\s*.CASCADE.",
             self.migration_src,
         ), "FK voucher_id ON DELETE CASCADE 缺失"
 
@@ -229,7 +260,9 @@ class TestVoucherLinesRLS:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v266_financial_voucher_lines.py"
         )
         self.migration_src = path.read_text(encoding="utf-8")
@@ -259,7 +292,8 @@ class TestVoucherLinesRLS:
             r"CREATE POLICY.*financial_voucher_lines_tenant.*"
             r"USING\s*\(.*app\.tenant_id.*\).*"
             r"WITH\s+CHECK\s*\(.*app\.tenant_id.*\)",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         ), "POLICY 必须同时声明 USING 和 WITH CHECK"
 
     def test_tenant_id_is_not_nullable(self):
@@ -267,13 +301,13 @@ class TestVoucherLinesRLS:
         # 找 tenant_id 列定义
         tenant_col = re.search(
             r'Column\(\s*"tenant_id"\s*,\s*UUID\(as_uuid=True\)\s*,\s*(.+?)\)',
-            self.migration_src, re.S,
+            self.migration_src,
+            re.S,
         )
         assert tenant_col is not None, "tenant_id 列定义未找到"
         col_def = tenant_col.group(1)
         assert "nullable=False" in col_def, (
-            "tenant_id 必须 nullable=False, "
-            "否则 NULL 行可被恶意租户通过 unset app.tenant_id 读到"
+            "tenant_id 必须 nullable=False, " "否则 NULL 行可被恶意租户通过 unset app.tenant_id 读到"
         )
 
 
@@ -289,7 +323,9 @@ class TestV266MigrationFileStructure:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v266_financial_voucher_lines.py"
         )
         self.migration_src = path.read_text(encoding="utf-8")
@@ -313,7 +349,8 @@ class TestV266MigrationFileStructure:
         # 业务要求: 科目总账索引必须是 (tenant_id, account_code) 复合
         assert re.search(
             r'ix_fvl_tenant_account.*?\[\s*"tenant_id"\s*,\s*"account_code"\s*\]',
-            self.migration_src, re.S,
+            self.migration_src,
+            re.S,
         ), "ix_fvl_tenant_account 必须是 (tenant_id, account_code) 复合索引"
 
     def test_upgrade_has_raise_notice_markers(self):
@@ -323,8 +360,7 @@ class TestV266MigrationFileStructure:
 
     def test_downgrade_is_not_empty(self):
         """downgrade 必须实际 DROP TABLE, 不能是 pass."""
-        m = re.search(r"def downgrade\(\) -> None:(.*?)(?=\Z|^def )",
-                      self.migration_src, re.S | re.M)
+        m = re.search(r"def downgrade\(\) -> None:(.*?)(?=\Z|^def )", self.migration_src, re.S | re.M)
         assert m is not None
         body = m.group(1)
         assert "drop_table" in body.lower() or "DROP TABLE" in body
@@ -346,13 +382,12 @@ class TestV266MigrationFileStructure:
         # 只检函数体 (upgrade + downgrade), 不检 docstring 里解释为什么不用 CONCURRENTLY.
         func_bodies = re.findall(
             r"^def (?:upgrade|downgrade)\(\) -> None:(.*?)(?=\Z|^def )",
-            self.migration_src, re.S | re.M,
+            self.migration_src,
+            re.S | re.M,
         )
         assert len(func_bodies) == 2, "upgrade + downgrade 函数应都存在"
         combined = "\n".join(func_bodies)
         assert not re.search(
             r"CREATE\s+INDEX\s+CONCURRENTLY", combined, re.I
         ), "v266 是新空表, DDL 不应含 CREATE INDEX CONCURRENTLY"
-        assert "autocommit_block" not in combined, (
-            "v266 新空表不需要 autocommit_block() — 这是给老表 CONCURRENTLY 用的"
-        )
+        assert "autocommit_block" not in combined, "v266 新空表不需要 autocommit_block() — 这是给老表 CONCURRENTLY 用的"

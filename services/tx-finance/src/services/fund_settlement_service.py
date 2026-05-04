@@ -66,7 +66,8 @@ class FundSettlementService:
             raise ValueError("fixed_fee_fen 不能为负数")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO split_rules (
                     tenant_id, store_id, rule_type, rate_permil, fixed_fee_fen,
                     effective_from, effective_to, is_active
@@ -77,7 +78,8 @@ class FundSettlementService:
                 RETURNING id, tenant_id, store_id, rule_type, rate_permil,
                           fixed_fee_fen, effective_from, effective_to,
                           is_active, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -134,14 +136,16 @@ class FundSettlementService:
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, rule_type, rate_permil,
                        fixed_fee_fen, effective_from, effective_to,
                        is_active, created_at, updated_at
                 FROM split_rules
                 WHERE {where_sql}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -168,13 +172,15 @@ class FundSettlementService:
         """
         # 1. 查询订单
         order_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, actual_amount_fen, payment_id
                 FROM orders
                 WHERE id = :order_id::UUID
                   AND tenant_id = :tenant_id::UUID
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"order_id": str(order_id), "tenant_id": str(tenant_id)},
         )
         order_row = order_result.mappings().first()
@@ -187,12 +193,14 @@ class FundSettlementService:
 
         # 2. 检查是否已分账
         existing = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM split_ledgers
                 WHERE order_id = :order_id::UUID
                   AND tenant_id = :tenant_id::UUID
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"order_id": str(order_id), "tenant_id": str(tenant_id)},
         )
         if existing.mappings().first():
@@ -201,7 +209,8 @@ class FundSettlementService:
         # 3. 加载分账规则
         today = date.today()
         rules_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT rule_type, rate_permil, fixed_fee_fen
                 FROM split_rules
                 WHERE store_id = :store_id::UUID
@@ -210,7 +219,8 @@ class FundSettlementService:
                   AND is_deleted = FALSE
                   AND effective_from <= :today
                   AND (effective_to IS NULL OR effective_to >= :today)
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -224,7 +234,8 @@ class FundSettlementService:
 
         # 5. 写入流水
         ledger_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO split_ledgers (
                     tenant_id, order_id, payment_id, store_id,
                     total_amount_fen, platform_fee_fen, brand_royalty_fen,
@@ -239,7 +250,8 @@ class FundSettlementService:
                           total_amount_fen, platform_fee_fen, brand_royalty_fen,
                           franchise_share_fen, net_settlement_fen, status,
                           created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "order_id": str(order_id),
@@ -284,7 +296,8 @@ class FundSettlementService:
 
         # 查询未分账的订单
         orders_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT o.id, o.store_id, o.actual_amount_fen, o.payment_id
                 FROM orders o
                 WHERE o.tenant_id = :tenant_id::UUID
@@ -298,7 +311,8 @@ class FundSettlementService:
                         AND sl.is_deleted = FALSE
                   )
                 ORDER BY o.created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -319,7 +333,8 @@ class FundSettlementService:
         # 加载分账规则（批量共用同一门店规则）
         today = date.today()
         rules_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT rule_type, rate_permil, fixed_fee_fen
                 FROM split_rules
                 WHERE store_id = :store_id::UUID
@@ -328,7 +343,8 @@ class FundSettlementService:
                   AND is_deleted = FALSE
                   AND effective_from <= :today
                   AND (effective_to IS NULL OR effective_to >= :today)
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -346,7 +362,8 @@ class FundSettlementService:
                 split_amounts = _calculate_split(order["actual_amount_fen"], rules)
 
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO split_ledgers (
                             tenant_id, order_id, payment_id, store_id,
                             total_amount_fen, platform_fee_fen, brand_royalty_fen,
@@ -357,7 +374,8 @@ class FundSettlementService:
                             :brand_royalty_fen, :franchise_share_fen,
                             :net_settlement_fen, 'pending'
                         )
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": str(tenant_id),
                         "order_id": str(order["id"]),
@@ -416,7 +434,8 @@ class FundSettlementService:
 
         # 汇总待结算的分账流水
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS total_orders,
                        COALESCE(SUM(total_amount_fen), 0) AS total_amount_fen,
                        COALESCE(SUM(platform_fee_fen + brand_royalty_fen), 0) AS total_split_fen
@@ -427,7 +446,8 @@ class FundSettlementService:
                   AND batch_id IS NULL
                   AND is_deleted = FALSE
                   AND created_at::DATE BETWEEN :period_start AND :period_end
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -445,7 +465,8 @@ class FundSettlementService:
 
         # 创建批次
         batch_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO settlement_batches (
                     tenant_id, batch_no, period_start, period_end, store_id,
                     total_orders, total_amount_fen, total_split_fen, status
@@ -457,7 +478,8 @@ class FundSettlementService:
                 RETURNING id, tenant_id, batch_no, period_start, period_end,
                           store_id, total_orders, total_amount_fen,
                           total_split_fen, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "batch_no": batch_no,
@@ -474,7 +496,8 @@ class FundSettlementService:
 
         # 关联流水到批次
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE split_ledgers
                 SET batch_id = :batch_id::UUID, updated_at = NOW()
                 WHERE tenant_id = :tenant_id::UUID
@@ -483,7 +506,8 @@ class FundSettlementService:
                   AND batch_id IS NULL
                   AND is_deleted = FALSE
                   AND created_at::DATE BETWEEN :period_start AND :period_end
-            """),
+            """
+            ),
             {
                 "batch_id": str(batch_id),
                 "tenant_id": str(tenant_id),
@@ -538,7 +562,8 @@ class FundSettlementService:
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, batch_no, period_start, period_end,
                        store_id, total_orders, total_amount_fen,
                        total_split_fen, status, created_at, updated_at
@@ -546,7 +571,8 @@ class FundSettlementService:
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(r) for r in items_result.mappings().all()]
@@ -564,7 +590,8 @@ class FundSettlementService:
         """
         # 批次基本信息
         batch_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, batch_no, period_start, period_end,
                        store_id, total_orders, total_amount_fen,
                        total_split_fen, status, created_at
@@ -572,7 +599,8 @@ class FundSettlementService:
                 WHERE id = :batch_id::UUID
                   AND tenant_id = :tenant_id::UUID
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"batch_id": str(batch_id), "tenant_id": str(tenant_id)},
         )
         batch_row = batch_result.mappings().first()
@@ -581,7 +609,8 @@ class FundSettlementService:
 
         # 汇总分账明细
         detail_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS ledger_count,
                     COALESCE(SUM(total_amount_fen), 0) AS sum_total_fen,
@@ -593,7 +622,8 @@ class FundSettlementService:
                 WHERE batch_id = :batch_id::UUID
                   AND tenant_id = :tenant_id::UUID
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"batch_id": str(batch_id), "tenant_id": str(tenant_id)},
         )
         detail = detail_result.mappings().first()
@@ -622,7 +652,8 @@ class FundSettlementService:
         """
         # 更新批次状态
         batch_result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE settlement_batches
                 SET status = 'confirmed', updated_at = NOW()
                 WHERE id = :batch_id::UUID
@@ -630,7 +661,8 @@ class FundSettlementService:
                   AND status = 'draft'
                   AND is_deleted = FALSE
                 RETURNING id, batch_no, status
-            """),
+            """
+            ),
             {"batch_id": str(batch_id), "tenant_id": str(tenant_id)},
         )
         batch_row = batch_result.mappings().first()
@@ -639,14 +671,16 @@ class FundSettlementService:
 
         # 更新关联流水状态
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE split_ledgers
                 SET status = 'settled', settled_at = NOW(), updated_at = NOW()
                 WHERE batch_id = :batch_id::UUID
                   AND tenant_id = :tenant_id::UUID
                   AND status = 'pending'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"batch_id": str(batch_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()

@@ -40,8 +40,10 @@ router = APIRouter(prefix="/api/v1/member/rfm/outreach", tags=["member-rfm-outre
 
 # ── 请求/响应模型 ─────────────────────────────────────────────────
 
+
 class OutreachPlanRequest(BaseModel):
     """生成 RFM 触达规划"""
+
     segment_filter: list[str] = Field(
         default_factory=lambda: ["S4", "S5"],
         description="仅保留这些分层（默认 S4/S5 沉睡客户）",
@@ -76,6 +78,7 @@ class OutreachPlanResponse(BaseModel):
 
 # ── 端点 ─────────────────────────────────────────────────────────
 
+
 @router.post("/plan", response_model=dict)
 async def generate_outreach_plan(
     req: OutreachPlanRequest,
@@ -95,12 +98,19 @@ async def generate_outreach_plan(
     # 1. 拉取候选客户（不筛 segment，service 层按 segment_filter 处理）
     try:
         candidates = await _fetch_customer_snapshots(
-            db, tenant_id=x_tenant_id, store_id=req.store_id, limit=req.limit,
+            db,
+            tenant_id=x_tenant_id,
+            store_id=req.store_id,
+            limit=req.limit,
             recency_min_days=30,  # 至少 30 天没来（节省无意义 CF 计算）
         )
         active_peers = await _fetch_customer_snapshots(
-            db, tenant_id=x_tenant_id, store_id=req.store_id, limit=500,
-            recency_min_days=None, recency_max_days=14,  # 14 天内到店的活跃人
+            db,
+            tenant_id=x_tenant_id,
+            store_id=req.store_id,
+            limit=500,
+            recency_min_days=None,
+            recency_max_days=14,  # 14 天内到店的活跃人
         )
     except SQLAlchemyError as exc:
         logger.exception("rfm_outreach_db_fetch_failed")
@@ -188,7 +198,9 @@ async def execute_outreach_campaign(
     _parse_uuid(x_operator_id, "X-Operator-ID")
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             UPDATE rfm_outreach_campaigns
             SET status = 'sending',
                 confirmed_by = CAST(:op AS uuid),
@@ -199,7 +211,10 @@ async def execute_outreach_campaign(
               AND status IN ('plan_generated', 'human_confirmed')
               AND is_deleted = false
             RETURNING id, status, target_count
-        """), {"cid": campaign_id, "tid": x_tenant_id, "op": x_operator_id})
+        """
+            ),
+            {"cid": campaign_id, "tid": x_tenant_id, "op": x_operator_id},
+        )
         row = result.mappings().first()
         await db.commit()
     except SQLAlchemyError as exc:
@@ -226,13 +241,12 @@ async def execute_outreach_campaign(
 
 # ── 辅助 ─────────────────────────────────────────────────────────
 
+
 def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc
 
 
 async def _fetch_customer_snapshots(
@@ -265,7 +279,9 @@ async def _fetch_customer_snapshots(
 
     # 简化版：直接从 customers + orders 实时聚合。生产应读 mv_member_clv。
     try:
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(
+                f"""
             WITH snap AS (
                 SELECT
                     c.id::text AS customer_id,
@@ -295,7 +311,10 @@ async def _fetch_customer_snapshots(
             WHERE 1=1 {recency_filter}
             ORDER BY recency_days DESC
             LIMIT :limit
-        """), params)
+        """
+            ),
+            params,
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError:
         logger.exception("rfm_snapshot_query_failed")
@@ -304,12 +323,14 @@ async def _fetch_customer_snapshots(
     snapshots: list[CustomerSnapshot] = []
     for row in rows:
         items = row.get("preferred_items") or []
-        snapshots.append(CustomerSnapshot(
-            customer_id=row["customer_id"],
-            name=row.get("name"),
-            recency_days=int(row["recency_days"]),
-            frequency=int(row["frequency"] or 0),
-            monetary_fen=int(row["monetary_fen"] or 0),
-            preferred_items=[str(i) for i in items if i],
-        ))
+        snapshots.append(
+            CustomerSnapshot(
+                customer_id=row["customer_id"],
+                name=row.get("name"),
+                recency_days=int(row["recency_days"]),
+                frequency=int(row["frequency"] or 0),
+                monetary_fen=int(row["monetary_fen"] or 0),
+                preferred_items=[str(i) for i in items if i],
+            )
+        )
     return snapshots

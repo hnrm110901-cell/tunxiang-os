@@ -9,10 +9,10 @@ from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
-from services.tx_supply.src.services import expiry_monitor, inventory_io, stock_forecast
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from services.tx_supply.src.services import expiry_monitor, inventory_io, stock_forecast
 from shared.ontology.src.base import TenantBase
 from shared.ontology.src.entities import Ingredient
 from shared.ontology.src.enums import InventoryStatus

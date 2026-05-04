@@ -26,9 +26,11 @@ async def register_developer(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.developers (tenant_id, name, email, company, status)
+        text(
+            """INSERT INTO forge.developers (tenant_id, name, email, company, status)
                 VALUES (:tid, :name, :email, :company, 'pending')
-                RETURNING id, name, email, status, created_at"""),
+                RETURNING id, name, email, status, created_at"""
+        ),
         {"tid": x_tenant_id, "name": body["name"], "email": body["email"], "company": body.get("company")},
     )
     await db.commit()
@@ -102,9 +104,11 @@ async def get_developer_revenue(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     row = await db.execute(
-        text("""SELECT developer_id, SUM(amount) AS total_revenue, COUNT(*) AS tx_count
+        text(
+            """SELECT developer_id, SUM(amount) AS total_revenue, COUNT(*) AS tx_count
                 FROM forge.payouts WHERE developer_id = :did AND tenant_id = :tid
-                GROUP BY developer_id"""),
+                GROUP BY developer_id"""
+        ),
         {"did": str(developer_id), "tid": x_tenant_id},
     )
     result = row.mappings().first()

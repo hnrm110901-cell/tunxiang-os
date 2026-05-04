@@ -677,9 +677,7 @@ async def resolve_dead_letter(
             offline_order_id=offline_order_id,
             error=str(exc),
         )
-        return ManualOpResponse(
-            ok=False, error={"code": "DB_ERROR", "message": "解决死信失败"}
-        )
+        return ManualOpResponse(ok=False, error={"code": "DB_ERROR", "message": "解决死信失败"})
 
     if not ok:
         # 条目不存在或非 dead_letter 状态
@@ -760,9 +758,7 @@ async def retry_dead_letter(
             offline_order_id=offline_order_id,
             error=str(exc),
         )
-        return ManualOpResponse(
-            ok=False, error={"code": "DB_ERROR", "message": "重试调度失败"}
-        )
+        return ManualOpResponse(ok=False, error={"code": "DB_ERROR", "message": "重试调度失败"})
 
     if not ok:
         return ManualOpResponse(

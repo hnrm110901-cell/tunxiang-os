@@ -189,7 +189,8 @@ async def register_terminal(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kiosk_terminals (
                     id, tenant_id, store_id, terminal_code, terminal_name,
                     type, display_mode, payment_modes, idle_timeout_seconds,
@@ -200,7 +201,8 @@ async def register_terminal(
                     :welcome_screen_config::jsonb, :ad_images::jsonb,
                     'inactive', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": terminal_id,
                 "tenant_id": tenant_id,
@@ -236,7 +238,8 @@ async def list_terminals(
     tenant_id = _get_tenant_id(request)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, terminal_code, terminal_name, type, display_mode,
                    payment_modes, status, idle_timeout_seconds, created_at, updated_at
             FROM kiosk_terminals
@@ -244,7 +247,8 @@ async def list_terminals(
               AND store_id  = :store_id
               AND is_deleted = FALSE
             ORDER BY created_at ASC
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id},
     )
     items = [dict(row._mapping) for row in rows]
@@ -314,11 +318,13 @@ async def update_terminal(
     set_clauses.append("updated_at = :now")
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE kiosk_terminals
             SET {", ".join(set_clauses)}
             WHERE id = :terminal_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         params,
     )
     await db.commit()
@@ -339,12 +345,14 @@ async def activate_terminal(
     tenant_id = _get_tenant_id(request)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE kiosk_terminals
             SET status = 'active', updated_at = :now
             WHERE id = :terminal_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"terminal_id": terminal_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
     )
     await db.commit()
@@ -366,12 +374,14 @@ async def deactivate_terminal(
     tenant_id = _get_tenant_id(request)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE kiosk_terminals
             SET status = 'inactive', updated_at = :now
             WHERE id = :terminal_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"terminal_id": terminal_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
     )
     await db.commit()
@@ -393,13 +403,15 @@ async def get_terminal_config(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_id, terminal_code, terminal_name, type, display_mode,
                    payment_modes, idle_timeout_seconds, welcome_screen_config,
                    ad_images, status
             FROM kiosk_terminals
             WHERE id = :terminal_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     terminal = row.fetchone()
@@ -410,13 +422,15 @@ async def get_terminal_config(
 
     # 获取门店可用菜单分类（简略版，供终端启动配置）
     cats = await db.execute(
-        text("""
+        text(
+            """
             SELECT DISTINCT category_name
             FROM dish_items
             WHERE store_id = :store_id AND tenant_id = :tenant_id
               AND is_available = TRUE AND is_deleted = FALSE
             ORDER BY category_name
-        """),
+        """
+        ),
         {"store_id": t["store_id"], "tenant_id": tenant_id},
     )
     menu_categories = [r[0] for r in cats.fetchall()]
@@ -456,10 +470,12 @@ async def get_kiosk_menu(
 
     # 先获取终端所属门店
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id FROM kiosk_terminals
             WHERE id = :terminal_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     terminal = row.fetchone()
@@ -475,7 +491,8 @@ async def get_kiosk_menu(
         params["category"] = category
 
     dishes = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, dish_name, category_name, price_fen, image_url,
                    description, is_available, stock_count,
                    specs_config
@@ -484,7 +501,8 @@ async def get_kiosk_menu(
               AND is_available = TRUE AND is_deleted = FALSE
               {category_filter}
             ORDER BY category_name, sort_order NULLS LAST, dish_name
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in dishes.fetchall()]
@@ -521,10 +539,12 @@ async def upsert_cart(
 
     # 验证终端存在
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, status FROM kiosk_terminals
             WHERE id = :terminal_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     terminal = row.fetchone()
@@ -538,12 +558,14 @@ async def upsert_cart(
     # 查询各菜品价格和库存
     dish_ids = [item.dish_id for item in req.items]
     dishes_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_name, price_fen, is_available, stock_count
             FROM dish_items
             WHERE id = ANY(:dish_ids) AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"dish_ids": dish_ids, "tenant_id": tenant_id},
     )
     dish_map = {str(r[0]): dict(r._mapping) for r in dishes_res.fetchall()}
@@ -583,7 +605,8 @@ async def upsert_cart(
     # 写入或更新购物车（按 session_token upsert）
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kiosk_carts (
                     id, tenant_id, terminal_id, store_id, session_token,
                     items, subtotal_fen, discount_fen, total_fen,
@@ -602,7 +625,8 @@ async def upsert_cart(
                     updated_at = EXCLUDED.updated_at,
                     expires_at = EXCLUDED.expires_at
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "id": cart_id,
                 "tenant_id": tenant_id,
@@ -647,12 +671,14 @@ async def get_cart(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, session_token, items, subtotal_fen, discount_fen, total_fen,
                    created_at, updated_at, expires_at
             FROM kiosk_carts
             WHERE id = :cart_id AND terminal_id = :terminal_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"cart_id": cart_id, "terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     cart = row.fetchone()
@@ -686,14 +712,16 @@ async def kiosk_place_order(
 
     # 拉取购物车
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT c.id, c.store_id, c.items, c.subtotal_fen, c.discount_fen, c.total_fen,
                    t.status as terminal_status
             FROM kiosk_carts c
             JOIN kiosk_terminals t ON t.id = c.terminal_id
             WHERE c.id = :cart_id AND c.terminal_id = :terminal_id AND c.tenant_id = :tenant_id
               AND c.expires_at > NOW()
-        """),
+        """
+        ),
         {"cart_id": req.cart_id, "terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     cart = row.fetchone()
@@ -707,13 +735,15 @@ async def kiosk_place_order(
 
     # 生成取餐叫号
     seq_row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO call_number_sequences (store_id, current_date, last_number)
             VALUES (:store_id, CURRENT_DATE, 1)
             ON CONFLICT (store_id, current_date)
             DO UPDATE SET last_number = call_number_sequences.last_number + 1
             RETURNING last_number
-        """),
+        """
+        ),
         {"store_id": store_id},
     )
     seq_result = seq_row.fetchone()
@@ -724,7 +754,8 @@ async def kiosk_place_order(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kiosk_orders (
                     id, tenant_id, store_id, terminal_id, cart_id, order_no,
                     queue_number, member_code, dining_type, table_no,
@@ -736,7 +767,8 @@ async def kiosk_place_order(
                     :items, :subtotal_fen, :discount_fen, :total_amount_fen,
                     'pending_payment', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": order_id,
                 "tenant_id": tenant_id,
@@ -804,13 +836,15 @@ async def get_kiosk_order_status(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT o.id, o.order_no, o.queue_number, o.status, o.items,
                    o.total_amount_fen, o.created_at,
                    EXTRACT(EPOCH FROM (NOW() - o.created_at)) / 60 AS waiting_minutes
             FROM kiosk_orders o
             WHERE o.id = :order_id AND o.terminal_id = :terminal_id AND o.tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"order_id": order_id, "terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     order = row.fetchone()
@@ -854,11 +888,13 @@ async def kiosk_scan_pay(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, total_amount_fen, store_id, order_no
             FROM kiosk_orders
             WHERE id = :order_id AND terminal_id = :terminal_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"order_id": order_id, "terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     order = row.fetchone()
@@ -873,7 +909,8 @@ async def kiosk_scan_pay(
     # 记录支付请求（实际支付由 payment gateway 处理，此处为占位）
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kiosk_payments (
                     id, tenant_id, order_id, store_id, receipt_no,
                     scan_code, amount_fen, payment_method, status, created_at
@@ -881,7 +918,8 @@ async def kiosk_scan_pay(
                     :id, :tenant_id, :order_id, :store_id, :receipt_no,
                     :scan_code, :amount_fen, 'scan_pay', 'processing', :now
                 )
-            """),
+            """
+            ),
             {
                 "id": str(uuid4()),
                 "tenant_id": tenant_id,
@@ -895,10 +933,12 @@ async def kiosk_scan_pay(
         )
         # 更新订单状态 → paying
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE kiosk_orders SET status = 'paying', updated_at = :now
                 WHERE id = :order_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"order_id": order_id, "tenant_id": tenant_id, "now": datetime.now(timezone.utc)},
         )
         await db.commit()
@@ -932,11 +972,13 @@ async def kiosk_qr_pay(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, total_amount_fen, store_id, order_no
             FROM kiosk_orders
             WHERE id = :order_id AND terminal_id = :terminal_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"order_id": order_id, "terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     order = row.fetchone()
@@ -953,7 +995,8 @@ async def kiosk_qr_pay(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kiosk_payments (
                     id, tenant_id, order_id, store_id, receipt_no,
                     polling_key, amount_fen, payment_method, status,
@@ -963,7 +1006,8 @@ async def kiosk_qr_pay(
                     :polling_key, :amount_fen, 'qr_pay', 'pending',
                     :qr_code_url, NOW() + INTERVAL '5 minutes', :now
                 )
-            """),
+            """
+            ),
             {
                 "id": str(uuid4()),
                 "tenant_id": tenant_id,
@@ -1009,13 +1053,15 @@ async def get_pay_result(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT p.status, p.order_id, p.amount_fen, p.receipt_no, p.updated_at
             FROM kiosk_payments p
             JOIN kiosk_orders o ON o.id = p.order_id
             WHERE p.polling_key = :polling_key AND p.tenant_id = :tenant_id
               AND o.terminal_id = :terminal_id
-        """),
+        """
+        ),
         {"polling_key": polling_key, "tenant_id": tenant_id, "terminal_id": terminal_id},
     )
     payment = row.fetchone()
@@ -1050,10 +1096,12 @@ async def get_calling_current(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id FROM kiosk_terminals
             WHERE id = :terminal_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"terminal_id": terminal_id, "tenant_id": tenant_id},
     )
     terminal = row.fetchone()
@@ -1064,7 +1112,8 @@ async def get_calling_current(
 
     # 正在叫号的订单（状态 = calling）
     calling_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT queue_number
             FROM kiosk_orders
             WHERE store_id = :store_id AND tenant_id = :tenant_id
@@ -1072,21 +1121,24 @@ async def get_calling_current(
               AND DATE(created_at) = CURRENT_DATE
             ORDER BY updated_at DESC
             LIMIT 5
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     now_calling = [r[0] for r in calling_rows.fetchall()]
 
     # 等待中的订单数
     waiting_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as waiting_count,
                    AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / 60) as avg_wait
             FROM kiosk_orders
             WHERE store_id = :store_id AND tenant_id = :tenant_id
               AND status IN ('paid', 'preparing')
               AND DATE(created_at) = CURRENT_DATE
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     stats = waiting_row.fetchone()

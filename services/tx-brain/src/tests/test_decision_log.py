@@ -205,9 +205,9 @@ class TestDecisionLog:
 
             await auditor._write_decision_log(db, payload, metrics, result, execution_ms=20)
             assert len(captured_params) == 1
-            assert captured_params[0]["confidence"] == expected_conf, (
-                f"source={source} 应对应 confidence={expected_conf}"
-            )
+            assert (
+                captured_params[0]["confidence"] == expected_conf
+            ), f"source={source} 应对应 confidence={expected_conf}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

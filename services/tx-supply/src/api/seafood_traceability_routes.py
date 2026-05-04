@@ -79,7 +79,8 @@ async def batch_receive(
 ):
     total_cost = body.weight_g * body.unit_price_fen // 500  # 斤=500g
     result = await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO seafood_batches
             (tenant_id, store_id, supplier_id, supplier_name, species, batch_no,
              quantity, weight_g, unit_price_fen, total_cost_fen,
@@ -87,7 +88,8 @@ async def batch_receive(
         VALUES (:tid::UUID, :sid::UUID, :sup_id, :sup_name, :species, :batch_no,
                 :qty, :wg, :price, :cost, :qty, :wg, :origin)
         RETURNING id, received_at
-    """),
+    """
+        ),
         {
             "tid": tenant_id,
             "sid": body.store_id,
@@ -132,12 +134,14 @@ async def list_batches(
 
     total = (await db.execute(text(f"SELECT COUNT(*) FROM seafood_batches WHERE {w}"), params)).scalar() or 0
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT id, store_id, supplier_name, species, batch_no, quantity, weight_g,
                unit_price_fen, remaining_qty, remaining_weight_g, status, origin, received_at
         FROM seafood_batches WHERE {w}
         ORDER BY received_at DESC LIMIT :lim OFFSET :off
-    """),
+    """
+        ),
         params,
     )
     items = []
@@ -159,11 +163,13 @@ async def batch_trace(
     tenant_id: str = Depends(_tid),
 ):
     batch = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, supplier_name, species, batch_no, quantity, weight_g,
                origin, received_at, remaining_qty, status
         FROM seafood_batches WHERE id = :bid::UUID AND is_deleted=FALSE
-    """),
+    """
+        ),
         {"bid": batch_id},
     )
     b = batch.mappings().first()
@@ -172,20 +178,24 @@ async def batch_trace(
 
     # 缸位分配记录
     tanks = await db.execute(
-        text("""
+        text(
+            """
         SELECT t.tank_no, t.species, t.current_qty, t.current_weight_g, t.temperature_c, t.survival_rate
         FROM seafood_tanks t WHERE t.batch_id = :bid::UUID AND t.is_deleted=FALSE
-    """),
+    """
+        ),
         {"bid": batch_id},
     )
 
     # 损耗记录
     losses = await db.execute(
-        text("""
+        text(
+            """
         SELECT dead_qty, dead_weight_g, cause, recorded_at, notes
         FROM seafood_mortality_logs WHERE batch_id = :bid::UUID AND is_deleted=FALSE
         ORDER BY recorded_at
-    """),
+    """
+        ),
         {"bid": batch_id},
     )
 
@@ -210,21 +220,25 @@ async def tank_assignment(
 ):
     # 更新缸位
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE seafood_tanks SET batch_id = :bid::UUID, current_qty = current_qty + :qty,
                current_weight_g = current_weight_g + :wg, updated_at = now()
         WHERE id = :tid::UUID AND is_deleted=FALSE
-    """),
+    """
+        ),
         {"bid": body.batch_id, "qty": body.quantity, "wg": body.weight_g, "tid": body.tank_id},
     )
 
     # 扣减批次剩余
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE seafood_batches SET remaining_qty = remaining_qty - :qty,
                remaining_weight_g = remaining_weight_g - :wg
         WHERE id = :bid::UUID
-    """),
+    """
+        ),
         {"bid": body.batch_id, "qty": body.quantity, "wg": body.weight_g},
     )
     await db.commit()
@@ -238,12 +252,14 @@ async def list_tanks(
     tenant_id: str = Depends(_tid),
 ):
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, tank_no, species, current_qty, current_weight_g,
                temperature_c, salinity_ppt, survival_rate, status, batch_id, updated_at
         FROM seafood_tanks WHERE store_id = :sid::UUID AND is_deleted=FALSE
         ORDER BY tank_no
-    """),
+    """
+        ),
         {"sid": store_id},
     )
     items = []
@@ -265,12 +281,14 @@ async def record_mortality(
     tenant_id: str = Depends(_tid),
 ):
     result = await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO seafood_mortality_logs
             (tenant_id, store_id, batch_id, tank_id, species, dead_qty, dead_weight_g, cause, notes)
         VALUES (:tid::UUID, :sid::UUID, :bid, :tkid, :sp, :dq, :dw, :cause, :notes)
         RETURNING id, recorded_at
-    """),
+    """
+        ),
         {
             "tid": tenant_id,
             "sid": body.store_id,
@@ -288,13 +306,15 @@ async def record_mortality(
     # 更新缸位存活率
     if body.tank_id:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE seafood_tanks SET
                 current_qty = GREATEST(0, current_qty - :dq),
                 current_weight_g = GREATEST(0, current_weight_g - :dw),
                 updated_at = now()
             WHERE id = :tid::UUID
-        """),
+        """
+            ),
             {"dq": body.dead_qty, "dw": body.dead_weight_g, "tid": body.tank_id},
         )
 
@@ -316,7 +336,8 @@ async def loss_report(
         params["sid"] = store_id
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT m.species,
                COUNT(*) AS incidents,
                SUM(m.dead_qty) AS total_dead_qty,
@@ -329,7 +350,8 @@ async def loss_report(
           {store_filter}
         GROUP BY m.species, b.supplier_name
         ORDER BY total_dead_qty DESC
-    """),
+    """
+        ),
         params,
     )
 

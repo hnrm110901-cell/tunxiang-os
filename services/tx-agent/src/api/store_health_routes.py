@@ -62,7 +62,8 @@ def _health_grade(score: int) -> str:
 async def _fetch_all_stores(db: AsyncSession, tenant_id: str) -> list[dict]:
     """返回租户下所有在营门店基础信息。"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 s.id::text          AS store_id,
                 s.name              AS store_name,
@@ -72,7 +73,8 @@ async def _fetch_all_stores(db: AsyncSession, tenant_id: str) -> list[dict]:
             WHERE s.tenant_id = :tenant_id
               AND s.is_deleted = FALSE
             ORDER BY s.name
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     return [
@@ -100,7 +102,8 @@ async def _fetch_store_revenue(
     """
     try:
         rev_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(total_amount_fen), 0)::bigint AS revenue_fen,
                     COUNT(*)::int AS order_count
@@ -110,20 +113,23 @@ async def _fetch_store_revenue(
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :today
                   AND status IN ('paid', 'completed')
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "today": today},
         )
         rev_row = rev_result.fetchone()
 
         cost_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(cost_rate, 0) AS cost_rate
                 FROM daily_pl_records
                 WHERE tenant_id = :tenant_id
                   AND store_id = :store_id::uuid
                   AND record_date = :today
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "today": today},
         )
         cost_row = cost_result.fetchone()
@@ -166,13 +172,15 @@ async def _fetch_target_fen(
         return daily_target_fen
     try:
         hist_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(AVG(revenue_fen), 0)::bigint AS avg_revenue
                 FROM daily_pl_records
                 WHERE tenant_id = :tenant_id
                   AND store_id = :store_id::uuid
                   AND record_date >= CURRENT_DATE - INTERVAL '30 days'
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         hist_row = hist_result.fetchone()
@@ -340,7 +348,8 @@ async def get_store_health_detail(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     s.id::text       AS store_id,
                     s.name           AS store_name,
@@ -350,7 +359,8 @@ async def get_store_health_detail(
                 WHERE s.tenant_id = :tenant_id
                   AND s.id = :store_id::uuid
                   AND s.is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         row = result.fetchone()

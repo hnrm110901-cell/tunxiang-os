@@ -249,8 +249,7 @@ async def spend_points(
         if not margin_check["allowed"]:
             return _err(
                 422,
-                f"margin_floor_violation:{margin_check['reason']};"
-                f"max_offset_fen={margin_check['max_offset_fen']}",
+                f"margin_floor_violation:{margin_check['reason']};" f"max_offset_fen={margin_check['max_offset_fen']}",
             )
 
     try:
@@ -419,9 +418,7 @@ async def get_points_history(
     if not _SERVICES_AVAILABLE:
         raise HTTPException(status_code=503, detail="points_service_unavailable")
     try:
-        result = await _svc_history(
-            card_id=card_id, tenant_id=x_tenant_id, db=db, page=page, size=size
-        )
+        result = await _svc_history(card_id=card_id, tenant_id=x_tenant_id, db=db, page=page, size=size)
     except ValueError as exc:
         return _err(422, str(exc))
     return _ok(result)

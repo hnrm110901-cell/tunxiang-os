@@ -148,7 +148,8 @@ async def create_cost_item(
             raise safe_http_exception(400, "reference_id 格式错误", exc) from exc
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO cost_items
             (tenant_id, store_id, cost_date, cost_type, reference_id,
              description, amount_fen, quantity, unit, unit_cost_fen)
@@ -157,7 +158,8 @@ async def create_cost_item(
              :reference_id::UUID,
              :description, :amount_fen, :quantity, :unit, :unit_cost_fen)
             RETURNING id
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -227,7 +229,8 @@ async def get_cost_items(
 
     # 查询总数
     count_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*)
             FROM cost_items
             WHERE tenant_id = :tenant_id::UUID
@@ -235,7 +238,8 @@ async def get_cost_items(
               AND cost_date = :cost_date
               AND is_deleted = FALSE
               {type_filter}
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -247,7 +251,8 @@ async def get_cost_items(
 
     # 查询明细
     items_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, cost_date, cost_type, description,
                    amount_fen, quantity, unit, unit_cost_fen,
                    reference_id, created_at
@@ -259,7 +264,8 @@ async def get_cost_items(
               {type_filter}
             ORDER BY created_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -325,7 +331,8 @@ async def get_cost_summary(
         raise HTTPException(status_code=400, detail="查询区间不能超过 366 天")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 cost_type,
                 SUM(amount_fen) AS total_fen
@@ -336,7 +343,8 @@ async def get_cost_summary(
               AND is_deleted = FALSE
             GROUP BY cost_type
             ORDER BY total_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -411,7 +419,8 @@ async def set_finance_config(
         effective_until = _parse_date_param(body.effective_until).isoformat()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO finance_configs
             (tenant_id, store_id, config_type, value_fen, value_pct,
              effective_from, effective_until)
@@ -421,7 +430,8 @@ async def set_finance_config(
              :config_type, :value_fen, :value_pct,
              :effective_from::DATE, :effective_until::DATE)
             RETURNING id
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": sid_str,
@@ -474,7 +484,8 @@ async def get_finance_configs(
     cfg_date = _parse_date_param(as_of_date)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT DISTINCT ON (config_type)
                 id, config_type, value_fen, value_pct,
                 effective_from, effective_until, store_id
@@ -488,7 +499,8 @@ async def get_finance_configs(
                 config_type,
                 CASE WHEN store_id IS NOT NULL THEN 0 ELSE 1 END,
                 effective_from DESC NULLS LAST
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),

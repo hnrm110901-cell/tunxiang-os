@@ -56,9 +56,7 @@ async def test_xujihaixian_scheduler_invokes_mark_offline_global_each_tick():
         if len(sleep_calls) >= 3:
             raise asyncio.CancelledError()
 
-    fake_global = AsyncMock(
-        return_value={"tenants_scanned": 2, "devices_marked_offline": 2}
-    )
+    fake_global = AsyncMock(return_value={"tenants_scanned": 2, "devices_marked_offline": 2})
 
     fake_session_factory = AsyncMock()  # 内部不会真用，仅传给 global 的 mock
 
@@ -87,9 +85,7 @@ async def test_xujihaixian_scheduler_graceful_cancel_on_lifespan_exit():
     """tx-trade lifespan 退出时 cancel mark_offline_scheduler_loop task，
     task 应当干净退出（CancelledError 向上传播，不卡 await，不吞异常）。"""
     fake_session_factory: Any = AsyncMock()
-    fake_global = AsyncMock(
-        return_value={"tenants_scanned": 0, "devices_marked_offline": 0}
-    )
+    fake_global = AsyncMock(return_value={"tenants_scanned": 0, "devices_marked_offline": 0})
 
     with patch(
         "src.services.device_registry_service.DeviceRegistryService.mark_offline_if_stale_global",
@@ -148,6 +144,6 @@ async def test_xujihaixian_scheduler_survives_db_error_does_not_die():
             await mark_offline_scheduler_loop(fake_session_factory, interval_sec=60)
 
     # 验证：第一轮异常未杀死 task，第二轮成功调用
-    assert fake_global.await_count == 2, (
-        f"DB 闪断后 task 必须继续，期望 2 次 global 调用，实际 {fake_global.await_count}"
-    )
+    assert (
+        fake_global.await_count == 2
+    ), f"DB 闪断后 task 必须继续，期望 2 次 global 调用，实际 {fake_global.await_count}"

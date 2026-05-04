@@ -15,10 +15,7 @@ def test_pure_function_same_input_same_bucket() -> None:
         Variant(name="control", weight=5000),
         Variant(name="variant_a", weight=5000),
     ]
-    results = [
-        assign_bucket("checkout.v2", "user_42", variants, "seed_alpha")
-        for _ in range(100)
-    ]
+    results = [assign_bucket("checkout.v2", "user_42", variants, "seed_alpha") for _ in range(100)]
     buckets = {r.bucket for r in results}
     positions = {r.bucket_position for r in results}
     assert len(buckets) == 1
@@ -33,16 +30,12 @@ def test_bucket_distribution_within_tolerance() -> None:
     ]
     counts: dict[str, int] = {"control": 0, "variant_a": 0}
     for i in range(10000):
-        result = assign_bucket(
-            "checkout.v2", f"user_{i}", variants, "seed_uniformity"
-        )
+        result = assign_bucket("checkout.v2", f"user_{i}", variants, "seed_uniformity")
         counts[result.bucket] += 1
 
     for bucket_name, count in counts.items():
         # 期望 5000，允许 ±400（4%）
-        assert abs(count - 5000) < 400, (
-            f"{bucket_name} 分桶 {count} 次，超出 ±4% 容差"
-        )
+        assert abs(count - 5000) < 400, f"{bucket_name} 分桶 {count} 次，超出 ±4% 容差"
 
 
 def test_variant_weights_respected() -> None:
@@ -54,9 +47,7 @@ def test_variant_weights_respected() -> None:
     ]
     counts: dict[str, int] = {"control": 0, "variant_a": 0, "variant_b": 0}
     for i in range(10000):
-        result = assign_bucket(
-            "pricing.v3", f"device_{i}", variants, "seed_weighted"
-        )
+        result = assign_bucket("pricing.v3", f"device_{i}", variants, "seed_weighted")
         counts[result.bucket] += 1
 
     assert abs(counts["control"] - 7000) < 400

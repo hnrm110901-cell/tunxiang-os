@@ -605,7 +605,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
 
             # 查找最近一条未归因的 touch（在归因窗口内）
             row = await self._db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, channel, campaign_type, message_id
                     FROM marketing_touch_log
                     WHERE tenant_id = :tenant_id::uuid
@@ -616,7 +617,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                       AND NOT is_deleted
                     ORDER BY sent_at DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(self.tenant_id),
                     "member_id": member_id,
@@ -637,7 +639,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
             touch_id = str(touch_row.id)
             # 更新归因
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE marketing_touch_log
                     SET attribution_order_id = :order_id::uuid,
                         attribution_revenue_fen = :revenue_fen,
@@ -645,7 +648,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                         status = 'converted'
                     WHERE id = :touch_id::uuid
                       AND tenant_id = :tenant_id::uuid
-                """),
+                """
+                ),
                 {
                     "order_id": order_id,
                     "revenue_fen": order_amount_fen,
@@ -709,14 +713,16 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                     {"tid": str(self.tenant_id)},
                 )
                 row = await self._db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) FROM marketing_touch_log
                         WHERE tenant_id = :tenant_id::uuid
                           AND member_id = :member_id::uuid
                           AND campaign_type = :campaign_type
                           AND sent_at > NOW() - make_interval(hours => :hours)
                           AND NOT is_deleted
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": str(self.tenant_id),
                         "member_id": member_id,
@@ -872,7 +878,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                 )
                 primary_channel = channels[0] if channels else "unknown"
                 await self._db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO marketing_touch_log
                           (tenant_id, member_id, channel, campaign_type,
                            message_id, content_hash, status, sent_at, metadata_json)
@@ -884,7 +891,8 @@ class AiMarketingOrchestratorAgent(SkillAgent):
                            :status, NOW(),
                            :metadata::jsonb)
                         ON CONFLICT DO NOTHING
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": str(self.tenant_id),
                         "member_id": member_id,

@@ -115,12 +115,14 @@ async def get_config(
     tenant_id = _get_tenant_id(request)
     row = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT id, store_id, rules, waive_conditions, is_active,
                    created_at, updated_at
             FROM minimum_consumption_configs
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
     ).fetchone()
@@ -184,35 +186,41 @@ async def set_config(
     # UPSERT: 利用唯一索引 (tenant_id, store_id)
     existing = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT id FROM minimum_consumption_configs
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
     ).fetchone()
 
     if existing:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE minimum_consumption_configs
                 SET rules = :rules::jsonb,
                     waive_conditions = :waive::jsonb,
                     is_active = true,
                     updated_at = NOW()
                 WHERE id = :id
-            """),
+            """
+            ),
             {"rules": _jsonb(rules_json), "waive": _jsonb(waive_json), "id": existing.id},
         )
         config_id = str(existing.id)
     else:
         new_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO minimum_consumption_configs
                     (id, tenant_id, store_id, rules, waive_conditions, is_active)
                 VALUES (:id, :tid, :sid, :rules::jsonb, :waive::jsonb, true)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tenant_id,
@@ -263,12 +271,14 @@ async def calculate(
     # 获取门店规则配置
     config_row = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT rules, waive_conditions
             FROM minimum_consumption_configs
             WHERE tenant_id = :tid AND store_id = :sid
               AND is_active = true AND is_deleted = false
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": body.store_id},
         )
     ).fetchone()
@@ -345,7 +355,8 @@ async def calculate(
     # 3. 记录补齐记录（仅当有差额且未豁免时）
     if shortfall_fen > 0:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO minimum_consumption_surcharges
                     (tenant_id, store_id, dining_session_id, rule_type,
                      min_amount_fen, actual_amount_fen, surcharge_fen,
@@ -353,7 +364,8 @@ async def calculate(
                 VALUES (:tid, :sid, :dsid, :rtype,
                         :min_fen, :actual_fen, :surcharge_fen,
                         :waived, :waive_reason)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": body.store_id,
@@ -406,7 +418,8 @@ async def surcharge_report(
     # 汇总统计
     summary_row = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*)                                       AS total_count,
                 COALESCE(SUM(surcharge_fen), 0)                AS total_surcharge_fen,
@@ -417,7 +430,8 @@ async def surcharge_report(
             WHERE tenant_id = :tid AND store_id = :sid
               AND created_at >= :start AND created_at < :end::date + 1
               AND is_deleted = false
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,
@@ -433,7 +447,8 @@ async def surcharge_report(
     offset = (page - 1) * size
     rows = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT s.id, s.dining_session_id, s.rule_type,
                    s.min_amount_fen, s.actual_amount_fen, s.surcharge_fen,
                    s.waived, s.waive_reason, s.created_at
@@ -443,7 +458,8 @@ async def surcharge_report(
               AND s.is_deleted = false
             ORDER BY s.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,

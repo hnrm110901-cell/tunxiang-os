@@ -91,13 +91,7 @@ class MonthlyPnL:
 
     @property
     def total_cost_fen(self) -> int:
-        return (
-            self.food_cost_fen
-            + self.labor_cost_fen
-            + self.rent_fen
-            + self.utility_fen
-            + self.other_fen
-        )
+        return self.food_cost_fen + self.labor_cost_fen + self.rent_fen + self.utility_fen + self.other_fen
 
     @property
     def net_fen(self) -> int:
@@ -236,11 +230,7 @@ class BudgetForecastResult:
 
     @property
     def cache_hit_rate(self) -> float:
-        total = (
-            self.cache_read_tokens
-            + self.cache_creation_tokens
-            + self.input_tokens
-        )
+        total = self.cache_read_tokens + self.cache_creation_tokens + self.input_tokens
         if total <= 0:
             return 0.0
         return round(self.cache_read_tokens / total, 4)
@@ -693,18 +683,14 @@ class BudgetForecastService:
 
         return self._parse_response(response, fallback_bundle=bundle)
 
-    def _parse_response(
-        self, response: dict, fallback_bundle: BudgetSignalBundle
-    ) -> BudgetForecastResult:
+    def _parse_response(self, response: dict, fallback_bundle: BudgetSignalBundle) -> BudgetForecastResult:
         """从 Anthropic 响应中提取 JSON + usage"""
         result = BudgetForecastResult(model_id=SONNET_CACHED_MODEL)
 
         # usage
         usage = response.get("usage", {}) or {}
         result.cache_read_tokens = int(usage.get("cache_read_input_tokens", 0) or 0)
-        result.cache_creation_tokens = int(
-            usage.get("cache_creation_input_tokens", 0) or 0
-        )
+        result.cache_creation_tokens = int(usage.get("cache_creation_input_tokens", 0) or 0)
         result.input_tokens = int(usage.get("input_tokens", 0) or 0)
         result.output_tokens = int(usage.get("output_tokens", 0) or 0)
 
@@ -824,15 +810,9 @@ async def save_forecast_to_db(
             },
             ensure_ascii=False,
         ),
-        "predicted_line_items": json.dumps(
-            [li.to_dict() for li in result.predicted_line_items], ensure_ascii=False
-        ),
-        "variance_risks": json.dumps(
-            [r.to_dict() for r in result.variance_risks], ensure_ascii=False
-        ),
-        "preventive_actions": json.dumps(
-            [a.to_dict() for a in result.preventive_actions], ensure_ascii=False
-        ),
+        "predicted_line_items": json.dumps([li.to_dict() for li in result.predicted_line_items], ensure_ascii=False),
+        "variance_risks": json.dumps([r.to_dict() for r in result.variance_risks], ensure_ascii=False),
+        "preventive_actions": json.dumps([a.to_dict() for a in result.preventive_actions], ensure_ascii=False),
         "sonnet_analysis": result.sonnet_analysis,
         "predicted_revenue_fen": max(0, result.predicted_revenue_fen),
         "predicted_net_fen": result.predicted_net_fen,
@@ -846,7 +826,8 @@ async def save_forecast_to_db(
     }
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO budget_forecast_analyses (
                 tenant_id, brand_id, store_id, forecast_month, forecast_scope,
                 history_months, business_type, history_snapshot,
@@ -890,7 +871,8 @@ async def save_forecast_to_db(
                 status = EXCLUDED.status,
                 updated_at = NOW()
             RETURNING id
-        """),
+        """
+        ),
         payload,
     )
     analysis_id = row.scalar_one()

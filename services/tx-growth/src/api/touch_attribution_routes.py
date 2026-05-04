@@ -37,9 +37,9 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, field_validator
+
 from services.attribution_aggregator import AttributionAggregator
 from services.touch_tracker import TouchTracker
-
 from shared.ontology.src.database import async_session_factory
 
 log = structlog.get_logger(__name__)

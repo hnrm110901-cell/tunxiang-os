@@ -37,11 +37,13 @@ class ForgeAllianceService:
 
         # 验证应用存在且已发布
         app_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, app_name, developer_id, status
                 FROM forge_apps
                 WHERE app_id = :aid AND is_deleted = false
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         app_data = app_row.mappings().first()
@@ -58,7 +60,8 @@ class ForgeAllianceService:
         shared_tenants_val = shared_tenants or []
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_alliance_listings
                     (id, tenant_id, listing_id, app_id, sharing_mode,
                      shared_tenants, revenue_share_rate, platform_fee_rate,
@@ -70,7 +73,8 @@ class ForgeAllianceService:
                      0, 0)
                 RETURNING listing_id, app_id, sharing_mode, revenue_share_rate,
                           platform_fee_rate, created_at
-            """),
+            """
+            ),
             {
                 "listing_id": listing_id,
                 "app_id": app_id,
@@ -102,12 +106,14 @@ class ForgeAllianceService:
             params["owner_tid"] = owner_tenant_id
         else:
             # 显示当前租户可见的: public + invited 且包含当前租户
-            conditions.append("""(
+            conditions.append(
+                """(
                 l.sharing_mode = 'public'
                 OR (l.sharing_mode = 'invited'
                     AND l.shared_tenants @> to_jsonb(current_setting('app.tenant_id'))
                 )
-            )""")
+            )"""
+            )
 
         if sharing_mode:
             conditions.append("l.sharing_mode = :sharing_mode")
@@ -119,7 +125,8 @@ class ForgeAllianceService:
         total = total_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT l.listing_id, l.app_id, a.app_name, l.sharing_mode,
                        l.revenue_share_rate, l.install_count, l.total_revenue_fen,
                        l.created_at
@@ -128,7 +135,8 @@ class ForgeAllianceService:
                 WHERE {where}
                 ORDER BY l.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings().all()]
@@ -137,7 +145,8 @@ class ForgeAllianceService:
     # ── 联盟详情 ─────────────────────────────────────────────
     async def get_listing(self, db: AsyncSession, listing_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT l.listing_id, l.app_id, a.app_name, a.description,
                        a.developer_id, l.sharing_mode, l.shared_tenants,
                        l.revenue_share_rate, l.platform_fee_rate,
@@ -146,7 +155,8 @@ class ForgeAllianceService:
                 FROM forge_alliance_listings l
                 JOIN forge_apps a ON a.app_id = l.app_id AND a.is_deleted = false
                 WHERE l.listing_id = :lid AND l.is_deleted = false
-            """),
+            """
+            ),
             {"lid": listing_id},
         )
         row = result.mappings().first()
@@ -157,14 +167,16 @@ class ForgeAllianceService:
 
         # 附加交易摘要
         tx_summary = await db.execute(
-            text("""
+            text(
+                """
                 SELECT count(*) AS tx_count,
                        COALESCE(SUM(amount_fen), 0) AS total_amount_fen,
                        COALESCE(SUM(developer_share_fen), 0) AS total_dev_share_fen,
                        COALESCE(SUM(platform_fee_fen), 0) AS total_platform_fee_fen
                 FROM forge_alliance_transactions
                 WHERE listing_id = :lid AND is_deleted = false
-            """),
+            """
+            ),
             {"lid": listing_id},
         )
         listing["transaction_summary"] = dict(tx_summary.mappings().one())
@@ -174,11 +186,13 @@ class ForgeAllianceService:
     async def install_alliance_app(self, db: AsyncSession, *, listing_id: str) -> dict:
         # 获取 listing
         listing_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT listing_id, app_id, sharing_mode, shared_tenants
                 FROM forge_alliance_listings
                 WHERE listing_id = :lid AND is_deleted = false
-            """),
+            """
+            ),
             {"lid": listing_id},
         )
         listing = listing_row.mappings().first()
@@ -191,11 +205,13 @@ class ForgeAllianceService:
 
         if listing["sharing_mode"] == "invited":
             tenant_check = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT 1 WHERE :tid = ANY(
                         SELECT jsonb_array_elements_text(:tenants::jsonb)
                     )
-                """),
+                """
+                ),
                 {
                     "tid": "current_setting_placeholder",
                     "tenants": json.dumps(listing["shared_tenants"] or []),
@@ -206,7 +222,8 @@ class ForgeAllianceService:
 
         install_id = f"inst_{uuid4().hex[:12]}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_installations
                     (id, tenant_id, install_id, app_id, installed_by,
                      status, source_listing_id)
@@ -214,7 +231,8 @@ class ForgeAllianceService:
                     (gen_random_uuid(), current_setting('app.tenant_id')::uuid,
                      :install_id, :app_id, 'system',
                      'active', :listing_id)
-            """),
+            """
+            ),
             {
                 "install_id": install_id,
                 "app_id": listing["app_id"],
@@ -224,11 +242,13 @@ class ForgeAllianceService:
 
         # 更新安装计数
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_alliance_listings
                 SET install_count = install_count + 1, updated_at = NOW()
                 WHERE listing_id = :lid
-            """),
+            """
+            ),
             {"lid": listing_id},
         )
 
@@ -254,11 +274,13 @@ class ForgeAllianceService:
 
         # 获取分成比例
         listing_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT listing_id, revenue_share_rate, platform_fee_rate
                 FROM forge_alliance_listings
                 WHERE listing_id = :lid AND is_deleted = false
-            """),
+            """
+            ),
             {"lid": listing_id},
         )
         listing = listing_row.mappings().first()
@@ -271,7 +293,8 @@ class ForgeAllianceService:
         tx_id = f"atx_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_alliance_transactions
                     (id, tenant_id, transaction_id, listing_id,
                      transaction_type, amount_fen,
@@ -283,7 +306,8 @@ class ForgeAllianceService:
                      :dev_share, :platform_fee)
                 RETURNING transaction_id, listing_id, amount_fen,
                           developer_share_fen, platform_fee_fen, created_at
-            """),
+            """
+            ),
             {
                 "tx_id": tx_id,
                 "listing_id": listing_id,
@@ -297,11 +321,13 @@ class ForgeAllianceService:
 
         # 更新 listing 累计收入
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_alliance_listings
                 SET total_revenue_fen = total_revenue_fen + :amount, updated_at = NOW()
                 WHERE listing_id = :lid
-            """),
+            """
+            ),
             {"amount": amount_fen, "lid": listing_id},
         )
 
@@ -327,21 +353,24 @@ class ForgeAllianceService:
 
         # 总计
         summary_row = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT count(*) AS transaction_count,
                        COALESCE(SUM(t.amount_fen), 0) AS total_amount_fen,
                        COALESCE(SUM(t.developer_share_fen), 0) AS total_dev_share_fen,
                        COALESCE(SUM(t.platform_fee_fen), 0) AS total_platform_fee_fen
                 FROM forge_alliance_transactions t
                 WHERE {where}
-            """),
+            """
+            ),
             params,
         )
         summary = dict(summary_row.mappings().one())
 
         # 按 listing 分组
         by_listing = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT t.listing_id, a.app_name,
                        count(*) AS tx_count,
                        SUM(t.amount_fen) AS amount_fen,
@@ -352,7 +381,8 @@ class ForgeAllianceService:
                 WHERE {where}
                 GROUP BY t.listing_id, a.app_name
                 ORDER BY amount_fen DESC
-            """),
+            """
+            ),
             params,
         )
         breakdown = [dict(r) for r in by_listing.mappings().all()]

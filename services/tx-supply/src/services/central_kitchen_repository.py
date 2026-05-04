@@ -56,7 +56,8 @@ class CentralKitchenRepository:
         await self._set_tenant()
         kid = uuid.uuid4()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO central_kitchen_profiles
                     (id, tenant_id, name, address, capacity_daily,
                      manager_id, contact_phone, is_active, created_at)
@@ -65,7 +66,8 @@ class CentralKitchenRepository:
                      :mgr, :phone, true, NOW())
                 RETURNING id, name, address, capacity_daily,
                           manager_id, contact_phone, is_active, created_at
-            """),
+            """
+            ),
             {
                 "id": kid,
                 "tid": self._tid,
@@ -84,13 +86,15 @@ class CentralKitchenRepository:
     async def list_kitchens(self) -> List[Dict[str, Any]]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, address, capacity_daily, manager_id,
                        contact_phone, is_active, created_at
                 FROM central_kitchen_profiles
                 WHERE tenant_id = :tid AND is_active = true
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         return [self._kitchen_row(r) for r in result.fetchall()]
@@ -98,12 +102,14 @@ class CentralKitchenRepository:
     async def get_kitchen(self, kitchen_id: str) -> Optional[Dict[str, Any]]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, address, capacity_daily, manager_id,
                        contact_phone, is_active, created_at
                 FROM central_kitchen_profiles
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(kitchen_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -123,14 +129,16 @@ class CentralKitchenRepository:
         await self._set_tenant()
         plan_id = uuid.uuid4()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO production_plans
                     (id, tenant_id, kitchen_id, plan_date, status, items, created_by, created_at)
                 VALUES
                     (:id, :tid, :kid, :plan_date::date, 'draft', :items::jsonb, :created_by, NOW())
                 RETURNING id, kitchen_id, plan_date, status, items,
                           created_by, confirmed_at, created_at
-            """),
+            """
+            ),
             {
                 "id": plan_id,
                 "tid": self._tid,
@@ -154,12 +162,14 @@ class CentralKitchenRepository:
     async def get_plan(self, plan_id: str) -> Optional[Dict[str, Any]]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, kitchen_id, plan_date, status, items,
                        created_by, confirmed_at, created_at
                 FROM production_plans
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(plan_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -192,13 +202,15 @@ class CentralKitchenRepository:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, kitchen_id, plan_date, status, items,
                        created_by, confirmed_at, created_at
                 FROM production_plans {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [self._plan_row(r, str(r.id)) for r in result.fetchall()]
@@ -215,11 +227,13 @@ class CentralKitchenRepository:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE production_plans
                 SET status = 'confirmed', confirmed_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"now": now, "id": uuid.UUID(plan_id), "tid": self._tid},
         )
 
@@ -227,14 +241,16 @@ class CentralKitchenRepository:
         op_uuid = uuid.UUID(operator_id) if operator_id else None
         for item in plan.get("items", []):
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO production_orders
                         (id, tenant_id, kitchen_id, plan_id, dish_id,
                          quantity, unit, status, operator_id, created_at)
                     VALUES
                         (:id, :tid, :kid, :pid, :dish_id,
                          :qty, :unit, 'pending', :op, NOW())
-                """),
+                """
+                ),
                 {
                     "id": uuid.uuid4(),
                     "tid": self._tid,
@@ -271,11 +287,13 @@ class CentralKitchenRepository:
             {"id": uuid.UUID(plan_id), "tid": self._tid},
         )
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE production_orders
                 SET status='in_progress', started_at=:now
                 WHERE plan_id=:pid AND tenant_id=:tid AND status='pending'
-            """),
+            """
+            ),
             {"now": now, "pid": uuid.UUID(plan_id), "tid": self._tid},
         )
         await self.db.flush()
@@ -289,12 +307,14 @@ class CentralKitchenRepository:
     async def get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, kitchen_id, plan_id, dish_id, quantity, unit,
                        status, started_at, completed_at, operator_id, created_at
                 FROM production_orders
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(order_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -310,13 +330,15 @@ class CentralKitchenRepository:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE production_orders
                 SET status='completed', completed_at=:now,
                     quantity=:qty,
                     started_at=COALESCE(started_at, :now)
                 WHERE id=:id AND tenant_id=:tid
-            """),
+            """
+            ),
             {"now": now, "qty": actual_qty, "id": uuid.UUID(order_id), "tid": self._tid},
         )
         await self._auto_complete_plan(order["plan_id"])
@@ -338,14 +360,16 @@ class CentralKitchenRepository:
         qty_clause = "quantity = CASE WHEN :status='completed' THEN :qty ELSE quantity END,"
 
         await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE production_orders
                 SET {started_at_clause}
                     {completed_at_clause}
                     {qty_clause}
                     status = :status
                 WHERE id=:id AND tenant_id=:tid
-            """),
+            """
+            ),
             {
                 "now": now,
                 "status": status,
@@ -386,13 +410,15 @@ class CentralKitchenRepository:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, kitchen_id, plan_id, dish_id, quantity, unit,
                        status, started_at, completed_at, operator_id, created_at
                 FROM production_orders {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [self._order_row(r, str(r.id)) for r in result.fetchall()]
@@ -401,11 +427,13 @@ class CentralKitchenRepository:
     async def _auto_complete_plan(self, plan_id: str) -> None:
         """若同计划所有工单均已终结，自动将计划升为 completed"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FILTER (WHERE status NOT IN ('completed','cancelled')) AS pending_cnt
                 FROM production_orders
                 WHERE plan_id=:pid AND tenant_id=:tid
-            """),
+            """
+            ),
             {"pid": uuid.UUID(plan_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -432,7 +460,8 @@ class CentralKitchenRepository:
         await self._set_tenant()
         oid = uuid.uuid4()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO distribution_orders
                     (id, tenant_id, kitchen_id, target_store_id, scheduled_at,
                      status, items, driver_name, driver_phone, created_at)
@@ -441,7 +470,8 @@ class CentralKitchenRepository:
                      'pending', :items::jsonb, :drv_name, :drv_phone, NOW())
                 RETURNING id, kitchen_id, target_store_id, scheduled_at, delivered_at,
                           status, items, driver_name, driver_phone, created_at
-            """),
+            """
+            ),
             {
                 "id": oid,
                 "tid": self._tid,
@@ -467,13 +497,15 @@ class CentralKitchenRepository:
     async def mark_dispatched(self, order_id: str) -> Dict[str, Any]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE distribution_orders
                 SET status='dispatched', delivered_at=NOW()
                 WHERE id=:id AND tenant_id=:tid AND status='pending'
                 RETURNING id, kitchen_id, target_store_id, scheduled_at, delivered_at,
                           status, items, driver_name, driver_phone, created_at
-            """),
+            """
+            ),
             {"id": uuid.UUID(order_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -510,13 +542,15 @@ class CentralKitchenRepository:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, kitchen_id, target_store_id, scheduled_at, delivered_at,
                        status, items, driver_name, driver_phone, created_at
                 FROM distribution_orders {where}
                 ORDER BY scheduled_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [self._dist_row(r, str(r.id)) for r in result.fetchall()]
@@ -537,11 +571,13 @@ class CentralKitchenRepository:
         await self._set_tenant()
         # 查配送单
         dist_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, target_store_id, status, items, delivered_at
                 FROM distribution_orders
                 WHERE id=:id AND tenant_id=:tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(distribution_order_id), "tid": self._tid},
         )
         dist = dist_result.fetchone()
@@ -582,13 +618,15 @@ class CentralKitchenRepository:
         now = datetime.now(timezone.utc)
         conf_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_receiving_confirmations
                     (id, tenant_id, distribution_order_id, store_id,
                      confirmed_by, confirmed_at, items, notes, created_at)
                 VALUES
                     (:id, :tid, :did, :sid, :by, :now, :items::jsonb, :notes, :now)
-            """),
+            """
+            ),
             {
                 "id": conf_id,
                 "tid": self._tid,
@@ -602,11 +640,13 @@ class CentralKitchenRepository:
         )
         delivered_at = dist.delivered_at or now
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE distribution_orders
                 SET status='confirmed', delivered_at=:da
                 WHERE id=:id AND tenant_id=:tid
-            """),
+            """
+            ),
             {"da": delivered_at, "id": uuid.UUID(distribution_order_id), "tid": self._tid},
         )
         await self.db.flush()
@@ -637,12 +677,14 @@ class CentralKitchenRepository:
         kid = uuid.UUID(kitchen_id)
 
         plans_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, kitchen_id, plan_date, status, items,
                        created_by, confirmed_at, created_at
                 FROM production_plans
                 WHERE tenant_id=:tid AND kitchen_id=:kid AND plan_date=:d::date
-            """),
+            """
+            ),
             {"tid": self._tid, "kid": kid, "d": date_str},
         )
         plan_rows = plans_result.fetchall()
@@ -652,25 +694,29 @@ class CentralKitchenRepository:
         prod_summary: Dict[str, int] = {"pending": 0, "in_progress": 0, "completed": 0, "cancelled": 0}
         if plan_ids:
             ord_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT status, COUNT(*) as cnt
                     FROM production_orders
                     WHERE tenant_id=:tid AND plan_id=ANY(:pids)
                     GROUP BY status
-                """),
+                """
+                ),
                 {"tid": self._tid, "pids": plan_ids},
             )
             for r in ord_result.fetchall():
                 prod_summary[r.status] = r.cnt
 
         dist_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT status, COUNT(*) as cnt
                 FROM distribution_orders
                 WHERE tenant_id=:tid AND kitchen_id=:kid
                   AND scheduled_at::date = :d::date
                 GROUP BY status
-            """),
+            """
+            ),
             {"tid": self._tid, "kid": kid, "d": date_str},
         )
         dist_summary: Dict[str, int] = {"pending": 0, "dispatched": 0, "delivered": 0, "confirmed": 0}
@@ -697,7 +743,8 @@ class CentralKitchenRepository:
         since = (target - timedelta(days=30)).isoformat()
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT po.dish_id, SUM(po.quantity) AS total_qty,
                        COUNT(DISTINCT pp.plan_date) AS day_count,
                        po.unit
@@ -707,7 +754,8 @@ class CentralKitchenRepository:
                   AND po.status = 'completed'
                   AND pp.plan_date >= :since::date
                 GROUP BY po.dish_id, po.unit
-            """),
+            """
+            ),
             {"tid": self._tid, "kid": uuid.UUID(kitchen_id), "since": since},
         )
         rows = result.fetchall()

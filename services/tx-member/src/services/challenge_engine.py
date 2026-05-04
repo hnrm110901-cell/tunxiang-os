@@ -34,12 +34,14 @@ async def join_challenge(
 
     # 校验挑战存在且进行中
     ch_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, rules, reward, max_participants, current_participants,
                    start_date, end_date, is_active
             FROM challenges
             WHERE tenant_id = :tid AND id = :cid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": challenge_id},
     )
     challenge = ch_row.mappings().first()
@@ -64,12 +66,14 @@ async def join_challenge(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO challenge_progress
                     (tenant_id, customer_id, challenge_id, target_value, reward_snapshot)
                 VALUES (:tid, :cust, :ch, :target, :reward::jsonb)
                 ON CONFLICT (tenant_id, customer_id, challenge_id) DO NOTHING
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cust": customer_id,
@@ -80,7 +84,8 @@ async def join_challenge(
         )
         # 增加参与者计数
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE challenges
                 SET current_participants = current_participants + 1,
                     updated_at = NOW()
@@ -91,7 +96,8 @@ async def join_challenge(
                         AND challenge_id = :cid AND is_deleted = false
                         AND created_at < NOW() - INTERVAL '1 second'
                   )
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": challenge_id, "cust": customer_id},
         )
         await db.commit()
@@ -129,12 +135,14 @@ async def update_progress(
 
     # 先获取当前进度
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, current_value, target_value, status, progress_detail
             FROM challenge_progress
             WHERE tenant_id = :tid AND customer_id = :cust
               AND challenge_id = :ch AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "cust": customer_id, "ch": challenge_id},
     )
     progress = row.mappings().first()
@@ -161,14 +169,16 @@ async def update_progress(
     completed_at_clause = ", completed_at = NOW()" if new_status == "completed" else ""
 
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE challenge_progress
             SET current_value = :val,
                 status = :st,
                 progress_detail = :pd::jsonb,
                 updated_at = NOW(){completed_at_clause}
             WHERE id = :pid AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "val": new_value,
             "st": new_status,
@@ -199,12 +209,14 @@ async def claim_reward(
 ) -> dict:
     """领取已完成挑战的奖励"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, reward_snapshot
             FROM challenge_progress
             WHERE tenant_id = :tid AND customer_id = :cust
               AND challenge_id = :ch AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "cust": customer_id, "ch": challenge_id},
     )
     progress = row.mappings().first()
@@ -216,11 +228,13 @@ async def claim_reward(
     reward = progress["reward_snapshot"] if isinstance(progress["reward_snapshot"], dict) else {}
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE challenge_progress
             SET status = 'claimed', claimed_at = NOW(), updated_at = NOW()
             WHERE id = :pid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"pid": str(progress["id"]), "tid": tenant_id},
     )
     await db.commit()
@@ -247,17 +261,20 @@ async def get_active_challenges(
     """获取当前进行中的挑战列表"""
     offset = (page - 1) * size
     count_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM challenges
             WHERE tenant_id = :tid AND is_active = true AND is_deleted = false
               AND start_date <= NOW() AND end_date >= NOW()
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     total = int(count_row.scalar() or 0)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, type, rules, reward, badge_id,
                    start_date, end_date, max_participants, current_participants,
                    icon_url, display_order
@@ -266,7 +283,8 @@ async def get_active_challenges(
               AND start_date <= NOW() AND end_date >= NOW()
             ORDER BY display_order, start_date
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"tid": tenant_id, "lim": size, "off": offset},
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -281,7 +299,8 @@ async def get_progress(
 ) -> dict:
     """获取会员在某挑战的进度"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT cp.id, cp.challenge_id, cp.current_value, cp.target_value,
                    cp.status, cp.progress_detail, cp.joined_at,
                    cp.completed_at, cp.claimed_at, cp.reward_snapshot,
@@ -290,7 +309,8 @@ async def get_progress(
             JOIN challenges c ON c.id = cp.challenge_id AND c.tenant_id = cp.tenant_id
             WHERE cp.tenant_id = :tid AND cp.customer_id = :cust
               AND cp.challenge_id = :ch AND cp.is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "cust": customer_id, "ch": challenge_id},
     )
     r = row.mappings().first()
@@ -312,7 +332,8 @@ async def get_customer_challenges(
         params["st"] = status
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT cp.id, cp.challenge_id, cp.current_value, cp.target_value,
                    cp.status, cp.joined_at, cp.completed_at, cp.claimed_at,
                    c.name, c.type, c.end_date, c.icon_url, c.reward
@@ -321,7 +342,8 @@ async def get_customer_challenges(
             WHERE cp.tenant_id = :tid AND cp.customer_id = :cust
               AND cp.is_deleted = false{where_extra}
             ORDER BY cp.joined_at DESC
-        """),
+        """
+        ),
         params,
     )
     return [dict(r) for r in rows.mappings().all()]
@@ -337,23 +359,27 @@ async def get_challenge_participants(
     """获取挑战参与者列表"""
     offset = (page - 1) * size
     count_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM challenge_progress
             WHERE tenant_id = :tid AND challenge_id = :ch AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "ch": challenge_id},
     )
     total = int(count_row.scalar() or 0)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT customer_id, current_value, target_value, status,
                    joined_at, completed_at, claimed_at
             FROM challenge_progress
             WHERE tenant_id = :tid AND challenge_id = :ch AND is_deleted = false
             ORDER BY current_value DESC, joined_at
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"tid": tenant_id, "ch": challenge_id, "lim": size, "off": offset},
     )
     items = [dict(r) for r in rows.mappings().all()]

@@ -48,10 +48,12 @@ class GrowthStoreCapabilityService:
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT store_name, config, seats, status, city, district
             FROM stores WHERE id = :sid AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"sid": str(store_id)},
         )
         row = result.fetchone()
@@ -98,11 +100,13 @@ class GrowthStoreCapabilityService:
         if not required_caps:
             # 通用旅程，所有活跃门店都支持
             result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT id, store_name, city, district, seats
                 FROM stores WHERE is_deleted = FALSE AND status = 'active'
                 ORDER BY store_name
-            """)
+            """
+                )
             )
             stores = [
                 {"store_id": str(r[0]), "store_name": r[1], "city": r[2], "district": r[3], "seats": r[4]}
@@ -118,13 +122,15 @@ class GrowthStoreCapabilityService:
         # 需要特定能力的旅程，从config JSON中过滤
         conditions = " AND ".join([f"(config->>'{cap}')::boolean = true" for cap in required_caps])
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id, store_name, city, district, seats, config
             FROM stores
             WHERE is_deleted = FALSE AND status = 'active'
               AND {conditions}
             ORDER BY store_name
-        """)
+        """
+            )
         )
         stores = [
             {"store_id": str(r[0]), "store_name": r[1], "city": r[2], "district": r[3], "seats": r[4]}
@@ -177,11 +183,13 @@ class GrowthStoreCapabilityService:
         await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, store_name, config, seats, city
             FROM stores WHERE is_deleted = FALSE AND status = 'active'
             ORDER BY store_name
-        """)
+        """
+            )
         )
 
         stores: list[dict] = []

@@ -22,6 +22,7 @@ from uuid import uuid4
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+
 from services.e_signature_service import (
     CONTRACT_TYPES,
     STATUS_LABELS,
