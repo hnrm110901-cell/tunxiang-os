@@ -264,7 +264,8 @@ async def create_offer(
 
         new_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO offers
                     (id, tenant_id, name, offer_type, description, goal,
                      discount_rules, validity_days, target_segments,
@@ -277,7 +278,8 @@ async def create_offer(
                      :stores::jsonb, :time_slots::jsonb, :margin_floor, :max_per_user,
                      'active', 0, 0, 0,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tid,
@@ -361,7 +363,8 @@ async def list_offers(
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, offer_type, description, goal,
                        discount_rules, validity_days, target_segments,
                        applicable_stores, time_slots, margin_floor, max_per_user,
@@ -371,7 +374,8 @@ async def list_offers(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -407,7 +411,8 @@ async def recommend_offer(
 
         # 从 DB 查询包含该 segment 的活跃优惠（target_segments JSONB 包含 segment_id）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, offer_type, description, goal,
                        discount_rules, validity_days, margin_floor,
                        issued_count, redeemed_count, total_discount_fen
@@ -422,7 +427,8 @@ async def recommend_offer(
                   )
                 ORDER BY redeemed_count DESC, created_at DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"tid": tid, "segment_json": json.dumps([segment_id])},
         )
         rows = result.fetchall()
@@ -530,7 +536,8 @@ async def get_offer_detail(
         oid = uuid.UUID(offer_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, offer_type, description, goal,
                        discount_rules, validity_days, target_segments,
                        applicable_stores, time_slots, margin_floor, max_per_user,
@@ -539,7 +546,8 @@ async def get_offer_detail(
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         row = result.fetchone()
@@ -575,12 +583,14 @@ async def check_eligibility(
 
         # 查询优惠基础信息
         offer_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, offer_type, status, discount_rules, validity_days, max_per_user
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         offer = offer_result.fetchone()
@@ -593,11 +603,13 @@ async def check_eligibility(
         # 查询用户已领取/核销次数
         try:
             redemption_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM offer_redemptions
                     WHERE tenant_id = :tid AND offer_id = :oid
                       AND external_user_id = :uid AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "oid": oid, "uid": uid},
             )
             user_redemption_count = redemption_result.scalar() or 0
@@ -647,12 +659,14 @@ async def get_offer_analytics(
 
         # 查询优惠基础信息
         offer_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, offer_type, issued_count, redeemed_count, total_discount_fen
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         offer = offer_result.fetchone()
@@ -665,13 +679,15 @@ async def get_offer_analytics(
         actual_discount_fen = 0
         try:
             redemption_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS cnt,
                            COALESCE(SUM(order_total_fen), 0) AS total_revenue,
                            COALESCE(SUM(discount_fen), 0) AS total_discount
                     FROM offer_redemptions
                     WHERE tenant_id = :tid AND offer_id = :oid AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "oid": oid},
             )
             r = redemption_result.fetchone()
@@ -735,12 +751,14 @@ async def calculate_offer_cost(
         oid = uuid.UUID(offer_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, discount_rules, validity_days, margin_floor
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         row = result.fetchone()
@@ -820,12 +838,14 @@ async def check_margin_compliance(
         oid = uuid.UUID(req.offer_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, margin_floor
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         row = result.fetchone()

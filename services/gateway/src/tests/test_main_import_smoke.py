@@ -1,3 +1,4 @@
+# ruff: noqa: S603 — 整个文件的 subprocess 调用都是固定脚本路径，无注入风险
 """网关应用可导入性回归：防止再次出现双 FastAPI 实例、死 middleware 文件等问题。
 
 与 Dockerfile 一致：`uvicorn services.gateway.src.main:app`。

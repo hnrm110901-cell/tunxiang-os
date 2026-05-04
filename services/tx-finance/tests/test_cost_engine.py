@@ -12,6 +12,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from services.tx_finance.src.services.cost_engine import (
     CostEngine,
     OrderCostResult,
@@ -61,6 +62,7 @@ def _make_bom(bom_id, dish_id, yield_rate, ingredients):
 
 # ─── Test 1: 单笔订单成本追溯 ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_compute_order_cost_basic():
     """单笔订单：1道菜，有BOM，验证成本与毛利率计算正确"""
@@ -78,10 +80,9 @@ async def test_compute_order_cost_basic():
         _make_order_item(ORDER_ITEM_ID_1, DISH_ID_1, qty=1, price_fen=5000),  # 卖价 50元
     ]
 
-    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), \
-         patch.object(engine, "_fetch_active_bom", new=AsyncMock(return_value=bom)), \
-         patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
-
+    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), patch.object(
+        engine, "_fetch_active_bom", new=AsyncMock(return_value=bom)
+    ), patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
         result = await engine.compute_order_cost(
             order_id=ORDER_ID,
             tenant_id=TENANT_A,
@@ -102,6 +103,7 @@ async def test_compute_order_cost_basic():
 
 # ─── Test 2: BOM层级成本归集（套餐含多种配料）────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_bom_multi_ingredient_aggregation():
     """套餐含3种配料，验证总成本 = sum(各配料成本)"""
@@ -116,18 +118,17 @@ async def test_bom_multi_ingredient_aggregation():
         yield_rate=1.0,
         ingredients=[
             (ing_a, 1.0, 1000),
-            (ing_b, 0.5, 1000),   # 0.5 × 1000 = 500
-            (ing_c, 0.3, 1000),   # 0.3 × 1000 = 300
+            (ing_b, 0.5, 1000),  # 0.5 × 1000 = 500
+            (ing_c, 0.3, 1000),  # 0.3 × 1000 = 300
         ],
     )
     order_items = [
         _make_order_item(ORDER_ITEM_ID_1, DISH_ID_1, qty=1, price_fen=8000),
     ]
 
-    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), \
-         patch.object(engine, "_fetch_active_bom", new=AsyncMock(return_value=bom)), \
-         patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
-
+    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), patch.object(
+        engine, "_fetch_active_bom", new=AsyncMock(return_value=bom)
+    ), patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
         result = await engine.compute_order_cost(ORDER_ID, TENANT_A, db)
 
     dish_cost = result.items[0]
@@ -135,6 +136,7 @@ async def test_bom_multi_ingredient_aggregation():
 
 
 # ─── Test 3: 损耗率应用（库存成本 × 产出率）──────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_yield_rate_applied():
@@ -154,10 +156,9 @@ async def test_yield_rate_applied():
         _make_order_item(ORDER_ITEM_ID_1, DISH_ID_1, qty=1, price_fen=5000),
     ]
 
-    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), \
-         patch.object(engine, "_fetch_active_bom", new=AsyncMock(return_value=bom)), \
-         patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
-
+    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), patch.object(
+        engine, "_fetch_active_bom", new=AsyncMock(return_value=bom)
+    ), patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
         result = await engine.compute_order_cost(ORDER_ID, TENANT_A, db)
 
     dish_cost = result.items[0]
@@ -167,6 +168,7 @@ async def test_yield_rate_applied():
 
 # ─── Test 4: 无BOM时fallback到菜品标准成本 ───────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_fallback_to_standard_cost_when_no_bom():
     """无激活BOM时，fallback使用 OrderItem.cost_fen 作为标准成本"""
@@ -175,14 +177,12 @@ async def test_fallback_to_standard_cost_when_no_bom():
 
     std_cost_fen = 1500
     order_items = [
-        _make_order_item(ORDER_ITEM_ID_1, DISH_ID_1, qty=1,
-                         price_fen=5000, std_cost_fen=std_cost_fen),
+        _make_order_item(ORDER_ITEM_ID_1, DISH_ID_1, qty=1, price_fen=5000, std_cost_fen=std_cost_fen),
     ]
 
-    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), \
-         patch.object(engine, "_fetch_active_bom", new=AsyncMock(return_value=None)), \
-         patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
-
+    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), patch.object(
+        engine, "_fetch_active_bom", new=AsyncMock(return_value=None)
+    ), patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
         result = await engine.compute_order_cost(ORDER_ID, TENANT_A, db)
 
     dish_cost = result.items[0]
@@ -192,6 +192,7 @@ async def test_fallback_to_standard_cost_when_no_bom():
 
 
 # ─── Test 5: tenant_id 隔离 ──────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_tenant_isolation():
@@ -224,6 +225,7 @@ async def test_tenant_isolation():
 
 # ─── Test 6: get_order_margin 从快照查询 ─────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_order_margin_from_snapshot():
     """get_order_margin 优先从 cost_snapshots 返回缓存结果"""
@@ -247,6 +249,7 @@ async def test_get_order_margin_from_snapshot():
 
 # ─── Test 7: 多菜品订单汇总 ──────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_multi_dish_order_total():
     """2道菜的订单，total_cost = 各菜成本之和"""
@@ -267,10 +270,9 @@ async def test_multi_dish_order_total():
     async def mock_fetch_bom(dish_id, tenant_id, db):
         return bom_map.get(dish_id)
 
-    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), \
-         patch.object(engine, "_fetch_active_bom", new=mock_fetch_bom), \
-         patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
-
+    with patch.object(engine, "_fetch_order_items", new=AsyncMock(return_value=order_items)), patch.object(
+        engine, "_fetch_active_bom", new=mock_fetch_bom
+    ), patch.object(engine, "_save_cost_snapshots", new=AsyncMock()):
         result = await engine.compute_order_cost(ORDER_ID, TENANT_A, db)
 
     # dish1: 1000, dish2: 1.0×2qty×1000 = 2000 => total=3000
@@ -279,6 +281,7 @@ async def test_multi_dish_order_total():
 
 
 # ─── Test 8: batch_recompute_date 调用次数 ───────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_batch_recompute_date():
@@ -292,11 +295,9 @@ async def test_batch_recompute_date():
 
     order_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
 
-    with patch.object(engine, "_fetch_order_ids_by_date",
-                      new=AsyncMock(return_value=order_ids)), \
-         patch.object(engine, "compute_order_cost",
-                      new=AsyncMock(return_value=MagicMock())) as mock_compute:
-
+    with patch.object(engine, "_fetch_order_ids_by_date", new=AsyncMock(return_value=order_ids)), patch.object(
+        engine, "compute_order_cost", new=AsyncMock(return_value=MagicMock())
+    ) as mock_compute:
         await engine.batch_recompute_date(store_id, biz_date, TENANT_A, db)
 
     assert mock_compute.call_count == len(order_ids)

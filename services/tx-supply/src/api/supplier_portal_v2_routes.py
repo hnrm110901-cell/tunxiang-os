@@ -118,14 +118,16 @@ async def supplier_login(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, portal_status, portal_password_hash, portal_last_login
                 FROM supplier_accounts
                 WHERE contact->>'phone' = :phone
                   AND is_deleted = FALSE
                   AND tenant_id = :tenant_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"phone": body.phone, "tenant_id": x_tenant_id},
         )
         row = result.mappings().first()
@@ -200,7 +202,8 @@ async def get_supplier_profile(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, category, contact, certifications,
                        portal_status, bank_name, bank_account, tax_no,
                        contact_email, rating, total_orders, total_amount_fen,
@@ -208,7 +211,8 @@ async def get_supplier_profile(
                 FROM supplier_accounts
                 WHERE id = :supplier_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"supplier_id": supplier_id},
         )
         row = result.mappings().first()
@@ -266,7 +270,8 @@ async def list_rfq(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT r.id, r.request_no, r.supplier_id, r.store_id,
                        r.status, r.items, r.expected_delivery_date,
                        r.quote_valid_until, r.quoted_price_fen,
@@ -275,7 +280,8 @@ async def list_rfq(
                 WHERE {where_sql}
                 ORDER BY r.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -311,12 +317,14 @@ async def get_rfq_detail(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT r.*, a.name AS supplier_name
                 FROM supplier_rfq_requests r
                 LEFT JOIN supplier_accounts a ON r.supplier_id = a.id
                 WHERE r.id = :rfq_id AND r.is_deleted = FALSE
-            """),
+            """
+            ),
             {"rfq_id": rfq_id},
         )
         row = result.mappings().first()
@@ -354,11 +362,13 @@ async def submit_rfq_quote(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, supplier_id, status, request_no
                 FROM supplier_rfq_requests
                 WHERE id = :rfq_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"rfq_id": rfq_id},
         )
         row = result.mappings().first()
@@ -381,7 +391,8 @@ async def submit_rfq_quote(
             )
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE supplier_rfq_requests
                 SET status = 'quoted',
                     quoted_price_fen = :quoted_price_fen,
@@ -389,7 +400,8 @@ async def submit_rfq_quote(
                     notes = :notes,
                     updated_at = NOW()
                 WHERE id = :rfq_id
-            """),
+            """
+            ),
             {
                 "rfq_id": rfq_id,
                 "quoted_price_fen": body.quoted_price_fen,
@@ -478,7 +490,8 @@ async def list_purchase_orders(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     po.id,
                     po.po_number,
@@ -513,7 +526,8 @@ async def list_purchase_orders(
                 GROUP BY po.id, sa.name
                 ORDER BY po.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -558,11 +572,13 @@ async def confirm_purchase_order(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, po_number
                 FROM purchase_orders
                 WHERE id = :po_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"po_id": po_id},
         )
         row = result.mappings().first()
@@ -585,14 +601,16 @@ async def confirm_purchase_order(
             )
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE purchase_orders
                 SET status = 'confirmed',
                     expected_delivery_date = COALESCE(:expected_delivery_date, expected_delivery_date),
                     notes = COALESCE(:notes, notes),
                     updated_at = NOW()
                 WHERE id = :po_id
-            """),
+            """
+            ),
             {
                 "po_id": po_id,
                 "expected_delivery_date": body.estimated_deliver_date,
@@ -655,11 +673,13 @@ async def confirm_delivery(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, po_number
                 FROM purchase_orders
                 WHERE id = :po_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"po_id": po_id},
         )
         row = result.mappings().first()
@@ -682,7 +702,8 @@ async def confirm_delivery(
             )
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE purchase_orders
                 SET status = 'delivered',
                     actual_delivery_date = :actual_delivery_date,
@@ -691,7 +712,8 @@ async def confirm_delivery(
                                  ELSE notes END,
                     updated_at = NOW()
                 WHERE id = :po_id
-            """),
+            """
+            ),
             {
                 "po_id": po_id,
                 "actual_delivery_date": body.actual_deliver_date,
@@ -780,7 +802,8 @@ async def list_suppliers_portal(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, category, contact, portal_status,
                        rating, total_orders, total_amount_fen,
                        contact_email, bank_name, created_at
@@ -788,7 +811,8 @@ async def list_suppliers_portal(
                 WHERE {where_sql}
                 ORDER BY rating DESC, total_orders DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -832,11 +856,13 @@ async def update_supplier_rating(
         await _set_tenant(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, rating
                 FROM supplier_accounts
                 WHERE id = :supplier_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"supplier_id": supplier_id},
         )
         row = result.mappings().first()
@@ -848,11 +874,13 @@ async def update_supplier_rating(
             )
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE supplier_accounts
                 SET rating = :rating, updated_at = NOW()
                 WHERE id = :supplier_id
-            """),
+            """
+            ),
             {"supplier_id": supplier_id, "rating": body.rating},
         )
         await db.commit()

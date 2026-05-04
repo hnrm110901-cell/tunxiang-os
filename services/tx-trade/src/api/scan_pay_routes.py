@@ -72,12 +72,14 @@ async def scan_pay(
             {"tid": tenant_id},
         )
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO scan_pay_transactions
                     (tenant_id, store_id, payment_id, auth_code, channel, amount_fen, cashier_id, status)
                 VALUES
                     (:tenant_id, :store_id, :payment_id, :auth_code, :channel, :amount_fen, :cashier_id, 'pending')
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": body.store_id,
@@ -147,11 +149,13 @@ async def _simulate_payment(payment_id: str, tenant_id: str, store_id: str, amou
                 {"tid": tenant_id},
             )
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE scan_pay_transactions
                     SET status = 'paid', paid_at = NOW(), updated_at = NOW()
                     WHERE payment_id = :payment_id AND tenant_id = :tenant_id AND status = 'pending'
-                """),
+                """
+                ),
                 {"payment_id": payment_id, "tenant_id": tenant_id},
             )
             await db.commit()
@@ -184,12 +188,14 @@ async def get_payment_status(
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT payment_id, channel, amount_fen, status,
                        merchant_order_id, paid_at, created_at
                 FROM scan_pay_transactions
                 WHERE payment_id = :payment_id
-            """),
+            """
+            ),
             {"payment_id": payment_id},
         )
         row = result.mappings().one_or_none()
@@ -222,12 +228,14 @@ async def cancel_payment(
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE scan_pay_transactions
                 SET status = 'cancelled', updated_at = NOW()
                 WHERE payment_id = :payment_id AND status = 'pending'
                 RETURNING payment_id, status
-            """),
+            """
+            ),
             {"payment_id": payment_id},
         )
         row = result.mappings().one_or_none()

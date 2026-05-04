@@ -155,7 +155,8 @@ class MemoryRetriever:
 
         where_clause = " AND ".join(conditions)
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT id, memory_type, memory_key, content, confidence,
                    store_id, user_id, scope, category, importance,
                    updated_at, access_count,
@@ -164,7 +165,8 @@ class MemoryRetriever:
             WHERE {where_clause}
             ORDER BY similarity DESC
             LIMIT :limit
-        """)
+        """
+        )
 
         result = await self.db.execute(sql, params)
         rows = result.mappings().all()

@@ -80,7 +80,8 @@ async def _forecast_dish_demand(
     """预测菜品需求量：基于近7天平均日销量 * days_ahead。"""
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id,
                    d.name AS dish_name,
                    COALESCE(SUM(oi.quantity), 0) AS total_sold,
@@ -95,7 +96,8 @@ async def _forecast_dish_demand(
             GROUP BY oi.dish_id, d.name
             HAVING SUM(oi.quantity) > 0
             ORDER BY predicted_demand DESC
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "store_id": store_id,
@@ -127,7 +129,8 @@ async def _bom_decompose(
 
         try:
             bom_rows = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT bi.ingredient_id, i.name AS ingredient_name,
                        bi.standard_qty, i.unit
                 FROM bom_items bi
@@ -139,7 +142,8 @@ async def _bom_decompose(
                   AND bt.is_active = TRUE
                   AND bt.is_deleted = FALSE
                   AND bi.is_deleted = FALSE
-            """),
+            """
+                ),
                 {
                     "tid": tenant_id,
                     "store_id": store_id,
@@ -177,14 +181,16 @@ async def _get_current_stock(
 
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, COALESCE(quantity, 0) AS qty
             FROM ingredients
             WHERE tenant_id = :tid
               AND store_id  = :store_id
               AND is_deleted = FALSE
               AND id = ANY(:ids::uuid[])
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "store_id": store_id,
@@ -204,7 +210,8 @@ async def _get_best_supplier(
     """获取原料的最佳供应商（最近供货 + 评分最高）。"""
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
             SELECT supplier_id, supplier_name,
                    COALESCE(unit_price_fen, 0) AS unit_price_fen
             FROM receiving_records
@@ -213,7 +220,8 @@ async def _get_best_supplier(
               AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT 1
-        """),
+        """
+            ),
             {"tid": tenant_id, "iid": ingredient_id},
         )
         r = row.fetchone()
@@ -301,7 +309,8 @@ async def get_procurement_suggestion(
             # 写入建议表
             suggestion_id = uuid.uuid4()
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO smart_procurement_suggestions
                     (id, tenant_id, store_id, ingredient_id, ingredient_name,
                      predicted_demand, current_stock, safety_stock,
@@ -311,7 +320,8 @@ async def get_procurement_suggestion(
                         :demand, :stock, :safety,
                         :qty, :unit, :sup_id, :sup_name,
                         :cost, :days, 'draft')
-            """),
+            """
+                ),
                 {
                     "id": str(suggestion_id),
                     "tid": x_tenant_id,
@@ -393,7 +403,8 @@ async def create_procurement_order(
             params[f"s{i}"] = s
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id, ingredient_id, ingredient_name, suggested_qty, unit,
                    supplier_id, supplier_name, estimated_cost_fen
             FROM smart_procurement_suggestions
@@ -401,7 +412,8 @@ async def create_procurement_order(
               AND status = 'draft'
               AND id IN ({placeholders})
               AND is_deleted = FALSE
-        """),
+        """
+            ),
             params,
         )
         suggestions = rows.fetchall()
@@ -416,13 +428,15 @@ async def create_procurement_order(
         total_amount = sum(int(s.estimated_cost_fen or 0) for s in suggestions)
 
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO smart_procurement_orders
                 (id, tenant_id, store_id, suggestion_ids, order_no,
                  total_amount_fen, item_count, status, source)
             VALUES (:id, :tid, :store_id, :sids::jsonb, :order_no,
                     :amount, :count, 'pending', 'ai_suggested')
-        """),
+        """
+            ),
             {
                 "id": str(order_id),
                 "tid": x_tenant_id,
@@ -437,11 +451,13 @@ async def create_procurement_order(
         # 3. 更新建议状态为 ordered
         for s in suggestions:
             await db.execute(
-                text("""
+                text(
+                    """
                 UPDATE smart_procurement_suggestions
                 SET status = 'ordered'
                 WHERE id = :sid AND tenant_id = :tid
-            """),
+            """
+                ),
                 {"sid": str(s.id), "tid": x_tenant_id},
             )
 
@@ -513,7 +529,8 @@ async def waste_reduction_report(
 
         # 1. AI建议汇总
         suggestion_rows = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 COUNT(*)                                    AS total_suggestions,
                 SUM(CASE WHEN s.status = 'ordered' THEN 1 ELSE 0 END) AS adopted_count,
@@ -525,14 +542,16 @@ async def waste_reduction_report(
               AND s.created_at >= :since
               AND s.is_deleted = FALSE
               {store_filter}
-        """),
+        """
+            ),
             params,
         )
         suggestion_stats = suggestion_rows.fetchone()
 
         # 2. 实际采购 vs 实际消耗（基于库存流水）
         waste_rows = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 COALESCE(SUM(CASE WHEN transaction_type = 'inbound'
                              THEN quantity ELSE 0 END), 0)  AS total_inbound,
@@ -545,7 +564,8 @@ async def waste_reduction_report(
               AND created_at >= :since
               AND is_deleted = FALSE
               {"AND store_id = :store_id" if store_id else ""}
-        """),
+        """
+            ),
             params,
         )
         waste_stats = waste_rows.fetchone()

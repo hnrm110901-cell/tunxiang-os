@@ -24,10 +24,12 @@ async def marketplace_stats(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     row = await db.execute(
-        text("""SELECT
+        text(
+            """SELECT
                 (SELECT COUNT(*) FROM forge.apps WHERE tenant_id = :tid) AS total_apps,
                 (SELECT COUNT(*) FROM forge.developers WHERE tenant_id = :tid) AS total_developers,
-                (SELECT COUNT(*) FROM forge.installations WHERE tenant_id = :tid AND status = 'active') AS active_installations"""),
+                (SELECT COUNT(*) FROM forge.installations WHERE tenant_id = :tid AND status = 'active') AS active_installations"""
+        ),
         {"tid": x_tenant_id},
     )
     return dict(row.mappings().one())
@@ -43,9 +45,11 @@ async def trending_apps(
     await _set_tenant(db, x_tenant_id)
     days = int(period.rstrip("d")) if period.endswith("d") else 7
     rows = await db.execute(
-        text("""SELECT a.id, a.name, a.category, COUNT(i.id) AS install_count
+        text(
+            """SELECT a.id, a.name, a.category, COUNT(i.id) AS install_count
                 FROM forge.apps a LEFT JOIN forge.installations i ON a.id = i.app_id AND i.created_at >= now() - make_interval(days => :days)
-                WHERE a.tenant_id = :tid GROUP BY a.id ORDER BY install_count DESC LIMIT :limit"""),
+                WHERE a.tenant_id = :tid GROUP BY a.id ORDER BY install_count DESC LIMIT :limit"""
+        ),
         {"tid": x_tenant_id, "days": days, "limit": limit},
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "period": period}

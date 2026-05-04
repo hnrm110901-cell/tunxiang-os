@@ -120,12 +120,14 @@ async def get_autonomy_configs(
     """获取各Agent自治等级配置。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT agent_id, level, auto_rules, updated_at
             FROM agent_autonomy_configs
             WHERE tenant_id = :tenant_id AND is_deleted = FALSE
             ORDER BY agent_id
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id},
         )
         rows = result.mappings().all()
@@ -177,12 +179,14 @@ async def update_autonomy_config(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO agent_autonomy_configs (id, tenant_id, agent_id, level, auto_rules, updated_at)
         VALUES (gen_random_uuid(), :tenant_id, :agent_id, :level, :auto_rules, :now)
         ON CONFLICT (tenant_id, agent_id) WHERE is_deleted = FALSE
         DO UPDATE SET level = :level, auto_rules = :auto_rules, updated_at = :now
-    """),
+    """
+        ),
         {
             "tenant_id": x_tenant_id,
             "agent_id": agent_id,
@@ -249,13 +253,15 @@ async def get_auto_execution_log(
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id, agent_id, action, params, result, status, executed_at
             FROM agent_auto_executions
             WHERE {where}
             ORDER BY executed_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -282,22 +288,26 @@ async def get_pending_actions(
     offset = (page - 1) * size
     try:
         count_result = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*)::int FROM agent_auto_executions
             WHERE tenant_id = :tenant_id AND status = 'pending'
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id},
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, agent_id, action, params, created_at
             FROM agent_auto_executions
             WHERE tenant_id = :tenant_id AND status = 'pending'
             ORDER BY created_at ASC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id, "limit": size, "offset": offset},
         )
         rows = result.mappings().all()

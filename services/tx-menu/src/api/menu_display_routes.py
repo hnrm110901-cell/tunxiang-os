@@ -84,13 +84,15 @@ async def get_menu_display(
 
         # 1. 获取分类
         cat_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, icon, sort_order
                 FROM dish_categories
                 WHERE tenant_id = :tid::uuid
                   AND is_deleted = false
                 ORDER BY sort_order, name
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         categories_raw = cat_result.mappings().all()
@@ -109,7 +111,8 @@ async def get_menu_display(
             params["store_id"] = store_id
 
         dish_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT d.id, d.name, d.category_id, d.price_fen, d.member_price_fen,
                        d.description, d.images, d.tags, d.allergens,
                        d.is_available, d.is_sold_out, d.pricing_method,
@@ -122,7 +125,8 @@ async def get_menu_display(
                   {channel_filter}
                   {store_filter}
                 ORDER BY d.sort_order, d.name
-            """),
+            """
+            ),
             params,
         )
         dishes_raw = dish_result.mappings().all()
@@ -213,13 +217,15 @@ async def get_dish_spec_sheet(
 
         # 获取菜品基本信息
         dish_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, price_fen, images
                 FROM dishes
                 WHERE id = :did::uuid
                   AND tenant_id = :tid::uuid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"did": dish_id, "tid": x_tenant_id},
         )
         dish = dish_result.mappings().one_or_none()
@@ -228,14 +234,16 @@ async def get_dish_spec_sheet(
 
         # 获取规格组 + 选项
         groups_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT g.id, g.name, g.is_required, g.min_select, g.max_select, g.sort_order
                 FROM dish_spec_groups g
                 WHERE g.dish_id = :did::uuid
                   AND g.tenant_id = :tid::uuid
                   AND g.is_deleted = false
                 ORDER BY g.sort_order, g.id
-            """),
+            """
+            ),
             {"did": dish_id, "tid": x_tenant_id},
         )
         groups_raw = groups_result.mappings().all()
@@ -243,14 +251,16 @@ async def get_dish_spec_sheet(
         spec_groups = []
         for g in groups_raw:
             opts_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, name, price_delta_fen, sort_order
                     FROM dish_spec_options
                     WHERE group_id = :gid::uuid
                       AND tenant_id = :tid::uuid
                       AND is_deleted = false
                     ORDER BY sort_order, id
-                """),
+                """
+                ),
                 {"gid": str(g["id"]), "tid": x_tenant_id},
             )
             opts = opts_result.mappings().all()
@@ -274,14 +284,16 @@ async def get_dish_spec_sheet(
 
         # 获取做法（practices）作为额外规格组
         practice_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, price_delta_fen, category, sort_order
                 FROM dish_practices
                 WHERE dish_id = :did::uuid
                   AND tenant_id = :tid::uuid
                   AND is_deleted = false
                 ORDER BY category, sort_order, id
-            """),
+            """
+            ),
             {"did": dish_id, "tid": x_tenant_id},
         )
         practices = practice_result.mappings().all()
@@ -350,14 +362,16 @@ async def batch_soldout(
         updated_ids = []
         for item in req.items:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dishes
                     SET is_sold_out = :sold_out,
                         updated_at = NOW()
                     WHERE id = :did::uuid
                       AND tenant_id = :tid::uuid
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {
                     "did": item.dish_id,
                     "sold_out": item.sold_out,

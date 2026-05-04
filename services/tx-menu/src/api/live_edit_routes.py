@@ -183,13 +183,15 @@ async def bulk_update_availability(
         {"tid": x_tenant_id},
     )
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dishes
                SET is_available = :is_available, updated_at = NOW()
              WHERE id = ANY(:ids::uuid[])
                AND tenant_id = :tid::uuid
                AND is_deleted = false
-        """),
+        """
+        ),
         {
             "is_available": req.is_available,
             "ids": req.dish_ids,

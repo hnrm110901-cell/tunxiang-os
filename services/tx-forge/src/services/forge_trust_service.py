@@ -30,13 +30,15 @@ class ForgeTrustService:
     async def get_tier_definitions(self, db: AsyncSession) -> list[dict]:
         """返回所有信任等级定义，按 sort_order 排序"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT tier_id, tier_name, description, sort_order,
                        data_access, action_scope, financial_allowed,
                        created_at
                 FROM forge_trust_tiers
                 ORDER BY sort_order ASC
-            """),
+            """
+            ),
         )
         rows = result.mappings().all()
         if not rows:
@@ -49,13 +51,15 @@ class ForgeTrustService:
         """获取应用当前信任等级、最近审计记录和违规统计"""
         # 1. 当前信任等级
         policy_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, trust_tier, allowed_entities, allowed_actions,
                        denied_actions, token_budget_daily, rate_limit_rpm,
                        sandbox_mode, kill_switch, updated_at
                 FROM forge_runtime_policies
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         policy_row = policy_result.mappings().first()
@@ -68,27 +72,31 @@ class ForgeTrustService:
 
         # 2. 最近 10 条审计记录
         audit_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT audit_id, audit_type, previous_tier, requested_tier,
                        auditor_id, evidence, status, created_at
                 FROM forge_trust_audits
                 WHERE app_id = :app_id AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT 10
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         recent_audits = [dict(r) for r in audit_result.mappings().all()]
 
         # 3. 最近 30 天违规计数
         violation_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM forge_runtime_violations
                 WHERE app_id = :app_id
                   AND is_deleted = false
                   AND created_at >= NOW() - INTERVAL '30 days'
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         violation_count_30d = violation_result.scalar_one()
@@ -125,10 +133,12 @@ class ForgeTrustService:
 
         # 获取当前等级
         current_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT trust_tier FROM forge_runtime_policies
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         current_row = current_result.mappings().first()
@@ -152,7 +162,8 @@ class ForgeTrustService:
 
         # 插入审计记录
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_trust_audits
                     (id, tenant_id, audit_id, app_id, audit_type,
                      previous_tier, requested_tier, auditor_id,
@@ -162,7 +173,8 @@ class ForgeTrustService:
                      :audit_id, :app_id, :audit_type,
                      :previous_tier, :requested_tier, :auditor_id,
                      :evidence::jsonb, 'approved', NOW())
-            """),
+            """
+            ),
             {
                 "audit_id": audit_id,
                 "app_id": app_id,
@@ -176,12 +188,14 @@ class ForgeTrustService:
 
         # 更新运行时策略
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_runtime_policies
                 SET trust_tier = :tier,
                     updated_at = NOW()
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"tier": requested_tier, "app_id": app_id},
         )
 
@@ -221,10 +235,12 @@ class ForgeTrustService:
 
         # 获取当前等级
         current_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT trust_tier FROM forge_runtime_policies
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         current_row = current_result.mappings().first()
@@ -249,13 +265,15 @@ class ForgeTrustService:
         if target_order >= 2:
             # T2+ 要求：3个月以上运行历史 + 评分 >= 4.0
             history_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         created_at,
                         EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400 AS days_active
                     FROM forge_runtime_policies
                     WHERE app_id = :app_id AND is_deleted = false
-                """),
+                """
+                ),
                 {"app_id": app_id},
             )
             history_row = history_result.mappings().first()
@@ -264,10 +282,12 @@ class ForgeTrustService:
                 requirement_errors.append(f"运行时间不足 90 天 (当前 {int(history_row['days_active'])} 天)")
 
             rating_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT rating FROM forge_apps
                     WHERE app_id = :app_id AND is_deleted = false
-                """),
+                """
+                ),
                 {"app_id": app_id},
             )
             rating_row = rating_result.mappings().first()
@@ -278,7 +298,8 @@ class ForgeTrustService:
         # 创建待审核记录
         audit_id = f"audit_{uuid4().hex[:12]}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_trust_audits
                     (id, tenant_id, audit_id, app_id, audit_type,
                      previous_tier, requested_tier, auditor_id,
@@ -288,7 +309,8 @@ class ForgeTrustService:
                      :audit_id, :app_id, 'upgrade',
                      :previous_tier, :requested_tier, :app_id,
                      :evidence::jsonb, 'pending_review', NOW())
-            """),
+            """
+            ),
             {
                 "audit_id": audit_id,
                 "app_id": app_id,
@@ -328,10 +350,12 @@ class ForgeTrustService:
         """违规超限时触发自动降级（每次降一级，不低于 T0）"""
         # 获取当前等级
         current_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT trust_tier FROM forge_runtime_policies
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         current_row = current_result.mappings().first()
@@ -362,7 +386,8 @@ class ForgeTrustService:
         # 插入降级审计记录
         audit_id = f"audit_{uuid4().hex[:12]}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_trust_audits
                     (id, tenant_id, audit_id, app_id, audit_type,
                      previous_tier, requested_tier, auditor_id,
@@ -372,7 +397,8 @@ class ForgeTrustService:
                      :audit_id, :app_id, 'downgrade',
                      :previous_tier, :new_tier, 'system',
                      :evidence::jsonb, 'approved', NOW())
-            """),
+            """
+            ),
             {
                 "audit_id": audit_id,
                 "app_id": app_id,
@@ -384,12 +410,14 @@ class ForgeTrustService:
 
         # 更新运行时策略
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_runtime_policies
                 SET trust_tier = :tier,
                     updated_at = NOW()
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"tier": new_tier, "app_id": app_id},
         )
 

@@ -49,7 +49,8 @@ class ForgeAIOpsService:
 
         # 每个 agent 近 7 天决策统计
         decision_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     agent_id,
                     COUNT(*)              AS decision_count,
@@ -60,7 +61,8 @@ class ForgeAIOpsService:
                 WHERE decided_at >= NOW() - INTERVAL '7 days'
                 {store_filter}
                 GROUP BY agent_id
-            """),
+            """
+            ),
             params,
         )
         decision_map: dict[str, dict] = {}
@@ -74,7 +76,8 @@ class ForgeAIOpsService:
 
         # 约束违规：constraints_check 中包含 false 值的记录
         violation_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     agent_id,
                     COUNT(*) AS violation_count
@@ -83,14 +86,16 @@ class ForgeAIOpsService:
                   AND constraints_check::text LIKE '%false%'
                 {store_filter}
                 GROUP BY agent_id
-            """),
+            """
+            ),
             params,
         )
         violation_map: dict[str, int] = {r["agent_id"]: r["violation_count"] for r in violation_result.mappings().all()}
 
         # 活跃会话
         active_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     agent_template_name AS agent_id,
                     COUNT(*)            AS active_sessions
@@ -98,7 +103,8 @@ class ForgeAIOpsService:
                 WHERE status = 'running'
                 {store_filter}
                 GROUP BY agent_template_name
-            """),
+            """
+            ),
             params,
         )
         active_map: dict[str, int] = {r["agent_id"]: r["active_sessions"] for r in active_result.mappings().all()}
@@ -149,21 +155,24 @@ class ForgeAIOpsService:
 
         # 决策类型分布
         type_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT decision_type, COUNT(*) AS cnt
                 FROM agent_decision_logs
                 WHERE agent_id = :agent_id
                   AND decided_at >= NOW() - MAKE_INTERVAL(days => :days)
                 GROUP BY decision_type
                 ORDER BY cnt DESC
-            """),
+            """
+            ),
             params,
         )
         decision_type_distribution = [dict(r) for r in type_result.mappings().all()]
 
         # 置信度直方图 (10 个桶: 0-0.1, 0.1-0.2, ..., 0.9-1.0)
         histogram_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     WIDTH_BUCKET(confidence, 0, 1, 10) AS bucket,
                     COUNT(*) AS cnt
@@ -173,7 +182,8 @@ class ForgeAIOpsService:
                   AND confidence IS NOT NULL
                 GROUP BY bucket
                 ORDER BY bucket
-            """),
+            """
+            ),
             params,
         )
         confidence_histogram = [
@@ -187,7 +197,8 @@ class ForgeAIOpsService:
 
         # 约束维度分解（哪些约束项 false 最多）
         constraint_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     key AS constraint_name,
                     COUNT(*) AS violation_count
@@ -198,14 +209,16 @@ class ForgeAIOpsService:
                   AND kv.value = 'false'
                 GROUP BY key
                 ORDER BY violation_count DESC
-            """),
+            """
+            ),
             params,
         )
         constraint_breakdown = [dict(r) for r in constraint_result.mappings().all()]
 
         # 最近 20 条决策
         recent_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id, decision_type, input_context, reasoning,
                     output_action, constraints_check, confidence,
@@ -214,14 +227,16 @@ class ForgeAIOpsService:
                 WHERE agent_id = :agent_id
                 ORDER BY decided_at DESC
                 LIMIT 20
-            """),
+            """
+            ),
             {"agent_id": agent_id},
         )
         recent_decisions = [dict(r) for r in recent_result.mappings().all()]
 
         # 日趋势
         trend_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     DATE(decided_at) AS day,
                     COUNT(*)         AS decision_count,
@@ -232,7 +247,8 @@ class ForgeAIOpsService:
                   AND decided_at >= NOW() - MAKE_INTERVAL(days => :days)
                 GROUP BY DATE(decided_at)
                 ORDER BY day
-            """),
+            """
+            ),
             params,
         )
         daily_trend = [
@@ -291,7 +307,8 @@ class ForgeAIOpsService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     session_id, agent_template_name, store_id,
                     trigger_type, status, total_tokens, total_cost_fen,
@@ -300,7 +317,8 @@ class ForgeAIOpsService:
                 {where}
                 ORDER BY started_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -311,14 +329,16 @@ class ForgeAIOpsService:
         """单次会话：运行信息 + 事件时间线。"""
         # 会话主记录
         run_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     session_id, agent_template_name, store_id,
                     trigger_type, status, total_tokens, total_cost_fen,
                     started_at, finished_at
                 FROM session_runs
                 WHERE session_id = :session_id
-            """),
+            """
+            ),
             {"session_id": session_id},
         )
         run = run_result.mappings().first()
@@ -327,7 +347,8 @@ class ForgeAIOpsService:
 
         # 事件时间线（用 session_runs 的 PK 关联 session_events）
         events_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     e.sequence_no, e.event_type, e.step_id, e.agent_id,
                     e.action, e.input_json, e.output_json, e.reasoning,
@@ -336,7 +357,8 @@ class ForgeAIOpsService:
                 JOIN session_runs r ON r.id = e.session_id
                 WHERE r.session_id = :session_id
                 ORDER BY e.sequence_no
-            """),
+            """
+            ),
             {"session_id": session_id},
         )
         events = [dict(r) for r in events_result.mappings().all()]
@@ -365,7 +387,8 @@ class ForgeAIOpsService:
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id, agent_id, decision_type, input_context,
                     reasoning, output_action, constraints_check,
@@ -375,7 +398,8 @@ class ForgeAIOpsService:
                 {where}
                 ORDER BY decided_at DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             params,
         )
         return [dict(r) for r in result.mappings().all()]
@@ -387,7 +411,8 @@ class ForgeAIOpsService:
     async def get_model_registry(self, db: AsyncSession, *, days: int = 30) -> list[dict]:
         """模型调用汇总：调用量 / 延迟 / Token / 成本 / 成功率。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     model,
                     COUNT(*)                                    AS call_count,
@@ -402,7 +427,8 @@ class ForgeAIOpsService:
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
                 GROUP BY model
                 ORDER BY call_count DESC
-            """),
+            """
+            ),
             {"days": days},
         )
         return [
@@ -431,7 +457,8 @@ class ForgeAIOpsService:
         group_alias = "period" if group_by == "day" else group_by
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     {group_expr}                            AS {group_alias},
                     COUNT(*)                                AS call_count,
@@ -443,7 +470,8 @@ class ForgeAIOpsService:
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
                 GROUP BY {group_expr}
                 ORDER BY {group_expr}
-            """),
+            """
+            ),
             {"days": days},
         )
         entries = [
@@ -456,7 +484,8 @@ class ForgeAIOpsService:
 
         # 合计
         totals_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)               AS total_calls,
                     SUM(input_tokens)      AS total_input_tokens,
@@ -465,7 +494,8 @@ class ForgeAIOpsService:
                     ROUND(AVG(duration_ms)::numeric, 1) AS avg_duration_ms
                 FROM model_call_logs
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
-            """),
+            """
+            ),
             {"days": days},
         )
         totals = dict(totals_result.mappings().one())
@@ -482,7 +512,8 @@ class ForgeAIOpsService:
         """延迟百分位统计：全局 P50/P95/P99 + 按模型分解。"""
         # 全局百分位
         global_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50,
                     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95,
@@ -491,7 +522,8 @@ class ForgeAIOpsService:
                     AVG(duration_ms) AS avg_ms
                 FROM model_call_logs
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
-            """),
+            """
+            ),
             {"days": days},
         )
         global_stats = dict(global_result.mappings().one())
@@ -500,7 +532,8 @@ class ForgeAIOpsService:
 
         # 按模型分解
         model_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     model,
                     COUNT(*)  AS call_count,
@@ -512,7 +545,8 @@ class ForgeAIOpsService:
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
                 GROUP BY model
                 ORDER BY call_count DESC
-            """),
+            """
+            ),
             {"days": days},
         )
         per_model = [
@@ -565,7 +599,8 @@ class ForgeAIOpsService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id, agent_id, memory_type, memory_key,
                     content, confidence, access_count,
@@ -574,7 +609,8 @@ class ForgeAIOpsService:
                 {where}
                 ORDER BY last_accessed_at DESC NULLS LAST
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]

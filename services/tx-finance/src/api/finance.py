@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 from shared.ontology.src.entities import Order, OrderItem, Store
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.budget_service import BudgetService
 
@@ -63,7 +64,7 @@ async def get_daily_revenue(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         rev = await _revenue_engine.get_daily_revenue(tid, sid, biz_date, db)
@@ -630,7 +631,7 @@ async def get_daily_revenue_summary(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         report = await _report_engine.daily_revenue_summary(tid, sid, biz_date, db)
@@ -654,7 +655,7 @@ async def get_payment_discount_report(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         report = await _report_engine.payment_discount_report(tid, sid, biz_date, db)
@@ -678,7 +679,7 @@ async def get_cashflow_by_store(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         report = await _report_engine.cashflow_by_store(tid, sid, biz_date, db)
@@ -703,7 +704,7 @@ async def get_dish_sales_stats(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         report = await _report_engine.dish_sales_stats(tid, sid, biz_date, db, top_n=top_n)
@@ -727,7 +728,7 @@ async def get_billing_audit(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         report = await _report_engine.billing_audit(tid, sid, biz_date, db)
@@ -749,7 +750,7 @@ async def get_realtime_store_stats(
         sid = _uuid.UUID(store_id)
         tid = _uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"参数格式错误: {exc}") from exc
+        raise safe_http_exception(400, "参数格式错误", exc) from exc
 
     try:
         report = await _report_engine.realtime_store_stats(tid, sid, db)

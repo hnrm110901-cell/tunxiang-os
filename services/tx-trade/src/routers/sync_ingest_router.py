@@ -244,7 +244,8 @@ async def get_cloud_changes(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT change_id, table_name, record_id, operation,
                        data, tenant_id, changed_at
                 FROM sync_cloud_changelog
@@ -252,7 +253,8 @@ async def get_cloud_changes(
                   AND changed_at > :since
                 ORDER BY changed_at ASC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "since": since_dt,
@@ -330,11 +332,13 @@ async def _check_already_processed(db: AsyncSession, change_id: str) -> bool:
     """检查 change_id 是否已写入 sync_ingested_log（幂等去重）"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM sync_ingested_log
                 WHERE change_id = :change_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"change_id": change_id},
         )
         return result.one_or_none() is not None
@@ -407,13 +411,15 @@ async def _apply_soft_delete(
 ) -> None:
     """软删除：设置 is_deleted=TRUE"""
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE "{change.table_name}"
             SET is_deleted = TRUE,
                 updated_at = :updated_at
             WHERE id = :id
               AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {
             "id": change.record_id,
             "tenant_id": change.tenant_id,
@@ -430,7 +436,8 @@ async def _log_ingested(
     """记录已处理的 change_id 到 sync_ingested_log（幂等去重 + 审计）"""
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS sync_ingested_log (
                     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     change_id   TEXT UNIQUE NOT NULL,
@@ -440,16 +447,19 @@ async def _log_ingested(
                     operation   TEXT NOT NULL,
                     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
-            """)
+            """
+            )
         )
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sync_ingested_log
                     (change_id, table_name, record_id, tenant_id, operation, ingested_at)
                 VALUES
                     (:change_id, :table_name, :record_id, :tenant_id, :operation, NOW())
                 ON CONFLICT (change_id) DO NOTHING
-            """),
+            """
+            ),
             {
                 "change_id": change.change_id,
                 "table_name": change.table_name,

@@ -45,11 +45,13 @@ class BanquetProductionService:
         """从宴会菜单自动生成排产计划"""
         # 获取宴会
         row = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, event_date, time_slot, table_count, menu_json
                 FROM banquets
                 WHERE id = :bid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"bid": banquet_id, "tid": self.tenant_id},
         )
         banquet = row.mappings().first()
@@ -131,7 +133,8 @@ class BanquetProductionService:
 
         # 插入计划
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_production_plans
                     (id, tenant_id, banquet_id, store_id, plan_date, total_dishes,
                      total_servings, prep_start_time, service_start_time,
@@ -139,7 +142,8 @@ class BanquetProductionService:
                 VALUES (:id, :tid, :bid, :sid, :pdate, :dishes,
                     :servings, :prep, :svc,
                     :timeline::jsonb, :staff::jsonb, 'planned')
-            """),
+            """
+            ),
             {
                 "id": plan_id,
                 "tid": self.tenant_id,
@@ -158,7 +162,8 @@ class BanquetProductionService:
         # 插入任务
         for t in tasks_to_insert:
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO banquet_production_tasks
                         (id, tenant_id, plan_id, course_no, course_name, dish_id,
                          dish_name, quantity, prep_time_min, cook_time_min,
@@ -166,7 +171,8 @@ class BanquetProductionService:
                     VALUES (:id, :tid, :plan_id, :course_no, :course_name, :dish_id,
                         :dish_name, :quantity, :prep_time_min, :cook_time_min,
                         :target_serve_time, 'pending')
-                """),
+                """
+                ),
                 t,
             )
 
@@ -198,13 +204,15 @@ class BanquetProductionService:
         updated = 0
         for a in assignments:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_production_tasks
                     SET assigned_chef_id = :chef_id, assigned_chef_name = :chef_name,
                         station_id = :station_id, station_name = :station_name, updated_at = NOW()
                     WHERE id = :task_id AND tenant_id = :tid AND is_deleted = FALSE
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "task_id": a["task_id"],
                     "tid": self.tenant_id,
@@ -300,12 +308,14 @@ class BanquetProductionService:
         """确认排产 planned→confirmed"""
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_production_plans
                 SET status = 'confirmed', confirmed_by = :by, confirmed_at = :now, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid AND status = 'planned' AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"id": plan_id, "tid": self.tenant_id, "by": confirmed_by, "now": now},
         )
         if not result.mappings().first():
@@ -316,11 +326,13 @@ class BanquetProductionService:
     async def start_execution(self, plan_id: str) -> dict:
         """开始执行 confirmed→in_progress"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_production_plans SET status = 'in_progress', updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid AND status = 'confirmed' AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"id": plan_id, "tid": self.tenant_id},
         )
         if not result.mappings().first():
@@ -331,11 +343,13 @@ class BanquetProductionService:
     async def complete_plan(self, plan_id: str) -> dict:
         """完成排产"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_production_plans SET status = 'completed', updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid AND status = 'in_progress' AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"id": plan_id, "tid": self.tenant_id},
         )
         if not result.mappings().first():
@@ -346,7 +360,8 @@ class BanquetProductionService:
     async def get_course_progress(self, plan_id: str) -> list:
         """按出菜序统计进度"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT course_name,
                        COUNT(*) AS total,
                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
@@ -358,7 +373,8 @@ class BanquetProductionService:
                 WHERE plan_id = :pid AND tenant_id = :tid AND is_deleted = FALSE
                 GROUP BY course_name
                 ORDER BY MIN(course_no)
-            """),
+            """
+            ),
             {"pid": plan_id, "tid": self.tenant_id},
         )
         result = []
@@ -372,13 +388,15 @@ class BanquetProductionService:
     async def get_kitchen_timeline(self, plan_id: str) -> list:
         """获取厨房时间轴视图"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT target_serve_time, course_name, dish_name, quantity,
                        station_name, assigned_chef_name, status
                 FROM banquet_production_tasks
                 WHERE plan_id = :pid AND tenant_id = :tid AND is_deleted = FALSE
                 ORDER BY target_serve_time, course_no
-            """),
+            """
+            ),
             {"pid": plan_id, "tid": self.tenant_id},
         )
         return [dict(r) for r in rows.mappings().all()]

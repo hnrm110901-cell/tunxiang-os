@@ -257,14 +257,16 @@ async def get_performance_summary(
 
     # ── Total touches in period ──────────────────────────────────────────────
     total_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as total_touches,
                    COUNT(DISTINCT member_id) as unique_members
             FROM marketing_touch_log
             WHERE tenant_id = :tenant_id::uuid
               AND sent_at > NOW() - (:days || ' days')::interval
               AND NOT is_deleted
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "days": days},
     )
     totals = total_row.fetchone()
@@ -273,7 +275,8 @@ async def get_performance_summary(
 
     # ── Channel breakdown ────────────────────────────────────────────────────
     chan_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT channel,
                    COUNT(*) as sent,
                    COUNT(*) FILTER (WHERE status IN ('sent','delivered','clicked','converted')) as delivered,
@@ -283,7 +286,8 @@ async def get_performance_summary(
               AND sent_at > NOW() - (:days || ' days')::interval
               AND NOT is_deleted
             GROUP BY channel
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "days": days},
     )
     channel_breakdown: dict[str, Any] = {}
@@ -297,7 +301,8 @@ async def get_performance_summary(
 
     # ── Campaign performance ─────────────────────────────────────────────────
     camp_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT campaign_type,
                    COUNT(*) as sent,
                    COUNT(*) FILTER (WHERE attribution_revenue_fen IS NOT NULL AND attribution_revenue_fen > 0) as attributed_orders,
@@ -308,7 +313,8 @@ async def get_performance_summary(
               AND NOT is_deleted
             GROUP BY campaign_type
             ORDER BY revenue_fen DESC
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "days": days},
     )
     campaign_performance = [
@@ -323,13 +329,15 @@ async def get_performance_summary(
 
     # ── Total attributed revenue ─────────────────────────────────────────────
     total_revenue_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(attribution_revenue_fen), 0) as total_revenue
             FROM marketing_touch_log
             WHERE tenant_id = :tenant_id::uuid
               AND sent_at > NOW() - (:days || ' days')::interval
               AND NOT is_deleted
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "days": days},
     )
     total_revenue = int(total_revenue_row.scalar() or 0)

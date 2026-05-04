@@ -357,11 +357,13 @@ async def advance_lifecycle(
 
     # 查询当前阶段
     dish_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_name, lifecycle_stage, is_deleted
             FROM dishes
             WHERE id = :did AND tenant_id = :tid
-        """),
+        """
+        ),
         {"did": did, "tid": tid},
     )
     dish_row = dish_result.fetchone()
@@ -382,13 +384,15 @@ async def advance_lifecycle(
 
     # 更新生命周期阶段
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dishes
             SET lifecycle_stage      = :stage,
                 lifecycle_changed_at = NOW(),
                 updated_at           = NOW()
             WHERE id = :did AND tenant_id = :tid
-        """),
+        """
+        ),
         {"stage": req.target_stage, "did": did, "tid": tid},
     )
     await db.commit()
@@ -438,7 +442,8 @@ async def lifecycle_report(
             raise HTTPException(status_code=422, detail=f"store_id 格式错误: {store_id}") from exc
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 COALESCE(lifecycle_stage, 'full') AS stage,
                 COUNT(*) AS cnt
@@ -447,7 +452,8 @@ async def lifecycle_report(
               AND is_deleted = false
               {store_clause}
             GROUP BY 1
-        """),
+        """
+        ),
         params,
     )
     counts: dict[str, int] = {row[0]: int(row[1]) for row in result.fetchall()}
@@ -519,25 +525,29 @@ async def retire_dish(
 
     # 1. 更新 dishes 表
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dishes
             SET is_available         = false,
                 lifecycle_stage      = 'discontinued',
                 lifecycle_changed_at = NOW(),
                 updated_at           = NOW()
             WHERE id = :did AND tenant_id = :tid
-        """),
+        """
+        ),
         {"did": did, "tid": tid},
     )
 
     # 2. 下线所有渠道的菜品映射
     channels_result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE channel_menu_items
             SET is_available = false, updated_at = NOW()
             WHERE dish_id = :did AND tenant_id = :tid
             RETURNING channel
-        """),
+        """
+        ),
         {"did": did, "tid": tid},
     )
     retired_channels = [row[0] for row in channels_result.fetchall()]

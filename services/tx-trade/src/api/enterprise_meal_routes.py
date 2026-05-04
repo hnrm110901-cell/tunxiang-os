@@ -14,7 +14,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+
 from ..security.rbac import UserContext, require_role_audited
 from ..services.trade_audit_log import write_audit
 
@@ -75,14 +76,16 @@ async def get_weekly_menu(
 
     try:
         await _set_tenant(db, company_id)
-        sql = text("""
+        sql = text(
+            """
             SELECT id, store_id, weekday, meal_type, dish_ids, is_published
             FROM enterprise_meal_menus
             WHERE week_start = :ws
               AND (:sid = '' OR store_id = :sid::UUID)
               AND is_deleted = FALSE
             ORDER BY weekday
-        """)
+        """
+        )
         result = await db.execute(sql, {"ws": week_start, "sid": store_id})
         rows = result.mappings().all()
         days = [
@@ -117,13 +120,15 @@ async def get_enterprise_account(
 
     try:
         await _set_tenant(db, company_id)
-        sql = text("""
+        sql = text(
+            """
             SELECT balance_fen, meal_count_remaining
             FROM enterprise_meal_accounts
             WHERE employee_id = :eid::UUID
               AND is_deleted = FALSE
             LIMIT 1
-        """)
+        """
+        )
         result = await db.execute(sql, {"eid": member_id})
         row = result.mappings().first()
         if row is None:
@@ -158,7 +163,8 @@ async def create_enterprise_meal_order(
 
     try:
         await _set_tenant(db, req.company_id)
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO enterprise_meal_orders
                 (tenant_id, store_id, employee_id, meal_date, meal_type,
                  dish_ids, amount_fen, payment_method, status)
@@ -166,7 +172,8 @@ async def create_enterprise_meal_order(
                 (:tid::UUID, :sid::UUID, :eid::UUID, :md, :mt,
                  :dish_ids::JSONB, :amount_fen, 'account', 'confirmed')
             RETURNING id
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -237,7 +244,8 @@ async def get_enterprise_meal_orders(
 
     try:
         await _set_tenant(db, company_id)
-        sql = text("""
+        sql = text(
+            """
             SELECT id, store_id, employee_id, meal_date, meal_type,
                    dish_ids, amount_fen, payment_method, status, created_at
             FROM enterprise_meal_orders
@@ -246,7 +254,8 @@ async def get_enterprise_meal_orders(
               AND is_deleted = FALSE
             ORDER BY meal_date DESC
             LIMIT 30
-        """)
+        """
+        )
         result = await db.execute(sql, {"eid": member_id, "month": month})
         rows = result.mappings().all()
         items = [

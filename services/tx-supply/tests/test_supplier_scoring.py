@@ -31,6 +31,7 @@ from services.supplier_scoring_engine import (
 # 辅助工具
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_engine() -> SupplierScoringEngine:
     return SupplierScoringEngine()
 
@@ -54,6 +55,7 @@ def _make_dimension_scores(
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 1：五维度加权计算正确性
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestWeightedScoreCalculation:
     """验证加权公式：composite_score = sum(维度值 × 权重) × 100"""
@@ -115,6 +117,7 @@ class TestWeightedScoreCalculation:
 # 测试 2：composite_score 范围验证（0-100）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestScoreRangeValidation:
     """composite_score 必须始终在 [0, 100] 范围内"""
 
@@ -151,6 +154,7 @@ class TestScoreRangeValidation:
 # 测试 3：评分历史写入格式验证
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestScoreHistoryFormat:
     """验证写入 supplier_score_history 的字段符合 v064 表结构"""
 
@@ -167,10 +171,15 @@ class TestScoreHistoryFormat:
             ai_insight="表现稳定，建议续约。",
         )
         required_fields = {
-            "tenant_id", "supplier_id",
-            "period_start", "period_end",
-            "delivery_rate", "quality_rate", "price_stability",
-            "response_speed", "compliance_rate",
+            "tenant_id",
+            "supplier_id",
+            "period_start",
+            "period_end",
+            "delivery_rate",
+            "quality_rate",
+            "price_stability",
+            "response_speed",
+            "compliance_rate",
             "composite_score",
         }
         for field in required_fields:
@@ -224,6 +233,7 @@ class TestScoreHistoryFormat:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 4：AI 洞察调用 mock
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestAIInsightMock:
     """验证 generate_ai_insight 通过 ModelRouter.complete 调用，不直接调用 API"""
@@ -307,6 +317,7 @@ class TestAIInsightMock:
 # 测试 5：供应商分级判定逻辑
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestSupplierTierClassification:
     """验证四级分层阈值正确：优质 ≥85 / 合格 ≥70 / 观察 ≥55 / 淘汰 <55"""
 
@@ -378,6 +389,7 @@ class TestSupplierTierClassification:
 # 测试 6：AI 洞察触发策略
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestAIInsightTriggerStrategy:
     """验证 AI 洞察触发条件：composite_score < 70 或首次月报"""
 
@@ -402,6 +414,7 @@ class TestAIInsightTriggerStrategy:
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试 7：DimensionScores Pydantic 模型验证
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestDimensionScoresModel:
     """验证 DimensionScores 的 Pydantic V2 约束"""

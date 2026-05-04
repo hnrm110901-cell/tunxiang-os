@@ -185,7 +185,8 @@ class StoreCloneService:
         """克隆菜品分类和菜品（不克隆库存）"""
         # 菜品分类
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_categories
                     (id, tenant_id, store_id, name, sort_order, is_available, created_at, updated_at)
                 SELECT gen_random_uuid(), :tenant_id, :tgt,
@@ -194,7 +195,8 @@ class StoreCloneService:
                 WHERE tenant_id = :tenant_id
                   AND store_id = :src
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -203,7 +205,8 @@ class StoreCloneService:
     async def _clone_pricing(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆折扣规则"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO discount_rules
                     (id, tenant_id, store_id, name, discount_rate,
                      min_amount_fen, valid_days, created_at, updated_at)
@@ -213,7 +216,8 @@ class StoreCloneService:
                 WHERE tenant_id = :tenant_id
                   AND store_id = :src
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -222,7 +226,8 @@ class StoreCloneService:
     async def _clone_roles(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆角色权限配置"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO role_configs
                     (id, tenant_id, store_id, role_name, role_level, permissions,
                      created_at, updated_at)
@@ -232,7 +237,8 @@ class StoreCloneService:
                 WHERE tenant_id = :tenant_id
                   AND store_id = :src
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -241,7 +247,8 @@ class StoreCloneService:
     async def _clone_print_templates(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆小票/厨房单模板"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO receipt_templates
                     (id, tenant_id, store_id, template_type, template_name,
                      content_json, is_default, created_at, updated_at)
@@ -251,7 +258,8 @@ class StoreCloneService:
                 WHERE tenant_id = :tenant_id
                   AND store_id = :src
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -260,7 +268,8 @@ class StoreCloneService:
     async def _clone_kds_routes(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆 KDS 路由规则"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_dept_mappings
                     (id, tenant_id, store_id, dish_id, dept_id, created_at, updated_at)
                 SELECT gen_random_uuid(), :tenant_id, :tgt,
@@ -269,7 +278,8 @@ class StoreCloneService:
                 WHERE tenant_id = :tenant_id
                   AND store_id = :src
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -278,7 +288,8 @@ class StoreCloneService:
     async def _clone_business_hours(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆营业时间配置"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stores
                 SET business_hours = (
                         SELECT business_hours FROM stores
@@ -286,7 +297,8 @@ class StoreCloneService:
                     ),
                     updated_at = NOW()
                 WHERE id = :tgt AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -295,7 +307,8 @@ class StoreCloneService:
     async def _clone_thresholds(cls, db: AsyncSession, tenant_id: UUID, src: UUID, tgt: UUID) -> None:
         """克隆毛利底线、折扣阈值等经营阈值"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stores
                 SET min_gross_margin_rate = (
                         SELECT min_gross_margin_rate FROM stores
@@ -311,7 +324,8 @@ class StoreCloneService:
                     ),
                     updated_at = NOW()
                 WHERE id = :tgt AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "src": str(src), "tgt": str(tgt)},
         )
         await db.flush()
@@ -330,14 +344,16 @@ class StoreCloneService:
         operator_id: UUID,
     ) -> None:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_clone_tasks
                     (id, tenant_id, source_store_id, target_store_id,
                      selected_items, status, progress, created_by, created_at, updated_at)
                 VALUES
                     (:id, :tenant_id, :source, :target,
                      :items, 'pending', 0, :operator_id, NOW(), NOW())
-            """),
+            """
+            ),
             {
                 "id": task_id,
                 "tenant_id": str(tenant_id),
@@ -361,7 +377,8 @@ class StoreCloneService:
         progress_pct = 100 if is_terminal else 0
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE store_clone_tasks
                     SET status = :status,
                         progress = :progress,
@@ -369,7 +386,8 @@ class StoreCloneService:
                         error_message = :error_msg,
                         updated_at = NOW()
                     WHERE id = :task_id
-                """),
+                """
+                ),
                 {
                     "task_id": task_id,
                     "status": status.value,

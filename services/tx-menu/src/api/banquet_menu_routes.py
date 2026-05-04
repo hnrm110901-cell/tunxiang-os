@@ -132,14 +132,16 @@ async def list_banquet_menus(
         conditions.append("tier = :tier")
         params["tier"] = tier
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT id, menu_code, menu_name, tier, per_person_fen,
                min_persons, min_tables, description, highlights,
                is_active, valid_from, valid_until, sort_order
         FROM banquet_menus
         WHERE {" AND ".join(conditions)}
         ORDER BY per_person_fen
-    """),
+    """
+        ),
         params,
     )
     rows = result.fetchall()
@@ -179,7 +181,8 @@ async def create_banquet_menu(
     await _rls(db, tid)
     menu_id = _uuid.uuid4()
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO banquet_menus
             (id, tenant_id, store_id, menu_code, menu_name, tier,
              per_person_fen, min_persons, min_tables,
@@ -188,7 +191,8 @@ async def create_banquet_menu(
             (:id, :tid, :sid, :code, :name, :tier,
              :price, :min_p, :min_t,
              :desc, :hl::jsonb, :vf::date, :vu::date)
-    """),
+    """
+        ),
         {
             "id": menu_id,
             "tid": _uuid.UUID(tid),
@@ -224,12 +228,14 @@ async def get_banquet_menu_detail(
 
     # 菜单基本信息
     menu_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, menu_code, menu_name, tier, per_person_fen,
                min_persons, min_tables, description, highlights
         FROM banquet_menus
         WHERE id = :mid AND tenant_id = :tid AND is_deleted = false
-    """),
+    """
+        ),
         {"mid": mid, "tid": tiduid},
     )
     menu = menu_result.fetchone()
@@ -238,19 +244,22 @@ async def get_banquet_menu_detail(
 
     # 分节列表
     sections_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, section_name, serve_sequence, serve_delay_minutes, sort_order, notes
         FROM banquet_menu_sections
         WHERE menu_id = :mid AND tenant_id = :tid
         ORDER BY serve_sequence, sort_order
-    """),
+    """
+        ),
         {"mid": mid, "tid": tiduid},
     )
     sections_raw = sections_result.fetchall()
 
     # 每节菜品
     items_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT bmi.id, bmi.section_id, bmi.dish_id, bmi.dish_name,
                bmi.quantity_per_table, bmi.is_mandatory,
                bmi.alternative_dish_ids, bmi.extra_price_fen,
@@ -260,7 +269,8 @@ async def get_banquet_menu_detail(
         LEFT JOIN dishes d ON d.id = bmi.dish_id
         WHERE bmi.menu_id = :mid AND bmi.tenant_id = :tid
         ORDER BY bmi.sort_order
-    """),
+    """
+        ),
         {"mid": mid, "tid": tiduid},
     )
     items_raw = items_result.fetchall()
@@ -335,12 +345,14 @@ async def add_section(
     await _rls(db, tid)
     section_id = _uuid.uuid4()
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO banquet_menu_sections
             (id, tenant_id, menu_id, section_name, serve_sequence,
              serve_delay_minutes, sort_order, notes)
         VALUES (:id, :tid, :mid, :name, :seq, :delay, :sort, :notes)
-    """),
+    """
+        ),
         {
             "id": section_id,
             "tid": _uuid.UUID(tid),
@@ -378,7 +390,8 @@ async def add_menu_item(
     item_id = _uuid.uuid4()
     alts_json = str(req.alternative_dish_ids).replace("'", '"') if req.alternative_dish_ids else "[]"
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO banquet_menu_items
             (id, tenant_id, menu_id, section_id, dish_id, dish_name,
              quantity_per_table, is_mandatory, alternative_dish_ids,
@@ -387,7 +400,8 @@ async def add_menu_item(
             (:id, :tid, :mid, :sid, :did, :name,
              :qty, :mandatory, :alts::jsonb,
              :extra, :note, :sort)
-    """),
+    """
+        ),
         {
             "id": item_id,
             "tid": _uuid.UUID(tid),
@@ -429,7 +443,8 @@ async def create_banquet_session(
     session_id = _uuid.uuid4()
     table_ids_json = str(req.table_ids).replace("'", '"') if req.table_ids else "[]"
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO banquet_sessions
             (id, tenant_id, store_id, contract_id, banquet_menu_id,
              session_name, scheduled_at, guest_count, table_count,
@@ -438,7 +453,8 @@ async def create_banquet_session(
             (:id, :tid, :sid, :cid, :mid,
              :name, :scheduled_at, :guests, :tables,
              :table_ids::jsonb, 'scheduled', :notes)
-    """),
+    """
+        ),
         {
             "id": session_id,
             "tid": _uuid.UUID(tid),
@@ -486,7 +502,8 @@ async def list_banquet_sessions(
         conditions.append("DATE(bs.scheduled_at) = :date::date")
         params["date"] = date
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT bs.id, bs.session_name, bs.scheduled_at, bs.status,
                bs.guest_count, bs.table_count, bs.notes,
                bm.menu_name, bm.tier, bm.per_person_fen
@@ -494,7 +511,8 @@ async def list_banquet_sessions(
         LEFT JOIN banquet_menus bm ON bm.id = bs.banquet_menu_id
         WHERE {" AND ".join(conditions)}
         ORDER BY bs.scheduled_at
-    """),
+    """
+        ),
         params,
     )
     rows = result.fetchall()
@@ -541,11 +559,13 @@ async def banquet_session_action(
 
     # 查当前状态
     cur = await db.execute(
-        text("""
+        text(
+            """
         SELECT status, banquet_menu_id, table_ids, scheduled_at, current_section_id
         FROM banquet_sessions
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = false
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(session_id), "tid": _uuid.UUID(tid)},
     )
     session = cur.fetchone()
@@ -571,11 +591,13 @@ async def banquet_session_action(
 
         # 获取第一节分节，设置下一节触发时间
         first_section = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, serve_delay_minutes FROM banquet_menu_sections
             WHERE menu_id = :mid AND tenant_id = :tid
             ORDER BY serve_sequence LIMIT 1
-        """),
+        """
+            ),
             {"mid": _uuid.UUID(str(menu_id)), "tid": _uuid.UUID(tid)},
         )
         first = first_section.fetchone()
@@ -588,7 +610,8 @@ async def banquet_session_action(
         # 查找下一节
         if current_section_id:
             next_sec = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT id, section_name, serve_delay_minutes FROM banquet_menu_sections
                 WHERE menu_id = :mid AND tenant_id = :tid
                   AND serve_sequence > (
@@ -596,7 +619,8 @@ async def banquet_session_action(
                     WHERE id = :cur_sid
                   )
                 ORDER BY serve_sequence LIMIT 1
-            """),
+            """
+                ),
                 {"mid": _uuid.UUID(str(menu_id)), "tid": _uuid.UUID(tid), "cur_sid": current_section_id},
             )
             next_row = next_sec.fetchone()
@@ -631,11 +655,13 @@ async def banquet_session_action(
 
     if set_parts:
         await db.execute(
-            text(f"""
+            text(
+                f"""
             UPDATE banquet_sessions
             SET {", ".join(set_parts)}, updated_at = now()
             WHERE id = :sid AND tenant_id = :tid
-        """),
+        """
+            ),
             set_params,
         )
 
@@ -674,14 +700,16 @@ async def get_banquet_notice_print_data(
     tiduid = _uuid.UUID(tid)
 
     session_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT bs.id, bs.session_name, bs.scheduled_at, bs.guest_count, bs.table_count,
                bs.notes, bs.status,
                bm.menu_name, bm.per_person_fen, bm.tier
         FROM banquet_sessions bs
         LEFT JOIN banquet_menus bm ON bm.id = bs.banquet_menu_id
         WHERE bs.id = :sid AND bs.tenant_id = :tid
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(session_id), "tid": tiduid},
     )
     session = session_result.fetchone()
@@ -690,7 +718,8 @@ async def get_banquet_notice_print_data(
 
     # 获取菜单详情（各节菜品）
     menu_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT s.section_name, s.serve_sequence, s.serve_delay_minutes,
                mi.dish_name, mi.quantity_per_table, mi.is_mandatory, mi.note
         FROM banquet_menu_sections s
@@ -700,7 +729,8 @@ async def get_banquet_notice_print_data(
             WHERE id = :sid AND tenant_id = :tid
         ) AND s.tenant_id = :tid
         ORDER BY s.serve_sequence, mi.sort_order
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(session_id), "tid": tiduid},
     )
     menu_rows = menu_result.fetchall()

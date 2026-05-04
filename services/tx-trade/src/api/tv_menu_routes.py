@@ -101,3 +101,109 @@ async def seafood_board(store_id: str, tenant_id: str = Header(alias="X-Tenant-I
 async def ranking(store_id: str, metric: str = "hot_sales", tenant_id: str = Header(alias="X-Tenant-ID")):
     data = await tv_menu_service.get_ranking_board(store_id, metric, tenant_id, db=None)
     return {"ok": True, "data": data}
+
+
+@router.get("/waitlist/{store_id}")
+async def waitlist_current(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_waitlist_current(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/waitlist-detail/{store_id}")
+async def waitlist_detailed(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_waitlist_detailed(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/categories/{store_id}")
+async def categories(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_categories(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/dishes/{store_id}/{category_id}")
+async def dishes_by_category(
+    store_id: str,
+    category_id: str,
+    is_available: bool = Query(False),
+    tenant_id: str = Header(alias="X-Tenant-ID"),
+):
+    data = await tv_menu_service.get_dishes_by_category(store_id, category_id, is_available, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/sales-today/{store_id}")
+async def sales_today(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_sales_today(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/combos/{store_id}")
+async def combos(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_combo_showcase(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/festival/{store_id}")
+async def festival_theme(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_festival_theme(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/weather-mock")
+async def weather_mock(city: str = Query("beijing")):
+    """Mock 天气端点 — 不依赖租户，单纯 mock 天气数据"""
+    data = await tv_menu_service.get_weather_mock(city)
+    return {"ok": True, "data": data}
+
+
+class ScreenHeartbeatRequest(BaseModel):
+    store_id: str
+    screen_id: str
+
+
+@router.post("/screen/heartbeat")
+async def screen_heartbeat(req: ScreenHeartbeatRequest, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.screen_heartbeat(req.store_id, req.screen_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+class ScreenUnregisterRequest(BaseModel):
+    store_id: str
+    screen_id: str
+
+
+@router.post("/screen/unregister")
+async def screen_unregister(req: ScreenUnregisterRequest, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.screen_unregister(req.store_id, req.screen_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+class MarkSoldOutRequest(BaseModel):
+    store_id: str
+    dish_ids: list[str]
+
+
+@router.post("/sold-out")
+async def mark_sold_out(req: MarkSoldOutRequest, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.mark_sold_out(req.store_id, req.dish_ids, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/sold-out/{store_id}")
+async def sold_out_list(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_sold_out_list(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/timeslot/{store_id}")
+async def timeslot_switch(store_id: str, tenant_id: str = Header(alias="X-Tenant-ID")):
+    data = await tv_menu_service.get_timeslot_switch(store_id, tenant_id, db=None)
+    return {"ok": True, "data": data}
+
+
+@router.get("/health")
+async def health():
+    """TV 菜单服务健康检查 — 不需要租户"""
+    data = await tv_menu_service.get_health()
+    return {"ok": True, "data": data}

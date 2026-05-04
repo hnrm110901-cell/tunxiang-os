@@ -318,7 +318,8 @@ class PLReportService:
         end_dt = datetime.combine(biz_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(cs.raw_material_cost), 0) AS total_cost
                 FROM cost_snapshots cs
                 JOIN orders o ON o.id = cs.order_id
@@ -326,7 +327,8 @@ class PLReportService:
                   AND cs.tenant_id = :tenant_id
                   AND cs.computed_at >= :start_dt
                   AND cs.computed_at <= :end_dt
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -385,7 +387,8 @@ class PLReportService:
         end_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     DATE(o.created_at AT TIME ZONE 'UTC') AS biz_date,
                     COALESCE(SUM(o.final_amount_fen), 0)  AS revenue_fen,
@@ -404,7 +407,8 @@ class PLReportService:
                   AND o.created_at <= :end_dt
                 GROUP BY DATE(o.created_at AT TIME ZONE 'UTC')
                 ORDER BY biz_date
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -436,7 +440,8 @@ class PLReportService:
         sid_strs = [str(s) for s in store_ids]
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     o.store_id,
                     COALESCE(SUM(o.final_amount_fen), 0)  AS revenue_fen,
@@ -454,7 +459,8 @@ class PLReportService:
                   AND o.created_at >= :start_dt
                   AND o.created_at <= :end_dt
                 GROUP BY o.store_id
-            """),
+            """
+            ),
             {
                 "store_ids": sid_strs,
                 "tenant_id": str(tenant_id),
@@ -491,7 +497,8 @@ class PLReportService:
             params["status"] = status
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, voucher_no, voucher_type, total_amount, status, created_at
                 FROM financial_vouchers
                 WHERE store_id = :store_id::UUID
@@ -499,7 +506,8 @@ class PLReportService:
                   AND voucher_date = :voucher_date::DATE
                   {status_clause}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         return [

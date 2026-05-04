@@ -398,13 +398,15 @@ class PnLEngine:
 
         # 获取已同步的 order_id 集合，避免重复插入
         existing_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT order_id FROM revenue_records
                 WHERE tenant_id = :tenant_id::UUID
                   AND store_id = :store_id::UUID
                   AND record_date = :record_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -430,7 +432,8 @@ class PnLEngine:
             actual_revenue_fen = int(net_amount * 0.85) if is_group_buy_channel else net_amount
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO revenue_records
                     (tenant_id, store_id, record_date, order_id, channel,
                      gross_amount_fen, discount_fen, net_amount_fen,
@@ -445,7 +448,8 @@ class PnLEngine:
                         discount_fen = EXCLUDED.discount_fen,
                         net_amount_fen = EXCLUDED.net_amount_fen,
                         actual_revenue_fen = EXCLUDED.actual_revenue_fen
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": str(store_id),
@@ -507,7 +511,8 @@ class PnLEngine:
 
         # 先查 cost_items 中已记录的活鲜死亡成本
         explicit_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(amount_fen), 0)
                 FROM cost_items
                 WHERE tenant_id = :tenant_id::UUID
@@ -515,7 +520,8 @@ class PnLEngine:
                   AND cost_date = :cost_date
                   AND cost_type = 'live_seafood_death'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -530,7 +536,8 @@ class PnLEngine:
         # Fallback：从 live_seafood_weigh_records 的当日取消/死亡记录估算
         # 取消的称重记录视为活鲜损耗（顾客退单后鱼无法回池的场景）
         cancelled_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(r.amount_fen), 0) AS cancelled_amount,
                     COUNT(*) AS cancelled_count
@@ -540,7 +547,8 @@ class PnLEngine:
                   AND r.status = 'cancelled'
                   AND r.updated_at::date = :loss_date
                   AND r.is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -553,7 +561,8 @@ class PnLEngine:
         # 从 fish_tank_zones 的 alive_rate_pct 估算自然死亡损耗
         # 若某鱼缸当天有盘点记录（dish.live_stock_weight_g 变化），计算差异损耗
         tank_loss_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(
                         d.purchase_price_fen * (1.0 - d.alive_rate_pct / 100.0)
@@ -568,7 +577,8 @@ class PnLEngine:
                   AND d.is_deleted = FALSE
                   AND tz.is_deleted = FALSE
                   AND tz.is_active = TRUE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -671,7 +681,8 @@ class PnLEngine:
 
         # 2. 损耗成本（cost_items 表 wastage 类型）
         wastage_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(amount_fen), 0)
                 FROM cost_items
                 WHERE tenant_id = :tenant_id::UUID
@@ -679,7 +690,8 @@ class PnLEngine:
                   AND cost_date = :cost_date
                   AND cost_type = 'wastage'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -717,7 +729,8 @@ class PnLEngine:
         """
         # 从 finance_configs 表读取，优先门店级配置，按 effective_from 取最近生效版本
         cfg_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT config_type, value_fen, value_pct
                 FROM finance_configs
                 WHERE tenant_id = :tenant_id::UUID
@@ -728,7 +741,8 @@ class PnLEngine:
                 ORDER BY
                     CASE WHEN store_id IS NOT NULL THEN 0 ELSE 1 END,
                     effective_from DESC NULLS LAST
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -800,7 +814,8 @@ class PnLEngine:
         start_dt, end_dt = _day_window(biz_date)
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(
                         cs.actual_hours * COALESCE(e.hourly_wage_fen, 0)
                     ), 0) AS labor_cost
@@ -811,7 +826,8 @@ class PnLEngine:
                       AND cs.shift_start >= :start_dt
                       AND cs.shift_start <= :end_dt
                       AND cs.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -879,7 +895,8 @@ class PnLEngine:
     ) -> None:
         """Upsert daily_pnl 表（唯一键：tenant_id + store_id + pnl_date）。"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO daily_pnl (
                     tenant_id, store_id, pnl_date,
                     gross_revenue_fen, dine_in_revenue_fen, takeaway_revenue_fen,
@@ -926,7 +943,8 @@ class PnLEngine:
                     calculated_at           = now(),
                     updated_at              = now()
                 WHERE daily_pnl.status != 'locked'
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(result.store_id),

@@ -46,7 +46,8 @@ class ForgeSDKService:
         api_key_prefix = raw_key[:16]
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_api_keys
                     (key_id, developer_id, key_name, api_key_hash,
                      api_key_prefix, permissions, status, usage_count)
@@ -55,7 +56,8 @@ class ForgeSDKService:
                      :api_key_prefix, :permissions, 'active', 0)
                 RETURNING id, key_id, key_name, api_key_prefix,
                           permissions, status, created_at
-            """),
+            """
+            ),
             {
                 "key_id": key_id,
                 "developer_id": developer_id,
@@ -83,12 +85,14 @@ class ForgeSDKService:
     async def revoke_api_key(self, db: AsyncSession, key_id: str) -> dict:
         """吊销 API 密钥。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_api_keys
                 SET status = 'revoked', revoked_at = NOW()
                 WHERE key_id = :key_id AND status = 'active'
                 RETURNING key_id, status, revoked_at
-            """),
+            """
+            ),
             {"key_id": key_id},
         )
         row = result.mappings().first()
@@ -102,13 +106,15 @@ class ForgeSDKService:
     async def list_api_keys(self, db: AsyncSession, developer_id: str) -> list[dict]:
         """列出开发者的所有密钥（前缀脱敏显示）。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT key_id, key_name, api_key_prefix, permissions,
                        status, usage_count, last_used_at, created_at, revoked_at
                 FROM forge_api_keys
                 WHERE developer_id = :developer_id
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         rows = result.mappings().all()
@@ -124,11 +130,13 @@ class ForgeSDKService:
         """汇总开发者 API 用量及配额。"""
         # 获取开发者类型以确定配额
         dev_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT dev_type
                 FROM forge_developers
                 WHERE developer_id = :developer_id
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         dev_row = dev_result.mappings().first()
@@ -137,13 +145,15 @@ class ForgeSDKService:
 
         # 汇总用量
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(usage_count), 0) AS total_calls,
                     COUNT(*) FILTER (WHERE status = 'active') AS active_keys
                 FROM forge_api_keys
                 WHERE developer_id = :developer_id
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         agg = result.mappings().one()
@@ -151,13 +161,15 @@ class ForgeSDKService:
 
         # 逐 key 明细
         breakdown_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT key_id, key_name, api_key_prefix, usage_count,
                        status, last_used_at
                 FROM forge_api_keys
                 WHERE developer_id = :developer_id AND status = 'active'
                 ORDER BY usage_count DESC
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         key_breakdown = [dict(r) for r in breakdown_result.mappings().all()]

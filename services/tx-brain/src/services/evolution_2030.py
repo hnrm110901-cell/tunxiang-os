@@ -15,8 +15,6 @@ from typing import Any
 
 import structlog
 
-from .cfo_dashboard import _safe_ratio
-
 logger = structlog.get_logger()
 
 # ─── 默认功能集 ──────────────────────────────────────────────────

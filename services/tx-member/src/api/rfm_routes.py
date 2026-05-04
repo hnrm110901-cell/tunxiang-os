@@ -181,7 +181,8 @@ async def get_rfm_changes(
 
     # 尝试从 rfm_change_logs 表查询（如不存在则降级为简易查询）
     try:
-        change_sql = text("""
+        change_sql = text(
+            """
             SELECT
                 cl.customer_id,
                 c.display_name,
@@ -198,9 +199,11 @@ async def get_rfm_changes(
                    OR (:direction = 'downgrade' AND cl.new_level > cl.old_level))
             ORDER BY cl.changed_at DESC
             LIMIT :size OFFSET :offset
-        """)
+        """
+        )
 
-        count_sql = text("""
+        count_sql = text(
+            """
             SELECT count(*)
             FROM rfm_change_logs cl
             WHERE cl.tenant_id = :tenant_id
@@ -208,7 +211,8 @@ async def get_rfm_changes(
               AND (:direction = 'all'
                    OR (:direction = 'upgrade' AND cl.new_level < cl.old_level)
                    OR (:direction = 'downgrade' AND cl.new_level > cl.old_level))
-        """)
+        """
+        )
 
         params = {
             "tenant_id": str(tenant_id),

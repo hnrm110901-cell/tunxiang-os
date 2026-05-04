@@ -1,4 +1,5 @@
 """宴会售后服务 — 评价收集/转介绍/复购提醒"""
+
 import uuid
 from datetime import datetime, timezone
 
@@ -32,10 +33,12 @@ class BanquetAftercareService:
             raise ValueError("评分范围1-5")
         fid = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_feedbacks (id, tenant_id, banquet_id, customer_name, customer_phone, overall_score, food_score, service_score, venue_score, value_score, comments, improvement_suggestions, would_recommend)
             VALUES (:id, :tid, :bid, :name, :phone, :overall, :food, :svc, :venue, :value, :comments, :improve, :recommend)
-        """),
+        """
+            ),
             {
                 "id": fid,
                 "tid": self.tenant_id,
@@ -121,10 +124,12 @@ class BanquetAftercareService:
     ) -> dict:
         rid = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_referrals (id, tenant_id, referrer_banquet_id, referrer_name, referrer_phone, referred_name, referred_phone, referrer_reward_type, referrer_reward_value_fen, status)
             VALUES (:id, :tid, :rbid, :rname, :rphone, :dname, :dphone, :rtype, :rvalue, 'pending')
-        """),
+        """
+            ),
             {
                 "id": rid,
                 "tid": self.tenant_id,

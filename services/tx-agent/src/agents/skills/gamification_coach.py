@@ -340,20 +340,23 @@ class GamificationCoachAgent(SkillAgent):
             )
 
             # 活跃会员数（近30天有订单）
-            member_q = sa_text("""
+            member_q = sa_text(
+                """
                 SELECT COUNT(DISTINCT customer_id) AS cnt
                 FROM orders
                 WHERE tenant_id = :tid
                   AND (:sid IS NULL OR store_id = :sid::uuid)
                   AND status = 'paid' AND is_deleted = false
                   AND created_at >= NOW() - INTERVAL '30 days'
-            """)
+            """
+            )
             r1 = await self._db.execute(member_q, {"tid": str(tenant_id), "sid": store_id})
             row1 = r1.mappings().first()
             defaults["active_member_count"] = int(row1["cnt"]) if row1 else 0
 
             # 近30天订单数 + 平均客单价
-            order_q = sa_text("""
+            order_q = sa_text(
+                """
                 SELECT COUNT(*) AS order_count,
                        COALESCE(AVG(total_fen), 0) AS avg_fen
                 FROM orders
@@ -361,7 +364,8 @@ class GamificationCoachAgent(SkillAgent):
                   AND (:sid IS NULL OR store_id = :sid::uuid)
                   AND status = 'paid' AND is_deleted = false
                   AND created_at >= NOW() - INTERVAL '30 days'
-            """)
+            """
+            )
             r2 = await self._db.execute(order_q, {"tid": str(tenant_id), "sid": store_id})
             row2 = r2.mappings().first()
             if row2:

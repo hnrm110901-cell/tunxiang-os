@@ -17,7 +17,9 @@ from .api.anomaly_routes import router as anomaly_router
 from .api.banquet_analytics_routes import router as banquet_analytics_router  # S7 宴会分析报表（8端点）
 from .api.booking_report_routes import router as booking_report_router  # 预定报表（4端点）
 from .api.boss_bi_routes import router as boss_bi_router
+from .api.ceo_cockpit_routes import router as ceo_cockpit_router  # G6: CEO今日经营驾驶舱（7端点）
 from .api.cost_health_routes import router as cost_health_router
+from .api.cost_root_cause_routes import router as cost_root_cause_router  # v379: 成本根因分析Agent（4端点）
 from .api.daily_brief_routes import router as daily_brief_router
 from .api.dashboard_routes import router as dashboard_router
 from .api.delivery_report_routes import router as delivery_report_router  # 外卖报表（4端点）
@@ -38,8 +40,6 @@ from .api.monthly_brief_routes import router as monthly_brief_router  # W2 4/13 
 from .api.narrative_enhanced_routes import router as narrative_enhanced_router  # P3-02
 from .api.nlq_routes import router as nlq_router
 from .api.private_domain_routes import router as private_domain_router
-from .api.ceo_cockpit_routes import router as ceo_cockpit_router  # G6: CEO今日经营驾驶舱（7端点）
-from .api.cost_root_cause_routes import router as cost_root_cause_router  # v379: 成本根因分析Agent（4端点）
 from .api.report_builder_routes import router as report_builder_router  # S5: 报表配置化引擎（12端点）
 from .api.report_config_routes import router as report_config_router
 from .api.report_routes import router as report_router

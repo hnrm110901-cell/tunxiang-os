@@ -238,7 +238,8 @@ async def get_alert_detail(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             ca.id::text AS alert_id,
             ca.employee_id::text,
@@ -265,7 +266,8 @@ async def get_alert_detail(
         LEFT JOIN employees e ON e.id = ca.employee_id AND e.is_deleted = FALSE
         LEFT JOIN departments d ON d.id = e.department_id AND d.is_active = TRUE
         WHERE ca.id = :alert_id AND ca.is_deleted = FALSE
-    """)
+    """
+    )
 
     result = await db.execute(sql, {"alert_id": alert_id})
     row = result.fetchone()
@@ -296,7 +298,8 @@ async def acknowledge_alert(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE compliance_alerts
             SET status = 'acknowledged',
                 acknowledged_by = :ack_by,
@@ -305,7 +308,8 @@ async def acknowledge_alert(
                 updated_at = :now
             WHERE id = :alert_id AND is_deleted = FALSE AND status = 'pending'
             RETURNING id::text AS alert_id
-        """),
+        """
+        ),
         {
             "alert_id": alert_id,
             "ack_by": req.acknowledged_by,
@@ -345,7 +349,8 @@ async def resolve_alert(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE compliance_alerts
             SET status = 'resolved',
                 resolved_by = :res_by,
@@ -354,7 +359,8 @@ async def resolve_alert(
                 updated_at = :now
             WHERE id = :alert_id AND is_deleted = FALSE AND status IN ('pending', 'acknowledged')
             RETURNING id::text AS alert_id
-        """),
+        """
+        ),
         {
             "alert_id": alert_id,
             "res_by": req.resolved_by,
@@ -395,7 +401,8 @@ async def get_compliance_dashboard(
         params["store_id"] = store_id
 
     # 总体统计
-    overview_sql = text(f"""
+    overview_sql = text(
+        f"""
         SELECT
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE ca.status = 'pending') AS pending_count,
@@ -407,14 +414,16 @@ async def get_compliance_dashboard(
             COUNT(*) FILTER (WHERE ca.severity = 'low') AS low_count
         FROM compliance_alerts ca
         WHERE ca.is_deleted = FALSE {store_filter}
-    """)
+    """
+    )
     overview_result = await db.execute(text(str(overview_sql)), params)
     overview = dict(overview_result.fetchone()._mapping)
     for key in overview:
         overview[key] = int(overview[key] or 0)
 
     # 按类型统计
-    type_sql = text(f"""
+    type_sql = text(
+        f"""
         SELECT
             ca.alert_type,
             COUNT(*) AS count,
@@ -423,7 +432,8 @@ async def get_compliance_dashboard(
         WHERE ca.is_deleted = FALSE {store_filter}
         GROUP BY ca.alert_type
         ORDER BY count DESC
-    """)
+    """
+    )
     type_result = await db.execute(type_sql, params)
     type_items = []
     for r in type_result.fetchall():
@@ -433,7 +443,8 @@ async def get_compliance_dashboard(
         type_items.append(d)
 
     # 按门店统计
-    store_sql = text(f"""
+    store_sql = text(
+        f"""
         SELECT
             ca.store_id::text,
             COUNT(*) AS total,
@@ -443,7 +454,8 @@ async def get_compliance_dashboard(
         WHERE ca.is_deleted = FALSE AND ca.store_id IS NOT NULL {store_filter}
         GROUP BY ca.store_id
         ORDER BY urgent DESC, total DESC
-    """)
+    """
+    )
     store_result = await db.execute(store_sql, params)
     store_items = []
     for r in store_result.fetchall():
@@ -454,7 +466,8 @@ async def get_compliance_dashboard(
         store_items.append(d)
 
     # 近7天趋势
-    trend_sql = text(f"""
+    trend_sql = text(
+        f"""
         SELECT
             ca.created_at::date AS date,
             COUNT(*) AS new_alerts,
@@ -465,7 +478,8 @@ async def get_compliance_dashboard(
           {store_filter}
         GROUP BY ca.created_at::date
         ORDER BY date
-    """)
+    """
+    )
     trend_result = await db.execute(trend_sql, params)
     trend_items = []
     for r in trend_result.fetchall():
@@ -518,7 +532,8 @@ async def trigger_compliance_scan(
 
     # 证照扫描
     if req.scan_type in ("all", "documents"):
-        doc_sql = text("""
+        doc_sql = text(
+            """
             WITH expiring AS (
                 SELECT e.id AS employee_id, e.store_id,
                        'health_cert_expiry' AS alert_type,
@@ -561,7 +576,8 @@ async def trigger_compliance_scan(
                   AND ca.alert_type = expiring.alert_type
                   AND ca.status IN ('pending', 'acknowledged')
             )
-        """)
+        """
+        )
         doc_result = await db.execute(doc_sql)
         for r in doc_result.fetchall():
             d = dict(r._mapping)
@@ -576,7 +592,8 @@ async def trigger_compliance_scan(
                 sev = "low"
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO compliance_alerts (
                         id, tenant_id, employee_id, store_id, alert_type, severity,
                         title, description, status, created_at, updated_at, is_deleted
@@ -584,7 +601,8 @@ async def trigger_compliance_scan(
                         :id, :tid, :emp_id, :store_id, :alert_type, :severity,
                         :title, :desc, 'pending', :now, :now, FALSE
                     )
-                """),
+                """
+                ),
                 {
                     "id": str(uuid4()),
                     "tid": tenant_id,
@@ -601,7 +619,8 @@ async def trigger_compliance_scan(
 
     # 考勤异常扫描
     if req.scan_type in ("all", "attendance"):
-        att_sql = text("""
+        att_sql = text(
+            """
             SELECT
                 employee_id,
                 store_id,
@@ -612,7 +631,8 @@ async def trigger_compliance_scan(
             GROUP BY employee_id, store_id
             HAVING COUNT(*) FILTER (WHERE is_absent = TRUE) >= 3
                 OR COUNT(*) FILTER (WHERE is_late = TRUE) >= 5
-        """)
+        """
+        )
         att_result = await db.execute(att_sql)
         for r in att_result.fetchall():
             d = dict(r._mapping)
@@ -622,20 +642,23 @@ async def trigger_compliance_scan(
 
             # 去重
             existing = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM compliance_alerts
                     WHERE employee_id = :emp_id AND alert_type = 'attendance_anomaly'
                       AND status IN ('pending', 'acknowledged')
                       AND created_at >= CURRENT_DATE - INTERVAL '7 days'
                     LIMIT 1
-                """),
+                """
+                ),
                 {"emp_id": str(d["employee_id"])},
             )
             if existing.fetchone():
                 continue
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO compliance_alerts (
                         id, tenant_id, employee_id, store_id, alert_type, severity,
                         title, description, status, created_at, updated_at, is_deleted
@@ -643,7 +666,8 @@ async def trigger_compliance_scan(
                         :id, :tid, :emp_id, :store_id, 'attendance_anomaly', :severity,
                         :title, :desc, 'pending', :now, :now, FALSE
                     )
-                """),
+                """
+                ),
                 {
                     "id": str(uuid4()),
                     "tid": tenant_id,
@@ -659,7 +683,8 @@ async def trigger_compliance_scan(
 
     # 绩效扫描
     if req.scan_type in ("all", "performance"):
-        perf_sql = text("""
+        perf_sql = text(
+            """
             WITH recent AS (
                 SELECT
                     employee_id,
@@ -679,27 +704,31 @@ async def trigger_compliance_scan(
             SELECT r.employee_id
             FROM recent r, overall_avg oa
             WHERE r.avg_net < oa.global_avg * 0.8
-        """)
+        """
+        )
         perf_result = await db.execute(perf_sql)
         for r in perf_result.fetchall():
             emp_id = str(r._mapping["employee_id"])
 
             # 去重
             existing = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM compliance_alerts
                     WHERE employee_id = :emp_id AND alert_type = 'low_performance'
                       AND status IN ('pending', 'acknowledged')
                       AND created_at >= CURRENT_DATE - INTERVAL '30 days'
                     LIMIT 1
-                """),
+                """
+                ),
                 {"emp_id": emp_id},
             )
             if existing.fetchone():
                 continue
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO compliance_alerts (
                         id, tenant_id, employee_id, alert_type, severity,
                         title, description, status, created_at, updated_at, is_deleted
@@ -707,7 +736,8 @@ async def trigger_compliance_scan(
                         :id, :tid, :emp_id, 'low_performance', 'high',
                         :title, :desc, 'pending', :now, :now, FALSE
                     )
-                """),
+                """
+                ),
                 {
                     "id": str(uuid4()),
                     "tid": tenant_id,

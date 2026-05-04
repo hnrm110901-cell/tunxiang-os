@@ -100,9 +100,7 @@ async def get_dynamic_price(
     if daypart:
         ctx["daypart"] = daypart
     try:
-        result = await _svc.calculate_dynamic_price(
-            db, store_id, x_tenant_id, dish_id, context=ctx
-        )
+        result = await _svc.calculate_dynamic_price(db, store_id, x_tenant_id, dish_id, context=ctx)
         return {"ok": True, "data": result}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -122,9 +120,7 @@ async def batch_calculate_prices(
 ) -> dict[str, Any]:
     """批量计算门店所有菜品动态价格（开市前刷新）"""
     try:
-        results = await _svc.calculate_store_prices(
-            db, store_id, x_tenant_id
-        )
+        results = await _svc.calculate_store_prices(db, store_id, x_tenant_id)
         return {
             "ok": True,
             "data": {
@@ -151,9 +147,7 @@ async def simulate_pricing(
     """模拟定价 — 给定假设条件，预览定价结果（不写库）"""
     mock_ctx = req.mock_context.model_dump(exclude_none=True)
     try:
-        result = await _svc.simulate_pricing(
-            db, store_id, x_tenant_id, req.dish_id, mock_ctx
-        )
+        result = await _svc.simulate_pricing(db, store_id, x_tenant_id, req.dish_id, mock_ctx)
         return {"ok": True, "data": result}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -175,9 +169,7 @@ async def get_pricing_history(
 ) -> dict[str, Any]:
     """查询菜品动态定价历史"""
     try:
-        history = await _svc.get_pricing_history(
-            db, store_id, x_tenant_id, dish_id, days=days
-        )
+        history = await _svc.get_pricing_history(db, store_id, x_tenant_id, dish_id, days=days)
         return {
             "ok": True,
             "data": {
@@ -206,9 +198,7 @@ async def list_rules(
 ) -> dict[str, Any]:
     """获取动态定价规则列表"""
     try:
-        rules = await _svc.list_rules(
-            db, store_id, x_tenant_id, dish_id=dish_id, rule_type=rule_type
-        )
+        rules = await _svc.list_rules(db, store_id, x_tenant_id, dish_id=dish_id, rule_type=rule_type)
         return {
             "ok": True,
             "data": {"rules": rules, "total": len(rules)},
@@ -231,9 +221,7 @@ async def create_rule(
     rule_data = req.model_dump(exclude_none=True)
     store_id = rule_data.pop("store_id")
     try:
-        result = await _svc.create_rule(
-            db, store_id, x_tenant_id, rule_data
-        )
+        result = await _svc.create_rule(db, store_id, x_tenant_id, rule_data)
         await db.commit()
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:

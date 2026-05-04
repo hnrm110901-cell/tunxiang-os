@@ -23,7 +23,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -197,6 +196,7 @@ def _patch_emit_and_create_task(monkeypatch):
     通过 import 的模块对象直接 setattr，而不是通过 dotted path，
     避免 services 命名空间冲突。
     """
+
     async def _noop_emit(**kwargs):
         return "fake-event-id"
 
@@ -461,9 +461,7 @@ class TestCrossTenantIsolation:
             db=db_a,
             evaluate_alert=False,
         )
-        await svc.evaluate_alert_for_delivery(
-            tenant_id=TENANT_A, delivery_id=DELIVERY_ID, db=db_a
-        )
+        await svc.evaluate_alert_for_delivery(tenant_id=TENANT_A, delivery_id=DELIVERY_ID, db=db_a)
 
         # tenant B 完全独立 — 没有阈值，没有日志
         rows_b = await svc.list_active_alerts(tenant_id=TENANT_B, db=db_b)

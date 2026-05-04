@@ -9,6 +9,7 @@
 - 不依赖 Redis/PG, 纯内存 Mock 子类验证抽象契约
 - OntologyEvent 最小 stub (T5.1.3 完整实现)
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -25,6 +26,7 @@ from shared.events.schemas.base import OntologyEvent
 # ----------------------------------------------------------------------
 # 测试用 Payload (作为 OntologyEvent 的合法子类)
 # ----------------------------------------------------------------------
+
 
 class _OrderPaidTestPayload(OntologyEvent):
     order_id: str
@@ -54,6 +56,7 @@ def _make_envelope(**overrides) -> EventEnvelope:
 # ======================================================================
 # §1 EventEnvelope 字段完整性 + 不可变性
 # ======================================================================
+
 
 class TestEventEnvelopeFields:
     def test_envelope_constructs_with_required_fields(self) -> None:
@@ -98,6 +101,7 @@ class TestEventEnvelopeFields:
 # §2 EventEnvelope 分区键语义 (aggregate_id)
 # ======================================================================
 
+
 class TestEventEnvelopePartitionKey:
     def test_same_aggregate_same_partition_key(self) -> None:
         """同一聚合根的事件应有相同 aggregate_id (分区键)."""
@@ -115,6 +119,7 @@ class TestEventEnvelopePartitionKey:
 # §3 EventEnvelope payload 类型约束
 # ======================================================================
 
+
 class TestEventEnvelopePayloadTyping:
     def test_payload_accepts_any_ontology_event_subclass(self) -> None:
         """任何 OntologyEvent 子类均可作为 payload."""
@@ -130,6 +135,7 @@ class TestEventEnvelopePayloadTyping:
 # §4 EventBus 抽象契约
 # ======================================================================
 
+
 class TestEventBusAbstractContract:
     def test_event_bus_cannot_be_instantiated_directly(self) -> None:
         """EventBus 是 ABC, 不可直接实例化."""
@@ -142,6 +148,7 @@ class TestEventBusAbstractContract:
         class IncompleteBus(EventBus):
             async def publish(self, envelope, *, maxlen=100_000):  # type: ignore[override]
                 return "id-0"
+
             # 未实现 subscribe/replay/ack/close
 
         with pytest.raises(TypeError, match="abstract"):
@@ -206,6 +213,7 @@ class TestEventBusAbstractContract:
 # §5 OntologyEvent schema_version ClassVar 契约
 # ======================================================================
 
+
 class TestOntologyEventSchemaVersion:
     def test_base_has_default_schema_version(self) -> None:
         """OntologyEvent 基类带有默认 schema_version '1.0'."""
@@ -239,6 +247,7 @@ class TestOntologyEventSchemaVersion:
 # ======================================================================
 # 测试用 Mock 实现 (最小完整 EventBus 子类)
 # ======================================================================
+
 
 class _MockBus(EventBus):
     """纯内存 Mock, 仅用于抽象契约测试. 不保证顺序 / 持久化."""

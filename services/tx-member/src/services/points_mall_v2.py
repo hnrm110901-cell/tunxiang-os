@@ -144,7 +144,8 @@ async def list_products(
     total: int = cnt_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT p.id, p.name, p.description, p.image_url,
                    p.product_type, p.points_required,
                    p.stock, p.stock_sold,
@@ -154,7 +155,8 @@ async def list_products(
             WHERE {where_sql}
             ORDER BY p.sort_order ASC, p.created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         params,
     )
     products = rows.mappings().all()
@@ -167,7 +169,8 @@ async def list_products(
         id_array = "{" + ",".join(product_ids) + "}"
 
         count_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT o.product_id::text,
                        COUNT(*) AS cnt,
                        p.limit_period_days
@@ -179,7 +182,8 @@ async def list_products(
                   AND o.status != 'cancelled'
                   AND o.created_at >= (NOW() - (p.limit_period_days || ' days')::interval)
                 GROUP BY o.product_id, p.limit_period_days
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": customer_id, "pids": id_array},
         )
         for row in count_rows.mappings().all():
@@ -232,7 +236,8 @@ async def get_product(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, image_url,
                    product_type, points_required,
                    stock, stock_sold, product_content,
@@ -240,7 +245,8 @@ async def get_product(
                    is_active, sort_order, valid_from, valid_until
             FROM points_mall_products
             WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pid": product_id, "tid": tenant_id},
     )
     product = row.mappings().first()
@@ -251,14 +257,16 @@ async def get_product(
     customer_count = 0
     if customer_id:
         cnt_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM points_mall_orders
                 WHERE tenant_id = :tid
                   AND customer_id = :cid
                   AND product_id = :pid
                   AND status != 'cancelled'
                   AND created_at >= (NOW() - (:days || ' days')::interval)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": customer_id,
@@ -333,7 +341,8 @@ async def redeem(
 
     # ── Step 1: FOR UPDATE 锁定商品，防止并发超卖 ──────────────
     prod_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, product_type, points_required,
                    stock, stock_sold, product_content,
                    limit_per_customer, limit_per_period, limit_period_days,
@@ -341,7 +350,8 @@ async def redeem(
             FROM points_mall_products
             WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
             FOR UPDATE
-        """),
+        """
+        ),
         {"pid": product_id, "tid": tenant_id},
     )
     product = prod_row.mappings().first()
@@ -368,14 +378,16 @@ async def redeem(
     if product["limit_per_customer"] > 0:
         period_days = product["limit_period_days"]
         limit_count_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM points_mall_orders
                 WHERE tenant_id = :tid
                   AND customer_id = :cid
                   AND product_id = :pid
                   AND status != 'cancelled'
                   AND created_at >= (NOW() - (:days || ' days')::interval)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": customer_id,
@@ -389,12 +401,14 @@ async def redeem(
 
     # ── Step 4: 查会员卡 + 验证积分余额 ──────────────────────
     card_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, points FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid
               AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     card = card_row.mappings().first()
@@ -407,14 +421,16 @@ async def redeem(
 
     # ── Step 5: 原子扣积分（WHERE points >= deduct 防超扣）────
     deduct_result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points - :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid
               AND is_deleted = false
               AND points >= :pts
             RETURNING id
-        """),
+        """
+        ),
         {"pts": total_points, "cid": card_id, "tid": tenant_id, "now": now},
     )
     if deduct_result.rowcount == 0:
@@ -424,16 +440,19 @@ async def redeem(
     if product["stock"] == -1:
         # 不限库存：只增 stock_sold
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_products
                 SET stock_sold = stock_sold + :qty, updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"qty": quantity, "pid": product_id, "tid": tenant_id, "now": now},
         )
     else:
         stock_result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_products
                 SET stock = stock - :qty,
                     stock_sold = stock_sold + :qty,
@@ -441,7 +460,8 @@ async def redeem(
                 WHERE id = :pid AND tenant_id = :tid
                   AND (stock - stock_sold) >= :qty
                 RETURNING id
-            """),
+            """
+            ),
             {"qty": quantity, "pid": product_id, "tid": tenant_id, "now": now},
         )
         if stock_result.rowcount == 0:
@@ -453,7 +473,8 @@ async def redeem(
     initial_status = "pending"
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_mall_orders
                 (id, tenant_id, order_no, customer_id, product_id, store_id,
                  points_deducted, quantity, status,
@@ -464,7 +485,8 @@ async def redeem(
                  :pts, :qty, :status,
                  :daddr, :dname, :dphone,
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": order_id,
             "tid": tenant_id,
@@ -514,14 +536,16 @@ async def redeem(
     # dish / physical 保持 pending，等门店核销
     if final_status == "fulfilled":
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_orders
                 SET status = 'fulfilled',
                     fulfilled_at = :now,
                     coupon_id = :coupon_id,
                     updated_at = :now
                 WHERE id = :oid AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "now": now,
                 "coupon_id": coupon_id,
@@ -533,11 +557,13 @@ async def redeem(
     # ── Step 9: 写积分流水 ────────────────────────────────────
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'spend', 'points_mall_redeem', :pts, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -603,7 +629,8 @@ async def fulfill_order(
 
     now = _now_utc()
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE points_mall_orders
             SET status = 'fulfilled',
                 fulfilled_at = :now,
@@ -612,7 +639,8 @@ async def fulfill_order(
               AND status = 'pending'
               AND is_deleted = false
             RETURNING id, order_no, customer_id, product_id, points_deducted, quantity
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id, "now": now},
     )
     row = result.mappings().first()
@@ -659,14 +687,16 @@ async def cancel_order(
 
     # 锁定订单
     order_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, order_no, customer_id, product_id,
                    points_deducted, quantity, status
             FROM points_mall_orders
             WHERE id = :oid AND tenant_id = :tid
               AND is_deleted = false
             FOR UPDATE
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     order = order_row.mappings().first()
@@ -682,12 +712,14 @@ async def cancel_order(
 
     # 查会员卡
     card_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid
               AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     card = card_row.mappings().first()
@@ -697,22 +729,26 @@ async def cancel_order(
 
     # 退还积分
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points + :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pts": points_to_refund, "cid": card_id, "tid": tenant_id, "now": now},
     )
 
     # 写积分流水
     refund_log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'earn', 'points_mall_refund', :pts, :now)
-        """),
+        """
+        ),
         {
             "id": refund_log_id,
             "tid": tenant_id,
@@ -731,35 +767,41 @@ async def cancel_order(
     if prod and prod["stock"] == -1:
         # 不限库存：只退 stock_sold
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_products
                 SET stock_sold = GREATEST(0, stock_sold - :qty), updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"qty": qty, "pid": product_id, "tid": tenant_id, "now": now},
         )
     elif prod:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_products
                 SET stock = stock + :qty,
                     stock_sold = GREATEST(0, stock_sold - :qty),
                     updated_at = :now
                 WHERE id = :pid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"qty": qty, "pid": product_id, "tid": tenant_id, "now": now},
         )
 
     # 更新订单状态
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE points_mall_orders
             SET status = 'cancelled',
                 cancelled_at = :now,
                 cancel_reason = :reason,
                 updated_at = :now
             WHERE id = :oid AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "now": now,
             "reason": cancel_reason,
@@ -806,17 +848,20 @@ async def get_customer_orders(
     offset = (page - 1) * size
 
     cnt_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM points_mall_orders
             WHERE customer_id = :cid AND tenant_id = :tid
               AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     total: int = cnt_row.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT o.id, o.order_no, o.product_id, o.store_id,
                    o.points_deducted, o.quantity, o.status,
                    o.coupon_id, o.tracking_no,
@@ -830,7 +875,8 @@ async def get_customer_orders(
               AND o.is_deleted = false
             ORDER BY o.created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id, "lim": size, "off": offset},
     )
 
@@ -874,7 +920,8 @@ async def get_order_detail(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT o.id, o.order_no, o.customer_id, o.product_id, o.store_id,
                    o.points_deducted, o.quantity, o.status,
                    o.coupon_id, o.tracking_no,
@@ -887,7 +934,8 @@ async def get_order_detail(
             LEFT JOIN points_mall_products p ON p.id = o.product_id
             WHERE o.id = :oid AND o.tenant_id = :tid
               AND o.is_deleted = false
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     r = row.mappings().first()
@@ -935,7 +983,8 @@ async def get_order_stats(
 
     # 汇总统计
     summary_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE status != 'cancelled') AS total_redeem_count,
                 COALESCE(SUM(points_deducted) FILTER (WHERE status != 'cancelled'), 0) AS total_points_consumed,
@@ -944,14 +993,16 @@ async def get_order_stats(
                 COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count
             FROM points_mall_orders
             WHERE tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     summary = summary_row.mappings().first()
 
     # 各商品兑换排名（TOP 20）
     rank_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT p.id::text AS product_id,
                    p.name AS product_name,
                    p.product_type,
@@ -963,7 +1014,8 @@ async def get_order_stats(
             GROUP BY p.id, p.name, p.product_type
             ORDER BY redeem_count DESC
             LIMIT 20
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
 
@@ -1028,7 +1080,8 @@ async def create_product(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_mall_products
                 (id, tenant_id, name, description, image_url,
                  product_type, points_required,
@@ -1043,7 +1096,8 @@ async def create_product(
                  :lpc, :lpp, :lpd,
                  true, :sort, :vfrom, :vuntil,
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": product_id,
             "tid": tenant_id,
@@ -1145,11 +1199,13 @@ async def update_product(
 
     set_sql = ", ".join(set_parts)
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE points_mall_products
             SET {set_sql}
             WHERE id = :pid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         params,
     )
     await db.flush()
@@ -1196,7 +1252,8 @@ async def _issue_coupon(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO coupons
                     (id, tenant_id, customer_id, template_id,
                      amount_fen, status, source,
@@ -1206,7 +1263,8 @@ async def _issue_coupon(
                      :amt, 'unused', 'points_mall_redeem',
                      :now, :now, false)
                 ON CONFLICT (id) DO NOTHING
-            """),
+            """
+            ),
             {
                 "id": coupon_id,
                 "tid": tenant_id,
@@ -1263,7 +1321,8 @@ async def _add_stored_value(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stored_value_cards
                 SET main_balance_fen = main_balance_fen + :amt,
                     updated_at = :now
@@ -1271,7 +1330,8 @@ async def _add_stored_value(
                   AND is_deleted = false
                   AND status = 'active'
                 RETURNING id
-            """),
+            """
+            ),
             {"amt": amount_fen, "cid": customer_id, "tid": tenant_id, "now": now},
         )
         if result.rowcount == 0:
@@ -1313,19 +1373,22 @@ async def _async_update_customer_stats(
     try:
         # total_order_count += 1（兑换也算一次互动）
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customers
                 SET total_order_count = total_order_count + 1,
                     updated_at = :now
                 WHERE id = :cid AND tenant_id = :tid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id, "now": now},
         )
 
         # 打标签"积分兑换用户"（若尚未有此标签）
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customers
                 SET tags = CASE
                     WHEN tags @> '["积分兑换用户"]'::jsonb THEN tags
@@ -1334,7 +1397,8 @@ async def _async_update_customer_stats(
                 updated_at = :now
                 WHERE id = :cid AND tenant_id = :tid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id, "now": now},
         )
     except (ValueError, KeyError) as exc:
@@ -1363,13 +1427,15 @@ async def list_categories(
     await _set_tenant(db, tenant_id)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, category_name, category_code, icon_url,
                    sort_order, is_active, created_at
             FROM points_mall_categories
             WHERE tenant_id = :tid AND is_deleted = false
             ORDER BY sort_order ASC, created_at ASC
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     items = [
@@ -1407,7 +1473,8 @@ async def create_category(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO points_mall_categories
                     (id, tenant_id, category_name, category_code,
                      icon_url, sort_order, is_active,
@@ -1416,7 +1483,8 @@ async def create_category(
                     (:id, :tid, :name, :code,
                      :icon, :sort, true,
                      :now, :now, false)
-            """),
+            """
+            ),
             {
                 "id": cat_id,
                 "tid": tenant_id,
@@ -1484,11 +1552,13 @@ async def update_category(
 
     set_sql = ", ".join(set_parts)
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE points_mall_categories
             SET {set_sql}
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         params,
     )
     await db.flush()
@@ -1511,12 +1581,14 @@ async def delete_category(
 
     now = _now_utc()
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE points_mall_categories
             SET is_deleted = true, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
             RETURNING id
-        """),
+        """
+        ),
         {"cid": category_id, "tid": tenant_id, "now": now},
     )
     if result.rowcount == 0:
@@ -1608,7 +1680,8 @@ async def seed_default_achievements(
         ach_id = str(uuid.uuid4())
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO points_mall_achievement_configs
                         (id, tenant_id, achievement_code, achievement_name,
                          description, trigger_type, trigger_threshold,
@@ -1620,7 +1693,8 @@ async def seed_default_achievements(
                          :reward_pts, :icon, true, :sort,
                          :now, :now, false)
                     ON CONFLICT (tenant_id, achievement_code) DO NOTHING
-                """),
+                """
+                ),
                 {
                     "id": ach_id,
                     "tid": tenant_id,
@@ -1664,14 +1738,16 @@ async def get_achievement_list(
 
     # 从DB读取成就配置
     config_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, achievement_code, achievement_name, description,
                    trigger_type, trigger_threshold, reward_points,
                    badge_icon_url, sort_order
             FROM points_mall_achievement_configs
             WHERE tenant_id = :tid AND is_active = true AND is_deleted = false
             ORDER BY sort_order ASC
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     configs = config_rows.mappings().all()
@@ -1681,7 +1757,8 @@ async def get_achievement_list(
 
     # 查询客户指标
     metrics_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE((SELECT COUNT(*) FROM orders
                           WHERE customer_id = :cid AND tenant_id = :tid
@@ -1693,7 +1770,8 @@ async def get_achievement_list(
                           WHERE customer_id = :cid AND tenant_id = :tid), 0) as share_count,
                 COALESCE((SELECT COUNT(*) FROM reviews
                           WHERE customer_id = :cid AND tenant_id = :tid), 0) as review_count
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     metrics = metrics_row.mappings().first()
@@ -1702,10 +1780,12 @@ async def get_achievement_list(
 
     # 已获得的成就
     earned_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT achievement_id FROM customer_achievements
             WHERE customer_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     earned_ids = {str(r[0]) for r in earned_row.fetchall()}
@@ -1762,7 +1842,8 @@ async def cleanup_expired_products(
 
     now = _now_utc()
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE points_mall_products
             SET is_active = false, updated_at = :now
             WHERE tenant_id = :tid
@@ -1771,7 +1852,8 @@ async def cleanup_expired_products(
               AND valid_until IS NOT NULL
               AND valid_until < :now
             RETURNING id
-        """),
+        """
+        ),
         {"tid": tenant_id, "now": now},
     )
     deactivated_ids = [str(r[0]) for r in result.fetchall()]
@@ -1805,7 +1887,8 @@ async def cleanup_expired_orders(
 
     # 查找待过期订单
     expired_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, order_no, customer_id, product_id,
                    points_deducted, quantity
             FROM points_mall_orders
@@ -1818,7 +1901,8 @@ async def cleanup_expired_orders(
                   (expired_at IS NULL AND created_at < :now - (:days || ' days')::interval)
               )
             FOR UPDATE
-        """),
+        """
+        ),
         {"tid": tenant_id, "now": now, "days": expire_after_days},
     )
     orders_to_expire = expired_rows.mappings().all()
@@ -1835,44 +1919,52 @@ async def cleanup_expired_orders(
 
         # 标记为 expired
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE points_mall_orders
                 SET status = 'expired', updated_at = :now
                 WHERE id = :oid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"oid": order_id, "tid": tenant_id, "now": now},
         )
 
         # 退还积分
         card_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM member_cards
                 WHERE customer_id = :cid AND tenant_id = :tid
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id},
         )
         card = card_row.mappings().first()
         if card:
             card_id = str(card["id"])
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE member_cards
                     SET points = points + :pts, updated_at = :now
                     WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-                """),
+                """
+                ),
                 {"pts": points, "cid": card_id, "tid": tenant_id, "now": now},
             )
 
             # 写退还积分流水
             refund_log_id = str(uuid.uuid4())
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO points_log
                         (id, tenant_id, card_id, direction, source, points, created_at)
                     VALUES (:id, :tid, :cid, 'earn', 'points_mall_expired_refund', :pts, :now)
-                """),
+                """
+                ),
                 {
                     "id": refund_log_id,
                     "tid": tenant_id,
@@ -1890,22 +1982,26 @@ async def cleanup_expired_orders(
         prod = prod_row.mappings().first()
         if prod and prod["stock"] == -1:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE points_mall_products
                     SET stock_sold = GREATEST(0, stock_sold - :qty), updated_at = :now
                     WHERE id = :pid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"qty": qty, "pid": product_id, "tid": tenant_id, "now": now},
             )
         elif prod:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE points_mall_products
                     SET stock = stock + :qty,
                         stock_sold = GREATEST(0, stock_sold - :qty),
                         updated_at = :now
                     WHERE id = :pid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"qty": qty, "pid": product_id, "tid": tenant_id, "now": now},
             )
 
@@ -1952,7 +2048,8 @@ async def ship_order(
 
     # 锁定订单
     order_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT o.id, o.order_no, o.customer_id, o.product_id,
                    o.status, o.fulfillment_status,
                    p.product_type
@@ -1961,7 +2058,8 @@ async def ship_order(
             WHERE o.id = :oid AND o.tenant_id = :tid
               AND o.is_deleted = false
             FOR UPDATE OF o
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     order = order_row.mappings().first()
@@ -1982,14 +2080,16 @@ async def ship_order(
     }
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE points_mall_orders
             SET fulfillment_status = 'shipped',
                 shipping_info = :info::jsonb,
                 tracking_no = :tracking,
                 updated_at = :now
             WHERE id = :oid AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "oid": order_id,
             "tid": tenant_id,
@@ -2027,7 +2127,8 @@ async def confirm_delivery(
     now = _now_utc()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE points_mall_orders
             SET fulfillment_status = 'delivered',
                 status = 'fulfilled',
@@ -2037,7 +2138,8 @@ async def confirm_delivery(
               AND fulfillment_status = 'shipped'
               AND is_deleted = false
             RETURNING id, order_no, customer_id
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id, "now": now},
     )
     row = result.mappings().first()

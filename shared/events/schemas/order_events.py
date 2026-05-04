@@ -5,6 +5,7 @@
 
 演进规则: 只加不改 (见 base.OntologyEvent 注释)
 """
+
 from __future__ import annotations
 
 from enum import Enum

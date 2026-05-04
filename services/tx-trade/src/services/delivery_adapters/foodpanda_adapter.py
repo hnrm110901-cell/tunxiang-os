@@ -3,6 +3,7 @@
 字段映射参考 Foodpanda Merchant API (马来西亚)。
 签名算法：HMAC-SHA256（shared_secret 为 key，payload 为 data）。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -74,9 +75,7 @@ class FoodpandaAdapter(BaseDeliveryAdapter):
             eta_str: Optional[str] = raw.get("estimated_delivery_time")
             if eta_str:
                 try:
-                    estimated_delivery_at = datetime.fromisoformat(
-                        eta_str.replace("Z", "+00:00")
-                    )
+                    estimated_delivery_at = datetime.fromisoformat(eta_str.replace("Z", "+00:00"))
                 except ValueError:
                     pass
 

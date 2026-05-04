@@ -39,7 +39,7 @@ import sys
 import types
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -135,8 +135,8 @@ class FakeDB:
 # Import services (after stubs are in place)
 # ---------------------------------------------------------------------------
 
-from services.group_deal_service import GroupDealError, GroupDealService
 from services.dual_reward_service import DualRewardError, DualRewardService
+from services.group_deal_service import GroupDealError, GroupDealService
 
 TENANT = uuid.uuid4()
 STORE = uuid.uuid4()
@@ -223,14 +223,18 @@ class TestGroupDealService:
         # Mock: first call = deal row, second call = no duplicate, then insert + update
         self.db.execute = AsyncMock(
             side_effect=[
-                FakeResult(rows=[{
-                    "id": deal_id,
-                    "status": "open",
-                    "current_participants": 1,
-                    "max_participants": 5,
-                    "min_participants": 3,
-                    "expires_at": now + timedelta(hours=24),
-                }]),
+                FakeResult(
+                    rows=[
+                        {
+                            "id": deal_id,
+                            "status": "open",
+                            "current_participants": 1,
+                            "max_participants": 5,
+                            "min_participants": 3,
+                            "expires_at": now + timedelta(hours=24),
+                        }
+                    ]
+                ),
                 FakeResult(),  # no duplicate
                 FakeResult(),  # insert
                 FakeResult(),  # update
@@ -254,14 +258,18 @@ class TestGroupDealService:
 
         self.db.execute = AsyncMock(
             side_effect=[
-                FakeResult(rows=[{
-                    "id": deal_id,
-                    "status": "open",
-                    "current_participants": 2,
-                    "max_participants": 5,
-                    "min_participants": 3,
-                    "expires_at": now + timedelta(hours=24),
-                }]),
+                FakeResult(
+                    rows=[
+                        {
+                            "id": deal_id,
+                            "status": "open",
+                            "current_participants": 2,
+                            "max_participants": 5,
+                            "min_participants": 3,
+                            "expires_at": now + timedelta(hours=24),
+                        }
+                    ]
+                ),
                 FakeResult(),  # no duplicate
                 FakeResult(),  # insert
                 FakeResult(),  # update
@@ -284,14 +292,18 @@ class TestGroupDealService:
         now = datetime.now(timezone.utc)
 
         self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[{
-                "id": deal_id,
-                "status": "open",
-                "current_participants": 5,
-                "max_participants": 5,
-                "min_participants": 3,
-                "expires_at": now + timedelta(hours=24),
-            }])
+            return_value=FakeResult(
+                rows=[
+                    {
+                        "id": deal_id,
+                        "status": "open",
+                        "current_participants": 5,
+                        "max_participants": 5,
+                        "min_participants": 3,
+                        "expires_at": now + timedelta(hours=24),
+                    }
+                ]
+            )
         )
 
         with pytest.raises(GroupDealError) as exc_info:
@@ -311,14 +323,18 @@ class TestGroupDealService:
 
         self.db.execute = AsyncMock(
             side_effect=[
-                FakeResult(rows=[{
-                    "id": deal_id,
-                    "status": "open",
-                    "current_participants": 1,
-                    "max_participants": 5,
-                    "min_participants": 3,
-                    "expires_at": now + timedelta(hours=24),
-                }]),
+                FakeResult(
+                    rows=[
+                        {
+                            "id": deal_id,
+                            "status": "open",
+                            "current_participants": 1,
+                            "max_participants": 5,
+                            "min_participants": 3,
+                            "expires_at": now + timedelta(hours=24),
+                        }
+                    ]
+                ),
                 FakeResult(rows=[{"id": uuid.uuid4()}]),  # duplicate found
             ]
         )
@@ -341,10 +357,14 @@ class TestGroupDealService:
         self.db.execute = AsyncMock(
             side_effect=[
                 FakeResult(rows=[{"id": pid, "paid": False}]),  # participant
-                FakeResult(rows=[{
-                    "initiator_customer_id": CUSTOMER_A,
-                    "status": "open",
-                }]),  # deal
+                FakeResult(
+                    rows=[
+                        {
+                            "initiator_customer_id": CUSTOMER_A,
+                            "status": "open",
+                        }
+                    ]
+                ),  # deal
                 FakeResult(),  # soft delete
                 FakeResult(),  # update deal
                 FakeResult(rows=[{"current_participants": 1}]),  # count
@@ -365,9 +385,7 @@ class TestGroupDealService:
         deal_id = uuid.uuid4()
         pid = uuid.uuid4()
 
-        self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[{"id": pid, "paid": True}])
-        )
+        self.db.execute = AsyncMock(return_value=FakeResult(rows=[{"id": pid, "paid": True}]))
 
         with pytest.raises(GroupDealError) as exc_info:
             await self.svc.leave_deal(
@@ -407,33 +425,35 @@ class TestGroupDealService:
     @pytest.mark.asyncio
     async def test_expire_stale_deals(self):
         self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[
-                {"id": uuid.uuid4()},
-                {"id": uuid.uuid4()},
-            ])
+            return_value=FakeResult(
+                rows=[
+                    {"id": uuid.uuid4()},
+                    {"id": uuid.uuid4()},
+                ]
+            )
         )
 
-        result = await self.svc.expire_stale_deals(
-            tenant_id=TENANT, db=self.db
-        )
+        result = await self.svc.expire_stale_deals(tenant_id=TENANT, db=self.db)
         assert result["expired_count"] == 2
 
     # 12. 统计
     @pytest.mark.asyncio
     async def test_get_deal_stats(self):
         self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[{
-                "total_deals": 10,
-                "filled_count": 7,
-                "completed_count": 5,
-                "avg_participants": 3.5,
-                "total_revenue_fen": 500000,
-            }])
+            return_value=FakeResult(
+                rows=[
+                    {
+                        "total_deals": 10,
+                        "filled_count": 7,
+                        "completed_count": 5,
+                        "avg_participants": 3.5,
+                        "total_revenue_fen": 500000,
+                    }
+                ]
+            )
         )
 
-        result = await self.svc.get_deal_stats(
-            tenant_id=TENANT, db=self.db, days=30
-        )
+        result = await self.svc.get_deal_stats(tenant_id=TENANT, db=self.db, days=30)
         assert result["total_deals"] == 10
         assert result["fill_rate"] == 70.0
         assert result["total_revenue_fen"] == 500000
@@ -488,9 +508,11 @@ class TestDualRewardService:
         order_id = uuid.uuid4()
 
         self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[
-                {"id": uuid.uuid4()},
-            ])
+            return_value=FakeResult(
+                rows=[
+                    {"id": uuid.uuid4()},
+                ]
+            )
         )
 
         result = await self.svc.trigger_on_first_order(
@@ -528,9 +550,7 @@ class TestDualRewardService:
     async def test_claim_reward_already_claimed(self):
         reward_id = uuid.uuid4()
 
-        self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[{"id": reward_id, "reward_status": "claimed"}])
-        )
+        self.db.execute = AsyncMock(return_value=FakeResult(rows=[{"id": reward_id, "reward_status": "claimed"}]))
 
         with pytest.raises(DualRewardError) as exc_info:
             await self.svc.claim_reward(
@@ -563,9 +583,7 @@ class TestDualRewardService:
             ]
         )
 
-        result = await self.svc.expire_unclaimed(
-            tenant_id=TENANT, db=self.db, days=30
-        )
+        result = await self.svc.expire_unclaimed(tenant_id=TENANT, db=self.db, days=30)
         assert result["expired_referrer_count"] == 1
         assert result["expired_referee_count"] == 2
 
@@ -573,15 +591,15 @@ class TestDualRewardService:
     @pytest.mark.asyncio
     async def test_get_referral_leaderboard(self):
         self.db.execute = AsyncMock(
-            return_value=FakeResult(rows=[
-                {"referrer_id": CUSTOMER_A, "successful_referrals": 10, "total_order_amount_fen": 50000},
-                {"referrer_id": CUSTOMER_B, "successful_referrals": 5, "total_order_amount_fen": 25000},
-            ])
+            return_value=FakeResult(
+                rows=[
+                    {"referrer_id": CUSTOMER_A, "successful_referrals": 10, "total_order_amount_fen": 50000},
+                    {"referrer_id": CUSTOMER_B, "successful_referrals": 5, "total_order_amount_fen": 25000},
+                ]
+            )
         )
 
-        result = await self.svc.get_referral_leaderboard(
-            tenant_id=TENANT, db=self.db, limit=20
-        )
+        result = await self.svc.get_referral_leaderboard(tenant_id=TENANT, db=self.db, limit=20)
         assert len(result) == 2
         assert result[0]["successful_referrals"] == 10
 
@@ -658,12 +676,14 @@ class TestGroupDealRoutes:
 
     # 21. POST / — 创建拼团
     def test_create_deal_api(self):
-        _fake_deal_svc_instance.create_deal = AsyncMock(return_value={
-            "deal_id": str(uuid.uuid4()),
-            "share_link_code": "abc12345",
-            "status": "open",
-            "current_participants": 1,
-        })
+        _fake_deal_svc_instance.create_deal = AsyncMock(
+            return_value={
+                "deal_id": str(uuid.uuid4()),
+                "share_link_code": "abc12345",
+                "status": "open",
+                "current_participants": 1,
+            }
+        )
 
         resp = _client.post(
             "/api/v1/growth/group-deals",
@@ -685,10 +705,12 @@ class TestGroupDealRoutes:
 
     # 22. GET / — 拼团列表
     def test_list_deals_api(self):
-        _fake_deal_svc_instance.list_deals = AsyncMock(return_value={
-            "items": [],
-            "total": 0,
-        })
+        _fake_deal_svc_instance.list_deals = AsyncMock(
+            return_value={
+                "items": [],
+                "total": 0,
+            }
+        )
 
         resp = _client.get(
             "/api/v1/growth/group-deals",
@@ -702,12 +724,14 @@ class TestGroupDealRoutes:
     # 23. GET /{id} — 拼团详情
     def test_get_deal_api(self):
         deal_id = uuid.uuid4()
-        _fake_deal_svc_instance.get_deal = AsyncMock(return_value={
-            "id": str(deal_id),
-            "name": "拼团",
-            "status": "open",
-            "participants": [],
-        })
+        _fake_deal_svc_instance.get_deal = AsyncMock(
+            return_value={
+                "id": str(deal_id),
+                "name": "拼团",
+                "status": "open",
+                "participants": [],
+            }
+        )
 
         resp = _client.get(
             f"/api/v1/growth/group-deals/{deal_id}",
@@ -720,11 +744,13 @@ class TestGroupDealRoutes:
     # 24. POST /{id}/join — 参团
     def test_join_deal_api(self):
         deal_id = uuid.uuid4()
-        _fake_deal_svc_instance.join_deal = AsyncMock(return_value={
-            "deal_id": str(deal_id),
-            "current_participants": 2,
-            "status": "open",
-        })
+        _fake_deal_svc_instance.join_deal = AsyncMock(
+            return_value={
+                "deal_id": str(deal_id),
+                "current_participants": 2,
+                "status": "open",
+            }
+        )
 
         resp = _client.post(
             f"/api/v1/growth/group-deals/{deal_id}/join",
@@ -740,11 +766,13 @@ class TestGroupDealRoutes:
     def test_pay_deal_api(self):
         deal_id = uuid.uuid4()
         order_id = uuid.uuid4()
-        _fake_deal_svc_instance.record_payment = AsyncMock(return_value={
-            "deal_id": str(deal_id),
-            "customer_id": str(CUSTOMER_A),
-            "paid": True,
-        })
+        _fake_deal_svc_instance.record_payment = AsyncMock(
+            return_value={
+                "deal_id": str(deal_id),
+                "customer_id": str(CUSTOMER_A),
+                "paid": True,
+            }
+        )
 
         resp = _client.post(
             f"/api/v1/growth/group-deals/{deal_id}/pay",

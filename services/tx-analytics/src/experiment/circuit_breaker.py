@@ -67,9 +67,7 @@ class CoreMetricsProvider(Protocol):
 
 
 class ExperimentDefinitionWriter(Protocol):
-    async def disable_experiment(
-        self, tenant_id: str, experiment_key: str, reason: str
-    ) -> bool: ...
+    async def disable_experiment(self, tenant_id: str, experiment_key: str, reason: str) -> bool: ...
 
 
 class CircuitBreakerEvaluator:
@@ -99,9 +97,7 @@ class CircuitBreakerEvaluator:
     ) -> CircuitBreakerStatus:
         """评估是否应熔断。永不抛异常。"""
         try:
-            snapshots = await self._metrics.snapshot_last_hour(
-                tenant_id=tenant_id, experiment_key=experiment_key
-            )
+            snapshots = await self._metrics.snapshot_last_hour(tenant_id=tenant_id, experiment_key=experiment_key)
         except (ConnectionError, TimeoutError, OSError, RuntimeError) as e:
             logger.warning(
                 "circuit_breaker_metrics_failed",
@@ -156,10 +152,7 @@ class CircuitBreakerEvaluator:
         """
         # 1. 关 experiment_definitions.enabled
         try:
-            reason = "; ".join(
-                f"{b.variant}.{b.metric_key} drop={b.drop_pct:.2f}%"
-                for b in status.breaches[:5]
-            )
+            reason = "; ".join(f"{b.variant}.{b.metric_key} drop={b.drop_pct:.2f}%" for b in status.breaches[:5])
             await self._writer.disable_experiment(
                 tenant_id=tenant_id,
                 experiment_key=experiment_key,
@@ -182,6 +175,7 @@ class CircuitBreakerEvaluator:
 
                 tripped_event = ExperimentEventType.CIRCUIT_BREAKER_TRIPPED
             except ImportError:
+
                 class _TrippedFallback:
                     value = "experiment.circuit_breaker_tripped"
 
@@ -233,6 +227,7 @@ class CircuitBreakerEvaluator:
 
                 reset_event = ExperimentEventType.CIRCUIT_BREAKER_RESET
             except ImportError:
+
                 class _ResetFallback:
                     value = "experiment.circuit_breaker_reset"
 

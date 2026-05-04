@@ -13,7 +13,7 @@
 """
 
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -182,7 +182,7 @@ class BrandPublishService:
         updated_plan = await self._repo.update_plan_status(
             plan_id=plan_id,
             status="published",
-            published_at=datetime.utcnow(),
+            published_at=datetime.now(timezone.utc),
         )
         await self.db.commit()
 
@@ -202,7 +202,7 @@ class BrandPublishService:
             "failed_stores": len(failed_stores),
             "failed_details": failed_stores,
             "total_dish_records": total_dishes_published,
-            "executed_at": datetime.utcnow().isoformat(),
+            "executed_at": datetime.now(timezone.utc).isoformat(),
         }
 
     # ══════════════════════════════════════════════════════
@@ -350,7 +350,7 @@ class BrandPublishService:
           4. 品牌标准价（dishes.price_fen）
         """
         if at_datetime is None:
-            at_datetime = datetime.utcnow()
+            at_datetime = datetime.now(timezone.utc)
 
         if channel not in _VALID_CHANNELS:
             raise ValueError(f"channel 必须为 {_VALID_CHANNELS} 之一，收到: {channel!r}")
@@ -358,13 +358,15 @@ class BrandPublishService:
         # 1. 获取品牌标准价
         await self._repo._set_tenant()
         dish_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT price_fen, dish_name
                 FROM dishes
                 WHERE id = :dish_id
                   AND tenant_id = :tid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"dish_id": _uuid.UUID(dish_id), "tid": self._repo._tid},
         )
         dish_row = dish_result.fetchone()

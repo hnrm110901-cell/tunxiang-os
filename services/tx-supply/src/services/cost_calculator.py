@@ -63,7 +63,8 @@ class CostCalculator:
 
         # 1. 查找激活的 BOM 模板
         bom_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, version, yield_rate
                 FROM bom_templates
                 WHERE dish_id = :dish_id
@@ -72,7 +73,8 @@ class CostCalculator:
                   AND is_deleted = false
                 ORDER BY effective_date DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"dish_id": dish_uuid, "tenant_id": self._tenant_uuid},
         )
         bom_row = bom_result.mappings().first()
@@ -94,7 +96,8 @@ class CostCalculator:
 
         # 2. 查询 BOM 明细 + 原料最新采购价
         items_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT bi.ingredient_id,
                        bi.standard_qty,
                        bi.unit,
@@ -109,7 +112,8 @@ class CostCalculator:
                 WHERE bi.bom_id = :bom_id
                   AND bi.tenant_id = :tenant_id
                   AND bi.is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tenant_id": self._tenant_uuid},
         )
         items_rows = items_result.mappings().all()

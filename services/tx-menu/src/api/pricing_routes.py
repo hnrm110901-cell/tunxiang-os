@@ -280,14 +280,16 @@ async def get_pricing_matrix(
 
     # 获取所有菜品基础价
     dishes_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_name, price_fen
             FROM dishes
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND is_available = true
             ORDER BY dish_name
-        """),
+        """
+        ),
         {"tid": tid},
     )
     dishes = dishes_result.fetchall()
@@ -305,13 +307,15 @@ async def get_pricing_matrix(
         params[f"did_{i}"] = did
 
     channel_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT dish_id, channel, channel_price_fen
             FROM channel_menu_items
             WHERE tenant_id = :tid
               AND store_id  = :sid
               AND dish_id IN ({placeholders})
-        """),
+        """
+        ),
         params,
     )
     channel_prices: dict[str, dict[str, Optional[int]]] = {}
@@ -375,7 +379,8 @@ async def batch_update_prices(
         try:
             did = _uuid.UUID(item.dish_id)
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO channel_menu_items
                         (tenant_id, store_id, dish_id, channel, channel_price_fen, is_available)
                     VALUES
@@ -383,7 +388,8 @@ async def batch_update_prices(
                     ON CONFLICT (tenant_id, store_id, dish_id, channel) DO UPDATE SET
                         channel_price_fen = EXCLUDED.channel_price_fen,
                         updated_at        = NOW()
-                """),
+                """
+                ),
                 {"tid": tid, "sid": sid, "did": did, "channel": item.channel, "price": item.new_price_fen},
             )
             updated += 1
@@ -417,13 +423,15 @@ async def list_pricing_rules(
     sid = _uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, channel, rule_type, value, description, is_active, created_at, updated_at
             FROM channel_pricing_rules
             WHERE tenant_id = :tid
               AND store_id  = :sid
             ORDER BY channel
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid},
     )
     rules = [
@@ -466,7 +474,8 @@ async def create_pricing_rule(
     sid = _uuid.UUID(req.store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO channel_pricing_rules
                 (tenant_id, store_id, channel, rule_type, value, description, is_active)
             VALUES
@@ -478,7 +487,8 @@ async def create_pricing_rule(
                 is_active   = true,
                 updated_at  = NOW()
             RETURNING id, channel, rule_type, value, description, is_active, created_at, updated_at
-        """),
+        """
+        ),
         {
             "tid": tid,
             "sid": sid,
@@ -530,7 +540,8 @@ async def preview_pricing(
 
     # 获取所有在该渠道上架的菜品（或回退到所有菜品基础价）
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 d.id,
                 d.dish_name,
@@ -546,7 +557,8 @@ async def preview_pricing(
               AND d.is_deleted = false
               AND d.is_available = true
             ORDER BY d.dish_name
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid, "channel": req.channel},
     )
     rows = result.fetchall()

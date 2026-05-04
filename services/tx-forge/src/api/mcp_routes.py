@@ -29,10 +29,12 @@ class ForgeMCPService:
 
     async def register_server(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""INSERT INTO forge.mcp_servers
+            text(
+                """INSERT INTO forge.mcp_servers
                     (tenant_id, app_id, server_name, transport, base_url, capabilities, health_endpoint)
                     VALUES (:tid, :app_id, :server_name, :transport, :base_url, :capabilities::jsonb, :health_endpoint)
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {
                 "tid": self.tenant_id,
                 "app_id": payload["app_id"],
@@ -128,10 +130,12 @@ class ForgeMCPService:
 
     async def register_tool(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         result = await self.db.execute(
-            text("""INSERT INTO forge.mcp_tools
+            text(
+                """INSERT INTO forge.mcp_tools
                     (tenant_id, server_id, tool_name, description, input_schema, ontology_bindings, trust_tier_required)
                     VALUES (:tid, :server_id, :tool_name, :description, :input_schema::jsonb, :ontology_bindings::jsonb, :trust_tier_required)
-                    RETURNING *"""),
+                    RETURNING *"""
+            ),
             {
                 "tid": self.tenant_id,
                 "server_id": payload["server_id"],

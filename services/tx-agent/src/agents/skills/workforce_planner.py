@@ -91,7 +91,8 @@ async def _load_current_schedules(
     week_end: date,
 ) -> list[dict[str, Any]]:
     """从 unified_schedules 查当前排班。"""
-    q = text("""
+    q = text(
+        """
         SELECT us.id::text, us.employee_id::text, us.schedule_date AS shift_date,
                us.start_time, us.end_time, us.role,
                e.emp_name
@@ -103,7 +104,8 @@ async def _load_current_schedules(
           AND us.schedule_date BETWEEN :week_start AND :week_end
           AND COALESCE(us.is_deleted, false) = false
         ORDER BY us.schedule_date, us.start_time
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,
@@ -129,7 +131,8 @@ async def _load_revenue_by_slot(
     """从历史订单聚合各时段营收；DB不可达时降级为零值。"""
     # 尝试从 mv_store_pnl 或 orders 聚合，失败则降级
     try:
-        q = text("""
+        q = text(
+            """
             SELECT
               CASE
                 WHEN EXTRACT(HOUR FROM o.created_at) BETWEEN 9 AND 10 THEN 'morning'
@@ -145,7 +148,8 @@ async def _load_revenue_by_slot(
               AND o.created_at >= CURRENT_DATE - :lookback_days * INTERVAL '1 day'
               AND o.status = 'paid'
             GROUP BY slot
-        """)
+        """
+        )
         result = await db.execute(
             q,
             {

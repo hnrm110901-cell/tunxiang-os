@@ -246,13 +246,15 @@ async def _query_ranking_data(db: AsyncSession, metric: str, date_range: str, te
 async def _query_stores_info(db: AsyncSession, store_ids: list[str], tenant_id: str) -> list[dict]:
     """查询门店基本信息"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, store_name
             FROM stores
             WHERE tenant_id = :tenant_id
               AND store_id = ANY(:store_ids)
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_ids": store_ids},
     )
     return [dict(r) for r in row.mappings().all()]

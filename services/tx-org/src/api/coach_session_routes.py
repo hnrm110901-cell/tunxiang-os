@@ -162,13 +162,15 @@ async def list_coach_sessions(
     rows = (
         (
             await db.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT {_FIELDS}
             FROM coach_sessions
             WHERE {where}
             ORDER BY session_date DESC, created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -200,7 +202,8 @@ async def create_coach_session(
     suggestions = body.suggestions or []
     focus_employees = body.focus_employees or []
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO coach_sessions
             (id, tenant_id, store_id, manager_id, session_date, session_type,
              suggestions, actions_taken, focus_employees,
@@ -212,7 +215,8 @@ async def create_coach_session(
              :readiness_before, :readiness_after, :notes,
              FALSE, :now, :now)
         RETURNING id::text
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -254,17 +258,20 @@ async def coach_dashboard(
     await _set_tenant(db, tenant_id)
 
     # This week / this month counts
-    counts_sql = text("""
+    counts_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE session_date >= date_trunc('week', CURRENT_DATE))::int AS this_week_count,
             COUNT(*) FILTER (WHERE session_date >= date_trunc('month', CURRENT_DATE))::int AS this_month_count
         FROM coach_sessions
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     counts = (await db.execute(counts_sql, {"tid": tenant_id})).mappings().first()
 
     # Acceptance rate (accepted / total suggestions)
-    accept_sql = text("""
+    accept_sql = text(
+        """
         SELECT
             COALESCE(SUM(jsonb_array_length(suggestions)), 0)::int AS total_suggestions,
             COALESCE(SUM((
@@ -274,7 +281,8 @@ async def coach_dashboard(
         FROM coach_sessions
         WHERE tenant_id = :tid AND is_deleted = FALSE
           AND suggestions IS NOT NULL AND jsonb_array_length(suggestions) > 0
-    """)
+    """
+    )
     accept = (await db.execute(accept_sql, {"tid": tenant_id})).mappings().first()
 
     total_sug = accept["total_suggestions"] if accept else 0
@@ -282,34 +290,40 @@ async def coach_dashboard(
     acceptance_rate = round(accepted_sug / total_sug * 100, 2) if total_sug > 0 else 0
 
     # Average readiness lift
-    lift_sql = text("""
+    lift_sql = text(
+        """
         SELECT COALESCE(ROUND(AVG(readiness_after - readiness_before), 2), 0) AS avg_readiness_lift
         FROM coach_sessions
         WHERE tenant_id = :tid AND is_deleted = FALSE
           AND readiness_before IS NOT NULL AND readiness_after IS NOT NULL
-    """)
+    """
+    )
     lift = (await db.execute(lift_sql, {"tid": tenant_id})).mappings().first()
 
     # By session type distribution
-    type_sql = text("""
+    type_sql = text(
+        """
         SELECT session_type, COUNT(*)::int AS count
         FROM coach_sessions
         WHERE tenant_id = :tid AND is_deleted = FALSE
         GROUP BY session_type
         ORDER BY count DESC
-    """)
+    """
+    )
     type_rows = (await db.execute(type_sql, {"tid": tenant_id})).mappings().all()
     by_session_type = {r["session_type"]: r["count"] for r in type_rows}
 
     # Top 5 active managers
-    top_sql = text("""
+    top_sql = text(
+        """
         SELECT manager_id::text, COUNT(*)::int AS session_count
         FROM coach_sessions
         WHERE tenant_id = :tid AND is_deleted = FALSE
         GROUP BY manager_id
         ORDER BY session_count DESC
         LIMIT 5
-    """)
+    """
+    )
     top_rows = (await db.execute(top_sql, {"tid": tenant_id})).mappings().all()
     top_managers = [{"manager_id": r["manager_id"], "session_count": r["session_count"]} for r in top_rows]
 
@@ -336,26 +350,31 @@ async def manager_summary(
     await _set_tenant(db, tenant_id)
 
     # Total sessions + avg readiness lift
-    stats_sql = text("""
+    stats_sql = text(
+        """
         SELECT
             COUNT(*)::int AS total_sessions,
             COALESCE(ROUND(AVG(readiness_after - readiness_before), 2), 0) AS avg_readiness_lift
         FROM coach_sessions
         WHERE tenant_id = :tid AND manager_id = :mid AND is_deleted = FALSE
           AND readiness_before IS NOT NULL AND readiness_after IS NOT NULL
-    """)
+    """
+    )
     stats = (await db.execute(stats_sql, {"tid": tenant_id, "mid": manager_id})).mappings().first()
 
     # Total session count (including those without readiness)
-    total_sql = text("""
+    total_sql = text(
+        """
         SELECT COUNT(*)::int AS total_sessions
         FROM coach_sessions
         WHERE tenant_id = :tid AND manager_id = :mid AND is_deleted = FALSE
-    """)
+    """
+    )
     total_row = (await db.execute(total_sql, {"tid": tenant_id, "mid": manager_id})).mappings().first()
 
     # Acceptance rate for this manager
-    accept_sql = text("""
+    accept_sql = text(
+        """
         SELECT
             COALESCE(SUM(jsonb_array_length(suggestions)), 0)::int AS total_suggestions,
             COALESCE(SUM((
@@ -365,7 +384,8 @@ async def manager_summary(
         FROM coach_sessions
         WHERE tenant_id = :tid AND manager_id = :mid AND is_deleted = FALSE
           AND suggestions IS NOT NULL AND jsonb_array_length(suggestions) > 0
-    """)
+    """
+    )
     accept = (await db.execute(accept_sql, {"tid": tenant_id, "mid": manager_id})).mappings().first()
 
     total_sug = accept["total_suggestions"] if accept else 0
@@ -373,13 +393,15 @@ async def manager_summary(
     acceptance_rate = round(accepted_sug / total_sug * 100, 2) if total_sug > 0 else 0
 
     # Recent 5 sessions
-    recent_sql = text(f"""
+    recent_sql = text(
+        f"""
         SELECT {_FIELDS}
         FROM coach_sessions
         WHERE tenant_id = :tid AND manager_id = :mid AND is_deleted = FALSE
         ORDER BY session_date DESC, created_at DESC
         LIMIT 5
-    """)
+    """
+    )
     recent_rows = (await db.execute(recent_sql, {"tid": tenant_id, "mid": manager_id})).mappings().all()
     recent_sessions = [_row_to_dict(r) for r in recent_rows]
 
@@ -403,7 +425,8 @@ async def coach_effectiveness(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             session_type,
             COUNT(*)::int AS session_count,
@@ -413,7 +436,8 @@ async def coach_effectiveness(
           AND readiness_before IS NOT NULL AND readiness_after IS NOT NULL
         GROUP BY session_type
         ORDER BY avg_lift DESC
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
     by_type = [
@@ -426,12 +450,14 @@ async def coach_effectiveness(
     ]
 
     # Overall average
-    overall_sql = text("""
+    overall_sql = text(
+        """
         SELECT COALESCE(ROUND(AVG(readiness_after - readiness_before), 2), 0) AS avg_lift
         FROM coach_sessions
         WHERE tenant_id = :tid AND is_deleted = FALSE
           AND readiness_before IS NOT NULL AND readiness_after IS NOT NULL
-    """)
+    """
+    )
     overall = (await db.execute(overall_sql, {"tid": tenant_id})).mappings().first()
 
     return _ok(
@@ -452,11 +478,13 @@ async def get_coach_session(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT {_FIELDS}
         FROM coach_sessions
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     row = (await db.execute(sql, {"sid": session_id, "tid": tenant_id})).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Coach session not found")
@@ -493,12 +521,14 @@ async def update_coach_session(
     set_clause = ", ".join(sets)
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE coach_sessions
             SET {set_clause}
             WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
             RETURNING id::text
-        """),
+        """
+        ),
         params,
     )
     row = result.mappings().first()
@@ -525,11 +555,13 @@ async def accept_suggestion(
     now = datetime.now(timezone.utc)
 
     # Verify index is valid
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT jsonb_array_length(suggestions) AS sug_len
         FROM coach_sessions
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     check = (await db.execute(check_sql, {"sid": session_id, "tid": tenant_id})).mappings().first()
     if not check:
         raise HTTPException(status_code=404, detail="Coach session not found")
@@ -539,13 +571,15 @@ async def accept_suggestion(
         )
 
     # Use jsonb_set to update accepted flag
-    sql = text("""
+    sql = text(
+        """
         UPDATE coach_sessions
         SET suggestions = jsonb_set(suggestions, :path, 'true'::jsonb),
             updated_at = :now
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, suggestions
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -598,13 +632,15 @@ async def append_action(
         "completed_at": None,
     }
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE coach_sessions
         SET actions_taken = COALESCE(actions_taken, '[]'::jsonb) || :new_action::jsonb,
             updated_at = :now
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, actions_taken
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -653,11 +689,13 @@ async def complete_action(
     now = datetime.now(timezone.utc)
 
     # Verify index is valid
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT jsonb_array_length(actions_taken) AS act_len
         FROM coach_sessions
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     check = (await db.execute(check_sql, {"sid": session_id, "tid": tenant_id})).mappings().first()
     if not check:
         raise HTTPException(status_code=404, detail="Coach session not found")
@@ -665,7 +703,8 @@ async def complete_action(
         raise HTTPException(status_code=400, detail=f"Action index {act_idx} out of range (0-{check['act_len'] - 1})")
 
     # Use jsonb_set to update result and completed_at
-    sql = text("""
+    sql = text(
+        """
         UPDATE coach_sessions
         SET actions_taken = jsonb_set(
                 jsonb_set(actions_taken, :result_path, :result_val::jsonb),
@@ -674,7 +713,8 @@ async def complete_action(
             updated_at = :now
         WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, actions_taken
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -724,12 +764,14 @@ async def delete_coach_session(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE coach_sessions
             SET is_deleted = TRUE, updated_at = :now
             WHERE id = :sid AND tenant_id = :tid AND is_deleted = FALSE
             RETURNING id::text
-        """),
+        """
+        ),
         {"sid": session_id, "tid": tenant_id, "now": now},
     )
     row = result.mappings().first()

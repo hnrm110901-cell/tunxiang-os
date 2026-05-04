@@ -92,7 +92,8 @@ class SalesTaskScheduler:
             birth_this_year = birthday.replace(year=today.year)
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sales_tasks (
                         tenant_id, id, store_id, employee_id,
                         task_type, related_customer_id,
@@ -106,7 +107,8 @@ class SalesTaskScheduler:
                         'birthday_remind', :customer_id,
                         :title, :description, :due_at, 'high'
                     )
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "id": str(uuid.uuid4()),
@@ -155,7 +157,8 @@ class SalesTaskScheduler:
             anniv = row["anniversary"]
             anniv_this_year = anniv.replace(year=today.year)
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sales_tasks (
                         tenant_id, id, store_id, employee_id,
                         task_type, related_customer_id,
@@ -169,7 +172,8 @@ class SalesTaskScheduler:
                         'anniversary_remind', :customer_id,
                         :title, :description, :due_at, 'medium'
                     )
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "id": str(uuid.uuid4()),
@@ -211,7 +215,8 @@ class SalesTaskScheduler:
         for row in rows:
             days_inactive = (today - row["last_visit_at"].date()).days if row.get("last_visit_at") else 30
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sales_tasks (
                         tenant_id, id, store_id, employee_id,
                         task_type, related_customer_id,
@@ -225,7 +230,8 @@ class SalesTaskScheduler:
                         'dormant_recall', :customer_id,
                         :title, :description, :due_at, :priority
                     )
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "id": str(uuid.uuid4()),
@@ -267,7 +273,8 @@ class SalesTaskScheduler:
         for row in rows:
             reserved_time = row["reserved_at"].strftime("%H:%M") if row.get("reserved_at") else "未知"
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sales_tasks (
                         tenant_id, id, store_id, employee_id,
                         task_type, related_customer_id,
@@ -281,7 +288,8 @@ class SalesTaskScheduler:
                         'reservation_confirm', :customer_id,
                         :title, :description, :due_at, 'high'
                     )
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "id": str(uuid.uuid4()),
@@ -299,14 +307,16 @@ class SalesTaskScheduler:
     async def _mark_overdue_tasks(self, tenant_id: str, db: Any) -> int:
         """标记逾期任务"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE sales_tasks
                 SET status = 'overdue', updated_at = now()
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = FALSE
                   AND status IN ('pending', 'in_progress')
                   AND due_at < now()
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         return result.rowcount

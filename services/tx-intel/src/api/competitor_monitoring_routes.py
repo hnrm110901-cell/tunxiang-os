@@ -221,7 +221,8 @@ async def get_active_alerts(
         )
 
         # 取近14天内每个竞对品牌的最新快照，提取活跃促销
-        sql = text("""
+        sql = text(
+            """
             SELECT DISTINCT ON (cs.competitor_brand_id)
                 cs.id::text                     AS snapshot_id,
                 cb.id::text                     AS competitor_id,
@@ -237,7 +238,8 @@ async def get_active_alerts(
               AND cb.is_active = TRUE
               AND cs.snapshot_date >= CURRENT_DATE - INTERVAL '14 days'
             ORDER BY cs.competitor_brand_id, cs.snapshot_date DESC
-        """)
+        """
+        )
         result = await db.execute(sql, {"tenant_id": tenant_id})
         rows = result.fetchall()
 

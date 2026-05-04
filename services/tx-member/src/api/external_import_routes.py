@@ -17,7 +17,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
-from services.identity_resolver import IdentityResolver
+
+from ..services.identity_resolver import IdentityResolver
 
 router = APIRouter(prefix="/api/v1/member/external", tags=["external-import"])
 

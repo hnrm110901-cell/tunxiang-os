@@ -291,17 +291,21 @@ class PgTaskRepository:
 
     async def get(self, task_id: UUID, tenant_id: UUID) -> Optional[Task]:
         row = (
-            await self.session.execute(
-                text(
-                    "SELECT task_id, tenant_id, store_id, task_type, assignee_employee_id, "
-                    "customer_id, due_at, status, escalated_to_employee_id, escalated_at, "
-                    "cancel_reason, source_event_id, payload, dispatched_at, completed_at, "
-                    "created_at, updated_at "
-                    "FROM tasks WHERE task_id = :task_id AND tenant_id = :tenant_id"
-                ),
-                {"task_id": str(task_id), "tenant_id": str(tenant_id)},
+            (
+                await self.session.execute(
+                    text(
+                        "SELECT task_id, tenant_id, store_id, task_type, assignee_employee_id, "
+                        "customer_id, due_at, status, escalated_to_employee_id, escalated_at, "
+                        "cancel_reason, source_event_id, payload, dispatched_at, completed_at, "
+                        "created_at, updated_at "
+                        "FROM tasks WHERE task_id = :task_id AND tenant_id = :tenant_id"
+                    ),
+                    {"task_id": str(task_id), "tenant_id": str(tenant_id)},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return _row_to_task(row) if row else None
 
     async def update(self, task: Task) -> Task:
@@ -401,17 +405,21 @@ class PgTaskRepository:
             "ORDER BY created_at DESC LIMIT 1"
         )
         row = (
-            await self.session.execute(
-                sql,
-                {
-                    "tenant_id": str(tenant_id),
-                    "task_type": task_type.value,
-                    "assignee": str(assignee_employee_id),
-                    "customer_id": str(customer_id) if customer_id else None,
-                    "due_at": due_at,
-                },
+            (
+                await self.session.execute(
+                    sql,
+                    {
+                        "tenant_id": str(tenant_id),
+                        "task_type": task_type.value,
+                        "assignee": str(assignee_employee_id),
+                        "customer_id": str(customer_id) if customer_id else None,
+                        "due_at": due_at,
+                    },
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return _row_to_task(row) if row else None
 
 

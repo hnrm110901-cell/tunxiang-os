@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from services.tx_trade.src.services.cook_time_stats import CookTimeStatsService
 
 # ─── 测试夹具 ───
@@ -31,6 +32,7 @@ def _make_db_mock():
 
 # ─── 1. P50/P90 计算 ───
 
+
 class TestComputeBaselines:
     """从历史kds_tasks计算dish_id+hour_of_day的P50/P90"""
 
@@ -45,8 +47,8 @@ class TestComputeBaselines:
         mock_row.dept_id = DEPT_ID
         mock_row.hour_bucket = 12  # 午高峰
         mock_row.day_type = "weekday"
-        mock_row.p50 = 480.0   # 8分钟
-        mock_row.p90 = 720.0   # 12分钟
+        mock_row.p50 = 480.0  # 8分钟
+        mock_row.p90 = 720.0  # 12分钟
         mock_row.sample_count = 20
 
         mock_result = MagicMock()
@@ -93,6 +95,7 @@ class TestComputeBaselines:
 
 # ─── 2. 时段变化测试 ───
 
+
 class TestTimeOfDayVariation:
     """预期完成时间随时段变化"""
 
@@ -117,12 +120,8 @@ class TestTimeOfDayVariation:
 
             service = CookTimeStatsService(db)
 
-            lunch = await service.get_expected_duration(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_A), hour_override=12
-            )
-            off_peak = await service.get_expected_duration(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_A), hour_override=15
-            )
+            lunch = await service.get_expected_duration(str(DISH_ID), str(DEPT_ID), str(TENANT_A), hour_override=12)
+            off_peak = await service.get_expected_duration(str(DISH_ID), str(DEPT_ID), str(TENANT_A), hour_override=15)
 
         assert lunch > off_peak, "午高峰预期时长应大于平峰"
 
@@ -134,6 +133,7 @@ class TestTimeOfDayVariation:
         with patch(
             "services.tx_trade.src.services.cook_time_stats.CookTimeStatsService._get_baseline_from_db"
         ) as mock_get:
+
             async def side_effect(dish_id, dept_id, tenant_id, hour_bucket, day_type):
                 if day_type == "weekend":
                     return {"p50_seconds": 480, "p90_seconds": 720, "sample_count": 15}
@@ -158,6 +158,7 @@ class TestTimeOfDayVariation:
 
 
 # ─── 3. 队列清空时间预估 ───
+
 
 class TestQueueClearTime:
     """队列清空时间预估：总预期时长 / 并发能力"""
@@ -201,9 +202,7 @@ class TestQueueClearTime:
             return_value=300,
         ):
             service = CookTimeStatsService(db)
-            result = await service.estimate_queue_clear_time(
-                str(DEPT_ID), str(TENANT_A), concurrent_capacity=2
-            )
+            result = await service.estimate_queue_clear_time(str(DEPT_ID), str(TENANT_A), concurrent_capacity=2)
 
         now = datetime.now(timezone.utc)
         expected_seconds = 4 * 300 / 2  # = 600
@@ -231,6 +230,7 @@ class TestQueueClearTime:
 
 # ─── 4. 新菜品fallback ───
 
+
 class TestFallbackBehavior:
     """无历史数据时fallback到dept默认值"""
 
@@ -249,9 +249,7 @@ class TestFallbackBehavior:
             return_value=15,  # dept.default_timeout_minutes = 15分钟
         ):
             service = CookTimeStatsService(db)
-            duration = await service.get_expected_duration(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_A)
-            )
+            duration = await service.get_expected_duration(str(DISH_ID), str(DEPT_ID), str(TENANT_A))
 
         # 15分钟 * 0.6 * 60秒 = 540秒
         expected = int(15 * 0.6 * 60)
@@ -272,9 +270,7 @@ class TestFallbackBehavior:
             return_value=20,
         ):
             service = CookTimeStatsService(db)
-            result = await service.get_expected_duration_with_meta(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_A)
-            )
+            result = await service.get_expected_duration_with_meta(str(DISH_ID), str(DEPT_ID), str(TENANT_A))
 
         assert result["source"] == "dept_default"
         assert result["reliable"] is False
@@ -290,15 +286,14 @@ class TestFallbackBehavior:
             return_value={"p50_seconds": 300, "p90_seconds": 500, "sample_count": 5},
         ):
             service = CookTimeStatsService(db)
-            result = await service.get_expected_duration_with_meta(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_A)
-            )
+            result = await service.get_expected_duration_with_meta(str(DISH_ID), str(DEPT_ID), str(TENANT_A))
 
         assert result["reliable"] is False
         assert result["source"] == "baseline"
 
 
 # ─── 5. tenant_id隔离 ───
+
 
 class TestTenantIsolation:
     """tenant_id隔离：A租户数据不泄露给B租户"""
@@ -324,12 +319,8 @@ class TestTenantIsolation:
         ):
             service = CookTimeStatsService(db)
 
-            result_a = await service.get_expected_duration_with_meta(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_A)
-            )
-            result_b = await service.get_expected_duration_with_meta(
-                str(DISH_ID), str(DEPT_ID), str(TENANT_B)
-            )
+            result_a = await service.get_expected_duration_with_meta(str(DISH_ID), str(DEPT_ID), str(TENANT_A))
+            result_b = await service.get_expected_duration_with_meta(str(DISH_ID), str(DEPT_ID), str(TENANT_B))
 
         assert result_a["source"] == "baseline"
         assert result_b["source"] == "dept_default"
@@ -368,9 +359,7 @@ class TestTenantIsolation:
             return_value={"p50_seconds": 300, "p90_seconds": 600, "sample_count": 20},
         ):
             service = CookTimeStatsService(db)
-            thresholds = await service.get_dept_timeout_thresholds(
-                str(DEPT_ID), str(DISH_ID), str(TENANT_A)
-            )
+            thresholds = await service.get_dept_timeout_thresholds(str(DEPT_ID), str(DISH_ID), str(TENANT_A))
 
         # warn_seconds = p90 * 0.8 = 480
         # critical_seconds = p90 = 600
@@ -380,6 +369,7 @@ class TestTenantIsolation:
 
 
 # ─── 6. 动态阈值 ───
+
 
 class TestDynamicThresholds:
     """动态阈值替代固定25分钟"""
@@ -395,11 +385,9 @@ class TestDynamicThresholds:
             return_value={"p50_seconds": 400, "p90_seconds": 800, "sample_count": 30},
         ):
             service = CookTimeStatsService(db)
-            thresholds = await service.get_dept_timeout_thresholds(
-                str(DEPT_ID), str(DISH_ID), str(TENANT_A)
-            )
+            thresholds = await service.get_dept_timeout_thresholds(str(DEPT_ID), str(DISH_ID), str(TENANT_A))
 
-        assert thresholds["warn_seconds"] == 640   # 800 * 0.8
+        assert thresholds["warn_seconds"] == 640  # 800 * 0.8
         assert thresholds["critical_seconds"] == 800
 
     @pytest.mark.asyncio
@@ -417,9 +405,7 @@ class TestDynamicThresholds:
             return_value=25,  # 传统固定25分钟
         ):
             service = CookTimeStatsService(db)
-            thresholds = await service.get_dept_timeout_thresholds(
-                str(DEPT_ID), str(DISH_ID), str(TENANT_A)
-            )
+            thresholds = await service.get_dept_timeout_thresholds(str(DEPT_ID), str(DISH_ID), str(TENANT_A))
 
         # fallback: warn = 25*60*0.8 = 1200, critical = 25*60 = 1500
         assert thresholds["warn_seconds"] == int(25 * 60 * 0.8)

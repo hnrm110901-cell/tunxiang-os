@@ -55,7 +55,8 @@ class DishProfitWeeklyWorker:
         try:
             # 查询所有有近期订单的 tenant+store 组合
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT DISTINCT o.tenant_id, o.store_id, s.store_name
                     FROM orders o
                     LEFT JOIN stores s ON s.id = o.store_id AND s.tenant_id = o.tenant_id
@@ -63,7 +64,8 @@ class DishProfitWeeklyWorker:
                       AND o.is_deleted = FALSE
                       AND o.order_time >= NOW() - INTERVAL '14 days'
                     ORDER BY o.tenant_id, o.store_id
-                """),
+                """
+                ),
             )
             combos = result.mappings().all()
 
@@ -80,7 +82,10 @@ class DishProfitWeeklyWorker:
 
                 try:
                     report_md = await self.generate_weekly_report(
-                        db, tenant_id, store_id, store_name,
+                        db,
+                        tenant_id,
+                        store_id,
+                        store_name,
                     )
                     if report_md:
                         await self._push_report(db, tenant_id, store_id, store_name, report_md)
@@ -124,13 +129,20 @@ class DishProfitWeeklyWorker:
 
         # ─── 1. 生成本周定价建议 ─────────────────────────────────
         suggestions = await generate_pricing_suggestions(
-            db, tenant_id, store_id, period_days=7,
+            db,
+            tenant_id,
+            store_id,
+            period_days=7,
         )
 
         # ─── 2. 更新共现数据 ─────────────────────────────────────
         try:
             await compute_dish_co_occurrence(
-                db, tenant_id, store_id, week_start, today,
+                db,
+                tenant_id,
+                store_id,
+                week_start,
+                today,
             )
         except SQLAlchemyError as exc:
             log.warning("weekly_worker.co_occurrence_error", error=str(exc), store_id=store_id)
@@ -173,13 +185,15 @@ class DishProfitWeeklyWorker:
             prev_q = prev_bcg_map.get(d["dish_id"])
             curr_q = d["bcg_quadrant"]
             if prev_q and prev_q != curr_q:
-                bcg_changes.append({
-                    "dish_name": d["dish_name"],
-                    "from": prev_q,
-                    "from_label": _QUADRANT_LABELS.get(prev_q, prev_q),
-                    "to": curr_q,
-                    "to_label": _QUADRANT_LABELS.get(curr_q, curr_q),
-                })
+                bcg_changes.append(
+                    {
+                        "dish_name": d["dish_name"],
+                        "from": prev_q,
+                        "from_label": _QUADRANT_LABELS.get(prev_q, prev_q),
+                        "to": curr_q,
+                        "to_label": _QUADRANT_LABELS.get(curr_q, curr_q),
+                    }
+                )
 
         # ─── 5. 组装 Markdown 周报 ───────────────────────────────
         md = self._build_markdown(
@@ -258,12 +272,7 @@ class DishProfitWeeklyWorker:
             lines.append("|------|------|------|----------|")
             for c in bcg_changes:
                 arrow = "↑" if c["to"] in ("star", "cash_cow") else "↓"
-                lines.append(
-                    f"| {c['dish_name']} "
-                    f"| {c['from_label']} "
-                    f"| {c['to_label']} "
-                    f"| {arrow} |"
-                )
+                lines.append(f"| {c['dish_name']} | {c['from_label']} | {c['to_label']} | {arrow} |")
             lines.append("")
         else:
             lines.append("## BCG象限变动")
@@ -324,14 +333,16 @@ class DishProfitWeeklyWorker:
         try:
             await _set_rls(db, tenant_id)
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO notifications
                         (tenant_id, store_id, channel, title, content,
                          notification_type, priority, status)
                     VALUES
                         (:tenant_id::uuid, :store_id::uuid, 'im',
                          :title, :content, 'weekly_report', 'normal', 'pending')
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "store_id": store_id,

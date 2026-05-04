@@ -55,6 +55,7 @@ def _fire_and_forget(coro: Coroutine[object, object, object]) -> asyncio.Task[ob
     task.add_done_callback(_on_done)
     return task
 
+
 TenantHeader = Annotated[
     str,
     Header(

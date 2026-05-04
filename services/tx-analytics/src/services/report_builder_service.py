@@ -249,14 +249,16 @@ class ReportBuilderService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, template_code, template_name, category,
                        description, data_source, dimensions, measures, filters,
                        default_sort, chart_type, layout, is_system, is_active,
                        version, created_at, updated_at
                 FROM report_templates
                 WHERE id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": template_id},
         )
         row = result.mappings().first()
@@ -300,7 +302,8 @@ class ReportBuilderService:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO report_templates (
                     id, tenant_id, template_code, template_name, category,
                     description, data_source, dimensions, measures, filters,
@@ -313,7 +316,8 @@ class ReportBuilderService:
                     FALSE, TRUE, 1, :now, :now
                 )
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": tenant_id,
@@ -354,10 +358,12 @@ class ReportBuilderService:
 
         # 检查模板是否存在及是否为系统模板
         check_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT is_system, tenant_id FROM report_templates
                 WHERE id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": template_id},
         )
         row = check_result.mappings().first()
@@ -406,11 +412,13 @@ class ReportBuilderService:
         set_clause = ", ".join(set_parts)
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE report_templates
                 SET {set_clause}
                 WHERE id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -588,7 +596,8 @@ class ReportBuilderService:
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO report_instances (
                     id, tenant_id, template_id, instance_name,
                     custom_filters, custom_dimensions, custom_measures,
@@ -599,7 +608,8 @@ class ReportBuilderService:
                     :custom_measures::jsonb,
                     'none', :created_by::uuid, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": instance_id,
                 "tenant_id": tenant_id,
@@ -714,24 +724,28 @@ class ReportBuilderService:
 
         # 校验实例存在
         check_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM report_instances
                 WHERE id = :iid AND is_deleted = false
-            """),
+            """
+            ),
             {"iid": instance_id},
         )
         if not check_result.scalar():
             raise InstanceNotFoundError(f"实例不存在: {instance_id}")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE report_instances
                 SET schedule_type = :schedule_type,
                     schedule_config = :config::jsonb,
                     recipients = :recipients::jsonb,
                     updated_at = NOW()
                 WHERE id = :iid AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "iid": instance_id,
                 "schedule_type": schedule_type,
@@ -807,7 +821,8 @@ class ReportBuilderService:
         file_size = len(content) if isinstance(content, bytes) else len(content.encode("utf-8"))
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO report_exports (
                     id, tenant_id, template_id, export_format,
                     file_size_bytes, requested_by, generated_at, created_at
@@ -815,7 +830,8 @@ class ReportBuilderService:
                     :id, :tenant_id::uuid, :template_id::uuid, :format,
                     :file_size, :requested_by::uuid, NOW(), NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": export_id,
                 "tenant_id": tenant_id,
@@ -1019,10 +1035,12 @@ class ReportBuilderService:
 
         # 校验实例存在
         check_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM report_instances
                 WHERE id = :iid AND is_deleted = false
-            """),
+            """
+            ),
             {"iid": instance_id},
         )
         if not check_result.scalar():
@@ -1033,7 +1051,8 @@ class ReportBuilderService:
 
         # UPSERT — 同一人同一渠道只有一条订阅
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO report_subscriptions (
                     id, tenant_id, instance_id, subscriber_id,
                     channel, is_active, created_at, updated_at
@@ -1045,7 +1064,8 @@ class ReportBuilderService:
                     WHERE is_deleted = false
                 DO UPDATE SET is_active = TRUE, updated_at = :now
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "id": sub_id,
                 "tenant_id": tenant_id,
@@ -1124,13 +1144,15 @@ class ReportBuilderService:
     ) -> dict[str, Any]:
         """加载模板原始数据（内部使用）"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, template_code, template_name, category,
                        description, data_source, dimensions, measures, filters,
                        default_sort, chart_type, is_system, is_active
                 FROM report_templates
                 WHERE id = :tid AND is_deleted = false AND is_active = true
-            """),
+            """
+            ),
             {"tid": template_id},
         )
         row = result.mappings().first()
@@ -1257,7 +1279,8 @@ class ReportBuilderService:
     ) -> dict[str, Any]:
         """获取实例详情 dict"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ri.id, ri.tenant_id, ri.template_id, ri.instance_name,
                        ri.custom_filters, ri.custom_dimensions, ri.custom_measures,
                        ri.schedule_type, ri.schedule_config, ri.recipients,
@@ -1267,7 +1290,8 @@ class ReportBuilderService:
                 FROM report_instances ri
                 JOIN report_templates rt ON rt.id = ri.template_id
                 WHERE ri.id = :iid AND ri.is_deleted = false
-            """),
+            """
+            ),
             {"iid": instance_id},
         )
         row = result.mappings().first()

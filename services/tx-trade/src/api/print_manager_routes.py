@@ -109,11 +109,13 @@ async def list_print_tasks(
         where_clause += " AND pt.status = :status"
         params["status"] = status
 
-    count_stmt = text(f"""
+    count_stmt = text(
+        f"""
         SELECT COUNT(*) FROM print_tasks pt
         JOIN printers p ON p.id = pt.printer_id
         {where_clause}
-    """)
+    """
+    )
     count_result = await db.execute(count_stmt, params)
     total = count_result.scalar() or 0
 
@@ -121,7 +123,8 @@ async def list_print_tasks(
     params["limit"] = size
     params["offset"] = offset
 
-    stmt = text(f"""
+    stmt = text(
+        f"""
         SELECT pt.id, pt.tenant_id, pt.printer_id, pt.content, pt.status,
                pt.retry_count, pt.error_message, pt.created_at, pt.updated_at,
                p.name AS printer_name
@@ -130,7 +133,8 @@ async def list_print_tasks(
         {where_clause}
         ORDER BY pt.created_at DESC
         LIMIT :limit OFFSET :offset
-    """)
+    """
+    )
     result = await db.execute(stmt, params)
     rows = result.fetchall()
 
@@ -176,14 +180,16 @@ async def retry_print_task(
         )
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE print_tasks
             SET status = 'pending', retry_count = retry_count + 1,
                 error_message = NULL, updated_at = NOW()
             WHERE id = :id AND tenant_id = :tenant_id
             RETURNING id, tenant_id, printer_id, content, status,
                       retry_count, error_message, created_at, updated_at
-        """),
+        """
+        ),
         {"id": task_uuid, "tenant_id": tid},
     )
     await db.commit()
@@ -273,12 +279,14 @@ async def send_test_page(
     # 写入任务队列
     task_id = uuid.uuid4()
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO print_tasks (id, tenant_id, printer_id, content, status, retry_count)
             VALUES (:id, :tenant_id, :printer_id, :content, 'pending', 0)
             RETURNING id, tenant_id, printer_id, content, status,
                       retry_count, error_message, created_at, updated_at
-        """),
+        """
+        ),
         {
             "id": task_id,
             "tenant_id": tid,
@@ -325,25 +333,29 @@ async def export_printer_config(
 
     # 查询打印机
     printers_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, type, connection_type, address, is_active, paper_width
             FROM printers
             WHERE tenant_id = :tenant_id AND store_id = :store_id
             ORDER BY created_at ASC
-        """),
+        """
+        ),
         {"tenant_id": tid, "store_id": sid},
     )
     printers = printers_result.fetchall()
 
     # 查询路由规则
     routes_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT r.printer_id, r.category_id, r.category_name,
                    r.dish_tag, r.priority, r.is_default
             FROM printer_routes r
             WHERE r.tenant_id = :tenant_id AND r.store_id = :store_id
             ORDER BY r.priority DESC
-        """),
+        """
+        ),
         {"tenant_id": tid, "store_id": sid},
     )
     routes = routes_result.fetchall()
@@ -442,13 +454,15 @@ async def import_printer_config(
             if body.overwrite:
                 # 覆盖：更新现有打印机配置
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE printers
                         SET type = :type, connection_type = :connection_type,
                             address = :address, paper_width = :paper_width,
                             updated_at = NOW()
                         WHERE name = :name AND tenant_id = :tenant_id AND store_id = :store_id
-                    """),
+                    """
+                    ),
                     {
                         "name": name,
                         "type": p.get("type", "receipt"),
@@ -467,12 +481,14 @@ async def import_printer_config(
         # 新建打印机
         new_pid = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO printers (id, tenant_id, store_id, name, type,
                                       connection_type, address, is_active, paper_width)
                 VALUES (:id, :tenant_id, :store_id, :name, :type,
                         :connection_type, :address, :is_active, :paper_width)
-            """),
+            """
+            ),
             {
                 "id": new_pid,
                 "tenant_id": tid,
@@ -509,14 +525,16 @@ async def import_printer_config(
 
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO printer_routes (id, tenant_id, store_id, printer_id,
                                                 category_id, category_name, dish_tag,
                                                 priority, is_default)
                     VALUES (:id, :tenant_id, :store_id, :printer_id,
                             :category_id, :category_name, :dish_tag,
                             :priority, :is_default)
-                """),
+                """
+                ),
                 {
                     "id": route_id,
                     "tenant_id": tid,

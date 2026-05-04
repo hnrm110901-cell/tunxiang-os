@@ -42,9 +42,7 @@ class JWTService:
         if not secret:
             if env == "production":
                 logger.error("jwt_secret_missing_production")
-                raise RuntimeError(
-                    "TX_JWT_SECRET_KEY is required in production environment"
-                )
+                raise RuntimeError("TX_JWT_SECRET_KEY is required in production environment")
             logger.warning(
                 "jwt_secret_not_set",
                 message="TX_JWT_SECRET_KEY未设置，使用不安全的默认值，仅限开发环境",

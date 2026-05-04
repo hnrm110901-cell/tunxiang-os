@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import structlog
@@ -34,7 +34,7 @@ class TunxiangBaseError(Exception):
         super().__init__(message)
         self.message = message
         self.context: Dict[str, Any] = context or {}
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> Dict[str, Any]:
         """将异常序列化为字典，便于日志记录和 API 响应。"""

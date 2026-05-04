@@ -6,7 +6,8 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+
 from ..services.kds_chef_stats import get_chef_daily_detail, get_leaderboard
 
 router = APIRouter(prefix="/api/v1/kds/chef-stats", tags=["kds-chef-stats"])

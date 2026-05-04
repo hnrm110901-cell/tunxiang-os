@@ -303,7 +303,8 @@ class DishLifecycleService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.id,
                     d.store_id,
@@ -320,7 +321,8 @@ class DishLifecycleService:
                   AND d.is_deleted = false
                   AND d.created_at BETWEEN :cutoff_start AND :cutoff_end
                 GROUP BY d.id, d.store_id, d.price_fen, d.cost_fen, d.created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_uuid,
                 "cutoff_start": cutoff_start,
@@ -436,7 +438,8 @@ class DishLifecycleService:
 
         # 查询各菜品库存与近7天日均销量
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.id AS dish_id,
                     COALESCE(inv.stock_qty, 0) AS stock_qty,
@@ -460,7 +463,8 @@ class DishLifecycleService:
                   AND d.is_deleted = false
                   AND d.is_available = true
                 GROUP BY d.id, inv.stock_qty
-            """),
+            """
+            ),
             {"tenant_id": tenant_uuid, "store_id": store_uuid},
         )
 
@@ -614,7 +618,8 @@ class DishLifecycleService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.id,
                     d.price_fen,
@@ -640,7 +645,8 @@ class DishLifecycleService:
                   AND d.is_deleted = false
                   AND d.is_available = true
                 GROUP BY d.id, d.price_fen, d.cost_fen, d.created_at, dhs.low_health_since
-            """),
+            """
+            ),
             {"tenant_id": tenant_uuid, "store_id": store_uuid},
         )
 

@@ -84,7 +84,8 @@ async def list_clone_history(
 ) -> dict:
     """查询克隆历史（最近50条，按创建时间降序）"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, source_store_id, target_store_id, selected_items,
                    status, progress, created_by, created_at, updated_at,
                    error_message, result_summary
@@ -93,7 +94,8 @@ async def list_clone_history(
               AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT 50
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     rows = result.fetchall()

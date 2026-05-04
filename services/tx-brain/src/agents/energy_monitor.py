@@ -163,7 +163,8 @@ class EnergyMonitorAgent:
                     params["sid"] = store_id
 
                 result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT tenant_id, store_id, stat_date,
                                electricity_kwh, gas_m3, water_ton,
                                energy_cost_fen, revenue_fen,
@@ -173,7 +174,8 @@ class EnergyMonitorAgent:
                         WHERE tenant_id = :tid {store_clause}
                         ORDER BY stat_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     params,
                 )
 

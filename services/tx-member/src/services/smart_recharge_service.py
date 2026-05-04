@@ -42,7 +42,8 @@ class SmartRechargeService:
         # 1) 获取生效规则
         today = date.today()
         rules_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, rule_name, multiplier_tiers, bonus_type,
                        bonus_value, min_recharge_fen, max_recharge_fen,
                        coupon_template_id
@@ -55,7 +56,8 @@ class SmartRechargeService:
                   AND is_deleted = FALSE
                 ORDER BY priority DESC, store_id NULLS LAST
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "today": today},
         )
         rule = rules_result.fetchone()
@@ -76,7 +78,8 @@ class SmartRechargeService:
         # 2) 写入推荐记录
         rec_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO smart_recharge_recommendations (
                     tenant_id, id, store_id, customer_id, order_id,
                     order_amount_fen, recommended_tiers, employee_id
@@ -84,7 +87,8 @@ class SmartRechargeService:
                     :tenant_id, :id, :store_id, :customer_id, :order_id,
                     :order_amount_fen, :recommended_tiers::JSONB, :employee_id
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": rec_id,
@@ -125,7 +129,8 @@ class SmartRechargeService:
     ) -> dict:
         """客户接受某一档储值推荐"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE smart_recharge_recommendations
                 SET selected_tier       = :selected_tier::JSONB,
                     recharge_amount_fen = :recharge_amount_fen,
@@ -137,7 +142,8 @@ class SmartRechargeService:
                   AND id = :recommendation_id
                   AND status = 'recommended'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "recommendation_id": recommendation_id,
@@ -165,7 +171,8 @@ class SmartRechargeService:
     ) -> dict:
         """客户拒绝储值推荐"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE smart_recharge_recommendations
                 SET status     = 'declined',
                     decided_at = now(),
@@ -174,7 +181,8 @@ class SmartRechargeService:
                   AND id = :recommendation_id
                   AND status = 'recommended'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "recommendation_id": recommendation_id},
         )
         await db.commit()
@@ -217,7 +225,8 @@ class SmartRechargeService:
         params["limit"] = size
         params["offset"] = offset
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, customer_id, order_id, order_amount_fen,
                        recommended_tiers, selected_tier,
                        recharge_amount_fen, bonus_amount_fen,
@@ -226,7 +235,8 @@ class SmartRechargeService:
                 WHERE {where}
                 ORDER BY recommended_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = items_result.fetchall()
@@ -262,7 +272,8 @@ class SmartRechargeService:
     ) -> dict:
         """储值推荐转化统计"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                                AS total_recommendations,
                     COUNT(*) FILTER (WHERE status = 'accepted')            AS accepted_count,
@@ -276,7 +287,8 @@ class SmartRechargeService:
                   AND store_id  = :store_id
                   AND recommended_at::DATE BETWEEN :start_date AND :end_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -326,7 +338,8 @@ class SmartRechargeService:
             effective_from = date.today()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO smart_recharge_rules (
                     tenant_id, id, store_id, brand_id, rule_name,
                     multiplier_tiers, bonus_type, bonus_value,
@@ -338,7 +351,8 @@ class SmartRechargeService:
                     :min_recharge_fen, :max_recharge_fen, :coupon_template_id,
                     :effective_from, :effective_until, :priority
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": rule_id,
@@ -401,11 +415,13 @@ class SmartRechargeService:
             params["priority"] = priority
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE smart_recharge_rules
                 SET {", ".join(sets)}
                 WHERE tenant_id = :tenant_id AND id = :rule_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -416,14 +432,16 @@ class SmartRechargeService:
     async def get_rule(db: AsyncSession, tenant_id: str, rule_id: str) -> Optional[dict]:
         """获取单个规则"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, brand_id, rule_name, is_active,
                        multiplier_tiers, bonus_type, bonus_value,
                        min_recharge_fen, max_recharge_fen, coupon_template_id,
                        effective_from, effective_until, priority, created_at
                 FROM smart_recharge_rules
                 WHERE tenant_id = :tenant_id AND id = :rule_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "rule_id": rule_id},
         )
         row = result.fetchone()
@@ -477,7 +495,8 @@ class SmartRechargeService:
         params["limit"] = size
         params["offset"] = offset
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, brand_id, rule_name, is_active,
                        bonus_type, bonus_value, priority,
                        effective_from, effective_until, created_at
@@ -485,7 +504,8 @@ class SmartRechargeService:
                 WHERE {where}
                 ORDER BY priority DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = items_result.fetchall()
@@ -510,11 +530,13 @@ class SmartRechargeService:
     async def delete_rule(db: AsyncSession, tenant_id: str, rule_id: str) -> dict:
         """软删除规则"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE smart_recharge_rules
                 SET is_deleted = TRUE, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :rule_id
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "rule_id": rule_id},
         )
         await db.commit()

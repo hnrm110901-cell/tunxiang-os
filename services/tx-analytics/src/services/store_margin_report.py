@@ -275,7 +275,8 @@ def _get_daily_revenue(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(final_amount_fen), 0)
             FROM orders
             WHERE store_id = :store_id
@@ -283,7 +284,8 @@ def _get_daily_revenue(
               AND DATE(order_time) = :target_date
               AND status IN ('completed', 'paid')
               AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         return result.scalar_one_or_none() or 0
@@ -308,7 +310,8 @@ def _get_daily_theoretical_cost(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(oi.food_cost_fen * oi.quantity), 0)
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -319,7 +322,8 @@ def _get_daily_theoretical_cost(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
               AND oi.food_cost_fen IS NOT NULL
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         return result.scalar_one_or_none() or 0
@@ -340,7 +344,8 @@ def _get_daily_actual_cost(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(ABS(total_cost_fen)), 0)
             FROM ingredient_transactions
             WHERE store_id = :store_id
@@ -348,7 +353,8 @@ def _get_daily_actual_cost(
               AND transaction_type = 'usage'
               AND DATE(transaction_time) = :target_date
               AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         return result.scalar_one_or_none() or 0
@@ -370,7 +376,8 @@ def _get_top_cost_dishes(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id, d.dish_name,
                    SUM(oi.quantity) as qty,
                    SUM(COALESCE(oi.food_cost_fen, 0) * oi.quantity) as total_cost_fen,
@@ -387,7 +394,8 @@ def _get_top_cost_dishes(
             GROUP BY oi.dish_id, d.dish_name
             ORDER BY total_cost_fen DESC
             LIMIT :limit
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,

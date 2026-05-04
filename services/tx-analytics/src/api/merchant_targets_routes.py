@@ -93,11 +93,13 @@ async def _load_overrides_from_db() -> None:
                     {"tid": str(tenant_uuid)},
                 )
                 result = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT target_key, target_value
                         FROM merchant_target_overrides
                         WHERE tenant_id = :tid AND merchant_code = :mc
-                    """),
+                    """
+                    ),
                     {"tid": str(tenant_uuid), "mc": merchant_code},
                 )
                 rows = result.fetchall()
@@ -183,7 +185,8 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
         if "avg_ticket_fen" in kpi_keys or "table_turnover_rate" in kpi_keys:
             try:
                 row = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             AVG(total_fen)      AS avg_ticket,
                             COUNT(*)            AS order_count
@@ -191,7 +194,8 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
                           AND created_at >= NOW() - INTERVAL '30 days'
-                    """),
+                    """
+                    ),
                     {"tid": tenant_id},
                 )
                 r = row.fetchone()
@@ -207,22 +211,26 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
         if "table_turnover_rate" in kpi_keys:
             try:
                 row_orders = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) AS cnt
                         FROM orders
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
                           AND created_at >= NOW() - INTERVAL '30 days'
-                    """),
+                    """
+                    ),
                     {"tid": tenant_id},
                 )
                 row_tables = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) AS cnt
                         FROM tables
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {"tid": tenant_id},
                 )
                 order_cnt = row_orders.scalar() or 0
@@ -388,7 +396,8 @@ async def update_merchant_targets(
                 )
                 for key, value in updated_targets.items():
                     await session.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO merchant_target_overrides
                               (tenant_id, merchant_code, target_key, target_value, updated_by)
                             VALUES (:tid, :mc, :key, :val, :by)
@@ -397,7 +406,8 @@ async def update_merchant_targets(
                               target_value = EXCLUDED.target_value,
                               updated_at   = NOW(),
                               updated_by   = EXCLUDED.updated_by
-                        """),
+                        """
+                        ),
                         {
                             "tid": str(tenant_uuid),
                             "mc": merchant_code,

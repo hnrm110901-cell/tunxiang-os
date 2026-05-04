@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -115,7 +116,8 @@ async def _fetch_swaps_from_db(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": tenant_id},
     )
-    sql = text("""
+    sql = text(
+        """
         SELECT
             id::text                                        AS id,
             from_date,
@@ -129,7 +131,8 @@ async def _fetch_swaps_from_db(
           AND (:status IS NULL OR status = :status)
         ORDER BY created_at DESC
         LIMIT 50
-    """)
+    """
+    )
     result = await db.execute(sql, {"crew_id": crew_id, "status": status})
     rows = result.mappings().all()
     items = []
@@ -199,7 +202,7 @@ async def checkin(
         }
     except ValueError as e:
         log.warning("crew_checkin_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "排班操作失败", e)
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_checkin_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -233,7 +236,7 @@ async def get_schedule(
         return {"ok": True, "data": {"items": items, "total": len(items), "week": week}}
     except ValueError as e:
         log.warning("crew_schedule_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "排班操作失败", e)
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_schedule_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -282,7 +285,7 @@ async def create_shift_swap(
         raise
     except ValueError as e:
         log.warning("crew_shift_swap_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "排班操作失败", e)
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_shift_swap_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -311,7 +314,7 @@ async def get_my_shift_swaps(
         return {"ok": True, "data": {"items": [], "total": 0}}
     except ValueError as e:
         log.warning("crew_shift_swaps_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "排班操作失败", e)
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_shift_swaps_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

@@ -109,7 +109,8 @@ async def get_store_insights(
 
     try:
         # ── 主查询：从 mv_store_pnl 聚合 ──────────────────────────────────────
-        pnl_sql = text("""
+        pnl_sql = text(
+            """
             SELECT
                 p.store_id::text,
                 s.store_name,
@@ -130,13 +131,15 @@ async def get_store_insights(
               AND COALESCE(s.is_deleted, false) = false
             GROUP BY p.store_id, s.store_name, s.city
             ORDER BY SUM(p.gross_revenue_fen) DESC
-        """)
+        """
+        )
         result = await db.execute(pnl_sql, {"tid": str(tid), "date_from": date_from, "date_to": date_to})
         rows = result.mappings().all()
 
         if not rows:
             # ── Fallback：mv_store_pnl 尚无数据，直接从 orders 聚合 ──────────
-            fallback_sql = text("""
+            fallback_sql = text(
+                """
                 SELECT
                     store_id::text,
                     store_id::text AS store_name,
@@ -154,7 +157,8 @@ async def get_store_insights(
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') BETWEEN :date_from AND :date_to
                 GROUP BY store_id
                 ORDER BY revenue_fen DESC
-            """)
+            """
+            )
             fallback_result = await db.execute(
                 fallback_sql, {"tid": str(tid), "date_from": date_from, "date_to": date_to}
             )
@@ -166,30 +170,35 @@ async def get_store_insights(
         store_ids = [r["store_id"] for r in rows]
 
         # ── 翻台率：tables 数量 + 订单数推算 ─────────────────────────────────
-        table_count_sql = text("""
+        table_count_sql = text(
+            """
             SELECT store_id::text, COUNT(*) AS cnt
             FROM tables
             WHERE tenant_id = :tid::uuid
               AND store_id = ANY(:store_ids::uuid[])
             GROUP BY store_id
-        """)
+        """
+        )
         table_result = await db.execute(table_count_sql, {"tid": str(tid), "store_ids": store_ids})
         table_counts: dict[str, int] = {str(r["store_id"]): int(r["cnt"]) for r in table_result.mappings().all()}
 
         # ── 上一周期营收（用于计算 revenue_growth）────────────────────────────
         prev_from, prev_to = _prev_date_range(period)
-        prev_sql = text("""
+        prev_sql = text(
+            """
             SELECT store_id::text, SUM(gross_revenue_fen)::bigint AS revenue_fen
             FROM mv_store_pnl
             WHERE tenant_id = :tid::uuid
               AND stat_date BETWEEN :date_from AND :date_to
             GROUP BY store_id
-        """)
+        """
+        )
         prev_result = await db.execute(prev_sql, {"tid": str(tid), "date_from": prev_from, "date_to": prev_to})
         prev_revenue: dict[str, int] = {str(r["store_id"]): int(r["revenue_fen"]) for r in prev_result.mappings().all()}
 
         # ── 合规告警（open）────────────────────────────────────────────────────
-        alert_sql = text("""
+        alert_sql = text(
+            """
             SELECT store_id::text, COUNT(*) AS cnt
             FROM compliance_alerts
             WHERE tenant_id = :tid::uuid
@@ -197,7 +206,8 @@ async def get_store_insights(
               AND status = 'open'
               AND created_at >= :date_from::date
             GROUP BY store_id
-        """)
+        """
+        )
         alert_result = await db.execute(alert_sql, {"tid": str(tid), "store_ids": store_ids, "date_from": date_from})
         alert_counts: dict[str, int] = {str(r["store_id"]): int(r["cnt"]) for r in alert_result.mappings().all()}
 
@@ -327,17 +337,20 @@ async def get_period_analysis(
 
     try:
         # ── 桌台数（用于翻台率分母）──────────────────────────────────────────
-        tbl_sql = text("""
+        tbl_sql = text(
+            """
             SELECT COUNT(*) AS cnt
             FROM tables
             WHERE tenant_id = :tid::uuid AND store_id = :store_id::uuid
-        """)
+        """
+        )
         tbl_result = await db.execute(tbl_sql, {"tid": str(tid), "store_id": store_id})
         tbl_row = tbl_result.mappings().first()
         table_count: int = int(tbl_row["cnt"]) if tbl_row else 0
 
         # ── 主聚合：按餐段汇总订单 ────────────────────────────────────────────
-        period_sql = text(f"""
+        period_sql = text(
+            f"""
             SELECT
                 {_hour_case_sql()} AS period_name,
                 COUNT(*)::int AS order_count,
@@ -351,7 +364,8 @@ async def get_period_analysis(
             GROUP BY period_name
             HAVING {_hour_case_sql()} IS NOT NULL
             ORDER BY MIN(created_at)
-        """)
+        """
+        )
         period_result = await db.execute(
             period_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date}
         )
@@ -361,7 +375,8 @@ async def get_period_analysis(
             return {"ok": True, "data": {"periods": [], "store_id": store_id, "date": target_date}}
 
         # ── peak_hour：每个餐段内按半小时分桶找订单最多的时段 ─────────────────
-        peak_sql = text(f"""
+        peak_sql = text(
+            f"""
             SELECT
                 {_hour_case_sql()} AS period_name,
                 TO_CHAR(
@@ -380,7 +395,8 @@ async def get_period_analysis(
             GROUP BY period_name, bucket_start
             HAVING {_hour_case_sql()} IS NOT NULL
             ORDER BY period_name, cnt DESC
-        """)
+        """
+        )
         peak_result = await db.execute(peak_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date})
         # 每个餐段取 cnt 最大的那个半小时
         peak_hours: dict[str, str] = {}
@@ -396,7 +412,8 @@ async def get_period_analysis(
                 peak_hours[pname] = f"{bucket}-{end_h:02d}:{end_m:02d}"
 
         # ── 热销菜：一次性查所有餐段，Python 侧分组 ───────────────────────────
-        dish_sql = text(f"""
+        dish_sql = text(
+            f"""
             SELECT
                 {_hour_case_sql().replace("created_at", "o.created_at")} AS period_name,
                 oi.dish_name,
@@ -411,7 +428,8 @@ async def get_period_analysis(
             GROUP BY period_name, oi.dish_name
             HAVING {_hour_case_sql().replace("created_at", "o.created_at")} IS NOT NULL
             ORDER BY period_name, total_qty DESC
-        """)
+        """
+        )
         dish_result = await db.execute(dish_sql, {"tid": str(tid), "store_id": store_id, "target_date": target_date})
         # 按餐段分组，每段取前5
         dishes_by_period: dict[str, list[dict]] = {}

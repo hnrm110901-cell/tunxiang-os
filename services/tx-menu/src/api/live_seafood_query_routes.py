@@ -70,7 +70,8 @@ async def list_tanks(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     tz.id::TEXT         AS zone_id,
                     tz.zone_code,
@@ -105,7 +106,8 @@ async def list_tanks(
                   AND tz.is_deleted = false
                 GROUP BY tz.id, tz.zone_code, tz.zone_name, tz.is_active
                 ORDER BY tz.sort_order, tz.zone_code
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id},
         )
         rows = result.fetchall()
@@ -150,7 +152,8 @@ async def list_tank_dishes(
     try:
         # 查鱼缸区域元数据
         zone_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::TEXT, zone_code, zone_name
                 FROM fish_tank_zones
                 WHERE zone_code  = :zone_code
@@ -158,7 +161,8 @@ async def list_tank_dishes(
                   AND tenant_id  = :tenant_id
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"zone_code": zone_code_upper, "store_id": store_id, "tenant_id": tenant_id},
         )
         zone_row = zone_result.fetchone()
@@ -174,7 +178,8 @@ async def list_tank_dishes(
 
     try:
         dishes_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.id::TEXT          AS dish_id,
                     d.dish_name,
@@ -192,7 +197,8 @@ async def list_tank_dishes(
                   AND d.is_deleted   = false
                   AND d.pricing_method IN ('weight', 'count')
                 ORDER BY d.live_stock_count DESC, d.dish_name
-            """),
+            """
+            ),
             {"zone_id": zone_id, "tenant_id": tenant_id},
         )
         dish_rows = dishes_result.fetchall()

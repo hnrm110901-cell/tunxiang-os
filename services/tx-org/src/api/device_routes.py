@@ -93,7 +93,8 @@ async def list_org_devices(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     device_id, tenant_id, store_id, device_type, device_name,
                     hardware_model, mac_address, ip_address,
@@ -103,7 +104,8 @@ async def list_org_devices(
                 WHERE {where_clause}
                 ORDER BY store_id, device_type, device_name
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -154,7 +156,8 @@ async def list_offline_devices(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     device_id, store_id, device_type, device_name,
                     hardware_model, ip_address, app_version,
@@ -164,7 +167,8 @@ async def list_offline_devices(
                 WHERE {where_clause}
                 ORDER BY last_heartbeat_at ASC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -212,7 +216,8 @@ async def get_device_stats(
     try:
         # 整体统计
         overall_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                                      AS total_devices,
                     COUNT(*) FILTER (WHERE status = 'online')                    AS status_online,
@@ -234,14 +239,16 @@ async def get_device_stats(
                     )                                                             AS online_rate_pct
                 FROM device_registry
                 WHERE tenant_id = :tenant_id
-            """),
+            """
+            ),
             params,
         )
         overall_row = overall_result.mappings().one()
 
         # 按门店分组
         by_store_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     store_id::TEXT,
                     COUNT(*)                                                   AS total,
@@ -267,14 +274,16 @@ async def get_device_stats(
                 WHERE tenant_id = :tenant_id
                 GROUP BY store_id
                 ORDER BY online_rate_pct ASC NULLS LAST
-            """),
+            """
+            ),
             params,
         )
         by_store = [dict(r) for r in by_store_result.mappings().all()]
 
         # 按硬件型号分组
         by_model_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(hardware_model, '未知型号')                        AS hardware_model,
                     COUNT(*)                                                   AS total,
@@ -293,14 +302,16 @@ async def get_device_stats(
                 WHERE tenant_id = :tenant_id
                 GROUP BY hardware_model
                 ORDER BY total DESC
-            """),
+            """
+            ),
             params,
         )
         by_model = [dict(r) for r in by_model_result.mappings().all()]
 
         # 按 App 版本分组
         by_version_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(app_version, '未知版本')  AS app_version,
                     COUNT(*)                          AS device_count,
@@ -309,7 +320,8 @@ async def get_device_stats(
                 WHERE tenant_id = :tenant_id
                 GROUP BY app_version, device_type
                 ORDER BY device_count DESC
-            """),
+            """
+            ),
             params,
         )
         by_version = [dict(r) for r in by_version_result.mappings().all()]

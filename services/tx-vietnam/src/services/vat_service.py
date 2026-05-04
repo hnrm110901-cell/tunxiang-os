@@ -19,7 +19,7 @@ Reference:
 
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from typing import Any
 
@@ -31,10 +31,10 @@ logger = structlog.get_logger()
 class VATCategory(Enum):
     """VAT rate categories per Vietnamese tax law."""
 
-    STANDARD = "standard"   # 10% — standard rate for most goods/services
-    REDUCED = "reduced"     # 8%  — reduced rate (2024-2026 stimulus program)
-    EXPORT = "export"       # 0%  — export services / goods
-    EXEMPT = "exempt"       # 0%  — exempt per Vietnamese tax law
+    STANDARD = "standard"  # 10% — standard rate for most goods/services
+    REDUCED = "reduced"  # 8%  — reduced rate (2024-2026 stimulus program)
+    EXPORT = "export"  # 0%  — export services / goods
+    EXEMPT = "exempt"  # 0%  — exempt per Vietnamese tax law
 
 
 # VAT rate table (as decimals)
@@ -128,17 +128,13 @@ class VATService:
             0      # Exempt, no VAT
         """
         if not isinstance(category, VATCategory):
-            raise InvalidVATCategoryError(
-                f"category must be a VATCategory enum value, got {category}"
-            )
+            raise InvalidVATCategoryError(f"category must be a VATCategory enum value, got {category}")
 
         _validate_amount_fen(amount_fen)
 
         rate = _VAT_RATES.get(category)
         if rate is None:
-            raise InvalidVATCategoryError(
-                f"Unknown VAT category: {category}"
-            )
+            raise InvalidVATCategoryError(f"Unknown VAT category: {category}")
 
         if rate == Decimal("0"):
             return 0
@@ -197,9 +193,7 @@ class VATService:
             try:
                 category = VATCategory(category_str)
             except ValueError as exc:
-                raise InvalidVATCategoryError(
-                    f"Invalid VAT category: {category_str}"
-                ) from exc
+                raise InvalidVATCategoryError(f"Invalid VAT category: {category_str}") from exc
 
             _validate_amount_fen(amount_fen)
 

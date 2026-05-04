@@ -106,7 +106,8 @@ class GrowthSuggestionService:
         context_json = json.dumps(data.get("context", {}))
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_agent_strategy_suggestions
                     (id, tenant_id, customer_id, suggestion_type, template_id,
                      agent_id, confidence_score, reasoning,
@@ -124,7 +125,8 @@ class GrowthSuggestionService:
                           suggested_channel, suggested_timing,
                           suggested_offer_json, suggested_message,
                           review_state, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": suggestion_id,
                 "tenant_id": tenant_id,
@@ -161,10 +163,12 @@ class GrowthSuggestionService:
 
         # 查当前状态
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT review_state FROM growth_agent_strategy_suggestions
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": str(suggestion_id)},
         )
         cur_row = cur.fetchone()
@@ -174,12 +178,14 @@ class GrowthSuggestionService:
         self._validate_transition(cur_row._mapping["review_state"], "pending_review")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_agent_strategy_suggestions
                 SET review_state = 'pending_review', updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
                 RETURNING id, review_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": str(suggestion_id)},
         )
         updated = dict(result.fetchone()._mapping)
@@ -228,7 +234,8 @@ class GrowthSuggestionService:
         params["lim"] = size
         params["off"] = offset
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, customer_id, suggestion_type, template_id,
                        agent_id, confidence_score, reasoning,
                        suggested_channel, suggested_timing,
@@ -240,7 +247,8 @@ class GrowthSuggestionService:
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows_result.fetchall()]
@@ -255,7 +263,8 @@ class GrowthSuggestionService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, customer_id, suggestion_type, template_id,
                        agent_id, confidence_score, reasoning,
                        suggested_channel, suggested_timing,
@@ -268,7 +277,8 @@ class GrowthSuggestionService:
                        created_at, updated_at
                 FROM growth_agent_strategy_suggestions
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": str(suggestion_id)},
         )
         row = result.fetchone()
@@ -295,10 +305,12 @@ class GrowthSuggestionService:
 
         # 查当前状态
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT review_state FROM growth_agent_strategy_suggestions
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": str(suggestion_id)},
         )
         cur_row = cur.fetchone()
@@ -347,14 +359,16 @@ class GrowthSuggestionService:
 
         set_sql = ", ".join(set_parts)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE growth_agent_strategy_suggestions
                 SET {set_sql}
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
                 RETURNING id, review_state, reviewer_id, reviewer_note,
                           revised_channel, revised_timing, revised_message,
                           updated_at
-            """),
+            """
+            ),
             params,
         )
         updated = dict(result.fetchone()._mapping)
@@ -391,11 +405,13 @@ class GrowthSuggestionService:
 
         # 查完整建议数据
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, review_state, customer_id, template_id, suggestion_type
                 FROM growth_agent_strategy_suggestions
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": str(suggestion_id)},
         )
         cur_row = cur.fetchone()
@@ -440,7 +456,8 @@ class GrowthSuggestionService:
 
         # 更新建议状态
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_agent_strategy_suggestions
                 SET review_state = 'published',
                     published_at = NOW(),
@@ -448,7 +465,8 @@ class GrowthSuggestionService:
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :sid AND is_deleted = false
                 RETURNING id, review_state, published_at, published_enrollment_id, updated_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": str(suggestion_id),
@@ -488,7 +506,8 @@ class GrowthSuggestionService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_agent_strategy_suggestions
                 SET review_state = 'expired', updated_at = NOW()
                 WHERE tenant_id = :tid
@@ -496,7 +515,8 @@ class GrowthSuggestionService:
                   AND created_at < NOW() - make_interval(hours => :hours)
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"tid": tenant_id, "hours": hours},
         )
         expired_rows = result.fetchall()

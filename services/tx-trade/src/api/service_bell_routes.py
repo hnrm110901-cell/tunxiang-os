@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.service_bell_service import (
     create_call,
     get_call_history,
@@ -67,7 +69,7 @@ async def api_create_call(
         )
         return {"ok": True, "data": _serialize_call(call)}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "呼叫请求参数无效", e)
 
 
 @router.post("/{call_id}/respond")
@@ -87,9 +89,9 @@ async def api_respond_call(
         )
         return {"ok": True, "data": _serialize_call(call)}
     except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "呼叫记录不存在", e)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "响应呼叫操作失败", e)
 
 
 @router.get("/pending")

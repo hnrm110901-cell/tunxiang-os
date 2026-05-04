@@ -6,7 +6,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+
 from ..services.kds_prep_recommendation import get_prep_recommendations
 
 router = APIRouter(prefix="/api/v1/kds/prep", tags=["kds-prep"])

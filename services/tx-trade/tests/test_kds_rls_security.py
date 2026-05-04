@@ -24,6 +24,7 @@ KDS_TABLES = ["production_depts", "dish_dept_mappings"]
 # Mock RLS 引擎（模拟 PostgreSQL RLS 行为）
 # ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class MockRow:
     table: str
@@ -69,9 +70,7 @@ class MockRLSDatabase:
         """RLS INSERT WITH CHECK 校验"""
         if table in self._rls_tables:
             if self._current_tenant is None or self._current_tenant == "":
-                raise PermissionError(
-                    "RLS INSERT blocked: app.tenant_id is not set (NULL/empty)"
-                )
+                raise PermissionError("RLS INSERT blocked: app.tenant_id is not set (NULL/empty)")
             if tenant_id != self._current_tenant:
                 raise PermissionError(
                     f"RLS INSERT blocked: row.tenant_id={tenant_id} != "
@@ -83,10 +82,7 @@ class MockRLSDatabase:
 
     def select(self, table: str) -> list[MockRow]:
         """RLS SELECT USING 过滤"""
-        return [
-            r for r in self._rows
-            if r.table == table and self._rls_check(table, r.tenant_id)
-        ]
+        return [r for r in self._rows if r.table == table and self._rls_check(table, r.tenant_id)]
 
     def select_bypass_rls(self, table: str) -> list[MockRow]:
         """超级用户视角（绕过 RLS，用于验证数据确实存在）"""
@@ -117,6 +113,7 @@ def _make_db_with_kds_data() -> tuple[MockRLSDatabase, str, str]:
 # 测试 1：session 变量名正确性检查
 # ──────────────────────────────────────────────────────────────────
 
+
 def test_rls_uses_correct_session_variable():
     """RLS 策略必须使用 app.tenant_id，而非 app.current_store_id / app.current_tenant。"""
     # 模拟 v006+ _SAFE_CONDITION（与 shared/db-migrations/versions/v006_rls_security_fix.py 一致）
@@ -126,14 +123,11 @@ def test_rls_uses_correct_session_variable():
         "AND tenant_id = current_setting('app.tenant_id')::UUID"
     )
 
-    assert CORRECT_SESSION_VAR in safe_condition, (
-        f"RLS 安全条件必须包含 '{CORRECT_SESSION_VAR}'"
-    )
+    assert CORRECT_SESSION_VAR in safe_condition, f"RLS 安全条件必须包含 '{CORRECT_SESSION_VAR}'"
 
     for wrong_var in WRONG_VARS:
         assert wrong_var not in safe_condition, (
-            f"RLS 安全条件不应包含错误变量 '{wrong_var}'，"
-            f"当前应用代码使用 '{CORRECT_SESSION_VAR}'"
+            f"RLS 安全条件不应包含错误变量 '{wrong_var}'，" f"当前应用代码使用 '{CORRECT_SESSION_VAR}'"
         )
 
 
@@ -167,18 +161,15 @@ def test_rls_policy_sql_references_correct_variable():
                     f"AND tenant_id = current_setting('app.tenant_id')::UUID)"
                 )
 
-            assert CORRECT_SESSION_VAR in sql, (
-                f"[{table}/{action}] SQL 未引用正确变量 '{CORRECT_SESSION_VAR}': {sql}"
-            )
+            assert CORRECT_SESSION_VAR in sql, f"[{table}/{action}] SQL 未引用正确变量 '{CORRECT_SESSION_VAR}': {sql}"
             for wrong_var in WRONG_VARS:
-                assert wrong_var not in sql, (
-                    f"[{table}/{action}] SQL 引用了错误变量 '{wrong_var}': {sql}"
-                )
+                assert wrong_var not in sql, f"[{table}/{action}] SQL 引用了错误变量 '{wrong_var}': {sql}"
 
 
 # ──────────────────────────────────────────────────────────────────
 # 测试 2：production_depts 多租户隔离
 # ──────────────────────────────────────────────────────────────────
+
 
 def test_tenant_a_cannot_read_tenant_b_production_depts():
     """tenant_a 设置 session 后，只能看到自己的 production_depts，看不到 tenant_b 的。"""
@@ -210,6 +201,7 @@ def test_tenant_b_cannot_read_tenant_a_production_depts():
 # 测试 3：dish_dept_mappings 多租户隔离
 # ──────────────────────────────────────────────────────────────────
 
+
 def test_tenant_a_cannot_read_tenant_b_dish_dept_mappings():
     """tenant_a 设置 session 后，只能看到自己的 dish_dept_mappings，看不到 tenant_b 的。"""
     db, tenant_a, tenant_b = _make_db_with_kds_data()
@@ -240,6 +232,7 @@ def test_tenant_b_cannot_read_tenant_a_dish_dept_mappings():
 # 测试 4：NULL 防护（session 未设置时全表不可见）
 # ──────────────────────────────────────────────────────────────────
 
+
 def test_production_depts_invisible_when_tenant_not_set():
     """未设置 app.tenant_id 时，production_depts 应全表不可见（NULL 防护）。"""
     db, tenant_a, tenant_b = _make_db_with_kds_data()
@@ -248,8 +241,7 @@ def test_production_depts_invisible_when_tenant_not_set():
     visible = db.select("production_depts")
 
     assert len(visible) == 0, (
-        f"未设置 app.tenant_id 时不应看到任何记录，"
-        f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
+        f"未设置 app.tenant_id 时不应看到任何记录，" f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
     )
 
 
@@ -261,14 +253,14 @@ def test_dish_dept_mappings_invisible_when_tenant_not_set():
     visible = db.select("dish_dept_mappings")
 
     assert len(visible) == 0, (
-        f"未设置 app.tenant_id 时不应看到任何记录，"
-        f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
+        f"未设置 app.tenant_id 时不应看到任何记录，" f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
     )
 
 
 # ──────────────────────────────────────────────────────────────────
 # 测试 5：跨租户 INSERT 被 RLS 阻止
 # ──────────────────────────────────────────────────────────────────
+
 
 def test_cross_tenant_insert_blocked_production_depts():
     """tenant_a 不能向 production_depts 写入 tenant_b 的数据。"""
@@ -328,33 +320,32 @@ def test_insert_without_tenant_blocked():
 # 测试 6：迁移文件包含 v016 对 KDS 表的覆盖验证
 # ──────────────────────────────────────────────────────────────────
 
+
 def test_v017_migration_covers_kds_tables():
     """验证 v017 迁移文件覆盖了 production_depts 和 dish_dept_mappings。"""
     import os
+
     migration_path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "..", "shared", "db-migrations", "versions",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
         "v017_kds_rls_security_fix.py",
     )
     migration_path = os.path.normpath(migration_path)
 
-    assert os.path.exists(migration_path), (
-        f"迁移文件不存在: {migration_path}"
-    )
+    assert os.path.exists(migration_path), f"迁移文件不存在: {migration_path}"
 
     with open(migration_path) as f:
         content = f.read()
 
     for table in KDS_TABLES:
-        assert table in content, (
-            f"v017 迁移文件未覆盖表 '{table}'"
-        )
+        assert table in content, f"v017 迁移文件未覆盖表 '{table}'"
 
-    assert CORRECT_SESSION_VAR in content, (
-        f"v017 迁移文件未使用正确 session 变量 '{CORRECT_SESSION_VAR}'"
-    )
+    assert CORRECT_SESSION_VAR in content, f"v017 迁移文件未使用正确 session 变量 '{CORRECT_SESSION_VAR}'"
 
     for wrong_var in WRONG_VARS:
-        assert wrong_var not in content, (
-            f"v017 迁移文件包含错误 session 变量 '{wrong_var}'"
-        )
+        assert wrong_var not in content, f"v017 迁移文件包含错误 session 变量 '{wrong_var}'"

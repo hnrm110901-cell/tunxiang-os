@@ -216,11 +216,13 @@ async def get_brand_strategy(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT strategy_config
             FROM brands
             WHERE id = :bid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"bid": brand_id, "tid": tenant_id},
     )
     row = result.fetchone()

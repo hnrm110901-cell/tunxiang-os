@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -67,7 +67,7 @@ async def get_realtime_dashboard(
          "avg_wait_min": float, "alerts": [...], "snapshot_at": str}
     """
     # 实际实现从 db 聚合; 这里返回结构骨架
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     # 调用各巡航模块收集告警
     table_alerts = await check_table_cruise(store_id, tenant_id, db)
@@ -124,7 +124,7 @@ async def check_table_cruise(
     """
     thr = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     alerts: List[Dict[str, Any]] = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for table in tables or []:
         table_id = table.get("table_id", "")
@@ -205,7 +205,7 @@ async def check_cooking_cruise(
     """
     thr = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     alerts: List[Dict[str, Any]] = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     pending_orders = orders or []
 
     # 出餐堆积
@@ -276,7 +276,7 @@ async def check_stockout_cruise(
         告警列表
     """
     alerts: List[Dict[str, Any]] = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for dish in dishes or []:
         dish_id = dish.get("dish_id", "")
@@ -356,7 +356,7 @@ async def record_patrol(
                 "description": finding.get("description", ""),
                 "severity": finding.get("severity", "info"),
                 "location": finding.get("location", ""),
-                "recorded_at": datetime.utcnow().isoformat(),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
             }
         )
 
@@ -367,7 +367,7 @@ async def record_patrol(
         "operator_id": operator_id,
         "findings": enriched_findings,
         "findings_count": len(enriched_findings),
-        "recorded_at": datetime.utcnow().isoformat(),
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(

@@ -92,7 +92,8 @@ class UGCService:
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ugc_submissions (
                     id, tenant_id, customer_id, order_id, store_id,
                     media_urls, caption, dish_ids,
@@ -102,7 +103,8 @@ class UGCService:
                     :media_urls::jsonb, :caption, :dish_ids::jsonb,
                     'pending_review', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": str(ugc_id),
                 "tenant_id": str(tenant_id),
@@ -146,7 +148,8 @@ class UGCService:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ugc_submissions
                 SET status = 'published',
                     points_awarded = :points,
@@ -157,7 +160,8 @@ class UGCService:
                   AND status IN ('pending_review', 'approved')
                   AND is_deleted = false
                 RETURNING id, customer_id, points_awarded
-            """),
+            """
+            ),
             {
                 "ugc_id": str(ugc_id),
                 "tenant_id": str(tenant_id),
@@ -204,7 +208,8 @@ class UGCService:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ugc_submissions
                 SET status = 'rejected',
                     rejection_reason = :reason,
@@ -214,7 +219,8 @@ class UGCService:
                   AND status = 'pending_review'
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "ugc_id": str(ugc_id),
                 "tenant_id": str(tenant_id),
@@ -262,19 +268,22 @@ class UGCService:
         offset = (page - 1) * size
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM ugc_submissions
                 WHERE tenant_id = :tenant_id
                   AND store_id = :store_id
                   AND status = 'published'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "store_id": str(store_id)},
         )
         total: int = count_result.scalar_one()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, media_urls, caption, dish_ids,
                        ai_quality_score, points_awarded,
                        view_count, like_count, share_count,
@@ -286,7 +295,8 @@ class UGCService:
                   AND is_deleted = false
                 ORDER BY featured DESC, published_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -329,7 +339,8 @@ class UGCService:
     ) -> list[dict]:
         """获取顾客自己的UGC投稿历史"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, media_urls, caption, dish_ids,
                        ai_quality_score, ai_quality_feedback,
                        status, rejection_reason, points_awarded,
@@ -340,7 +351,8 @@ class UGCService:
                   AND customer_id = :customer_id
                   AND is_deleted = false
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "customer_id": str(customer_id)},
         )
         rows = result.fetchall()
@@ -382,7 +394,8 @@ class UGCService:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ugc_submissions
                 SET featured = true,
                     points_awarded = points_awarded + :extra_points,
@@ -393,7 +406,8 @@ class UGCService:
                   AND featured = false
                   AND is_deleted = false
                 RETURNING id, customer_id, points_awarded
-            """),
+            """
+            ),
             {
                 "ugc_id": str(ugc_id),
                 "tenant_id": str(tenant_id),
@@ -433,14 +447,16 @@ class UGCService:
     ) -> None:
         """浏览量+1"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ugc_submissions
                 SET view_count = view_count + 1,
                     updated_at = NOW()
                 WHERE id = :ugc_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"ugc_id": str(ugc_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
@@ -453,14 +469,16 @@ class UGCService:
     ) -> None:
         """点赞量+1"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ugc_submissions
                 SET like_count = like_count + 1,
                     updated_at = NOW()
                 WHERE id = :ugc_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"ugc_id": str(ugc_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()

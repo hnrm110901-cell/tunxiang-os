@@ -41,22 +41,28 @@ class AgentDecisionLog(TenantBase):
     # Sprint D2：ROI 三字段 + 证据（v264 迁移）
     # 注：v264 用 DEFAULT 0 / '{}'::jsonb，ORM 端也给对应默认，避免旧代码路径 None
     saved_labor_hours: Mapped[Decimal] = mapped_column(
-        Numeric(10, 2), nullable=True, default=Decimal("0"),
+        Numeric(10, 2),
+        nullable=True,
+        default=Decimal("0"),
         comment="节省的人力工时（分析/盘点/跑腿代替）",
     )
     prevented_loss_fen: Mapped[int] = mapped_column(
-        BIGINT, nullable=True, default=0,
+        BIGINT,
+        nullable=True,
+        default=0,
         comment="拦截的损失金额（违规折扣/食安违规/浪费/重复支付，单位分）",
     )
     improved_kpi: Mapped[dict] = mapped_column(
-        JSONB, nullable=True, default=dict,
+        JSONB,
+        nullable=True,
+        default=dict,
         comment='正向 KPI 变化，例：{"revenue_uplift_fen": 500, "nps_delta": 0.3}',
     )
     roi_evidence: Mapped[dict] = mapped_column(
-        JSONB, nullable=True, default=dict,
+        JSONB,
+        nullable=True,
+        default=dict,
         comment="证据链：数据源 URL / SQL / 事件 ID / 验证方式",
     )
 
-    decided_at: Mapped[str] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    decided_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())

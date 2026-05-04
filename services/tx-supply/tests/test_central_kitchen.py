@@ -22,6 +22,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 import pytest
+
 from services.central_kitchen_service import (
     CentralKitchenService,
     _clear_store,
@@ -92,9 +93,7 @@ async def _make_confirmed_plan(svc: CentralKitchenService, kitchen_id: str):
         items=SAMPLE_ITEMS,
         created_by=OPERATOR,
     )
-    return await svc.confirm_production_plan(
-        tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR
-    )
+    return await svc.confirm_production_plan(tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR)
 
 
 async def _make_dispatched_order(svc: CentralKitchenService, kitchen_id: str):
@@ -163,15 +162,11 @@ async def test_confirm_plan_creates_production_orders(svc):
         items=SAMPLE_ITEMS,
         created_by=OPERATOR,
     )
-    confirmed = await svc.confirm_production_plan(
-        tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR
-    )
+    confirmed = await svc.confirm_production_plan(tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR)
     assert confirmed.status == "confirmed"
     assert confirmed.confirmed_at is not None
 
-    orders_result = await svc.list_production_orders(
-        tenant_id=TENANT_A, plan_id=plan.id
-    )
+    orders_result = await svc.list_production_orders(tenant_id=TENANT_A, plan_id=plan.id)
     assert orders_result["total"] == 2  # 两个菜品对应两张工单
     for order in orders_result["items"]:
         assert order["status"] == "pending"
@@ -187,14 +182,10 @@ async def test_confirm_plan_wrong_status_raises(svc):
         plan_date="2026-04-01",
         items=SAMPLE_ITEMS,
     )
-    await svc.confirm_production_plan(
-        tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR
-    )
+    await svc.confirm_production_plan(tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR)
     # 再次确认应抛出异常
     with pytest.raises(ValueError, match="只有 draft 状态可确认"):
-        await svc.confirm_production_plan(
-            tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR
-        )
+        await svc.confirm_production_plan(tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -244,16 +235,12 @@ async def test_complete_all_orders_auto_completes_plan(svc):
     order_ids = [o["id"] for o in orders["items"]]
 
     # 完成第一张工单，计划不应自动完成
-    await svc.complete_production_order(
-        tenant_id=TENANT_A, order_id=order_ids[0], actual_qty=48.0
-    )
+    await svc.complete_production_order(tenant_id=TENANT_A, order_id=order_ids[0], actual_qty=48.0)
     partial_plan = await svc.get_production_plan(tenant_id=TENANT_A, plan_id=plan.id)
     assert partial_plan.status == "in_progress"
 
     # 完成最后一张工单，计划自动升为 completed
-    await svc.complete_production_order(
-        tenant_id=TENANT_A, order_id=order_ids[1], actual_qty=29.5
-    )
+    await svc.complete_production_order(tenant_id=TENANT_A, order_id=order_ids[1], actual_qty=29.5)
     completed_plan = await svc.get_production_plan(tenant_id=TENANT_A, plan_id=plan.id)
     assert completed_plan.status == "completed"
 
@@ -265,9 +252,7 @@ async def test_complete_order_records_actual_qty(svc):
     orders = await svc.list_production_orders(tenant_id=TENANT_A, plan_id=plan.id)
     order_id = orders["items"][0]["id"]
 
-    completed_order = await svc.complete_production_order(
-        tenant_id=TENANT_A, order_id=order_id, actual_qty=47.5
-    )
+    completed_order = await svc.complete_production_order(tenant_id=TENANT_A, order_id=order_id, actual_qty=47.5)
     assert completed_order.status == "completed"
     assert completed_order.quantity == 47.5
     assert completed_order.completed_at is not None
@@ -280,9 +265,7 @@ async def test_complete_order_negative_qty_raises(svc):
     orders = await svc.list_production_orders(tenant_id=TENANT_A, plan_id=plan.id)
     order_id = orders["items"][0]["id"]
     with pytest.raises(ValueError, match="actual_qty 不能为负数"):
-        await svc.complete_production_order(
-            tenant_id=TENANT_A, order_id=order_id, actual_qty=-1.0
-        )
+        await svc.complete_production_order(tenant_id=TENANT_A, order_id=order_id, actual_qty=-1.0)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -298,9 +281,7 @@ async def test_update_progress_full_flow(svc):
     order_id = orders["items"][0]["id"]
 
     # pending → in_progress
-    in_prog = await svc.update_production_progress(
-        tenant_id=TENANT_A, order_id=order_id, status="in_progress"
-    )
+    in_prog = await svc.update_production_progress(tenant_id=TENANT_A, order_id=order_id, status="in_progress")
     assert in_prog.status == "in_progress"
     assert in_prog.started_at is not None
 
@@ -329,9 +310,7 @@ async def test_update_completed_order_raises(svc):
         quantity_done=50.0,
     )
     with pytest.raises(ValueError, match="已处于 completed 状态"):
-        await svc.update_production_progress(
-            tenant_id=TENANT_A, order_id=order_id, status="in_progress"
-        )
+        await svc.update_production_progress(tenant_id=TENANT_A, order_id=order_id, status="in_progress")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -415,9 +394,7 @@ async def test_confirm_receiving_updates_distribution_status(svc):
             }
         ],
     )
-    orders = await svc.list_distribution_orders(
-        tenant_id=TENANT_A, status="confirmed"
-    )
+    orders = await svc.list_distribution_orders(tenant_id=TENANT_A, status="confirmed")
     assert orders["total"] == 1
     assert orders["items"][0]["id"] == dispatched.id
 
@@ -472,9 +449,7 @@ async def test_dashboard_counts(svc):
     )
     await svc.mark_dispatched(tenant_id=TENANT_A, order_id=dist.id)
 
-    dashboard = await svc.get_daily_dashboard(
-        tenant_id=TENANT_A, kitchen_id=kitchen.id, date="2026-04-01"
-    )
+    dashboard = await svc.get_daily_dashboard(tenant_id=TENANT_A, kitchen_id=kitchen.id, date="2026-04-01")
 
     assert dashboard.plan_count == 1
     assert dashboard.plans[0]["id"] == plan.id
@@ -493,9 +468,7 @@ async def test_dashboard_empty_for_different_date(svc):
     kitchen = await _make_kitchen(svc)
     await _make_confirmed_plan(svc, kitchen.id)
 
-    dashboard = await svc.get_daily_dashboard(
-        tenant_id=TENANT_A, kitchen_id=kitchen.id, date="2026-04-02"
-    )
+    dashboard = await svc.get_daily_dashboard(tenant_id=TENANT_A, kitchen_id=kitchen.id, date="2026-04-02")
     assert dashboard.plan_count == 0
     assert dashboard.production_order_summary["pending"] == 0
 
@@ -507,9 +480,7 @@ async def test_dashboard_in_progress_orders_counted(svc):
     plan = await _make_confirmed_plan(svc, kitchen.id)
     await svc.start_production(tenant_id=TENANT_A, plan_id=plan.id)
 
-    dashboard = await svc.get_daily_dashboard(
-        tenant_id=TENANT_A, kitchen_id=kitchen.id, date="2026-04-01"
-    )
+    dashboard = await svc.get_daily_dashboard(tenant_id=TENANT_A, kitchen_id=kitchen.id, date="2026-04-01")
     assert dashboard.production_order_summary["in_progress"] == 2
     assert dashboard.production_order_summary["pending"] == 0
 
@@ -528,9 +499,7 @@ async def test_forecast_weekend_applies_weight(svc):
         _inject_consumption(TENANT_A, STORE_ID, DISH_ID_1, f"2026-03-{i:02d}", 100.0)
 
     # 2026-04-05 是周六
-    forecast = await svc.forecast_demand(
-        tenant_id=TENANT_A, kitchen_id=kitchen.id, target_date="2026-04-05"
-    )
+    forecast = await svc.forecast_demand(tenant_id=TENANT_A, kitchen_id=kitchen.id, target_date="2026-04-05")
     assert forecast.is_weekend is True
     assert len(forecast.dishes) == 1
     dish = forecast.dishes[0]
@@ -547,9 +516,7 @@ async def test_forecast_weekday_no_weight(svc):
         _inject_consumption(TENANT_A, STORE_ID, DISH_ID_1, f"2026-03-{i:02d}", 100.0)
 
     # 2026-04-01 是周三
-    forecast = await svc.forecast_demand(
-        tenant_id=TENANT_A, kitchen_id=kitchen.id, target_date="2026-04-01"
-    )
+    forecast = await svc.forecast_demand(tenant_id=TENANT_A, kitchen_id=kitchen.id, target_date="2026-04-01")
     assert forecast.is_weekend is False
     dish = forecast.dishes[0]
     assert dish.suggested_qty == pytest.approx(100.0, rel=0.01)
@@ -560,9 +527,7 @@ async def test_forecast_weekday_no_weight(svc):
 async def test_forecast_no_history_returns_empty(svc):
     """无历史记录时返回空预测列表"""
     kitchen = await _make_kitchen(svc)
-    forecast = await svc.forecast_demand(
-        tenant_id=TENANT_A, kitchen_id=kitchen.id, target_date="2026-04-01"
-    )
+    forecast = await svc.forecast_demand(tenant_id=TENANT_A, kitchen_id=kitchen.id, target_date="2026-04-01")
     assert forecast.dishes == []
 
 
@@ -589,9 +554,7 @@ async def test_cross_tenant_confirm_raises(svc):
         items=SAMPLE_ITEMS,
     )
     with pytest.raises(ValueError, match="不属于当前租户"):
-        await svc.confirm_production_plan(
-            tenant_id=TENANT_B, plan_id=plan.id, operator_id=OPERATOR
-        )
+        await svc.confirm_production_plan(tenant_id=TENANT_B, plan_id=plan.id, operator_id=OPERATOR)
 
 
 @pytest.mark.asyncio
@@ -631,13 +594,9 @@ async def test_complete_already_completed_order_raises(svc):
     orders = await svc.list_production_orders(tenant_id=TENANT_A, plan_id=plan.id)
     order_id = orders["items"][0]["id"]
 
-    await svc.complete_production_order(
-        tenant_id=TENANT_A, order_id=order_id, actual_qty=50.0
-    )
+    await svc.complete_production_order(tenant_id=TENANT_A, order_id=order_id, actual_qty=50.0)
     with pytest.raises(ValueError, match="已处于 completed 状态"):
-        await svc.complete_production_order(
-            tenant_id=TENANT_A, order_id=order_id, actual_qty=50.0
-        )
+        await svc.complete_production_order(tenant_id=TENANT_A, order_id=order_id, actual_qty=50.0)
 
 
 @pytest.mark.asyncio
@@ -703,9 +662,7 @@ async def test_list_plans_filter_by_status(svc):
         plan_date="2026-04-01",
         items=SAMPLE_ITEMS,
     )
-    await svc.confirm_production_plan(
-        tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR
-    )
+    await svc.confirm_production_plan(tenant_id=TENANT_A, plan_id=plan.id, operator_id=OPERATOR)
 
     drafts = await svc.list_production_plans(tenant_id=TENANT_A, status="draft")
     confirmed = await svc.list_production_plans(tenant_id=TENANT_A, status="confirmed")

@@ -135,7 +135,8 @@ async def _fetch_sync_enabled_stores() -> List[Dict[str, Any]]:
     try:
         async with engine.connect() as conn:
             rows = await conn.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         s.tenant_id,
                         s.id        AS store_id,
@@ -145,7 +146,8 @@ async def _fetch_sync_enabled_stores() -> List[Dict[str, Any]]:
                       AND (s.extra_data->>'sync_enabled')::boolean = TRUE
                     ORDER BY s.tenant_id, s.id
                     LIMIT 500
-                """)
+                """
+                )
             )
             import json as _json
 

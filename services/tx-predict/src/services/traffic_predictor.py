@@ -278,7 +278,8 @@ class TrafficPredictor:
         serialized = {f"{k[0]}_{k[1]}": v for k, v in baseline.items()}
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO prediction_results
                         (tenant_id, store_id, prediction_type, target_date, result_data)
                     VALUES
@@ -286,7 +287,8 @@ class TrafficPredictor:
                          CURRENT_DATE, :data::jsonb)
                     ON CONFLICT (tenant_id, store_id, prediction_type, target_date)
                     DO UPDATE SET result_data = EXCLUDED.result_data, updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "store_id": store_id,
@@ -327,7 +329,8 @@ class TrafficPredictor:
         """
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         EXTRACT(DOW FROM created_at)::int AS weekday,
                         EXTRACT(HOUR FROM created_at)::int AS hour,
@@ -337,10 +340,11 @@ class TrafficPredictor:
                     WHERE tenant_id = :tenant_id::uuid
                       AND store_id = :store_id::uuid
                       AND is_deleted = FALSE
-                      AND created_at >= NOW() - INTERVAL ':days days'
+                      AND created_at >= NOW() - make_interval(days => :days)
                     GROUP BY weekday, hour
                     ORDER BY weekday, hour
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id, "days": LOOKBACK_DAYS},
             )
             rows = result.fetchall()
@@ -375,14 +379,16 @@ class TrafficPredictor:
         """获取今日已有实际客流"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(customer_count), COUNT(*))
                     FROM orders
                     WHERE tenant_id = :tenant_id::uuid
                       AND store_id = :store_id::uuid
                       AND is_deleted = FALSE
                       AND created_at::date = CURRENT_DATE
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id},
             )
             return int(result.scalar() or 0)

@@ -13,11 +13,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,13 +39,15 @@ async def _get_device_health(db: AsyncSession, store_id: str, tenant_uuid: uuid.
     """查询门店设备健康状态"""
     sid = uuid.UUID(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT device_kind, health_status, COUNT(*) AS cnt
             FROM devices
             WHERE store_id = :sid AND tenant_id = :tid
             GROUP BY device_kind, health_status
             ORDER BY device_kind, health_status
-        """),
+        """
+        ),
         {"sid": sid, "tid": tenant_uuid},
     )
     rows = result.fetchall()
@@ -57,10 +59,7 @@ async def _get_device_health(db: AsyncSession, store_id: str, tenant_uuid: uuid.
             kinds[kind] = {}
         kinds[kind][status] = r.cnt
 
-    total_online = sum(
-        s.get("healthy", 0) + s.get("degraded", 0)
-        for s in kinds.values()
-    )
+    total_online = sum(s.get("healthy", 0) + s.get("degraded", 0) for s in kinds.values())
     total_devices = sum(sum(s.values()) for s in kinds.values())
     online_rate = round(total_online / total_devices * 100, 1) if total_devices > 0 else 0.0
 
@@ -76,12 +75,14 @@ async def _get_printer_health(db: AsyncSession, store_id: str, tenant_uuid: uuid
     """查询打印机状态"""
     sid = uuid.UUID(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT status, COUNT(*) AS cnt
             FROM printers
             WHERE store_id = :sid AND tenant_id = :tid AND is_deleted = FALSE
             GROUP BY status
-        """),
+        """
+        ),
         {"sid": sid, "tid": tenant_uuid},
     )
     rows = result.fetchall()
@@ -99,7 +100,8 @@ async def _get_kds_backlog(db: AsyncSession, store_id: str, tenant_uuid: uuid.UU
     """查询 KDS 积压情况"""
     sid = uuid.UUID(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT dept_id, COUNT(*) AS pending_count,
                    MAX(EXTRACT(EPOCH FROM (NOW() - created_at)))::INT AS max_wait_sec
             FROM kds_tasks
@@ -108,7 +110,8 @@ async def _get_kds_backlog(db: AsyncSession, store_id: str, tenant_uuid: uuid.UU
               AND created_at > NOW() - INTERVAL '4 hours'
             GROUP BY dept_id
             ORDER BY pending_count DESC
-        """),
+        """
+        ),
         {"sid": sid, "tid": tenant_uuid},
     )
     dept_backlogs = [
@@ -127,19 +130,19 @@ async def _get_kds_backlog(db: AsyncSession, store_id: str, tenant_uuid: uuid.UU
     }
 
 
-async def _get_daily_settlement_status(
-    db: AsyncSession, store_id: str, tenant_uuid: uuid.UUID
-) -> Dict[str, Any]:
+async def _get_daily_settlement_status(db: AsyncSession, store_id: str, tenant_uuid: uuid.UUID) -> Dict[str, Any]:
     """查询最近日结状态"""
     sid = uuid.UUID(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT settlement_date, status, completed_at
             FROM daily_settlements
             WHERE store_id = :sid AND tenant_id = :tid
             ORDER BY settlement_date DESC
             LIMIT 7
-        """),
+        """
+        ),
         {"sid": sid, "tid": tenant_uuid},
     )
     rows = result.fetchall()
@@ -153,9 +156,7 @@ async def _get_daily_settlement_status(
     ]
     # 是否有超过 1 天未日结
     today = datetime.now(timezone.utc).date()
-    has_overdue = all(
-        str(r.settlement_date) != str(today) for r in rows
-    ) if rows else True
+    has_overdue = all(str(r.settlement_date) != str(today) for r in rows) if rows else True
 
     return {
         "recent_7_days": recent,
@@ -168,13 +169,15 @@ async def _get_sync_status(db: AsyncSession, store_id: str) -> Dict[str, Any]:
     """查询 Mac mini 数据同步状态"""
     sid = uuid.UUID(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT last_sync_at, sync_lag_sec, sync_status
             FROM edge_sync_status
             WHERE store_id = :sid
             ORDER BY last_sync_at DESC
             LIMIT 1
-        """),
+        """
+        ),
         {"sid": sid},
     )
     r = result.fetchone()
@@ -251,11 +254,7 @@ async def store_health_overview(
             "store_name": store_row.store_name,
             "store_status": store_row.status,
             "health_score": health_score,
-            "health_status": (
-                "healthy" if health_score >= 90
-                else "degraded" if health_score >= 70
-                else "critical"
-            ),
+            "health_status": ("healthy" if health_score >= 90 else "degraded" if health_score >= 70 else "critical"),
             "alerts": alerts,
             "dimensions": {
                 "devices": devices,
@@ -280,10 +279,12 @@ async def store_alerts(
 
     # 查询所有活跃门店
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_name, status FROM stores
             WHERE tenant_id = :tid AND status = 'active' AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tid": tenant_uuid},
     )
     stores = result.fetchall()
@@ -303,14 +304,16 @@ async def store_alerts(
             ]
             health_score = round(sum(scores) / len(scores), 1)
             if health_score < 90:
-                alert_stores.append({
-                    "store_id": store_id_str,
-                    "store_name": store.store_name,
-                    "health_score": health_score,
-                    "device_online_rate": devices["online_rate_pct"],
-                    "today_settled": not settlement["overdue_alert"],
-                    "sync_ok": not sync.get("alert", True),
-                })
+                alert_stores.append(
+                    {
+                        "store_id": store_id_str,
+                        "store_name": store.store_name,
+                        "health_score": health_score,
+                        "device_online_rate": devices["online_rate_pct"],
+                        "today_settled": not settlement["overdue_alert"],
+                        "sync_ok": not sync.get("alert", True),
+                    }
+                )
         except Exception:
             logger.warning("store_alert_query_failed", store_id=store_id_str, exc_info=True)
 

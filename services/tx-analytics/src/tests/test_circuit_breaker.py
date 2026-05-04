@@ -20,9 +20,7 @@ class FakeMetricsProvider:
     def __init__(self, snapshots: list[MetricSnapshot]) -> None:
         self.snapshots = snapshots
 
-    async def snapshot_last_hour(
-        self, tenant_id: str, experiment_key: str
-    ) -> list[MetricSnapshot]:
+    async def snapshot_last_hour(self, tenant_id: str, experiment_key: str) -> list[MetricSnapshot]:
         return self.snapshots
 
 
@@ -30,9 +28,7 @@ class FakeWriter:
     def __init__(self) -> None:
         self.disabled: list[tuple] = []
 
-    async def disable_experiment(
-        self, tenant_id: str, experiment_key: str, reason: str
-    ) -> bool:
+    async def disable_experiment(self, tenant_id: str, experiment_key: str, reason: str) -> bool:
         self.disabled.append((tenant_id, experiment_key, reason))
         return True
 
@@ -69,9 +65,7 @@ async def test_variant_drops_22pct_trips_breaker() -> None:
             emit_func=emit,
             flag_dir=td,
         )
-        status = await breaker.evaluate(
-            tenant_id="tenant-A", experiment_key="checkout.v2", threshold_pct=-20.0
-        )
+        status = await breaker.evaluate(tenant_id="tenant-A", experiment_key="checkout.v2", threshold_pct=-20.0)
         assert status.tripped is True
         assert len(status.breaches) == 1
         assert status.breaches[0].variant == "variant_a"
@@ -92,9 +86,7 @@ async def test_variant_drops_15pct_does_not_trip() -> None:
         definition_writer=FakeWriter(),
         emit_func=None,
     )
-    status = await breaker.evaluate(
-        tenant_id="t", experiment_key="ex", threshold_pct=-20.0
-    )
+    status = await breaker.evaluate(tenant_id="t", experiment_key="ex", threshold_pct=-20.0)
     assert status.tripped is False
     assert status.breaches == []
 
@@ -113,9 +105,7 @@ async def test_per_experiment_threshold_override() -> None:
         definition_writer=FakeWriter(),
         emit_func=None,
     )
-    status = await breaker.evaluate(
-        tenant_id="t", experiment_key="ex", threshold_pct=-10.0
-    )
+    status = await breaker.evaluate(tenant_id="t", experiment_key="ex", threshold_pct=-10.0)
     assert status.tripped is True
 
 
@@ -138,14 +128,10 @@ async def test_trip_writes_flag_file_and_disables_definition() -> None:
             emit_func=emit,
             flag_dir=td,
         )
-        status = await breaker.evaluate(
-            tenant_id="tenant-A", experiment_key="checkout.v2"
-        )
+        status = await breaker.evaluate(tenant_id="tenant-A", experiment_key="checkout.v2")
         assert status.tripped is True
 
-        await breaker.trip(
-            tenant_id="tenant-A", experiment_key="checkout.v2", status=status
-        )
+        await breaker.trip(tenant_id="tenant-A", experiment_key="checkout.v2", status=status)
 
         # writer 关 enabled
         assert len(writer.disabled) == 1
@@ -157,10 +143,7 @@ async def test_trip_writes_flag_file_and_disables_definition() -> None:
         assert any(f.endswith(".disabled.yaml") for f in files)
 
         # 事件发出
-        assert any(
-            e["event_type"].value == "experiment.circuit_breaker_tripped"
-            for e in emit.events
-        )
+        assert any(e["event_type"].value == "experiment.circuit_breaker_tripped" for e in emit.events)
 
 
 @pytest.mark.asyncio
@@ -182,22 +165,13 @@ async def test_tripped_state_persists_until_reset() -> None:
             emit_func=emit,
             flag_dir=td,
         )
-        status = await breaker.evaluate(
-            tenant_id="tenant-A", experiment_key="checkout.v2"
-        )
-        await breaker.trip(
-            tenant_id="tenant-A", experiment_key="checkout.v2", status=status
-        )
+        status = await breaker.evaluate(tenant_id="tenant-A", experiment_key="checkout.v2")
+        await breaker.trip(tenant_id="tenant-A", experiment_key="checkout.v2", status=status)
         assert len(os.listdir(td)) == 1
 
-        await breaker.reset(
-            tenant_id="tenant-A", experiment_key="checkout.v2", actor="founder@tx"
-        )
+        await breaker.reset(tenant_id="tenant-A", experiment_key="checkout.v2", actor="founder@tx")
         assert os.listdir(td) == []
-        assert any(
-            e["event_type"].value == "experiment.circuit_breaker_reset"
-            for e in emit.events
-        )
+        assert any(e["event_type"].value == "experiment.circuit_breaker_reset" for e in emit.events)
 
 
 @pytest.mark.asyncio

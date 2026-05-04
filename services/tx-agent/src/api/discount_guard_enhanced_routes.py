@@ -153,7 +153,8 @@ async def _query_high_freq_members(
     since = datetime.now(timezone.utc) - timedelta(days=days)
     store_filter = "AND o.store_id = :store_id" if store_id else ""
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             c.id::text                         AS member_id,
             c.full_name                        AS name,
@@ -171,7 +172,8 @@ async def _query_high_freq_members(
         HAVING COUNT(o.id) >= :threshold
         ORDER BY COUNT(o.id) DESC
         LIMIT 200
-    """)
+    """
+    )
 
     params: dict = {"since": since, "threshold": threshold}
     if store_id:
@@ -210,7 +212,8 @@ async def _query_member_history(
 ) -> dict:
     """查询单个会员近 days 天的折扣历史（次数 + 累计金额）。"""
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    sql = text("""
+    sql = text(
+        """
         SELECT
             COUNT(o.id)                             AS discount_count,
             COALESCE(SUM(o.discount_amount_fen), 0) AS total_saved_fen
@@ -219,7 +222,8 @@ async def _query_member_history(
           AND o.discount_amount_fen > 0
           AND o.created_at >= :since
           AND o.status NOT IN ('cancelled', 'refunded')
-    """)
+    """
+    )
     try:
         result = await db.execute(sql, {"member_id": member_id, "since": since})
         row = result.mappings().one_or_none()
@@ -250,7 +254,8 @@ async def _query_suspicious_tables(
     since = datetime.now(timezone.utc) - timedelta(days=days)
     store_filter = "AND ds.store_id = :store_id" if store_id else ""
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             ds.table_id::text                          AS table_id,
             COUNT(DISTINCT o.created_at::date)         AS consecutive_discount_days,
@@ -273,7 +278,8 @@ async def _query_suspicious_tables(
         HAVING COUNT(DISTINCT o.created_at::date) >= :min_consecutive
         ORDER BY COUNT(DISTINCT o.created_at::date) DESC
         LIMIT 100
-    """)
+    """
+    )
 
     params: dict = {"since": since, "min_consecutive": min_consecutive}
     if store_id:
@@ -318,7 +324,8 @@ async def _query_table_history(
 ) -> Optional[dict]:
     """查询单个桌台近 days 天的折扣历史。"""
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    sql = text("""
+    sql = text(
+        """
         SELECT
             COUNT(DISTINCT o.created_at::date)         AS consecutive_discount_days,
             COUNT(o.id)                                AS discount_count,
@@ -336,7 +343,8 @@ async def _query_table_history(
           AND ds.opened_at >= :since
           AND o.discount_amount_fen > 0
           AND o.status NOT IN ('cancelled', 'refunded')
-    """)
+    """
+    )
     try:
         result = await db.execute(sql, {"table_id": table_id, "since": since})
         row = result.mappings().one_or_none()
@@ -735,7 +743,8 @@ async def get_discount_guard_summary(
                 ("this_week", week_start),
                 ("this_month", month_start),
             ]:
-                sql = text(f"""
+                sql = text(
+                    f"""
                     SELECT
                         COUNT(id)                                  AS checks,
                         COUNT(id) FILTER (WHERE discount_amount_fen > 0) AS alerts,
@@ -745,7 +754,8 @@ async def get_discount_guard_summary(
                       AND status NOT IN ('cancelled', 'refunded')
                       AND discount_amount_fen > 0
                       {store_filter}
-                """)
+                """
+                )
                 params: dict = {"period_start": period_start_str}
                 if store_id:
                     params["store_id"] = store_id

@@ -7,6 +7,7 @@
 - 字段校验 (金额 >=0, 类型枚举, 必填)
 - 演进规则: 新增可选字段向后兼容
 """
+
 from __future__ import annotations
 
 import pytest
@@ -28,6 +29,7 @@ from shared.events.schemas.order_events import (
 # ======================================================================
 # §1 OrderCreatedPayload
 # ======================================================================
+
 
 class TestOrderCreatedPayload:
     def test_constructs_with_required_fields(self) -> None:
@@ -52,22 +54,16 @@ class TestOrderCreatedPayload:
         assert p.table_id == "T-08"
 
     def test_is_subclass_of_ontology_event(self) -> None:
-        p = OrderCreatedPayload(
-            order_id="o-1", store_id="s-1", total_fen=1, created_by="e-1"
-        )
+        p = OrderCreatedPayload(order_id="o-1", store_id="s-1", total_fen=1, created_by="e-1")
         assert isinstance(p, OntologyEvent)
 
     def test_negative_total_fen_rejected(self) -> None:
         """金额严格 >=0, 负数被 Pydantic 拒绝."""
         with pytest.raises(ValidationError):
-            OrderCreatedPayload(
-                order_id="o-1", store_id="s-1", total_fen=-100, created_by="e"
-            )
+            OrderCreatedPayload(order_id="o-1", store_id="s-1", total_fen=-100, created_by="e")
 
     def test_is_frozen(self) -> None:
-        p = OrderCreatedPayload(
-            order_id="o-1", store_id="s-1", total_fen=1, created_by="e"
-        )
+        p = OrderCreatedPayload(order_id="o-1", store_id="s-1", total_fen=1, created_by="e")
         with pytest.raises(ValidationError):
             p.total_fen = 999  # type: ignore[misc]
 
@@ -75,6 +71,7 @@ class TestOrderCreatedPayload:
 # ======================================================================
 # §2 OrderPaidPayload
 # ======================================================================
+
 
 class TestOrderPaidPayload:
     def test_constructs_with_required_fields(self) -> None:
@@ -128,6 +125,7 @@ class TestOrderPaidPayload:
 # §3 InvoiceVerifiedPayload
 # ======================================================================
 
+
 class TestInvoiceVerifiedPayload:
     def test_constructs_with_required_fields(self) -> None:
         p = InvoiceVerifiedPayload(
@@ -179,6 +177,7 @@ class TestInvoiceVerifiedPayload:
 # ======================================================================
 # §4 CashFlowSnapshotPayload
 # ======================================================================
+
 
 class TestCashFlowSnapshotPayload:
     def test_constructs_with_required_fields(self) -> None:
@@ -248,6 +247,7 @@ class TestCashFlowSnapshotPayload:
 # ======================================================================
 # §5 演进规则验证 (只加不改)
 # ======================================================================
+
 
 class TestSchemaEvolution:
     def test_all_schemas_forbid_extra_fields(self) -> None:

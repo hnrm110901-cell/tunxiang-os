@@ -240,7 +240,8 @@ async def get_cache_stats(
             {"tid": str(tenant_id)},
         )
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE expires_at > NOW()) AS active_count,
                     COUNT(*) FILTER (WHERE expires_at <= NOW()) AS expired_count,
@@ -250,7 +251,8 @@ async def get_cache_stats(
                 FROM ai_content_cache
                 WHERE tenant_id = current_setting('app.tenant_id')::uuid
                   AND NOT is_deleted
-            """),
+            """
+            ),
         )
         stats = row.mappings().one_or_none()
         return {

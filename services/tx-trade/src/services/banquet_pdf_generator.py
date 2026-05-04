@@ -94,22 +94,13 @@ def generate_contract_pdf(
     start = time.perf_counter()
 
     # placeholder：URL 仅用 contract_id 构造，stable 且无副作用
-    pdf_url = (
-        f"https://fake-s3.banquet-contracts.tunxiang.local/"
-        f"{tenant_id}/{contract_id}.pdf"
-    )
+    pdf_url = f"https://fake-s3.banquet-contracts.tunxiang.local/{tenant_id}/{contract_id}.pdf"
 
-    deposit_ratio = (
-        Decimal(deposit_fen) / Decimal(total_amount_fen)
-        if total_amount_fen > 0
-        else Decimal(0)
-    )
+    deposit_ratio = Decimal(deposit_fen) / Decimal(total_amount_fen) if total_amount_fen > 0 else Decimal(0)
     text = _CONTRACT_TEXT_TEMPLATE.format(
         contract_id=contract_id,
         tenant_id=tenant_id,
-        banquet_type_label=_BANQUET_TYPE_LABELS.get(
-            banquet_type.value, banquet_type.value
-        ),
+        banquet_type_label=_BANQUET_TYPE_LABELS.get(banquet_type.value, banquet_type.value),
         tables=tables,
         total_yuan=total_amount_fen / 100,
         deposit_yuan=deposit_fen / 100,

@@ -150,7 +150,8 @@ async def list_training_records(
         total = count_res.scalar() or 0
 
         rows_res = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, employee_id, category, course_name, course_id,
                        assigned_at, completed_at, score, status,
                        certificate_id, pass_threshold,
@@ -159,7 +160,8 @@ async def list_training_records(
                 WHERE {where}
                 ORDER BY assigned_at DESC, created_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {**params, "size": size, "offset": offset},
         )
         rows = rows_res.fetchall()
@@ -225,7 +227,8 @@ async def create_training_record(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO employee_trainings
                     (id, tenant_id, employee_id, category, course_name,
                      course_id, assigned_at, started_at, completed_at,
@@ -236,7 +239,8 @@ async def create_training_record(
                      :course_id, :assigned_at, :started_at, :completed_at,
                      :score, :certificate_id, :status,
                      false, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tid": tid,
@@ -301,12 +305,14 @@ async def update_training_record(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE employee_trainings
                 SET {", ".join(set_parts)}
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             params,
         )
         updated = result.fetchone()
@@ -341,7 +347,8 @@ async def get_expiring_certificates(
 
     try:
         rows_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, category, course_name,
                        certificate_id, completed_at, status
                 FROM employee_trainings
@@ -353,7 +360,8 @@ async def get_expiring_certificates(
                   AND completed_at::date + INTERVAL '1 year' <= :cutoff
                   AND completed_at::date + INTERVAL '1 year' >= :today
                 ORDER BY completed_at ASC
-            """),
+            """
+            ),
             {"tid": tid, "cutoff": cutoff, "today": today},
         )
         rows = rows_res.fetchall()
@@ -415,14 +423,16 @@ async def list_training_plans(
 
     try:
         rows_res = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, name, training_type, frequency,
                        required_roles, is_mandatory, reminder_days_before, is_active,
                        created_at, updated_at
                 FROM training_plans
                 WHERE {where}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = rows_res.fetchall()
@@ -466,7 +476,8 @@ async def create_training_plan(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO training_plans
                     (id, tenant_id, store_id, name, training_type, frequency,
                      required_roles, is_mandatory, reminder_days_before,
@@ -475,7 +486,8 @@ async def create_training_plan(
                     (:id, :tid, :store_id, :name, :training_type, :frequency,
                      :required_roles, :is_mandatory, :reminder_days_before,
                      true, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": plan_id,
                 "tid": tid,
@@ -528,7 +540,8 @@ async def get_training_stats(
     try:
         # 本月培训人次（以 assigned_at 为准）
         monthly_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) as count,
                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as passed_count
                 FROM employee_trainings
@@ -536,7 +549,8 @@ async def get_training_stats(
                   AND is_deleted = false
                   AND assigned_at >= :month_start
                   AND assigned_at < :month_end
-            """),
+            """
+            ),
             {"tid": tid, "month_start": month_start, "month_end": month_end},
         )
         monthly_row = monthly_res.fetchone()
@@ -546,21 +560,24 @@ async def get_training_stats(
 
         # 证书持有人数（持有 certificate_id 且已完成）
         cert_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT employee_id) as cert_holders
                 FROM employee_trainings
                 WHERE tenant_id = :tid
                   AND is_deleted = false
                   AND certificate_id IS NOT NULL
                   AND status = 'completed'
-            """),
+            """
+            ),
             {"tid": tid},
         )
         cert_holders = cert_res.scalar() or 0
 
         # 即将到期数（完成时间距今超过 335 天，约 30 天内到期，假设证书有效期 1 年）
         expiring_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) as expiring
                 FROM employee_trainings
                 WHERE tenant_id = :tid
@@ -570,14 +587,16 @@ async def get_training_stats(
                   AND completed_at IS NOT NULL
                   AND completed_at::date + INTERVAL '1 year' <= :cutoff
                   AND completed_at::date + INTERVAL '1 year' >= :today
-            """),
+            """
+            ),
             {"tid": tid, "cutoff": expiring_30_cutoff, "today": today},
         )
         expiring_count = expiring_res.scalar() or 0
 
         # 按培训类型分组统计
         by_type_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT category,
                        COUNT(*) as total,
                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as passed
@@ -586,7 +605,8 @@ async def get_training_stats(
                   AND is_deleted = false
                 GROUP BY category
                 ORDER BY total DESC
-            """),
+            """
+            ),
             {"tid": tid},
         )
         by_type = [
@@ -634,7 +654,8 @@ async def get_employee_training_profile(
 
     try:
         rows_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, category, course_name, course_id,
                        assigned_at, started_at, completed_at,
                        score, certificate_id, status, created_at
@@ -643,7 +664,8 @@ async def get_employee_training_profile(
                   AND employee_id = :eid
                   AND is_deleted = false
                 ORDER BY assigned_at DESC
-            """),
+            """
+            ),
             {"tid": tid, "eid": employee_id},
         )
         rows = rows_res.fetchall()

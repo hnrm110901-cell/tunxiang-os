@@ -13,6 +13,7 @@
       v5 提供完整 RESTful 路径，v4 保持向下兼容。
 """
 
+import asyncio
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
@@ -24,6 +25,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 from shared.ontology.src.database import get_db
 
 log = structlog.get_logger()
@@ -176,7 +179,8 @@ async def create_franchisee_v5(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchisees
                     (id, tenant_id, name, company_name, contact_phone, contact_email,
                      region, store_name, store_address, brand_id,
@@ -187,7 +191,8 @@ async def create_franchisee_v5(
                      :region, :store_name, :store_address, :brand_id,
                      :join_date, :franchise_type, :contract_start_date, :contract_end_date,
                      :contract_file_url, 'active', :notes, NOW(), NOW(), false)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -195,6 +200,31 @@ async def create_franchisee_v5(
             },
         )
         await db.commit()
+        # ── v147+ 事件总线旁路写入：加盟商申请提交 ──
+        # 新建 franchisee 默认 status='active'，但业务流转视为 applied 入口；
+        # 后续 PUT /franchisees/{id} 升级为 ACTIVATED/SUSPENDED/TERMINATED
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.APPLIED,
+                tenant_id=x_tenant_id,
+                stream_id=new_id,
+                payload={
+                    "franchisee_id": new_id,
+                    "name": body.name,
+                    "company_name": body.company_name,
+                    "region": body.region,
+                    "store_name": body.store_name,
+                    "franchise_type": body.franchise_type,
+                    "brand_id": body.brand_id,
+                    "join_date": body.join_date,
+                    "contract_start_date": body.contract_start_date,
+                    "contract_end_date": body.contract_end_date,
+                    "status": "active",
+                },
+                source_service="tx-org",
+                metadata={"contact_phone": body.contact_phone},
+            )
+        )
     except SQLAlchemyError as exc:
         log.error("franchise_v5.create.db_error", error=str(exc), tenant_id=x_tenant_id)
         await db.rollback()
@@ -227,6 +257,36 @@ async def update_franchisee_v5(
         log.info(
             "franchise_v5.update", franchisee_id=franchisee_id, fields=list(body.model_dump(exclude_none=True).keys())
         )
+
+        # ── v147+ 事件总线旁路写入：加盟商状态变更 ──
+        # 仅当 status 字段被显式更新时发射对应事件，避免与 metadata 类编辑混淆
+        new_status = body.status
+        if new_status:
+            status_event_map = {
+                "active": FranchiseEventType.ACTIVATED,
+                "operating": FranchiseEventType.ACTIVATED,
+                "signing": FranchiseEventType.SIGNING,
+                "suspended": FranchiseEventType.SUSPENDED,
+                "terminated": FranchiseEventType.TERMINATED,
+            }
+            event_type = status_event_map.get(new_status)
+            if event_type is not None:
+                asyncio.create_task(
+                    emit_event(
+                        event_type=event_type,
+                        tenant_id=x_tenant_id,
+                        stream_id=franchisee_id,
+                        payload={
+                            "franchisee_id": franchisee_id,
+                            "new_status": new_status,
+                            "contract_start_date": body.contract_start_date,
+                            "contract_end_date": body.contract_end_date,
+                        },
+                        source_service="tx-org",
+                        metadata={"updated_fields": [k for k in updates if k != "franchisee_id"]},
+                    )
+                )
+
         return {"ok": True, "data": {"id": franchisee_id, **body.model_dump(exclude_none=True)}}
     except HTTPException:
         raise
@@ -247,13 +307,15 @@ async def get_franchisee_contract(
         await _set_rls(db, x_tenant_id)
         # 从 franchisees 取合同字段
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, company_name,
                        contract_start_date, contract_end_date, contract_file_url,
                        franchise_type, join_date, status
                 FROM franchisees
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": franchisee_id},
         )
         row = result.fetchone()
@@ -264,11 +326,13 @@ async def get_franchisee_contract(
         # 从 franchise_contracts 追加合同明细（如存在）
         try:
             c_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT * FROM franchise_contracts
                     WHERE franchisee_id = :fid AND is_deleted = false
                     ORDER BY created_at DESC LIMIT 1
-                """),
+                """
+                ),
                 {"fid": franchisee_id},
             )
             c_row = c_result.fetchone()
@@ -416,7 +480,8 @@ async def collect_fee(
             raise HTTPException(status_code=400, detail="该费用已收款，请勿重复操作")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchise_fees
                 SET status = 'paid',
                     paid_amount_fen = :paid_amount_fen,
@@ -425,7 +490,8 @@ async def collect_fee(
                     receipt_no = :receipt_no,
                     updated_at = NOW()
                 WHERE id = :fee_id AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "fee_id": fee_id,
                 "paid_amount_fen": body.paid_amount_fen,
@@ -470,14 +536,16 @@ async def generate_monthly_fees(
             fid = str(f_row._mapping["id"])
             # 检查是否已有同月同类费用
             exists_res = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT 1 FROM franchise_fees
                     WHERE franchisee_id = :fid
                       AND fee_type = :fee_type
                       AND TO_CHAR(due_date, 'YYYY-MM') = :ym
                       AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"fid": fid, "fee_type": body.fee_type, "ym": body.year_month},
             )
             if exists_res.fetchone():
@@ -485,12 +553,14 @@ async def generate_monthly_fees(
                 continue
             new_fee_id = str(uuid4())
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO franchise_fees
                         (id, tenant_id, franchisee_id, fee_type, amount_fen, due_date, status, notes, created_at, updated_at, is_deleted)
                     VALUES
                         (:id, :tenant_id, :franchisee_id, :fee_type, :amount_fen, :due_date, 'pending', :notes, NOW(), NOW(), false)
-                """),
+                """
+                ),
                 {
                     "id": new_fee_id,
                     "tenant_id": x_tenant_id,
@@ -579,14 +649,16 @@ async def create_common_code(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_common_codes
                     (id, tenant_id, code_type, code_no, name, description, unit,
                      price_fen, applicable_stores, status, created_at, updated_at, is_deleted)
                 VALUES
                     (:id, :tenant_id, :code_type, :code_no, :name, :description, :unit,
                      :price_fen, :applicable_stores::jsonb, 'active', NOW(), NOW(), false)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": x_tenant_id,
@@ -675,14 +747,16 @@ async def sync_common_codes(
             existing_stores: list = json.loads(row._mapping["applicable_stores"] or "[]")
             merged_stores = list(set(existing_stores + body.target_store_ids))
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE franchise_common_codes
                     SET is_synced = true,
                         synced_at = :synced_at,
                         applicable_stores = :stores::jsonb,
                         updated_at = NOW()
                     WHERE id = :code_id
-                """),
+                """
+                ),
                 {"code_id": code_id, "synced_at": synced_at, "stores": json.dumps(merged_stores)},
             )
             synced_count += 1
@@ -898,11 +972,13 @@ async def upload_contract_file(
 
         # 写回档案
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchisees
                 SET contract_file_url = :url, updated_at = NOW()
                 WHERE id = :id AND is_deleted = false
-            """),
+            """
+            ),
             {"url": file_url, "id": franchisee_id},
         )
         await db.commit()
@@ -940,7 +1016,8 @@ async def mark_overdue_fees(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchise_fees
                 SET status     = 'overdue',
                     updated_at = NOW()
@@ -948,7 +1025,8 @@ async def mark_overdue_fees(
                   AND status    = 'pending'
                   AND due_date  < CURRENT_DATE
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         marked_count = result.rowcount

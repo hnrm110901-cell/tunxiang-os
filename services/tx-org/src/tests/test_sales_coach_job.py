@@ -52,7 +52,7 @@ _emitter_mod = types.ModuleType("shared.events.src.emitter")
 _evt_types_mod = types.ModuleType("shared.events.src.event_types")
 
 _emitter_mod.emit_event = _fake_emit_event
-_emitter_mod.emits = lambda *a, **k: (lambda f: f)
+_emitter_mod.emits = lambda *a, **k: lambda f: f
 
 
 class _SalesCoachEventType:
@@ -61,9 +61,7 @@ class _SalesCoachEventType:
         (),
         {"value": "sales_coach.daily_tasks_dispatched"},
     )()
-    COACHING_ADVICE = type(
-        "E", (), {"value": "sales_coach.coaching_advice"}
-    )()
+    COACHING_ADVICE = type("E", (), {"value": "sales_coach.coaching_advice"})()
     GAP_ALERT = type("E", (), {"value": "sales_coach.gap_alert"})()
 
 
@@ -216,9 +214,7 @@ async def test_weekly_profile_audit_dispatches_补录_tasks() -> None:
     assert report["idempotent"] is False
 
     # 每个员工都触发一次 score_profile_completeness
-    score_calls = [
-        c for c in agent.run.call_args_list if c.args[0] == "score_profile_completeness"
-    ]
+    score_calls = [c for c in agent.run.call_args_list if c.args[0] == "score_profile_completeness"]
     assert len(score_calls) == 2
 
 
@@ -288,8 +284,7 @@ async def test_job_emits_daily_tasks_dispatched_event() -> None:
     await asyncio.sleep(0)
 
     events = [
-        e for e in _EVENT_RECORD
-        if getattr(e.get("event_type"), "value", "") == "sales_coach.daily_tasks_dispatched"
+        e for e in _EVENT_RECORD if getattr(e.get("event_type"), "value", "") == "sales_coach.daily_tasks_dispatched"
     ]
     assert len(events) >= 1
     assert events[0]["tenant_id"] == tenant_id

@@ -50,13 +50,15 @@ async def register_surprise_rule(
     await _set_rls(db, tenant_id)
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO surprise_rules
                     (tenant_id, store_id, name, nth_visit, probability, reward, is_active)
                 VALUES
                     (:tenant_id, :store_id, :name, :nth_visit, :probability, :reward ::jsonb, :is_active)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(rule["store_id"]) if rule.get("store_id") else None,
@@ -95,12 +97,14 @@ async def get_surprise_rules(
 
     where = " AND ".join(conditions)
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, nth_visit, probability, reward, name, store_id
             FROM surprise_rules
             WHERE {where}
             ORDER BY display_order ASC, created_at ASC
-        """),
+        """
+        ),
         params,
     )
     rows = result.mappings().all()
@@ -126,11 +130,13 @@ async def delete_surprise_rule(
     await _set_rls(db, tenant_id)
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE surprise_rules
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"rid": str(rule_id), "tid": str(tenant_id)},
         )
         await db.commit()
@@ -165,12 +171,14 @@ async def check_surprise(
 
     if visit_count is None:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT DATE(created_at)) AS cnt
                 FROM orders
                 WHERE tenant_id = :tid AND customer_id = :cid
                   AND is_deleted = false AND status = 'paid'
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": customer_id},
         )
         r = row.mappings().first()
@@ -230,13 +238,15 @@ async def _check_already_triggered(
     """检查是否已触发过（查 member_badges 或用通用日志表）"""
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM member_badges
                 WHERE tenant_id = :tid AND customer_id = :cid
                   AND unlock_context->>'surprise_rule_id' = :rid
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": customer_id, "rid": rule_id},
         )
         return row.first() is not None
@@ -263,11 +273,13 @@ async def _record_trigger(
         badge_id = reward.get("badge_id")
         if badge_id:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO member_badges (tenant_id, customer_id, badge_id, unlock_context)
                     VALUES (:tid, :cid, :bid, :ctx::jsonb)
                     ON CONFLICT (tenant_id, customer_id, badge_id) DO NOTHING
-                """),
+                """
+                ),
                 {
                     "tid": tenant_id,
                     "cid": customer_id,
@@ -289,14 +301,16 @@ async def get_surprise_history(
 ) -> list[dict]:
     """获取顾客的惊喜奖励历史"""
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, badge_id, unlock_context, unlocked_at
             FROM member_badges
             WHERE tenant_id = :tid AND customer_id = :cid
               AND unlock_context ? 'surprise_rule_id'
               AND is_deleted = false
             ORDER BY unlocked_at DESC
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     return [dict(r) for r in rows.mappings().all()]

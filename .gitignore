@@ -104,3 +104,5 @@ DerivedData/
 *.onnx
 !shared/ontology/**
 shared/ontology/src/__pycache__/
+
+.claude/agent-memory/

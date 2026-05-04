@@ -104,7 +104,8 @@ async def staffing_template_summary(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             store_type,
             COUNT(*)::int                          AS total_positions,
@@ -114,7 +115,8 @@ async def staffing_template_summary(
         WHERE tenant_id = :tid AND is_deleted = FALSE AND is_active = TRUE
         GROUP BY store_type
         ORDER BY store_type
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
     by_store_type = [
@@ -155,7 +157,8 @@ async def batch_upsert_staffing_templates(
     created = 0
     updated = 0
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO store_staffing_templates
             (id, tenant_id, store_type, position, shift, day_type,
              min_count, recommended_count, peak_buffer, min_skill_level,
@@ -175,7 +178,8 @@ async def batch_upsert_staffing_templates(
              is_deleted         = FALSE,
              updated_at         = EXCLUDED.updated_at
         RETURNING (xmax = 0) AS is_insert
-    """)
+    """
+    )
 
     for item in body:
         new_id = str(uuid4())
@@ -233,14 +237,16 @@ async def copy_staffing_templates(
     now = datetime.now(timezone.utc)
 
     # Fetch active templates from source
-    fetch_sql = text(f"""
+    fetch_sql = text(
+        f"""
         SELECT {_SELECT_COLS}
         FROM store_staffing_templates
         WHERE tenant_id = :tid
           AND store_type = :source_type
           AND is_active = TRUE
           AND is_deleted = FALSE
-    """)
+    """
+    )
     rows = (
         (
             await db.execute(
@@ -258,7 +264,8 @@ async def copy_staffing_templates(
     if not rows:
         raise HTTPException(status_code=404, detail="No active templates found for source store_type")
 
-    insert_sql = text("""
+    insert_sql = text(
+        """
         INSERT INTO store_staffing_templates
             (id, tenant_id, store_type, position, shift, day_type,
              min_count, recommended_count, peak_buffer, min_skill_level,
@@ -268,7 +275,8 @@ async def copy_staffing_templates(
              :min_count, :recommended_count, :peak_buffer, :min_skill_level,
              :notes, :is_active, FALSE, :now, :now)
         ON CONFLICT ON CONSTRAINT uq_staffing_tpl_composite DO NOTHING
-    """)
+    """
+    )
 
     copied = 0
     for r in rows:
@@ -354,13 +362,15 @@ async def list_staffing_templates(
     params["limit"] = size
     params["offset"] = offset
 
-    data_sql = text(f"""
+    data_sql = text(
+        f"""
         SELECT {_SELECT_COLS}
         FROM store_staffing_templates
         WHERE {where}
         ORDER BY store_type, position, shift
         LIMIT :limit OFFSET :offset
-    """)
+    """
+    )
     rows = (await db.execute(data_sql, params)).mappings().all()
 
     items = [_row_to_dict(r) for r in rows]
@@ -380,7 +390,8 @@ async def create_staffing_template(
     await _set_tenant(db, tenant_id)
 
     # Check uniqueness
-    dup_sql = text("""
+    dup_sql = text(
+        """
         SELECT id FROM store_staffing_templates
         WHERE tenant_id = :tid
           AND store_type = :store_type
@@ -388,7 +399,8 @@ async def create_staffing_template(
           AND shift = :shift
           AND COALESCE(day_type, '') = COALESCE(:day_type, '')
           AND is_deleted = FALSE
-    """)
+    """
+    )
     dup = (
         await db.execute(
             dup_sql,
@@ -410,7 +422,8 @@ async def create_staffing_template(
     new_id = str(uuid4())
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO store_staffing_templates
             (id, tenant_id, store_type, position, shift, day_type,
              min_count, recommended_count, peak_buffer, min_skill_level,
@@ -420,7 +433,8 @@ async def create_staffing_template(
              :min_count, :recommended_count, :peak_buffer, :min_skill_level,
              :notes, :is_active, FALSE, :now, :now)
         RETURNING id::text AS template_id
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -470,11 +484,13 @@ async def get_staffing_template(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT {_SELECT_COLS}
         FROM store_staffing_templates
         WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     row = (await db.execute(sql, {"id": template_id, "tid": tenant_id})).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Staffing template not found")
@@ -504,12 +520,14 @@ async def update_staffing_template(
     set_clauses = [f"{k} = :{k}" for k in fields]
     set_sql = ", ".join(set_clauses)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         UPDATE store_staffing_templates
         SET {set_sql}
         WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text AS template_id
-    """)
+    """
+    )
     params = {**fields, "id": template_id, "tid": tenant_id}
     result = (await db.execute(sql, params)).mappings().first()
 
@@ -537,12 +555,14 @@ async def delete_staffing_template(
     await _set_tenant(db, tenant_id)
 
     now = datetime.now(timezone.utc)
-    sql = text("""
+    sql = text(
+        """
         UPDATE store_staffing_templates
         SET is_deleted = TRUE, is_active = FALSE, updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text AS template_id
-    """)
+    """
+    )
     result = (await db.execute(sql, {"id": template_id, "tid": tenant_id, "now": now})).mappings().first()
 
     if not result:

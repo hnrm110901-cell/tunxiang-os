@@ -73,7 +73,8 @@ async def get_risk_matrix(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT store_id, alert_type,
             COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count,
             COUNT(*) FILTER (WHERE severity = 'warning')  AS warning_count,
@@ -82,7 +83,8 @@ async def get_risk_matrix(
         FROM ai_alerts
         WHERE tenant_id = :tid AND resolved = FALSE AND is_deleted = FALSE
         GROUP BY store_id, alert_type
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
     stores: set[str] = set()
@@ -129,7 +131,8 @@ async def get_trend_analysis(
     await _set_tenant(db, tenant_id)
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    sql = text("""
+    sql = text(
+        """
         SELECT DATE_TRUNC(:group_by, created_at) AS period,
             alert_type,
             COUNT(*) AS new_count,
@@ -138,7 +141,8 @@ async def get_trend_analysis(
         WHERE tenant_id = :tid AND created_at >= :since AND is_deleted = FALSE
         GROUP BY period, alert_type
         ORDER BY period
-    """)
+    """
+    )
     rows = (
         (
             await db.execute(
@@ -180,7 +184,8 @@ async def get_store_risk_ranking(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         WITH alert_scores AS (
             SELECT store_id,
                 SUM(CASE severity
@@ -220,7 +225,8 @@ async def get_store_risk_ranking(
         FULL OUTER JOIN coverage c ON COALESCE(a.store_id, r.store_id) = c.store_id
         ORDER BY risk_score DESC
         LIMIT :top_n
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id, "top_n": top_n})).mappings().all()
 
     ranking = [
@@ -250,12 +256,14 @@ async def get_employee_risk_profile(
     await _set_tenant(db, tenant_id)
 
     # 相关预警
-    alerts_sql = text("""
+    alerts_sql = text(
+        """
         SELECT id, alert_type, severity, title, resolved, created_at
         FROM ai_alerts
         WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
         ORDER BY created_at DESC
-    """)
+    """
+    )
     alert_rows = (
         (
             await db.execute(
@@ -271,12 +279,14 @@ async def get_employee_risk_profile(
     )
 
     # 训练进度
-    training_sql = text("""
+    training_sql = text(
+        """
         SELECT id, path_name, status, progress_pct, started_at, expected_end, completed_at
         FROM onboarding_paths
         WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
         ORDER BY created_at DESC
-    """)
+    """
+    )
     training_rows = (
         (
             await db.execute(
@@ -292,12 +302,14 @@ async def get_employee_risk_profile(
     )
 
     # 认证状态
-    cert_sql = text("""
+    cert_sql = text(
+        """
         SELECT id, position_name, cert_status, score, certified_at, expires_at
         FROM position_certifications
         WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
         ORDER BY created_at DESC
-    """)
+    """
+    )
     cert_rows = (
         (
             await db.execute(
@@ -313,14 +325,16 @@ async def get_employee_risk_profile(
     )
 
     # 带教关系
-    mentor_sql = text("""
+    mentor_sql = text(
+        """
         SELECT id, mentor_id, mentee_id, status, avg_score, started_at
         FROM mentorship_relations
         WHERE tenant_id = :tid
             AND (mentee_id = :eid OR mentor_id = :eid)
             AND is_deleted = FALSE
         ORDER BY created_at DESC
-    """)
+    """
+    )
     mentor_rows = (
         (
             await db.execute(
@@ -367,7 +381,8 @@ async def get_problem_stores(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         WITH critical_stores AS (
             SELECT store_id, COUNT(*) AS critical_count
             FROM ai_alerts
@@ -412,7 +427,8 @@ async def get_problem_stores(
         LEFT JOIN red_stores rs ON s.store_id = rs.store_id
         LEFT JOIN low_coverage_stores lc ON s.store_id = lc.store_id
         ORDER BY COALESCE(cs.critical_count, 0) DESC
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
     stores = [
@@ -442,7 +458,8 @@ async def get_action_effectiveness(
     await _set_tenant(db, tenant_id)
 
     # 总体指标
-    overall_sql = text("""
+    overall_sql = text(
+        """
         SELECT
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE resolved = TRUE) AS resolved,
@@ -451,14 +468,16 @@ async def get_action_effectiveness(
             COUNT(*) FILTER (WHERE linked_order_id IS NOT NULL) AS with_order
         FROM ai_alerts
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     ov = (await db.execute(overall_sql, {"tid": tenant_id})).mappings().one()
 
     total = ov["total"] or 0
     resolved = ov["resolved"] or 0
 
     # 按类型分组
-    by_type_sql = text("""
+    by_type_sql = text(
+        """
         SELECT
             alert_type,
             COUNT(*) AS total,
@@ -468,7 +487,8 @@ async def get_action_effectiveness(
         FROM ai_alerts
         WHERE tenant_id = :tid AND is_deleted = FALSE
         GROUP BY alert_type
-    """)
+    """
+    )
     type_rows = (await db.execute(by_type_sql, {"tid": tenant_id})).mappings().all()
 
     by_type = [
@@ -507,7 +527,8 @@ async def get_hub_overview(
     await _set_tenant(db, tenant_id)
 
     # -- alerts
-    alerts_sql = text("""
+    alerts_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE resolved = FALSE) AS total_unresolved,
             COUNT(*) FILTER (WHERE resolved = FALSE AND severity = 'critical') AS critical,
@@ -516,10 +537,12 @@ async def get_hub_overview(
                 ELSE 0 END AS resolution_rate
         FROM ai_alerts
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
 
     # -- staffing
-    staffing_sql = text("""
+    staffing_sql = text(
+        """
         SELECT
             COUNT(*) AS total_templates,
             COUNT(*) FILTER (WHERE gap_count > 0) AS gap_stores
@@ -530,10 +553,12 @@ async def get_hub_overview(
                 AND resolved = FALSE AND is_deleted = FALSE
             GROUP BY store_id
         ) sub
-    """)
+    """
+    )
 
     # -- training
-    training_sql = text("""
+    training_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
             COUNT(*) FILTER (WHERE status = 'in_progress' AND expected_end < NOW()) AS overdue,
@@ -542,10 +567,12 @@ async def get_hub_overview(
                 ELSE 0 END AS completion_rate
         FROM onboarding_paths
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
 
     # -- certification
-    cert_sql = text("""
+    cert_sql = text(
+        """
         SELECT
             COUNT(*) AS total,
             CASE WHEN COUNT(*) > 0
@@ -554,19 +581,23 @@ async def get_hub_overview(
             COUNT(*) FILTER (WHERE expires_at BETWEEN NOW() AND NOW() + INTERVAL '30 days') AS expiring_soon
         FROM position_certifications
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
 
     # -- mentorship
-    mentor_sql = text("""
+    mentor_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE status = 'active') AS active,
             COALESCE(AVG(avg_score) FILTER (WHERE status = 'active'), 0) AS avg_score
         FROM mentorship_relations
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
 
     # -- readiness
-    readiness_sql = text("""
+    readiness_sql = text(
+        """
         SELECT
             COALESCE(AVG(overall_score), 0) AS avg_score,
             COUNT(*) FILTER (WHERE risk_level = 'red') AS red_stores,
@@ -577,10 +608,12 @@ async def get_hub_overview(
             WHERE tenant_id = :tid AND is_deleted = FALSE
             ORDER BY store_id, created_at DESC
         ) latest
-    """)
+    """
+    )
 
     # -- peak_guard
-    peak_sql = text("""
+    peak_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE event_date >= CURRENT_DATE) AS upcoming,
             COALESCE(AVG(coverage_score), 0) AS avg_coverage,
@@ -588,10 +621,12 @@ async def get_hub_overview(
         FROM peak_guard_records
         WHERE tenant_id = :tid AND is_deleted = FALSE
             AND event_date >= CURRENT_DATE - 7
-    """)
+    """
+    )
 
     # -- dri work orders (coaching proxy)
-    coaching_sql = text("""
+    coaching_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('week', NOW())) AS this_week,
             CASE WHEN COUNT(*) > 0
@@ -600,7 +635,8 @@ async def get_hub_overview(
             0 AS avg_lift
         FROM dri_work_orders
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
 
     params = {"tid": tenant_id}
     alerts_r = (await db.execute(alerts_sql, params)).mappings().one()
@@ -681,7 +717,8 @@ async def get_weekly_digest(
     }
 
     # 本周 / 上周预警统计
-    week_sql = text("""
+    week_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE created_at >= :this_monday::date) AS new_this_week,
             COUNT(*) FILTER (WHERE resolved_at >= :this_monday::date AND resolved = TRUE) AS resolved_this_week,
@@ -693,7 +730,8 @@ async def get_weekly_digest(
             ) AS resolved_last_week
         FROM ai_alerts
         WHERE tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     ws = (await db.execute(week_sql, params)).mappings().one()
 
     new_this = ws["new_this_week"] or 0
@@ -701,7 +739,8 @@ async def get_weekly_digest(
     new_last = ws["new_last_week"] or 0
 
     # 本周 critical 事件
-    critical_sql = text("""
+    critical_sql = text(
+        """
         SELECT id, store_id, alert_type, title, created_at
         FROM ai_alerts
         WHERE tenant_id = :tid AND is_deleted = FALSE
@@ -709,11 +748,13 @@ async def get_weekly_digest(
             AND created_at >= :this_monday::date
         ORDER BY created_at DESC
         LIMIT 20
-    """)
+    """
+    )
     critical_rows = (await db.execute(critical_sql, params)).mappings().all()
 
     # 本周风险最高的3个门店
-    top_stores_sql = text("""
+    top_stores_sql = text(
+        """
         SELECT store_id,
             SUM(CASE severity
                 WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 ELSE 1
@@ -725,25 +766,30 @@ async def get_weekly_digest(
         GROUP BY store_id
         ORDER BY risk_score DESC
         LIMIT 3
-    """)
+    """
+    )
     top_rows = (await db.execute(top_stores_sql, params)).mappings().all()
 
     # 本周完成训练
-    train_sql = text("""
+    train_sql = text(
+        """
         SELECT COUNT(*) AS cnt
         FROM onboarding_paths
         WHERE tenant_id = :tid AND is_deleted = FALSE
             AND status = 'completed' AND completed_at >= :this_monday::date
-    """)
+    """
+    )
     train_r = (await db.execute(train_sql, params)).mappings().one()
 
     # 本周新通过认证
-    cert_sql = text("""
+    cert_sql = text(
+        """
         SELECT COUNT(*) AS cnt
         FROM position_certifications
         WHERE tenant_id = :tid AND is_deleted = FALSE
             AND cert_status = 'passed' AND certified_at >= :this_monday::date
-    """)
+    """
+    )
     cert_r = (await db.execute(cert_sql, params)).mappings().one()
 
     return _ok(

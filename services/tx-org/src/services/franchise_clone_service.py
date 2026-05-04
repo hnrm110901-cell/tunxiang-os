@@ -186,13 +186,15 @@ async def _update_clone_status(
 ) -> None:
     """更新 franchise_stores.clone_status，顺带刷新 updated_at。"""
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE franchise_stores
                SET clone_status = :clone_status,
                    updated_at   = now()
              WHERE store_id  = :store_id
                AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"clone_status": clone_status, "store_id": store_id, "tenant_id": tenant_id},
     )
     await db.commit()

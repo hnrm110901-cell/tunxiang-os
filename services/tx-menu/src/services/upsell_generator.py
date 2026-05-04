@@ -114,12 +114,14 @@ async def generate_upsell_prompt(
     try:
         # 获取菜品名称
         dish_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_name FROM dishes
                 WHERE id IN (:trigger_id, :suggest_id)
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "trigger_id": str(trigger_dish_id),
                 "suggest_id": str(suggest_dish_id),
@@ -140,7 +142,8 @@ async def generate_upsell_prompt(
 
         # 存入数据库
         insert_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO upsell_prompts
                     (tenant_id, store_id, trigger_dish_id, suggest_dish_id,
                      prompt_text, prompt_type, metadata)
@@ -148,7 +151,8 @@ async def generate_upsell_prompt(
                     (:tenant_id, :store_id, :trigger_id, :suggest_id,
                      :prompt_text, :prompt_type, :metadata ::jsonb)
                 RETURNING id, prompt_text, prompt_type, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id) if store_id else None,
@@ -210,7 +214,8 @@ async def batch_generate_prompts(
     try:
         # 取高亲和菜品对
         affinity_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT dam.dish_a_id, dam.dish_b_id, dam.affinity_score
                 FROM dish_affinity_matrix dam
                 WHERE dam.tenant_id = :tenant_id
@@ -219,7 +224,8 @@ async def batch_generate_prompts(
                   AND dam.is_deleted = FALSE
                 ORDER BY dam.affinity_score DESC
                 LIMIT :top_n
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -235,7 +241,8 @@ async def batch_generate_prompts(
 
             # 检查是否已有话术
             existing = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM upsell_prompts
                     WHERE tenant_id = :tenant_id
                       AND trigger_dish_id = :trigger_id
@@ -243,7 +250,8 @@ async def batch_generate_prompts(
                       AND prompt_type = :prompt_type
                       AND is_deleted = FALSE
                     LIMIT 1
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "trigger_id": dish_a,
@@ -313,7 +321,8 @@ async def get_upsell_for_cart(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 WITH cart_affinities AS (
                     SELECT
                         CASE
@@ -358,7 +367,8 @@ async def get_upsell_for_cart(
                 WHERE r.rn = 1
                 ORDER BY r.affinity_score DESC
                 LIMIT :lim
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -393,14 +403,16 @@ async def record_impression(
     await _set_rls(db, tenant_id)
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE upsell_prompts
                 SET impression_count = impression_count + 1,
                     updated_at = NOW()
                 WHERE id = :prompt_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"prompt_id": str(prompt_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
@@ -419,14 +431,16 @@ async def record_conversion(
     await _set_rls(db, tenant_id)
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE upsell_prompts
                 SET conversion_count = conversion_count + 1,
                     updated_at = NOW()
                 WHERE id = :prompt_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"prompt_id": str(prompt_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()

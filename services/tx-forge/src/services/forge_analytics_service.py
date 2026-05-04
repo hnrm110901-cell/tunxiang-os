@@ -23,7 +23,8 @@ class ForgeAnalyticsService:
     async def get_marketplace_stats(self, db: AsyncSession) -> dict:
         """市场全局汇总指标。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                          AS total_apps,
                     COUNT(*) FILTER (WHERE status = 'published')      AS published_apps,
@@ -35,18 +36,21 @@ class ForgeAnalyticsService:
                                              AND rating > 0), 0
                     )                                                 AS avg_rating
                 FROM forge_apps
-            """)
+            """
+            )
         )
         agg = dict(result.mappings().one())
 
         # 分类分布
         cat_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT category, COUNT(*) AS app_count
                 FROM forge_apps
                 GROUP BY category
                 ORDER BY app_count DESC
-            """)
+            """
+            )
         )
         category_distribution = [
             {
@@ -72,7 +76,8 @@ class ForgeAnalyticsService:
     ) -> list[dict]:
         """热门应用排行：install_count * 0.6 + rating * 40（归一化）。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     a.app_id,
                     a.app_name,
@@ -88,7 +93,8 @@ class ForgeAnalyticsService:
                 WHERE a.status = 'published'
                 ORDER BY trend_score DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             {"limit": limit},
         )
         rows = result.mappings().all()
@@ -104,7 +110,8 @@ class ForgeAnalyticsService:
     async def get_category_stats(self, db: AsyncSession) -> list[dict]:
         """按分类聚合应用统计。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     category,
                     COUNT(*)                              AS app_count,
@@ -115,7 +122,8 @@ class ForgeAnalyticsService:
                 FROM forge_apps
                 GROUP BY category
                 ORDER BY total_installs DESC
-            """)
+            """
+            )
         )
         return [
             {

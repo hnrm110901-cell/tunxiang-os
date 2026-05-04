@@ -143,7 +143,8 @@ async def _fetch_integration_stats(
     try:
         # 近24小时事件聚合
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     MAX(occurred_at)                                    AS last_sync_at,
                     COUNT(*) FILTER (WHERE payload->>'status' = 'error'
@@ -157,7 +158,8 @@ async def _fetch_integration_stats(
                   AND source_service = :source_service
                   AND metadata->>'channel' = :channel
                   AND occurred_at >= NOW() - INTERVAL '24 hours'
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "source_service": _ADAPTER_META.get(f"intg-{channel}", {}).get("source_service", "tx-trade"),
@@ -173,14 +175,16 @@ async def _fetch_integration_stats(
 
         # 今日订单同步数（CHANNEL.ORDER_SYNCED 类事件）
         synced_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM events
                 WHERE tenant_id = :tenant_id
                   AND metadata->>'channel' = :channel
                   AND event_type LIKE '%ORDER_SYNCED%'
                   AND occurred_at::date = CURRENT_DATE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "channel": channel},
         )
         cnt_row = synced_row.first()
@@ -296,7 +300,8 @@ async def get_integration_detail(
 
         # 近期错误事件（最多5条）
         error_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT occurred_at,
                        payload->>'error_code'    AS code,
                        payload->>'error_message' AS message,
@@ -308,7 +313,8 @@ async def get_integration_detail(
                   AND occurred_at >= NOW() - INTERVAL '24 hours'
                 ORDER BY occurred_at DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "channel": meta["event_channel"]},
         )
         recent_errors = [
@@ -389,7 +395,8 @@ async def retry_integration(
 
         # 查询最近错误状态
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE payload->>'status' = 'error') AS error_count,
                     MAX(occurred_at) FILTER (WHERE payload->>'status' = 'error') AS last_error_at
@@ -397,7 +404,8 @@ async def retry_integration(
                 WHERE tenant_id = :tenant_id
                   AND metadata->>'channel' = :channel
                   AND occurred_at >= NOW() - INTERVAL '1 hour'
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "channel": meta["event_channel"]},
         )
         r = row.first()
@@ -405,7 +413,8 @@ async def retry_integration(
 
         # 写入重试事件
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO events (
                     tenant_id, stream_id, stream_type, event_type,
                     source_service, payload, metadata
@@ -418,7 +427,8 @@ async def retry_integration(
                     :payload::jsonb,
                     :metadata::jsonb
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "stream_id": integration_id,
@@ -498,7 +508,8 @@ async def get_recent_webhooks(
         where_clause = " AND ".join(conditions)
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     event_id::text                          AS id,
                     metadata->>'channel'                   AS source,
@@ -515,7 +526,8 @@ async def get_recent_webhooks(
                 WHERE {where_clause}
                 ORDER BY occurred_at DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             params,
         )
         items = []
@@ -538,7 +550,8 @@ async def get_recent_webhooks(
 
         # 聚合统计（全部近24小时，不受分页影响）
         agg_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                                            AS total,
                     COUNT(*) FILTER (WHERE COALESCE(payload->>'status','success') = 'success') AS success_count,
@@ -548,7 +561,8 @@ async def get_recent_webhooks(
                 WHERE tenant_id = :tenant_id
                   AND event_type LIKE 'CHANNEL.%'
                   AND occurred_at >= NOW() - INTERVAL '24 hours'
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id},
         )
         agg = agg_row.first()

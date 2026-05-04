@@ -264,7 +264,8 @@ async def approve_approval(
             raise HTTPException(status_code=422, detail="payload.store_id 格式错误") from exc
         price_fen = payload.get("channel_price_fen")
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO channel_menu_items
                     (tenant_id, store_id, dish_id, channel, channel_price_fen, is_available)
                 VALUES
@@ -273,7 +274,8 @@ async def approve_approval(
                     is_available = true,
                     channel_price_fen = COALESCE(EXCLUDED.channel_price_fen, channel_menu_items.channel_price_fen),
                     updated_at = NOW()
-            """),
+            """
+            ),
             {"tid": tid, "sid": store_uuid, "did": did, "channel": channel, "price": price_fen},
         )
         action_detail = {"channel": channel, "dish_id": dish_id_str}

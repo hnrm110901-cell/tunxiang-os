@@ -101,11 +101,14 @@ async def list_roles(
     tenant_id = _get_tenant(x_tenant_id)
     offset = (page - 1) * size
 
-    count_sql = text("""
+    count_sql = text(
+        """
         SELECT COUNT(*) FROM role_configs
         WHERE tenant_id = :tenant_id AND is_deleted = FALSE
-    """)
-    items_sql = text("""
+    """
+    )
+    items_sql = text(
+        """
         SELECT id, role_name, role_code, level,
                max_discount_rate, max_wipeoff_fen, max_gift_fen_v2 AS max_gift_fen,
                data_query_days, can_void_order, can_modify_price, can_override_discount,
@@ -114,7 +117,8 @@ async def list_roles(
         WHERE tenant_id = :tenant_id AND is_deleted = FALSE
         ORDER BY level ASC, created_at ASC
         LIMIT :size OFFSET :offset
-    """)
+    """
+    )
 
     total_result = await db.execute(count_sql, {"tenant_id": str(tenant_id)})
     total = total_result.scalar_one()
@@ -168,7 +172,8 @@ async def create_role(
         )
 
     role_id = str(uuid.uuid4())
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO role_configs
             (id, tenant_id, role_name, role_code, role_level, level,
              max_discount_rate, max_wipeoff_fen, max_gift_fen_v2,
@@ -182,7 +187,8 @@ async def create_role(
              :max_discount_pct_legacy, :max_wipeoff_fen, :max_gift_fen, 0,
              :data_query_limit_legacy)
         RETURNING id, role_name, level
-    """)
+    """
+    )
     # 兼容旧字段（v1时代）
     data_query_days = req.data_query_days
     if data_query_days >= 9999:
@@ -243,14 +249,16 @@ async def get_role(
     """查询单个角色详情"""
     tenant_id = _get_tenant(x_tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT id, role_name, role_code, level,
                max_discount_rate, max_wipeoff_fen, max_gift_fen_v2 AS max_gift_fen,
                data_query_days, can_void_order, can_modify_price, can_override_discount,
                created_at, updated_at
         FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-    """)
+    """
+    )
     result = await db.execute(sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     row = result.mappings().first()
 
@@ -287,10 +295,12 @@ async def patch_role(
     tenant_id = _get_tenant(x_tenant_id)
 
     # 查询被修改角色的当前级别
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT level FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-    """)
+    """
+    )
     check_result = await db.execute(check_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     target_row = check_result.mappings().first()
     if target_row is None:
@@ -348,12 +358,14 @@ async def patch_role(
     set_clauses = ", ".join(f"{col} = :{col}" for col in updates)
     params = {**updates, "role_id": str(role_id), "tenant_id": str(tenant_id)}
 
-    update_sql = text(f"""
+    update_sql = text(
+        f"""
         UPDATE role_configs
         SET {set_clauses}, updated_at = NOW()
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
         RETURNING id, role_name, level
-    """)
+    """
+    )
     update_result = await db.execute(update_sql, params)
     updated_row = update_result.mappings().first()
     await db.commit()
@@ -389,10 +401,12 @@ async def delete_role(
     tenant_id = _get_tenant(x_tenant_id)
 
     # 查询被删除角色的级别
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT level FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-    """)
+    """
+    )
     check_result = await db.execute(check_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     target_row = check_result.mappings().first()
     if target_row is None:
@@ -411,11 +425,13 @@ async def delete_role(
             detail="操作人级别不足，无权删除该角色",
         )
 
-    delete_sql = text("""
+    delete_sql = text(
+        """
         UPDATE role_configs
         SET is_deleted = TRUE, updated_at = NOW()
         WHERE id = :role_id AND tenant_id = :tenant_id
-    """)
+    """
+    )
     await db.execute(delete_sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     await db.commit()
 
@@ -434,13 +450,15 @@ async def get_role_level_defaults(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """查询10级默认角色模板（系统级，无需租户过滤）"""
-    sql = text("""
+    sql = text(
+        """
         SELECT level, level_name, max_discount_rate, max_wipeoff_fen, max_gift_fen,
                data_query_days, can_void_order, can_modify_price, can_override_discount,
                description
         FROM role_level_defaults
         ORDER BY level ASC
-    """)
+    """
+    )
     result = await db.execute(sql)
     rows = result.mappings().all()
 

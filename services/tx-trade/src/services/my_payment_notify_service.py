@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from sqlalchemy import func, select
@@ -352,12 +352,14 @@ async def _apply_payment_and_maybe_complete(
     payment_no = f"{method.upper()}-{transaction_id}"[:64]
 
     existing_pending = await db.execute(
-        select(Payment).where(
+        select(Payment)
+        .where(
             Payment.order_id == order_uuid,
             Payment.method == method,
             Payment.status == PaymentStatus.pending.value,
             Payment.amount_fen == amount_fen,
-        ).limit(1)
+        )
+        .limit(1)
     )
     existing_pay = existing_pending.scalar_one_or_none()
 

@@ -199,7 +199,8 @@ class SOPSchedulerService:
 
         # 获取模板的所有时段
         slots_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, slot_code, start_time, end_time
                 FROM sop_time_slots
                 WHERE template_id = :template_id
@@ -207,7 +208,8 @@ class SOPSchedulerService:
                   AND is_deleted = FALSE
                   AND is_active = TRUE
                 ORDER BY sort_order
-            """),
+            """
+            ),
             {"template_id": template_id, "tenant_id": tid},
         )
         slots = slots_result.fetchall()
@@ -221,7 +223,8 @@ class SOPSchedulerService:
 
         # 获取模板的所有活跃任务定义
         tasks_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, slot_id, task_code, target_role
                 FROM sop_tasks
                 WHERE template_id = :template_id
@@ -229,7 +232,8 @@ class SOPSchedulerService:
                   AND is_deleted = FALSE
                   AND is_active = TRUE
                 ORDER BY sort_order
-            """),
+            """
+            ),
             {"template_id": template_id, "tenant_id": tid},
         )
         task_defs = tasks_result.fetchall()
@@ -239,14 +243,16 @@ class SOPSchedulerService:
 
         # 查询已存在的实例（防重）
         existing_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT task_id
                 FROM sop_task_instances
                 WHERE tenant_id = :tenant_id
                   AND store_id = :store_id
                   AND instance_date = :target_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tid,
                 "store_id": sid,
@@ -277,7 +283,8 @@ class SOPSchedulerService:
 
             instance_id = uuid4()
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sop_task_instances (
                         id, tenant_id, store_id, task_id, instance_date,
                         slot_code, target_role, status, due_at
@@ -286,7 +293,8 @@ class SOPSchedulerService:
                         :slot_code, :target_role, :status, :due_at
                     )
                     ON CONFLICT DO NOTHING
-                """),
+                """
+                ),
                 {
                     "id": instance_id,
                     "tenant_id": tid,
@@ -337,7 +345,8 @@ class SOPSchedulerService:
             return None
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ts.id, ts.slot_code, ts.slot_name,
                     ts.start_time, ts.end_time, ts.sort_order
@@ -350,7 +359,8 @@ class SOPSchedulerService:
                   AND ts.end_time > :current_time
                 ORDER BY ts.sort_order
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "template_id": config_row.template_id,
                 "tenant_id": tid,
@@ -399,7 +409,8 @@ class SOPSchedulerService:
             params["role"] = role
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     ti.id AS instance_id,
                     ti.status,
@@ -428,7 +439,8 @@ class SOPSchedulerService:
                   AND ti.is_deleted = FALSE
                   {role_filter}
                 ORDER BY td.sort_order, td.priority
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -479,7 +491,8 @@ class SOPSchedulerService:
 
         # 查找超时的pending任务
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ti.id, ti.task_id, ti.slot_code,
                     ti.target_role, ti.due_at, ti.instance_date,
@@ -491,7 +504,8 @@ class SOPSchedulerService:
                   AND ti.status = :status_pending
                   AND ti.due_at < :now
                   AND ti.is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tid,
                 "store_id": sid,
@@ -509,13 +523,15 @@ class SOPSchedulerService:
         for row in overdue_rows:
             # 标记为overdue
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE sop_task_instances
                     SET status = :status_overdue,
                         updated_at = NOW()
                     WHERE id = :instance_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "status_overdue": TASK_STATUS_OVERDUE,
                     "instance_id": row.id,
@@ -534,7 +550,8 @@ class SOPSchedulerService:
             action_id = uuid4()
             corrective_due_at = now + timedelta(hours=1)
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sop_corrective_actions (
                         id, tenant_id, store_id, source_instance_id,
                         action_type, severity, title, description,
@@ -544,7 +561,8 @@ class SOPSchedulerService:
                         :action_type, :severity, :title, :description,
                         :assignee_id, :due_at, :status
                     )
-                """),
+                """
+                ),
                 {
                     "id": action_id,
                     "tenant_id": tid,
@@ -653,7 +671,8 @@ class SOPSchedulerService:
         for task_code in mapped_task_codes:
             # 查找今日该门店对应task_code的pending实例
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT ti.id
                     FROM sop_task_instances ti
                     JOIN sop_tasks td ON td.id = ti.task_id
@@ -664,7 +683,8 @@ class SOPSchedulerService:
                       AND ti.status = :status_pending
                       AND ti.is_deleted = FALSE
                     LIMIT 1
-                """),
+                """
+                ),
                 {
                     "tenant_id": tid,
                     "store_id": sid,
@@ -700,7 +720,8 @@ class SOPSchedulerService:
 
         # 查找今日冷库验温任务实例
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT ti.id
                 FROM sop_task_instances ti
                 JOIN sop_tasks td ON td.id = ti.task_id
@@ -710,7 +731,8 @@ class SOPSchedulerService:
                   AND td.task_code LIKE '%cold_storage%'
                   AND ti.is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": tid,
                 "store_id": sid,
@@ -735,7 +757,8 @@ class SOPSchedulerService:
         equipment = payload.get("equipment_name", "未知设备")
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sop_corrective_actions (
                     id, tenant_id, store_id, source_instance_id,
                     action_type, severity, title, description,
@@ -745,7 +768,8 @@ class SOPSchedulerService:
                     :action_type, :severity, :title, :description,
                     :assignee_id, :due_at, :status
                 )
-            """),
+            """
+            ),
             {
                 "id": action_id,
                 "tenant_id": tid,
@@ -792,7 +816,8 @@ class SOPSchedulerService:
 
         # 总体统计
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'completed') AS completed,
@@ -806,7 +831,8 @@ class SOPSchedulerService:
                   AND store_id = :store_id
                   AND instance_date = :target_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "target_date": target_date},
         )
         overall = result.fetchone()
@@ -817,7 +843,8 @@ class SOPSchedulerService:
 
         # 按时段统计
         slot_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     slot_code,
                     COUNT(*) AS total,
@@ -832,7 +859,8 @@ class SOPSchedulerService:
                   AND is_deleted = FALSE
                 GROUP BY slot_code
                 ORDER BY slot_code
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "target_date": target_date},
         )
         by_slot = [
@@ -848,7 +876,8 @@ class SOPSchedulerService:
 
         # 按角色统计
         role_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     target_role,
                     COUNT(*) AS total,
@@ -863,7 +892,8 @@ class SOPSchedulerService:
                   AND is_deleted = FALSE
                 GROUP BY target_role
                 ORDER BY target_role
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "target_date": target_date},
         )
         by_role = [
@@ -879,7 +909,8 @@ class SOPSchedulerService:
 
         # 纠正动作统计
         ca_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE ca.status = 'open') AS open_count,
                     COUNT(*) FILTER (WHERE ca.status = 'resolved') AS resolved_count,
@@ -890,7 +921,8 @@ class SOPSchedulerService:
                   AND ca.store_id = :store_id
                   AND ti.instance_date = :target_date
                   AND ca.is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "target_date": target_date},
         )
         ca_row = ca_result.fetchone()
@@ -929,7 +961,8 @@ class SOPSchedulerService:
         sid = UUID(store_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     sc.id AS config_id,
                     sc.template_id,
@@ -954,7 +987,8 @@ class SOPSchedulerService:
                   AND sc.is_deleted = FALSE
                   AND sc.is_active = TRUE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid},
         )
         row = result.fetchone()
@@ -989,13 +1023,15 @@ class SOPSchedulerService:
 
         # 检查模板是否存在
         tpl_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, template_name, store_format
                 FROM sop_templates
                 WHERE id = :template_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         tpl_row = tpl_result.fetchone()
@@ -1009,7 +1045,8 @@ class SOPSchedulerService:
         if existing is not None:
             # 更新现有配置
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE sop_store_configs
                     SET template_id = :template_id,
                         timezone = :timezone,
@@ -1018,7 +1055,8 @@ class SOPSchedulerService:
                         updated_at = NOW()
                     WHERE id = :config_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "template_id": tpl_id,
                     "timezone": timezone,
@@ -1037,7 +1075,8 @@ class SOPSchedulerService:
         else:
             # 创建新配置
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sop_store_configs (
                         id, tenant_id, store_id, template_id,
                         timezone, custom_overrides, is_active
@@ -1045,7 +1084,8 @@ class SOPSchedulerService:
                         :id, :tenant_id, :store_id, :template_id,
                         :timezone, :custom_overrides, TRUE
                     )
-                """),
+                """
+                ),
                 {
                     "id": config_id,
                     "tenant_id": tid,
@@ -1080,7 +1120,8 @@ class SOPSchedulerService:
     async def _get_store_config_row(self, tid: UUID, sid: UUID):
         """获取门店SOP配置行"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, template_id, timezone, custom_overrides
                 FROM sop_store_configs
                 WHERE tenant_id = :tenant_id
@@ -1088,7 +1129,8 @@ class SOPSchedulerService:
                   AND is_deleted = FALSE
                   AND is_active = TRUE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid},
         )
         return result.fetchone()
@@ -1101,7 +1143,8 @@ class SOPSchedulerService:
     ) -> dict:
         """获取tick时的快速概况"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status IN ('completed', 'auto_completed')) AS done,
@@ -1113,7 +1156,8 @@ class SOPSchedulerService:
                   AND store_id = :store_id
                   AND instance_date = :target_date
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "target_date": target_date},
         )
         row = result.fetchone()

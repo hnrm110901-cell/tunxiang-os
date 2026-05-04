@@ -25,6 +25,7 @@
     任意中间态 → escalated (人工介入)
     任意 → error (异常)
 """
+
 from __future__ import annotations
 
 import json
@@ -94,17 +95,18 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "resolved_refund_partial": set(),
     "resolved_merchant_win": set(),
     "withdrawn": set(),
-    "escalated": {"resolved_refund_full", "resolved_refund_partial",
-                   "resolved_merchant_win", "error"},
+    "escalated": {"resolved_refund_full", "resolved_refund_partial", "resolved_merchant_win", "error"},
     "error": {"escalated", "resolved_refund_full"},
 }
 
-TERMINAL_STATUSES = frozenset({
-    "resolved_refund_full",
-    "resolved_refund_partial",
-    "resolved_merchant_win",
-    "withdrawn",
-})
+TERMINAL_STATUSES = frozenset(
+    {
+        "resolved_refund_full",
+        "resolved_refund_partial",
+        "resolved_merchant_win",
+        "withdrawn",
+    }
+)
 
 
 class DisputeError(Exception):
@@ -156,9 +158,7 @@ class MerchantResponseInput:
             self.evidence_urls = []
         if self.action not in ("accept_full", "offer_partial", "dispute"):
             raise DisputeError(f"action 非法: {self.action!r}")
-        if self.action == "offer_partial" and (
-            self.offered_refund_fen is None or self.offered_refund_fen < 0
-        ):
+        if self.action == "offer_partial" and (self.offered_refund_fen is None or self.offered_refund_fen < 0):
             raise DisputeError("offer_partial 必须提供 offered_refund_fen >= 0")
         if not self.response_text.strip():
             raise DisputeError("response_text 不能为空")
@@ -218,9 +218,7 @@ class DisputeService:
             "dispute_type": inp.dispute_type,
             "dispute_reason": inp.dispute_reason,
             "customer_claim_amount_fen": inp.customer_claim_amount_fen,
-            "customer_evidence_urls": json.dumps(
-                inp.customer_evidence_urls, ensure_ascii=False
-            ),
+            "customer_evidence_urls": json.dumps(inp.customer_evidence_urls, ensure_ascii=False),
             "raised_at": inp.raised_at,
             "merchant_deadline_at": deadline,
             "source": inp.source,
@@ -228,7 +226,8 @@ class DisputeService:
         }
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO delivery_disputes (
                     tenant_id, canonical_order_id, platform, platform_dispute_id,
                     platform_order_id, store_id, brand_id,
@@ -251,7 +250,8 @@ class DisputeService:
                     raw_payload = EXCLUDED.raw_payload,
                     updated_at = NOW()
                 RETURNING id, status, (xmax = 0) AS was_new
-            """),
+            """
+            ),
             params,
         )
         rec = row.mappings().first()
@@ -261,10 +261,7 @@ class DisputeService:
         if was_new:
             await self._insert_system_message(
                 dispute_id=dispute_id,
-                content=(
-                    f"异议单已创建。类型：{inp.dispute_type}，"
-                    f"商家需在 {deadline.isoformat()} 前响应。"
-                ),
+                content=(f"异议单已创建。类型：{inp.dispute_type}，商家需在 {deadline.isoformat()} 前响应。"),
             )
         await self._db.commit()
 
@@ -304,9 +301,7 @@ class DisputeService:
                 customer_claim_fen=dispute.get("customer_claim_amount_fen"),
             )
             if template is None:
-                raise DisputeError(
-                    f"未找到 dispute_type={dispute['dispute_type']} 的推荐模板"
-                )
+                raise DisputeError(f"未找到 dispute_type={dispute['dispute_type']} 的推荐模板")
 
         rendered = render_template(
             template,
@@ -315,9 +310,7 @@ class DisputeService:
             customer_claim_fen=dispute.get("customer_claim_amount_fen"),
             extra=extra_variables,
         )
-        suggested = template.suggested_refund_fen(
-            dispute.get("customer_claim_amount_fen")
-        )
+        suggested = template.suggested_refund_fen(dispute.get("customer_claim_amount_fen"))
 
         return DraftResponseResult(
             template=template,
@@ -327,9 +320,7 @@ class DisputeService:
 
     # ── 3. Submit Merchant Response ──
 
-    async def submit_merchant_response(
-        self, *, dispute_id: str, response: MerchantResponseInput
-    ) -> dict[str, Any]:
+    async def submit_merchant_response(self, *, dispute_id: str, response: MerchantResponseInput) -> dict[str, Any]:
         """商家响应 → 状态机迁移"""
         dispute = await self._fetch_dispute(dispute_id)
         if dispute is None:
@@ -346,7 +337,8 @@ class DisputeService:
 
         # 更新主表
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE delivery_disputes SET
                     status = :target,
                     merchant_response_template_id = :template_id,
@@ -358,7 +350,8 @@ class DisputeService:
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
-            """),
+            """
+            ),
             {
                 "id": dispute_id,
                 "tenant_id": self._tenant_id,
@@ -366,19 +359,13 @@ class DisputeService:
                 "template_id": response.template_id,
                 "response_text": response.response_text,
                 "refund_fen": response.offered_refund_fen,
-                "evidence": json.dumps(
-                    response.evidence_urls, ensure_ascii=False
-                ),
+                "evidence": json.dumps(response.evidence_urls, ensure_ascii=False),
                 "responded_by": response.responded_by,
             },
         )
 
         # 加消息
-        msg_type = (
-            "refund_offer"
-            if response.action in ("accept_full", "offer_partial")
-            else "text"
-        )
+        msg_type = "refund_offer" if response.action in ("accept_full", "offer_partial") else "text"
         await self._insert_message(
             dispute_id=dispute_id,
             sender_role="merchant",
@@ -399,9 +386,7 @@ class DisputeService:
 
     # ── 4. Platform Ruling ──
 
-    async def record_platform_ruling(
-        self, *, dispute_id: str, ruling: PlatformRulingInput
-    ) -> dict[str, Any]:
+    async def record_platform_ruling(self, *, dispute_id: str, ruling: PlatformRulingInput) -> dict[str, Any]:
         """平台裁决（通常由 webhook 触发）"""
         dispute = await self._fetch_dispute(dispute_id)
         if dispute is None:
@@ -426,7 +411,8 @@ class DisputeService:
         is_terminal = target in TERMINAL_STATUSES
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE delivery_disputes SET
                     status = :target,
                     platform_decision = :decision,
@@ -436,7 +422,8 @@ class DisputeService:
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
-            """),
+            """
+            ),
             {
                 "id": dispute_id,
                 "tenant_id": self._tenant_id,
@@ -467,22 +454,22 @@ class DisputeService:
 
     # ── 5. Edge ──
 
-    async def escalate(
-        self, *, dispute_id: str, reason: str, escalated_by: Optional[str] = None
-    ) -> dict[str, Any]:
+    async def escalate(self, *, dispute_id: str, reason: str, escalated_by: Optional[str] = None) -> dict[str, Any]:
         dispute = await self._fetch_dispute(dispute_id)
         if dispute is None:
             raise DisputeError(f"dispute {dispute_id} 不存在")
         self._assert_transition(dispute["status"], "escalated")
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE delivery_disputes SET
                     status = 'escalated',
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
-            """),
+            """
+            ),
             {"id": dispute_id, "tenant_id": self._tenant_id},
         )
         await self._insert_message(
@@ -501,14 +488,16 @@ class DisputeService:
         self._assert_transition(dispute["status"], "withdrawn")
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE delivery_disputes SET
                     status = 'withdrawn',
                     closed_at = NOW(),
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
-            """),
+            """
+            ),
             {"id": dispute_id, "tenant_id": self._tenant_id},
         )
         if reason:
@@ -529,7 +518,8 @@ class DisputeService:
         """
         now = now or datetime.now(tz=timezone.utc)
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE delivery_disputes SET
                     status = 'expired',
                     sla_breached = true,
@@ -540,7 +530,8 @@ class DisputeService:
                   AND status = 'pending_merchant'
                   AND merchant_deadline_at < :now
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id, "now": now},
         )
         affected = [row["id"] for row in result.mappings()]
@@ -559,7 +550,8 @@ class DisputeService:
 
     async def _fetch_dispute(self, dispute_id: str) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, canonical_order_id, platform, platform_dispute_id,
                        platform_order_id, store_id, brand_id,
                        dispute_type, dispute_reason, customer_claim_amount_fen,
@@ -571,7 +563,8 @@ class DisputeService:
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"id": dispute_id, "tenant_id": self._tenant_id},
         )
         rec = row.mappings().first()
@@ -580,10 +573,7 @@ class DisputeService:
     def _assert_transition(self, current: str, target: str) -> None:
         allowed = ALLOWED_TRANSITIONS.get(current, set())
         if target not in allowed:
-            raise DisputeError(
-                f"状态转换 {current} → {target} 不允许。"
-                f"允许的目标：{sorted(allowed) or '(终态)'}"
-            )
+            raise DisputeError(f"状态转换 {current} → {target} 不允许。允许的目标：{sorted(allowed) or '(终态)'}")
 
     async def _insert_message(
         self,
@@ -598,7 +588,8 @@ class DisputeService:
         raw_payload: Optional[dict[str, Any]] = None,
     ) -> str:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO delivery_dispute_messages (
                     tenant_id, dispute_id, sender_role, sender_id,
                     message_type, content, attachment_urls,
@@ -610,7 +601,8 @@ class DisputeService:
                     :linked_refund_fen, CAST(:raw_payload AS jsonb)
                 )
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "dispute_id": dispute_id,
@@ -618,18 +610,14 @@ class DisputeService:
                 "sender_id": sender_id,
                 "message_type": message_type,
                 "content": content,
-                "attachment_urls": json.dumps(
-                    attachment_urls or [], ensure_ascii=False
-                ),
+                "attachment_urls": json.dumps(attachment_urls or [], ensure_ascii=False),
                 "linked_refund_fen": linked_refund_fen,
                 "raw_payload": json.dumps(raw_payload or {}, ensure_ascii=False),
             },
         )
         return str(row.scalar_one())
 
-    async def _insert_system_message(
-        self, *, dispute_id: str, content: str
-    ) -> None:
+    async def _insert_system_message(self, *, dispute_id: str, content: str) -> None:
         await self._insert_message(
             dispute_id=dispute_id,
             sender_role="system",

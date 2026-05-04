@@ -476,10 +476,7 @@ async def complete_receiving(
         from .price_ledger_service import record_price as _record_price
 
         for item in order.items:
-            if (
-                item.unit_price_fen is None
-                or float(item.accepted_quantity or 0) <= 0
-            ):
+            if item.unit_price_fen is None or float(item.accepted_quantity or 0) <= 0:
                 continue
             try:
                 await _record_price(
@@ -488,13 +485,11 @@ async def complete_receiving(
                     supplier_id=str(order.supplier_id),
                     unit_price_fen=int(item.unit_price_fen),
                     db=db,
-                    quantity_unit=getattr(item, "expected_unit", None)
-                    or getattr(item, "unit", None),
+                    quantity_unit=getattr(item, "expected_unit", None) or getattr(item, "unit", None),
                     captured_at=order.signed_at or _now(),
                     source_doc_type="receiving",
                     source_doc_id=str(order.id),
-                    source_doc_no=getattr(order, "delivery_note_no", None)
-                    or str(order.id)[:8],
+                    source_doc_no=getattr(order, "delivery_note_no", None) or str(order.id)[:8],
                     store_id=str(order.store_id) if order.store_id else None,
                     notes="receiving v2 auto-captured",
                     created_by=signer_id,
@@ -636,9 +631,7 @@ async def _try_allocate_to_location(
             expiry_date=expiry_date,
             ingredient_category=getattr(ingredient, "category", None),
         )
-        return await _wls.auto_allocate_location(
-            body=req, tenant_id=tenant_id, db=db
-        )
+        return await _wls.auto_allocate_location(body=req, tenant_id=tenant_id, db=db)
     except _wls.WarehouseLocationError as exc:
         logger.warning(
             "receiving_auto_allocate_skipped",

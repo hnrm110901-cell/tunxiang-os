@@ -157,7 +157,8 @@ class MemberInsightAgent:
                 params: dict = {"tenant_id": tenant_id}
 
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             COUNT(*) AS total_members,
                             COUNT(*) FILTER (WHERE churn_probability > 0.7) AS high_churn_count,
@@ -169,7 +170,8 @@ class MemberInsightAgent:
                             AVG(visit_count) AS avg_visit_count
                         FROM mv_member_clv
                         WHERE tenant_id = :tenant_id
-                    """),
+                    """
+                    ),
                     params,
                 )
                 row = result.mappings().one_or_none()

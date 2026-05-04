@@ -62,7 +62,8 @@ class CostEngineRepository:
                 "quantity", "unit_price_fen", "subtotal_fen"}]
         """
         start_dt, end_dt = _range_window(start_date, end_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 oi.id             AS order_item_id,
                 oi.order_id,
@@ -82,7 +83,8 @@ class CostEngineRepository:
               AND o.is_deleted = false
               AND oi.is_deleted = false
               AND (oi.return_flag IS NULL OR oi.return_flag = false)
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -122,7 +124,8 @@ class CostEngineRepository:
             return {}
 
         dish_id_strs = [str(d) for d in dish_ids]
-        sql = text("""
+        sql = text(
+            """
             WITH active_bom AS (
                 SELECT
                     bt.id          AS bom_id,
@@ -155,7 +158,8 @@ class CostEngineRepository:
                 bom_id,
                 COALESCE(cost_fen, 0) AS cost_fen
             FROM bom_cost
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -188,7 +192,8 @@ class CostEngineRepository:
 
         ing_id_strs = [str(i) for i in ingredient_ids]
         as_of_dt = datetime.combine(as_of_date, datetime.max.time()).replace(tzinfo=timezone.utc)
-        sql = text("""
+        sql = text(
+            """
             WITH ranked AS (
                 SELECT
                     it.ingredient_id,
@@ -207,7 +212,8 @@ class CostEngineRepository:
             SELECT ingredient_id, unit_price_fen
             FROM ranked
             WHERE rn = 1
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -232,7 +238,8 @@ class CostEngineRepository:
         返回: {"total_food_cost_fen": int, "order_count": int, "snapshot_count": int}
         """
         start_dt, end_dt = _day_window(biz_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 COUNT(DISTINCT cs.order_id)             AS order_count,
                 COALESCE(SUM(cs.raw_material_cost), 0)  AS total_food_cost_fen,
@@ -244,7 +251,8 @@ class CostEngineRepository:
               AND o.order_time >= :start_dt
               AND o.order_time <= :end_dt
               AND o.is_deleted = false
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -272,7 +280,8 @@ class CostEngineRepository:
     ) -> int:
         """查询当日实收营收（分），用于计算成本率"""
         start_dt, end_dt = _day_window(biz_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen
             FROM orders o
             WHERE o.store_id   = :store_id
@@ -281,7 +290,8 @@ class CostEngineRepository:
               AND o.order_time >= :start_dt
               AND o.order_time <= :end_dt
               AND o.is_deleted = false
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -311,7 +321,8 @@ class CostEngineRepository:
                 "avg_cost_fen", "total_revenue_fen", "cost_ratio"}]
         """
         start_dt, end_dt = _range_window(start_date, end_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 cs.dish_id,
                 d.dish_name,
@@ -332,7 +343,8 @@ class CostEngineRepository:
             GROUP BY cs.dish_id, d.dish_name
             ORDER BY total_cost_fen DESC
             LIMIT :top_n
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -374,7 +386,8 @@ class CostEngineRepository:
         返回: {"monthly_rent_fen": int, "monthly_utility_fen": int,
                "monthly_other_fixed_fen": int}
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 COALESCE(monthly_rent_fen,        0) AS monthly_rent_fen,
                 COALESCE(monthly_utility_fen,     0) AS monthly_utility_fen,
@@ -385,7 +398,8 @@ class CostEngineRepository:
               AND tenant_id = :tenant_id
               AND is_deleted = false
             LIMIT 1
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 sql,
@@ -439,7 +453,8 @@ class CostEngineRepository:
         db: AsyncSession,
     ) -> None:
         """写入门店固定成本配置到 config JSONB（兼容无专用列的情况）"""
-        sql = text("""
+        sql = text(
+            """
             UPDATE stores
             SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
                 'fixed_costs', jsonb_build_object(
@@ -452,7 +467,8 @@ class CostEngineRepository:
             WHERE id        = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = false
-        """)
+        """
+        )
         await db.execute(
             sql,
             {
@@ -480,7 +496,8 @@ class CostEngineRepository:
         payroll_records 中金额单位为元，转换为分。
         通过 employees.store_id 关联到门店。
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT COALESCE(SUM(pr.gross_salary * 100), 0)::BIGINT AS labor_cost_fen
             FROM payroll_records pr
             JOIN employees e ON e.id = pr.employee_id
@@ -489,7 +506,8 @@ class CostEngineRepository:
               AND pr.period_year = :year
               AND pr.period_month = :month
               AND pr.status     != 'cancelled'
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 sql,
@@ -527,7 +545,8 @@ class CostEngineRepository:
         通过 waste_events + ingredient 单价估算损耗金额。
         """
         start_dt, end_dt = _range_window(start_date, end_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT COALESCE(
                 SUM(
                     we.quantity
@@ -549,7 +568,8 @@ class CostEngineRepository:
               AND we.occurred_at >= :start_dt
               AND we.occurred_at <= :end_dt
               AND we.is_deleted  = FALSE
-        """)
+        """
+        )
         try:
             result = await db.execute(
                 sql,

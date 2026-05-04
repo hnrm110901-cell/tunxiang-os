@@ -87,7 +87,8 @@ async def _predict_daily_traffic(
     """
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(AVG(daily_count), 0)::int AS avg_traffic
             FROM (
                 SELECT DATE(created_at) AS d, COUNT(*) AS daily_count
@@ -99,7 +100,8 @@ async def _predict_daily_traffic(
                   AND EXTRACT(DOW FROM created_at) = :dow
                 GROUP BY DATE(created_at)
             ) sub
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "store_id": store_id,
@@ -124,7 +126,8 @@ async def _get_available_employees(
     """获取门店可排班员工列表（排除当日已请假的）。"""
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT e.id, e.name, e.role,
                    COALESCE(e.hourly_rate_fen, :default_rate) AS hourly_rate_fen
             FROM employees e
@@ -140,7 +143,8 @@ async def _get_available_employees(
                     AND is_deleted = FALSE
               )
             ORDER BY e.name
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "store_id": store_id,
@@ -244,13 +248,15 @@ async def get_schedule_suggestion(
             # 4. 写入建议记录
             schedule_id = uuid.uuid4()
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO smart_schedules
                     (id, tenant_id, store_id, schedule_date, status, source,
                      total_labor_cost_fen, predicted_traffic)
                 VALUES (:id, :tid, :store_id, :sdate, 'draft', 'ai_suggested',
                         :cost, :traffic)
-            """),
+            """
+                ),
                 {
                     "id": str(schedule_id),
                     "tid": x_tenant_id,
@@ -263,13 +269,15 @@ async def get_schedule_suggestion(
 
             for slot in slots:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                     INSERT INTO smart_schedule_slots
                         (id, tenant_id, schedule_id, time_slot, predicted_traffic,
                          required_headcount, assigned_employee_ids, labor_cost_fen)
                     VALUES (gen_random_uuid(), :tid, :schedule_id, :time_slot,
                             :traffic, :headcount, :emp_ids::jsonb, :cost)
-                """),
+                """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "schedule_id": str(schedule_id),
@@ -336,11 +344,13 @@ async def apply_schedule(
 
         # 1. 校验建议存在且为draft
         row = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, schedule_date, status
             FROM smart_schedules
             WHERE id = :sid AND tenant_id = :tid AND store_id = :store_id
-        """),
+        """
+            ),
             {"sid": schedule_id, "tid": x_tenant_id, "store_id": sid},
         )
         schedule = row.fetchone()
@@ -352,13 +362,15 @@ async def apply_schedule(
 
         # 2. 读取时段明细
         slots_row = await db.execute(
-            text("""
+            text(
+                """
             SELECT time_slot, required_headcount, assigned_employee_ids
             FROM smart_schedule_slots
             WHERE schedule_id = :sid AND tenant_id = :tid
               AND is_deleted = FALSE
             ORDER BY time_slot
-        """),
+        """
+            ),
             {"sid": schedule_id, "tid": x_tenant_id},
         )
         slots = slots_row.fetchall()
@@ -369,14 +381,16 @@ async def apply_schedule(
             emp_ids = slot.assigned_employee_ids or []
             for emp_id in emp_ids:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                     INSERT INTO work_schedules
                         (id, tenant_id, store_id, employee_id, schedule_date,
                          shift_start, shift_end, source, created_at)
                     VALUES (gen_random_uuid(), :tid, :store_id, :emp_id,
                             :sdate, :shift_start, :shift_end, 'ai_suggested', NOW())
                     ON CONFLICT DO NOTHING
-                """),
+                """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "store_id": sid,
@@ -390,10 +404,12 @@ async def apply_schedule(
 
         # 4. 更新建议状态
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE smart_schedules SET status = 'applied', updated_at = NOW()
             WHERE id = :sid AND tenant_id = :tid
-        """),
+        """
+            ),
             {"sid": schedule_id, "tid": x_tenant_id},
         )
 
@@ -435,11 +451,13 @@ async def labor_forecast(
 
         # 获取租户下所有活跃门店
         stores_row = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, name FROM stores
             WHERE tenant_id = :tid AND is_deleted = FALSE
             ORDER BY name
-        """),
+        """
+            ),
             {"tid": x_tenant_id},
         )
         stores = stores_row.fetchall()

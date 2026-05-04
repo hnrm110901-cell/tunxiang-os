@@ -108,14 +108,16 @@ class JourneyEngine:
 
         # 查找该租户下匹配事件类型的活跃旅程
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, trigger_conditions, steps, name
                 FROM journey_definitions
                 WHERE tenant_id = :tenant_id
                   AND is_active = TRUE
                   AND is_deleted = FALSE
                   AND trigger_event = :event_type
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "event_type": event_type},
         )
         definitions = result.fetchall()
@@ -156,14 +158,16 @@ class JourneyEngine:
 
             # 检查是否已有 active enrollment（防重入）
             existing = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM journey_enrollments
                     WHERE tenant_id = :tenant_id
                       AND journey_definition_id = :jd_id
                       AND customer_id = :customer_id
                       AND status = 'active'
                     LIMIT 1
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "jd_id": str(journey_def_id),
@@ -312,14 +316,16 @@ class JourneyEngine:
         phone = context.get("phone") or context.get("customer_phone")
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO journey_enrollments
                     (id, tenant_id, journey_definition_id, customer_id, phone,
                      current_step_id, status, enrolled_at, context_data, next_step_at)
                 VALUES
                     (:id, :tenant_id, :jd_id, :customer_id, :phone,
                      :step_id, 'active', :enrolled_at, :context_data::jsonb, :next_step_at)
-            """),
+            """
+            ),
             {
                 "id": str(enrollment_id),
                 "tenant_id": str(tenant_id),
@@ -374,7 +380,8 @@ class JourneyEngine:
         """
         # 查询 enrollment 及其旅程定义
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     e.id, e.tenant_id, e.journey_definition_id, e.customer_id,
                     e.current_step_id, e.status, e.context_data, e.phone,
@@ -383,7 +390,8 @@ class JourneyEngine:
                 JOIN journey_definitions d ON d.id = e.journey_definition_id
                 WHERE e.id = :enrollment_id
                   AND e.status = 'active'
-            """),
+            """
+            ),
             {"enrollment_id": str(enrollment_id)},
         )
         row = result.fetchone()
@@ -466,12 +474,14 @@ class JourneyEngine:
         next_step_at = now + timedelta(hours=wait_hours) if wait_hours else now
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_enrollments
                 SET current_step_id = :step_id,
                     next_step_at    = :next_step_at
                 WHERE id = :enrollment_id
-            """),
+            """
+            ),
             {
                 "step_id": next_step_id,
                 "next_step_at": next_step_at,
@@ -539,14 +549,16 @@ class JourneyEngine:
 
         # 更新步骤执行状态为 executing
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_step_executions
                 SET status = 'executing',
                     executed_at = NOW()
                 WHERE enrollment_id = :enrollment_id
                   AND step_id = :step_id
                   AND status = 'pending'
-            """),
+            """
+            ),
             {"enrollment_id": str(enrollment_id), "step_id": step_id},
         )
 
@@ -563,7 +575,8 @@ class JourneyEngine:
             error_msg = str(exc)
             log.error("execute_step_error", error=error_msg, exc_info=True)
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE journey_step_executions
                     SET status = 'failed',
                         error_message = :error,
@@ -571,7 +584,8 @@ class JourneyEngine:
                     WHERE enrollment_id = :enrollment_id
                       AND step_id = :step_id
                       AND status = 'executing'
-                """),
+                """
+                ),
                 {
                     "error": error_msg,
                     "enrollment_id": str(enrollment_id),
@@ -582,14 +596,16 @@ class JourneyEngine:
 
         # 更新步骤执行状态为 completed
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_step_executions
                 SET status = 'completed',
                     result = :result::jsonb
                 WHERE enrollment_id = :enrollment_id
                   AND step_id = :step_id
                   AND status = 'executing'
-            """),
+            """
+            ),
             {
                 "result": _json_dumps(exec_result),
                 "enrollment_id": str(enrollment_id),
@@ -622,14 +638,16 @@ class JourneyEngine:
         log.info("process_pending_steps_start")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id
                 FROM journey_enrollments
                 WHERE status = 'active'
                   AND next_step_at <= :now
                 ORDER BY next_step_at ASC
                 LIMIT 500
-            """),
+            """
+            ),
             {"now": now},
         )
         enrollment_ids = [row[0] for row in result.fetchall()]
@@ -675,7 +693,8 @@ class JourneyEngine:
         """从 DB 获取客户基本数据（用于条件评估）。"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         phone,
                         tags,
@@ -688,7 +707,8 @@ class JourneyEngine:
                       AND id = :customer_id
                       AND is_deleted = FALSE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_id), "customer_id": str(customer_id)},
             )
             row = result.fetchone()
@@ -719,7 +739,8 @@ class JourneyEngine:
     ) -> None:
         """创建步骤执行记录（status=pending）。"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO journey_step_executions
                     (id, tenant_id, enrollment_id, step_id, action_type,
                      action_config, status, scheduled_at)
@@ -727,7 +748,8 @@ class JourneyEngine:
                     (:id, :tenant_id, :enrollment_id, :step_id, :action_type,
                      :action_config::jsonb, 'pending', :scheduled_at)
                 ON CONFLICT DO NOTHING
-            """),
+            """
+            ),
             {
                 "id": str(uuid.uuid4()),
                 "tenant_id": str(tenant_id),
@@ -746,12 +768,14 @@ class JourneyEngine:
     ) -> None:
         """将 enrollment 标记为 completed。"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_enrollments
                 SET status = 'completed',
                     completed_at = NOW()
                 WHERE id = :enrollment_id
-            """),
+            """
+            ),
             {"enrollment_id": str(enrollment_id)},
         )
         logger.info("enrollment_completed", enrollment_id=str(enrollment_id))
@@ -764,11 +788,13 @@ class JourneyEngine:
     ) -> None:
         """将 enrollment 标记为 failed。"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_enrollments
                 SET status = 'failed'
                 WHERE id = :enrollment_id
-            """),
+            """
+            ),
             {"enrollment_id": str(enrollment_id)},
         )
         logger.error(

@@ -4,16 +4,27 @@
 1. 阶梯分润计算（类似个税累进）
 2. 月度账单批处理（查询、汇总、写入、逾期标记）
 3. 加盟商看板数据汇总
+
+金额单位约定（CLAUDE.md §10 + §17 Tier 1 财务红线）：
+- 公开 API：calculate_fen(int → int)，入参/出参一律分（整数）
+- 内部计算：Decimal（精度 6 位），rate 字面量用 Decimal(str)
+- 收尾舍入：ROUND_HALF_UP（金融业惯例）
+- 旧 API：calculate(yuan_float → yuan_float) 保留为兼容包装，内部走 calculate_fen
 """
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 
 from ..models.franchise import (
     Franchisee,
@@ -24,6 +35,38 @@ logger = structlog.get_logger(__name__)
 
 # 欠款超过此天数标记为 overdue
 OVERDUE_DAYS = 60
+
+# Decimal 字面量缓存（避免反复构造）
+_DEC_ZERO = Decimal("0")
+_DEC_ONE = Decimal("1")
+_DEC_HUNDRED = Decimal("100")  # 元 ↔ 分换算
+
+
+def _to_decimal_rate(rate: float | Decimal | str) -> Decimal:
+    """将费率转换为 Decimal（避免 float → Decimal 直接构造导致的精度污染）。
+
+    例：float 0.05 → Decimal('0.05000000000000000277555756...') ❌
+        str   '0.05' → Decimal('0.05')                             ✅
+    """
+    if isinstance(rate, Decimal):
+        return rate
+    # 通过 str 中转，确保字面量精度（如 0.05 在 float 下有微小漂移）
+    return Decimal(str(rate))
+
+
+def _yuan_to_fen_decimal(yuan: float | int | Decimal | str) -> Decimal:
+    """将元（可能是 float）安全转换为分（Decimal），避免 float 漂移。
+
+    例：float 1_000_000.0 → Decimal('1000000') × 100 = 100_000_000
+    """
+    if isinstance(yuan, Decimal):
+        return yuan * _DEC_HUNDRED
+    return Decimal(str(yuan)) * _DEC_HUNDRED
+
+
+def _quantize_fen(value: Decimal) -> int:
+    """将 Decimal 量化到分（int），ROUND_HALF_UP 舍入。"""
+    return int(value.quantize(_DEC_ONE, rounding=ROUND_HALF_UP))
 
 
 class FranchiseeDashboard:
@@ -101,65 +144,97 @@ class RoyaltyCalculator:
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     @staticmethod
-    def calculate(monthly_revenue: float, franchisee: Franchisee) -> float:
-        """计算月度分润金额。
+    def calculate_fen(monthly_revenue_fen: int, franchisee: Franchisee) -> int:
+        """计算月度分润金额（分 → 分，零浮点参与）。
 
-        无阶梯：royalty = revenue × royalty_rate
+        【Tier 1 财务红线】CLAUDE.md §10 + §17：
+        - 入参 monthly_revenue_fen：分（int）
+        - 出参 royalty_fen：分（int）
+        - 内部用 Decimal 做 segment_fen × rate 计算
+        - 收尾 quantize ROUND_HALF_UP 至分
+
+        无阶梯：royalty_fen = monthly_revenue_fen × royalty_rate
         有阶梯：按区间分段累进（类似个税）
 
-        阶梯示例（按 min_revenue 升序）：
-          [{"min_revenue": 0,      "rate": 0.05},
-           {"min_revenue": 100000, "rate": 0.04},
-           {"min_revenue": 500000, "rate": 0.03}]
+        阶梯示例（model.RoyaltyTier.min_revenue 单位为元，DB JSONB 兼容）：
+          [{"min_revenue": 0,        "rate": 0.05},
+           {"min_revenue": 100_000,  "rate": 0.04},   # 100_000 元 = 10_000_000 分
+           {"min_revenue": 500_000,  "rate": 0.03}]
 
-        营业额 200,000 时：
-          - [0, 100000)     → 100,000 × 0.05 = 5,000
-          - [100000, 200000)→ 100,000 × 0.04 = 4,000
-          合计 = 9,000
+        营业额 200_000 元（= 20_000_000 分）时：
+          - [0, 10_000_000)        × 0.05 = 500_000 分（5000 元）
+          - [10_000_000, 20_000_000)× 0.04 = 400_000 分（4000 元）
+          合计 = 900_000 分（9000 元）
+        """
+        if monthly_revenue_fen <= 0:
+            return 0
+
+        revenue_fen_dec = Decimal(monthly_revenue_fen)
+        base_rate = _to_decimal_rate(franchisee.royalty_rate)
+        tiers = franchisee.sorted_tiers()
+
+        # 无阶梯：直接 revenue × rate
+        if not tiers:
+            royalty_dec = revenue_fen_dec * base_rate
+            return _quantize_fen(royalty_dec)
+
+        # ─── 阶梯累进算法（语义清晰版本）────────────────────────────────
+        # 构建分段边界（fen）+ 段费率：
+        #   段 0：[0, tiers[0].min_fen)     → base_rate（若 tiers[0].min > 0 才存在）
+        #   段 1..N-1：[tiers[i-1].min_fen, tiers[i].min_fen) → tiers[i-1].rate
+        #   段 N：[tiers[-1].min_fen, revenue_fen) → tiers[-1].rate（若 revenue 超末档）
+        #
+        # 修正：原算法在 revenue ≤ tiers[0].min 时错误回退到 last_tier.rate；
+        #       本版本严格按"段边界"枚举，不会越权用最后一档费率。
+
+        royalty_dec: Decimal = _DEC_ZERO
+
+        # 先建立"段表"：(lower_fen, upper_fen, rate)
+        # 注意：upper 用 None 占位表示"开口至 revenue"
+        segments: List[tuple[Decimal, Optional[Decimal], Decimal]] = []
+        first_min_fen = _yuan_to_fen_decimal(tiers[0].min_revenue)
+
+        if first_min_fen > _DEC_ZERO:
+            # 段 0：基础费率覆盖 [0, tiers[0].min)
+            segments.append((_DEC_ZERO, first_min_fen, base_rate))
+
+        for i, tier in enumerate(tiers):
+            lower = _yuan_to_fen_decimal(tier.min_revenue)
+            upper: Optional[Decimal] = _yuan_to_fen_decimal(tiers[i + 1].min_revenue) if i + 1 < len(tiers) else None
+            segments.append((lower, upper, _to_decimal_rate(tier.rate)))
+
+        # 累加各段贡献：段宽 × 段费率
+        for lower, upper, rate in segments:
+            if lower >= revenue_fen_dec:
+                # 段起点已 ≥ revenue，本段及后续段不贡献
+                break
+            seg_upper = revenue_fen_dec if upper is None else min(upper, revenue_fen_dec)
+            seg_width = seg_upper - lower
+            if seg_width > _DEC_ZERO:
+                royalty_dec += seg_width * rate
+
+        return _quantize_fen(royalty_dec)
+
+    @staticmethod
+    def calculate(monthly_revenue: float, franchisee: Franchisee) -> float:
+        """【DEPRECATED — 兼容包装】旧的元（float）入参/出参 API。
+
+        新代码请使用 calculate_fen(int → int)。
+        本方法保留是为了避免一次性大改散落调用点（test_franchise.py /
+        test_franchise_settlement.py 等），内部已切到 calculate_fen 路径以消除
+        float 漂移：
+          1. 元 → 分（Decimal 中转，避免 float * 100 漂移）
+          2. 调用 calculate_fen
+          3. 分 → 元（int / 100 → float）
+
+        Tier 1 验收：100 万元 × 5% 必须返回精确 50_000.0 元，不允许 49999.99...。
         """
         if monthly_revenue <= 0:
             return 0.0
-
-        tiers = franchisee.sorted_tiers()
-
-        # 无阶梯配置：直接用基础费率
-        if not tiers:
-            return round(monthly_revenue * franchisee.royalty_rate, 2)
-
-        # 确保第一个阶梯从 0 开始（若配置未覆盖0则用基础费率补齐）
-        # 若首档 min_revenue > 0，则 [0, tiers[0].min_revenue) 使用基础费率
-        royalty = 0.0
-        prev_threshold = 0.0
-
-        for i, tier in enumerate(tiers):
-            if tier.min_revenue >= monthly_revenue:
-                # 本档起点已超过营业额，本档之前的区间已全部处理完毕
-                break
-
-            # 若首档 min_revenue > 0，先用基础费率计算空缺区间
-            if i == 0 and tier.min_revenue > 0:
-                gap = min(tier.min_revenue, monthly_revenue)
-                royalty += gap * franchisee.royalty_rate
-                prev_threshold = tier.min_revenue
-                if monthly_revenue <= tier.min_revenue:
-                    break
-
-            # 当前档区间：[tier.min_revenue, next_tier.min_revenue) 或 [tier.min_revenue, revenue)
-            next_threshold = tiers[i + 1].min_revenue if i + 1 < len(tiers) else monthly_revenue
-            segment_upper = min(next_threshold, monthly_revenue)
-            segment = segment_upper - tier.min_revenue
-
-            if segment > 0:
-                royalty += segment * tier.rate
-
-            prev_threshold = segment_upper
-
-        # 若营业额超出最后一档，最后一档费率延续
-        if prev_threshold < monthly_revenue and tiers:
-            last_tier = tiers[-1]
-            royalty += (monthly_revenue - prev_threshold) * last_tier.rate
-
-        return round(royalty, 2)
+        revenue_fen = int(_yuan_to_fen_decimal(monthly_revenue).quantize(_DEC_ONE, rounding=ROUND_HALF_UP))
+        royalty_fen = RoyaltyCalculator.calculate_fen(revenue_fen, franchisee)
+        # 出参元（float），但精度由 fen→yuan 整除保证
+        return royalty_fen / 100.0
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  月度账单批处理
@@ -201,18 +276,19 @@ class RoyaltyCalculator:
         today = date.today()
 
         for franchisee in active_franchisees:
-            # Step 2: 汇总该加盟商门店当月营业额
+            # Step 2: 汇总该加盟商门店当月营业额（分）
             store_ids = await RoyaltyCalculator._fetch_franchisee_store_ids(franchisee.id, tenant_id, db)
             total_revenue_fen: int = await RoyaltyCalculator._sum_store_revenue_fen(
                 store_ids, period_start, period_end, tenant_id, db
             )
-            total_revenue = total_revenue_fen / 100.0
 
-            # Step 3: 计算分润
-            royalty_amount = RoyaltyCalculator.calculate(total_revenue, franchisee)
-            royalty_amount_fen = int(round(royalty_amount * 100))
+            # Step 3: 计算分润（全程分，零浮点） — Tier 1 财务红线
+            royalty_amount_fen = RoyaltyCalculator.calculate_fen(total_revenue_fen, franchisee)
             management_fee_fen = franchisee.management_fee_fen  # type: ignore[attr-defined]
             total_due_fen = royalty_amount_fen + management_fee_fen
+            # 模型字段（元）仅用于回退兼容路径与日志展示，整除转换无误差
+            total_revenue = total_revenue_fen / 100.0
+            royalty_amount = royalty_amount_fen / 100.0
 
             # Step 4: 构建账单
             due_date = RoyaltyCalculator._calc_due_date(bill_month)
@@ -262,6 +338,30 @@ class RoyaltyCalculator:
                 total_revenue=total_revenue,
                 royalty_amount=royalty_amount,
                 status=bill.status,
+            )
+
+            # ── v147+ 事件总线旁路写入：分润计算完成 ──
+            # stream_id = royalty_bills.id（账单聚合根）；金额字段全部 fen（int）
+            asyncio.create_task(
+                emit_event(
+                    event_type=FranchiseEventType.ROYALTY_CALCULATED,
+                    tenant_id=str(tenant_id),
+                    stream_id=str(bill.id),
+                    payload={
+                        "bill_id": str(bill.id),
+                        "franchisee_id": str(franchisee.id),
+                        "bill_month": bill_month,
+                        "period_start": period_start.isoformat(),
+                        "period_end": period_end.isoformat(),
+                        "revenue_fen": total_revenue_fen,
+                        "royalty_amount_fen": royalty_amount_fen,
+                        "management_fee_fen": management_fee_fen,
+                        "total_due_fen": total_due_fen,
+                        "due_date": due_date.isoformat() if due_date else None,
+                        "status": bill.status,
+                    },
+                    source_service="tx-org",
+                )
             )
 
         log.info("franchise.generate_monthly_bills.done", count=len(bills))

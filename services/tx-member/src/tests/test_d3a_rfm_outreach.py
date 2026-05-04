@@ -11,6 +11,7 @@
   8. v266 迁移静态验证（RLS + status 枚举 + CHECK 约束）
   9. ModelRouter 注册 rfm_outreach_message task_type
 """
+
 from __future__ import annotations
 
 import os
@@ -38,12 +39,13 @@ from services.rfm_outreach_service import (
 # 1. 单维度 RFM 打分
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_score_rfm_recency_smaller_better():
     # R 维度：越小越好（越近期到店）
-    assert score_rfm(3, R_BUCKETS, higher_better=False) == 5    # ≤7 天 → S1
-    assert score_rfm(7, R_BUCKETS, higher_better=False) == 5    # 边界
-    assert score_rfm(30, R_BUCKETS, higher_better=False) == 4   # S2
-    assert score_rfm(90, R_BUCKETS, higher_better=False) == 3   # S3
+    assert score_rfm(3, R_BUCKETS, higher_better=False) == 5  # ≤7 天 → S1
+    assert score_rfm(7, R_BUCKETS, higher_better=False) == 5  # 边界
+    assert score_rfm(30, R_BUCKETS, higher_better=False) == 4  # S2
+    assert score_rfm(90, R_BUCKETS, higher_better=False) == 3  # S3
     assert score_rfm(180, R_BUCKETS, higher_better=False) == 2  # S4
     assert score_rfm(365, R_BUCKETS, higher_better=False) == 1  # S5
 
@@ -67,11 +69,14 @@ def test_score_rfm_monetary_higher_better():
 # 2. segment_for 复合分层
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_segment_active_customer_is_s1():
     """R=5/F=5/M=5 → min=5 → S1"""
     snap = CustomerSnapshot(
-        customer_id="c1", recency_days=3,
-        frequency=15, monetary_fen=800000,
+        customer_id="c1",
+        recency_days=3,
+        frequency=15,
+        monetary_fen=800000,
     )
     assert segment_for(snap) == "S1"
 
@@ -79,8 +84,10 @@ def test_segment_active_customer_is_s1():
 def test_segment_dormant_customer_is_s5():
     """R=1/F=1/M=5 → min=1 → S5（半年没来就是 S5，不管多有钱）"""
     snap = CustomerSnapshot(
-        customer_id="c2", recency_days=200,
-        frequency=0, monetary_fen=1000000,
+        customer_id="c2",
+        recency_days=200,
+        frequency=0,
+        monetary_fen=1000000,
     )
     assert segment_for(snap) == "S5"
 
@@ -89,9 +96,10 @@ def test_segment_weak_dimension_dominates():
     """任一维度最差就决定整体分层"""
     # R 健康但 F/M 差 → 看 min
     snap = CustomerSnapshot(
-        customer_id="c3", recency_days=5,  # R=5
-        frequency=0,                        # F=1
-        monetary_fen=0,                     # M=1
+        customer_id="c3",
+        recency_days=5,  # R=5
+        frequency=0,  # F=1
+        monetary_fen=0,  # M=1
     )
     assert segment_for(snap) == "S5"
 
@@ -99,6 +107,7 @@ def test_segment_weak_dimension_dominates():
 # ──────────────────────────────────────────────────────────────────────
 # 3. 余弦相似度
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_cosine_similarity_empty_returns_zero():
     assert cosine_similarity(set(), {"a"}) == 0.0
@@ -123,18 +132,28 @@ def test_cosine_similarity_partial():
 # 4. CF 打分
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_score_cf_candidate_returns_top_items():
     candidate = CustomerSnapshot(
-        customer_id="c1", recency_days=120, frequency=1, monetary_fen=5000,
+        customer_id="c1",
+        recency_days=120,
+        frequency=1,
+        monetary_fen=5000,
         preferred_items=["d1", "d2"],  # 候选只点过 d1 和 d2
     )
     peers = [
         CustomerSnapshot(
-            customer_id="p1", recency_days=3, frequency=15, monetary_fen=800000,
+            customer_id="p1",
+            recency_days=3,
+            frequency=15,
+            monetary_fen=800000,
             preferred_items=["d1", "d2", "d3"],  # 与候选 2 个重合 + d3
         ),
         CustomerSnapshot(
-            customer_id="p2", recency_days=5, frequency=12, monetary_fen=600000,
+            customer_id="p2",
+            recency_days=5,
+            frequency=12,
+            monetary_fen=600000,
             preferred_items=["d1", "d4", "d5"],  # 与候选 1 重合 + d4/d5
         ),
     ]
@@ -149,12 +168,18 @@ def test_score_cf_candidate_returns_top_items():
 
 def test_score_cf_candidate_no_overlap_returns_zero():
     candidate = CustomerSnapshot(
-        customer_id="c1", recency_days=120, frequency=1, monetary_fen=5000,
+        customer_id="c1",
+        recency_days=120,
+        frequency=1,
+        monetary_fen=5000,
         preferred_items=["dx"],
     )
     peers = [
         CustomerSnapshot(
-            customer_id="p1", recency_days=3, frequency=15, monetary_fen=800000,
+            customer_id="p1",
+            recency_days=3,
+            frequency=15,
+            monetary_fen=800000,
             preferred_items=["dy", "dz"],
         ),
     ]
@@ -167,6 +192,7 @@ def test_score_cf_candidate_no_overlap_returns_zero():
 # 5. RFMOutreachService.build_plan
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_build_plan_s4_s5_candidates_get_message():
     """S4/S5 沉睡客户应走完整流程：CF 打分 + Haiku 文案"""
@@ -174,15 +200,19 @@ async def test_build_plan_s4_s5_candidates_get_message():
 
     candidates = [
         CustomerSnapshot(
-            customer_id="dormant-s5", recency_days=200,
-            frequency=0, monetary_fen=0,
+            customer_id="dormant-s5",
+            recency_days=200,
+            frequency=0,
+            monetary_fen=0,
             preferred_items=["d1", "d2"],
         ),
     ]
     active_peers = [
         CustomerSnapshot(
-            customer_id="active-p1", recency_days=3,
-            frequency=15, monetary_fen=800000,
+            customer_id="active-p1",
+            recency_days=3,
+            frequency=15,
+            monetary_fen=800000,
             preferred_items=["d1", "d2", "d3"],
         ),
     ]
@@ -207,25 +237,34 @@ async def test_build_plan_filters_non_target_segments():
     service = RFMOutreachService()
     candidates = [
         CustomerSnapshot(
-            customer_id="active", recency_days=3,  # S1
-            frequency=15, monetary_fen=800000,
+            customer_id="active",
+            recency_days=3,  # S1
+            frequency=15,
+            monetary_fen=800000,
             preferred_items=["d1"],
         ),
         CustomerSnapshot(
-            customer_id="dormant", recency_days=200,  # S5
-            frequency=0, monetary_fen=0,
+            customer_id="dormant",
+            recency_days=200,  # S5
+            frequency=0,
+            monetary_fen=0,
             preferred_items=["d1"],
         ),
     ]
     peers = [
         CustomerSnapshot(
-            customer_id="p1", recency_days=3, frequency=15, monetary_fen=800000,
+            customer_id="p1",
+            recency_days=3,
+            frequency=15,
+            monetary_fen=800000,
             preferred_items=["d1", "d2"],
         ),
     ]
     plan = await service.build_plan(
-        tenant_id="t-1", store_id=None,
-        candidates=candidates, active_peers=peers,
+        tenant_id="t-1",
+        store_id=None,
+        candidates=candidates,
+        active_peers=peers,
         target_segments=["S5"],
     )
     assert plan.target_count == 1
@@ -243,15 +282,26 @@ async def test_build_plan_calls_haiku_invoker_when_provided():
 
     service = RFMOutreachService(haiku_invoker=mock_haiku)
     plan = await service.build_plan(
-        tenant_id="t-1", store_id=None,
-        candidates=[CustomerSnapshot(
-            customer_id="c1", recency_days=200, frequency=0, monetary_fen=0,
-            preferred_items=["d1"],
-        )],
-        active_peers=[CustomerSnapshot(
-            customer_id="p1", recency_days=3, frequency=15, monetary_fen=800000,
-            preferred_items=["d1", "d2"],
-        )],
+        tenant_id="t-1",
+        store_id=None,
+        candidates=[
+            CustomerSnapshot(
+                customer_id="c1",
+                recency_days=200,
+                frequency=0,
+                monetary_fen=0,
+                preferred_items=["d1"],
+            )
+        ],
+        active_peers=[
+            CustomerSnapshot(
+                customer_id="p1",
+                recency_days=3,
+                frequency=15,
+                monetary_fen=800000,
+                preferred_items=["d1", "d2"],
+            )
+        ],
     )
     assert plan.target_count == 1
     assert plan.candidates[0].outreach_message == "来自 Haiku 的个性化文案。"
@@ -262,32 +312,46 @@ async def test_build_plan_calls_haiku_invoker_when_provided():
 @pytest.mark.asyncio
 async def test_build_plan_haiku_failure_falls_back_to_template():
     """Haiku invoker 抛异常时不崩溃，走降级模板"""
+
     async def boom_haiku(prompt: str, model_id: str) -> str:
         raise RuntimeError("Haiku API 429")
 
     service = RFMOutreachService(haiku_invoker=boom_haiku)
     plan = await service.build_plan(
-        tenant_id="t-1", store_id=None,
-        candidates=[CustomerSnapshot(
-            customer_id="c1", recency_days=200, frequency=0, monetary_fen=0,
-            preferred_items=["d1"],
-        )],
-        active_peers=[CustomerSnapshot(
-            customer_id="p1", recency_days=3, frequency=15, monetary_fen=800000,
-            preferred_items=["d1", "d2"],
-        )],
+        tenant_id="t-1",
+        store_id=None,
+        candidates=[
+            CustomerSnapshot(
+                customer_id="c1",
+                recency_days=200,
+                frequency=0,
+                monetary_fen=0,
+                preferred_items=["d1"],
+            )
+        ],
+        active_peers=[
+            CustomerSnapshot(
+                customer_id="p1",
+                recency_days=3,
+                frequency=15,
+                monetary_fen=800000,
+                preferred_items=["d1", "d2"],
+            )
+        ],
     )
     assert plan.target_count == 1
     msg = plan.candidates[0].outreach_message
-    assert msg is not None and "Haiku" not in msg   # 是 fallback 不是 LLM 输出
+    assert msg is not None and "Haiku" not in msg  # 是 fallback 不是 LLM 输出
 
 
 @pytest.mark.asyncio
 async def test_build_plan_no_candidates_returns_empty():
     service = RFMOutreachService()
     plan = await service.build_plan(
-        tenant_id="t-1", store_id=None,
-        candidates=[], active_peers=[],
+        tenant_id="t-1",
+        store_id=None,
+        candidates=[],
+        active_peers=[],
     )
     assert plan.target_count == 0
     assert plan.estimated_revenue_fen == 0
@@ -297,10 +361,18 @@ async def test_build_plan_no_candidates_returns_empty():
 # 6. v266 迁移静态校验
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_v266_migration_creates_table_with_required_columns():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v266_rfm_outreach_campaigns.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v266_rfm_outreach_campaigns.py",
     )
     if not os.path.exists(path):
         pytest.skip("迁移文件不存在")
@@ -319,8 +391,15 @@ def test_v266_migration_creates_table_with_required_columns():
 
 def test_v266_has_status_enum_check():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v266_rfm_outreach_campaigns.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v266_rfm_outreach_campaigns.py",
     )
     if not os.path.exists(path):
         pytest.skip("迁移文件不存在")
@@ -334,8 +413,15 @@ def test_v266_has_status_enum_check():
 
 def test_v266_has_rls_policy():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v266_rfm_outreach_campaigns.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v266_rfm_outreach_campaigns.py",
     )
     if not os.path.exists(path):
         pytest.skip("迁移文件不存在")
@@ -348,8 +434,15 @@ def test_v266_has_rls_policy():
 
 def test_v266_down_revision_chains_to_v265():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v266_rfm_outreach_campaigns.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v266_rfm_outreach_campaigns.py",
     )
     if not os.path.exists(path):
         pytest.skip("迁移文件不存在")
@@ -362,12 +455,22 @@ def test_v266_down_revision_chains_to_v265():
 # 7. ModelRouter 注册
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_model_router_registers_rfm_outreach_message_as_simple():
     """rfm_outreach_message task 必须路由到 Haiku（SIMPLE complexity）"""
     try:
         path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "..", "..",
-            "services", "tunxiang-api", "src", "shared", "core", "model_router.py"
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "..",
+            "services",
+            "tunxiang-api",
+            "src",
+            "shared",
+            "core",
+            "model_router.py",
         )
         if not os.path.exists(path):
             pytest.skip("model_router.py 路径不存在")

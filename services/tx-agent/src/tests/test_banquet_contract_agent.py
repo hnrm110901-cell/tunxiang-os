@@ -27,12 +27,8 @@ import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 TX_AGENT_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-TX_TRADE_SRC = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "tx-trade", "src")
-)
-TX_TRADE_PKG_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "tx-trade")
-)
+TX_TRADE_SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tx-trade", "src"))
+TX_TRADE_PKG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tx-trade"))
 # tx-agent 的 src 已被 pytest 作为顶层 `src` 包注册；我们需要把 tx-trade 的
 # service/repo 以独立包名 `txtrade_src` 加载，避免与 tx-agent 的 `src` 冲突。
 # 做法：将 tx-trade/src 的 __init__.py 显式当作一个新包 `txtrade_src` 注册，
@@ -63,9 +59,7 @@ def _register_package(alias: str, src_dir: str) -> types.ModuleType:
     return mod
 
 
-def _register_submodule(
-    pkg_alias: str, sub_path: str, sub_name: str
-) -> types.ModuleType:
+def _register_submodule(pkg_alias: str, sub_path: str, sub_name: str) -> types.ModuleType:
     """在 `pkg_alias` 包下注册子模块；sub_path 相对 pkg 根目录。"""
     full_alias = f"{pkg_alias}.{sub_name}"
     if full_alias in sys.modules:
@@ -169,9 +163,7 @@ class FakeLeadApiClient:
         self._payloads = lead_payloads
         self.calls: list[uuid.UUID] = []
 
-    async def get_lead(
-        self, *, tenant_id: uuid.UUID, lead_id: uuid.UUID
-    ) -> dict[str, Any]:
+    async def get_lead(self, *, tenant_id: uuid.UUID, lead_id: uuid.UUID) -> dict[str, Any]:
         self.calls.append(lead_id)
         return self._payloads.get(lead_id, {})
 
@@ -217,9 +209,7 @@ def emitted() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def contract_service(
-    repo: InMemoryBanquetContractRepository, emitted: list[dict[str, Any]]
-) -> BanquetContractService:
+def contract_service(repo: InMemoryBanquetContractRepository, emitted: list[dict[str, Any]]) -> BanquetContractService:
     async def _fake_emit(**kwargs: Any) -> str:
         emitted.append(kwargs)
         return str(uuid.uuid4())
@@ -337,9 +327,7 @@ async def test_generate_contract_writes_event(
         },
     )
     assert result.success, result.error
-    assert any(
-        e["event_type"].value == "banquet.contract_generated" for e in emitted
-    )
+    assert any(e["event_type"].value == "banquet.contract_generated" for e in emitted)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -653,9 +641,7 @@ async def test_progress_reminder_dispatches_4_tier_tasks(
             },
         )
         assert r.success, r.error
-        assert len(r.data["notified_ticket_ids"]) == 5, (
-            f"{stage} 应向 5 部门推送"
-        )
+        assert len(r.data["notified_ticket_ids"]) == 5, f"{stage} 应向 5 部门推送"
     # 共 4 × 5 = 20 条任务
     assert len(task_api.dispatched) == 20
     types = {d["task_type"] for d in task_api.dispatched}
@@ -809,9 +795,7 @@ async def test_route_approval_trusts_db_not_params(
     )
     assert route.success, route.error
     # 必须不能 auto_passed — 走店长审批链
-    assert route.data["auto_passed"] is False, (
-        "C-1 fail: params 覆盖了 DB 值，绕过了审批"
-    )
+    assert route.data["auto_passed"] is False, "C-1 fail: params 覆盖了 DB 值，绕过了审批"
     assert route.data["next_role"] == "store_manager"
     assert route.data["final_status"] == "pending_approval"
 
@@ -931,19 +915,16 @@ async def test_lock_schedule_concurrent_double_lock_prevented(
     assert lock1.success and lock2.success
     # 只有一个 locked=True
     locked_count = sum(1 for r in (lock1, lock2) if r.data.get("locked") is True)
-    assert locked_count == 1, (
-        f"C-2 fail: 双锁并发未被阻断（locked_count={locked_count}）"
-    )
+    assert locked_count == 1, f"C-2 fail: 双锁并发未被阻断（locked_count={locked_count}）"
     # 失败方 schedule_conflict=True（进候补）
     losers = [r for r in (lock1, lock2) if r.data.get("locked") is False]
     assert len(losers) == 1
     # 失败方因 v283 UNIQUE 冲突或候补队列命中（两种情况都合法）
     # 若是 DB 冲突：schedule_conflict=True；若是 queue 命中：False 但 queued_contract_ids 非空
     loser = losers[0]
-    assert (
-        loser.data.get("schedule_conflict") is True
-        or len(loser.data.get("queued_contract_ids", [])) > 0
-    ), "C-2 fail: 失败方既无 DB 冲突标记也无候补队列"
+    assert loser.data.get("schedule_conflict") is True or len(loser.data.get("queued_contract_ids", [])) > 0, (
+        "C-2 fail: 失败方既无 DB 冲突标记也无候补队列"
+    )
 
 
 @pytest.mark.asyncio
@@ -995,9 +976,7 @@ async def test_route_approval_concurrent_store_manager_only_one_wins(
 
     call_count = {"n": 0}
 
-    async def racy_list(
-        contract_id_arg: uuid.UUID, tenant_id_arg: uuid.UUID
-    ) -> list[Any]:
+    async def racy_list(contract_id_arg: uuid.UUID, tenant_id_arg: uuid.UUID) -> list[Any]:
         rows = await original_list(contract_id_arg, tenant_id_arg)
         call_count["n"] += 1
         # 前两次返回前释放控制权，让两个并发请求都读到同样的"空 store_manager"状态
@@ -1039,13 +1018,11 @@ async def test_route_approval_concurrent_store_manager_only_one_wins(
 
     assert res_a.success and res_b.success
     # 一个推进（next_role=district_manager），另一个 idempotent
-    idempotent_count = sum(
-        1 for r in (res_a, res_b) if r.data.get("idempotent") is True
-    )
+    idempotent_count = sum(1 for r in (res_a, res_b) if r.data.get("idempotent") is True)
     advanced_count = sum(
-        1 for r in (res_a, res_b)
-        if r.data.get("idempotent") is not True
-        and r.data.get("next_role") == "district_manager"
+        1
+        for r in (res_a, res_b)
+        if r.data.get("idempotent") is not True and r.data.get("next_role") == "district_manager"
     )
     assert idempotent_count == 1, (
         f"C-3 fail: 并发双写未被阻断（idempotent_count={idempotent_count}） "

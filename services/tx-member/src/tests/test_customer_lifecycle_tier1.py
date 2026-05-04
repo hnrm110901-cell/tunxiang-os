@@ -179,11 +179,7 @@ class _FakeRepo:
         existing = self._rows.get(cid)
 
         # 幂等短路
-        if (
-            existing is not None
-            and trig is not None
-            and existing.last_transition_event_id == trig
-        ):
+        if existing is not None and trig is not None and existing.last_transition_event_id == trig:
             return existing
 
         if existing is None:
@@ -301,9 +297,7 @@ async def test_60_days_no_order_triggers_active_to_dormant():
     # 先置为 active（上次消费是 70 天前，但 state 还停留在 active，
     # 因为夜批尚未跑）
     existing_since = datetime.now(timezone.utc) - timedelta(days=70)
-    repo._rows[cid] = _record(
-        tid, cid, CustomerLifecycleState.ACTIVE, since_ts=existing_since
-    )
+    repo._rows[cid] = _record(tid, cid, CustomerLifecycleState.ACTIVE, since_ts=existing_since)
 
     fsm = _TestFSM(tid, repo)
     now = datetime.now(timezone.utc)
@@ -583,41 +577,27 @@ def test_evaluate_state_pure_function_boundaries():
     now = datetime(2026, 4, 23, 10, 0, 0, tzinfo=timezone.utc)
 
     # 0 单 → no_order
-    assert (
-        fsm.evaluate_state(now=now, last_order_at=None, order_count=0)
-        == CustomerLifecycleState.NO_ORDER
-    )
+    assert fsm.evaluate_state(now=now, last_order_at=None, order_count=0) == CustomerLifecycleState.NO_ORDER
     # 刚消费（0 天）→ active
-    assert (
-        fsm.evaluate_state(now=now, last_order_at=now, order_count=1)
-        == CustomerLifecycleState.ACTIVE
-    )
+    assert fsm.evaluate_state(now=now, last_order_at=now, order_count=1) == CustomerLifecycleState.ACTIVE
     # 59 天前 → active
     assert (
-        fsm.evaluate_state(
-            now=now, last_order_at=now - timedelta(days=59), order_count=2
-        )
+        fsm.evaluate_state(now=now, last_order_at=now - timedelta(days=59), order_count=2)
         == CustomerLifecycleState.ACTIVE
     )
     # 60 天前 → dormant
     assert (
-        fsm.evaluate_state(
-            now=now, last_order_at=now - timedelta(days=60), order_count=2
-        )
+        fsm.evaluate_state(now=now, last_order_at=now - timedelta(days=60), order_count=2)
         == CustomerLifecycleState.DORMANT
     )
     # 179 天前 → dormant
     assert (
-        fsm.evaluate_state(
-            now=now, last_order_at=now - timedelta(days=179), order_count=2
-        )
+        fsm.evaluate_state(now=now, last_order_at=now - timedelta(days=179), order_count=2)
         == CustomerLifecycleState.DORMANT
     )
     # 180 天前 → churned
     assert (
-        fsm.evaluate_state(
-            now=now, last_order_at=now - timedelta(days=180), order_count=2
-        )
+        fsm.evaluate_state(now=now, last_order_at=now - timedelta(days=180), order_count=2)
         == CustomerLifecycleState.CHURNED
     )
 

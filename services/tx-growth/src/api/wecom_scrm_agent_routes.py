@@ -77,7 +77,8 @@ async def get_birthday_upcoming(
         )
         today = date.today()
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text AS member_id,
                     full_name AS name,
@@ -104,7 +105,8 @@ async def get_birthday_upcoming(
                           FROM generate_series(0, :days_ahead) AS offs
                       )
                   )
-            """),
+            """
+            ),
             {"days_ahead": days_ahead},
         )
         rows = result.mappings().all()
@@ -184,12 +186,14 @@ async def send_birthday_messages(
             {"tid": x_tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text AS member_id, full_name AS name, tags
                 FROM customers
                 WHERE id = ANY(:ids::uuid[])
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"ids": body.member_ids},
         )
         for row in result.mappings().all():
@@ -259,7 +263,8 @@ async def get_dormant_list(
             {"tid": x_tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text AS member_id,
                     full_name AS name,
@@ -281,7 +286,8 @@ async def get_dormant_list(
                   AND is_deleted = FALSE
                   AND NOT (tags @> ARRAY['unsubscribed'])
                 ORDER BY dormant_days ASC
-            """),
+            """
+            ),
             {"dormant_days": dormant_days, "min_spend": min_historical_spend_fen},
         )
         rows = result.mappings().all()
@@ -366,7 +372,8 @@ async def wake_dormant_members(
             {"tid": x_tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text AS member_id,
                     full_name AS name,
@@ -375,7 +382,8 @@ async def wake_dormant_members(
                 FROM customers
                 WHERE id = ANY(:ids::uuid[])
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"ids": body.member_ids},
         )
         for row in result.mappings().all():
@@ -507,7 +515,8 @@ async def get_post_order_stats(
             {"tid": x_tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     o.id::text AS order_id,
                     o.customer_id::text AS member_id,
@@ -520,7 +529,8 @@ async def get_post_order_stats(
                   AND o.created_at > NOW() - INTERVAL '24 hours'
                   AND o.is_deleted = FALSE
                 ORDER BY o.created_at DESC
-            """),
+            """
+            ),
         )
         for row in result.mappings().all():
             member_name = row["member_name"] or ""

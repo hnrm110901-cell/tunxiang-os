@@ -71,7 +71,8 @@ class BOMService:
 
         # 插入 bom_templates
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO bom_templates (
                     id, tenant_id, store_id, dish_id, version,
                     yield_rate, standard_portion, prep_time_minutes,
@@ -85,7 +86,8 @@ class BOMService:
                     false, false, false,
                     :now, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": self._tenant_uuid,
@@ -109,7 +111,8 @@ class BOMService:
             ingredient_uuid = uuid.UUID(item["ingredient_id"])
 
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO bom_items (
                         id, tenant_id, bom_id, store_id, ingredient_id,
                         standard_qty, raw_qty, unit, unit_cost_fen,
@@ -123,7 +126,8 @@ class BOMService:
                         :prep_notes, 'ADD', false,
                         :now, :now
                     )
-                """),
+                """
+                ),
                 {
                     "id": item_id,
                     "tenant_id": self._tenant_uuid,
@@ -181,7 +185,8 @@ class BOMService:
 
         # 查询模板
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, dish_id, version,
                        effective_date, expiry_date, yield_rate,
                        standard_portion, prep_time_minutes,
@@ -191,7 +196,8 @@ class BOMService:
                 WHERE id = :id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"id": template_uuid, "tenant_id": self._tenant_uuid},
         )
         row = result.mappings().first()
@@ -200,7 +206,8 @@ class BOMService:
 
         # 查询明细
         items_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, ingredient_id, standard_qty, raw_qty, unit,
                        unit_cost_fen, is_key_ingredient, is_optional,
                        waste_factor, prep_notes, item_action
@@ -209,7 +216,8 @@ class BOMService:
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
                 ORDER BY created_at
-            """),
+            """
+            ),
             {"bom_id": template_uuid, "tenant_id": self._tenant_uuid},
         )
         items_rows = items_result.mappings().all()
@@ -291,14 +299,16 @@ class BOMService:
         params["offset"] = offset
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, dish_id, version, yield_rate,
                        is_active, is_approved, scope, created_at
                 FROM bom_templates
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -343,11 +353,13 @@ class BOMService:
 
         # 确认模板存在
         check = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, dish_id, version
                 FROM bom_templates
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": template_uuid, "tenant_id": self._tenant_uuid},
         )
         template_row = check.mappings().first()
@@ -374,21 +386,25 @@ class BOMService:
             update_params["notes"] = notes
 
         await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE bom_templates
                 SET {", ".join(update_fields)}
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             update_params,
         )
 
         # 软删除旧明细
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE bom_items
                 SET is_deleted = true, updated_at = :now
                 WHERE bom_id = :bom_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"bom_id": template_uuid, "tenant_id": self._tenant_uuid, "now": now},
         )
 
@@ -399,7 +415,8 @@ class BOMService:
             ingredient_uuid = uuid.UUID(item["ingredient_id"])
 
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO bom_items (
                         id, tenant_id, bom_id, store_id, ingredient_id,
                         standard_qty, raw_qty, unit, unit_cost_fen,
@@ -413,7 +430,8 @@ class BOMService:
                         :prep_notes, 'ADD', false,
                         :now, :now
                     )
-                """),
+                """
+                ),
                 {
                     "id": item_id,
                     "tenant_id": self._tenant_uuid,
@@ -467,10 +485,12 @@ class BOMService:
 
         # 确认存在
         check = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM bom_templates
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": template_uuid, "tenant_id": self._tenant_uuid},
         )
         if not check.scalar_one_or_none():
@@ -478,21 +498,25 @@ class BOMService:
 
         # 软删除模板
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE bom_templates
                 SET is_deleted = true, is_active = false, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": template_uuid, "tenant_id": self._tenant_uuid, "now": now},
         )
 
         # 软删除明细
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE bom_items
                 SET is_deleted = true, updated_at = :now
                 WHERE bom_id = :bom_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"bom_id": template_uuid, "tenant_id": self._tenant_uuid, "now": now},
         )
 
@@ -512,11 +536,13 @@ class BOMService:
 
         # 查询模板
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, version, store_id
                 FROM bom_templates
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": template_uuid, "tenant_id": self._tenant_uuid},
         )
         row = result.mappings().first()
@@ -527,23 +553,27 @@ class BOMService:
 
         # 先停用同菜品所有版本
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE bom_templates
                 SET is_active = false, updated_at = :now
                 WHERE dish_id = :dish_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"dish_id": dish_id, "tenant_id": self._tenant_uuid, "now": now},
         )
 
         # 激活指定版本
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE bom_templates
                 SET is_active = true, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": template_uuid, "tenant_id": self._tenant_uuid, "now": now},
         )
 

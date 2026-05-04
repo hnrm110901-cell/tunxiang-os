@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -95,10 +96,7 @@ def _validate_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> 
     try:
         uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"X-Tenant-ID 格式错误: {exc}",
-        ) from exc
+        raise safe_http_exception(400, "X-Tenant-ID 格式错误", exc) from exc
     return x_tenant_id
 
 
@@ -106,17 +104,11 @@ def _validate_date_range(start_date: str, end_date: str) -> tuple[date, date]:
     try:
         d_start = date.fromisoformat(start_date)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"start_date 格式错误: {start_date}，请使用 YYYY-MM-DD",
-        ) from exc
+        raise safe_http_exception(400, "start_date 格式错误，请使用 YYYY-MM-DD", exc) from exc
     try:
         d_end = date.fromisoformat(end_date)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"end_date 格式错误: {end_date}，请使用 YYYY-MM-DD",
-        ) from exc
+        raise safe_http_exception(400, "end_date 格式错误，请使用 YYYY-MM-DD", exc) from exc
     if d_start > d_end:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -129,10 +121,7 @@ def _validate_uuid(value: str, field_name: str) -> str:
     try:
         uuid.UUID(value)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"{field_name} 格式错误: {exc}",
-        ) from exc
+        raise safe_http_exception(400, f"{field_name} 格式错误", exc) from exc
     return value
 
 
@@ -266,7 +255,8 @@ async def get_payment_details(
 
     params["limit"] = size
     params["offset"] = (page - 1) * size
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT p.id AS payment_id, p.order_id, p.channel, p.amount_fen,
                p.paid_at, e.name AS cashier_name, s.name AS store_name
         FROM payments p
@@ -274,7 +264,8 @@ async def get_payment_details(
         LEFT JOIN stores s ON p.store_id = s.id
         WHERE {where_clause}
         ORDER BY p.paid_at DESC LIMIT :limit OFFSET :offset
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     rows = result.fetchall()
 
@@ -407,7 +398,8 @@ async def get_crm_reconciliation(
         params["store_id"] = store_id
 
     # 按会员聚合: CRM侧(stored_value_transactions) vs 财务侧(payments where channel=member_card)
-    sql = text(f"""
+    sql = text(
+        f"""
         WITH crm_side AS (
             SELECT
                 svt.member_id,
@@ -439,12 +431,14 @@ async def get_crm_reconciliation(
         WHERE COALESCE(c.crm_total_fen, 0) != COALESCE(f.finance_total_fen, 0)
         ORDER BY ABS(COALESCE(c.crm_total_fen, 0) - COALESCE(f.finance_total_fen, 0)) DESC
         LIMIT 100
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     mismatch_rows = result.fetchall()
 
     # 总匹配数
-    match_sql = text(f"""
+    match_sql = text(
+        f"""
         WITH crm_side AS (
             SELECT member_id, type, COALESCE(SUM(amount_fen), 0) AS total
             FROM stored_value_transactions
@@ -463,7 +457,8 @@ async def get_crm_reconciliation(
         SELECT COUNT(*) FROM crm_side c
         JOIN finance_side f ON c.member_id = f.member_id AND c.type = f.type
         WHERE c.total = f.total
-    """)
+    """
+    )
     match_result = await db.execute(match_sql, params)
     match_count = match_result.scalar() or 0
 

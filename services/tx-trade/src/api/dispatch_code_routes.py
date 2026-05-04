@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dispatch_code_service import DispatchCodeService
 
@@ -73,7 +74,7 @@ async def api_generate(
             platform=req.platform,
         )
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise safe_http_exception(500, "出餐码生成失败", e) from e
 
     # qr_data: 打包员扫码时传回的唯一标识（格式：txdc://<code>）
     qr_data = f"txdc://{dc.code}"

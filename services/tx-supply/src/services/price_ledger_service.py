@@ -88,9 +88,7 @@ def _row_to_alert(row: dict[str, Any]) -> dict[str, Any]:
         "supplier_id": str(row["supplier_id"]) if row.get("supplier_id") else None,
         "triggered_at": row["triggered_at"],
         "current_price_fen": int(row["current_price_fen"]),
-        "baseline_price_fen": int(row["baseline_price_fen"])
-        if row.get("baseline_price_fen") is not None
-        else None,
+        "baseline_price_fen": int(row["baseline_price_fen"]) if row.get("baseline_price_fen") is not None else None,
         "breach_value": row.get("breach_value"),
         "severity": row["severity"],
         "status": row["status"],
@@ -914,10 +912,7 @@ async def acknowledge_alert(
     await _set_tenant(db, tenant_id)
 
     found = await db.execute(
-        text(
-            "SELECT id, status FROM price_alerts "
-            "WHERE id = :aid AND tenant_id = :tid AND is_deleted = false"
-        ),
+        text("SELECT id, status FROM price_alerts WHERE id = :aid AND tenant_id = :tid AND is_deleted = false"),
         {"aid": str(alert_id), "tid": str(tenant_id)},
     )
     row = found.mappings().one_or_none()

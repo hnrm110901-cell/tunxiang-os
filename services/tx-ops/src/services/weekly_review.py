@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -75,7 +75,7 @@ async def generate_weekly_review(
         "improvement_actions": improvement_actions,
         "highlights": highlights,
         "status": "draft",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(

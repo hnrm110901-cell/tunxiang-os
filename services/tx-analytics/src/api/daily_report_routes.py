@@ -52,7 +52,8 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
     row = (
         (
             await session.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT
                 COUNT(*)                              AS order_count,
                 COALESCE(SUM(o.final_amount_fen), 0)  AS revenue_fen,
@@ -64,7 +65,8 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
               AND o.status NOT IN ('cancelled', 'voided')
               AND o.is_deleted = false
               {store_filter}
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -80,7 +82,8 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
     pay_rows = (
         (
             await session.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT
                 COALESCE(o.payment_method, 'other') AS method,
                 SUM(o.final_amount_fen)             AS amount_fen
@@ -92,7 +95,8 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
               AND o.is_deleted = false
               {store_filter}
             GROUP BY o.payment_method
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -105,7 +109,8 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
     channel_rows = (
         (
             await session.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT
                 COALESCE(o.order_type, 'other') AS channel,
                 SUM(o.final_amount_fen)         AS amount_fen
@@ -117,7 +122,8 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
               AND o.is_deleted = false
               {store_filter}
             GROUP BY o.order_type
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -129,13 +135,15 @@ async def _query_daily_report(session, d: date, store_id: Optional[str]) -> dict
     # 新增会员数
     new_members: int = (
         await session.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) FROM customers
             WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
               AND created_at >= :start
               AND created_at <= :end
               AND is_deleted = false
-        """),
+        """
+            ),
             {"start": day_start, "end": day_end},
         )
     ).scalar() or 0
@@ -230,7 +238,8 @@ async def daily_reports_summary(
             row = (
                 (
                     await session.execute(
-                        text(f"""
+                        text(
+                            f"""
                     SELECT
                         COUNT(*)                              AS total_orders,
                         COALESCE(SUM(o.final_amount_fen), 0) AS total_revenue_fen
@@ -241,7 +250,8 @@ async def daily_reports_summary(
                       AND o.status NOT IN ('cancelled', 'voided')
                       AND o.is_deleted = false
                       {store_filter}
-                """),
+                """
+                        ),
                         params,
                     )
                 )
@@ -254,13 +264,15 @@ async def daily_reports_summary(
 
             new_members_total: int = (
                 await session.execute(
-                    text("""
+                    text(
+                        """
                     SELECT COUNT(*) FROM customers
                     WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                       AND created_at >= :start
                       AND created_at <= :end
                       AND is_deleted = false
-                """),
+                """
+                    ),
                     {"start": day_start, "end": day_end},
                 )
             ).scalar() or 0

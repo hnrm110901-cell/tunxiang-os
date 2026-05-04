@@ -5,15 +5,16 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
-from services.marketing_engine import (
-    SCHEME_TYPES,
-    apply_schemes_in_order,
-)
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+
+from ..services.marketing_engine import (
+    SCHEME_TYPES,
+    apply_schemes_in_order,
+)
 
 router = APIRouter(prefix="/api/v1/member/marketing-schemes", tags=["marketing"])
 

@@ -40,11 +40,13 @@ class ForgeReviewService:
 
         # ── 验证应用存在且处于待审核状态 ──
         app_check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, status, current_version
                 FROM forge_apps
                 WHERE app_id = :aid AND is_deleted = false
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         app_row = app_check.mappings().first()
@@ -60,7 +62,8 @@ class ForgeReviewService:
 
         # ── 插入审核记录 ──
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_reviews
                     (id, tenant_id, review_id, app_id, reviewer_id,
                      decision, review_notes, reviewed_at)
@@ -70,7 +73,8 @@ class ForgeReviewService:
                      :decision, :review_notes, NOW())
                 RETURNING review_id, app_id, reviewer_id, decision,
                           review_notes, reviewed_at
-            """),
+            """
+            ),
             {
                 "review_id": review_id,
                 "app_id": app_id,
@@ -88,24 +92,28 @@ class ForgeReviewService:
             update_parts += ", published_at = NOW()"
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_apps
                 SET {update_parts}
                 WHERE app_id = :aid AND is_deleted = false
-            """),
+            """
+            ),
             {"new_status": new_status, "aid": app_id},
         )
 
         # 如果通过审核，同步更新版本状态
         if decision == "approved":
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE forge_app_versions
                     SET status = 'published', published_at = NOW()
                     WHERE app_id = :aid
                       AND version = :ver
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"aid": app_id, "ver": app_row["current_version"]},
             )
 
@@ -129,16 +137,19 @@ class ForgeReviewService:
         params: dict = {"limit": size, "offset": (page - 1) * size}
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM forge_apps a
                 WHERE a.status = 'pending_review' AND a.is_deleted = false
-            """),
+            """
+            ),
         )
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     a.app_id, a.app_name, a.category, a.description,
                     a.current_version, a.created_at,
@@ -149,7 +160,8 @@ class ForgeReviewService:
                 WHERE a.status = 'pending_review' AND a.is_deleted = false
                 ORDER BY a.created_at ASC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -158,13 +170,15 @@ class ForgeReviewService:
     # ── 审核历史 ─────────────────────────────────────────────
     async def get_review_history(self, db: AsyncSession, app_id: str) -> list[dict]:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT review_id, app_id, reviewer_id, decision,
                        review_notes, reviewed_at
                 FROM forge_reviews
                 WHERE app_id = :aid AND is_deleted = false
                 ORDER BY reviewed_at DESC
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         return [dict(r) for r in result.mappings().all()]

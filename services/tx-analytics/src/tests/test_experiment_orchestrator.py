@@ -113,12 +113,8 @@ async def test_idempotent_repeated_get_bucket_returns_same_value() -> None:
 
     sub = ExperimentSubject(subject_type="user", subject_id="user_42")
 
-    r1 = await orch.get_bucket(
-        tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub
-    )
-    r2 = await orch.get_bucket(
-        tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub
-    )
+    r1 = await orch.get_bucket(tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub)
+    r2 = await orch.get_bucket(tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub)
 
     assert r1.bucket == r2.bucket
     assert r1.is_new_exposure is True
@@ -143,12 +139,8 @@ async def test_emits_exposed_event_only_on_first_exposure() -> None:
     )
 
     sub = ExperimentSubject(subject_type="user", subject_id="user_42")
-    await orch.get_bucket(
-        tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub
-    )
-    await orch.get_bucket(
-        tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub
-    )
+    await orch.get_bucket(tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub)
+    await orch.get_bucket(tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub)
 
     assert len(emit.events) == 1
     assert emit.events[0]["event_type"].value == "experiment.exposed"
@@ -246,9 +238,7 @@ async def test_definition_cache_hits_within_ttl() -> None:
     )
     sub = ExperimentSubject(subject_type="user", subject_id="u")
 
-    await orch.get_bucket(
-        tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub
-    )
+    await orch.get_bucket(tenant_id="tenant-A", experiment_key="checkout.v2", subject=sub)
     await orch.get_bucket(
         tenant_id="tenant-A",
         experiment_key="checkout.v2",

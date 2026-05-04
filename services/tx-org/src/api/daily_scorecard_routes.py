@@ -70,9 +70,7 @@ async def compute_daily_scorecards(
     """计算指定门店当日(或指定日期)所有员工的日得分卡"""
     try:
         target_date = body.score_date or date.today()
-        result = await _scorecard_svc.compute_daily_scores(
-            db, UUID(store_id.hex), UUID(x_tenant_id), target_date
-        )
+        result = await _scorecard_svc.compute_daily_scores(db, UUID(store_id.hex), UUID(x_tenant_id), target_date)
         return {"ok": True, "data": {"score_date": str(target_date), "scorecards": result}}
     except SQLAlchemyError as exc:
         logger.error("compute_scorecards_failed", store_id=str(store_id), error=str(exc))
@@ -154,9 +152,7 @@ async def preview_monthly_bonus(
 ):
     """月度奖金预览（基于截至今日的得分预估）"""
     try:
-        result = await _bonus_svc.preview_bonus(
-            db, UUID(store_id.hex), UUID(x_tenant_id), year, month
-        )
+        result = await _bonus_svc.preview_bonus(db, UUID(store_id.hex), UUID(x_tenant_id), year, month)
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
         logger.error("preview_bonus_failed", store_id=str(store_id), error=str(exc))
@@ -173,9 +169,7 @@ async def calculate_monthly_bonus(
 ):
     """计算月度绩效奖金"""
     try:
-        result = await _bonus_svc.calculate_monthly_bonus(
-            db, UUID(store_id.hex), UUID(x_tenant_id), year, month
-        )
+        result = await _bonus_svc.calculate_monthly_bonus(db, UUID(store_id.hex), UUID(x_tenant_id), year, month)
         return {"ok": True, "data": {"year": year, "month": month, "bonuses": result}}
     except SQLAlchemyError as exc:
         logger.error("calculate_bonus_failed", store_id=str(store_id), error=str(exc))
@@ -191,9 +185,7 @@ async def get_bonus_rules(
 ):
     """获取奖金规则"""
     try:
-        result = await _bonus_svc.get_rules(
-            db, UUID(x_tenant_id), store_id=store_id, role=role
-        )
+        result = await _bonus_svc.get_rules(db, UUID(x_tenant_id), store_id=store_id, role=role)
         return {"ok": True, "data": {"rules": result}}
     except SQLAlchemyError as exc:
         logger.error("get_bonus_rules_failed", error=str(exc))
@@ -248,9 +240,7 @@ async def get_store_lifecycle(
 ):
     """单店生命周期详情"""
     try:
-        result = await _lifecycle_svc.determine_stage(
-            db, UUID(store_id.hex), UUID(x_tenant_id)
-        )
+        result = await _lifecycle_svc.determine_stage(db, UUID(store_id.hex), UUID(x_tenant_id))
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
         logger.error("get_store_lifecycle_failed", store_id=str(store_id), error=str(exc))

@@ -59,7 +59,7 @@ async def _get_access_token() -> str:
     data = resp.json()
     if data.get("errcode", 0) != 0:
         logger.error("jssdk_get_token_api_error", errcode=data.get("errcode"), errmsg=data.get("errmsg"))
-        raise HTTPException(status_code=502, detail=f"企微 API 错误: {data.get('errmsg')}")
+        raise HTTPException(status_code=502, detail="企微 access_token 获取失败")
 
     return str(data["access_token"])
 
@@ -84,7 +84,7 @@ async def _get_jsapi_ticket(token: str) -> str:
     data = resp.json()
     if data.get("errcode", 0) != 0:
         logger.error("jssdk_get_ticket_api_error", errcode=data.get("errcode"), errmsg=data.get("errmsg"))
-        raise HTTPException(status_code=502, detail=f"jsapi_ticket 错误: {data.get('errmsg')}")
+        raise HTTPException(status_code=502, detail="jsapi_ticket 获取失败")
 
     return str(data["ticket"])
 
@@ -109,7 +109,7 @@ async def _get_agent_ticket(token: str) -> str:
     data = resp.json()
     if data.get("errcode", 0) != 0:
         logger.error("jssdk_get_agent_ticket_api_error", errcode=data.get("errcode"), errmsg=data.get("errmsg"))
-        raise HTTPException(status_code=502, detail=f"agent_ticket 错误: {data.get('errmsg')}")
+        raise HTTPException(status_code=502, detail="agent_ticket 获取失败")
 
     return str(data["ticket"])
 

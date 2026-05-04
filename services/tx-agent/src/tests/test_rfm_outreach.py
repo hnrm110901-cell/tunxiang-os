@@ -131,15 +131,13 @@ def _fake_usage(cache_read: int = 3000, input_tokens: int = 500) -> dict[str, in
 
 def test_rfm_outreach_registered() -> None:
     assert RfmOutreachAgent in ALL_SKILL_AGENTS, (
-        "RfmOutreachAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 "
-        "ALL_SKILL_AGENTS 列表中注册"
+        "RfmOutreachAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 ALL_SKILL_AGENTS 列表中注册"
     )
 
 
 def test_scope_is_margin_and_experience() -> None:
     assert RfmOutreachAgent.constraint_scope == {"margin", "experience"}, (
-        f"D3a RFM 触达必须声明 margin + experience 双 scope，"
-        f"实际：{RfmOutreachAgent.constraint_scope}"
+        f"D3a RFM 触达必须声明 margin + experience 双 scope，实际：{RfmOutreachAgent.constraint_scope}"
     )
 
 
@@ -163,15 +161,9 @@ def test_system_blocks_meet_cache_threshold() -> None:
     assert isinstance(blocks, list) and len(blocks) >= 1
 
     total_text = "".join(b.get("text", "") for b in blocks)
-    assert len(total_text) >= 4000, (
-        f"系统提示合计 {len(total_text)} 字符，低于 4000 字符门槛（粗估 <1024 tokens）"
-    )
+    assert len(total_text) >= 4000, f"系统提示合计 {len(total_text)} 字符，低于 4000 字符门槛（粗估 <1024 tokens）"
 
-    has_cache = any(
-        isinstance(b, dict)
-        and b.get("cache_control", {}).get("type") == "ephemeral"
-        for b in blocks
-    )
+    has_cache = any(isinstance(b, dict) and b.get("cache_control", {}).get("type") == "ephemeral" for b in blocks)
     assert has_cache, "至少一个 system block 必须带 cache_control={'type':'ephemeral'}"
 
 
@@ -286,9 +278,7 @@ def test_model_router_maps_rfm_outreach_to_haiku_4_5() -> None:
     """ModelSelectionStrategy 必须把 rfm_outreach 路由到 claude-haiku-4-5-20251001。"""
     strategy = ModelSelectionStrategy()
     model = strategy.select_model("rfm_outreach")
-    assert model == "claude-haiku-4-5-20251001", (
-        f"rfm_outreach 应路由到 Haiku 4.5，实际：{model}"
-    )
+    assert model == "claude-haiku-4-5-20251001", f"rfm_outreach 应路由到 Haiku 4.5，实际：{model}"
 
 
 @pytest.mark.asyncio
@@ -315,8 +305,7 @@ async def test_model_router_called_with_haiku_4_5() -> None:
     fake_router.complete_with_cache.assert_awaited_once()
     kwargs = fake_router.complete_with_cache.await_args.kwargs
     assert kwargs["task_type"] == "rfm_outreach", (
-        f"task_type 必须是 'rfm_outreach'（路由到 Haiku 4.5），"
-        f"实际：{kwargs.get('task_type')}"
+        f"task_type 必须是 'rfm_outreach'（路由到 Haiku 4.5），实际：{kwargs.get('task_type')}"
     )
     assert kwargs["tenant_id"] == TENANT_ID
     # 系统提示必须为 list[dict] 且至少一个块含 cache_control
@@ -398,8 +387,7 @@ async def test_decision_log_records_improved_kpi_repurchase_rate() -> None:
     assert roi is not None
     improved_kpi = roi["improved_kpi"]
     assert improved_kpi["metric"] == "repurchase_rate", (
-        f"D3a 触达必须回写 repurchase_rate 为 improved_kpi.metric，"
-        f"实际：{improved_kpi.get('metric')}"
+        f"D3a 触达必须回写 repurchase_rate 为 improved_kpi.metric，实际：{improved_kpi.get('metric')}"
     )
     assert improved_kpi["delta_pct"] > 0
     # 触达不防损，prevented_loss_fen 应为 None
@@ -426,18 +414,16 @@ def test_no_broad_except() -> None:
             continue
         exc_type = node.type
         # bare `except:` 也禁止
-        assert exc_type is not None, (
-            f"bare `except:` 在 rfm_outreach.py:{node.lineno} —— 必须声明具体异常类型"
-        )
+        assert exc_type is not None, f"bare `except:` 在 rfm_outreach.py:{node.lineno} —— 必须声明具体异常类型"
         # `except Exception:` / `except BaseException:` 不允许
         if isinstance(exc_type, ast.Name):
             assert exc_type.id not in ("Exception", "BaseException"), (
-                f"broad `except {exc_type.id}:` 在 rfm_outreach.py:{node.lineno} —— "
-                f"§十四 新代码禁止 except Exception"
+                f"broad `except {exc_type.id}:` 在 rfm_outreach.py:{node.lineno} —— §十四 新代码禁止 except Exception"
             )
         if isinstance(exc_type, ast.Tuple):
             for elt in exc_type.elts:
                 if isinstance(elt, ast.Name):
-                    assert elt.id not in ("Exception", "BaseException"), (
-                        f"broad `except (..., {elt.id}, ...):` 在 rfm_outreach.py:{node.lineno}"
-                    )
+                    assert elt.id not in (
+                        "Exception",
+                        "BaseException",
+                    ), f"broad `except (..., {elt.id}, ...):` 在 rfm_outreach.py:{node.lineno}"

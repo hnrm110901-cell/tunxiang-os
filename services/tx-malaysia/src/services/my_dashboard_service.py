@@ -8,23 +8,19 @@
 
 from __future__ import annotations
 
-import math
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from services.tx_agent.src.config.malaysia_holidays import (
-    get_high_impact_periods,
-    get_holidays_by_year,
-)
 from services.tx_agent.src.config.malaysia_cuisine_profiles import (
     CUISINE_PROFILES,
     get_cuisine_by_state,
-    get_cuisine_profile,
 )
+from services.tx_agent.src.config.malaysia_holidays import (
+    get_holidays_by_year,
+)
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
@@ -92,7 +88,8 @@ class MYDashboardService:
 
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         sst_category,
                         SUM(amount_fen) AS total_amount_fen,
@@ -107,7 +104,8 @@ class MYDashboardService:
                       AND o.is_deleted = FALSE
                     GROUP BY sst_category, TO_CHAR(transaction_date, 'YYYY-MM')
                     ORDER BY month, sst_category
-                """),
+                """
+                ),
                 {
                     "tid": tenant_id,
                     "pstart": period_start,
@@ -223,7 +221,8 @@ class MYDashboardService:
 
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         status,
                         platform,
@@ -236,7 +235,8 @@ class MYDashboardService:
                       AND is_deleted = FALSE
                     GROUP BY status, platform, TO_CHAR(submitted_at, 'YYYY-MM')
                     ORDER BY month, platform, status
-                """),
+                """
+                ),
                 {
                     "tid": tenant_id,
                     "pstart": period_start,
@@ -360,11 +360,13 @@ class MYDashboardService:
         # 获取所有商店的州信息（用于菜系匹配）
         try:
             store_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, region, store_metadata
                     FROM stores
                     WHERE tenant_id = :tid AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             stores = store_rows.mappings().fetchall()
@@ -404,7 +406,11 @@ class MYDashboardService:
             # 计算实际增长
             avg_daily_before = sales_before["total_fen"] / max(sales_before["day_count"], 1)
             avg_daily_during = sales_during["total_fen"] / max(sales_during["day_count"], 1)
-            dine_in_actual = round((avg_daily_during - avg_daily_before) / max(avg_daily_before, 1), 4) if avg_daily_before > 0 else 0.0
+            dine_in_actual = (
+                round((avg_daily_during - avg_daily_before) / max(avg_daily_before, 1), 4)
+                if avg_daily_before > 0
+                else 0.0
+            )
 
             # 最佳菜系（基于配置数据和分类销量）
             category_boost = holiday.get("category_boost", {})
@@ -415,23 +421,25 @@ class MYDashboardService:
 
             expected_boost = holiday.get("dine_in_boost", 0.0)
 
-            results.append({
-                "holiday_name": holiday_name,
-                "date": holiday_date,
-                "duration_days": duration,
-                "impact": holiday.get("impact", "low"),
-                "cuisine_trend": holiday.get("cuisine_trend", ""),
-                "sales_before_fen": sales_before["total_fen"],
-                "sales_during_fen": sales_during["total_fen"],
-                "sales_after_fen": sales_after["total_fen"],
-                "avg_daily_before_fen": int(round(avg_daily_before)),
-                "avg_daily_during_fen": int(round(avg_daily_during)),
-                "dine_in_boost_expected": expected_boost,
-                "dine_in_boost_actual": dine_in_actual,
-                "best_performing_cuisine": best_cuisine,
-                "expected_category_boost": category_boost,
-                "yoy_change_pct": yoy_change,
-            })
+            results.append(
+                {
+                    "holiday_name": holiday_name,
+                    "date": holiday_date,
+                    "duration_days": duration,
+                    "impact": holiday.get("impact", "low"),
+                    "cuisine_trend": holiday.get("cuisine_trend", ""),
+                    "sales_before_fen": sales_before["total_fen"],
+                    "sales_during_fen": sales_during["total_fen"],
+                    "sales_after_fen": sales_after["total_fen"],
+                    "avg_daily_before_fen": int(round(avg_daily_before)),
+                    "avg_daily_during_fen": int(round(avg_daily_during)),
+                    "dine_in_boost_expected": expected_boost,
+                    "dine_in_boost_actual": dine_in_actual,
+                    "best_performing_cuisine": best_cuisine,
+                    "expected_category_boost": category_boost,
+                    "yoy_change_pct": yoy_change,
+                }
+            )
 
         # 按日期排序
         results.sort(key=lambda x: x["date"])
@@ -496,7 +504,8 @@ class MYDashboardService:
 
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         d.cuisine_category AS cuisine,
                         COUNT(*) AS order_count,
@@ -516,7 +525,8 @@ class MYDashboardService:
                       AND d.cuisine_category IS NOT NULL
                     GROUP BY d.cuisine_category
                     ORDER BY total_sales_fen DESC
-                """),
+                """
+                ),
                 {
                     "tid": tenant_id,
                     "pstart": period_start,
@@ -565,7 +575,8 @@ class MYDashboardService:
         for cuisine_key in cuisines:
             try:
                 dish_rows = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             d.name AS dish_name,
                             SUM(oi.amount_fen) AS sales_fen,
@@ -582,7 +593,8 @@ class MYDashboardService:
                         GROUP BY d.name
                         ORDER BY sales_fen DESC
                         LIMIT 5
-                    """),
+                    """
+                    ),
                     {
                         "tid": tenant_id,
                         "pstart": period_start,
@@ -652,7 +664,8 @@ class MYDashboardService:
         try:
             # 活跃补贴
             active_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, program, subsidy_rate, monthly_fee_fen,
                            subsidy_amount_fen, applied_at, expires_at, status
                     FROM tenant_subsidies
@@ -660,7 +673,8 @@ class MYDashboardService:
                       AND status = 'active'
                       AND expires_at >= NOW()
                     ORDER BY applied_at DESC
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             active_subsidies = [
@@ -681,14 +695,16 @@ class MYDashboardService:
 
             # 累计节省 / 账单
             bill_stats = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(subsidy_fen), 0) AS total_saved_fen,
                         COALESCE(SUM(base_fee_fen), 0) AS total_billed_fen,
                         COALESCE(SUM(payable_fen), 0) AS total_payable_fen
                     FROM subsidy_bills
                     WHERE tenant_id = :tid
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             bill_row = bill_stats.fetchone()
@@ -698,7 +714,8 @@ class MYDashboardService:
 
             # 月度节省趋势
             monthly_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         TO_CHAR(period_start, 'YYYY-MM') AS month,
                         SUM(subsidy_fen) AS subsidy_fen,
@@ -708,7 +725,8 @@ class MYDashboardService:
                     GROUP BY TO_CHAR(period_start, 'YYYY-MM')
                     ORDER BY month DESC
                     LIMIT 12
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             monthly_savings = [
@@ -724,7 +742,8 @@ class MYDashboardService:
 
             # 按项目汇总
             program_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         program,
                         COUNT(*) AS cnt,
@@ -733,7 +752,8 @@ class MYDashboardService:
                     WHERE tenant_id = :tid
                     GROUP BY program
                     ORDER BY total_saved_fen DESC
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             program_summary = [
@@ -808,7 +828,8 @@ class MYDashboardService:
 
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         s.id AS store_id,
                         s.name AS store_name,
@@ -825,7 +846,8 @@ class MYDashboardService:
                       AND s.is_deleted = FALSE
                     GROUP BY s.id, s.name, s.country_code, s.currency
                     ORDER BY revenue_fen DESC
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             store_data = rows.mappings().fetchall()
@@ -913,7 +935,8 @@ class MYDashboardService:
         """查询指定日期范围内的销售汇总"""
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(final_amount_fen), 0) AS total_fen,
                         COUNT(*) AS order_count,
@@ -924,7 +947,8 @@ class MYDashboardService:
                       AND order_date <= :dto
                       AND status IN ('completed', 'settled')
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "dfrom": date_from, "dto": date_to},
             )
             r = row.fetchone()
@@ -952,7 +976,8 @@ class MYDashboardService:
             prev_year_end = (h_dt.replace(year=h_dt.year - 1) + timedelta(days=duration - 1)).isoformat()
 
             prev_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(AVG(final_amount_fen), 0) AS avg_revenue
                     FROM orders
                     WHERE tenant_id = :tid
@@ -960,13 +985,15 @@ class MYDashboardService:
                       AND order_date <= :dto
                       AND status IN ('completed', 'settled')
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "dfrom": prev_year_start, "dto": prev_year_end},
             )
             prev_avg = int(prev_row.fetchone().avg_revenue) if prev_row else 0
 
             curr_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(AVG(final_amount_fen), 0) AS avg_revenue
                     FROM orders
                     WHERE tenant_id = :tid
@@ -974,7 +1001,8 @@ class MYDashboardService:
                       AND order_date <= :dto
                       AND status IN ('completed', 'settled')
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "dfrom": holiday_date, "dto": (h_dt + timedelta(days=duration - 1)).isoformat()},
             )
             curr_avg = int(curr_row.fetchone().avg_revenue) if curr_row else 0

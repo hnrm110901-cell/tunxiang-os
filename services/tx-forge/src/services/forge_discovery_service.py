@@ -77,7 +77,8 @@ class ForgeDiscoveryService:
             params["categories"] = matched_categories
 
         apps_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT a.app_id, a.app_name, a.category, a.description,
                        a.pricing_model, a.rating, a.install_count,
                        a.icon_url
@@ -91,14 +92,16 @@ class ForgeDiscoveryService:
                   )
                 ORDER BY a.install_count DESC
                 LIMIT 20
-            """),
+            """
+            ),
             params,
         )
         apps = [dict(r) for r in apps_result.mappings().all()]
 
         # 3. 搜索匹配的 Agent 组合
         combos_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT combo_id, combo_name, description, use_case,
                        target_role, synergy_score
                 FROM forge_app_combos
@@ -110,7 +113,8 @@ class ForgeDiscoveryService:
                   )
                 ORDER BY synergy_score DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"query": f"%{query}%"},
         )
         combos = [dict(r) for r in combos_result.mappings().all()]
@@ -118,12 +122,14 @@ class ForgeDiscoveryService:
         # 4. 记录搜索意图
         search_id = f"si_{uuid4().hex[:12]}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_search_intents
                     (search_id, query, matched_categories, result_count)
                 VALUES
                     (:search_id, :query, :categories::jsonb, :result_count)
-            """),
+            """
+            ),
             {
                 "search_id": search_id,
                 "query": query,
@@ -160,13 +166,15 @@ class ForgeDiscoveryService:
     ) -> dict:
         """记录用户在搜索结果中点击了哪个应用。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_search_intents
                 SET clicked_app_id = :clicked_app_id,
                     clicked_at = NOW()
                 WHERE search_id = :search_id
                 RETURNING search_id, query, clicked_app_id, clicked_at
-            """),
+            """
+            ),
             {"search_id": search_id, "clicked_app_id": clicked_app_id},
         )
         row = result.mappings().first()
@@ -188,7 +196,8 @@ class ForgeDiscoveryService:
 
         # 总量 + CTR
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                            AS total_searches,
                     COUNT(clicked_app_id)                               AS total_clicks,
@@ -197,28 +206,32 @@ class ForgeDiscoveryService:
                     )                                                   AS ctr_pct
                 FROM forge_search_intents
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
-            """),
+            """
+            ),
             params,
         )
         summary = dict(summary_result.mappings().one())
 
         # 热门查询 Top 10
         top_queries_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT query, COUNT(*) AS search_count
                 FROM forge_search_intents
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
                 GROUP BY query
                 ORDER BY search_count DESC
                 LIMIT 10
-            """),
+            """
+            ),
             params,
         )
         top_queries = [dict(r) for r in top_queries_result.mappings().all()]
 
         # 热门点击 App Top 10
         top_clicks_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT clicked_app_id, COUNT(*) AS click_count
                 FROM forge_search_intents
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
@@ -226,14 +239,16 @@ class ForgeDiscoveryService:
                 GROUP BY clicked_app_id
                 ORDER BY click_count DESC
                 LIMIT 10
-            """),
+            """
+            ),
             params,
         )
         top_clicked_apps = [dict(r) for r in top_clicks_result.mappings().all()]
 
         # 零结果查询
         zero_result_queries = await db.execute(
-            text("""
+            text(
+                """
                 SELECT query, COUNT(*) AS search_count
                 FROM forge_search_intents
                 WHERE created_at >= NOW() - MAKE_INTERVAL(days => :days)
@@ -241,7 +256,8 @@ class ForgeDiscoveryService:
                 GROUP BY query
                 ORDER BY search_count DESC
                 LIMIT 10
-            """),
+            """
+            ),
             params,
         )
         zero_results = [dict(r) for r in zero_result_queries.mappings().all()]
@@ -276,10 +292,12 @@ class ForgeDiscoveryService:
 
         # 验证所有 app_id 存在
         check_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id FROM forge_apps
                 WHERE app_id = ANY(:app_ids) AND is_deleted = false
-            """),
+            """
+            ),
             {"app_ids": app_ids},
         )
         found_ids = {r["app_id"] for r in check_result.mappings().all()}
@@ -293,7 +311,8 @@ class ForgeDiscoveryService:
         combo_id = f"combo_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_app_combos
                     (combo_id, combo_name, description, app_ids,
                      use_case, target_role, synergy_score, evidence)
@@ -303,7 +322,8 @@ class ForgeDiscoveryService:
                 RETURNING combo_id, combo_name, description, app_ids,
                           use_case, target_role, synergy_score,
                           is_active, created_at
-            """),
+            """
+            ),
             {
                 "combo_id": combo_id,
                 "combo_name": combo_name,
@@ -357,14 +377,16 @@ class ForgeDiscoveryService:
 
         # 数据
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT c.combo_id, c.combo_name, c.description, c.app_ids,
                        c.use_case, c.target_role, c.synergy_score, c.created_at
                 FROM forge_app_combos c
                 {where}
                 ORDER BY c.synergy_score DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         combos = [dict(r) for r in result.mappings().all()]
@@ -380,11 +402,13 @@ class ForgeDiscoveryService:
         app_map: dict[str, dict] = {}
         if all_app_ids:
             apps_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT app_id, app_name, category, icon_url, rating
                     FROM forge_apps
                     WHERE app_id = ANY(:app_ids) AND is_deleted = false
-                """),
+                """
+                ),
                 {"app_ids": list(set(all_app_ids))},
             )
             for app_row in apps_result.mappings().all():
@@ -407,13 +431,15 @@ class ForgeDiscoveryService:
     ) -> dict:
         """获取单个组合的完整信息（含应用详情）。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT combo_id, combo_name, description, app_ids,
                        use_case, target_role, synergy_score,
                        evidence, is_active, created_at
                 FROM forge_app_combos
                 WHERE combo_id = :combo_id
-            """),
+            """
+            ),
             {"combo_id": combo_id},
         )
         row = result.mappings().first()
@@ -428,12 +454,14 @@ class ForgeDiscoveryService:
         # 查关联应用
         if app_ids:
             apps_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT app_id, app_name, category, description,
                            pricing_model, rating, install_count, icon_url
                     FROM forge_apps
                     WHERE app_id = ANY(:app_ids) AND is_deleted = false
-                """),
+                """
+                ),
                 {"app_ids": app_ids},
             )
             combo["apps"] = [dict(r) for r in apps_result.mappings().all()]
@@ -451,14 +479,16 @@ class ForgeDiscoveryService:
         """基于角色推荐 Agent 组合 + 热门单应用。"""
         # 角色组合
         combos_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT combo_id, combo_name, description, app_ids,
                        use_case, synergy_score
                 FROM forge_app_combos
                 WHERE target_role = :role AND is_active = true
                 ORDER BY synergy_score DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"role": role},
         )
         combos = [dict(r) for r in combos_result.mappings().all()]
@@ -478,7 +508,8 @@ class ForgeDiscoveryService:
         top_apps: list[dict] = []
         if categories:
             apps_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT app_id, app_name, category, description,
                            pricing_model, rating, install_count, icon_url
                     FROM forge_apps
@@ -487,7 +518,8 @@ class ForgeDiscoveryService:
                       AND status = 'published'
                     ORDER BY install_count DESC
                     LIMIT 10
-                """),
+                """
+                ),
                 {"categories": categories},
             )
             top_apps = [dict(r) for r in apps_result.mappings().all()]

@@ -158,7 +158,8 @@ async def analyze_waste(
     # MVP: 从 waste_events 表直接查询
     by_type: dict[str, dict[str, Any]] = {}
     try:
-        type_query = text("""
+        type_query = text(
+            """
             SELECT
                 event_type,
                 COUNT(*) AS event_count,
@@ -171,7 +172,8 @@ async def analyze_waste(
               AND CAST(occurred_at AS DATE) <= CAST(:date_to AS DATE)
             GROUP BY event_type
             ORDER BY total_qty DESC
-        """)
+        """
+        )
         type_result = await db.execute(
             type_query,
             {

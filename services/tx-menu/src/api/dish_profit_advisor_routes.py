@@ -45,19 +45,24 @@ router = APIRouter(
 
 class ApplySuggestionsRequest(BaseModel):
     """批量应用定价建议"""
+
     suggestion_ids: list[str] = Field(
-        ..., min_length=1, max_length=100,
+        ...,
+        min_length=1,
+        max_length=100,
         description="要应用的建议ID列表",
     )
 
 
 class GenerateSuggestionsRequest(BaseModel):
     """手动生成定价建议"""
+
     period_days: int = Field(default=14, ge=7, le=90, description="分析周期天数")
 
 
 class TriggerWeeklyReportRequest(BaseModel):
     """手动触发周报"""
+
     store_name: Optional[str] = Field(default=None, description="门店名称，不传则自动查询")
 
 
@@ -87,8 +92,12 @@ async def list_pricing_suggestions(
     try:
         offset = (page - 1) * size
         result = await get_suggestions(
-            db, x_tenant_id, store_id,
-            status_filter=status, limit=size, offset=offset,
+            db,
+            x_tenant_id,
+            store_id,
+            status_filter=status,
+            limit=size,
+            offset=offset,
         )
         return {
             "ok": True,
@@ -120,7 +129,10 @@ async def generate_suggestions(
 
     try:
         suggestions = await generate_pricing_suggestions(
-            db, x_tenant_id, store_id, period_days=body.period_days,
+            db,
+            x_tenant_id,
+            store_id,
+            period_days=body.period_days,
         )
         return {
             "ok": True,
@@ -160,7 +172,10 @@ async def apply_pricing_suggestions(
 
     try:
         result = await apply_suggestions(
-            db, x_tenant_id, store_id, body.suggestion_ids,
+            db,
+            x_tenant_id,
+            store_id,
+            body.suggestion_ids,
         )
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
@@ -262,14 +277,22 @@ async def get_dish_co_occurrence(
     try:
         if refresh:
             result = await compute_dish_co_occurrence(
-                db, x_tenant_id, store_id, d_from, d_to,
+                db,
+                x_tenant_id,
+                store_id,
+                d_from,
+                d_to,
             )
             return {"ok": True, "data": result}
 
         # 从已有数据查询
         pairs = await get_co_occurrence(
-            db, x_tenant_id, store_id,
-            dish_id=dish_id, min_score=min_score, limit=limit,
+            db,
+            x_tenant_id,
+            store_id,
+            dish_id=dish_id,
+            min_score=min_score,
+            limit=limit,
         )
         return {
             "ok": True,
@@ -329,15 +352,18 @@ async def trigger_weekly_report(
     if not store_name:
         # 自动查询门店名称
         from sqlalchemy import text
+
         from ..services.dish_pricing_advisor_service import _set_rls
 
         await _set_rls(db, x_tenant_id)
         name_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT store_name FROM stores
                 WHERE id = :store_id::uuid AND tenant_id = :tenant_id::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": x_tenant_id},
         )
         row = name_result.scalar_one_or_none()
@@ -346,7 +372,10 @@ async def trigger_weekly_report(
     try:
         worker = DishProfitWeeklyWorker()
         report_md = await worker.generate_weekly_report(
-            db, x_tenant_id, store_id, store_name,
+            db,
+            x_tenant_id,
+            store_id,
+            store_name,
         )
 
         if not report_md:

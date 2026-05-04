@@ -581,7 +581,8 @@ class PrivateOpsAgent(SkillAgent):
             from sqlalchemy import text
 
             row = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(DISTINCT o.id) as order_count,
                     EXTRACT(DAY FROM NOW() - MAX(o.completed_at)) as days_since_last,
@@ -592,7 +593,8 @@ class PrivateOpsAgent(SkillAgent):
                   AND o.customer_id = :customer_id
                   AND o.status = 'completed'
                 GROUP BY c.birth_date
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "customer_id": customer_id},
             )
             r = dict(row.mappings().first() or {})

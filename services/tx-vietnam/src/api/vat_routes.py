@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-
 from tx_vietnam.src.services.vat_service import (
     VATCategory,
     VATError,
@@ -67,8 +66,7 @@ async def calculate_vat(body: dict[str, Any]) -> dict:
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid VAT category: {category_str}. Must be one of: "
-                   f"{[c.value for c in VATCategory]}",
+            detail=f"Invalid VAT category: {category_str}. Must be one of: {[c.value for c in VATCategory]}",
         ) from exc
 
     try:

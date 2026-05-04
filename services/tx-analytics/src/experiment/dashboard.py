@@ -154,9 +154,7 @@ class ExperimentDashboard:
                 )
                 continue
 
-            control_mean = (
-                sum(control_samples) / len(control_samples) if control_samples else 0.0
-            )
+            control_mean = sum(control_samples) / len(control_samples) if control_samples else 0.0
             summary.cells.append(
                 VariantMetricCell(
                     variant=self._control_name,
@@ -186,11 +184,7 @@ class ExperimentDashboard:
                     )
                     continue
 
-                variant_mean = (
-                    sum(variant_samples) / len(variant_samples)
-                    if variant_samples
-                    else 0.0
-                )
+                variant_mean = sum(variant_samples) / len(variant_samples) if variant_samples else 0.0
                 summary.cells.append(
                     VariantMetricCell(
                         variant=variant_name,
@@ -201,11 +195,7 @@ class ExperimentDashboard:
                 )
 
                 welch = welch_t_test(control_samples, variant_samples)
-                lift_pct = (
-                    ((variant_mean - control_mean) / control_mean) * 100.0
-                    if control_mean
-                    else 0.0
-                )
+                lift_pct = ((variant_mean - control_mean) / control_mean) * 100.0 if control_mean else 0.0
                 summary.pairs.append(
                     PairwiseResult(
                         metric_key=metric_key,

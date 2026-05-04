@@ -99,7 +99,8 @@ class LiveStreamingService:
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO live_events (
                     id, tenant_id, store_id, platform, title,
                     description, cover_image_url, host_employee_id,
@@ -111,7 +112,8 @@ class LiveStreamingService:
                     'scheduled', :scheduled_at,
                     :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -155,7 +157,8 @@ class LiveStreamingService:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_events
                 SET status = 'live',
                     started_at = :now,
@@ -165,7 +168,8 @@ class LiveStreamingService:
                   AND status = 'scheduled'
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -212,7 +216,8 @@ class LiveStreamingService:
 
         # 先汇总该直播的优惠券统计
         coupon_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(COUNT(*) FILTER (WHERE status IN ('claimed', 'redeemed')), 0) AS total_distributed,
                     COALESCE(COUNT(*) FILTER (WHERE status = 'redeemed'), 0) AS total_redeemed,
@@ -221,7 +226,8 @@ class LiveStreamingService:
                 WHERE live_event_id = :event_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -234,7 +240,8 @@ class LiveStreamingService:
         total_revenue_fen = coupon_row.total_revenue_fen if coupon_row else 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_events
                 SET status = 'ended',
                     ended_at = :now,
@@ -247,7 +254,8 @@ class LiveStreamingService:
                   AND status = 'live'
                   AND is_deleted = false
                 RETURNING id, viewer_count, peak_viewer_count, like_count, comment_count
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -395,7 +403,8 @@ class LiveStreamingService:
             活动完整信息字典
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id, tenant_id, store_id, platform, live_room_id,
                     title, description, cover_image_url, host_employee_id,
@@ -408,7 +417,8 @@ class LiveStreamingService:
                 WHERE id = :event_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),
@@ -501,7 +511,8 @@ class LiveStreamingService:
         params["offset"] = offset
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id, store_id, platform, title, status,
                     scheduled_at, started_at, ended_at,
@@ -511,7 +522,8 @@ class LiveStreamingService:
                 WHERE {where_sql}
                 ORDER BY scheduled_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -559,7 +571,8 @@ class LiveStreamingService:
 
         # 总体统计
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                        AS total_events,
                     COALESCE(SUM(viewer_count), 0)                  AS total_viewers,
@@ -571,7 +584,8 @@ class LiveStreamingService:
                   AND is_deleted = false
                   AND status IN ('live', 'ended')
                   AND scheduled_at >= :since
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "since": since},
         )
         row = result.fetchone()
@@ -582,7 +596,8 @@ class LiveStreamingService:
 
         # 分平台统计
         platform_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     platform,
                     COUNT(*)                                    AS event_count,
@@ -595,7 +610,8 @@ class LiveStreamingService:
                   AND scheduled_at >= :since
                 GROUP BY platform
                 ORDER BY revenue_fen DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "since": since},
         )
         platform_rows = platform_result.fetchall()
@@ -639,7 +655,8 @@ class LiveStreamingService:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE live_events
                 SET status = 'cancelled',
                     updated_at = :now
@@ -648,7 +665,8 @@ class LiveStreamingService:
                   AND status = 'scheduled'
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "event_id": str(event_id),
                 "tenant_id": str(tenant_id),

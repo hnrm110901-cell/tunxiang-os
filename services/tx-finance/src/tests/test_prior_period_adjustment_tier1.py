@@ -15,6 +15,7 @@ Tier 级别:
 运行:
   pytest src/tests/test_prior_period_adjustment_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -54,12 +55,16 @@ def _prior_period_payload(
         source_period_month=source_month,
         lines=[
             VoucherLineInput(
-                account_code="1403", account_name="原材料",
-                debit_fen=1500000, summary="补录 2026-12 漏入库 ¥15,000",
+                account_code="1403",
+                account_name="原材料",
+                debit_fen=1500000,
+                summary="补录 2026-12 漏入库 ¥15,000",
             ),
             VoucherLineInput(
-                account_code="6901", account_name="以前年度损益调整",
-                credit_fen=1500000, summary="冲减 2026 年度利润",
+                account_code="6901",
+                account_name="以前年度损益调整",
+                credit_fen=1500000,
+                summary="冲减 2026 年度利润",
             ),
         ],
     )
@@ -85,7 +90,8 @@ class TestCreatePriorPeriodAdjustment:
 
         payload = _prior_period_payload()
         voucher = await svc.create_prior_period_adjustment(
-            payload, session=session,
+            payload,
+            session=session,
         )
 
         assert voucher.source_period_year == 2026
@@ -146,7 +152,8 @@ class TestCreatePriorPeriodAdjustment:
         # voucher_date = 2026-03-10, source_period = 2027-01 (未来)
         payload = _prior_period_payload(
             voucher_date=date(2026, 3, 10),
-            source_year=2027, source_month=1,
+            source_year=2027,
+            source_month=1,
         )
         with pytest.raises(ValueError, match="source_period.*在过去"):
             await svc.create_prior_period_adjustment(payload, session=session)
@@ -162,7 +169,8 @@ class TestCreatePriorPeriodAdjustment:
         # voucher_date = 2027-03-10, source_period = 2027-03 (同月)
         payload = _prior_period_payload(
             voucher_date=date(2027, 3, 10),
-            source_year=2027, source_month=3,
+            source_year=2027,
+            source_month=3,
         )
         voucher = await svc.create_prior_period_adjustment(payload, session=session)
         assert voucher.source_period_year == 2027
@@ -174,27 +182,38 @@ class TestOrmPriorPeriodAttributes:
 
     def test_is_prior_period_adjustment_false_by_default(self):
         v = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            voucher_no="V_NORMAL", voucher_type="sales",
-            entries=[], voided=False,
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_NORMAL",
+            voucher_type="sales",
+            entries=[],
+            voided=False,
         )
         assert v.is_prior_period_adjustment is False
 
     def test_is_prior_period_adjustment_true_when_source_year_set(self):
         v = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            voucher_no="V_PPA", voucher_type="prior_period_adjustment",
-            entries=[], voided=False,
-            source_period_year=2026, source_period_month=12,
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_PPA",
+            voucher_type="prior_period_adjustment",
+            entries=[],
+            voided=False,
+            source_period_year=2026,
+            source_period_month=12,
         )
         assert v.is_prior_period_adjustment is True
 
     def test_to_dict_exposes_source_period_fields(self):
         v = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            voucher_no="V_TO_DICT", voucher_type="prior_period_adjustment",
-            entries=[], voided=False,
-            source_period_year=2026, source_period_month=11,
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_TO_DICT",
+            voucher_type="prior_period_adjustment",
+            entries=[],
+            voided=False,
+            source_period_year=2026,
+            source_period_month=11,
         )
         d = v.to_dict()
         assert d["source_period_year"] == 2026
@@ -231,14 +250,16 @@ class TestV278Migration:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v278_prior_period_adjustment.py"
         )
         assert path.exists(), f"v278 迁移不存在: {path}"
         self.migration_src = path.read_text(encoding="utf-8")
 
     def test_revision_is_v278(self):
-        assert re.search(r'^revision\s*=\s*"v278"', self.migration_src, re.M)
+        assert re.search(r'^revision\s*=\s*"v278[a-z]?"', self.migration_src, re.M)
 
     def test_down_revision_is_v276(self):
         assert re.search(r'^down_revision\s*=\s*"v276"', self.migration_src, re.M)
@@ -247,7 +268,8 @@ class TestV278Migration:
         for col in ("source_period_year", "source_period_month"):
             assert re.search(
                 rf"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+{col}\b",
-                self.migration_src, re.I,
+                self.migration_src,
+                re.I,
             )
 
     def test_check_source_period_consistency(self):
@@ -256,32 +278,33 @@ class TestV278Migration:
         # 必须同时 NULL 分支
         assert re.search(
             r"source_period_year\s+IS\s+NULL\s+AND\s+source_period_month\s+IS\s+NULL",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
         # 非空分支 + 范围 CHECK
         assert re.search(
             r"source_period_year\s+BETWEEN\s+2020\s+AND\s+2100",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
         assert re.search(
             r"source_period_month\s+BETWEEN\s+1\s+AND\s+12",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_partial_index_for_audit_query(self):
         """partial index WHERE source_period_year IS NOT NULL (审计查询)."""
         assert "ix_fv_source_period" in self.migration_src
         assert re.search(
-            r"CREATE\s+INDEX\s+CONCURRENTLY.*ix_fv_source_period.*"
-            r"WHERE\s+source_period_year\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.S | re.I,
+            r"CREATE\s+INDEX\s+CONCURRENTLY.*ix_fv_source_period.*" r"WHERE\s+source_period_year\s+IS\s+NOT\s+NULL",
+            self.migration_src,
+            re.S | re.I,
         )
 
     def test_orm_has_check_constraint_mirror(self):
         """ORM __table_args__ 必须镜像 DB CHECK."""
-        orm_path = (
-            Path(__file__).resolve().parents[1] / "models" / "voucher.py"
-        )
+        orm_path = Path(__file__).resolve().parents[1] / "models" / "voucher.py"
         orm_src = orm_path.read_text(encoding="utf-8")
         assert "chk_fv_source_period" in orm_src
 

@@ -110,7 +110,8 @@ async def import_bill(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO platform_bills (
                     tenant_id, store_id, platform, bill_period, bill_type,
                     total_orders, gross_amount_fen, commission_fen,
@@ -135,7 +136,8 @@ async def import_bill(
                     status = 'imported',
                     updated_at = NOW()
                 RETURNING id, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "store_id": str(sid),
@@ -218,7 +220,8 @@ async def list_bills(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, platform, bill_period, bill_type,
                        total_orders, gross_amount_fen, commission_fen,
                        subsidy_fen, other_deductions_fen, actual_receive_fen,
@@ -227,7 +230,8 @@ async def list_bills(
                 WHERE {where_sql}
                 ORDER BY bill_period DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(row) for row in items_result.mappings().all()]
@@ -261,14 +265,16 @@ async def get_bill(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, platform, bill_period, bill_type,
                        total_orders, gross_amount_fen, commission_fen,
                        subsidy_fen, other_deductions_fen, actual_receive_fen,
                        bill_file_url, raw_data, status, created_at, updated_at
                 FROM platform_bills
                 WHERE id = :bill_id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"bill_id": str(bid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -440,7 +446,8 @@ async def list_discrepancies(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, platform, bill_id,
                        platform_order_id, internal_order_id,
                        platform_amount_fen, system_amount_fen, diff_fen,
@@ -450,7 +457,8 @@ async def list_discrepancies(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(row) for row in items_result.mappings().all()]
@@ -484,7 +492,8 @@ async def resolve_discrepancy(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE settlement_discrepancies
                 SET status = 'resolved',
                     resolved_at = NOW(),
@@ -493,7 +502,8 @@ async def resolve_discrepancy(
                   AND tenant_id = :tenant_id::UUID
                   AND status = 'open'
                 RETURNING id, status, resolved_at
-            """),
+            """
+            ),
             {
                 "discrepancy_id": str(did),
                 "tenant_id": str(tid),

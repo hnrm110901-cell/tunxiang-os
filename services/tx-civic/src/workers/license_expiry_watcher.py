@@ -123,7 +123,8 @@ class LicenseExpiryWatcher:
         warn_date = today + timedelta(days=LICENSE_WARN_DAYS)
 
         # 标记即将到期（valid -> expiring_soon）
-        mark_expiring_sql = text("""
+        mark_expiring_sql = text(
+            """
             UPDATE civic_licenses
             SET status = 'expiring_soon', updated_at = NOW()
             WHERE is_deleted = FALSE
@@ -132,10 +133,12 @@ class LicenseExpiryWatcher:
               AND expiry_date > :today
               AND expiry_date <= :warn_date
             RETURNING id, tenant_id, store_id, license_type, license_name, expiry_date
-        """)
+        """
+        )
 
         # 标记已过期（valid/expiring_soon -> expired）
-        mark_expired_sql = text("""
+        mark_expired_sql = text(
+            """
             UPDATE civic_licenses
             SET status = 'expired', updated_at = NOW()
             WHERE is_deleted = FALSE
@@ -143,7 +146,8 @@ class LicenseExpiryWatcher:
               AND expiry_date IS NOT NULL
               AND expiry_date <= :today
             RETURNING id, tenant_id, store_id, license_type, license_name, expiry_date
-        """)
+        """
+        )
 
         try:
             expiring_result = await db.execute(mark_expiring_sql, {"today": today, "warn_date": warn_date})
@@ -202,7 +206,8 @@ class LicenseExpiryWatcher:
         today = date.today()
         warn_date = today + timedelta(days=HEALTH_CERT_WARN_DAYS)
 
-        mark_expiring_sql = text("""
+        mark_expiring_sql = text(
+            """
             UPDATE civic_health_certs
             SET status = 'expiring_soon', updated_at = NOW()
             WHERE is_deleted = FALSE
@@ -211,9 +216,11 @@ class LicenseExpiryWatcher:
               AND expiry_date > :today
               AND expiry_date <= :warn_date
             RETURNING id, tenant_id, store_id, employee_id, employee_name, expiry_date
-        """)
+        """
+        )
 
-        mark_expired_sql = text("""
+        mark_expired_sql = text(
+            """
             UPDATE civic_health_certs
             SET status = 'expired', updated_at = NOW()
             WHERE is_deleted = FALSE
@@ -221,7 +228,8 @@ class LicenseExpiryWatcher:
               AND expiry_date IS NOT NULL
               AND expiry_date <= :today
             RETURNING id, tenant_id, store_id, employee_id, employee_name, expiry_date
-        """)
+        """
+        )
 
         try:
             expiring_result = await db.execute(mark_expiring_sql, {"today": today, "warn_date": warn_date})

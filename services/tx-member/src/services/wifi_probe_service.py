@@ -74,7 +74,8 @@ class WiFiProbeService:
 
         # 查找30分钟内同MAC的活跃会话
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, first_seen_at, last_seen_at
                 FROM wifi_visit_logs
                 WHERE tenant_id = :tid AND store_id = :sid
@@ -82,7 +83,8 @@ class WiFiProbeService:
                   AND last_seen_at >= :threshold
                 ORDER BY last_seen_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,
@@ -98,14 +100,16 @@ class WiFiProbeService:
             first_seen = existing["first_seen_at"]
             duration = int((now - first_seen).total_seconds())
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE wifi_visit_logs
                     SET last_seen_at = :now,
                         visit_duration_sec = :dur,
                         signal_strength = COALESCE(:sig, signal_strength),
                         updated_at = NOW()
                     WHERE id = :vid
-                """),
+                """
+                ),
                 {"now": now, "dur": duration, "sig": signal_strength, "vid": visit_id},
             )
             await db.commit()
@@ -120,25 +124,29 @@ class WiFiProbeService:
 
         # 判断是否新访客（该MAC在此门店从未出现过）
         prev = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM wifi_visit_logs
                 WHERE tenant_id = :tid AND store_id = :sid
                   AND mac_hash = :mh AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": store_id, "mh": mac_hash},
         )
         is_new = prev.first() is None
 
         # 插入新会话
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO wifi_visit_logs
                     (tenant_id, store_id, mac_hash, device_vendor,
                      first_seen_at, last_seen_at, signal_strength, is_new_visitor)
                 VALUES (:tid, :sid, :mh, :vendor, :now, :now, :sig, :is_new)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": store_id,
@@ -180,7 +188,8 @@ class WiFiProbeService:
             params["dto"] = date_to
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT EXTRACT(HOUR FROM first_seen_at)::int AS hour,
                        COUNT(*)::int AS visit_count,
                        COUNT(DISTINCT mac_hash)::int AS unique_visitors,
@@ -191,7 +200,8 @@ class WiFiProbeService:
                   {where_extra}
                 GROUP BY hour
                 ORDER BY hour
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -205,7 +215,8 @@ class WiFiProbeService:
     ) -> dict[str, Any]:
         """门店访问概览统计"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)::int AS total_visits,
                     COUNT(DISTINCT mac_hash)::int AS unique_macs,
@@ -218,7 +229,8 @@ class WiFiProbeService:
                 FROM wifi_visit_logs
                 WHERE tenant_id = :tid AND store_id = :sid
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
         row = result.mappings().first()

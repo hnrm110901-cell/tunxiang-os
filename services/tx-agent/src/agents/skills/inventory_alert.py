@@ -158,7 +158,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
             # 查询过去30天的消耗记录（从库存变动日志或order_items中推算）
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT DATE(oi.created_at) as date,
                        SUM(oi.quantity * COALESCE(bi.quantity_per_dish, 1)) as daily_consumption
                 FROM order_items oi
@@ -170,7 +171,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                   AND o.status = 'completed'
                 GROUP BY DATE(oi.created_at)
                 ORDER BY date DESC
-            """),
+            """
+                ),
                 {"ingredient_id": ingredient_id, "tenant_id": self.tenant_id, "store_id": store_id},
             )
 
@@ -313,7 +315,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             from sqlalchemy import text
 
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT i.id, i.name, i.unit,
                        COALESCE(il.quantity, 0) as current_qty,
                        COALESCE(i.safety_stock_qty, 0) as safety_stock,
@@ -326,7 +329,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                   AND COALESCE(il.quantity, 0) < COALESCE(i.safety_stock_qty, 1)
                 ORDER BY (COALESCE(i.safety_stock_qty, 1) - COALESCE(il.quantity, 0)) DESC
                 LIMIT 15
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id},
             )
 
@@ -516,7 +520,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
 
             # 查询库存不足和临期食材
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT i.id, i.name, i.unit,
                        COALESCE(il.quantity, 0) as current_qty,
                        i.safety_stock_qty,
@@ -528,7 +533,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
                   AND i.is_deleted = false
                 ORDER BY current_qty ASC
                 LIMIT 50
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id},
             )
 
@@ -966,7 +972,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
             )
 
         rows = await self._db.execute(
-            text("""
+            text(
+                """
             SELECT
                 ingredient_id, ingredient_name,
                 theoretical_g, actual_g,
@@ -979,7 +986,8 @@ class InventoryAlertAgent(EdgeAwareMixin, SkillAgent):
               AND stat_date = :stat_date
             ORDER BY loss_cost_fen DESC
             LIMIT 50
-        """),
+        """
+            ),
             {
                 "tenant_id": self.tenant_id,
                 "store_id": store_id,

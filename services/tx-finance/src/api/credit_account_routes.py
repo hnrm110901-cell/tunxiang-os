@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import CreditEventType
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -42,7 +43,7 @@ def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
         return uuid.UUID(val)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"无效的 {field_name}: {val}") from exc
+        raise safe_http_exception(400, f"{field_name} 格式错误", exc) from exc
 
 
 def _serialize_row(row: dict) -> dict:
@@ -126,7 +127,8 @@ async def create_agreement(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_credit_agreements (
                     tenant_id, brand_id, company_name, company_tax_no,
                     credit_limit_fen, used_amount_fen,
@@ -139,7 +141,8 @@ async def create_agreement(
                     :created_by::UUID, :remark
                 )
                 RETURNING id, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "brand_id": str(body.brand_id),
@@ -246,7 +249,8 @@ async def list_agreements(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, brand_id, company_name, company_tax_no,
                        credit_limit_fen, used_amount_fen,
                        (credit_limit_fen - used_amount_fen) AS available_fen,
@@ -256,7 +260,8 @@ async def list_agreements(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -286,7 +291,8 @@ async def get_agreement(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, brand_id, company_name, company_tax_no,
                        credit_limit_fen, used_amount_fen,
                        (credit_limit_fen - used_amount_fen) AS available_fen,
@@ -296,7 +302,8 @@ async def get_agreement(
                        created_at, updated_at
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(aid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -305,7 +312,7 @@ async def get_agreement(
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
 
     if row is None:
-        raise HTTPException(status_code=404, detail=f"协议不存在: {agreement_id}")
+        raise HTTPException(status_code=404, detail="协议不存在")
 
     return {"ok": True, "data": _serialize_row(dict(row)), "error": None}
 
@@ -331,11 +338,13 @@ async def charge_credit(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, company_name, credit_limit_fen, used_amount_fen, status
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(aid), "tenant_id": str(tid)},
         )
         agreement = fetch.mappings().first()
@@ -344,12 +353,12 @@ async def charge_credit(
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
 
     if agreement is None:
-        raise HTTPException(status_code=404, detail=f"协议不存在: {agreement_id}")
+        raise HTTPException(status_code=404, detail="协议不存在")
 
     if agreement["status"] != "active":
         raise HTTPException(
             status_code=409,
-            detail=f"协议状态 {agreement['status']} 不允许挂账消费",
+            detail="协议状态不允许挂账消费",
         )
 
     available = agreement["credit_limit_fen"] - agreement["used_amount_fen"]
@@ -364,18 +373,21 @@ async def charge_credit(
     try:
         # 更新已用额度
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_agreements
                 SET used_amount_fen = :new_used,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"new_used": new_used, "id": str(aid), "tenant_id": str(tid)},
         )
 
         # 写消费记录
         charge_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_credit_charges (
                     tenant_id, agreement_id, order_id, store_id,
                     charged_amount_fen, charged_at, operator_id, remark
@@ -384,7 +396,8 @@ async def charge_credit(
                     :charged_amount_fen, NOW(), :operator_id::UUID, :remark
                 )
                 RETURNING id, charged_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),
@@ -484,7 +497,8 @@ async def suspend_agreement(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_agreements
                 SET status = 'suspended',
                     remark = COALESCE(:remark, remark),
@@ -492,7 +506,8 @@ async def suspend_agreement(
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                   AND status = 'active'
                 RETURNING id, status, updated_at
-            """),
+            """
+            ),
             {
                 "remark": body.remark,
                 "id": str(aid),
@@ -569,7 +584,8 @@ async def list_bills(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, bill_no, period_start, period_end,
                        total_amount_fen, paid_amount_fen,
                        (total_amount_fen - paid_amount_fen) AS unpaid_fen,
@@ -578,7 +594,8 @@ async def list_bills(
                 WHERE {where_sql}
                 ORDER BY period_start DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -611,13 +628,15 @@ async def pay_bill(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT b.id, b.agreement_id, b.total_amount_fen, b.paid_amount_fen, b.status,
                        a.used_amount_fen, a.credit_limit_fen
                 FROM biz_credit_bills b
                 JOIN biz_credit_agreements a ON a.id = b.agreement_id
                 WHERE b.id = :id::UUID AND b.tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(bid), "tenant_id": str(tid)},
         )
         bill = fetch.mappings().first()
@@ -626,7 +645,7 @@ async def pay_bill(
         raise HTTPException(status_code=500, detail="查询账单失败") from exc
 
     if bill is None:
-        raise HTTPException(status_code=404, detail=f"账单不存在: {bill_id}")
+        raise HTTPException(status_code=404, detail="账单不存在")
 
     if bill["status"] == "paid":
         raise HTTPException(status_code=409, detail="账单已还清，无需重复还款")
@@ -635,7 +654,7 @@ async def pay_bill(
     if body.pay_amount_fen > unpaid:
         raise HTTPException(
             status_code=400,
-            detail=f"还款金额 {body.pay_amount_fen} 超过未还金额 {unpaid}（分）",
+            detail="还款金额超过未还金额",
         )
 
     new_paid = bill["paid_amount_fen"] + body.pay_amount_fen
@@ -645,14 +664,16 @@ async def pay_bill(
     try:
         # 更新账单
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_bills
                 SET paid_amount_fen = :new_paid,
                     status = :new_status,
                     paid_at = CASE WHEN :new_status = 'paid' THEN NOW() ELSE paid_at END,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {
                 "new_paid": new_paid,
                 "new_status": new_bill_status,
@@ -663,12 +684,14 @@ async def pay_bill(
 
         # 还款后减少协议已用额度
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_credit_agreements
                 SET used_amount_fen = :new_used,
                     updated_at = NOW()
                 WHERE id = :agreement_id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {
                 "new_used": new_used,
                 "agreement_id": str(bill["agreement_id"]),
@@ -748,26 +771,30 @@ async def get_statement(
     try:
         # 协议信息
         agr_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, company_name, credit_limit_fen, billing_cycle, status
                 FROM biz_credit_agreements
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(aid), "tenant_id": str(tid)},
         )
         agreement = agr_result.mappings().first()
         if agreement is None:
-            raise HTTPException(status_code=404, detail=f"协议不存在: {agreement_id}")
+            raise HTTPException(status_code=404, detail="协议不存在")
 
         # 消费明细
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM biz_credit_charges
                 WHERE tenant_id = :tenant_id::UUID
                   AND agreement_id = :agreement_id::UUID
                   AND charged_at >= :start_date::DATE
                   AND charged_at < (:end_date::DATE + INTERVAL '1 day')
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),
@@ -778,7 +805,8 @@ async def get_statement(
         total = count_result.scalar()
 
         charges_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, order_id, store_id, charged_amount_fen, charged_at,
                        operator_id, remark
                 FROM biz_credit_charges
@@ -788,7 +816,8 @@ async def get_statement(
                   AND charged_at < (:end_date::DATE + INTERVAL '1 day')
                 ORDER BY charged_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),
@@ -802,7 +831,8 @@ async def get_statement(
 
         # 汇总
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(charged_amount_fen), 0) AS total_charged_fen,
                        COUNT(*) AS total_transactions
                 FROM biz_credit_charges
@@ -810,7 +840,8 @@ async def get_statement(
                   AND agreement_id = :agreement_id::UUID
                   AND charged_at >= :start_date::DATE
                   AND charged_at < (:end_date::DATE + INTERVAL '1 day')
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "agreement_id": str(aid),

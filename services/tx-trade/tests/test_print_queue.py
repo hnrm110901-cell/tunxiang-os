@@ -20,6 +20,7 @@ from print_queue import JobStatus, PrintJob, PrintQueue
 
 # ─── 测试夹具 ───
 
+
 @pytest.fixture
 def tmp_db(tmp_path):
     """使用临时目录的 SQLite 数据库"""
@@ -49,6 +50,7 @@ def _make_job(printer_address: str = "192.168.1.100:9100") -> PrintJob:
 
 # ─── Test 1: 打印失败 → 任务进入重试队列 ───
 
+
 @pytest.mark.asyncio
 async def test_failed_print_enqueues_job(queue):
     """send_to_printer 失败时任务应入队，状态为 pending"""
@@ -75,6 +77,7 @@ async def test_enqueue_stores_payload(queue):
 
 
 # ─── Test 2: 重连后队列自动消费，补打所有积压任务 ───
+
 
 @pytest.mark.asyncio
 async def test_process_pending_success(queue):
@@ -141,6 +144,7 @@ async def test_process_pending_skips_future_retry(queue):
 
 # ─── Test 3: 重试超过5次 → 死信 ───
 
+
 @pytest.mark.asyncio
 async def test_exceed_max_retries_becomes_dead_letter(queue):
     """重试 5 次失败后任务状态应变为 dead_letter"""
@@ -189,6 +193,7 @@ async def test_dead_letter_not_retried_again(queue):
 
 # ─── Test 4: 指数退避 ───
 
+
 @pytest.mark.asyncio
 async def test_exponential_backoff_on_failure(queue):
     """每次失败后 next_retry_at 应按指数退避增长"""
@@ -209,7 +214,11 @@ async def test_exponential_backoff_on_failure(queue):
     # next_retry_at 应在 [now+0.5s, now+2s] 范围内（容错0.5s）
     expected_delta = timedelta(seconds=1)
     actual_next = jobs[0]["next_retry_at"]
-    assert now_before + expected_delta - timedelta(seconds=0.5) <= actual_next <= now_after + expected_delta + timedelta(seconds=0.5)
+    assert (
+        now_before + expected_delta - timedelta(seconds=0.5)
+        <= actual_next
+        <= now_after + expected_delta + timedelta(seconds=0.5)
+    )
 
 
 @pytest.mark.asyncio
@@ -219,9 +228,7 @@ async def test_backoff_delays_are_exponential(queue):
 
     for attempt, expected_delay in enumerate(expected_delays):
         delay = PrintQueue.backoff_seconds(attempt)
-        assert delay == expected_delay, (
-            f"第 {attempt+1} 次重试期望退避 {expected_delay}s，实际为 {delay}s"
-        )
+        assert delay == expected_delay, f"第 {attempt+1} 次重试期望退避 {expected_delay}s，实际为 {delay}s"
 
 
 @pytest.mark.asyncio
@@ -255,6 +262,7 @@ async def test_retry_count_increments_on_failure(queue):
 
 
 # ─── 辅助：get_dead_letters 查询 ───
+
 
 @pytest.mark.asyncio
 async def test_get_dead_letters_returns_all_dead(queue):

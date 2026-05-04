@@ -74,17 +74,13 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict[str, Any]:
 
 
 def _require_tenant(request: Request) -> uuid.UUID:
-    raw = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    raw = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not raw:
         raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
     try:
         return uuid.UUID(str(raw))
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid X-Tenant-ID: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid X-Tenant-ID: {exc}") from exc
 
 
 def _optional_store_id(request: Request) -> Optional[uuid.UUID]:
@@ -352,9 +348,7 @@ async def list_eo_tickets(
     eo_service: BanquetEOTicketService = Depends(get_eo_service),
 ) -> dict[str, Any]:
     tenant_id = _require_tenant(request)
-    tickets = await eo_service.list_by_contract(
-        tenant_id=tenant_id, contract_id=contract_id
-    )
+    tickets = await eo_service.list_by_contract(tenant_id=tenant_id, contract_id=contract_id)
     return _ok({"items": [t.model_dump(mode="json") for t in tickets]})
 
 

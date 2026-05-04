@@ -232,6 +232,7 @@ async def finalize_stocktake_route(
                     causation_id=stocktake_id,
                 )
             )
+
         # ─── v370 集成：盘点完成后自动建盘亏案件 ───
         # 异步触发，不阻塞响应；失败仅记录日志，不影响盘点本身
         async def _try_auto_create() -> None:

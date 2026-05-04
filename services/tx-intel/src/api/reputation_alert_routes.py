@@ -86,17 +86,20 @@ async def list_alerts(
 
         # 总数
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) FROM reputation_alerts
                 WHERE tenant_id = :tenant_id AND is_deleted = false {filters}
-            """),
+            """
+            ),
             params,
         )
         total = int(count_result.scalar() or 0)
 
         # 列表
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, platform, alert_type, severity,
                        summary, response_status, response_time_sec,
                        sla_met, assigned_to, created_at, updated_at
@@ -111,26 +114,29 @@ async def list_alerts(
                     END,
                     created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
         items = []
         for row in rows:
-            items.append({
-                "id": str(row[0]),
-                "store_id": str(row[1]) if row[1] else None,
-                "platform": row[2],
-                "alert_type": row[3],
-                "severity": row[4],
-                "summary": row[5],
-                "response_status": row[6],
-                "response_time_sec": row[7],
-                "sla_met": row[8],
-                "assigned_to": str(row[9]) if row[9] else None,
-                "created_at": row[10].isoformat() if row[10] else None,
-                "updated_at": row[11].isoformat() if row[11] else None,
-            })
+            items.append(
+                {
+                    "id": str(row[0]),
+                    "store_id": str(row[1]) if row[1] else None,
+                    "platform": row[2],
+                    "alert_type": row[3],
+                    "severity": row[4],
+                    "summary": row[5],
+                    "response_status": row[6],
+                    "response_time_sec": row[7],
+                    "sla_met": row[8],
+                    "assigned_to": str(row[9]) if row[9] else None,
+                    "created_at": row[10].isoformat() if row[10] else None,
+                    "updated_at": row[11].isoformat() if row[11] else None,
+                }
+            )
 
         return {
             "ok": True,
@@ -155,7 +161,8 @@ async def get_alert_detail(
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, platform, alert_type, severity,
                        trigger_mention_ids, trigger_data, summary,
                        recommended_actions, response_status, response_text,
@@ -166,7 +173,8 @@ async def get_alert_detail(
                 WHERE id = :alert_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"alert_id": alert_id, "tenant_id": x_tenant_id},
         )
         row = result.fetchone()

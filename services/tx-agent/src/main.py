@@ -238,7 +238,12 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
-app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","), allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(planner_router)
 app.include_router(observability_router)
 app.include_router(voice_router)

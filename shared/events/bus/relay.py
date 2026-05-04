@@ -19,6 +19,7 @@
 APScheduler 注册 (scheduler.py 中, 另一 session 稳定后接入):
     scheduler.add_job(relay.run_once, 'interval', seconds=10)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -66,9 +67,7 @@ class OutboxReader(ABC):
         """获取指定 relay 的 last_sequence. 不存在返回 0."""
 
     @abstractmethod
-    async def fetch_batch(
-        self, *, after_sequence: int, limit: int
-    ) -> list[PendingEvent]:
+    async def fetch_batch(self, *, after_sequence: int, limit: int) -> list[PendingEvent]:
         """读取 sequence_num > after_sequence 的事件, 按 sequence 升序."""
 
     @abstractmethod
@@ -113,9 +112,7 @@ class EventRelay:
         "处理"包括成功发布 + 毒丸跳过; "返回数" 是游标前进的条数.
         """
         last_seq = await self._reader.get_cursor(self._name)
-        batch = await self._reader.fetch_batch(
-            after_sequence=last_seq, limit=self._batch
-        )
+        batch = await self._reader.fetch_batch(after_sequence=last_seq, limit=self._batch)
         if not batch:
             return 0
 
@@ -165,9 +162,7 @@ class EventRelay:
     # 内部: PendingEvent -> EventEnvelope
     # ------------------------------------------------------------------
 
-    def _try_build_envelope(
-        self, pending: PendingEvent
-    ) -> Optional[EventEnvelope]:
+    def _try_build_envelope(self, pending: PendingEvent) -> Optional[EventEnvelope]:
         payload_cls = self._schemas.get(pending.event_type)
         if payload_cls is None:
             logger.error(

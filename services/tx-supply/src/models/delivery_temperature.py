@@ -13,6 +13,7 @@
       BreachType, Severity, AlertStatus, ScopeType, Source,
   )
 """
+
 from __future__ import annotations
 
 import uuid

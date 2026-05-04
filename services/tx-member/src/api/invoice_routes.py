@@ -90,13 +90,15 @@ async def list_invoice_titles(
         await _set_rls(db, x_tenant_id)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, type, title, tax_id,
                        address, phone, bank_name, bank_account, is_default
                 FROM invoice_titles
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
                 ORDER BY is_default DESC, created_at DESC
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "cid": customer_id},
         )
         items = [_row_to_title(r) for r in rows.all()]
@@ -124,16 +126,19 @@ async def create_invoice_title(
         # 若设为默认，先清除旧默认
         if req.is_default:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE invoice_titles
                     SET is_default = false, updated_at = NOW()
                     WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "cid": req.customer_id},
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO invoice_titles
                     (tenant_id, customer_id, type, title, tax_id,
                      address, phone, bank_name, bank_account, is_default)
@@ -142,7 +147,8 @@ async def create_invoice_title(
                      :address, :phone, :bank_name, :bank_account, :is_default)
                 RETURNING id, customer_id, type, title, tax_id,
                           address, phone, bank_name, bank_account, is_default
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "cid": req.customer_id,
@@ -187,11 +193,13 @@ async def delete_invoice_title(
         await _set_rls(db, x_tenant_id)
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoice_titles
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :tid_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"tid_id": title_id, "tid": x_tenant_id},
         )
         await db.commit()
@@ -221,17 +229,20 @@ async def list_invoices(
         await _set_rls(db, x_tenant_id)
 
         cnt_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM invoices
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "cid": customer_id},
         )
         total: int = cnt_row.scalar() or 0
 
         offset = (page - 1) * size
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, order_no, amount_fen,
                        status, title_snapshot, type_snapshot,
                        invoice_no, issued_at, created_at
@@ -239,7 +250,8 @@ async def list_invoices(
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "cid": customer_id, "lim": size, "off": offset},
         )
         items = [_row_to_invoice(r) for r in rows.all()]

@@ -16,6 +16,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_voucher_period_check_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -28,7 +29,6 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
 from models.accounting_period import (  # type: ignore  # noqa: E402
     STATUS_CLOSED,
     STATUS_LOCKED,
@@ -36,6 +36,7 @@ from models.accounting_period import (  # type: ignore  # noqa: E402
     AccountingPeriod,
     month_range,
 )
+from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
 from services.accounting_period_service import (  # type: ignore  # noqa: E402
     AccountingPeriodService,
 )
@@ -44,7 +45,6 @@ from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     VoucherCreateInput,
     VoucherLineInput,
 )
-
 
 # ─── 构造辅助 ───────────────────────────────────────────────────────
 
@@ -64,16 +64,15 @@ def _balanced_payload(
         event_type="daily_settlement.closed" if event_id else None,
         event_id=event_id,
         lines=[
-            VoucherLineInput(account_code="1001", account_name="现金",
-                             debit_fen=10000),
-            VoucherLineInput(account_code="6001", account_name="主营业务收入",
-                             credit_fen=10000),
+            VoucherLineInput(account_code="1001", account_name="现金", debit_fen=10000),
+            VoucherLineInput(account_code="6001", account_name="主营业务收入", credit_fen=10000),
         ],
     )
 
 
-def _period(year: int = 2026, month: int = 4, status: str = STATUS_OPEN,
-            tenant_id: uuid.UUID | None = None) -> AccountingPeriod:
+def _period(
+    year: int = 2026, month: int = 4, status: str = STATUS_OPEN, tenant_id: uuid.UUID | None = None
+) -> AccountingPeriod:
     start, end = month_range(year, month)
     return AccountingPeriod(
         id=uuid.uuid4(),
@@ -145,9 +144,7 @@ class TestWithPeriodServiceClosedPeriod:
     async def test_create_rejects_when_period_closed(self):
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
-        period_service.find_period_for_date = AsyncMock(
-            return_value=_period(status=STATUS_CLOSED)
-        )
+        period_service.find_period_for_date = AsyncMock(return_value=_period(status=STATUS_CLOSED))
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
@@ -175,9 +172,7 @@ class TestWithPeriodServiceLockedPeriod:
     async def test_create_rejects_when_period_locked(self):
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
-        period_service.find_period_for_date = AsyncMock(
-            return_value=_period(status=STATUS_LOCKED)
-        )
+        period_service.find_period_for_date = AsyncMock(return_value=_period(status=STATUS_LOCKED))
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
@@ -253,10 +248,8 @@ class TestValidationOrder:
             voucher_date=date(2026, 4, 19),
             voucher_type="sales",
             lines=[
-                VoucherLineInput(account_code="1001", account_name="现金",
-                                 debit_fen=10000),
-                VoucherLineInput(account_code="6001", account_name="收入",
-                                 credit_fen=9900),  # 少 1 分
+                VoucherLineInput(account_code="1001", account_name="现金", debit_fen=10000),
+                VoucherLineInput(account_code="6001", account_name="收入", credit_fen=9900),  # 少 1 分
             ],
         )
 
@@ -280,9 +273,7 @@ class TestValidationOrder:
         """
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
-        period_service.find_period_for_date = AsyncMock(
-            return_value=_period(status=STATUS_CLOSED)
-        )
+        period_service.find_period_for_date = AsyncMock(return_value=_period(status=STATUS_CLOSED))
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
@@ -338,9 +329,7 @@ class TestVoidNotAffectedByPeriodCheck:
         """void() 不走 period 校验 — 误录的凭证应永远可以作废审计."""
         period_service = AsyncMock(spec=AccountingPeriodService)
         # 即便 is_date_writable 会 raise, void 路径不访问它
-        period_service.is_date_writable = AsyncMock(
-            side_effect=RuntimeError("不该被调用")
-        )
+        period_service.is_date_writable = AsyncMock(side_effect=RuntimeError("不该被调用"))
 
         svc = FinancialVoucherService(period_service=period_service)
 
@@ -396,10 +385,8 @@ def _meituan_payload(
         event_type="order.paid",
         event_id=event_id,
         lines=[
-            VoucherLineInput(account_code="1002", account_name="美团代收款",
-                             debit_fen=8800),
-            VoucherLineInput(account_code="6001", account_name="外卖收入",
-                             credit_fen=8800),
+            VoucherLineInput(account_code="1002", account_name="美团代收款", debit_fen=8800),
+            VoucherLineInput(account_code="6001", account_name="外卖收入", credit_fen=8800),
         ],
     )
 
@@ -463,10 +450,12 @@ class TestW2BIdempotencyBeforePeriodCheck:
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
         # B5 execute → 豁免; _find_by_event execute → 命中
-        session.execute = AsyncMock(side_effect=[
-            _b5_exempt_execute(),
-            _idempotent_hit_execute(existing),
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _b5_exempt_execute(),
+                _idempotent_hit_execute(existing),
+            ]
+        )
 
         payload = _meituan_payload(
             tenant_id=tenant_id,
@@ -492,17 +481,18 @@ class TestW2BIdempotencyBeforePeriodCheck:
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
         period_service.find_period_for_date = AsyncMock(
-            return_value=_period(year=2026, month=4, status=STATUS_CLOSED,
-                                 tenant_id=tenant_id)
+            return_value=_period(year=2026, month=4, status=STATUS_CLOSED, tenant_id=tenant_id)
         )
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
         # B5 豁免; _find_by_event miss (全新 event_id)
-        session.execute = AsyncMock(side_effect=[
-            _b5_exempt_execute(),
-            _idempotent_miss_execute(),
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _b5_exempt_execute(),
+                _idempotent_miss_execute(),
+            ]
+        )
 
         payload = _meituan_payload(
             tenant_id=tenant_id,
@@ -529,8 +519,7 @@ class TestW2BIdempotencyBeforePeriodCheck:
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
         period_service.find_period_for_date = AsyncMock(
-            return_value=_period(year=2026, month=4, status=STATUS_CLOSED,
-                                 tenant_id=tenant_id)
+            return_value=_period(year=2026, month=4, status=STATUS_CLOSED, tenant_id=tenant_id)
         )
 
         svc = FinancialVoucherService(period_service=period_service)
@@ -547,10 +536,8 @@ class TestW2BIdempotencyBeforePeriodCheck:
             event_type=None,
             event_id=None,  # 手工凭证
             lines=[
-                VoucherLineInput(account_code="5401", account_name="原材料成本",
-                                 debit_fen=50000),
-                VoucherLineInput(account_code="1001", account_name="现金",
-                                 credit_fen=50000),
+                VoucherLineInput(account_code="5401", account_name="原材料成本", debit_fen=50000),
+                VoucherLineInput(account_code="1001", account_name="现金", credit_fen=50000),
             ],
         )
 
@@ -571,16 +558,16 @@ class TestW2BIdempotencyBeforePeriodCheck:
         existing = _existing_voucher(tenant_id)
 
         period_service = AsyncMock(spec=AccountingPeriodService)
-        period_service.is_date_writable = AsyncMock(
-            side_effect=AssertionError("幂等命中不应走账期校验")
-        )
+        period_service.is_date_writable = AsyncMock(side_effect=AssertionError("幂等命中不应走账期校验"))
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[
-            _b5_exempt_execute(),
-            _idempotent_hit_execute(existing),
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _b5_exempt_execute(),
+                _idempotent_hit_execute(existing),
+            ]
+        )
 
         payload = _meituan_payload(
             tenant_id=tenant_id,
@@ -603,16 +590,16 @@ class TestW2BIdempotencyBeforePeriodCheck:
         existing = _existing_voucher(tenant_id)
 
         period_service = AsyncMock(spec=AccountingPeriodService)
-        period_service.is_date_writable = AsyncMock(
-            side_effect=AssertionError("年结 locked, 幂等命中不应走账期校验")
-        )
+        period_service.is_date_writable = AsyncMock(side_effect=AssertionError("年结 locked, 幂等命中不应走账期校验"))
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[
-            _b5_exempt_execute(),
-            _idempotent_hit_execute(existing),
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _b5_exempt_execute(),
+                _idempotent_hit_execute(existing),
+            ]
+        )
 
         payload = _meituan_payload(
             tenant_id=tenant_id,
@@ -650,9 +637,7 @@ class TestW2BIdempotencyBeforePeriodCheck:
             return True
 
         period_service = AsyncMock(spec=AccountingPeriodService)
-        period_service.is_date_writable = AsyncMock(
-            side_effect=_is_date_writable_spy
-        )
+        period_service.is_date_writable = AsyncMock(side_effect=_is_date_writable_spy)
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
@@ -689,10 +674,12 @@ class TestW2BIdempotencyBeforePeriodCheck:
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[
-            _b5_exempt_execute(),
-            _idempotent_miss_execute(),
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _b5_exempt_execute(),
+                _idempotent_miss_execute(),
+            ]
+        )
         session.flush = AsyncMock()
 
         payload = _meituan_payload(
@@ -720,16 +707,17 @@ class TestW2BIdempotencyBeforePeriodCheck:
         period_service = AsyncMock(spec=AccountingPeriodService)
         period_service.is_date_writable = AsyncMock(return_value=False)
         period_service.find_period_for_date = AsyncMock(
-            return_value=_period(year=2026, month=4, status=STATUS_CLOSED,
-                                 tenant_id=tenant_id)
+            return_value=_period(year=2026, month=4, status=STATUS_CLOSED, tenant_id=tenant_id)
         )
 
         svc = FinancialVoucherService(period_service=period_service)
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[
-            _b5_exempt_execute(),
-            _idempotent_miss_execute(),
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _b5_exempt_execute(),
+                _idempotent_miss_execute(),
+            ]
+        )
 
         payload = _meituan_payload(
             tenant_id=tenant_id,

@@ -76,7 +76,8 @@ class ForgeOutcomeService:
         outcome_id = f"oc_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_outcome_definitions
                     (outcome_id, app_id, outcome_type, outcome_name, description,
                      measurement_method, price_fen_per_outcome,
@@ -89,7 +90,8 @@ class ForgeOutcomeService:
                           measurement_method, price_fen_per_outcome,
                           attribution_window_hours, verification_method,
                           is_active, created_at
-            """),
+            """
+            ),
             {
                 "outcome_id": outcome_id,
                 "app_id": app_id,
@@ -139,7 +141,8 @@ class ForgeOutcomeService:
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT outcome_id, app_id, outcome_type, outcome_name, description,
                        measurement_method, price_fen_per_outcome,
                        attribution_window_hours, verification_method,
@@ -147,7 +150,8 @@ class ForgeOutcomeService:
                 FROM forge_outcome_definitions
                 {where}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         return [dict(r) for r in result.mappings().all()]
@@ -170,12 +174,14 @@ class ForgeOutcomeService:
 
         # 查定义获取单价
         def_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT outcome_id, app_id, outcome_type, price_fen_per_outcome,
                        verification_method
                 FROM forge_outcome_definitions
                 WHERE outcome_id = :outcome_id AND is_active = true
-            """),
+            """
+            ),
             {"outcome_id": outcome_id},
         )
         definition = def_result.mappings().first()
@@ -188,7 +194,8 @@ class ForgeOutcomeService:
         event_id = f"oev_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_outcome_events
                     (event_id, outcome_id, app_id, store_id, agent_id,
                      decision_log_id, outcome_data, revenue_fen,
@@ -200,7 +207,8 @@ class ForgeOutcomeService:
                 RETURNING event_id, outcome_id, app_id, store_id, agent_id,
                           decision_log_id, outcome_data, revenue_fen,
                           verified, verified_at, created_at
-            """),
+            """
+            ),
             {
                 "event_id": event_id,
                 "outcome_id": outcome_id,
@@ -218,14 +226,16 @@ class ForgeOutcomeService:
         # 自动验证时直接记录收入
         if auto_verified and price_fen > 0:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO forge_revenue_entries
                         (app_id, payer_tenant_id, amount_fen, platform_fee_fen,
                          developer_payout_fen, fee_rate, pricing_model)
                     VALUES
                         (:app_id, :store_id, :amount_fen, :platform_fee_fen,
                          :developer_payout_fen, :fee_rate, 'usage_based')
-                """),
+                """
+                ),
                 {
                     "app_id": app_id,
                     "store_id": store_id or "platform",
@@ -260,7 +270,8 @@ class ForgeOutcomeService:
     ) -> dict:
         """人工验证结果事件，验证失败时冲销收入。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_outcome_events
                 SET verified = :verified,
                     verified_at = NOW(),
@@ -268,7 +279,8 @@ class ForgeOutcomeService:
                 WHERE event_id = :event_id
                 RETURNING event_id, outcome_id, app_id, store_id,
                           revenue_fen, verified, verified_at, verified_by
-            """),
+            """
+            ),
             {
                 "event_id": event_id,
                 "verified": verified,
@@ -284,14 +296,16 @@ class ForgeOutcomeService:
         # 验证失败 → 冲销收入（插入负数流水）
         if not verified and row_dict["revenue_fen"] > 0:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO forge_revenue_entries
                         (app_id, payer_tenant_id, amount_fen, platform_fee_fen,
                          developer_payout_fen, fee_rate, pricing_model)
                     VALUES
                         (:app_id, :store_id, :neg_amount, :neg_fee,
                          :neg_payout, :fee_rate, 'usage_based')
-                """),
+                """
+                ),
                 {
                     "app_id": row_dict["app_id"],
                     "store_id": row_dict["store_id"] or "platform",
@@ -336,12 +350,14 @@ class ForgeOutcomeService:
 
         # 查定义
         def_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT outcome_id, outcome_type, price_fen_per_outcome,
                        attribution_window_hours
                 FROM forge_outcome_definitions
                 WHERE outcome_id = :outcome_id AND is_active = true
-            """),
+            """
+            ),
             {"outcome_id": outcome_id},
         )
         definition = def_result.mappings().first()
@@ -353,13 +369,15 @@ class ForgeOutcomeService:
 
         # 查归因窗口内的 Agent 决策日志
         logs_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, agent_id, decision_type, confidence, created_at
                 FROM agent_decision_logs
                 WHERE store_id = :store_id
                   AND created_at >= NOW() - MAKE_INTERVAL(hours => :window_hours)
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"store_id": store_id, "window_hours": window_hours},
         )
         decision_logs = [dict(r) for r in logs_result.mappings().all()]
@@ -400,14 +418,16 @@ class ForgeOutcomeService:
         }
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_outcome_events
                     (event_id, outcome_id, app_id, store_id,
                      outcome_data, revenue_fen, verified)
                 VALUES
                     (:event_id, :outcome_id, :app_id, :store_id,
                      :outcome_data::jsonb, :revenue_fen, true)
-            """),
+            """
+            ),
             {
                 "event_id": event_id,
                 "outcome_id": outcome_id,
@@ -452,7 +472,8 @@ class ForgeOutcomeService:
 
         # 总量统计
         summary_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*)                                    AS total_outcomes,
                     COUNT(*) FILTER (WHERE e.verified = true)   AS verified_outcomes,
@@ -460,14 +481,16 @@ class ForgeOutcomeService:
                 FROM forge_outcome_events e
                 WHERE e.created_at >= NOW() - MAKE_INTERVAL(days => :days)
                   {app_filter}
-            """),
+            """
+            ),
             params,
         )
         summary = dict(summary_result.mappings().one())
 
         # 按类型拆分
         type_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     d.outcome_type,
                     COUNT(*)                        AS event_count,
@@ -478,14 +501,16 @@ class ForgeOutcomeService:
                   {app_filter}
                 GROUP BY d.outcome_type
                 ORDER BY revenue_fen DESC
-            """),
+            """
+            ),
             params,
         )
         by_type = [dict(r) for r in type_result.mappings().all()]
 
         # 按日趋势
         trend_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     e.created_at::date              AS day,
                     COUNT(*)                        AS event_count,
@@ -495,14 +520,16 @@ class ForgeOutcomeService:
                   {app_filter}
                 GROUP BY e.created_at::date
                 ORDER BY day ASC
-            """),
+            """
+            ),
             params,
         )
         daily_trend = [dict(r) for r in trend_result.mappings().all()]
 
         # Top Agent 归因排行
         top_agents_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     e.agent_id,
                     COUNT(*)                        AS outcome_count,
@@ -514,7 +541,8 @@ class ForgeOutcomeService:
                 GROUP BY e.agent_id
                 ORDER BY revenue_fen DESC
                 LIMIT 10
-            """),
+            """
+            ),
             params,
         )
         top_agents = [dict(r) for r in top_agents_result.mappings().all()]
@@ -559,16 +587,19 @@ class ForgeOutcomeService:
 
         # 总数
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) FROM forge_outcome_events e {where}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar_one()
 
         # 数据
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT e.event_id, e.outcome_id, e.app_id, e.store_id,
                        e.agent_id, e.decision_log_id, e.outcome_data,
                        e.revenue_fen, e.verified, e.verified_at,
@@ -577,7 +608,8 @@ class ForgeOutcomeService:
                 {where}
                 ORDER BY e.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]

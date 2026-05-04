@@ -4,11 +4,12 @@ from decimal import Decimal
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.supply_chain_mobile_service import (
     PurchaseOrderNotFoundError,
@@ -138,9 +139,9 @@ async def api_record_count(
             unit_cost=body.unit_cost,
         )
     except StocktakeSessionNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "盘点会话不存在", e)
     except StocktakeAlreadyCompletedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise safe_http_exception(409, "盘点已完成", e)
     return {"ok": True, "data": result}
 
 
@@ -153,9 +154,9 @@ async def api_complete_stocktake(
     try:
         report = await complete_stocktake(session_id=session_id, tenant_id=x_tenant_id, db=db)
     except StocktakeSessionNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "盘点会话不存在", e)
     except StocktakeAlreadyCompletedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise safe_http_exception(409, "盘点已完成", e)
     return {"ok": True, "data": report}
 
 
@@ -207,5 +208,5 @@ async def api_approve_purchase(
             comment=body.comment,
         )
     except PurchaseOrderNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "采购单不存在", e)
     return {"ok": True, "data": result}

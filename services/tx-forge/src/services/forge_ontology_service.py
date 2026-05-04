@@ -50,13 +50,15 @@ class ForgeOntologyService:
         where_clause = " AND ".join(where_parts)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT binding_id, app_id, entity_name, access_mode,
                        allowed_fields, constraints, created_at, updated_at
                 FROM forge_ontology_bindings
                 WHERE {where_clause}
                 ORDER BY entity_name ASC, app_id ASC
-            """),
+            """
+            ),
             params,
         )
         return [dict(r) for r in result.mappings().all()]
@@ -92,7 +94,8 @@ class ForgeOntologyService:
         # UPSERT：基于 app_id + entity_name 唯一约束
         binding_id = f"bind_{uuid4().hex[:12]}"
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_ontology_bindings
                     (id, tenant_id, binding_id, app_id, entity_name,
                      access_mode, allowed_fields, constraints)
@@ -108,7 +111,8 @@ class ForgeOntologyService:
                     updated_at = NOW()
                 RETURNING binding_id, app_id, entity_name, access_mode,
                           allowed_fields, constraints, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "binding_id": binding_id,
                 "app_id": app_id,
@@ -138,14 +142,16 @@ class ForgeOntologyService:
     ) -> dict:
         """移除 Ontology 绑定"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_ontology_bindings
                 SET is_deleted = true, updated_at = NOW()
                 WHERE app_id = :app_id
                   AND entity_name = :entity_name
                   AND is_deleted = false
                 RETURNING binding_id, app_id, entity_name
-            """),
+            """
+            ),
             {"app_id": app_id, "entity_name": entity_name},
         )
         row = result.mappings().first()
@@ -168,7 +174,8 @@ class ForgeOntologyService:
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     b.binding_id, b.app_id, b.access_mode,
                     b.allowed_fields, b.constraints,
@@ -182,7 +189,8 @@ class ForgeOntologyService:
                 WHERE b.entity_name = :entity_name
                   AND b.is_deleted = false
                 ORDER BY a.app_name ASC
-            """),
+            """
+            ),
             {"entity_name": entity_name},
         )
         return [dict(r) for r in result.mappings().all()]
@@ -244,10 +252,12 @@ class ForgeOntologyService:
 
         # 5. app_id 存在性检查
         app_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM forge_apps
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         if not app_result.first():
@@ -290,7 +300,8 @@ class ForgeOntologyService:
         checksum = hashlib.sha256(content_str.encode()).hexdigest()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_manifest_versions
                     (id, tenant_id, manifest_id, app_id,
                      content, checksum, forge_version,
@@ -300,7 +311,8 @@ class ForgeOntologyService:
                      :manifest_id, :app_id,
                      :content::jsonb, :checksum, :forge_version,
                      NOW())
-            """),
+            """
+            ),
             {
                 "manifest_id": manifest_id,
                 "app_id": app_id,
@@ -312,11 +324,13 @@ class ForgeOntologyService:
 
         # 3. 同步 ontology bindings：软删除旧的，插入新的
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_ontology_bindings
                 SET is_deleted = true, updated_at = NOW()
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
 
@@ -344,12 +358,14 @@ class ForgeOntologyService:
         if mcp_tools:
             # 查找该 app 关联的 server
             server_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT server_id FROM forge_mcp_servers
                     WHERE app_id = :app_id AND is_deleted = false
                     ORDER BY created_at DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"app_id": app_id},
             )
             server_row = server_result.mappings().first()
@@ -359,11 +375,13 @@ class ForgeOntologyService:
 
                 # 软删除旧工具
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE forge_mcp_tools
                         SET is_deleted = true, updated_at = NOW()
                         WHERE server_id = :server_id AND is_deleted = false
-                    """),
+                    """
+                    ),
                     {"server_id": server_id},
                 )
 
@@ -409,13 +427,15 @@ class ForgeOntologyService:
     async def get_manifest_history(self, db: AsyncSession, app_id: str) -> list[dict]:
         """获取应用的 Manifest 提交历史"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT manifest_id, app_id, forge_version,
                        checksum, submitted_at
                 FROM forge_manifest_versions
                 WHERE app_id = :app_id AND is_deleted = false
                 ORDER BY submitted_at DESC
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         return [dict(r) for r in result.mappings().all()]

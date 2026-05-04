@@ -215,7 +215,7 @@ class SalesTargetRepository:
                    target_value, parent_target_id, notes, created_by,
                    created_at, updated_at
             FROM sales_targets
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             ORDER BY period_start DESC
             """
         )
@@ -251,7 +251,7 @@ class SalesTargetRepository:
                    target_value, parent_target_id, notes, created_by,
                    created_at, updated_at
             FROM sales_targets
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             ORDER BY period_start DESC
             """
         )
@@ -479,28 +479,17 @@ class SalesTargetRepository:
         rows = result.fetchall()
         return [
             {
-                "target_id": getattr(r, "target_id", None)
-                or r._mapping.get("target_id"),
-                "employee_id": getattr(r, "employee_id", None)
-                or r._mapping.get("employee_id"),
-                "store_id": getattr(r, "store_id", None)
-                or r._mapping.get("store_id"),
-                "metric_type": getattr(r, "metric_type", None)
-                or r._mapping.get("metric_type"),
-                "period_type": getattr(r, "period_type", None)
-                or r._mapping.get("period_type"),
-                "period_start": getattr(r, "period_start", None)
-                or r._mapping.get("period_start"),
-                "period_end": getattr(r, "period_end", None)
-                or r._mapping.get("period_end"),
-                "target_value": getattr(r, "target_value", None)
-                or r._mapping.get("target_value"),
-                "actual_value": getattr(r, "actual_value", None)
-                or r._mapping.get("actual_value"),
-                "achievement_rate": getattr(r, "achievement_rate", None)
-                or r._mapping.get("achievement_rate"),
-                "snapshot_at": getattr(r, "snapshot_at", None)
-                or r._mapping.get("snapshot_at"),
+                "target_id": getattr(r, "target_id", None) or r._mapping.get("target_id"),
+                "employee_id": getattr(r, "employee_id", None) or r._mapping.get("employee_id"),
+                "store_id": getattr(r, "store_id", None) or r._mapping.get("store_id"),
+                "metric_type": getattr(r, "metric_type", None) or r._mapping.get("metric_type"),
+                "period_type": getattr(r, "period_type", None) or r._mapping.get("period_type"),
+                "period_start": getattr(r, "period_start", None) or r._mapping.get("period_start"),
+                "period_end": getattr(r, "period_end", None) or r._mapping.get("period_end"),
+                "target_value": getattr(r, "target_value", None) or r._mapping.get("target_value"),
+                "actual_value": getattr(r, "actual_value", None) or r._mapping.get("actual_value"),
+                "achievement_rate": getattr(r, "achievement_rate", None) or r._mapping.get("achievement_rate"),
+                "snapshot_at": getattr(r, "snapshot_at", None) or r._mapping.get("snapshot_at"),
             }
             for r in rows
         ]
@@ -526,13 +515,9 @@ class SalesTargetRepository:
     STORE_LEVEL_SENTINEL_EMPLOYEE_ID = UUID(int=0)
 
     # 门店级指标（个人无法独立聚合）
-    _STORE_LEVEL_METRICS = frozenset(
-        {"table_count", "unit_avg_fen", "per_guest_avg_fen"}
-    )
+    _STORE_LEVEL_METRICS = frozenset({"table_count", "unit_avg_fen", "per_guest_avg_fen"})
     # 可按员工归属聚合的指标
-    _PER_EMPLOYEE_METRICS = frozenset(
-        {"revenue_fen", "order_count", "new_customer_count"}
-    )
+    _PER_EMPLOYEE_METRICS = frozenset({"revenue_fen", "order_count", "new_customer_count"})
 
     async def aggregate_metric_from_views(
         self,
@@ -561,18 +546,12 @@ class SalesTargetRepository:
         """
         if metric_type in self._STORE_LEVEL_METRICS:
             # 门店级指标：要求 employee_id 为哨兵或 None
-            if (
-                employee_id is not None
-                and employee_id != self.STORE_LEVEL_SENTINEL_EMPLOYEE_ID
-            ):
+            if employee_id is not None and employee_id != self.STORE_LEVEL_SENTINEL_EMPLOYEE_ID:
                 log.warning(
                     "sales_target_store_level_metric_rejected_individual",
                     metric_type=metric_type,
                     employee_id=str(employee_id),
-                    reason=(
-                        "门店级指标不支持按个人员工聚合，"
-                        "请使用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建门店级目标"
-                    ),
+                    reason=("门店级指标不支持按个人员工聚合，请使用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建门店级目标"),
                 )
                 return 0
             return await self._aggregate_store_level_from_view(
@@ -585,10 +564,7 @@ class SalesTargetRepository:
             )
 
         if metric_type in self._PER_EMPLOYEE_METRICS:
-            if (
-                employee_id is None
-                or employee_id == self.STORE_LEVEL_SENTINEL_EMPLOYEE_ID
-            ):
+            if employee_id is None or employee_id == self.STORE_LEVEL_SENTINEL_EMPLOYEE_ID:
                 # 门店级 revenue/order_count 目标：允许走 mv_store_pnl 总额
                 return await self._aggregate_store_level_from_view(
                     db,
@@ -625,9 +601,7 @@ class SalesTargetRepository:
             "revenue_fen": "COALESCE(SUM(gross_revenue_fen), 0)",
             "order_count": "COALESCE(SUM(order_count), 0)",
             "table_count": "COALESCE(SUM(order_count), 0)",
-            "unit_avg_fen": (
-                "COALESCE(SUM(gross_revenue_fen) / NULLIF(SUM(order_count),0), 0)"
-            ),
+            "unit_avg_fen": ("COALESCE(SUM(gross_revenue_fen) / NULLIF(SUM(order_count),0), 0)"),
             "per_guest_avg_fen": "COALESCE(AVG(avg_check_fen), 0)",
             "new_customer_count": "COALESCE(SUM(customer_count), 0)",
         }
@@ -651,7 +625,7 @@ class SalesTargetRepository:
             f"""
             SELECT {metric_to_sql[metric_type]} AS actual
             FROM mv_store_pnl
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             """
         )
         try:
@@ -708,18 +682,12 @@ class SalesTargetRepository:
         period_end_exclusive = period_end + timedelta(days=1)
 
         metric_sql: dict[str, str] = {
-            "revenue_fen": (
-                "COALESCE(SUM((payload->>'final_amount_fen')::bigint), 0)"
-            ),
+            "revenue_fen": ("COALESCE(SUM((payload->>'final_amount_fen')::bigint), 0)"),
             "order_count": "COUNT(*)",
-            "new_customer_count": (
-                "COUNT(DISTINCT NULLIF(payload->>'customer_id', ''))"
-            ),
+            "new_customer_count": ("COUNT(DISTINCT NULLIF(payload->>'customer_id', ''))"),
         }
         if metric_type not in metric_sql:
-            raise ValueError(
-                f"metric_type {metric_type!r} 不是员工可归属指标"
-            )
+            raise ValueError(f"metric_type {metric_type!r} 不是员工可归属指标")
 
         clauses = [
             "tenant_id = :tenant_id",
@@ -747,7 +715,7 @@ class SalesTargetRepository:
             f"""
             SELECT {metric_sql[metric_type]} AS actual
             FROM events
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             """
         )
         try:

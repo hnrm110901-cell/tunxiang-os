@@ -31,7 +31,8 @@ class GrowthExperimentService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 ab_variant,
                 COUNT(*) FILTER (WHERE journey_state = 'completed') AS successes,
@@ -41,7 +42,8 @@ class GrowthExperimentService:
             WHERE journey_template_id = :tid AND is_deleted = FALSE
               AND ab_variant IS NOT NULL
             GROUP BY ab_variant
-        """),
+        """
+            ),
             {"tid": str(template_id)},
         )
 
@@ -100,7 +102,8 @@ class GrowthExperimentService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 ab_variant,
                 COUNT(*) FILTER (WHERE journey_state = 'completed') AS successes,
@@ -110,7 +113,8 @@ class GrowthExperimentService:
               AND ab_variant IS NOT NULL
             GROUP BY ab_variant
             HAVING COUNT(*) >= :min_samples
-        """),
+        """
+            ),
             {"tid": str(template_id), "min_samples": min_samples},
         )
 
@@ -160,7 +164,8 @@ class GrowthExperimentService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 ab_variant,
                 COUNT(*) AS total,
@@ -175,7 +180,8 @@ class GrowthExperimentService:
               AND ab_variant IS NOT NULL
             GROUP BY ab_variant
             ORDER BY ab_variant
-        """),
+        """
+            ),
             {"tid": str(template_id)},
         )
 
@@ -212,10 +218,12 @@ class GrowthExperimentService:
 
         # 查有A/B实验的活跃模板
         templates = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, code, name, ab_test_id FROM growth_journey_templates
             WHERE is_deleted = FALSE AND is_active = TRUE AND ab_test_id IS NOT NULL
-        """)
+        """
+            )
         )
 
         actions_taken = []
@@ -232,7 +240,8 @@ class GrowthExperimentService:
                 for variant in pause_check["pause_variants"]:
                     # 暂停该variant的所有active enrollment
                     paused = await db.execute(
-                        text("""
+                        text(
+                            """
                         UPDATE growth_journey_enrollments SET
                             journey_state = 'cancelled',
                             exit_reason = 'auto_experiment_pause',
@@ -243,7 +252,8 @@ class GrowthExperimentService:
                           AND journey_state IN ('eligible', 'active', 'paused')
                           AND is_deleted = FALSE
                         RETURNING id
-                    """),
+                    """
+                        ),
                         {"tid": str(template_id), "variant": variant},
                     )
                     cancelled_count = len(paused.fetchall())
@@ -269,11 +279,13 @@ class GrowthExperimentService:
             if pause_check.get("variants"):
                 best_variant = max(pause_check["variants"], key=lambda v: v["success_rate"])
                 await db.execute(
-                    text("""
+                    text(
+                        """
                     UPDATE growth_journey_templates SET
                         updated_at = NOW()
                     WHERE id = :tid
-                """),
+                """
+                    ),
                     {"tid": str(template_id)},
                 )
                 # 记录最优variant到日志
@@ -307,7 +319,8 @@ class GrowthExperimentService:
 
         # 检查低效mechanism
         low_perf = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 mechanism_type,
                 channel,
@@ -320,7 +333,8 @@ class GrowthExperimentService:
               AND execution_state NOT IN ('blocked','skipped')
             GROUP BY mechanism_type, channel
             HAVING COUNT(*) >= 20
-        """)
+        """
+            )
         )
 
         for row in low_perf.fetchall():
@@ -345,7 +359,8 @@ class GrowthExperimentService:
 
         # 检查低效旅程
         low_journey = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 gjt.code, gjt.name,
                 COUNT(*) AS total,
@@ -356,7 +371,8 @@ class GrowthExperimentService:
               AND gje.created_at >= NOW() - INTERVAL '14 days'
             GROUP BY gjt.code, gjt.name
             HAVING COUNT(*) >= 10
-        """)
+        """
+            )
         )
 
         for row in low_journey.fetchall():

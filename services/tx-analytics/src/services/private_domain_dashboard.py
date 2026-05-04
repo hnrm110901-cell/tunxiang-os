@@ -10,7 +10,7 @@
 
 import asyncio
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
@@ -292,7 +292,7 @@ async def get_private_domain_dashboard(
     cross_brand = _safe(results[4], {"brands": []}) if group_id else None
 
     return {
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
         "tenant_id": tenant_id,
         "member_health": member_health,
         "wecom_reach_efficiency": wecom_reach,

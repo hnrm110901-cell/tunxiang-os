@@ -19,6 +19,8 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from .external_sdk import WecomSDK
 
 logger = structlog.get_logger(__name__)
@@ -123,7 +125,7 @@ async def internal_wecom_send(
         else:
             raise HTTPException(
                 status_code=422,
-                detail=f"不支持的消息类型: {body.message_type}",
+                detail="不支持的消息类型",
             )
 
     except HTTPException:
@@ -134,7 +136,7 @@ async def internal_wecom_send(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=502, detail=f"企微发送失败: {exc}") from exc
+        raise safe_http_exception(502, "企微消息发送失败", exc) from exc
 
     log.info("wecom_internal_send_success")
     return WecomSendResponse(

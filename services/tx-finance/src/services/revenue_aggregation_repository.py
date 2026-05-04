@@ -119,7 +119,8 @@ class RevenueAggregationRepository:
         refunds 表没有 ORM 实体，用 text() + 参数化查询。
         """
         start_dt, end_dt = _day_window(biz_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT COALESCE(SUM(r.amount_fen), 0)
             FROM refunds r
             JOIN orders o ON r.order_id = o.id
@@ -129,7 +130,8 @@ class RevenueAggregationRepository:
               AND o.order_time <= :end_dt
               AND r.is_deleted = false
               AND o.is_deleted = false
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -153,7 +155,8 @@ class RevenueAggregationRepository:
         返回: [{"method": "wechat", "amount_fen": 12300, "order_count": 5}]
         """
         start_dt, end_dt = _day_window(biz_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 p.method                          AS method,
                 COALESCE(SUM(p.amount_fen), 0)    AS amount_fen,
@@ -170,7 +173,8 @@ class RevenueAggregationRepository:
               AND o.is_deleted = false
             GROUP BY p.method
             ORDER BY SUM(p.amount_fen) DESC
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -327,7 +331,8 @@ class RevenueAggregationRepository:
     ) -> int:
         """查询区间内 refunds 表退款总额（分）"""
         start_dt, end_dt = _range_window(start_date, end_date)
-        sql = text("""
+        sql = text(
+            """
             SELECT COALESCE(SUM(r.amount_fen), 0)
             FROM refunds r
             JOIN orders o ON r.order_id = o.id
@@ -337,7 +342,8 @@ class RevenueAggregationRepository:
               AND o.order_time <= :end_dt
               AND r.is_deleted = false
               AND o.is_deleted = false
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -375,7 +381,8 @@ class RevenueAggregationRepository:
         ]
         """
         start_dt, end_dt = _range_window(start_date, end_date)
-        sql = text("""
+        sql = text(
+            """
             WITH order_by_method AS (
                 -- 通过 payments 关联找出每笔订单的支付方式
                 SELECT
@@ -435,7 +442,8 @@ class RevenueAggregationRepository:
             FULL OUTER JOIN paid_by_method   pb ON ob.method = pb.method
             FULL OUTER JOIN refund_by_method rb ON ob.method = rb.method
             ORDER BY COALESCE(pb.paid_amount_fen, 0) DESC
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {

@@ -87,7 +87,8 @@ async def list_annual_budgets(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     period,
                     MAX(CASE WHEN category = 'revenue'         THEN budget_fen END) AS revenue_target_fen,
@@ -101,7 +102,8 @@ async def list_annual_budgets(
                   AND period LIKE :year_prefix
                 GROUP BY period
                 ORDER BY period ASC
-            """),
+            """
+            ),
             {
                 "tid": str(tid),
                 "sid": str(sid),
@@ -174,7 +176,8 @@ async def create_monthly_budget(
         upserted = []
         for cat, fen in categories:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO budget_plans
                         (tenant_id, store_id, period_type, period, category, budget_fen, note, status)
                     VALUES
@@ -185,7 +188,8 @@ async def create_monthly_budget(
                         note       = COALESCE(EXCLUDED.note, budget_plans.note),
                         updated_at = NOW()
                     RETURNING id, category, budget_fen, status, created_at, updated_at
-                """),
+                """
+                ),
                 {
                     "tid": tid,
                     "sid": sid,
@@ -256,14 +260,16 @@ async def get_budget_execution(
     try:
         # ── 读取预算计划 ──────────────────────────────────────
         budget_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT category, budget_fen
                 FROM budget_plans
                 WHERE tenant_id = :tid::UUID
                   AND store_id = :sid::UUID
                   AND period_type = 'monthly'
                   AND period = :period
-            """),
+            """
+            ),
             {"tid": str(tid), "sid": str(sid), "period": period_str},
         )
         budget_rows = budget_result.fetchall()
@@ -276,7 +282,8 @@ async def get_budget_execution(
 
         # ── 实际营收 ─────────────────────────────────────────
         rev_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_amount_fen), 0)
                 FROM orders
                 WHERE tenant_id = :tid::UUID
@@ -284,14 +291,16 @@ async def get_budget_execution(
                   AND status IN ('paid', 'completed', 'settled')
                   AND is_deleted = FALSE
                   AND DATE(created_at) BETWEEN :sd AND :ed
-            """),
+            """
+            ),
             {"tid": str(tid), "sid": str(sid), "sd": start_date.isoformat(), "ed": end_date.isoformat()},
         )
         actual_revenue_fen = int(rev_result.scalar() or 0)
 
         # ── 实际人力成本 ─────────────────────────────────────
         labor_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(net_pay_fen), 0)
                 FROM payroll_records
                 WHERE tenant_id = :tid::UUID
@@ -299,14 +308,16 @@ async def get_budget_execution(
                   AND status IN ('approved', 'paid')
                   AND is_deleted = FALSE
                   AND pay_year = :year AND pay_month = :month
-            """),
+            """
+            ),
             {"tid": str(tid), "sid": str(sid), "year": year, "month": month},
         )
         actual_labor_fen = int(labor_result.scalar() or 0)
 
         # ── 实际食材成本 ─────────────────────────────────────
         food_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_amount_fen), 0)
                 FROM purchase_orders
                 WHERE tenant_id = :tid::UUID
@@ -314,7 +325,8 @@ async def get_budget_execution(
                   AND status = 'received'
                   AND is_deleted = FALSE
                   AND DATE(received_at) BETWEEN :sd AND :ed
-            """),
+            """
+            ),
             {"tid": str(tid), "sid": str(sid), "sd": start_date.isoformat(), "ed": end_date.isoformat()},
         )
         actual_food_fen = int(food_result.scalar() or 0)

@@ -147,7 +147,8 @@ class GroupDashboardService:
 
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(o.final_amount_fen), 0)          AS total_revenue_fen,
                         COUNT(o.id)                                    AS total_orders,
@@ -160,14 +161,16 @@ class GroupDashboardService:
                       AND COALESCE(o.biz_date, DATE(o.created_at)) = :today
                       AND o.status     = 'paid'
                       AND o.is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "today": today},
             )
             rev_row = row.mappings().first()
 
             # 翻台率：今日桌台总会话数 / 总桌台数
             table_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(ts.id)                              AS session_count,
                         COALESCE(MAX(s.table_count), 1)           AS total_tables
@@ -176,14 +179,16 @@ class GroupDashboardService:
                     WHERE ts.tenant_id  = :tenant_id
                       AND DATE(ts.started_at) = :today
                       AND ts.is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "today": today},
             )
             tbl = table_row.mappings().first()
 
             # 毛利率：(营收 - 食材成本) / 营收
             margin_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(SUM(oi.cost_fen * oi.quantity), 0) AS total_cost_fen
                     FROM order_items oi
@@ -192,7 +197,8 @@ class GroupDashboardService:
                       AND COALESCE(o.biz_date, DATE(o.created_at)) = :today
                       AND o.status     = 'paid'
                       AND oi.is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "today": today},
             )
             margin_data = margin_row.mappings().first()
@@ -203,14 +209,16 @@ class GroupDashboardService:
             # 上周同日营收（用于周同比）
             last_week = today - timedelta(days=7)
             wow_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen
                     FROM orders o
                     WHERE o.tenant_id  = :tenant_id
                       AND COALESCE(o.biz_date, DATE(o.created_at)) = :last_week
                       AND o.status     = 'paid'
                       AND o.is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "last_week": last_week},
             )
             wow_data = wow_row.mappings().first()
@@ -291,7 +299,8 @@ class GroupDashboardService:
         try:
             # 当期品牌汇总
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         s.brand_id,
                         COALESCE(MAX(s.brand_name), s.brand_id)  AS brand_name,
@@ -313,14 +322,16 @@ class GroupDashboardService:
                       AND s.brand_id  IS NOT NULL
                     GROUP BY s.brand_id
                     ORDER BY revenue_fen DESC
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "start_date": start_date, "today": today},
             )
             current_brands = row.mappings().all()
 
             # 上期品牌营收（用于环比）
             prev_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         s.brand_id,
                         COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen
@@ -335,7 +346,8 @@ class GroupDashboardService:
                       AND s.is_deleted = FALSE
                       AND s.brand_id  IS NOT NULL
                     GROUP BY s.brand_id
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "prev_start": prev_start, "prev_end": prev_end},
             )
             prev_map: dict[str, int] = {r["brand_id"]: int(r["revenue_fen"]) for r in prev_row.mappings().all()}
@@ -399,7 +411,8 @@ class GroupDashboardService:
         try:
             # 查询今日各门店营业额
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         s.id            AS store_id,
                         s.store_name,
@@ -416,7 +429,8 @@ class GroupDashboardService:
                     WHERE s.tenant_id  = :tenant_id
                       AND s.is_deleted = FALSE
                     GROUP BY s.id, s.store_name, s.brand_id, s.brand_name
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "today": today},
             )
             stores = row.mappings().all()
@@ -594,7 +608,8 @@ class GroupDashboardService:
 
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COALESCE(o.biz_date, DATE(o.created_at))    AS biz_date,
                         COALESCE(SUM(o.final_amount_fen), 0)        AS revenue_fen,
@@ -610,7 +625,8 @@ class GroupDashboardService:
                       AND o.is_deleted = FALSE
                     GROUP BY biz_date
                     ORDER BY biz_date ASC
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,

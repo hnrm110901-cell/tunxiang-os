@@ -11,6 +11,7 @@
   8. v278 迁移静态校验
   9. ModelRouter 注册 dish_dynamic_pricing → MODERATE
 """
+
 from __future__ import annotations
 
 import os
@@ -36,12 +37,10 @@ from services.dish_dynamic_pricing_service import (  # noqa: E402
 # 1. 弹性估算
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_elasticity_insufficient_data():
     """数据 < 14 点 → 返回 insufficient + 先验"""
-    obs = [
-        PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50)
-        for i in range(5)
-    ]
+    obs = [PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50) for i in range(5)]
     est = estimate_elasticity_log_log(obs)
     assert est.source == "insufficient"
     assert est.elasticity == DEFAULT_PRIOR_ELASTICITY
@@ -51,10 +50,7 @@ def test_elasticity_insufficient_data():
 
 def test_elasticity_no_price_variation_returns_prior():
     """价格从未变过 → 无法估弹性 → prior"""
-    obs = [
-        PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50)
-        for i in range(20)
-    ]
+    obs = [PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50) for i in range(20)]
     est = estimate_elasticity_log_log(obs)
     assert est.source == "prior"
     assert est.elasticity == DEFAULT_PRIOR_ELASTICITY
@@ -65,16 +61,32 @@ def test_elasticity_typical_negative():
     # 价格 5000 → 销量 80；价格 6000 → 销量 60；价格 7000 → 销量 45
     # 用这三组 * 5 次重复构成 15 点数据
     obs = []
-    i = 0
-    for price, qty in [(5000, 80), (5500, 70), (6000, 60),
-                       (6500, 52), (7000, 45), (5200, 75), (5800, 65),
-                       (6300, 55), (6800, 48), (7500, 40),
-                       (5100, 78), (5700, 67), (6200, 57),
-                       (6700, 50), (7200, 42)]:
-        obs.append(PricingObservation(
-            day=date(2026, 1, i + 1), price_fen=price, quantity_sold=qty,
-        ))
-        i += 1
+    for i, (price, qty) in enumerate(
+        [
+            (5000, 80),
+            (5500, 70),
+            (6000, 60),
+            (6500, 52),
+            (7000, 45),
+            (5200, 75),
+            (5800, 65),
+            (6300, 55),
+            (6800, 48),
+            (7500, 40),
+            (5100, 78),
+            (5700, 67),
+            (6200, 57),
+            (6700, 50),
+            (7200, 42),
+        ]
+    ):
+        obs.append(
+            PricingObservation(
+                day=date(2026, 1, i + 1),
+                price_fen=price,
+                quantity_sold=qty,
+            )
+        )
     est = estimate_elasticity_log_log(obs)
     assert est.source == "log_log"
     assert est.elasticity < 0, f"典型涨价-减量应是负弹性，实际 {est.elasticity}"
@@ -84,6 +96,7 @@ def test_elasticity_typical_negative():
 # ──────────────────────────────────────────────────────────────────────
 # 2. 最优价格
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_solve_optimal_price_respects_margin_floor():
     """成本 5000，毛利底线 15% → 价格必须 ≥ 5000/(1-0.15) ≈ 5882"""
@@ -114,7 +127,7 @@ def test_solve_optimal_price_positive_elasticity_no_change():
     result = solve_optimal_price(
         current_price_fen=10000,
         cost_fen=3000,
-        elasticity=0.5,   # 正弹性（异常）
+        elasticity=0.5,  # 正弹性（异常）
     )
     assert result == 10000
 
@@ -134,7 +147,7 @@ def test_solve_optimal_price_low_elasticity_pushes_up():
 def test_solve_optimal_price_below_floor_must_raise():
     """当前价已低于毛利底线 → 强制涨到 min_price"""
     result = solve_optimal_price(
-        current_price_fen=3000,   # 当前毛利率 0%
+        current_price_fen=3000,  # 当前毛利率 0%
         cost_fen=3000,
         elasticity=-2.0,
     )
@@ -145,6 +158,7 @@ def test_solve_optimal_price_below_floor_must_raise():
 # ──────────────────────────────────────────────────────────────────────
 # 3. 销量变化估算
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_expected_qty_delta_price_up_reduces_qty():
     """涨价 + 负弹性 → 销量下降"""
@@ -189,19 +203,38 @@ def test_expected_qty_delta_zero_current_qty():
 # 4. suggest_pricing 端到端
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_suggest_pricing_with_sufficient_data():
     """≥14 点历史数据 → log_log elasticity + 合理建议"""
     service = DishDynamicPricingService()
     obs = []
-    for i, (price, qty) in enumerate([
-        (5000, 80), (5500, 70), (6000, 60), (6500, 52), (7000, 45),
-        (5200, 75), (5800, 65), (6300, 55), (6800, 48), (7500, 40),
-        (5100, 78), (5700, 67), (6200, 57), (6700, 50), (7200, 42),
-    ]):
-        obs.append(PricingObservation(
-            day=date(2026, 1, i + 1), price_fen=price, quantity_sold=qty,
-        ))
+    for i, (price, qty) in enumerate(
+        [
+            (5000, 80),
+            (5500, 70),
+            (6000, 60),
+            (6500, 52),
+            (7000, 45),
+            (5200, 75),
+            (5800, 65),
+            (6300, 55),
+            (6800, 48),
+            (7500, 40),
+            (5100, 78),
+            (5700, 67),
+            (6200, 57),
+            (6700, 50),
+            (7200, 42),
+        ]
+    ):
+        obs.append(
+            PricingObservation(
+                day=date(2026, 1, i + 1),
+                price_fen=price,
+                quantity_sold=qty,
+            )
+        )
 
     result = await service.suggest_pricing(
         dish_id="00000000-0000-0000-0000-000000000001",
@@ -222,14 +255,13 @@ async def test_suggest_pricing_with_sufficient_data():
 async def test_suggest_pricing_insufficient_data_marks_high_risk():
     """数据不足 → prior elasticity → fallback 标 high risk"""
     service = DishDynamicPricingService()
-    obs = [
-        PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50)
-        for i in range(5)
-    ]
+    obs = [PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50) for i in range(5)]
     result = await service.suggest_pricing(
         dish_id="00000000-0000-0000-0000-000000000002",
         dish_name="小众菜",
-        current_price_fen=6000, cost_fen=2000, current_daily_qty=10,
+        current_price_fen=6000,
+        cost_fen=2000,
+        current_daily_qty=10,
         observations=obs,
     )
     assert result.elasticity.source == "insufficient"
@@ -242,10 +274,7 @@ async def test_suggest_pricing_insufficient_data_marks_high_risk():
 async def test_suggest_pricing_below_margin_floor_flags_violation():
     """当前毛利率已低于 15% → constraint_check 不标 passed"""
     service = DishDynamicPricingService()
-    obs = [
-        PricingObservation(day=date(2026, 1, i + 1), price_fen=3100, quantity_sold=50)
-        for i in range(20)
-    ]
+    obs = [PricingObservation(day=date(2026, 1, i + 1), price_fen=3100, quantity_sold=50) for i in range(20)]
     result = await service.suggest_pricing(
         dish_id="00000000-0000-0000-0000-000000000003",
         dish_name="成本超标菜",
@@ -262,6 +291,7 @@ async def test_suggest_pricing_below_margin_floor_flags_violation():
 # 5. Sonnet validate
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_sonnet_validate_with_invoker():
     invoked = []
@@ -272,15 +302,15 @@ async def test_sonnet_validate_with_invoker():
 
     service = DishDynamicPricingService(sonnet_invoker=mock_sonnet)
     obs = [
-        PricingObservation(day=date(2026, 1, i + 1),
-                           price_fen=5000 + (i % 3) * 500,
-                           quantity_sold=50 - (i % 3) * 5)
+        PricingObservation(day=date(2026, 1, i + 1), price_fen=5000 + (i % 3) * 500, quantity_sold=50 - (i % 3) * 5)
         for i in range(20)
     ]
     result = await service.suggest_pricing(
         dish_id="00000000-0000-0000-0000-000000000004",
         dish_name="test",
-        current_price_fen=5500, cost_fen=2000, current_daily_qty=50,
+        current_price_fen=5500,
+        cost_fen=2000,
+        current_daily_qty=50,
         observations=obs,
     )
     assert len(invoked) == 1
@@ -295,14 +325,13 @@ async def test_sonnet_validate_failure_falls_back_to_rules():
         raise RuntimeError("API 503")
 
     service = DishDynamicPricingService(sonnet_invoker=boom)
-    obs = [
-        PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50)
-        for i in range(20)
-    ]
+    obs = [PricingObservation(day=date(2026, 1, i + 1), price_fen=5000, quantity_sold=50) for i in range(20)]
     result = await service.suggest_pricing(
         dish_id="00000000-0000-0000-0000-000000000005",
         dish_name="fallback test",
-        current_price_fen=5000, cost_fen=2000, current_daily_qty=50,
+        current_price_fen=5000,
+        cost_fen=2000,
+        current_daily_qty=50,
         observations=obs,
     )
     assert result.sonnet_risk_level in {"low", "medium", "high"}
@@ -317,12 +346,19 @@ def test_parse_sonnet_risk_level_variants():
         ElasticityEstimate,
         PricingSuggestion,
     )
+
     stub = PricingSuggestion(
-        dish_id="x", dish_name="x",
-        current_price_fen=100, suggested_price_fen=110, current_cost_fen=40,
-        current_margin_rate=0.6, suggested_margin_rate=0.63, price_change_pct=0.1,
+        dish_id="x",
+        dish_name="x",
+        current_price_fen=100,
+        suggested_price_fen=110,
+        current_cost_fen=40,
+        current_margin_rate=0.6,
+        suggested_margin_rate=0.63,
+        price_change_pct=0.1,
         elasticity=ElasticityEstimate(-1, 0.5, "log_log", 20),
-        expected_daily_qty_delta=0, expected_daily_margin_delta_fen=0,
+        expected_daily_qty_delta=0,
+        expected_daily_margin_delta_fen=0,
         constraint_check={},
     )
     for text_in, expected in [
@@ -341,8 +377,15 @@ def test_parse_sonnet_risk_level_variants():
 # ──────────────────────────────────────────────────────────────────────
 
 _MIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "..",
-    "shared", "db-migrations", "versions", "v278_dish_pricing_suggestions.py"
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "shared",
+    "db-migrations",
+    "versions",
+    "v278_dish_pricing_suggestions.py",
 )
 
 
@@ -356,13 +399,26 @@ def _read_migration() -> str:
 def test_v278_creates_table_with_all_columns():
     content = _read_migration()
     for col in (
-        "current_price_fen", "suggested_price_fen", "current_cost_fen",
-        "current_margin_rate", "suggested_margin_rate", "price_change_pct",
-        "elasticity", "elasticity_confidence", "elasticity_source",
-        "expected_daily_qty_delta", "expected_daily_margin_delta_fen",
-        "constraint_check", "sonnet_analysis", "sonnet_risk_level",
-        "status", "confirmed_by", "applied_at", "reverted_at",
-        "actual_qty_delta", "actual_margin_delta_fen",
+        "current_price_fen",
+        "suggested_price_fen",
+        "current_cost_fen",
+        "current_margin_rate",
+        "suggested_margin_rate",
+        "price_change_pct",
+        "elasticity",
+        "elasticity_confidence",
+        "elasticity_source",
+        "expected_daily_qty_delta",
+        "expected_daily_margin_delta_fen",
+        "constraint_check",
+        "sonnet_analysis",
+        "sonnet_risk_level",
+        "status",
+        "confirmed_by",
+        "applied_at",
+        "reverted_at",
+        "actual_qty_delta",
+        "actual_margin_delta_fen",
     ):
         assert col in content, f"缺列 {col}"
 
@@ -395,10 +451,20 @@ def test_v278_down_revision_chains_to_v277():
 # 7. ModelRouter 注册
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_model_router_registers_dish_dynamic_pricing_as_moderate():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "services", "tunxiang-api", "src", "shared", "core", "model_router.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "services",
+        "tunxiang-api",
+        "src",
+        "shared",
+        "core",
+        "model_router.py",
     )
     if not os.path.exists(path):
         pytest.skip("model_router.py 不存在")

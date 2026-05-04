@@ -113,7 +113,8 @@ class SupplyRepository:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT supplier_id, composite_score, delivery_rate,
                            quality_rate, price_stability, response_speed,
                            compliance_rate, tier, score_month, created_at
@@ -122,7 +123,8 @@ class SupplyRepository:
                       AND supplier_id = :supplier_id::uuid
                     ORDER BY score_month DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": self.tenant_id, "supplier_id": supplier_id},
             )
             row = result.fetchone()
@@ -150,7 +152,8 @@ class SupplyRepository:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT po.supplier_id,
                            AVG(poi.unit_price_fen)::BIGINT AS avg_price_fen,
                            MIN(poi.unit_price_fen)          AS min_price_fen,
@@ -164,7 +167,8 @@ class SupplyRepository:
                       AND po.supplier_id IS NOT NULL
                     GROUP BY po.supplier_id
                     ORDER BY avg_price_fen ASC
-                """),
+                """
+                ),
                 {
                     "tenant_id": self.tenant_id,
                     "ingredient_id": ingredient_id,

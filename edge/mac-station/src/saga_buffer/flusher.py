@@ -23,6 +23,7 @@ HTTP 状态码分路（Fix-8a）：
 
 关联：CLAUDE.md §8 离线优先 / §17 Tier1
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -222,9 +223,7 @@ class SagaFlusher:
         if status == 401:
             # 复位为 pending，让下一轮 flush_ready 仍可选中（保证不卡 flushing）
             await self._buffer.mark_jwt_expired_skip(entry.idempotency_key)
-            self._jwt_expired_skip_until[entry.idempotency_key] = (
-                now_ts + JWT_EXPIRED_BACKOFF_SEC
-            )
+            self._jwt_expired_skip_until[entry.idempotency_key] = now_ts + JWT_EXPIRED_BACKOFF_SEC
             logger.warning(
                 "saga_flusher.jwt_expired_skip_retry",
                 saga_id=entry.saga_id,

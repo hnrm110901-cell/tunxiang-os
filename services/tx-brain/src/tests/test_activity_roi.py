@@ -98,8 +98,7 @@ class FakeModelRouter:
     def __init__(self, response_text: str | None = None, raise_exc: Exception | None = None):
         self.response_text = response_text or json.dumps(
             {
-                "narrative": "建议谨慎启动本次满减活动。预算约 2000 元，预期增量 GMV 约 8000 元，"
-                "相对客单未明显稀释。",
+                "narrative": "建议谨慎启动本次满减活动。预算约 2000 元，预期增量 GMV 约 8000 元，相对客单未明显稀释。",
                 "caveats": ["假动作风险：会员日老客本就消费", "毛利侵蚀：满减幅度需复核"],
             },
             ensure_ascii=False,
@@ -140,12 +139,12 @@ async def test_prophet_baseline_forecasts_with_synthetic_data():
     assert all(p.baseline_gmv_fen < 200_000_00 for p in points)
 
     # 周末（周六/周日）应高于周内（周一到周五），季节性被学到了
-    weekday_avg = sum(
-        p.baseline_gmv_fen for p in points if p.date.weekday() < 5
-    ) / max(1, sum(1 for p in points if p.date.weekday() < 5))
-    weekend_avg = sum(
-        p.baseline_gmv_fen for p in points if p.date.weekday() >= 5
-    ) / max(1, sum(1 for p in points if p.date.weekday() >= 5))
+    weekday_avg = sum(p.baseline_gmv_fen for p in points if p.date.weekday() < 5) / max(
+        1, sum(1 for p in points if p.date.weekday() < 5)
+    )
+    weekend_avg = sum(p.baseline_gmv_fen for p in points if p.date.weekday() >= 5) / max(
+        1, sum(1 for p in points if p.date.weekday() >= 5)
+    )
     assert weekend_avg > weekday_avg, "fallback Holt-Winters 必须学到周季节"
 
 

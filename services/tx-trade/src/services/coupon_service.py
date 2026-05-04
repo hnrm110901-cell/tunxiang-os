@@ -262,7 +262,8 @@ async def deduct_stored_value(
 
     # 原子SQL：余额充足时扣减，不足时影响0行
     result = await db.execute(
-        text("""
+        text(
+            """
         UPDATE stored_value_accounts
         SET balance_fen        = balance_fen - :amount,
             total_consumed_fen = total_consumed_fen + :amount,
@@ -272,7 +273,8 @@ async def deduct_stored_value(
           AND is_deleted = FALSE
           AND (balance_fen - frozen_fen) >= :amount
         RETURNING balance_fen, id, member_id
-        """),
+        """
+        ),
         {
             "amount": amount_fen,
             "card_id": card_id,
@@ -284,11 +286,13 @@ async def deduct_stored_value(
         # 行数为0：余额不足 or 账户不存在 or 非本租户
         # 查询原因（只读）
         check = await db.execute(
-            text("""
+            text(
+                """
             SELECT balance_fen, frozen_fen, is_deleted
             FROM stored_value_accounts
             WHERE id = :card_id AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {"card_id": card_id, "tenant_id": tenant_id},
         )
         account = check.fetchone()
@@ -302,7 +306,8 @@ async def deduct_stored_value(
     # 写流水记录（写入 stored_value_transactions 表）
     try:
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO stored_value_transactions
                 (id, tenant_id, account_id, member_id, type, amount_fen,
                  balance_after_fen, order_id, created_at)
@@ -310,7 +315,8 @@ async def deduct_stored_value(
                 (gen_random_uuid(), :tenant_id::uuid, :account_id::uuid,
                  :member_id::uuid, 'consume', :amount, :balance_after,
                  :order_id::uuid, NOW())
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "account_id": card_id,

@@ -78,14 +78,16 @@ async def _send_notification(
     """写入一条审批通知记录。"""
     nid = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO approval_notifications
                 (id, tenant_id, instance_id, recipient_id, recipient_name,
                  notification_type, message, is_read, sent_at)
             VALUES
                 (:id, :tenant_id, :instance_id, :recipient_id, :recipient_name,
                  :notification_type, :message, false, now())
-        """),
+        """
+        ),
         {
             "id": nid,
             "tenant_id": tenant_id,
@@ -140,7 +142,8 @@ class ApprovalEngine:
         """
         # 1. 查询模板
         row = await db.fetch_one(
-            text("""
+            text(
+                """
                 SELECT id, template_name, steps
                 FROM approval_templates
                 WHERE tenant_id = :tenant_id
@@ -149,7 +152,8 @@ class ApprovalEngine:
                   AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "business_type": business_type},
         )
         if row is None:
@@ -169,7 +173,8 @@ class ApprovalEngine:
 
         # 3. 写入实例
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO approval_instances
                     (id, tenant_id, template_id, business_type, business_id,
                      title, description, amount_fen,
@@ -182,7 +187,8 @@ class ApprovalEngine:
                      :initiator_id, :initiator_name,
                      1, :total_steps, 'pending',
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": instance_id,
                 "tenant_id": tenant_id,
@@ -267,7 +273,8 @@ class ApprovalEngine:
 
         # 查询实例
         inst = await db.fetch_one(
-            text("""
+            text(
+                """
                 SELECT ai.id, ai.tenant_id, ai.template_id, ai.business_type,
                        ai.business_id, ai.title, ai.current_step, ai.total_steps,
                        ai.status, ai.deadline_at, ai.initiator_id, ai.initiator_name,
@@ -277,7 +284,8 @@ class ApprovalEngine:
                 WHERE ai.id = :instance_id
                   AND ai.tenant_id = :tenant_id
                   AND ai.is_deleted = false
-            """),
+            """
+            ),
             {"instance_id": instance_id, "tenant_id": tenant_id},
         )
         if inst is None:
@@ -292,11 +300,13 @@ class ApprovalEngine:
         now = _now_utc()
         if deadline is not None and now > deadline:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE approval_instances
                     SET status = 'expired', updated_at = :now
                     WHERE id = :id
-                """),
+                """
+                ),
                 {"id": instance_id, "now": now},
             )
             log.info("approval_instance_expired", instance_id=instance_id)
@@ -333,7 +343,8 @@ class ApprovalEngine:
         # 写步骤记录
         record_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO approval_step_records
                     (id, tenant_id, instance_id, step_no,
                      approver_id, approver_name, approver_role,
@@ -342,7 +353,8 @@ class ApprovalEngine:
                     (:id, :tenant_id, :instance_id, :step_no,
                      :approver_id, :approver_name, :approver_role,
                      :action, :comment, :now)
-            """),
+            """
+            ),
             {
                 "id": record_id,
                 "tenant_id": tenant_id,
@@ -373,11 +385,13 @@ class ApprovalEngine:
         if action == "reject":
             # 驳回 → status=rejected
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE approval_instances
                     SET status = 'rejected', updated_at = :now
                     WHERE id = :id
-                """),
+                """
+                ),
                 {"id": instance_id, "now": now},
             )
             # 通知发起人
@@ -401,11 +415,13 @@ class ApprovalEngine:
         if current_step >= total_steps:
             # 最后一步，全部通过
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE approval_instances
                     SET status = 'approved', updated_at = :now
                     WHERE id = :id
-                """),
+                """
+                ),
                 {"id": instance_id, "now": now},
             )
             # 通知发起人
@@ -428,11 +444,13 @@ class ApprovalEngine:
             # 推进到下一步
             next_step_no = current_step + 1
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE approval_instances
                     SET current_step = :next_step, updated_at = :now
                     WHERE id = :id
-                """),
+                """
+                ),
                 {"id": instance_id, "next_step": next_step_no, "now": now},
             )
             # 找下一步角色
@@ -475,7 +493,8 @@ class ApprovalEngine:
         （生产环境可扩展：approver_id 可以是 user_id，通过员工-角色映射表关联）
         """
         rows = await db.fetch_all(
-            text("""
+            text(
+                """
                 SELECT ai.id, ai.tenant_id, ai.business_type, ai.business_id,
                        ai.title, ai.description, ai.amount_fen,
                        ai.initiator_id, ai.initiator_name,
@@ -488,7 +507,8 @@ class ApprovalEngine:
                   AND ai.status = 'pending'
                   AND ai.is_deleted = false
                 ORDER BY ai.created_at ASC
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
 
@@ -516,7 +536,8 @@ class ApprovalEngine:
         """查询 initiator_id 发起的审批，可按 status 过滤。"""
         if status is not None:
             rows = await db.fetch_all(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, template_id, business_type, business_id,
                            title, description, amount_fen,
                            initiator_id, initiator_name,
@@ -528,12 +549,14 @@ class ApprovalEngine:
                       AND status = :status
                       AND is_deleted = false
                     ORDER BY created_at DESC
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "initiator_id": initiator_id, "status": status},
             )
         else:
             rows = await db.fetch_all(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, template_id, business_type, business_id,
                            title, description, amount_fen,
                            initiator_id, initiator_name,
@@ -544,7 +567,8 @@ class ApprovalEngine:
                       AND initiator_id = :initiator_id
                       AND is_deleted = false
                     ORDER BY created_at DESC
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "initiator_id": initiator_id},
             )
         return [dict(row) for row in rows]
@@ -558,7 +582,8 @@ class ApprovalEngine:
         """
         now = _now_utc()
         rows = await db.fetch_all(
-            text("""
+            text(
+                """
                 SELECT id, title, initiator_id, initiator_name
                 FROM approval_instances
                 WHERE tenant_id = :tenant_id
@@ -566,18 +591,21 @@ class ApprovalEngine:
                   AND deadline_at IS NOT NULL
                   AND deadline_at < :now
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "now": now},
         )
 
         count = 0
         for row in rows:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE approval_instances
                     SET status = 'expired', updated_at = :now
                     WHERE id = :id
-                """),
+                """
+                ),
                 {"id": row["id"], "now": now},
             )
             # 通知发起人

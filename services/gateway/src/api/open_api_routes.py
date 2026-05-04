@@ -196,7 +196,8 @@ async def get_application_logs(
     offset = (page - 1) * size
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, endpoint, method, status_code,
                    request_duration_ms, ip_address, request_id, created_at
             FROM api_request_logs
@@ -204,7 +205,8 @@ async def get_application_logs(
               AND tenant_id = :tenant_id
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {
             "app_id": str(app_id),
             "tenant_id": str(tenant_id),
@@ -215,10 +217,12 @@ async def get_application_logs(
     items = [dict(r) for r in result.mappings().fetchall()]
 
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM api_request_logs
             WHERE app_id = :app_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"app_id": str(app_id), "tenant_id": str(tenant_id)},
     )
     total = count_result.scalar_one()

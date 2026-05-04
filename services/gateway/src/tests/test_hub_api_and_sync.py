@@ -52,9 +52,9 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-# 导入被测路由
-from services.gateway.src.hub_api import router as hub_router
-from services.gateway.src.sync_scheduler import sync_router as sync_health_router
+# 导入被测路由（CI 设置 PYTHONPATH=src，故顶层 import 即可）
+from hub_api import router as hub_router
+from sync_scheduler import sync_router as sync_health_router
 
 # 导入真实的 get_db_no_rls 引用，供 dependency_overrides 使用
 from shared.ontology.src.database import get_db_no_rls

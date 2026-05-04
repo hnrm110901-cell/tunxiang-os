@@ -142,15 +142,18 @@ async def get_lifecycle_members(
     await _set_rls(db, tenant_id)
 
     where_store = "AND store_id = :store_id" if store_id else ""
-    count_sql = text(f"""
+    count_sql = text(
+        f"""
         SELECT count(*)
         FROM customers
         WHERE tenant_id = :tid
           AND is_deleted = FALSE
           AND lifecycle_stage = :stage
           {where_store}
-    """)
-    list_sql = text(f"""
+    """
+    )
+    list_sql = text(
+        f"""
         SELECT id, display_name, primary_phone, lifecycle_stage,
                first_order_at, last_order_at, rfm_level, total_order_count
         FROM customers
@@ -160,7 +163,8 @@ async def get_lifecycle_members(
           {where_store}
         ORDER BY last_order_at DESC NULLS LAST
         LIMIT :limit OFFSET :offset
-    """)
+    """
+    )
 
     params: dict[str, Any] = {
         "tid": str(tenant_id),
@@ -276,24 +280,28 @@ async def get_lifecycle_events(
     await _set_rls(db, tenant_id)
 
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT count(*)
             FROM lifecycle_events
             WHERE tenant_id = :tid AND member_id = :mid
-        """),
+        """
+        ),
         {"tid": str(tenant_id), "mid": member_id},
     )
     total = count_result.scalar() or 0
 
     rows_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, from_stage, to_stage, trigger_reason,
                    action_taken, created_at
             FROM lifecycle_events
             WHERE tenant_id = :tid AND member_id = :mid
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {
             "tid": str(tenant_id),
             "mid": member_id,
@@ -345,13 +353,15 @@ async def get_lifecycle_config(
     await _set_rls(db, tenant_id)
 
     rows_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT stage, days_threshold, auto_action,
                    coupon_template_id, message_template, is_active
             FROM lifecycle_configs
             WHERE tenant_id = :tid
             ORDER BY stage
-        """),
+        """
+        ),
         {"tid": str(tenant_id)},
     )
     rows = rows_result.fetchall()
@@ -422,7 +432,8 @@ async def update_lifecycle_config(
     tenant_id = _parse_tenant(x_tenant_id)
     await _set_rls(db, tenant_id)
 
-    upsert_sql = text("""
+    upsert_sql = text(
+        """
         INSERT INTO lifecycle_configs
             (tenant_id, stage, days_threshold, auto_action,
              coupon_template_id, message_template, is_active)
@@ -439,7 +450,8 @@ async def update_lifecycle_config(
             updated_at         = NOW()
         RETURNING stage, days_threshold, auto_action,
                   coupon_template_id, message_template, is_active
-    """)
+    """
+    )
 
     result = await db.execute(
         upsert_sql,

@@ -15,6 +15,7 @@
 - 测试: 传 fakeredis.FakeAsyncRedis()
 - 环境: 传自定义连接池
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -35,7 +36,7 @@ logger = structlog.get_logger(__name__)
 class RedisStreamsEventBus(EventBus):
     """基于 Redis Streams 的 EventBus 实现."""
 
-    DEFAULT_BLOCK_MS = 200   # XREADGROUP 阻塞毫秒 (短周期响应取消)
+    DEFAULT_BLOCK_MS = 200  # XREADGROUP 阻塞毫秒 (短周期响应取消)
     DEFAULT_READ_COUNT = 64  # 单次 XREADGROUP 读取条数
 
     def __init__(
@@ -83,16 +84,13 @@ class RedisStreamsEventBus(EventBus):
             "payload": envelope.payload.model_dump_json(),
         }
 
-    def _fields_to_envelope(
-        self, fields: dict[str, str]
-    ) -> EventEnvelope:
+    def _fields_to_envelope(self, fields: dict[str, str]) -> EventEnvelope:
         """Redis stream fields → EventEnvelope (Pydantic 校验 payload)."""
         event_type = fields["event_type"]
         payload_cls = self._schemas.get(event_type)
         if payload_cls is None:
             raise ValueError(
-                f"未注册的 event_type: {event_type}. "
-                f"请在 schema_registry 中登记对应的 OntologyEvent 子类."
+                f"未注册的 event_type: {event_type}. 请在 schema_registry 中登记对应的 OntologyEvent 子类."
             )
         payload_dict = json.loads(fields["payload"])
         payload = payload_cls.model_validate(payload_dict)

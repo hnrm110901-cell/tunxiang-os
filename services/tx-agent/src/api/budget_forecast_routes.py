@@ -9,10 +9,10 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any, Dict, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ from ..services.budget_forecast_service import (
     get_latest_forecast,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(
     prefix="/api/v1/agent/budget",
     tags=["agent-budget-forecast"],

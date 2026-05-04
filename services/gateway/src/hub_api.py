@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError, ProgrammingError
@@ -38,8 +38,8 @@ def _pg_unavailable(exc: ProgrammingError) -> HTTPException:
 @router.get("/merchants")
 async def list_merchants(
     status: Optional[str] = None,
-    page: int = Field(default=1, ge=1),
-    size: int = Field(default=20, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db_no_rls),
 ):
     """列出所有商户（platform_tenants + 门店数聚合）"""
@@ -103,8 +103,8 @@ async def update_merchant(
 async def list_all_stores(
     merchant_id: Optional[str] = None,
     online: Optional[bool] = None,
-    page: int = Field(default=1, ge=1),
-    size: int = Field(default=20, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db_no_rls),
 ):
     """全局门店列表（stores + hub_store_overlay + platform_tenants）"""
@@ -308,8 +308,8 @@ async def edges_topology(db: AsyncSession = Depends(get_db_no_rls)):
 @router.get("/edges")
 async def list_edges(
     status: Optional[str] = None,
-    page: int = Field(default=1, ge=1),
-    size: int = Field(default=20, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db_no_rls),
 ):
     """边缘节点列表（替代 /deployment/mac-minis）"""
@@ -499,8 +499,8 @@ async def customer_timeline(customer_id: str, db: AsyncSession = Depends(get_db_
 @router.get("/customers")
 async def list_customers(
     status: Optional[str] = None,
-    page: int = Field(default=1, ge=1),
-    size: int = Field(default=20, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db_no_rls),
 ):
     """客户列表（带健康分/ARR/门店数/NPS/续约日）"""
@@ -591,8 +591,8 @@ class UpdateIncidentBody(BaseModel):
 async def list_incidents(
     status: Optional[str] = None,
     priority: Optional[str] = None,
-    page: int = Field(default=1, ge=1),
-    size: int = Field(default=20, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db_no_rls),
 ):
     """Incident 列表（status/priority 过滤）"""
@@ -642,7 +642,9 @@ async def update_incident(
     """更新 Incident（状态/优先级/指挥官）"""
     try:
         data = await hub_service.hub_update_incident(
-            db, incident_id, body.model_dump(exclude_none=True),
+            db,
+            incident_id,
+            body.model_dump(exclude_none=True),
         )
         if not data:
             raise HTTPException(status_code=404, detail=f"Incident {incident_id} 不存在")
@@ -694,8 +696,8 @@ class CreateMigrationBody(BaseModel):
 @router.get("/migrations")
 async def list_migrations(
     status: Optional[str] = None,
-    page: int = Field(default=1, ge=1),
-    size: int = Field(default=20, ge=1, le=200),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=200),
     db: AsyncSession = Depends(get_db_no_rls),
 ):
     """迁移项目列表"""
@@ -899,7 +901,10 @@ async def run_playbook(
     """触发 Playbook 执行"""
     try:
         data = await hub_service.hub_run_playbook(
-            db, playbook_id, body.target_id, body.target_type,
+            db,
+            playbook_id,
+            body.target_id,
+            body.target_type,
         )
         if not data:
             raise HTTPException(status_code=404, detail=f"Playbook {playbook_id} 不存在")

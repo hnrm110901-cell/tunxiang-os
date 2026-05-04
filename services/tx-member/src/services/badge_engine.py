@@ -44,12 +44,14 @@ async def _get_customer_stats(
 
     # 到店次数
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(DISTINCT DATE(created_at)) AS visit_count
             FROM orders
             WHERE tenant_id = :tid AND customer_id = :cid
               AND is_deleted = false AND status = 'paid'
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     r = row.mappings().first()
@@ -57,12 +59,14 @@ async def _get_customer_stats(
 
     # 累计消费（分）
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(total_fen), 0) AS spend_total
             FROM orders
             WHERE tenant_id = :tid AND customer_id = :cid
               AND is_deleted = false AND status = 'paid'
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     r = row.mappings().first()
@@ -70,7 +74,8 @@ async def _get_customer_stats(
 
     # 连续到店天数（最近连续）
     row = await db.execute(
-        text("""
+        text(
+            """
             WITH daily AS (
                 SELECT DISTINCT DATE(created_at) AS d
                 FROM orders
@@ -86,7 +91,8 @@ async def _get_customer_stats(
             SELECT COUNT(*) AS streak
             FROM numbered
             WHERE grp = (SELECT grp FROM numbered LIMIT 1)
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     r = row.mappings().first()
@@ -94,13 +100,15 @@ async def _get_customer_stats(
 
     # 品类多样性（不同菜品数）
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(DISTINCT oi.dish_id) AS dish_variety
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
             WHERE o.tenant_id = :tid AND o.customer_id = :cid
               AND o.is_deleted = false AND o.status = 'paid'
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     r = row.mappings().first()
@@ -108,12 +116,14 @@ async def _get_customer_stats(
 
     # 推荐人数
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS referral_count
             FROM referrals
             WHERE tenant_id = :tid AND referrer_id = :cid
               AND is_deleted = false AND status = 'completed'
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     r = row.mappings().first()
@@ -148,21 +158,25 @@ async def evaluate_badges(
 
     # 获取该租户所有活跃徽章
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, category, unlock_rule, rarity, points_reward
             FROM badges
             WHERE tenant_id = :tid AND is_active = true AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     badges = rows.mappings().all()
 
     # 获取已解锁徽章
     owned_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT badge_id FROM member_badges
             WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     owned_ids = {str(r["badge_id"]) for r in owned_rows.mappings().all()}
@@ -222,11 +236,13 @@ async def unlock_badge(
     """解锁单个徽章，返回是否成功（幂等，重复解锁返回 False）"""
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO member_badges (tenant_id, customer_id, badge_id, unlock_context)
                 VALUES (:tid, :cid, :bid, :ctx::jsonb)
                 ON CONFLICT (tenant_id, customer_id, badge_id) DO NOTHING
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": customer_id,
@@ -254,7 +270,8 @@ async def get_customer_badges(
 ) -> list[dict]:
     """获取顾客所有已解锁徽章"""
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT mb.id, mb.badge_id, mb.unlocked_at, mb.is_showcase,
                    b.name, b.category, b.rarity, b.icon_url, b.points_reward
             FROM member_badges mb
@@ -262,7 +279,8 @@ async def get_customer_badges(
             WHERE mb.tenant_id = :tid AND mb.customer_id = :cid
               AND mb.is_deleted = false AND b.is_deleted = false
             ORDER BY mb.unlocked_at DESC
-        """),
+        """
+        ),
         {"tid": tenant_id, "cid": customer_id},
     )
     return [dict(r) for r in rows.mappings().all()]
@@ -275,7 +293,8 @@ async def get_badge_leaderboard(
 ) -> list[dict]:
     """徽章排行榜 — 按解锁数量排名"""
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT mb.customer_id,
                    COUNT(*) AS badge_count,
                    SUM(b.points_reward) AS total_points
@@ -285,7 +304,8 @@ async def get_badge_leaderboard(
             GROUP BY mb.customer_id
             ORDER BY badge_count DESC, total_points DESC
             LIMIT :lim
-        """),
+        """
+        ),
         {"tid": tenant_id, "lim": limit},
     )
     result = []
@@ -311,22 +331,26 @@ async def get_badge_holders(
     """获取某徽章的所有持有者"""
     offset = (page - 1) * size
     count_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS total FROM member_badges
             WHERE tenant_id = :tid AND badge_id = :bid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "bid": badge_id},
     )
     total = int(count_row.scalar() or 0)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT customer_id, unlocked_at, unlock_context
             FROM member_badges
             WHERE tenant_id = :tid AND badge_id = :bid AND is_deleted = false
             ORDER BY unlocked_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"tid": tenant_id, "bid": badge_id, "lim": size, "off": offset},
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -348,23 +372,27 @@ async def list_badges(
         params["cat"] = category
 
     count_row = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*) FROM badges
             WHERE tenant_id = :tid AND is_deleted = false{where_extra}
-        """),
+        """
+        ),
         params,
     )
     total = int(count_row.scalar() or 0)
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, name, description, category, unlock_rule, rarity,
                    points_reward, icon_url, display_order, is_active
             FROM badges
             WHERE tenant_id = :tid AND is_deleted = false{where_extra}
             ORDER BY display_order, created_at
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in rows.mappings().all()]

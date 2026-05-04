@@ -140,7 +140,8 @@ async def list_growth_campaigns(
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, campaign_type, name, description, status,
                        config, start_time, end_time, budget_fen, spent_fen,
                        target_segments, participant_count, reward_count,
@@ -150,7 +151,8 @@ async def list_growth_campaigns(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -264,11 +266,13 @@ async def update_growth_campaign(
             params["config"] = json.dumps(existing_config)
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE campaigns
                 SET {", ".join(set_parts)}
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             params,
         )
         await db.commit()
@@ -361,11 +365,13 @@ async def get_growth_campaign_stats(
         cid = uuid.UUID(campaign_id)
 
         distinct_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT customer_id) AS distinct_customers
                 FROM campaign_participants
                 WHERE tenant_id = :tid AND campaign_id = :cid
-            """),
+            """
+            ),
             {"tid": tid, "cid": cid},
         )
         distinct_row = distinct_result.fetchone()
@@ -375,13 +381,15 @@ async def get_growth_campaign_stats(
         used_count = 0
         try:
             used_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM customer_coupons cc
                     JOIN campaign_rewards cr
                       ON cc.coupon_id = (cr.reward_data->>'coupon_id')::uuid
                     WHERE cr.tenant_id = :tid AND cr.campaign_id = :cid
                       AND cc.status = 'used'
-                """),
+                """
+                ),
                 {"tid": tid, "cid": cid},
             )
             used_count = used_result.scalar() or 0
@@ -657,7 +665,8 @@ async def apply_coupon_to_order(
         # ① 查询该客户已领取未使用、未过期的优惠券（联表取折扣信息和门槛）
         try:
             coupon_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT cc.id AS cc_id,
                            cc.coupon_id,
                            cc.expire_at,
@@ -676,7 +685,8 @@ async def apply_coupon_to_order(
                       AND c.is_active = true
                       AND c.is_deleted = false
                     ORDER BY cc.created_at ASC
-                """),
+                """
+                ),
                 {
                     "tid": tid,
                     "customer_id": uuid.UUID(req.customer_id),
@@ -700,7 +710,8 @@ async def apply_coupon_to_order(
         # ② 查询当前有效活动（status=active，且在活动期内）
         try:
             campaign_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, name, campaign_type
                     FROM campaigns
                     WHERE tenant_id = :tid
@@ -708,7 +719,8 @@ async def apply_coupon_to_order(
                       AND is_deleted = false
                       AND (start_time IS NULL OR start_time <= :now)
                       AND (end_time IS NULL OR end_time >= :now)
-                """),
+                """
+                ),
                 {"tid": tid, "now": now},
             )
             active_campaigns = campaign_result.fetchall()

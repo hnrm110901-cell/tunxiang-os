@@ -577,7 +577,8 @@ async def _sample_customer_from_reservations(
     from sqlalchemy import text as _text  # noqa: PLC0415
 
     try:
-        sql = _text("""
+        sql = _text(
+            """
             SELECT customer_name, phone
             FROM reservations
             WHERE store_id = :store_id
@@ -586,7 +587,8 @@ async def _sample_customer_from_reservations(
               AND phone IS NOT NULL
             ORDER BY RANDOM()
             LIMIT 1
-        """)
+        """
+        )
         result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
         row = result.fetchone()
         if row:

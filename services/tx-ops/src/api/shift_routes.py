@@ -89,7 +89,8 @@ async def start_shift(
     try:
         await _set_tenant(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO shift_records
                     (tenant_id, store_id, shift_date, shift_type, handover_by, status)
                 VALUES
@@ -99,7 +100,8 @@ async def start_shift(
                           cash_counted_fen, pos_cash_fen, cash_diff_fen,
                           notes, status, disputed, dispute_reason,
                           created_at, updated_at, is_deleted
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "store_id": body.store_id,
@@ -150,7 +152,8 @@ async def initiate_handover(
         cash_diff_fen = body.cash_counted_fen - body.pos_cash_fen
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE shift_records
                 SET end_time         = NOW(),
                     received_by      = :received_by,
@@ -165,7 +168,8 @@ async def initiate_handover(
                           cash_counted_fen, pos_cash_fen, cash_diff_fen,
                           notes, status, disputed, dispute_reason,
                           created_at, updated_at, is_deleted
-            """),
+            """
+            ),
             {
                 "sid": shift_id,
                 "received_by": body.received_by,
@@ -188,12 +192,14 @@ async def initiate_handover(
         if body.device_checklist:
             for item in body.device_checklist:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO shift_device_checklist
                             (shift_id, tenant_id, item, status, note)
                         VALUES
                             (:shift_id, :tenant_id, :item, :status, :note)
-                    """),
+                    """
+                    ),
                     {
                         "shift_id": shift_id,
                         "tenant_id": x_tenant_id,
@@ -237,7 +243,8 @@ async def confirm_handover(
 
         new_status = "disputed" if body.disputed else "confirmed"
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE shift_records
                 SET status         = :status,
                     disputed       = :disputed,
@@ -251,7 +258,8 @@ async def confirm_handover(
                           cash_counted_fen, pos_cash_fen, cash_diff_fen,
                           notes, status, disputed, dispute_reason,
                           created_at, updated_at, is_deleted
-            """),
+            """
+            ),
             {
                 "sid": shift_id,
                 "status": new_status,
@@ -290,7 +298,8 @@ async def list_shifts(
         await _set_tenant(db, x_tenant_id)
         if shift_date is not None:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, store_id, shift_date, shift_type,
                            start_time, end_time, handover_by, received_by,
                            cash_counted_fen, pos_cash_fen, cash_diff_fen,
@@ -302,12 +311,14 @@ async def list_shifts(
                       AND shift_date = :shift_date
                     ORDER BY shift_date DESC, created_at DESC
                     LIMIT 50
-                """),
+                """
+                ),
                 {"store_id": store_id, "shift_date": shift_date.isoformat()},
             )
         else:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, store_id, shift_date, shift_type,
                            start_time, end_time, handover_by, received_by,
                            cash_counted_fen, pos_cash_fen, cash_diff_fen,
@@ -318,7 +329,8 @@ async def list_shifts(
                       AND store_id = :store_id
                     ORDER BY shift_date DESC, created_at DESC
                     LIMIT 50
-                """),
+                """
+                ),
                 {"store_id": store_id},
             )
         rows = result.mappings().all()
@@ -347,7 +359,8 @@ async def get_shift_summary(
     try:
         await _set_tenant(db, x_tenant_id)
         shift_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, shift_date, shift_type,
                        start_time, end_time, handover_by, received_by,
                        cash_counted_fen, pos_cash_fen, cash_diff_fen,
@@ -355,7 +368,8 @@ async def get_shift_summary(
                        created_at, updated_at, is_deleted
                 FROM shift_records
                 WHERE id = :sid
-            """),
+            """
+            ),
             {"sid": shift_id},
         )
         shift_row = shift_result.mappings().first()
@@ -364,11 +378,13 @@ async def get_shift_summary(
         shift = dict(shift_row)
 
         checklist_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, shift_id, tenant_id, item, status, note, created_at
                 FROM shift_device_checklist
                 WHERE shift_id = :sid
-            """),
+            """
+            ),
             {"sid": shift_id},
         )
         device_checklist = [dict(r) for r in checklist_result.mappings().all()]

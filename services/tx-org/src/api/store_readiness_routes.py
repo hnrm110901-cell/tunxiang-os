@@ -173,13 +173,15 @@ async def list_readiness(
     rows = (
         (
             await db.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT {_FIELDS}
             FROM store_readiness_scores
             WHERE {where}
             ORDER BY score_date DESC, risk_level DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -217,7 +219,8 @@ async def upsert_readiness(
     risk_positions = body.risk_positions if body.risk_positions is not None else auto_risk_pos
     action_items = body.action_items or []
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO store_readiness_scores
             (id, tenant_id, store_id, score_date, shift,
              overall_score, dimensions, risk_level, risk_positions, action_items,
@@ -235,7 +238,8 @@ async def upsert_readiness(
             action_items    = EXCLUDED.action_items,
             updated_at      = EXCLUDED.updated_at
         RETURNING id::text, overall_score, risk_level
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -285,7 +289,8 @@ async def readiness_dashboard(
     s_date = score_date or date.today()
 
     # Risk level counts + avg score
-    summary_sql = text("""
+    summary_sql = text(
+        """
         SELECT
             COUNT(*) FILTER (WHERE risk_level = 'green')::int  AS green_count,
             COUNT(*) FILTER (WHERE risk_level = 'yellow')::int AS yellow_count,
@@ -293,17 +298,20 @@ async def readiness_dashboard(
             COALESCE(ROUND(AVG(overall_score), 2), 0)          AS avg_score
         FROM store_readiness_scores
         WHERE tenant_id = :tid AND score_date = :sd AND is_deleted = FALSE
-    """)
+    """
+    )
     summary = (await db.execute(summary_sql, {"tid": tenant_id, "sd": s_date})).mappings().first()
 
     # Worst stores top 5
-    worst_sql = text("""
+    worst_sql = text(
+        """
         SELECT store_id::text, overall_score, risk_level
         FROM store_readiness_scores
         WHERE tenant_id = :tid AND score_date = :sd AND is_deleted = FALSE
         ORDER BY overall_score ASC
         LIMIT 5
-    """)
+    """
+    )
     worst_rows = (await db.execute(worst_sql, {"tid": tenant_id, "sd": s_date})).mappings().all()
 
     worst_stores = [
@@ -316,7 +324,8 @@ async def readiness_dashboard(
     ]
 
     # Dimension averages
-    dim_sql = text("""
+    dim_sql = text(
+        """
         SELECT
             COALESCE(ROUND(AVG((dimensions->>'shift_coverage')::numeric), 2), 0)       AS avg_shift_coverage,
             COALESCE(ROUND(AVG((dimensions->>'skill_coverage')::numeric), 2), 0)       AS avg_skill_coverage,
@@ -325,7 +334,8 @@ async def readiness_dashboard(
         FROM store_readiness_scores
         WHERE tenant_id = :tid AND score_date = :sd AND is_deleted = FALSE
           AND dimensions IS NOT NULL AND dimensions != '{}'::jsonb
-    """)
+    """
+    )
     dim_row = (await db.execute(dim_sql, {"tid": tenant_id, "sd": s_date})).mappings().first()
 
     return _ok(
@@ -354,7 +364,8 @@ async def readiness_today(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT {_FIELDS}
         FROM store_readiness_scores
         WHERE tenant_id = :tid AND score_date = CURRENT_DATE AND is_deleted = FALSE
@@ -365,7 +376,8 @@ async def readiness_today(
                 WHEN 'green' THEN 3
                 ELSE 4
             END ASC
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
     items = [_row_to_dict(r) for r in rows]
@@ -383,7 +395,8 @@ async def readiness_trend(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT score_date, overall_score, risk_level, shift
         FROM store_readiness_scores
         WHERE tenant_id = :tid
@@ -391,7 +404,8 @@ async def readiness_trend(
           AND score_date >= CURRENT_DATE - :days
           AND is_deleted = FALSE
         ORDER BY score_date ASC
-    """)
+    """
+    )
     rows = (
         (
             await db.execute(
@@ -429,13 +443,15 @@ async def readiness_heatmap(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT DISTINCT ON (store_id)
             store_id::text, overall_score, risk_level, score_date, shift
         FROM store_readiness_scores
         WHERE tenant_id = :tid AND is_deleted = FALSE
         ORDER BY store_id, score_date DESC
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id})).mappings().all()
 
     items = [
@@ -462,11 +478,13 @@ async def get_readiness(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT {_FIELDS}
         FROM store_readiness_scores
         WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     row = (await db.execute(sql, {"rid": record_id, "tid": tenant_id})).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Readiness record not found")
@@ -528,12 +546,14 @@ async def update_readiness(
     set_clause = ", ".join(sets)
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE store_readiness_scores
             SET {set_clause}
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
             RETURNING id::text
-        """),
+        """
+        ),
         params,
     )
     row = result.mappings().first()
@@ -559,13 +579,15 @@ async def append_action_items(
 
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE store_readiness_scores
         SET action_items = COALESCE(action_items, '[]'::jsonb) || :new_items::jsonb,
             updated_at = :now
         WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text, action_items
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -612,12 +634,14 @@ async def delete_readiness(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE store_readiness_scores
             SET is_deleted = TRUE, updated_at = :now
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
             RETURNING id::text
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id, "now": now},
     )
     row = result.mappings().first()

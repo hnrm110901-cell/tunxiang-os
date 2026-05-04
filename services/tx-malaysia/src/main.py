@@ -16,8 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.ontology.src.database import init_db
 
-from .api.my_dashboard_routes import router as my_dashboard_router
 from .api.ai_insights_routes import router as ai_insights_router
+from .api.my_dashboard_routes import router as my_dashboard_router
 from .api.regional_routes import router as regional_router
 from .api.sme_onboarding_routes import router as onboarding_router
 

@@ -11,6 +11,7 @@
 - T5.1.6: OntologySubscriber 基于本抽象订阅
 - 未来 Phase: KafkaEventBus / NatsEventBus 以相同抽象替换
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

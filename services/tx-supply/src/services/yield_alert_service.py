@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from sqlalchemy import text
@@ -40,9 +40,9 @@ CRITICAL_THRESHOLD_PCT = 15.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SHIFTS = {
-    "morning":   {"label": "早班", "start_hour": 6,  "end_hour": 14},
+    "morning": {"label": "早班", "start_hour": 6, "end_hour": 14},
     "afternoon": {"label": "午班", "start_hour": 14, "end_hour": 22},
-    "evening":   {"label": "晚班", "start_hour": 22, "end_hour": 6},
+    "evening": {"label": "晚班", "start_hour": 22, "end_hour": 6},
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -50,13 +50,13 @@ SHIFTS = {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ROOT_CAUSES = {
-    "staff_error":    "操作失误（领料/切配不规范）",
-    "over_prep":      "备餐过量",
-    "spoilage":       "食材变质/过期",
-    "bom_deviation":  "BOM配方与实际操作偏差",
-    "theft":          "盗损嫌疑",
-    "equipment":      "设备故障导致损耗",
-    "unknown":        "原因待排查",
+    "staff_error": "操作失误（领料/切配不规范）",
+    "over_prep": "备餐过量",
+    "spoilage": "食材变质/过期",
+    "bom_deviation": "BOM配方与实际操作偏差",
+    "theft": "盗损嫌疑",
+    "equipment": "设备故障导致损耗",
+    "unknown": "原因待排查",
 }
 
 
@@ -162,7 +162,8 @@ class YieldAlertService:
         await self._set_tenant(db, tenant_id)
 
         # 理论用量: BOM x 当日订单
-        sql_theory = text("""
+        sql_theory = text(
+            """
             SELECT
                 bd.ingredient_id,
                 i.name AS ingredient_name,
@@ -180,10 +181,12 @@ class YieldAlertService:
               AND o.status IN ('completed', 'paid')
               AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
             GROUP BY bd.ingredient_id, i.name, i.category
-        """)
+        """
+        )
 
         # 实际用量: inventory_transactions (usage)
-        sql_actual = text("""
+        sql_actual = text(
+            """
             SELECT
                 it.ingredient_id,
                 SUM(it.qty) AS actual_qty
@@ -194,7 +197,8 @@ class YieldAlertService:
               AND it.tx_type = 'usage'
               AND it.tx_date = :target_date
             GROUP BY it.ingredient_id
-        """)
+        """
+        )
 
         params = {
             "tenant_id": tenant_id,
@@ -220,23 +224,22 @@ class YieldAlertService:
             theory_qty = float(row.theory_qty or 0)
             actual_qty = actual_map.get(ing_id, 0.0)
             variance_qty = actual_qty - theory_qty
-            variance_pct = (
-                round(variance_qty / theory_qty * 100, 2)
-                if theory_qty > 0 else 0.0
-            )
+            variance_pct = round(variance_qty / theory_qty * 100, 2) if theory_qty > 0 else 0.0
 
             severity = _classify_severity(variance_pct)
 
-            yield_items.append({
-                "ingredient_id": ing_id,
-                "ingredient_name": str(row.ingredient_name),
-                "ingredient_category": str(row.ingredient_category or ""),
-                "theory_qty": round(theory_qty, 2),
-                "actual_qty": round(actual_qty, 2),
-                "variance_qty": round(variance_qty, 2),
-                "variance_pct": variance_pct,
-                "severity": severity,
-            })
+            yield_items.append(
+                {
+                    "ingredient_id": ing_id,
+                    "ingredient_name": str(row.ingredient_name),
+                    "ingredient_category": str(row.ingredient_category or ""),
+                    "theory_qty": round(theory_qty, 2),
+                    "actual_qty": round(actual_qty, 2),
+                    "variance_qty": round(variance_qty, 2),
+                    "variance_pct": variance_pct,
+                    "severity": severity,
+                }
+            )
 
         # 排序: critical 优先, 然后 warning, 然后按差异率绝对值降序
         severity_order = {"critical": 0, "warning": 1, None: 2}
@@ -286,7 +289,8 @@ class YieldAlertService:
         await self._set_tenant(db, tenant_id)
 
         # 实际用量按班次分组
-        sql_actual_by_shift = text("""
+        sql_actual_by_shift = text(
+            """
             SELECT
                 CASE
                     WHEN EXTRACT(HOUR FROM it.created_at) >= 6
@@ -307,10 +311,12 @@ class YieldAlertService:
               AND it.tx_type = 'usage'
               AND it.tx_date = :target_date
             GROUP BY shift_id
-        """)
+        """
+        )
 
         # 理论用量按班次分组 (按订单时间划分)
-        sql_theory_by_shift = text("""
+        sql_theory_by_shift = text(
+            """
             SELECT
                 CASE
                     WHEN EXTRACT(HOUR FROM o.created_at) >= 6
@@ -332,7 +338,8 @@ class YieldAlertService:
               AND o.status IN ('completed', 'paid')
               AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
             GROUP BY shift_id
-        """)
+        """
+        )
 
         params = {
             "tenant_id": tenant_id,
@@ -374,22 +381,21 @@ class YieldAlertService:
             operator_ids = actual_data["operator_ids"]
 
             variance_qty = actual_qty - theory_qty
-            variance_pct = (
-                round(variance_qty / theory_qty * 100, 2)
-                if theory_qty > 0 else 0.0
-            )
+            variance_pct = round(variance_qty / theory_qty * 100, 2) if theory_qty > 0 else 0.0
 
             shift_info = SHIFTS.get(shift_id, {})
-            shift_comparisons.append({
-                "shift_id": shift_id,
-                "shift_label": shift_info.get("label", shift_id),
-                "theory_qty": round(theory_qty, 2),
-                "actual_qty": round(actual_qty, 2),
-                "variance_qty": round(variance_qty, 2),
-                "variance_pct": variance_pct,
-                "operator_ids": operator_ids,
-                "severity": _classify_severity(variance_pct),
-            })
+            shift_comparisons.append(
+                {
+                    "shift_id": shift_id,
+                    "shift_label": shift_info.get("label", shift_id),
+                    "theory_qty": round(theory_qty, 2),
+                    "actual_qty": round(actual_qty, 2),
+                    "variance_qty": round(variance_qty, 2),
+                    "variance_pct": variance_pct,
+                    "operator_ids": operator_ids,
+                    "severity": _classify_severity(variance_pct),
+                }
+            )
 
         log.info(
             "yield_alert.shift_attribution",
@@ -433,7 +439,10 @@ class YieldAlertService:
 
         # 1. 扫描
         yield_items = await self.scan_daily_yield(
-            store_id, target_date, tenant_id, db,
+            store_id,
+            target_date,
+            tenant_id,
+            db,
         )
 
         # 2. 过滤超标原料
@@ -488,7 +497,8 @@ class YieldAlertService:
             }
 
             # 4. 写入 DB
-            sql_insert = text("""
+            sql_insert = text(
+                """
                 INSERT INTO yield_alerts (
                     id, tenant_id, store_id, alert_date,
                     ingredient_id, ingredient_name,
@@ -503,9 +513,11 @@ class YieldAlertService:
                     :severity, :status
                 )
                 ON CONFLICT DO NOTHING
-            """)
+            """
+            )
 
             import json
+
             await db.execute(
                 sql_insert,
                 {
@@ -600,7 +612,8 @@ class YieldAlertService:
 
         # 分页查询
         offset = (page - 1) * size
-        data_sql = text(f"""
+        data_sql = text(
+            f"""
             SELECT
                 id, store_id, alert_date, ingredient_id, ingredient_name,
                 theory_qty, actual_qty, variance_qty, variance_pct,
@@ -611,7 +624,8 @@ class YieldAlertService:
             WHERE {where_clause}
             ORDER BY alert_date DESC, severity ASC, ABS(variance_pct) DESC
             LIMIT :limit OFFSET :offset
-        """)
+        """
+        )
         params["limit"] = size
         params["offset"] = offset
 
@@ -672,7 +686,8 @@ class YieldAlertService:
         """
         await self._set_tenant(db, tenant_id)
 
-        sql = text("""
+        sql = text(
+            """
             UPDATE yield_alerts
             SET status = 'acknowledged'
             WHERE id = :alert_id::UUID
@@ -680,7 +695,8 @@ class YieldAlertService:
               AND status = 'open'
               AND is_deleted = FALSE
             RETURNING id, status
-        """)
+        """
+        )
 
         result = await db.execute(
             sql,
@@ -727,7 +743,8 @@ class YieldAlertService:
         await self._set_tenant(db, tenant_id)
 
         now = datetime.now(timezone.utc)
-        sql = text("""
+        sql = text(
+            """
             UPDATE yield_alerts
             SET status = 'resolved',
                 resolved_by = :resolved_by::UUID,
@@ -738,7 +755,8 @@ class YieldAlertService:
               AND status IN ('open', 'acknowledged')
               AND is_deleted = FALSE
             RETURNING id, status
-        """)
+        """
+        )
 
         result = await db.execute(
             sql,
@@ -824,7 +842,8 @@ class YieldAlertService:
         where_clause = " AND ".join(conditions)
 
         # 按日汇总
-        sql_daily = text(f"""
+        sql_daily = text(
+            f"""
             SELECT
                 alert_date,
                 COUNT(*) AS alert_count,
@@ -837,7 +856,8 @@ class YieldAlertService:
             WHERE {where_clause}
             GROUP BY alert_date
             ORDER BY alert_date ASC
-        """)
+        """
+        )
 
         result = await db.execute(sql_daily, params)
         daily_rows = result.fetchall()
@@ -856,7 +876,8 @@ class YieldAlertService:
         ]
 
         # TOP5 超标原料
-        sql_top = text(f"""
+        sql_top = text(
+            f"""
             SELECT
                 ingredient_id,
                 ingredient_name,
@@ -868,7 +889,8 @@ class YieldAlertService:
             GROUP BY ingredient_id, ingredient_name
             ORDER BY AVG(ABS(variance_pct)) DESC
             LIMIT 5
-        """)
+        """
+        )
 
         top_result = await db.execute(sql_top, params)
         top_rows = top_result.fetchall()
@@ -888,10 +910,7 @@ class YieldAlertService:
         total_alerts = sum(d["alert_count"] for d in daily_trend)
         total_critical = sum(d["critical_count"] for d in daily_trend)
         total_warning = sum(d["warning_count"] for d in daily_trend)
-        avg_daily_variance = (
-            sum(d["avg_variance_pct"] for d in daily_trend) / len(daily_trend)
-            if daily_trend else 0.0
-        )
+        avg_daily_variance = sum(d["avg_variance_pct"] for d in daily_trend) / len(daily_trend) if daily_trend else 0.0
 
         trend_data = {
             "store_id": store_id,

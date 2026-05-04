@@ -24,7 +24,7 @@ DisputeType = Literal[
     "wrong_item",
     "delivery_late",
     "quality",
-    "platform_audit",   # 平台审核异议（强制人工）
+    "platform_audit",  # 平台审核异议（强制人工）
     "refund_request",
     "chargeback",
     "other",

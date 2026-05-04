@@ -367,7 +367,8 @@ class POSSyncService:
             price_fen = _safe_int_from_mapper(dish.get("dishPrice", 0))
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dishes (id, tenant_id, store_id, name, price_fen,
                                         sales_channel_id, external_id, is_active)
                     VALUES (gen_random_uuid(), :tenant_id, :store_id, :name, :price_fen,
@@ -378,7 +379,8 @@ class POSSyncService:
                         name = EXCLUDED.name,
                         price_fen = EXCLUDED.price_fen,
                         updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": store_id,
@@ -403,12 +405,14 @@ class POSSyncService:
 
         # 统计今日已同步订单数
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM orders
                 WHERE sales_channel_id = 'pinzhi'
                   AND DATE(order_time) = :today
-            """),
+            """
+            ),
             {"today": today_str},
         )
         row = result.fetchone()
@@ -416,11 +420,13 @@ class POSSyncService:
 
         # 最近一条品智订单时间
         result2 = await db.execute(
-            text("""
+            text(
+                """
                 SELECT MAX(updated_at) AS last_sync
                 FROM orders
                 WHERE sales_channel_id = 'pinzhi'
-            """),
+            """
+            ),
         )
         row2 = result2.fetchone()
         last_sync = str(row2[0]) if row2 and row2[0] else None
@@ -503,11 +509,13 @@ class POSSyncService:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id::text FROM stores
                     WHERE is_active = true
                     ORDER BY created_at
-                """),
+                """
+                ),
             )
             return [str(row[0]) for row in result.fetchall()]
         except (OSError, ValueError, RuntimeError) as e:
@@ -517,7 +525,8 @@ class POSSyncService:
     async def _upsert_order(self, order_dict: dict[str, Any], db: AsyncSession) -> bool:
         """UPSERT单条订单，返回是否为新插入"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO orders
                     (id, tenant_id, store_id, order_no, order_type,
                      sales_channel_id, table_number, waiter_id,
@@ -542,7 +551,8 @@ class POSSyncService:
                     order_metadata      = EXCLUDED.order_metadata::jsonb,
                     updated_at          = NOW()
                 RETURNING (xmax = 0) AS is_insert
-            """),
+            """
+            ),
             {
                 **order_dict,
                 "order_metadata": json.dumps(order_dict.get("order_metadata") or {}, ensure_ascii=False),
@@ -554,7 +564,8 @@ class POSSyncService:
     async def _upsert_order_item(self, item_dict: dict[str, Any], db: AsyncSession) -> None:
         """UPSERT单条订单明细"""
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO order_items
                     (id, tenant_id, order_id, item_name, quantity,
                      unit_price_fen, subtotal_fen, notes, customizations)
@@ -567,7 +578,8 @@ class POSSyncService:
                     unit_price_fen = EXCLUDED.unit_price_fen,
                     subtotal_fen   = EXCLUDED.subtotal_fen,
                     updated_at     = NOW()
-            """),
+            """
+            ),
             {
                 **item_dict,
                 "customizations": json.dumps(item_dict.get("customizations") or {}, ensure_ascii=False),

@@ -97,10 +97,12 @@ class BanquetIntegrationService:
                 payment_id = str(uuid.uuid4())
                 payment_no = f"BQ-DEP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
                 await self.db.execute(
-                    text("""
+                    text(
+                        """
                     INSERT INTO payments (id, tenant_id, order_id, method, amount_fen, status, payment_no, extra, created_at)
                     VALUES (:id, :tid, :cid, :method, :amount, 'paid', :pno, :extra, NOW())
-                """),
+                """
+                    ),
                     {
                         "id": payment_id,
                         "tid": self.tenant_id,
@@ -188,12 +190,14 @@ class BanquetIntegrationService:
                 table_no = result.get("venue", {}).get("hall_name", "宴会厅")
 
                 await self.db.execute(
-                    text("""
+                    text(
+                        """
                     INSERT INTO orders (id, tenant_id, store_id, order_no, table_number,
                         order_type, status, total_amount_fen, final_amount_fen, order_time, created_at)
                     VALUES (:id, :tid, :sid, :ono, :tbl, 'banquet', 'confirmed',
                         :total, :final, NOW(), NOW())
-                """),
+                """
+                    ),
                     {
                         "id": order_id,
                         "tid": self.tenant_id,
@@ -210,11 +214,13 @@ class BanquetIntegrationService:
                 for idx, item in enumerate(menu_items):
                     item_id = str(uuid.uuid4())
                     await self.db.execute(
-                        text("""
+                        text(
+                            """
                         INSERT INTO order_items (id, tenant_id, order_id, dish_id, item_name,
                             quantity, unit_price_fen, subtotal_fen, sort_order, created_at)
                         VALUES (:id, :tid, :oid, :did, :name, :qty, :price, :sub, :sort, NOW())
-                    """),
+                    """
+                        ),
                         {
                             "id": item_id,
                             "tid": self.tenant_id,
@@ -282,10 +288,12 @@ class BanquetIntegrationService:
                     pay_id = str(uuid.uuid4())
                     pay_no = f"BQ-BAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
                     await self.db.execute(
-                        text("""
+                        text(
+                            """
                         INSERT INTO payments (id, tenant_id, order_id, method, amount_fen, status, payment_no, extra, created_at)
                         VALUES (:id, :tid, :cid, :method, :amount, 'paid', :pno, :extra, NOW())
-                    """),
+                    """
+                        ),
                         {
                             "id": pay_id,
                             "tid": self.tenant_id,
@@ -325,11 +333,13 @@ class BanquetIntegrationService:
         if customer_id and total_fen > 0 and self.db:
             try:
                 await self.db.execute(
-                    text("""
+                    text(
+                        """
                     INSERT INTO member_transactions (id, tenant_id, customer_id, store_id,
                         transaction_type, points, amount_fen, description, created_at)
                     VALUES (:id, :tid, :cid, :sid, 'earn', :pts, :amt, :desc, NOW())
-                """),
+                """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tid": self.tenant_id,

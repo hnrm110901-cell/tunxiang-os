@@ -77,13 +77,15 @@ async def init_seats(
         label = f"{no}号"
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO order_seats (tenant_id, order_id, seat_no, seat_label)
                     VALUES (:tid, :oid, :no, :label)
                     ON CONFLICT (order_id, seat_no) DO NOTHING
                     RETURNING id, tenant_id, order_id, seat_no, seat_label,
                               sub_total, paid_amount, payment_status
-                """),
+                """
+                ),
                 {"tid": str(tenant_id), "oid": str(order_id), "no": no, "label": label},
             )
             row = result.fetchone()
@@ -116,12 +118,14 @@ async def assign_item_to_seat(
     db: AsyncSession,
 ) -> None:
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE order_items
                SET seat_no = :sno, seat_label = :slabel
              WHERE id = :iid AND tenant_id = :tid
          RETURNING order_id
-        """),
+        """
+        ),
         {"sno": seat_no, "slabel": seat_label, "iid": str(order_item_id), "tid": str(tenant_id)},
     )
     row = result.fetchone()
@@ -143,22 +147,26 @@ async def _recalc_seat_subtotal(
     db: AsyncSession,
 ) -> None:
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(quantity * unit_price), 0)
               FROM order_items
              WHERE order_id = :oid AND tenant_id = :tid
                AND seat_no = :sno AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"oid": str(order_id), "tid": str(tenant_id), "sno": seat_no},
     )
     subtotal = result.scalar() or Decimal("0")
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE order_seats
                SET sub_total = :st
              WHERE order_id = :oid AND tenant_id = :tid AND seat_no = :sno
-        """),
+        """
+        ),
         {"st": subtotal, "oid": str(order_id), "tid": str(tenant_id), "sno": seat_no},
     )
 
@@ -169,22 +177,26 @@ async def get_seat_summary(
     db: AsyncSession,
 ) -> list[SeatSummary]:
     seats_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT seat_no, seat_label, sub_total, paid_amount, payment_status
               FROM order_seats
              WHERE order_id = :oid AND tenant_id = :tid AND is_deleted = FALSE
              ORDER BY seat_no
-        """),
+        """
+        ),
         {"oid": str(order_id), "tid": str(tenant_id)},
     )
     seats = seats_result.fetchall()
 
     items_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_name, quantity, unit_price, seat_no
               FROM order_items
              WHERE order_id = :oid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"oid": str(order_id), "tid": str(tenant_id)},
     )
     all_items = items_result.fetchall()
@@ -331,11 +343,13 @@ async def generate_self_pay_link(
     db: AsyncSession,
 ) -> str:
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM order_seats
              WHERE order_id = :oid AND tenant_id = :tid AND seat_no = :sno
                AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"oid": str(order_id), "tid": str(tenant_id), "sno": seat_no},
     )
     row = result.fetchone()

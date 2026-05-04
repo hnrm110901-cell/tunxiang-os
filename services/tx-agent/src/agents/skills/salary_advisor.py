@@ -142,7 +142,8 @@ async def _load_employee_for_turnover(
     tenant_id: str,
     employee_id: str,
 ) -> Optional[dict[str, Any]]:
-    q = text("""
+    q = text(
+        """
         SELECT e.id::text AS employee_id, e.emp_name, e.role,
                e.seniority_months, e.daily_wage_standard_fen, e.performance_score,
                e.grade_level, e.training_completed, e.hire_date,
@@ -176,7 +177,8 @@ async def _load_employee_for_turnover(
           AND e.is_deleted = false
           AND COALESCE(e.is_active, true) = true
         LIMIT 1
-    """)
+    """
+    )
     try:
         result = await db.execute(q, {"tenant_id": tenant_id, "employee_id": employee_id})
         row = result.mappings().first()
@@ -332,7 +334,8 @@ async def _load_store_employees(
     store_id: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    q = text("""
+    q = text(
+        """
         SELECT e.id::text AS employee_id, e.emp_name, e.daily_wage_standard_fen,
                e.role, e.performance_score, e.seniority_months,
                ps.total_salary_fen AS payroll_salary_fen
@@ -351,7 +354,8 @@ async def _load_store_employees(
           AND COALESCE(e.is_active, true) = true
         ORDER BY e.updated_at DESC NULLS LAST
         LIMIT :lim
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,
@@ -774,7 +778,8 @@ class SalaryAdvisorAgent(SkillAgent):
     async def _load_store_pnl(self, store_id: str, month: str) -> dict[str, Any]:
         """从mv_store_pnl加载P&L数据，降级为mock"""
         if self._db is not None:
-            q = text("""
+            q = text(
+                """
                 SELECT COALESCE(AVG(revenue_fen), 0)::bigint AS avg_monthly_revenue_fen,
                        COALESCE(AVG(labor_cost_fen), 0)::bigint AS avg_monthly_labor_fen,
                        CASE
@@ -790,7 +795,8 @@ class SalaryAdvisorAgent(SkillAgent):
                   AND to_char(pnl_date, 'YYYY-MM') <= :month
                 ORDER BY pnl_date DESC
                 LIMIT 3
-            """)
+            """
+            )
             try:
                 result = await self._db.execute(
                     q,
@@ -816,7 +822,8 @@ class SalaryAdvisorAgent(SkillAgent):
     async def _load_current_staffing(self, store_id: str) -> list[dict[str, Any]]:
         """加载当前门店编制情况，降级为mock"""
         if self._db is not None:
-            q = text("""
+            q = text(
+                """
                 SELECT LOWER(COALESCE(role, 'waiter')) AS role,
                        COUNT(*) AS count
                 FROM employees
@@ -825,7 +832,8 @@ class SalaryAdvisorAgent(SkillAgent):
                   AND is_deleted = false
                   AND COALESCE(is_active, true) = true
                 GROUP BY LOWER(COALESCE(role, 'waiter'))
-            """)
+            """
+            )
             try:
                 result = await self._db.execute(
                     q,

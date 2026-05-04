@@ -222,10 +222,12 @@ async def create_card_type(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO card_types (id, tenant_id, name, rules, created_at, updated_at, is_deleted)
             VALUES (:id, :tid, :name, :rules::jsonb, :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": card_type_id,
             "tid": tenant_id,
@@ -279,10 +281,12 @@ async def set_card_levels(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET levels = :levels::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -337,12 +341,14 @@ async def create_anonymous_card(
         card_id = str(uuid.uuid4())
         card_ids.append(card_id)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO member_cards
                     (id, tenant_id, card_type_id, batch_no, status, is_anonymous,
                      created_at, updated_at, is_deleted)
                 VALUES (:id, :tid, :ctid, :batch, 'inactive', true, :now, :now, false)
-            """),
+            """
+            ),
             {
                 "id": card_id,
                 "tid": tenant_id,
@@ -391,7 +397,8 @@ async def issue_card(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO member_cards
                 (id, tenant_id, card_type_id, customer_id, status, is_anonymous,
                  level_rank, balance_fen, points, growth_value,
@@ -399,7 +406,8 @@ async def issue_card(
             VALUES (:id, :tid, :ctid, :cid, 'active', false,
                     0, 0, 0, 0,
                     :now, :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": card_id,
             "tid": tenant_id,
@@ -441,13 +449,15 @@ async def upgrade_level(
 
     # 获取卡信息
     card_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT mc.level_rank, mc.card_type_id, mc.growth_value,
                    ct.levels::text
             FROM member_cards mc
             JOIN card_types ct ON ct.id = mc.card_type_id
             WHERE mc.id = :cid AND mc.tenant_id = :tid AND mc.is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     row = card_row.mappings().first()
@@ -480,10 +490,12 @@ async def upgrade_level(
     new_rank = target["rank"]
     now = _now_utc()
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards SET level_rank = :rank, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"rank": new_rank, "cid": card_id, "tid": tenant_id, "now": now},
     )
     await db.flush()
@@ -512,13 +524,15 @@ async def downgrade_level(
     await _set_tenant(db, tenant_id)
 
     card_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT mc.level_rank, mc.card_type_id, mc.growth_value,
                    ct.levels::text
             FROM member_cards mc
             JOIN card_types ct ON ct.id = mc.card_type_id
             WHERE mc.id = :cid AND mc.tenant_id = :tid AND mc.is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     row = card_row.mappings().first()
@@ -544,10 +558,12 @@ async def downgrade_level(
     new_rank = target["rank"]
     now = _now_utc()
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards SET level_rank = :rank, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"rank": new_rank, "cid": card_id, "tid": tenant_id, "now": now},
     )
     await db.flush()
@@ -591,10 +607,12 @@ async def set_member_day(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET member_day_config = :cfg::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -631,12 +649,14 @@ async def get_card_benefits(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT mc.level_rank, ct.levels::text, ct.rules::text
             FROM member_cards mc
             JOIN card_types ct ON ct.id = mc.card_type_id
             WHERE mc.id = :cid AND mc.tenant_id = :tid AND mc.is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     card = row.mappings().first()
@@ -714,20 +734,24 @@ async def batch_card_operations(
         try:
             if op_type == "recharge":
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE member_cards
                         SET balance_fen = balance_fen + :amt, updated_at = :now
                         WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-                    """),
+                    """
+                    ),
                     {"amt": amount_fen, "cid": card_id, "tid": tenant_id, "now": now},
                 )
             elif op_type == "deduct":
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE member_cards
                         SET balance_fen = GREATEST(balance_fen - :amt, 0), updated_at = :now
                         WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-                    """),
+                    """
+                    ),
                     {"amt": amount_fen, "cid": card_id, "tid": tenant_id, "now": now},
                 )
             elif op_type == "transfer":
@@ -735,19 +759,23 @@ async def batch_card_operations(
                 if not target_card_id:
                     raise ValueError("missing_target_card_id")
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE member_cards
                         SET balance_fen = GREATEST(balance_fen - :amt, 0), updated_at = :now
                         WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-                    """),
+                    """
+                    ),
                     {"amt": amount_fen, "cid": card_id, "tid": tenant_id, "now": now},
                 )
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE member_cards
                         SET balance_fen = balance_fen + :amt, updated_at = :now
                         WHERE id = :tcid AND tenant_id = :tid AND is_deleted = false
-                    """),
+                    """
+                    ),
                     {"amt": amount_fen, "tcid": target_card_id, "tid": tenant_id, "now": now},
                 )
 

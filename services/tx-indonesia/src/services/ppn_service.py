@@ -36,6 +36,7 @@ class PPNCategory(str, enum.Enum):
 
 class PPNInvalidNPWPError(ValueError):
     """NPWP 税号格式无效"""
+
     pass
 
 
@@ -96,9 +97,7 @@ class PPNService:
           - "exempt"    → EXEMPT   (0%)
           - NULL 或未知  → STANDARD (11%)
         """
-        result = await self.db.execute(
-            select(Dish.ppn_category).where(Dish.id == dish_id)
-        )
+        result = await self.db.execute(select(Dish.ppn_category).where(Dish.id == dish_id))
         row = result.fetchone()
         if row is None:
             return PPNCategory.STANDARD

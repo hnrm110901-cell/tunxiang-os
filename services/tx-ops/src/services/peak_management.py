@@ -51,7 +51,8 @@ async def detect_peak(
 
     # 查询上座率
     occupancy_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(CASE WHEN t.status = 'occupied' THEN 1 END) AS occupied_count,
                 COUNT(*) AS total_tables
@@ -59,7 +60,8 @@ async def detect_peak(
             WHERE t.store_id = :store_id
               AND t.tenant_id = :tenant_id
               AND t.is_deleted = false
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tenant_id": tenant_uuid},
     )
     occ_row = occupancy_result.mappings().first()
@@ -69,14 +71,16 @@ async def detect_peak(
 
     # 查询等位数
     queue_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS queue_count
             FROM queue_tickets qt
             WHERE qt.store_id = :store_id
               AND qt.tenant_id = :tenant_id
               AND qt.status = 'waiting'
               AND qt.created_at > :now - interval '4 hours'
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tenant_id": tenant_uuid, "now": now},
     )
     queue_count = queue_result.scalar() or 0
@@ -133,7 +137,8 @@ async def get_dept_load_monitor(
     store_uuid = uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 dept.id AS dept_id,
                 dept.name AS dept_name,
@@ -154,7 +159,8 @@ async def get_dept_load_monitor(
               AND dept.is_deleted = false
             GROUP BY dept.id, dept.name, dept.capacity_per_hour
             ORDER BY COUNT(oi.id) FILTER (WHERE oi.status IN ('pending', 'cooking')) DESC
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tenant_id": tenant_uuid},
     )
     rows = result.mappings().all()
@@ -218,7 +224,8 @@ async def suggest_staff_dispatch(
 
     # 查询当前值班人员
     staff_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 s.id AS staff_id,
                 s.name AS staff_name,
@@ -235,7 +242,8 @@ async def suggest_staff_dispatch(
               AND ss.is_on_duty = true
               AND ss.is_deleted = false
               AND s.is_deleted = false
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tenant_id": tenant_uuid},
     )
     staff_rows = staff_result.mappings().all()
@@ -302,7 +310,8 @@ async def get_queue_pressure(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 qt.table_type,
                 COUNT(*) AS queue_count,
@@ -316,14 +325,16 @@ async def get_queue_pressure(
               AND qt.created_at > :now - interval '4 hours'
             GROUP BY qt.table_type
             ORDER BY COUNT(*) DESC
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tenant_id": tenant_uuid, "now": now},
     )
     rows = result.mappings().all()
 
     # 查询各桌型翻台速度
     turnover_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 t.table_type,
                 AVG(EXTRACT(EPOCH FROM (o.paid_at - o.created_at))) AS avg_dining_seconds
@@ -335,7 +346,8 @@ async def get_queue_pressure(
               AND o.created_at > :now - interval '7 days'
               AND o.is_deleted = false
             GROUP BY t.table_type
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tenant_id": tenant_uuid, "now": now},
     )
     turnover_rows = {r["table_type"]: r["avg_dining_seconds"] for r in turnover_result.mappings().all()}
@@ -417,7 +429,8 @@ async def handle_peak_event(
 
     # 记录事件
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO peak_events (
                 id, tenant_id, store_id, event_type,
                 params, status,
@@ -427,7 +440,8 @@ async def handle_peak_event(
                 :params, 'active',
                 false, :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": event_id,
             "tenant_id": tenant_uuid,
@@ -446,13 +460,15 @@ async def handle_peak_event(
         hide_dish_ids = event_params.get("hide_dish_ids", [])
         if hide_dish_ids:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_store_settings
                     SET is_temporarily_hidden = true, updated_at = :now
                     WHERE store_id = :store_id
                       AND tenant_id = :tenant_id
                       AND dish_id = ANY(:dish_ids)
-                """),
+                """
+                ),
                 {
                     "store_id": store_uuid,
                     "tenant_id": tenant_uuid,
@@ -465,11 +481,13 @@ async def handle_peak_event(
     elif event_type == "express_mode":
         # 开启快速出餐模式：通知所有档口优先出简单菜品
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE store_runtime_config
                 SET express_mode = true, express_mode_since = :now, updated_at = :now
                 WHERE store_id = :store_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"store_id": store_uuid, "tenant_id": tenant_uuid, "now": now},
         )
         action_result = {"express_mode": True}

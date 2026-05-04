@@ -87,7 +87,8 @@ async def _load_absent_schedule(
     absent_date: date,
 ) -> Optional[dict[str, Any]]:
     """查询缺勤员工当天的排班信息。"""
-    q = text("""
+    q = text(
+        """
         SELECT us.id::text AS schedule_id, us.employee_id::text, us.store_id::text,
                us.shift_date, us.start_time, us.end_time, us.role,
                e.emp_name
@@ -99,7 +100,8 @@ async def _load_absent_schedule(
           AND us.shift_date = :absent_date
           AND COALESCE(us.is_deleted, false) = false
         LIMIT 1
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,
@@ -123,7 +125,8 @@ async def _create_shift_gap(
 ) -> Optional[str]:
     """在 shift_gaps 表插入一条缺口记录。"""
     gap_id = str(uuid4())
-    q = text("""
+    q = text(
+        """
         INSERT INTO shift_gaps (
             id, tenant_id, store_id, gap_date, start_time, end_time,
             role, reason, status, original_employee_id, created_at
@@ -132,7 +135,8 @@ async def _create_shift_gap(
             CAST(:store_id AS uuid), :gap_date, :start_time, :end_time,
             :role, 'absent', 'open', CAST(:emp_id AS uuid), NOW()
         )
-    """)
+    """
+    )
     try:
         await db.execute(
             q,
@@ -163,7 +167,8 @@ async def _find_available_candidates(
     exclude_employee_id: str,
 ) -> list[dict[str, Any]]:
     """查找当天未排班或有空闲的同角色员工。"""
-    q = text("""
+    q = text(
+        """
         SELECT e.id::text AS employee_id, e.emp_name, e.role,
                e.store_id::text AS store_id, e.phone
         FROM employees e
@@ -182,7 +187,8 @@ async def _find_available_candidates(
           CASE WHEN e.store_id = CAST(:store_id AS uuid) THEN 0 ELSE 1 END,
           CASE WHEN LOWER(e.role) = LOWER(:role) THEN 0 ELSE 1 END
         LIMIT 10
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,
@@ -250,7 +256,8 @@ class AttendanceRecoveryAgent(SkillAgent):
         SQL降级：reservations表不存在时返回空dict
         """
         try:
-            sql = text("""
+            sql = text(
+                """
                 SELECT COUNT(*) as total_reservations,
                        COALESCE(SUM(party_size), 0) as total_guests,
                        SUM(CASE WHEN party_size >= 8 THEN 1 ELSE 0 END) as large_parties,
@@ -260,7 +267,8 @@ class AttendanceRecoveryAgent(SkillAgent):
                   AND store_id = CAST(:store_id AS TEXT)
                   AND reservation_date = :date
                   AND status IN ('confirmed', 'seated')
-            """)
+            """
+            )
             result = await db.execute(
                 sql,
                 {

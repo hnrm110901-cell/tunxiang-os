@@ -367,7 +367,8 @@ class SmartMenuAgent(SkillAgent):
             from sqlalchemy import text
 
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                     SELECT oi.dish_id, oi.dish_name,
                            COUNT(*) AS order_count,
                            SUM(oi.quantity) AS total_qty,
@@ -381,7 +382,8 @@ class SmartMenuAgent(SkillAgent):
                     GROUP BY oi.dish_id, oi.dish_name
                     ORDER BY total_qty DESC
                     LIMIT 20
-                """),
+                """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id},
             )
             db_dishes = [dict(r) for r in rows.mappings().all()]
@@ -513,7 +515,8 @@ class SmartMenuAgent(SkillAgent):
 
             categories_str = ",".join(f"'{c}'" for c in affected_categories[:5])
             rows = await self._db.execute(
-                text(f"""
+                text(
+                    f"""
                 SELECT d.id, d.name, d.category, d.sell_price_fen,
                        COALESCE(d.cost_price_fen, 0) as cost_price_fen,
                        COUNT(oi.id) as recent_orders
@@ -530,7 +533,8 @@ class SmartMenuAgent(SkillAgent):
                 GROUP BY d.id, d.name, d.category, d.sell_price_fen, d.cost_price_fen
                 ORDER BY recent_orders DESC
                 LIMIT 8
-            """),
+            """
+                ),
                 {
                     "tenant_id": self.tenant_id,
                     "affected_ids": list(affected_dish_ids) or ["00000000-0000-0000-0000-000000000000"],
@@ -604,7 +608,8 @@ class SmartMenuAgent(SkillAgent):
             from sqlalchemy import text
 
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT DISTINCT d.id, d.name, d.category, d.sell_price_fen
                 FROM dishes d
                 JOIN bom_recipe_items bri ON bri.dish_id = d.id
@@ -612,7 +617,8 @@ class SmartMenuAgent(SkillAgent):
                   AND bri.ingredient_id = :ingredient_id
                   AND d.is_deleted = false
                   AND d.is_available = true
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "ingredient_id": ingredient_id},
             )
             dishes_to_mark = [dict(r) for r in rows.mappings()]
@@ -760,7 +766,8 @@ class SmartMenuAgent(SkillAgent):
             from sqlalchemy import text
 
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT d.id, d.name, d.category,
                        d.sell_price_fen,
                        COALESCE(d.cost_price_fen, 0) as cost_fen,
@@ -780,7 +787,8 @@ class SmartMenuAgent(SkillAgent):
                              ELSE 0 END > :threshold
                 ORDER BY cost_rate DESC
                 LIMIT 20
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "threshold": target_cost_rate},
             )
             db_dishes = [dict(r) for r in rows.mappings()]

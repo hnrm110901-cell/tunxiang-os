@@ -53,7 +53,8 @@ class SplitEngine:
             # 更新
             rule_uuid = uuid.UUID(rule_id)
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE profit_split_rules
                     SET name               = :name,
                         recipient_type     = :rtype,
@@ -69,7 +70,8 @@ class SplitEngine:
                         valid_to           = :vto,
                         updated_at         = NOW()
                     WHERE id = :id AND tenant_id = :tid
-                """),
+                """
+                ),
                 self._rule_params(rule_data, rule_uuid),
             )
             await self.db.flush()
@@ -78,7 +80,8 @@ class SplitEngine:
             # 新建
             rule_uuid = uuid.uuid4()
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO profit_split_rules
                         (id, tenant_id, name, recipient_type, recipient_id,
                          split_method, percentage, fixed_fen,
@@ -89,7 +92,8 @@ class SplitEngine:
                          :method, :pct, :fixed,
                          :stores::jsonb, :channels::jsonb,
                          :priority, :active, :vfrom, :vto)
-                """),
+                """
+                ),
                 self._rule_params(rule_data, rule_uuid),
             )
             await self.db.flush()
@@ -120,7 +124,8 @@ class SplitEngine:
         """查询单条规则"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, recipient_type, recipient_id,
                        split_method, percentage, fixed_fen,
                        applicable_stores, applicable_channels,
@@ -128,7 +133,8 @@ class SplitEngine:
                        created_at, updated_at
                 FROM profit_split_rules
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(rule_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -166,11 +172,13 @@ class SplitEngine:
         """停用规则（软删除）"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE profit_split_rules
                 SET is_active = FALSE, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid AND is_active = TRUE
-            """),
+            """
+            ),
             {"id": uuid.UUID(rule_id), "tid": self._tid},
         )
         await self.db.flush()
@@ -200,7 +208,8 @@ class SplitEngine:
         t_date = transaction_date or date.today()
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, recipient_type, recipient_id,
                        split_method, percentage, fixed_fen,
                        applicable_stores, applicable_channels
@@ -210,7 +219,8 @@ class SplitEngine:
                   AND (valid_from IS NULL OR valid_from <= :tdate)
                   AND (valid_to   IS NULL OR valid_to   >= :tdate)
                 ORDER BY priority ASC
-            """),
+            """
+            ),
             {"tid": self._tid, "tdate": t_date},
         )
         all_rules = result.fetchall()
@@ -248,7 +258,8 @@ class SplitEngine:
 
             rec_id = uuid.uuid4()
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO profit_split_records
                         (id, tenant_id, order_id, store_id, channel,
                          rule_id, recipient_type, recipient_id,
@@ -257,7 +268,8 @@ class SplitEngine:
                         (:id, :tid, :oid, :sid, :channel,
                          :rule_id, :rtype, :rid,
                          :gross, :split, 'pending')
-                """),
+                """
+                ),
                 {
                     "id": rec_id,
                     "tid": self._tid,
@@ -302,11 +314,13 @@ class SplitEngine:
         uuids = [uuid.UUID(r) for r in record_ids]
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE profit_split_records
                 SET status = 'settled', settled_at = :now
                 WHERE tenant_id = :tid AND id = ANY(:ids) AND status = 'pending'
-            """),
+            """
+            ),
             {"now": now, "tid": self._tid, "ids": uuids},
         )
         await self.db.flush()
@@ -320,11 +334,13 @@ class SplitEngine:
             return 0
         uuids = [uuid.UUID(r) for r in record_ids]
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE profit_split_records
                 SET status = 'cancelled'
                 WHERE tenant_id = :tid AND id = ANY(:ids) AND status = 'pending'
-            """),
+            """
+            ),
             {"tid": self._tid, "ids": uuids},
         )
         await self.db.flush()
@@ -350,7 +366,8 @@ class SplitEngine:
             return 0
         uuids = [uuid.UUID(r) for r in record_ids]
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE profit_split_records
                 SET status = 'pending',
                     retry_count = COALESCE(retry_count, 0) + 1,
@@ -359,7 +376,8 @@ class SplitEngine:
                   AND id = ANY(:ids)
                   AND status = 'cancelled'
                   AND COALESCE(retry_count, 0) < 3
-            """),
+            """
+            ),
             {"tid": self._tid, "ids": uuids},
         )
         await self.db.flush()
@@ -388,13 +406,15 @@ class SplitEngine:
 
         # 查询原始记录
         orig = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT order_id, store_id, channel, rule_id,
                        recipient_type, recipient_id,
                        gross_amount_fen, split_amount_fen, status
                 FROM profit_split_records
                 WHERE id = :id AND tenant_id = :tid AND status = 'settled'
-            """),
+            """
+            ),
             {"id": orig_uuid, "tid": self._tid},
         )
         row = orig.fetchone()
@@ -408,7 +428,8 @@ class SplitEngine:
 
         reversal_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO profit_split_records
                     (id, tenant_id, order_id, store_id, channel,
                      rule_id, recipient_type, recipient_id,
@@ -419,7 +440,8 @@ class SplitEngine:
                      :rule_id, :rtype, :rid,
                      :gross, :split, 'reversed',
                      :orig_id, :reason)
-            """),
+            """
+            ),
             {
                 "id": reversal_id,
                 "tid": self._tid,
@@ -463,7 +485,8 @@ class SplitEngine:
         await self._set_tenant()
         rec_uuid = uuid.UUID(record_id)
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE profit_split_records
                 SET status = 'discrepancy',
                     discrepancy_note = :note,
@@ -471,7 +494,8 @@ class SplitEngine:
                 WHERE id = :id
                   AND tenant_id = :tid
                   AND status IN ('settled', 'pending')
-            """),
+            """
+            ),
             {"id": rec_uuid, "tid": self._tid, "note": note or ""},
         )
         await self.db.flush()
@@ -495,15 +519,14 @@ class SplitEngine:
         where = "WHERE tenant_id = :tid AND status = 'discrepancy'"
         params: Dict[str, Any] = {"tid": self._tid}
 
-        count_result = await self.db.execute(
-            text(f"SELECT COUNT(*) FROM profit_split_records {where}"), params
-        )
+        count_result = await self.db.execute(text(f"SELECT COUNT(*) FROM profit_split_records {where}"), params)
         total = count_result.scalar() or 0
 
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, order_id, store_id, rule_id,
                        recipient_type, recipient_id,
                        split_amount_fen, status,
@@ -512,7 +535,8 @@ class SplitEngine:
                 {where}
                 ORDER BY discrepancy_at DESC NULLS LAST
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [
@@ -549,7 +573,8 @@ class SplitEngine:
         await self._set_tenant()
         rec_uuid = uuid.UUID(record_id)
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE profit_split_records
                 SET status = :new_status,
                     discrepancy_resolution = :note,
@@ -557,7 +582,8 @@ class SplitEngine:
                 WHERE id = :id
                   AND tenant_id = :tid
                   AND status = 'discrepancy'
-            """),
+            """
+            ),
             {
                 "new_status": resolution,
                 "note": note or f"差错已解决 -> {resolution}",
@@ -649,7 +675,8 @@ class SplitEngine:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT r.id, r.order_id, r.store_id, r.channel,
                        r.rule_id, r.recipient_type, r.recipient_id,
                        r.gross_amount_fen, r.split_amount_fen, r.status,
@@ -660,7 +687,8 @@ class SplitEngine:
                 {where}
                 ORDER BY r.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [self._record_row(r) for r in result.fetchall()]
@@ -692,7 +720,8 @@ class SplitEngine:
             params["ed"] = end_date
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT recipient_type, recipient_id,
                        COUNT(*) AS total_records,
                        SUM(split_amount_fen) AS total_amount_fen,
@@ -703,7 +732,8 @@ class SplitEngine:
                 {where}
                 GROUP BY recipient_type, recipient_id
                 ORDER BY total_amount_fen DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()

@@ -213,9 +213,10 @@ def test_table_pattern_anomaly():
         assert "employee_id" in emp
         assert "discount_count" in emp
 
-    assert data["alert_level"] in ("warning", "critical"), (
-        f"alert_level 应为 warning 或 critical，实际 {data['alert_level']}"
-    )
+    assert data["alert_level"] in (
+        "warning",
+        "critical",
+    ), f"alert_level 应为 warning 或 critical，实际 {data['alert_level']}"
     assert data["alert_message"], "alert_message 不应为空"
 
     # 业务字段完整性

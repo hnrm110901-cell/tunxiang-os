@@ -117,7 +117,8 @@ class PhotoReviewer:
         new_status = "approved" if auto_approved else "pending_review"
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE ugc_submissions
                 SET ai_quality_score = :score,
                     ai_quality_feedback = :feedback,
@@ -139,7 +140,8 @@ class PhotoReviewer:
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "ugc_id": str(ugc_id),
                 "tenant_id": str(tenant_id),

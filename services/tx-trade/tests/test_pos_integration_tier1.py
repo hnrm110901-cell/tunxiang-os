@@ -142,9 +142,7 @@ class TestPOSAdapterRobustnessTier1:
         mapped = map_pinjin_to_tunxiang(pinjin_raw)
 
         assert mapped["pos_order_id"] == "PJ20260413001"
-        assert mapped["amount_fen"] == 18800, (
-            f"188.00元应转换为18800分，实际为{mapped['amount_fen']}"
-        )
+        assert mapped["amount_fen"] == 18800, f"188.00元应转换为18800分，实际为{mapped['amount_fen']}"
 
     @pytest.mark.asyncio
     async def test_meituan_webhook_signature_verified(self):
@@ -160,20 +158,14 @@ class TestPOSAdapterRobustnessTier1:
         payload = '{"order_id":"12345","amount":"188.00"}'
 
         # 正确签名
-        valid_sig = hmac.new(
-            secret.encode(), payload.encode(), hashlib.sha256
-        ).hexdigest()
+        valid_sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
         # 伪造签名
         fake_sig = "0" * 64
 
         def verify_signature(payload, signature, secret):
-            expected = hmac.new(
-                secret.encode(), payload.encode(), hashlib.sha256
-            ).hexdigest()
+            expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
             return hmac.compare_digest(expected, signature)
 
         assert verify_signature(payload, valid_sig, secret) is True
-        assert verify_signature(payload, fake_sig, secret) is False, (
-            "伪造签名应被拒绝"
-        )
+        assert verify_signature(payload, fake_sig, secret) is False, "伪造签名应被拒绝"

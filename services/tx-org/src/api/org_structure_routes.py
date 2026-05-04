@@ -121,7 +121,8 @@ async def get_org_tree(
         store_filter = "AND d.store_id = :store_id"
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         WITH RECURSIVE dept_tree AS (
             SELECT
                 id, parent_id, name, dept_type, store_id, manager_id,
@@ -156,7 +157,8 @@ async def get_org_tree(
         FROM dept_tree dt
         LEFT JOIN employees e ON e.id = dt.manager_id AND e.is_deleted = FALSE
         ORDER BY dt.depth, dt.sort_order
-    """)
+    """
+    )
 
     result = await db.execute(sql, params)
     flat_rows = [dict(r._mapping) for r in result.fetchall()]
@@ -200,7 +202,8 @@ async def create_department(
         parent_path = parent_data.get("path") or ""
         path = f"{parent_path}/{req.name}"
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO departments (
             id, tenant_id, name, parent_id, dept_type, store_id,
             manager_id, sort_order, level, path, description,
@@ -211,7 +214,8 @@ async def create_department(
             TRUE, :now, :now
         )
         RETURNING id::text AS department_id
-    """)
+    """
+    )
 
     result = await db.execute(
         sql,
@@ -247,7 +251,8 @@ async def get_department_detail(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             d.id::text AS department_id,
             d.name,
@@ -270,7 +275,8 @@ async def get_department_detail(
         LEFT JOIN employees e ON e.id = d.manager_id AND e.is_deleted = FALSE
         LEFT JOIN departments pd ON pd.id = d.parent_id AND pd.is_active = TRUE
         WHERE d.id = :dept_id AND d.is_active = TRUE
-    """)
+    """
+    )
     result = await db.execute(sql, {"dept_id": dept_id})
     row = result.fetchone()
 
@@ -367,12 +373,14 @@ async def delete_department(
         raise HTTPException(status_code=400, detail=f"该部门下还有 {emp_count} 名在职员工，请先转移员工")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE departments
             SET is_active = FALSE, updated_at = :now
             WHERE id = :dept_id AND is_active = TRUE
             RETURNING id::text AS department_id
-        """),
+        """
+        ),
         {"dept_id": dept_id, "now": datetime.now(timezone.utc)},
     )
     row = result.fetchone()
@@ -464,7 +472,8 @@ async def move_department(
     # 防止移动到自身下级（环形检测）
     if req.new_parent_id:
         # 检查 new_parent_id 是否是当前部门的子部门
-        cycle_check_sql = text("""
+        cycle_check_sql = text(
+            """
             WITH RECURSIVE ancestors AS (
                 SELECT id, parent_id FROM departments WHERE id = :new_parent_id AND is_active = TRUE
                 UNION ALL
@@ -473,7 +482,8 @@ async def move_department(
                 WHERE d.is_active = TRUE
             )
             SELECT COUNT(*) FROM ancestors WHERE id = :dept_id
-        """)
+        """
+        )
         cycle_result = await db.execute(cycle_check_sql, {"new_parent_id": req.new_parent_id, "dept_id": dept_id})
         if (cycle_result.scalar() or 0) > 0:
             raise HTTPException(status_code=400, detail="不能将部门移动到其子部门下（会造成循环）")
@@ -497,11 +507,13 @@ async def move_department(
 
     # 更新当前部门
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE departments
             SET parent_id = :new_parent_id, level = :new_level, path = :new_path, updated_at = :now
             WHERE id = :dept_id AND is_active = TRUE
-        """),
+        """
+        ),
         {
             "new_parent_id": req.new_parent_id,
             "new_level": new_level,
@@ -513,7 +525,8 @@ async def move_department(
 
     # 递归更新子部门的 level 和 path
     await db.execute(
-        text("""
+        text(
+            """
             WITH RECURSIVE subtree AS (
                 SELECT id, name, parent_id, level, path
                 FROM departments WHERE parent_id = :dept_id AND is_active = TRUE
@@ -537,7 +550,8 @@ async def move_department(
                 updated_at = :now
             FROM subtree s
             WHERE d2.id = s.id
-        """),
+        """
+        ),
         {"dept_id": dept_id, "base_level": new_level, "now": now},
     )
 
@@ -569,7 +583,8 @@ async def get_org_statistics(
     if store_id:
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             d.id::text AS department_id,
             d.name AS department_name,
@@ -585,7 +600,8 @@ async def get_org_statistics(
         WHERE d.is_active = TRUE {store_filter}
         GROUP BY d.id, d.name, d.dept_type, d.level, d.store_id
         ORDER BY d.level, d.name
-    """)
+    """
+    )
 
     result = await db.execute(sql, params)
     items = []

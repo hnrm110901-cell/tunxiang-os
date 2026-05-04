@@ -44,6 +44,7 @@ from services.tx_expense.src.agents.a5_travel_assistant import (
 # A5 — estimate_travel_needed
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_a5_same_city_identical_name():
     """同名城市 → 不需要差旅"""
@@ -75,6 +76,7 @@ async def test_a5_missing_city_conservative():
 # ===========================================================================
 # A5 — handle_inspection_task_assigned
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_a5_same_city_event_skipped():
@@ -113,6 +115,7 @@ async def test_a5_missing_required_fields_returns_none():
 # A3 — _extract_destination_city
 # ===========================================================================
 
+
 def test_a3_extract_city_from_description():
     """从 expense_item 描述中提取城市名"""
     items = [{"description": "2026年4月出差上海项目对接，住宿费"}]
@@ -130,6 +133,7 @@ def test_a3_extract_city_not_found():
 # ===========================================================================
 # A3 — check_item_compliance（mock std_svc + _get_applicant_level）
 # ===========================================================================
+
 
 def _make_db() -> AsyncMock:
     db = AsyncMock()
@@ -169,7 +173,7 @@ async def test_a3_compliant_with_warning():
             brand_id=bid,
             applicant_id=aid,
             item_description="出差上海住宿费",
-            item_amount_fen=33000,   # 330 元，超标 10%
+            item_amount_fen=33000,  # 330 元，超标 10%
             expense_type="accommodation",
             destination_city="上海",
         )
@@ -211,7 +215,7 @@ async def test_a3_over_limit_minor():
             brand_id=bid,
             applicant_id=aid,
             item_description="出差上海住宿费",
-            item_amount_fen=40500,   # 超标 35%
+            item_amount_fen=40500,  # 超标 35%
             expense_type="accommodation",
             destination_city="上海",
         )
@@ -253,7 +257,7 @@ async def test_a3_over_limit_major_truncated():
             brand_id=bid,
             applicant_id=aid,
             item_description="出差上海住宿费",
-            item_amount_fen=48000,   # 超标 60%
+            item_amount_fen=48000,  # 超标 60%
             expense_type="accommodation",
             destination_city="上海",
         )

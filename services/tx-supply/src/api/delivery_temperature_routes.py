@@ -10,6 +10,7 @@
   POST /api/v1/supply/delivery/temperature-thresholds                创建阈值
   GET  /api/v1/supply/delivery/temperature-thresholds                列出阈值
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -179,9 +180,7 @@ async def list_active_alerts(
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    rows = await svc.list_active_alerts(
-        tenant_id=x_tenant_id, severity=severity, limit=limit, db=db
-    )
+    rows = await svc.list_active_alerts(tenant_id=x_tenant_id, severity=severity, limit=limit, db=db)
     return _ok({"items": rows, "count": len(rows)})
 
 
@@ -244,7 +243,5 @@ async def list_thresholds(
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    rows = await svc.list_thresholds(
-        tenant_id=x_tenant_id, enabled_only=enabled_only, db=db
-    )
+    rows = await svc.list_thresholds(tenant_id=x_tenant_id, enabled_only=enabled_only, db=db)
     return _ok({"items": rows, "count": len(rows)})

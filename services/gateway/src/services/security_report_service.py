@@ -64,7 +64,8 @@ class SecurityReportService:
 
         # 1. 登录失败次数（按 actor 分组）
         login_fail_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT actor_id, COUNT(*) AS cnt
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
@@ -74,7 +75,8 @@ class SecurityReportService:
                 GROUP BY actor_id
                 ORDER BY cnt DESC
                 LIMIT 20
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_str,
                 "action": AuditAction.LOGIN_FAILED.value,
@@ -88,7 +90,8 @@ class SecurityReportService:
 
         # 2. API 调用量（actor_type = api_app，按 actor_id 分组）
         api_call_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT actor_id, COUNT(*) AS cnt
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
@@ -98,7 +101,8 @@ class SecurityReportService:
                 GROUP BY actor_id
                 ORDER BY cnt DESC
                 LIMIT 20
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_str,
                 "ts_start": ts_start,
@@ -111,14 +115,16 @@ class SecurityReportService:
 
         # 3. 数据导出次数
         export_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
                   AND created_at >= :ts_start
                   AND created_at < :ts_end
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_str,
                 "action": AuditAction.DATA_EXPORT.value,
@@ -130,7 +136,8 @@ class SecurityReportService:
 
         # 4. 异常事件（severity = critical）
         critical_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, action, actor_id, actor_type,
                        resource_type, resource_id, created_at, extra
                 FROM audit_logs
@@ -140,7 +147,8 @@ class SecurityReportService:
                   AND created_at < :ts_end
                 ORDER BY created_at DESC
                 LIMIT 100
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_str,
                 "ts_start": ts_start,
@@ -217,14 +225,16 @@ class SecurityReportService:
 
         # 1. RLS 是否启用（查询 pg_class + pg_tables）
         rls_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT relrowsecurity
                 FROM pg_class
                 WHERE relname = 'audit_logs'
                   AND relnamespace = (
                       SELECT oid FROM pg_namespace WHERE nspname = current_schema()
                   )
-            """),
+            """
+            ),
         )
         rls_result = rls_row.scalar_one_or_none()
         rls_enabled: bool = bool(rls_result) if rls_result is not None else False
@@ -233,12 +243,13 @@ class SecurityReportService:
 
         # 2. 过期 token：TOKEN_ISSUED 但 TOKEN_REVOKED 未记录且超过90天
         expired_token_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM audit_logs issued
                 WHERE issued.tenant_id = :tenant_id
                   AND issued.action = :issued_action
-                  AND issued.created_at < NOW() - INTERVAL ':days days'
+                  AND issued.created_at < NOW() - make_interval(days => :days)
                   AND NOT EXISTS (
                       SELECT 1 FROM audit_logs revoked
                       WHERE revoked.tenant_id = issued.tenant_id
@@ -247,7 +258,8 @@ class SecurityReportService:
                         AND revoked.resource_id = issued.resource_id
                         AND revoked.created_at > issued.created_at
                   )
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_str,
                 "issued_action": AuditAction.TOKEN_ISSUED.value,
@@ -262,7 +274,8 @@ class SecurityReportService:
 
         # 3. 超30天未使用的 api_app
         unused_app_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT actor_id) AS cnt
                 FROM audit_logs first_seen
                 WHERE tenant_id = :tenant_id
@@ -272,9 +285,10 @@ class SecurityReportService:
                       WHERE recent.tenant_id = first_seen.tenant_id
                         AND recent.actor_id = first_seen.actor_id
                         AND recent.actor_type = 'api_app'
-                        AND recent.created_at >= NOW() - INTERVAL ':days days'
+                        AND recent.created_at >= NOW() - make_interval(days => :days)
                   )
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_str,
                 "days": _UNUSED_APP_THRESHOLD_DAYS,
@@ -289,7 +303,8 @@ class SecurityReportService:
         health_cert_alerts = 0
         try:
             health_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS cnt
                     FROM employees
                     WHERE tenant_id = :tenant_id
@@ -297,7 +312,8 @@ class SecurityReportService:
                       AND health_cert_expire_date IS NOT NULL
                       AND health_cert_expire_date <= CURRENT_DATE + INTERVAL '30 days'
                       AND health_cert_expire_date >= CURRENT_DATE
-                """),
+                """
+                ),
                 {"tenant_id": tenant_str},
             )
             health_cert_alerts = health_row.scalar_one()

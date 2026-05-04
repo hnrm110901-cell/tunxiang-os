@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -135,7 +135,7 @@ async def generate_daily_review(
         "staff_performance": staff_performance,
         "action_items": action_items,
         "status": "draft",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
@@ -186,7 +186,7 @@ async def submit_action_items(
                 "due_date": item.get("due_date", ""),
                 "status": "pending",
                 "created_by": manager_id,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
 
@@ -202,7 +202,7 @@ async def submit_action_items(
         "submitted_count": len(enriched),
         "items": enriched,
         "submitted_by": manager_id,
-        "submitted_at": datetime.utcnow().isoformat(),
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -276,7 +276,7 @@ async def sign_off_review(
             raise ValueError("Review already signed off")
         review["status"] = "signed_off"
         review["signed_by"] = manager_id
-        review["signed_at"] = datetime.utcnow().isoformat()
+        review["signed_at"] = datetime.now(timezone.utc).isoformat()
 
     log.info(
         "review_signed_off",
@@ -301,7 +301,7 @@ async def sign_off_review(
     return {
         "signed_off": True,
         "signed_by": manager_id,
-        "signed_at": datetime.utcnow().isoformat(),
+        "signed_at": datetime.now(timezone.utc).isoformat(),
         "store_id": store_id,
         "date": date_.isoformat(),
     }

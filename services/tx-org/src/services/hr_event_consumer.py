@@ -180,13 +180,15 @@ class HREventConsumer:
         try:
             async with async_session_factory() as db:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO compliance_alerts
                             (tenant_id, employee_id, alert_type, severity, title, detail, source)
                         VALUES
                             (:tenant_id, :employee_id, 'attendance_exception', 'warning',
                              :title, :detail, 'agent')
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "employee_id": employee_id or None,
@@ -232,13 +234,15 @@ class HREventConsumer:
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, store_id, date
                         FROM employee_schedules
                         WHERE employee_id = :eid
                           AND date BETWEEN :start AND :end
                           AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {"eid": employee_id, "start": leave_start, "end": leave_end},
                 )
                 rows = result.mappings().all()
@@ -298,14 +302,16 @@ class HREventConsumer:
         try:
             async with async_session_factory() as db:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO compliance_alerts
                             (tenant_id, employee_id, alert_type, severity, title, detail,
                              due_date, source)
                         VALUES
                             (:tenant_id, :employee_id, 'contract_expiry', 'warning',
                              '员工合同即将到期', :detail, :due_date, 'system')
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": tenant_id,
                         "employee_id": employee_id or None,
@@ -388,7 +394,8 @@ class HREventConsumer:
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, emp_name, role
                         FROM employees
                         WHERE store_id = :sid
@@ -401,7 +408,8 @@ class HREventConsumer:
                                 AND is_deleted = FALSE
                           )
                         LIMIT 5
-                    """),
+                    """
+                    ),
                     {"sid": store_id, "sdate": schedule_date},
                 )
                 rows = result.mappings().all()

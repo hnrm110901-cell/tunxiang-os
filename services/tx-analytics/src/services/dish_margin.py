@@ -256,11 +256,13 @@ def _get_dish_info(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[dic
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT id, dish_name, dish_code, price_fen, cost_fen, category_id
             FROM dishes
             WHERE id = :dish_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"dish_id": dish_id, "tenant_id": tenant_id},
         )
         row = result.mappings().first()
@@ -277,13 +279,15 @@ def _get_store_dishes(store_id: uuid.UUID, tenant_id: uuid.UUID, db) -> list[dic
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT id, dish_name, dish_code, price_fen, cost_fen
             FROM dishes
             WHERE (store_id = :store_id OR store_id IS NULL)
               AND tenant_id = :tenant_id
               AND is_available = TRUE AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id},
         )
         return [dict(row) for row in result.mappings().all()]
@@ -307,14 +311,16 @@ def _get_dish_cost(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[int
         now = datetime.now(timezone.utc)
         # 取当前有效 BOM
         bom_result = db.execute(
-            text("""
+            text(
+                """
             SELECT id FROM bom_templates
             WHERE dish_id = :dish_id AND tenant_id = :tenant_id
               AND is_active = TRUE AND is_deleted = FALSE
               AND effective_date <= :now
               AND (expiry_date IS NULL OR expiry_date > :now)
             ORDER BY effective_date DESC LIMIT 1
-        """),
+        """
+            ),
             {"dish_id": dish_id, "tenant_id": tenant_id, "now": now},
         )
         bom_id = bom_result.scalar_one_or_none()
@@ -323,14 +329,16 @@ def _get_dish_cost(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[int
 
         # 汇总 BOM 成本
         cost_result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(
                 CAST(standard_qty * (1 + COALESCE(waste_factor, 0)) * COALESCE(unit_cost_fen, 0) AS INTEGER)
             ), 0) as total_cost
             FROM bom_items
             WHERE bom_id = :bom_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE AND item_action != 'REMOVE'
-        """),
+        """
+            ),
             {"bom_id": bom_id, "tenant_id": tenant_id},
         )
         return cost_result.scalar_one_or_none() or 0
@@ -353,7 +361,8 @@ def _get_dish_sales_in_range(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(oi.quantity), 0)
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -364,7 +373,8 @@ def _get_dish_sales_in_range(
               AND o.status IN ('completed', 'paid')
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
-        """),
+        """
+            ),
             {
                 "dish_id": dish_id,
                 "store_id": store_id,

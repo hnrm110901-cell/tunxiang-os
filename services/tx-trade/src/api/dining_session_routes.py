@@ -191,11 +191,13 @@ async def _get_current_market_session_id(
     # 1. 门店自定义配置
     store_rows = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT id, start_time, end_time
             FROM store_market_sessions
             WHERE tenant_id = :tid AND store_id = :sid AND is_active = TRUE
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": store_id},
         )
     ).fetchall()
@@ -213,12 +215,14 @@ async def _get_current_market_session_id(
     # 2. 集团模板
     tmpl_rows = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT id, start_time, end_time
             FROM market_session_templates
             WHERE tenant_id = :tid AND is_active = TRUE
             ORDER BY display_order, start_time
-        """),
+        """
+            ),
             {"tid": tenant_id},
         )
     ).fetchall()
@@ -475,7 +479,8 @@ async def update_guest_count(
     from sqlalchemy import text
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dining_sessions
             SET guest_count  = :guest_count,
                 per_capita_fen = CASE
@@ -486,7 +491,8 @@ async def update_guest_count(
                 updated_at = NOW()
             WHERE id = :session_id
               AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {
             "guest_count": body.guest_count,
             "session_id": session_id,
@@ -553,11 +559,13 @@ async def link_banquet_session(
         _err("会话不存在", code=404)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dining_sessions
             SET banquet_session_id = :banquet_session_id, updated_at = NOW()
             WHERE id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {
             "banquet_session_id": body.banquet_session_id,
             "session_id": session_id,

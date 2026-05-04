@@ -37,14 +37,16 @@ class ForgeDeveloperService:
         developer_id = f"dev_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_developers
                     (id, tenant_id, developer_id, name, email, company, dev_type, description, status)
                 VALUES
                     (gen_random_uuid(), current_setting('app.tenant_id')::uuid,
                      :developer_id, :name, :email, :company, :dev_type, :description, 'active')
                 RETURNING developer_id, name, email, company, dev_type, status, created_at
-            """),
+            """
+            ),
             {
                 "developer_id": developer_id,
                 "name": name,
@@ -61,7 +63,8 @@ class ForgeDeveloperService:
     # ── 详情 ─────────────────────────────────────────────────
     async def get_developer_profile(self, db: AsyncSession, developer_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.developer_id, d.name, d.email, d.company, d.dev_type,
                     d.description, d.status, d.avatar_url, d.website,
@@ -79,7 +82,8 @@ class ForgeDeveloperService:
                 ) stats ON true
                 WHERE d.developer_id = :did
                   AND d.is_deleted = false
-            """),
+            """
+            ),
             {"did": developer_id},
         )
         row = result.mappings().first()
@@ -100,14 +104,16 @@ class ForgeDeveloperService:
         filtered["did"] = developer_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_developers
                 SET {set_clauses}, updated_at = NOW()
                 WHERE developer_id = :did AND is_deleted = false
                 RETURNING developer_id, name, email, company, dev_type,
                           description, status, avatar_url, website,
                           created_at, updated_at
-            """),
+            """
+            ),
             filtered,
         )
         row = result.mappings().first()
@@ -140,14 +146,16 @@ class ForgeDeveloperService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT developer_id, name, email, company, dev_type,
                        status, created_at
                 FROM forge_developers
                 {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]

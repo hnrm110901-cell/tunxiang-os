@@ -50,7 +50,8 @@ async def _query_today_metrics(
     if store_id:
         order_params["store_id"] = store_id
 
-    order_sql = text(f"""
+    order_sql = text(
+        f"""
         SELECT
             COALESCE(SUM(o.final_amount_fen), 0)                AS revenue_fen,
             COUNT(o.id)                                         AS order_count,
@@ -71,7 +72,8 @@ async def _query_today_metrics(
           AND o.status IN ('paid', 'voided')
           AND o.is_deleted = false
           {store_filter}
-    """)
+    """
+    )
 
     order_row = (await db.execute(order_sql, order_params)).fetchone()
 
@@ -113,14 +115,16 @@ async def _query_today_metrics(
         if store_id:
             ps_params["store_id"] = store_id
 
-        ps_sql = text(f"""
+        ps_sql = text(
+            f"""
             SELECT COALESCE(SUM(total_salary_fen), 0) AS labor_fen
             FROM payroll_summaries
             WHERE period_year  = :period_year
               AND period_month = :period_month
               AND is_deleted   = false
               {ps_filter}
-        """)
+        """
+        )
         ps_row = (await db.execute(ps_sql, ps_params)).fetchone()
         labor_fen = int(ps_row.labor_fen) if ps_row else 0
 
@@ -196,14 +200,16 @@ async def _query_compare_revenue(
     if store_id:
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen
         FROM orders o
         WHERE {date_filter}
           AND o.status     = 'paid'
           AND o.is_deleted = false
           {store_clause}
-    """)
+    """
+    )
 
     row = (await db.execute(sql, params)).fetchone()
     if not row:
@@ -234,7 +240,8 @@ async def _query_historical_stats(
     if store_id:
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         WITH daily AS (
             SELECT
                 DATE(o.order_time AT TIME ZONE 'Asia/Shanghai')         AS day,
@@ -277,7 +284,8 @@ async def _query_historical_stats(
             AVG(avg_order_value_fen)                                     AS aov_avg_30d,
             STDDEV(avg_order_value_fen)                                  AS aov_std
         FROM daily
-    """)
+    """
+    )
 
     row = (await db.execute(sql, params)).fetchone()
 

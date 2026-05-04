@@ -66,7 +66,8 @@ async def create_equipment(
     equipment_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_fire_equipment (
                     id, tenant_id, store_id, equipment_type, equipment_name,
                     location_desc, serial_no, manufacturer, install_date,
@@ -82,7 +83,8 @@ async def create_equipment(
                     END,
                     'active', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": equipment_id,
                 "tid": x_tenant_id,
@@ -116,7 +118,8 @@ async def create_inspection(
     inspection_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_fire_inspections (
                     id, tenant_id, store_id, inspector_id, inspector_name,
                     inspection_type, checklist_results, issues_found,
@@ -126,7 +129,8 @@ async def create_inspection(
                     :itype, :checklist, :issues,
                     :result, NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": inspection_id,
                 "tid": x_tenant_id,
@@ -193,7 +197,8 @@ async def list_due_equipment(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM civic_fire_equipment
                 WHERE tenant_id = :tid AND is_deleted = FALSE
                     AND status = 'active'
@@ -202,7 +207,8 @@ async def list_due_equipment(
                         OR next_inspection_date <= CURRENT_DATE + :days * INTERVAL '1 day'
                     )
                 ORDER BY next_inspection_date ASC NULLS FIRST
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "days": days},
         )
         items = [dict(r._mapping) for r in rows]

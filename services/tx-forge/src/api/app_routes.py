@@ -26,9 +26,11 @@ async def submit_app(
 ) -> Dict[str, Any]:
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.apps (tenant_id, developer_id, name, category, description, version, status)
+        text(
+            """INSERT INTO forge.apps (tenant_id, developer_id, name, category, description, version, status)
                 VALUES (:tid, :developer_id, :name, :category, :description, :version, 'draft')
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {"tid": x_tenant_id, **{k: body[k] for k in ("developer_id", "name", "category", "description", "version")}},
     )
     await db.commit()

@@ -2,6 +2,7 @@
 
 提供跨市场预测、市场就绪度评估、节假日影响分析。
 """
+
 from datetime import date
 from typing import Any, Optional
 

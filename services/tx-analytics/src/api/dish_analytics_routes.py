@@ -55,7 +55,8 @@ async def top_selling_dishes(
             rows = (
                 (
                     await session.execute(
-                        text(f"""
+                        text(
+                            f"""
                     SELECT
                         COALESCE(d.id::text, '')             AS dish_id,
                         oi.item_name                         AS dish_name,
@@ -76,7 +77,8 @@ async def top_selling_dishes(
                     GROUP BY d.id, oi.item_name, dc.name
                     ORDER BY sales_count DESC
                     LIMIT :limit
-                """),
+                """
+                        ),
                         {**params, "days_count": days},
                     )
                 )
@@ -127,7 +129,8 @@ async def dish_time_heatmap(
             rows = (
                 (
                     await session.execute(
-                        text(f"""
+                        text(
+                            f"""
                     SELECT
                         -- 0=周一 … 6=周日（ISO: 1=Mon, 7=Sun）
                         (EXTRACT(ISODOW FROM o.order_time AT TIME ZONE 'Asia/Shanghai') - 1)::int
@@ -145,7 +148,8 @@ async def dish_time_heatmap(
                       {dish_filter}
                     GROUP BY day_of_week, hour
                     ORDER BY day_of_week, hour
-                """),
+                """
+                        ),
                         params,
                     )
                 )
@@ -194,7 +198,8 @@ async def dish_pairing(
             rows = (
                 (
                     await session.execute(
-                        text("""
+                        text(
+                            """
                     WITH target_orders AS (
                         SELECT DISTINCT oi.order_id
                         FROM order_items oi
@@ -219,7 +224,8 @@ async def dish_pairing(
                     GROUP BY oi2.item_name
                     ORDER BY count DESC
                     LIMIT 10
-                """),
+                """
+                        ),
                         {"dish_id": dish_id, "start_dt": start_dt},
                     )
                 )
@@ -266,7 +272,8 @@ async def underperforming_dishes(
             rows = (
                 (
                     await session.execute(
-                        text("""
+                        text(
+                            """
                     SELECT
                         COALESCE(d.id::text, '') AS dish_id,
                         oi.item_name             AS dish_name,
@@ -286,7 +293,8 @@ async def underperforming_dishes(
                     HAVING SUM(oi.quantity) < :threshold
                     ORDER BY sales_count ASC
                     LIMIT 50
-                """),
+                """
+                        ),
                         {"start_dt": start_dt, "threshold": min_sales_threshold},
                     )
                 )

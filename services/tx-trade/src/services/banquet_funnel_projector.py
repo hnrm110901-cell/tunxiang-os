@@ -64,9 +64,7 @@ class BanquetFunnelProjector(ProjectorBase):
         DepositEventType.REFUNDED.value,
     }
 
-    def __init__(
-        self, tenant_id: Any, *, lead_service: Optional[Any] = None
-    ) -> None:
+    def __init__(self, tenant_id: Any, *, lead_service: Optional[Any] = None) -> None:
         """
         Args:
             tenant_id:    投影器租户上下文
@@ -118,9 +116,7 @@ class BanquetFunnelProjector(ProjectorBase):
     # 聚合应用（内存）
     # ─────────────────────────────────────────────────────────────────
 
-    def _apply_created(
-        self, stream_id: str, payload: dict[str, Any]
-    ) -> None:
+    def _apply_created(self, stream_id: str, payload: dict[str, Any]) -> None:
         sales_employee_id = payload.get("sales_employee_id") or "unassigned"
         source_channel = payload.get("source_channel") or "booking_desk"
         stage = payload.get("stage") or "all"
@@ -138,9 +134,7 @@ class BanquetFunnelProjector(ProjectorBase):
         self._funnel_by_employee[(sales_employee_id, stage)] += 1
         self._funnel_by_channel[(source_channel, stage)] += 1
 
-    def _apply_stage_changed(
-        self, stream_id: str, payload: dict[str, Any]
-    ) -> None:
+    def _apply_stage_changed(self, stream_id: str, payload: dict[str, Any]) -> None:
         prev_stage = payload.get("previous_stage")
         next_stage = payload.get("next_stage")
         if not next_stage:
@@ -161,31 +155,21 @@ class BanquetFunnelProjector(ProjectorBase):
         if cur_stage == next_stage:
             return
         # 扣减旧格子
-        self._funnel_by_employee[(emp, cur_stage)] = max(
-            0, self._funnel_by_employee[(emp, cur_stage)] - 1
-        )
-        self._funnel_by_channel[(ch, cur_stage)] = max(
-            0, self._funnel_by_channel[(ch, cur_stage)] - 1
-        )
+        self._funnel_by_employee[(emp, cur_stage)] = max(0, self._funnel_by_employee[(emp, cur_stage)] - 1)
+        self._funnel_by_channel[(ch, cur_stage)] = max(0, self._funnel_by_channel[(ch, cur_stage)] - 1)
         # 累加新格子
         self._funnel_by_employee[(emp, next_stage)] += 1
         self._funnel_by_channel[(ch, next_stage)] += 1
         record["stage"] = next_stage
 
-    def _apply_converted(
-        self, stream_id: str, payload: dict[str, Any]
-    ) -> None:
+    def _apply_converted(self, stream_id: str, payload: dict[str, Any]) -> None:
         # converted 本身不改 stage（stage 已经是 order），只登记 reservation
         record = self._state.get(stream_id)
         if record is None:
             return
-        record["converted_reservation_id"] = payload.get(
-            "converted_reservation_id"
-        )
+        record["converted_reservation_id"] = payload.get("converted_reservation_id")
 
-    async def _apply_deposit_refunded(
-        self, event: dict[str, Any], payload: dict[str, Any]
-    ) -> None:
+    async def _apply_deposit_refunded(self, event: dict[str, Any], payload: dict[str, Any]) -> None:
         """订金退款 → 关联宴会商机 → 触发 lead 置失效（独立验证 P1-3）。
 
         事件 payload 约定（tx-finance 发射）：

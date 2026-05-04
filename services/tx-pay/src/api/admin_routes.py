@@ -106,7 +106,8 @@ async def upsert_config(
     from sqlalchemy import text
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO payment_channel_configs (
                 tenant_id, brand_id, store_id, method,
                 channel_name, priority, is_active, config_data
@@ -123,7 +124,8 @@ async def upsert_config(
                 is_active = EXCLUDED.is_active,
                 config_data = EXCLUDED.config_data,
                 updated_at = NOW()
-        """),
+        """
+        ),
         {
             "tenant_id": x_tenant_id,
             "brand_id": req.brand_id or "",

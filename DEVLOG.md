@@ -1,3 +1,149 @@
+## 2026-05-04 v6 审计修复总会话（51 commit / 8 智能体并行 / 5 Tier 1 路径覆盖）
+
+> 单次会话产出最大的一次。从「W12 5 个开发任务 + 22 项审计修复」出发，
+> 经审计校对（仅 23% 准确率，剔除 6 项 ghost、纠正 3 项错路径），
+> 落地 51 commit + 约 105 个新测试用例 + 4 张新表 + 2 个 codemod 脚本 + 1 个 pre-commit 守门员。
+
+### 阶段一：审计校对（揭穿审计 6 项 Ghost + 3 项路径错）
+| 审计项 | 真相 |
+|---|---|
+| P1.4+1.5 CFOBudgetDashboardPage | git 全历史不存在 — Ghost |
+| P1.6 lineage_routes.py | 后端整个域不存在 — Ghost |
+| P3.1/P3.4 lineage_service | 同上 — Ghost |
+| P2.6 Gaussian 近似 | 实际是标准高斯机制 — Ghost |
+| P3.2/P3.3 排班/宴席性能 | 实际无嵌套查询 — Ghost |
+| P1.1 marketing_opportunity_engine | 实位 audience_pack_service.py:322-333 |
+| P1.2 traffic_predictor_v2 | 实位 traffic_predictor.py:340 |
+| P1.3 enterprise_overview_routes | 实位 group_routes.py |
+| 审计漏报 INTERVAL 9 处 | 全仓 5 服务真有同类 Bug，4 处导致安全告警静默失效 |
+
+### 阶段二：Tier 1 财务红线 + 安全闭合（24 commit）
+
+**SQL INTERVAL 全仓修复（5 commit）**：
+- [fix(tx-pay/tx-growth/tx-predict/gateway)] 9 处 `INTERVAL ':n unit'` → `make_interval()`
+- 关键发现：gateway/audit_log_service 4 处 + security_report_service 2 处导致登录失败/约束突破/数据导出/凌晨偷登 4 类安全告警**静默失效**
+
+**P1 真 Bug（3 commit）**：
+- [fix(tx-growth)] `audience_pack_service.py` 生日跨年/闰月边界（`make_date()` 方案）
+- [fix(tx-member)] `group_routes.py` 7 端点加成员验证 + 6 IDOR 测试（修复横向越权）
+- [fix(tx-org)] `franchise_settlement_service` 改用 calculate_fen 直传分
+
+**Tier 1 测试 + 实装（16 commit）**：
+- [test/feat(sync-engine)] LWW-Register CRDT 算法库 + 23 测试（含 200 单 4h 零丢失）
+- [test/feat(tx-org)] RoyaltyCalculator calculate_fen + Decimal 中间精度 + 11 Tier 1 测试（**100w × 5% 精确等于 5 万元**）
+- [test/feat(tx-member)] 积分系统毛利硬约束 + 跨店结算金额零泄漏 + FIFO 过期 + 22 Tier 1 测试
+
+### 阶段三：W12 业务功能（13 commit）
+
+| W12 | 落地 |
+|---|---|
+| W12-1 积分系统 | 5 commit / 22 测试 / 揭穿审计「80% 完成」实为 100% mock |
+| W12-2 配送调度 | v391 迁移 + 3 Provider Adapter（达达/顺丰/自有）+ 22 测试 |
+| W12-3 CRDT LWW | 见阶段二（Tier 1）|
+| W12-4 加盟管理 | 智能体精读后正确**拒绝重复实现** — 8 文件 + 4 service 已完整 |
+| W12-5 TV 菜单屏 | 25 端点对齐前端 + 规则模板布局 + 24 端到端测试 |
+
+### 阶段四：W12 后续接线（6 commit）
+
+- [migrate(tx-member)] **v392 创建积分系统核心三表**（member_cards/points_log/card_types） — 揭穿审计盲区：之前积分服务的 9 处 SQL 全是死的，3 张表都没建
+- [migrate(sync)] **v393 sync_checkpoints + last_pull_token** — LWW 接线 OfflineSyncService 持久化
+- [feat(sync)] resolve_conflict 替换 server_wins 占位 → field-level LWW（金额强制 PN-Counter）+ 22 集成测试
+- [refactor(tx-org)] **加盟路由冲突裁决**（保留 v5_routes 删除 routes/router 重复端点）+ 12 测试 — 揭穿现网 422 Bug：Starlette **先注册胜出**（不是后者覆盖），生产前端发 `name` 字段被旧 routes 拦截一直 422
+
+### 阶段五：技术债 codemod + 安全 hardening（21 commit）
+
+- [security(shared)] **safe_http_exception 中央错误处理器** + correlation_id + 7 测试
+- [security] gateway/tx-trade/tx-finance/tx-member 5 试点服务，**~177 个 detail=str(e) 异常泄漏**修复
+- [security(ci)] **pre-commit hook 直接 reject 新增 detail=str(e)** — 守门员就位
+- [refactor] datetime.utcnow → now(UTC) — 27 文件 / 190 处 + 可复用 codemod 脚本
+- [refactor] logging → structlog — 15 文件 / 100% 占位符 → keyword args 改造率
+
+### 数据变化
+- 迁移版本：v391（旧）→ v392 积分三表 → v393 sync_checkpoints token
+- 新增模块：4 个（lww_register / safe_http_exception / delivery_dispatch_adapters / points_settlement|expiry_fifo|expiry_worker）
+- 新增 codemod 脚本：1 个（codemod_utcnow.py）
+- 新增 pre-commit 钩子：1 个（no-detail-str-e）
+- 新增测试：约 105 个（CRDT 23 + 集成 22 + 积分 22 + 配送 22 + TV 24 + Royalty 11 + 企业集团 6 + 异常 handler 7 - 部分重叠）
+- 修改文件：约 80 个；新建文件：约 20 个
+
+### 遗留问题（已开 8 项跟踪任务）
+| ID | 待办 | 阻塞性 |
+|---|---|---|
+| PB.3 | 加盟接入 emit_event（FranchiseEventType 11 事件） | 进行中 |
+| PD.2 | Wave G+H 共 ~105 测试需 Python 3.11+ Docker 跑（本地 3.9 跑了 62/85 = 73%） | 上线前必跑 |
+| PE.2 | PB.1 修了阶梯费率 tier[0] 以下错误回退 last_tier 的 Bug，灰度前需对账 | 业务确认 |
+| PG.1 | v391 INSERT policy 错用 USING（PG 规范要求 WITH CHECK） | P1 安全 |
+| PG.2 | datetime codemod 第二轮（in-flight 释放后 12 文件） | P3 |
+| PG.3 | 多智能体并发 commit race（3 次撞上） | P1 架构 |
+| PG.4 | 云端 /api/v1/sync/pull 需支持 since_ts query | P1 增量同步 |
+| PD.1 | 积分系统 schema 已建（v392），但需创始人审批表名/列定后入生产 | 已建表 |
+
+### 关键架构反馈（智能体多次确认）
+1. **多智能体并发 commit race**：A 智能体 staged 改动被 B 的 `git add -A`/`commit -a` 卷走 — 已 3 次发生。建议加到 CLAUDE.md §21 用 `git stash`/`worktree` 隔离
+2. **审计准确率仅 ~23%**：建议把「审计校对」作为后续所有 Wave 的强制前置步骤
+3. **PG.1 v391 INSERT policy bug**：PD.1 智能体顺手发现 — INSERT 必须 WITH CHECK 才阻止跨租户，USING 对 INSERT 无效
+
+### 明日计划
+- Docker (Python 3.12) 跑全套 ~105 测试验证 100% 绿
+- 灰度 v392/v393 迁移到 DEMO 环境
+- 与首批客户对账阶梯费率新算法（PE.2）
+- 启动 P2.5 Phase 2（tx-org/tx-supply/tx-ops，预估 ~120 异常泄漏修复）
+
+---
+
+## 2026-05-04 W12-3 LWW-Register 接线 OfflineSyncService（Tier 1 — 4h 离线零丢失）
+
+### 今日完成
+- [migrate] v393_sync_checkpoints_token — 给 v036 sync_checkpoints 表增量增加 last_pull_token TEXT + last_pull_token_ts TIMESTAMPTZ + 审计索引（保留 v036 RLS/索引完整）
+- [feat(edge/sync-engine)] offline_sync_service.resolve_conflict 替换 server_wins 占位 → 字段级 LWW-Register 决策（调 lww_register.resolve_lww）
+- [feat(edge/sync-engine)] 字段策略表 LWW_FIELDS / MONETARY_FIELDS / LIST_FIELDS：金额字段强制 server_wins（PN-Counter 语义），列表字段 server_wins（顺序敏感），其它默认 server_wins 兜底
+- [feat(edge/sync-engine)] ConflictResolution 增加 field_decisions / merged_payload 字段供审计，决策结果以 _lww_resolution 子对象写回 order_data 不覆盖原始字段
+- [feat(edge/sync-engine)] _push_single_order 从云端 409 响应捕获 server_payload（兼容 server_payload + order_data 双 key）
+- [feat(edge/sync-engine)] load_sync_token / save_sync_token 公开方法 — 从 v393 持久化 SyncToken 恢复，无新列时降级到 v036 字段（向后兼容）
+- [feat(edge/sync-engine)] pull_updates 用 SyncToken.filter_unseen 二次过滤已见事件 + GREATEST UPSERT 防止并发回退
+- [test(edge/sync-engine)] test_offline_sync_service_integration.py — 22 用例（含 4h 离线 200 单 N+M=零丢失场景）
+- [docs] 决策表：status/桌号/会员绑定/备注 → LWW；*_fen 金额字段 → server_wins；items_data/payments_data → server_wins；缺失 payload → server_wins 兜底
+
+### 数据变化
+- 迁移版本：v392 → v393（sync_checkpoints 增量 2 列）
+- 修改服务：edge/sync-engine（offline_sync_service.py +327 行）
+- 新增测试：22 个（test_offline_sync_service_integration.py）
+
+### 遗留问题
+- 集成测试在沙盒 shell 内 pytest 被禁用，未在本次会话运行；需在标准 dev 环境 pytest edge/sync-engine/tests/ -v 验证全绿
+- pull_updates 接口契约扩展 since_ts query param，云端 sync API 需同步支持（云端实现为 W12-4 范围）
+- LIST_FIELDS（items_data / payments_data）暂走 server_wins，长期应迁移到 RGA/Logoot CRDT
+
+### 明日计划
+- 跑 pytest edge/sync-engine/tests/ 全绿确认（23 LWW + 22 集成 = 45 用例）
+- 灰度部署 v393 迁移到 DEMO 环境（徐记海鲜数据），手动跑 4h 断网 200 单回放主流程
+
+## 2026-05-04 积分系统 Tier 1 补全（路由接服务层 + 跨店结算 + FIFO 过期 + 毛利硬约束）
+
+### 今日完成
+- [feat(tx-member)] 修复审计 ghost claim：原 8 个积分端点全部为 mock 返回 0；本次接入 services.points_engine
+- [feat(tx-member)] services/points_settlement.py — 跨店应付分摊纯函数（按发行店权重，余数给最大债权人，金额无泄漏）
+- [feat(tx-member)] services/points_expiry_fifo.py — 批次列表 FIFO 消费 + 过期清零纯函数
+- [feat(tx-member)] services/points_engine.check_offset_against_margin_floor — 三条硬约束之一：抵现毛利率不可低于阈值（默认 15%），同时返回 max_offset_fen 提示
+- [feat(tx-member)] api/points_routes 全部改为依赖注入 + emit_event(MemberEventType.POINTS_CHANGED) 旁路写事件总线
+- [feat(tx-member)] 新增 POST /api/v1/member/points/offset-check 端点：POS 端预检
+- [feat(tx-member)] workers/points_expiry_worker.py — Cron Worker（单租户失败隔离）
+- [test(tx-member)] tests/test_points_tier1.py — 22 个用例覆盖 4 大场景
+
+### 数据变化
+- 迁移版本：无（schema 变更需 ontology 审批，本次不动）
+- 新增模块：3 个（points_settlement.py / points_expiry_fifo.py / points_expiry_worker.py）
+- 新增测试：22 个（test_points_tier1.py）
+
+### 遗留问题
+- services/points_engine.py 中 earn_points / spend_points 等异步函数仍引用 member_cards / points_log / card_types 三张未在任何 migration 中存在的表 → 集成测试落地需要 ontology 审批新增 schema
+- services/points_expiry.py 仍用模块级内存 dict 持久化批次；本次未替换为 DB（避免越权动 ontology），新模块以纯函数 + 注入方式绕开
+- main.py 尚未注册 PointsExpiryWorker 到 AsyncIOScheduler（待运维确认每日窗口期）
+
+### 明日计划
+- 推 ontology 审批：member_points_batches / member_card_points / points_log 三表 + RLS 策略
+- main.py lifespan 注册 PointsExpiryWorker（hour=3, minute=0）
+
 ## 2026-05-03 生产前安全审计全量修复 — 代码已 push
 
 ### 今日完成
@@ -49,7 +195,7 @@
 
 ---
 
-
+## 2026-05-03 A1 授权加固回归测试 + 基础设施安全加固
 
 ### 今日完成
 - [security(gateway)] 修复 5 个安全漏洞：api_key_pending 绕过、JWT type/iss/aud 缺失校验、生产环境密钥缺失不崩溃、中间件未注册、MFA 未强制

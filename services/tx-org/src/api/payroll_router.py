@@ -217,12 +217,14 @@ async def list_payroll_records(
     total: int = count_row.scalar_one()
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT * FROM payroll_records_v2
             WHERE {where}
             ORDER BY employee_id
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -241,12 +243,14 @@ async def get_payroll_record(
     _uuid(record_id, "record_id")
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT * FROM payroll_records_v2
             WHERE tenant_id = :tenant_id
               AND id = :id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "id": record_id},
     )
     mapping = row.mappings().first()
@@ -386,7 +390,8 @@ async def get_attendance_summary(
 
     where = " AND ".join(filters)
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 ar.employee_id,
                 COUNT(*) FILTER (WHERE ar.absence_type IS NULL)  AS work_days,
@@ -402,7 +407,8 @@ async def get_attendance_summary(
             WHERE {where}
             GROUP BY ar.employee_id
             ORDER BY ar.employee_id
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -429,12 +435,14 @@ async def list_salary_schemes(
     total: int = count_row.scalar_one()
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT * FROM salary_schemes
             WHERE tenant_id = :tid AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {"tid": tenant_id, "limit": size, "offset": (page - 1) * size},
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -457,7 +465,8 @@ async def create_salary_scheme(
         raise HTTPException(status_code=400, detail="时薪制方案 hourly_rate_fen 不能为 0")
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO salary_schemes (
                 tenant_id, name, scheme_type,
                 base_salary_fen, hourly_rate_fen, overtime_multiplier
@@ -466,7 +475,8 @@ async def create_salary_scheme(
                 :base_salary_fen, :hourly_rate_fen, :overtime_multiplier
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "name": req.name,
@@ -504,7 +514,8 @@ async def get_employee_salary_config(
     _uuid(employee_id, "employee_id")
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 esc.*,
                 ss.name            AS scheme_name,
@@ -519,7 +530,8 @@ async def get_employee_salary_config(
               AND esc.employee_id = :employee_id
               AND esc.is_deleted = FALSE
             ORDER BY esc.effective_from DESC
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "employee_id": employee_id},
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -569,7 +581,8 @@ async def upsert_employee_salary_config(
     # 1. 封闭旧有效配置（effective_to IS NULL 且 effective_from < 新生效日）
     seal_date = (eff_from - _timedelta(days=1)).isoformat()
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE employee_salary_configs
             SET effective_to = :seal_date,
                 updated_at   = NOW()
@@ -578,7 +591,8 @@ async def upsert_employee_salary_config(
               AND effective_to IS NULL
               AND is_deleted   = FALSE
               AND effective_from < :eff_from
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "employee_id": employee_id,
@@ -590,7 +604,8 @@ async def upsert_employee_salary_config(
     # 2. 插入新配置
     si_base = req.social_insurance_base_fen if req.social_insurance_base_fen > 0 else req.base_salary_fen
     new_row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO employee_salary_configs (
                 tenant_id, employee_id, scheme_id,
                 base_salary_fen, commission_rate,
@@ -603,7 +618,8 @@ async def upsert_employee_salary_config(
                 :effective_from, :effective_to
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "employee_id": employee_id,
@@ -677,7 +693,8 @@ async def list_my_payslips(
     total: int = count_row.scalar_one()
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 id, period_year, period_month,
                 base_salary_fen, commission_fen, overtime_pay_fen, bonus_fen,
@@ -689,7 +706,8 @@ async def list_my_payslips(
             WHERE {where}
             ORDER BY period_year DESC, period_month DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = []
@@ -724,7 +742,8 @@ async def get_my_payslip_detail(
     _uuid(employee_id, "employee_id")
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT *
             FROM payroll_records_v2
             WHERE tenant_id  = :tenant_id
@@ -732,7 +751,8 @@ async def get_my_payslip_detail(
               AND employee_id = :employee_id
               AND status IN ('confirmed', 'paid')
               AND is_deleted  = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "id": payslip_id, "employee_id": employee_id},
     )
     mapping = row.mappings().first()
@@ -821,10 +841,12 @@ async def update_salary_scheme(
 
     # 确认存在
     exists = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM salary_schemes
             WHERE tenant_id = :tenant_id AND id = :id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "id": scheme_id},
     )
     if not exists.first():
@@ -850,12 +872,14 @@ async def update_salary_scheme(
         params["is_active"] = req.is_active
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE salary_schemes
             SET {", ".join(set_parts)}
             WHERE tenant_id = :tenant_id AND id = :id AND is_deleted = FALSE
             RETURNING *
-        """),
+        """
+        ),
         params,
     )
     await db.commit()
@@ -895,12 +919,14 @@ async def list_si_configs(
     total: int = count_row.scalar_one()
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT * FROM social_insurance_configs
             WHERE {where}
             ORDER BY region, effective_from DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in rows.mappings().all()]
@@ -917,7 +943,8 @@ async def create_si_config(
     tenant_id = _get_tenant_id(request)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO social_insurance_configs (
                 tenant_id, region,
                 pension_rate_employee, pension_rate_employer,
@@ -932,7 +959,8 @@ async def create_si_config(
                 :hf_rate, :effective_from
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "region": req.region,

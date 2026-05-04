@@ -25,10 +25,12 @@ from typing import Any, Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 try:
     import requests as _http_lib
+
     _USE_REQUESTS = True
 except ImportError:
     try:
         import httpx as _http_lib  # type: ignore[no-redef]
+
         _USE_REQUESTS = False
     except ImportError:
         print("ERROR: 需要安装 requests 或 httpx。运行：pip install requests")
@@ -39,7 +41,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 DEMO_TENANT_ID = "11111111-0001-0001-0001-000000000001"
-DEMO_USER_ID   = "22222222-0002-0002-0002-000000000002"
+DEMO_USER_ID = "22222222-0002-0002-0002-000000000002"
 
 # 3个演示门店
 DEMO_STORE_1_ID = "33333333-0001-0001-0001-000000000001"
@@ -61,12 +63,12 @@ DEMO_APPROVER_ID = "66666666-0001-0001-0001-000000000001"
 # 颜色输出工具
 # ---------------------------------------------------------------------------
 
-GREEN  = "\033[92m"
-RED    = "\033[91m"
+GREEN = "\033[92m"
+RED = "\033[91m"
 YELLOW = "\033[93m"
-BLUE   = "\033[94m"
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
+BLUE = "\033[94m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
 
 
 def ok(msg: str) -> None:
@@ -90,6 +92,7 @@ def section(title: str) -> None:
 # ---------------------------------------------------------------------------
 # HTTP 客户端封装（兼容 requests / httpx）
 # ---------------------------------------------------------------------------
+
 
 class ApiClient:
     def __init__(self, base_url: str, tenant_id: str, user_id: str):
@@ -133,6 +136,7 @@ class ApiClient:
 # 工具函数
 # ---------------------------------------------------------------------------
 
+
 def today_str(delta_days: int = 0) -> str:
     return (date.today() + timedelta(days=delta_days)).isoformat()
 
@@ -150,23 +154,24 @@ def extract_id(resp: Any) -> Optional[str]:
 # 各模块初始化函数
 # ---------------------------------------------------------------------------
 
+
 def seed_categories(client: ApiClient) -> List[str]:
     """初始化12个费用科目，返回科目ID列表"""
     section("1/8  费用科目（12类）")
 
     categories_data = [
-        {"code": "UTILITIES",    "name": "水电费",       "description": "门店水费、电费、燃气费"},
-        {"code": "MAINTENANCE",  "name": "设备维修",     "description": "厨房设备、空调、收银机维修"},
-        {"code": "TRAVEL",       "name": "差旅费",       "description": "督导巡店、总部培训出差"},
-        {"code": "ENTERTAINMENT","name": "业务招待",     "description": "商务宴请、合作洽谈"},
-        {"code": "RENT",         "name": "租金",         "description": "门店场地租金、仓库租金"},
-        {"code": "DEPRECIATION", "name": "折旧摊销",     "description": "固定资产折旧、装修摊销"},
-        {"code": "LABOR",        "name": "人工成本",     "description": "员工工资、社保、奖金"},
+        {"code": "UTILITIES", "name": "水电费", "description": "门店水费、电费、燃气费"},
+        {"code": "MAINTENANCE", "name": "设备维修", "description": "厨房设备、空调、收银机维修"},
+        {"code": "TRAVEL", "name": "差旅费", "description": "督导巡店、总部培训出差"},
+        {"code": "ENTERTAINMENT", "name": "业务招待", "description": "商务宴请、合作洽谈"},
+        {"code": "RENT", "name": "租金", "description": "门店场地租金、仓库租金"},
+        {"code": "DEPRECIATION", "name": "折旧摊销", "description": "固定资产折旧、装修摊销"},
+        {"code": "LABOR", "name": "人工成本", "description": "员工工资、社保、奖金"},
         {"code": "PLATFORM_FEE", "name": "外卖平台佣金", "description": "美团/饿了么/抖音平台服务费"},
-        {"code": "SUPPLIES",     "name": "日常耗材",     "description": "包装盒、餐巾纸、清洁用品"},
-        {"code": "MARKETING",    "name": "营销推广",     "description": "社媒投流、活动物料、优惠券"},
-        {"code": "FOOD_WASTE",   "name": "食材损耗",     "description": "食材过期报废、备料损耗"},
-        {"code": "OTHER",        "name": "其他费用",     "description": "无法归类的杂项支出"},
+        {"code": "SUPPLIES", "name": "日常耗材", "description": "包装盒、餐巾纸、清洁用品"},
+        {"code": "MARKETING", "name": "营销推广", "description": "社媒投流、活动物料、优惠券"},
+        {"code": "FOOD_WASTE", "name": "食材损耗", "description": "食材过期报废、备料损耗"},
+        {"code": "OTHER", "name": "其他费用", "description": "无法归类的杂项支出"},
     ]
 
     # 先查询已有科目
@@ -212,58 +217,94 @@ def seed_travel_standards(client: ApiClient) -> None:
     # 城市差标数据（住宿上限/餐补/交通补，单位：元/天）
     standards = [
         # 一线城市
-        {"city": "北京",   "tier": "tier1", "accommodation_limit": 600, "meal_allowance": 150, "transport_allowance": 100},
-        {"city": "上海",   "tier": "tier1", "accommodation_limit": 600, "meal_allowance": 150, "transport_allowance": 100},
-        {"city": "广州",   "tier": "tier1", "accommodation_limit": 500, "meal_allowance": 120, "transport_allowance": 80},
-        {"city": "深圳",   "tier": "tier1", "accommodation_limit": 550, "meal_allowance": 120, "transport_allowance": 80},
+        {
+            "city": "北京",
+            "tier": "tier1",
+            "accommodation_limit": 600,
+            "meal_allowance": 150,
+            "transport_allowance": 100,
+        },
+        {
+            "city": "上海",
+            "tier": "tier1",
+            "accommodation_limit": 600,
+            "meal_allowance": 150,
+            "transport_allowance": 100,
+        },
+        {"city": "广州", "tier": "tier1", "accommodation_limit": 500, "meal_allowance": 120, "transport_allowance": 80},
+        {"city": "深圳", "tier": "tier1", "accommodation_limit": 550, "meal_allowance": 120, "transport_allowance": 80},
         # 新一线/二线
-        {"city": "成都",   "tier": "tier2", "accommodation_limit": 400, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "杭州",   "tier": "tier2", "accommodation_limit": 450, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "武汉",   "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "西安",   "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "南京",   "tier": "tier2", "accommodation_limit": 420, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "重庆",   "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "天津",   "tier": "tier2", "accommodation_limit": 400, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "苏州",   "tier": "tier2", "accommodation_limit": 420, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "长沙",   "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "郑州",   "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "青岛",   "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "沈阳",   "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "济南",   "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "厦门",   "tier": "tier2", "accommodation_limit": 400, "meal_allowance": 100, "transport_allowance": 60},
-        {"city": "宁波",   "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 90,  "transport_allowance": 60},
-        {"city": "大连",   "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 60},
+        {"city": "成都", "tier": "tier2", "accommodation_limit": 400, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "杭州", "tier": "tier2", "accommodation_limit": 450, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "武汉", "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "西安", "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "南京", "tier": "tier2", "accommodation_limit": 420, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "重庆", "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "天津", "tier": "tier2", "accommodation_limit": 400, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "苏州", "tier": "tier2", "accommodation_limit": 420, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "长沙", "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "郑州", "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "青岛", "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "沈阳", "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "济南", "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "厦门", "tier": "tier2", "accommodation_limit": 400, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "宁波", "tier": "tier2", "accommodation_limit": 380, "meal_allowance": 90, "transport_allowance": 60},
+        {"city": "大连", "tier": "tier2", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 60},
         # 三线及以下
-        {"city": "贵阳",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "南宁",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "昆明",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "哈尔滨", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "长春",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "呼和浩特","tier":"tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "乌鲁木齐","tier":"tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "兰州",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "银川",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "西宁",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "太原",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "南昌",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "福州",   "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "海口",   "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "三亚",   "tier": "tier3", "accommodation_limit": 500, "meal_allowance": 120, "transport_allowance": 80},
-        {"city": "合肥",   "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "石家庄", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "温州",   "tier": "tier3", "accommodation_limit": 320, "meal_allowance": 90,  "transport_allowance": 50},
-        {"city": "泉州",   "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "扬州",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "无锡",   "tier": "tier3", "accommodation_limit": 350, "meal_allowance": 90,  "transport_allowance": 50},
-        {"city": "常州",   "tier": "tier3", "accommodation_limit": 320, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "嘉兴",   "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "绍兴",   "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "唐山",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70,  "transport_allowance": 40},
-        {"city": "洛阳",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70,  "transport_allowance": 40},
-        {"city": "烟台",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70,  "transport_allowance": 40},
-        {"city": "潍坊",   "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70,  "transport_allowance": 40},
-        {"city": "桂林",   "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80,  "transport_allowance": 50},
-        {"city": "珠海",   "tier": "tier3", "accommodation_limit": 380, "meal_allowance": 100, "transport_allowance": 60},
+        {"city": "贵阳", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "南宁", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "昆明", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {
+            "city": "哈尔滨",
+            "tier": "tier3",
+            "accommodation_limit": 280,
+            "meal_allowance": 80,
+            "transport_allowance": 50,
+        },
+        {"city": "长春", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {
+            "city": "呼和浩特",
+            "tier": "tier3",
+            "accommodation_limit": 280,
+            "meal_allowance": 80,
+            "transport_allowance": 50,
+        },
+        {
+            "city": "乌鲁木齐",
+            "tier": "tier3",
+            "accommodation_limit": 300,
+            "meal_allowance": 80,
+            "transport_allowance": 50,
+        },
+        {"city": "兰州", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "银川", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "西宁", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "太原", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "南昌", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "福州", "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "海口", "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "三亚", "tier": "tier3", "accommodation_limit": 500, "meal_allowance": 120, "transport_allowance": 80},
+        {"city": "合肥", "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80, "transport_allowance": 50},
+        {
+            "city": "石家庄",
+            "tier": "tier3",
+            "accommodation_limit": 280,
+            "meal_allowance": 80,
+            "transport_allowance": 50,
+        },
+        {"city": "温州", "tier": "tier3", "accommodation_limit": 320, "meal_allowance": 90, "transport_allowance": 50},
+        {"city": "泉州", "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "扬州", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "无锡", "tier": "tier3", "accommodation_limit": 350, "meal_allowance": 90, "transport_allowance": 50},
+        {"city": "常州", "tier": "tier3", "accommodation_limit": 320, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "嘉兴", "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "绍兴", "tier": "tier3", "accommodation_limit": 300, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "唐山", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70, "transport_allowance": 40},
+        {"city": "洛阳", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70, "transport_allowance": 40},
+        {"city": "烟台", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70, "transport_allowance": 40},
+        {"city": "潍坊", "tier": "tier3", "accommodation_limit": 260, "meal_allowance": 70, "transport_allowance": 40},
+        {"city": "桂林", "tier": "tier3", "accommodation_limit": 280, "meal_allowance": 80, "transport_allowance": 50},
+        {"city": "珠海", "tier": "tier3", "accommodation_limit": 380, "meal_allowance": 100, "transport_allowance": 60},
     ]
 
     # 先检查是否已有差标配置
@@ -376,9 +417,9 @@ def seed_petty_cash(client: ApiClient) -> List[str]:
             "store_id": DEMO_STORE_1_ID,
             "brand_id": DEMO_BRAND_ID,
             "keeper_id": DEMO_KEEPER_1_ID,
-            "approved_limit": 500_00,    # 500元
-            "warning_threshold": 100_00, # 100元预警
-            "opening_balance": 300_00,   # 期初300元
+            "approved_limit": 500_00,  # 500元
+            "warning_threshold": 100_00,  # 100元预警
+            "opening_balance": 300_00,  # 期初300元
         },
         {
             "store_id": DEMO_STORE_2_ID,
@@ -435,10 +476,22 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "门店4月水费326元+电费1,243元",
             "items": [
-                {"category_id": cat_id, "description": "4月水费", "amount": 326_00,
-                 "quantity": 1.0, "unit": "笔", "expense_date": today_str(-5)},
-                {"category_id": cat_id, "description": "4月电费", "amount": 1243_00,
-                 "quantity": 1.0, "unit": "笔", "expense_date": today_str(-5)},
+                {
+                    "category_id": cat_id,
+                    "description": "4月水费",
+                    "amount": 326_00,
+                    "quantity": 1.0,
+                    "unit": "笔",
+                    "expense_date": today_str(-5),
+                },
+                {
+                    "category_id": cat_id,
+                    "description": "4月电费",
+                    "amount": 1243_00,
+                    "quantity": 1.0,
+                    "unit": "笔",
+                    "expense_date": today_str(-5),
+                },
             ],
             "_action": "draft",
         },
@@ -449,8 +502,14 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "主水泵故障，联系维修厂报价560元",
             "items": [
-                {"category_id": cat_id, "description": "水泵维修人工+材料", "amount": 560_00,
-                 "quantity": 1.0, "unit": "次", "expense_date": today_str(-1)},
+                {
+                    "category_id": cat_id,
+                    "description": "水泵维修人工+材料",
+                    "amount": 560_00,
+                    "quantity": 1.0,
+                    "unit": "次",
+                    "expense_date": today_str(-1),
+                },
             ],
             "_action": "draft",
         },
@@ -462,10 +521,22 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "包装盒/餐巾纸/清洁用品",
             "items": [
-                {"category_id": cat_id, "description": "包装盒(200套)", "amount": 180_00,
-                 "quantity": 200, "unit": "套", "expense_date": today_str(-3)},
-                {"category_id": cat_id, "description": "清洁用品套装", "amount": 95_00,
-                 "quantity": 1, "unit": "批", "expense_date": today_str(-3)},
+                {
+                    "category_id": cat_id,
+                    "description": "包装盒(200套)",
+                    "amount": 180_00,
+                    "quantity": 200,
+                    "unit": "套",
+                    "expense_date": today_str(-3),
+                },
+                {
+                    "category_id": cat_id,
+                    "description": "清洁用品套装",
+                    "amount": 95_00,
+                    "quantity": 1,
+                    "unit": "批",
+                    "expense_date": today_str(-3),
+                },
             ],
             "_action": "submit",
         },
@@ -476,12 +547,30 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "长沙→贵阳3店巡查，高铁+住宿2晚",
             "items": [
-                {"category_id": travel_cat_id, "description": "高铁票（长沙-贵阳往返）",
-                 "amount": 1040_00, "quantity": 1.0, "unit": "张", "expense_date": today_str(-7)},
-                {"category_id": travel_cat_id, "description": "住宿费（2晚）",
-                 "amount": 560_00, "quantity": 2.0, "unit": "晚", "expense_date": today_str(-6)},
-                {"category_id": travel_cat_id, "description": "餐补（3天×80元）",
-                 "amount": 240_00, "quantity": 3.0, "unit": "天", "expense_date": today_str(-6)},
+                {
+                    "category_id": travel_cat_id,
+                    "description": "高铁票（长沙-贵阳往返）",
+                    "amount": 1040_00,
+                    "quantity": 1.0,
+                    "unit": "张",
+                    "expense_date": today_str(-7),
+                },
+                {
+                    "category_id": travel_cat_id,
+                    "description": "住宿费（2晚）",
+                    "amount": 560_00,
+                    "quantity": 2.0,
+                    "unit": "晚",
+                    "expense_date": today_str(-6),
+                },
+                {
+                    "category_id": travel_cat_id,
+                    "description": "餐补（3天×80元）",
+                    "amount": 240_00,
+                    "quantity": 3.0,
+                    "unit": "天",
+                    "expense_date": today_str(-6),
+                },
             ],
             "_action": "submit",
         },
@@ -492,8 +581,14 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "接待供应商代表3人，商谈2026年食材供应合作",
             "items": [
-                {"category_id": ent_cat_id, "description": "商务宴请",
-                 "amount": 2380_00, "quantity": 1.0, "unit": "次", "expense_date": today_str(-10)},
+                {
+                    "category_id": ent_cat_id,
+                    "description": "商务宴请",
+                    "amount": 2380_00,
+                    "quantity": 1.0,
+                    "unit": "次",
+                    "expense_date": today_str(-10),
+                },
             ],
             "_action": "submit",
         },
@@ -505,10 +600,16 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "3台空调年度保养，共420元",
             "items": [
-                {"category_id": cat_id, "description": "空调年度保养（3台）",
-                 "amount": 420_00, "quantity": 3.0, "unit": "台", "expense_date": today_str(-20)},
+                {
+                    "category_id": cat_id,
+                    "description": "空调年度保养（3台）",
+                    "amount": 420_00,
+                    "quantity": 3.0,
+                    "unit": "台",
+                    "expense_date": today_str(-20),
+                },
             ],
-            "_action": "submit",   # 提交后需模拟审批通过 —— 脚本中仅标记为已提交
+            "_action": "submit",  # 提交后需模拟审批通过 —— 脚本中仅标记为已提交
         },
         {
             "title": "总部培训差旅费",
@@ -517,12 +618,30 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "参加总部新品培训，长沙→上海往返",
             "items": [
-                {"category_id": travel_cat_id, "description": "机票（长沙→上海往返）",
-                 "amount": 2800_00, "quantity": 1.0, "unit": "张", "expense_date": today_str(-15)},
-                {"category_id": travel_cat_id, "description": "住宿（4晚）",
-                 "amount": 2000_00, "quantity": 4.0, "unit": "晚", "expense_date": today_str(-14)},
-                {"category_id": travel_cat_id, "description": "餐补（5天）",
-                 "amount": 750_00, "quantity": 5.0, "unit": "天", "expense_date": today_str(-14)},
+                {
+                    "category_id": travel_cat_id,
+                    "description": "机票（长沙→上海往返）",
+                    "amount": 2800_00,
+                    "quantity": 1.0,
+                    "unit": "张",
+                    "expense_date": today_str(-15),
+                },
+                {
+                    "category_id": travel_cat_id,
+                    "description": "住宿（4晚）",
+                    "amount": 2000_00,
+                    "quantity": 4.0,
+                    "unit": "晚",
+                    "expense_date": today_str(-14),
+                },
+                {
+                    "category_id": travel_cat_id,
+                    "description": "餐补（5天）",
+                    "amount": 750_00,
+                    "quantity": 5.0,
+                    "unit": "天",
+                    "expense_date": today_str(-14),
+                },
             ],
             "_action": "submit",
         },
@@ -534,10 +653,22 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "3月水费298元+电费1,456元，已核销",
             "items": [
-                {"category_id": cat_id, "description": "3月水费", "amount": 298_00,
-                 "quantity": 1.0, "unit": "笔", "expense_date": today_str(-35)},
-                {"category_id": cat_id, "description": "3月电费", "amount": 1456_00,
-                 "quantity": 1.0, "unit": "笔", "expense_date": today_str(-35)},
+                {
+                    "category_id": cat_id,
+                    "description": "3月水费",
+                    "amount": 298_00,
+                    "quantity": 1.0,
+                    "unit": "笔",
+                    "expense_date": today_str(-35),
+                },
+                {
+                    "category_id": cat_id,
+                    "description": "3月电费",
+                    "amount": 1456_00,
+                    "quantity": 1.0,
+                    "unit": "笔",
+                    "expense_date": today_str(-35),
+                },
             ],
             "_action": "submit",
         },
@@ -548,8 +679,14 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "2月全体员工餐补，12人×28天×10元",
             "items": [
-                {"category_id": cat_id, "description": "2月员工餐补",
-                 "amount": 3360_00, "quantity": 1.0, "unit": "批", "expense_date": today_str(-50)},
+                {
+                    "category_id": cat_id,
+                    "description": "2月员工餐补",
+                    "amount": 3360_00,
+                    "quantity": 1.0,
+                    "unit": "批",
+                    "expense_date": today_str(-50),
+                },
             ],
             "_action": "submit",
         },
@@ -561,8 +698,14 @@ def seed_expenses(client: ApiClient, cat_ids: List[str]) -> List[str]:
             "brand_id": DEMO_BRAND_ID,
             "notes": "集团年会客户答谢晚宴，预计12桌，超出差标需附说明",
             "items": [
-                {"category_id": ent_cat_id, "description": "年会答谢晚宴（12桌）",
-                 "amount": 18000_00, "quantity": 12.0, "unit": "桌", "expense_date": today_str(-2)},
+                {
+                    "category_id": ent_cat_id,
+                    "description": "年会答谢晚宴（12桌）",
+                    "amount": 18000_00,
+                    "quantity": 12.0,
+                    "unit": "桌",
+                    "expense_date": today_str(-2),
+                },
             ],
             "_action": "submit",
         },
@@ -778,6 +921,7 @@ def seed_mock_invoices(client: ApiClient, exp_ids: List[str]) -> None:
 # ---------------------------------------------------------------------------
 # 主函数
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(

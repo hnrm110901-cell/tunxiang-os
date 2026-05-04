@@ -18,6 +18,7 @@
   - 案件号生成：调用 PG fn_next_loss_case_no(tenant_id, date) advisory lock
   - 审批链规则：< 5000 元（500000 分）= 1 节点；< 50000 元 = 2 节点；否则 = 3 节点
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -158,12 +159,11 @@ async def _generate_case_no(
     return str(row["case_no"])
 
 
-async def _fetch_case_row(
-    db: AsyncSession, case_id: str, tenant_id: str
-) -> dict[str, Any]:
+async def _fetch_case_row(db: AsyncSession, case_id: str, tenant_id: str) -> dict[str, Any]:
     """读取案件主表行（已设置 RLS 后调用）；不存在则抛 CaseNotFoundError。"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, stocktake_id, store_id, case_no,
                    total_loss_amount_fen, total_gain_amount_fen,
                    net_loss_amount_fen, responsible_party_type,
@@ -174,7 +174,8 @@ async def _fetch_case_row(
             FROM stocktake_loss_cases
             WHERE id = :cid::uuid AND tenant_id = :tid::uuid
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": case_id, "tid": tenant_id},
     )
     row = result.mappings().one_or_none()
@@ -208,11 +209,7 @@ async def _transition_status(
         params[col] = val
 
     await db.execute(
-        text(
-            f"UPDATE stocktake_loss_cases "
-            f"SET {', '.join(sets)} "
-            f"WHERE id = :cid::uuid AND tenant_id = :tid::uuid"
-        ),
+        text(f"UPDATE stocktake_loss_cases SET {', '.join(sets)} WHERE id = :cid::uuid AND tenant_id = :tid::uuid"),
         params,
     )
     log.info(
@@ -245,26 +242,27 @@ async def auto_create_loss_case_from_stocktake(
 
     # 校验 stocktake 存在并完成
     stocktake_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_id, status
             FROM stocktakes
             WHERE id = :sid::uuid AND tenant_id = :tid::uuid
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": stocktake_id, "tid": tenant_id},
     )
     st = stocktake_row.mappings().one_or_none()
     if not st:
         raise CaseValidationError(f"Stocktake {stocktake_id} not found")
     if st["status"] != "completed":
-        raise CaseValidationError(
-            f"Stocktake must be completed before auto-create-case (got {st['status']})"
-        )
+        raise CaseValidationError(f"Stocktake must be completed before auto-create-case (got {st['status']})")
     store_id = str(st["store_id"])
 
     # 拉取所有差异行（actual != expected 才纳入）
     items_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT ingredient_id,
                    expected_qty,
                    actual_qty,
@@ -274,7 +272,8 @@ async def auto_create_loss_case_from_stocktake(
               AND actual_qty IS NOT NULL
               AND ABS(actual_qty - expected_qty) > 0.001
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": stocktake_id, "tid": tenant_id},
     )
     diff_rows = items_result.mappings().all()
@@ -325,7 +324,8 @@ async def auto_create_loss_case_from_stocktake(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stocktake_loss_cases
                 (id, tenant_id, stocktake_id, store_id, case_no,
                  total_loss_amount_fen, total_gain_amount_fen,
@@ -334,7 +334,8 @@ async def auto_create_loss_case_from_stocktake(
                 (:id::uuid, :tid::uuid, :sid::uuid, :store_id::uuid, :case_no,
                  :loss, :gain,
                  'DRAFT', :created_by::uuid, :now, :now)
-        """),
+        """
+        ),
         {
             "id": case_id,
             "tid": tenant_id,
@@ -351,7 +352,8 @@ async def auto_create_loss_case_from_stocktake(
     # 批量插明细
     for it in items_payload:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stocktake_loss_items
                     (id, tenant_id, case_id, ingredient_id,
                      expected_qty, actual_qty, unit_cost_fen, diff_amount_fen,
@@ -359,7 +361,8 @@ async def auto_create_loss_case_from_stocktake(
                 VALUES
                     (gen_random_uuid(), :tid::uuid, :cid::uuid, :ing::uuid,
                      :exp, :act, :cost, :diff, :now, :now)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": case_id,
@@ -463,7 +466,8 @@ async def create_loss_case(
         )
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stocktake_loss_cases
                 (id, tenant_id, stocktake_id, store_id, case_no,
                  total_loss_amount_fen, total_gain_amount_fen,
@@ -474,7 +478,8 @@ async def create_loss_case(
                  :loss, :gain,
                  :rpt, :rpi, :rsn,
                  'DRAFT', :created_by::uuid, :now, :now)
-        """),
+        """
+        ),
         {
             "id": case_id,
             "tid": tenant_id,
@@ -493,7 +498,8 @@ async def create_loss_case(
 
     for r in item_rows:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stocktake_loss_items
                     (id, tenant_id, case_id, ingredient_id, batch_no,
                      expected_qty, actual_qty, unit_cost_fen, diff_amount_fen,
@@ -502,7 +508,8 @@ async def create_loss_case(
                     (gen_random_uuid(), :tid::uuid, :cid::uuid, :ing::uuid, :batch,
                      :exp, :act, :cost, :diff,
                      :reason, :detail, :now, :now)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": case_id,
@@ -574,9 +581,7 @@ async def add_items(
     await _set_tenant(db, tenant_id)
     case = await _fetch_case_row(db, case_id, tenant_id)
     if case["case_status"] != CaseStatus.DRAFT.value:
-        raise CaseValidationError(
-            f"Cannot add items: case is {case['case_status']}, not DRAFT"
-        )
+        raise CaseValidationError(f"Cannot add items: case is {case['case_status']}, not DRAFT")
 
     now = datetime.now(timezone.utc)
     add_loss = 0
@@ -591,7 +596,8 @@ async def add_items(
             add_gain += diff_abs_fen
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stocktake_loss_items
                     (id, tenant_id, case_id, ingredient_id, batch_no,
                      expected_qty, actual_qty, unit_cost_fen, diff_amount_fen,
@@ -600,7 +606,8 @@ async def add_items(
                     (gen_random_uuid(), :tid::uuid, :cid::uuid, :ing::uuid, :batch,
                      :exp, :act, :cost, :diff,
                      :reason, :detail, :now, :now)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": case_id,
@@ -619,12 +626,14 @@ async def add_items(
     new_loss = case["total_loss_amount_fen"] + add_loss
     new_gain = case["total_gain_amount_fen"] + add_gain
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stocktake_loss_cases
             SET total_loss_amount_fen = :loss,
                 total_gain_amount_fen = :gain
             WHERE id = :cid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {"loss": new_loss, "gain": new_gain, "cid": case_id, "tid": tenant_id},
     )
     await db.flush()
@@ -658,18 +667,18 @@ async def assign_responsibility(
         CaseStatus.DRAFT.value,
         CaseStatus.PENDING_APPROVAL.value,
     ):
-        raise CaseValidationError(
-            f"Cannot reassign responsibility: case is {case['case_status']}"
-        )
+        raise CaseValidationError(f"Cannot reassign responsibility: case is {case['case_status']}")
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stocktake_loss_cases
             SET responsible_party_type = :pt,
                 responsible_party_id   = :pid,
                 responsible_reason     = :rsn
             WHERE id = :cid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {
             "pt": party_type.value,
             "pid": party_id,
@@ -729,14 +738,16 @@ async def submit_for_approval(
     # 写所有审批节点（decision = NULL，待审）
     for seq, role in enumerate(chain, start=1):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stocktake_loss_approvals
                     (id, tenant_id, case_id, approval_node_seq, approver_role,
                      created_at, updated_at)
                 VALUES
                     (gen_random_uuid(), :tid::uuid, :cid::uuid, :seq, :role,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": case_id,
@@ -783,12 +794,11 @@ async def submit_for_approval(
 # ─────────────────────────────────────────────────────────────────────
 
 
-async def _find_current_pending_node(
-    db: AsyncSession, case_id: str, tenant_id: str
-) -> dict[str, Any]:
+async def _find_current_pending_node(db: AsyncSession, case_id: str, tenant_id: str) -> dict[str, Any]:
     """返回当前 decision IS NULL 的最小 seq 节点，找不到则抛 CaseValidationError。"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, approval_node_seq, approver_role
             FROM stocktake_loss_approvals
             WHERE case_id = :cid::uuid AND tenant_id = :tid::uuid
@@ -796,7 +806,8 @@ async def _find_current_pending_node(
               AND is_deleted = FALSE
             ORDER BY approval_node_seq ASC
             LIMIT 1
-        """),
+        """
+        ),
         {"cid": case_id, "tid": tenant_id},
     )
     row = result.mappings().one_or_none()
@@ -805,17 +816,17 @@ async def _find_current_pending_node(
     return dict(row)
 
 
-async def _is_last_node(
-    db: AsyncSession, case_id: str, tenant_id: str, seq: int
-) -> bool:
+async def _is_last_node(db: AsyncSession, case_id: str, tenant_id: str, seq: int) -> bool:
     """该节点是否是最后一个节点。"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT MAX(approval_node_seq) AS max_seq
             FROM stocktake_loss_approvals
             WHERE case_id = :cid::uuid AND tenant_id = :tid::uuid
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": case_id, "tid": tenant_id},
     )
     row = result.mappings().one()
@@ -844,27 +855,26 @@ async def approve(
     await _set_tenant(db, tenant_id)
     case = await _fetch_case_row(db, case_id, tenant_id)
     if case["case_status"] != CaseStatus.PENDING_APPROVAL.value:
-        raise CaseValidationError(
-            f"Cannot approve: case is {case['case_status']}, not PENDING_APPROVAL"
-        )
+        raise CaseValidationError(f"Cannot approve: case is {case['case_status']}, not PENDING_APPROVAL")
 
     node = await _find_current_pending_node(db, case_id, tenant_id)
     if node["approver_role"] != approver_role.value:
         raise ApprovalPermissionError(
-            f"Role mismatch: node requires {node['approver_role']}, "
-            f"got {approver_role.value}"
+            f"Role mismatch: node requires {node['approver_role']}, got {approver_role.value}"
         )
 
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stocktake_loss_approvals
             SET decision = 'APPROVED',
                 approver_id = :aid::uuid,
                 comment = :comment,
                 approved_at = :now
             WHERE id = :nid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {
             "aid": approver_id,
             "comment": comment,
@@ -874,9 +884,7 @@ async def approve(
         },
     )
 
-    is_last = await _is_last_node(
-        db, case_id, tenant_id, int(node["approval_node_seq"])
-    )
+    is_last = await _is_last_node(db, case_id, tenant_id, int(node["approval_node_seq"]))
 
     if is_last:
         await _transition_status(
@@ -940,27 +948,26 @@ async def reject(
     await _set_tenant(db, tenant_id)
     case = await _fetch_case_row(db, case_id, tenant_id)
     if case["case_status"] != CaseStatus.PENDING_APPROVAL.value:
-        raise CaseValidationError(
-            f"Cannot reject: case is {case['case_status']}, not PENDING_APPROVAL"
-        )
+        raise CaseValidationError(f"Cannot reject: case is {case['case_status']}, not PENDING_APPROVAL")
 
     node = await _find_current_pending_node(db, case_id, tenant_id)
     if node["approver_role"] != approver_role.value:
         raise ApprovalPermissionError(
-            f"Role mismatch: node requires {node['approver_role']}, "
-            f"got {approver_role.value}"
+            f"Role mismatch: node requires {node['approver_role']}, got {approver_role.value}"
         )
 
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stocktake_loss_approvals
             SET decision = 'REJECTED',
                 approver_id = :aid::uuid,
                 comment = :comment,
                 approved_at = :now
             WHERE id = :nid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {
             "aid": approver_id,
             "comment": comment,
@@ -1024,9 +1031,7 @@ async def writeoff(
     await _set_tenant(db, tenant_id)
     case = await _fetch_case_row(db, case_id, tenant_id)
     if case["case_status"] != CaseStatus.APPROVED.value:
-        raise WriteoffStateError(
-            f"Cannot writeoff: case is {case['case_status']}, not APPROVED"
-        )
+        raise WriteoffStateError(f"Cannot writeoff: case is {case['case_status']}, not APPROVED")
     if writeoff_amount_fen <= 0:
         raise CaseValidationError("writeoff_amount_fen must be > 0")
 
@@ -1034,7 +1039,8 @@ async def writeoff(
     writeoff_id = str(uuid.uuid4())
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stocktake_loss_writeoffs
                 (id, tenant_id, case_id, writeoff_voucher_no,
                  writeoff_amount_fen, accounting_subject,
@@ -1045,7 +1051,8 @@ async def writeoff(
                  :amount, :subject,
                  :now, :fuid::uuid, :att, :cmt,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "id": writeoff_id,
             "tid": tenant_id,
@@ -1147,18 +1154,10 @@ async def list_cases(
                 "total_gain_amount_fen": int(r["total_gain_amount_fen"]),
                 "net_loss_amount_fen": int(r["net_loss_amount_fen"] or 0),
                 "responsible_party_type": r["responsible_party_type"],
-                "created_at": r["created_at"].isoformat()
-                if r["created_at"]
-                else None,
-                "submitted_at": r["submitted_at"].isoformat()
-                if r["submitted_at"]
-                else None,
-                "final_approved_at": r["final_approved_at"].isoformat()
-                if r["final_approved_at"]
-                else None,
-                "written_off_at": r["written_off_at"].isoformat()
-                if r["written_off_at"]
-                else None,
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                "submitted_at": r["submitted_at"].isoformat() if r["submitted_at"] else None,
+                "final_approved_at": r["final_approved_at"].isoformat() if r["final_approved_at"] else None,
+                "written_off_at": r["written_off_at"].isoformat() if r["written_off_at"] else None,
             }
             for r in rows
         ],
@@ -1166,15 +1165,14 @@ async def list_cases(
     }
 
 
-async def get_case_detail(
-    case_id: str, tenant_id: str, db: AsyncSession
-) -> dict[str, Any]:
+async def get_case_detail(case_id: str, tenant_id: str, db: AsyncSession) -> dict[str, Any]:
     """获取案件完整详情（含明细 + 审批节点 + 核销凭证）。"""
     await _set_tenant(db, tenant_id)
     case = await _fetch_case_row(db, case_id, tenant_id)
 
     items_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, ingredient_id, batch_no,
                    expected_qty, actual_qty, diff_qty,
                    unit_cost_fen, diff_amount_fen,
@@ -1183,22 +1181,26 @@ async def get_case_detail(
             WHERE case_id = :cid::uuid AND tenant_id = :tid::uuid
               AND is_deleted = FALSE
             ORDER BY created_at ASC
-        """),
+        """
+        ),
         {"cid": case_id, "tid": tenant_id},
     )
     approvals_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, approval_node_seq, approver_role, approver_id,
                    decision, comment, approved_at, created_at
             FROM stocktake_loss_approvals
             WHERE case_id = :cid::uuid AND tenant_id = :tid::uuid
               AND is_deleted = FALSE
             ORDER BY approval_node_seq ASC
-        """),
+        """
+        ),
         {"cid": case_id, "tid": tenant_id},
     )
     writeoffs_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, writeoff_voucher_no, writeoff_amount_fen,
                    accounting_subject, writeoff_at, finance_user_id,
                    attachment_url, comment
@@ -1206,7 +1208,8 @@ async def get_case_detail(
             WHERE case_id = :cid::uuid AND tenant_id = :tid::uuid
               AND is_deleted = FALSE
             ORDER BY writeoff_at DESC
-        """),
+        """
+        ),
         {"cid": case_id, "tid": tenant_id},
     )
 
@@ -1221,22 +1224,12 @@ async def get_case_detail(
             "total_gain_amount_fen": int(case["total_gain_amount_fen"]),
             "net_loss_amount_fen": int(case["net_loss_amount_fen"] or 0),
             "responsible_party_type": case["responsible_party_type"],
-            "responsible_party_id": str(case["responsible_party_id"])
-            if case["responsible_party_id"]
-            else None,
+            "responsible_party_id": str(case["responsible_party_id"]) if case["responsible_party_id"] else None,
             "responsible_reason": case["responsible_reason"],
-            "created_at": case["created_at"].isoformat()
-            if case["created_at"]
-            else None,
-            "submitted_at": case["submitted_at"].isoformat()
-            if case["submitted_at"]
-            else None,
-            "final_approved_at": case["final_approved_at"].isoformat()
-            if case["final_approved_at"]
-            else None,
-            "written_off_at": case["written_off_at"].isoformat()
-            if case["written_off_at"]
-            else None,
+            "created_at": case["created_at"].isoformat() if case["created_at"] else None,
+            "submitted_at": case["submitted_at"].isoformat() if case["submitted_at"] else None,
+            "final_approved_at": case["final_approved_at"].isoformat() if case["final_approved_at"] else None,
+            "written_off_at": case["written_off_at"].isoformat() if case["written_off_at"] else None,
         },
         "items": [
             {
@@ -1261,9 +1254,7 @@ async def get_case_detail(
                 "approver_id": str(r["approver_id"]) if r["approver_id"] else None,
                 "decision": r["decision"],
                 "comment": r["comment"],
-                "approved_at": r["approved_at"].isoformat()
-                if r["approved_at"]
-                else None,
+                "approved_at": r["approved_at"].isoformat() if r["approved_at"] else None,
             }
             for r in approvals_res.mappings().all()
         ],
@@ -1273,9 +1264,7 @@ async def get_case_detail(
                 "writeoff_voucher_no": r["writeoff_voucher_no"],
                 "writeoff_amount_fen": int(r["writeoff_amount_fen"]),
                 "accounting_subject": r["accounting_subject"],
-                "writeoff_at": r["writeoff_at"].isoformat()
-                if r["writeoff_at"]
-                else None,
+                "writeoff_at": r["writeoff_at"].isoformat() if r["writeoff_at"] else None,
                 "finance_user_id": str(r["finance_user_id"]),
                 "attachment_url": r["attachment_url"],
                 "comment": r["comment"],

@@ -80,9 +80,7 @@ app.include_router(application_router)
 
 
 @app.exception_handler(StarletteHTTPException)
-async def _http_exception_handler(
-    request: Request, exc: StarletteHTTPException
-) -> JSONResponse:
+async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     detail = exc.detail
     if isinstance(detail, dict):
         error_payload = detail
@@ -95,9 +93,7 @@ async def _http_exception_handler(
 
 
 @app.exception_handler(SQLAlchemyError)
-async def _sqlalchemy_exception_handler(
-    request: Request, exc: SQLAlchemyError
-) -> JSONResponse:
+async def _sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
     logger.exception(
         "devforge_db_error",
         path=request.url.path,
@@ -123,5 +119,3 @@ async def _value_error_handler(request: Request, exc: ValueError) -> JSONRespons
             "error": {"code": "bad_request", "message": str(exc)},
         },
     )
-
-

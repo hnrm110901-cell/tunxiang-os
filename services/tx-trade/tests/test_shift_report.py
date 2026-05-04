@@ -21,6 +21,7 @@ from datetime import date, datetime, time, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from services.tx_trade.src.services.shift_report import (
     DeptComparison,
     DeptStats,
@@ -79,6 +80,7 @@ def _make_task(
 
 class FakeMapping:
     """模拟 SQLAlchemy RowMapping 的简单包装"""
+
     def __init__(self, data: dict):
         self._data = data
 
@@ -237,7 +239,9 @@ async def test_dept_comparison_multiple_depts():
     """档口对比报表正确分组并排序"""
     tasks = [
         _make_task(dept_id=DEPT_HOT, dept_name="热菜间", duration_seconds=300.0),
-        _make_task(dept_id=DEPT_HOT, dept_name="热菜间", duration_seconds=600.0, timeout_at=datetime(2026, 3, 30, 12, 15)),
+        _make_task(
+            dept_id=DEPT_HOT, dept_name="热菜间", duration_seconds=600.0, timeout_at=datetime(2026, 3, 30, 12, 15)
+        ),
         _make_task(dept_id=DEPT_COLD, dept_name="凉菜间", duration_seconds=150.0),
     ]
     depts = _group_by_dept(tasks)

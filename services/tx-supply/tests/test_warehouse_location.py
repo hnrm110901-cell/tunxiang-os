@@ -25,6 +25,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from services.tx_supply.src.models.warehouse_location import (
     AutoAllocateRequest,
     BindIngredientRequest,

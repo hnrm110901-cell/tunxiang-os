@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -104,7 +104,7 @@ async def create_opening_checklist(
         "template_key": template_key,
         "items": items,
         "status": "pending",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     log.info(
@@ -169,7 +169,7 @@ async def check_item(
     target_item["status"] = status
     target_item["result"] = result
     target_item["checked_by"] = operator_id
-    target_item["checked_at"] = datetime.utcnow().isoformat()
+    target_item["checked_at"] = datetime.now(timezone.utc).isoformat()
     target_item["note"] = note
 
     log.info(
@@ -275,7 +275,7 @@ async def approve_opening(
             f"Cannot approve opening: {blocked} required item(s) blocked. Checked {status['checked']}/{status['total']}"
         )
 
-    approved_at = datetime.utcnow().isoformat()
+    approved_at = datetime.now(timezone.utc).isoformat()
 
     if checklist is not None:
         checklist["status"] = "approved"

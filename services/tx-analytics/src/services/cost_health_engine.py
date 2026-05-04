@@ -407,7 +407,8 @@ class CostHealthEngine:
             return self._default_benchmark(brand_id or "", tenant_id, period_days)
 
         row = await db.execute(
-            text("""
+            text(
+                """
                 WITH store_metrics AS (
                     -- 先按门店聚合出各维度成本率
                     SELECT
@@ -478,7 +479,8 @@ class CostHealthEngine:
                     PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ingredient_rate) AS p25_ingredient,
                     PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ingredient_rate) AS p75_ingredient
                 FROM store_metrics
-            """),
+            """
+            ),
             {
                 "brand_id": brand_id,
                 "tenant_id": tenant_id,
@@ -531,13 +533,15 @@ class CostHealthEngine:
         log.info("get_group_cost_heatmap.start")
 
         stores_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id AS store_id, name AS store_name, brand_id
                 FROM stores
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 ORDER BY name
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         stores = list(stores_row.mappings().all())
@@ -660,14 +664,16 @@ class CostHealthEngine:
     async def _fetch_store_info(self, store_id: str, tenant_id: str, db: AsyncSession) -> dict | None:
         """查询门店名称和品牌ID"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT name AS store_name, brand_id
                 FROM stores
                 WHERE id = :store_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id},
         )
         return result.mappings().first()
@@ -685,7 +691,8 @@ class CostHealthEngine:
           - 时间范围：最近 period_days 天
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(o.final_amount_fen), 0)          AS net_revenue_fen,
                     COALESCE(SUM(
@@ -698,7 +705,8 @@ class CostHealthEngine:
                   AND o.status IN ('completed', 'settled', 'paid')
                   AND o.created_at >= NOW() - INTERVAL ':period_days days'
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "period_days": period_days},
         )
         return result.mappings().first()
@@ -712,7 +720,8 @@ class CostHealthEngine:
           - 无排班数据时返回 0（调用方 fallback 到配置比率）
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(
                         cs.actual_hours * COALESCE(e.hourly_wage_fen, 0)
@@ -725,7 +734,8 @@ class CostHealthEngine:
                   AND cs.tenant_id = :tenant_id
                   AND cs.shift_start >= NOW() - INTERVAL ':period_days days'
                   AND cs.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "period_days": period_days},
         )
         return result.mappings().first()
@@ -740,7 +750,8 @@ class CostHealthEngine:
           - 时间范围内无数据时返回 0（不影响整体评分）
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE((
                         SELECT SUM(wr.quantity * wr.unit_cost_fen)
@@ -758,7 +769,8 @@ class CostHealthEngine:
                           AND po.received_at >= NOW() - INTERVAL ':period_days days'
                           AND po.is_deleted = FALSE
                     ), 0) AS total_purchase_fen
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "period_days": period_days},
         )
         return result.mappings().first()

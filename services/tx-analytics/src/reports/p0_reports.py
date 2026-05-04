@@ -276,7 +276,8 @@ class P0Reports:
 
         store_filter = "AND o.store_id = ANY(:store_ids)" if store_ids else ""
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 o.store_id::text                                              AS store_id,
                 s.store_name,
@@ -297,7 +298,8 @@ class P0Reports:
               {store_filter}
             GROUP BY o.store_id, s.store_name
             ORDER BY revenue_fen DESC
-        """)
+        """
+        )
 
         params: dict = {"tenant_id": tenant_id, "target_date": target_date}
         if store_ids:
@@ -307,7 +309,8 @@ class P0Reports:
         rows = result.mappings().all()
 
         # 查询昨日 / 上周同日 数据用于环比
-        cmp_sql = text(f"""
+        cmp_sql = text(
+            f"""
             SELECT
                 o.store_id::text AS store_id,
                 COALESCE(o.biz_date, DATE(o.created_at))              AS biz_date,
@@ -319,7 +322,8 @@ class P0Reports:
               AND COALESCE(o.biz_date, DATE(o.created_at)) IN (:yesterday, :last_week)
               {store_filter}
             GROUP BY o.store_id, COALESCE(o.biz_date, DATE(o.created_at))
-        """)
+        """
+        )
         cmp_params: dict = {
             "tenant_id": tenant_id,
             "yesterday": yesterday,
@@ -396,7 +400,8 @@ class P0Reports:
             date=str(target_date),
         )
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 COALESCE(o.order_metadata->>'discount_type', 'none') AS discount_type,
                 COUNT(*)                                               AS use_count,
@@ -412,7 +417,8 @@ class P0Reports:
               AND COALESCE(o.discount_amount_fen, 0) > 0
             GROUP BY COALESCE(o.order_metadata->>'discount_type', 'none'), s.store_name
             ORDER BY discount_fen DESC
-        """)
+        """
+        )
         result = await session.execute(
             sql,
             {"tenant_id": tenant_id, "store_id": store_id, "target_date": target_date},
@@ -462,7 +468,8 @@ class P0Reports:
         session = _require_db(db)
         log.info("p0.cashflow_by_store", tenant_id=tenant_id, date=str(target_date))
 
-        income_sql = text("""
+        income_sql = text(
+            """
             SELECT
                 o.store_id::text                       AS store_id,
                 s.store_name,
@@ -477,9 +484,11 @@ class P0Reports:
               AND o.is_deleted = FALSE
               AND COALESCE(o.biz_date, DATE(p.paid_at)) = :target_date
             GROUP BY o.store_id, s.store_name, COALESCE(p.method, 'unknown')
-        """)
+        """
+        )
 
-        refund_sql = text("""
+        refund_sql = text(
+            """
             SELECT
                 o.store_id::text                       AS store_id,
                 COALESCE(p.method, 'unknown')          AS payment_method,
@@ -492,7 +501,8 @@ class P0Reports:
               AND o.is_deleted = FALSE
               AND COALESCE(o.biz_date, DATE(r.refunded_at)) = :target_date
             GROUP BY o.store_id, COALESCE(p.method, 'unknown')
-        """)
+        """
+        )
 
         params = {"tenant_id": tenant_id, "target_date": target_date}
         income_rows = (await session.execute(income_sql, params)).mappings().all()
@@ -548,7 +558,8 @@ class P0Reports:
         )
 
         # 汇总收款
-        income_sql = text("""
+        income_sql = text(
+            """
             SELECT
                 s.store_name,
                 COALESCE(p.method, 'unknown')     AS payment_method,
@@ -563,9 +574,11 @@ class P0Reports:
               AND o.is_deleted = FALSE
               AND COALESCE(o.biz_date, DATE(p.paid_at)) = :target_date
             GROUP BY s.store_name, COALESCE(p.method, 'unknown')
-        """)
+        """
+        )
 
-        refund_sql = text("""
+        refund_sql = text(
+            """
             SELECT
                 COALESCE(p.method, 'unknown')     AS payment_method,
                 COALESCE(SUM(r.amount_fen), 0)    AS refund_fen
@@ -578,10 +591,12 @@ class P0Reports:
               AND o.is_deleted = FALSE
               AND COALESCE(o.biz_date, DATE(r.refunded_at)) = :target_date
             GROUP BY COALESCE(p.method, 'unknown')
-        """)
+        """
+        )
 
         # 查询备用金和找零
-        cash_sql = text("""
+        cash_sql = text(
+            """
             SELECT
                 COALESCE(SUM(CASE WHEN cs.type = 'opening' THEN cs.amount_fen END), 0) AS cash_start_fen,
                 COALESCE(SUM(CASE WHEN cs.type = 'change'  THEN cs.amount_fen END), 0) AS cash_change_fen
@@ -590,7 +605,8 @@ class P0Reports:
               AND cs.store_id   = :store_id::UUID
               AND DATE(cs.session_date) = :target_date
               AND cs.is_deleted = FALSE
-        """)
+        """
+        )
 
         params = {"tenant_id": tenant_id, "store_id": store_id, "target_date": target_date}
         income_rows = (await session.execute(income_sql, params)).mappings().all()
@@ -673,7 +689,8 @@ class P0Reports:
 
         yesterday = target_date - timedelta(days=1)
 
-        sql = text("""
+        sql = text(
+            """
             WITH today AS (
                 SELECT
                     d.id                                                   AS dish_id,
@@ -727,7 +744,8 @@ class P0Reports:
             FROM today t
             LEFT JOIN prev p ON p.dish_id = t.dish_id
             ORDER BY t.sales_amount_fen DESC
-        """)
+        """
+        )
 
         result = await session.execute(
             sql,
@@ -787,7 +805,8 @@ class P0Reports:
             date=str(target_date),
         )
 
-        sql = text("""
+        sql = text(
+            """
             WITH anomaly AS (
                 SELECT
                     o.order_no,
@@ -847,7 +866,8 @@ class P0Reports:
             FROM anomaly
             WHERE is_high_discount OR has_return OR has_refund OR is_manual
             ORDER BY created_at DESC
-        """)
+        """
+        )
 
         result = await session.execute(
             sql,
@@ -902,7 +922,8 @@ class P0Reports:
             store_id=store_id,
         )
 
-        revenue_sql = text("""
+        revenue_sql = text(
+            """
             SELECT
                 s.store_name,
                 COUNT(*)                                              AS order_count,
@@ -924,9 +945,11 @@ class P0Reports:
               AND o.is_deleted = FALSE
               AND COALESCE(o.biz_date, DATE(o.created_at)) = CURRENT_DATE
             GROUP BY s.store_name
-        """)
+        """
+        )
 
-        table_sql = text("""
+        table_sql = text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE status = 'occupied') AS occupied_tables,
                 COUNT(*)                                     AS total_tables
@@ -934,16 +957,19 @@ class P0Reports:
             WHERE store_id   = :store_id::UUID
               AND tenant_id  = :tenant_id
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
-        waiting_sql = text("""
+        waiting_sql = text(
+            """
             SELECT COUNT(*) AS waiting_groups
             FROM waitlist
             WHERE store_id   = :store_id::UUID
               AND tenant_id  = :tenant_id
               AND status     = 'waiting'
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
         params = {"tenant_id": tenant_id, "store_id": store_id}
         rev_row = (await session.execute(revenue_sql, params)).mappings().first()
@@ -1003,7 +1029,8 @@ class P0Reports:
             date=str(target_date),
         )
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 o.store_id::text                                               AS store_id,
                 s.store_name,
@@ -1031,7 +1058,8 @@ class P0Reports:
                      COALESCE(o.biz_date, DATE(p.paid_at)),
                      COALESCE(p.method, 'unknown')
             ORDER BY s.store_name, collection_fen DESC
-        """)
+        """
+        )
 
         result = await session.execute(sql, {"tenant_id": tenant_id, "target_date": target_date})
         rows = result.mappings().all()

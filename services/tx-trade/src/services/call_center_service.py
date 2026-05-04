@@ -39,12 +39,14 @@ class CallCenterService:
         call_id = uuid.uuid4()
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO call_records
                     (tenant_id, id, store_id, caller_phone, call_type, agent_ext, status, started_at)
                 VALUES
                     (:tid, :cid, :sid, :phone, 'inbound', :ext, 'ringing', :now)
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "cid": str(call_id),
@@ -57,12 +59,14 @@ class CallCenterService:
 
         # 按手机号匹配客户
         customer_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, phone, membership_level, total_spend_fen, visit_count
                 FROM customers
                 WHERE tenant_id = :tid AND phone = :phone AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "phone": caller_phone},
         )
         customer = customer_row.mappings().first()
@@ -77,12 +81,14 @@ class CallCenterService:
 
             # 写入匹配记录
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO call_customer_matches
                         (tenant_id, id, call_record_id, customer_id, match_type, confidence)
                     VALUES
                         (:tid, :mid, :cid, :cust_id, 'phone_exact', 1.00)
-                """),
+                """
+                ),
                 {
                     "tid": str(tenant_id),
                     "mid": str(uuid.uuid4()),
@@ -93,35 +99,41 @@ class CallCenterService:
 
             # 更新通话记录关联客户
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE call_records SET customer_id = :cust_id, caller_name = :name
                     WHERE id = :cid
-                """),
+                """
+                ),
                 {"cust_id": cust_id, "name": customer["name"], "cid": str(call_id)},
             )
 
             # 近期预订（最近5条）
             res_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, store_id, party_size, reservation_date, reservation_time, status
                     FROM reservations
                     WHERE tenant_id = :tid AND customer_id = :cust_id AND is_deleted = FALSE
                     ORDER BY reservation_date DESC
                     LIMIT 5
-                """),
+                """
+                ),
                 {"tid": str(tenant_id), "cust_id": cust_id},
             )
             recent_reservations = [dict(r) for r in res_rows.mappings().all()]
 
             # 近期订单（最近5条）
             ord_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, store_id, total_fen, status, created_at
                     FROM orders
                     WHERE tenant_id = :tid AND customer_id = :cust_id AND is_deleted = FALSE
                     ORDER BY created_at DESC
                     LIMIT 5
-                """),
+                """
+                ),
                 {"tid": str(tenant_id), "cust_id": cust_id},
             )
             recent_orders = [dict(r) for r in ord_rows.mappings().all()]
@@ -160,13 +172,15 @@ class CallCenterService:
 
         # 客户基本信息
         cust_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, phone, membership_level, total_spend_fen, visit_count,
                        last_visit_at, tags
                 FROM customers
                 WHERE tenant_id = :tid AND phone = :phone AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "phone": phone},
         )
         customer = cust_row.mappings().first()
@@ -178,12 +192,14 @@ class CallCenterService:
 
         # RFM 数据
         rfm_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT recency_days, frequency, monetary_fen, rfm_segment
                 FROM customer_rfm
                 WHERE tenant_id = :tid AND customer_id = :cust_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "cust_id": cust_id},
         )
         rfm = rfm_row.mappings().first()
@@ -191,20 +207,23 @@ class CallCenterService:
 
         # 最近5单
         ord_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, total_fen, status, created_at
                 FROM orders
                 WHERE tenant_id = :tid AND customer_id = :cust_id AND is_deleted = FALSE
                 ORDER BY created_at DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "cust_id": cust_id},
         )
         profile["recent_orders"] = [dict(r) for r in ord_rows.mappings().all()]
 
         # 即将到来的预订
         res_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, party_size, reservation_date, reservation_time, status
                 FROM reservations
                 WHERE tenant_id = :tid AND customer_id = :cust_id
@@ -212,7 +231,8 @@ class CallCenterService:
                       AND is_deleted = FALSE
                 ORDER BY reservation_date ASC
                 LIMIT 5
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "cust_id": cust_id},
         )
         profile["upcoming_reservations"] = [dict(r) for r in res_rows.mappings().all()]
@@ -240,7 +260,8 @@ class CallCenterService:
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE call_records
                 SET duration_sec  = :dur,
                     recording_url = :url,
@@ -248,7 +269,8 @@ class CallCenterService:
                     ended_at      = :now,
                     updated_at    = :now
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "cid": str(call_id),
@@ -262,24 +284,28 @@ class CallCenterService:
         # 如果是未接来电，自动创建回拨任务
         if status == "missed":
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT caller_phone, store_id, customer_id
                     FROM call_records
                     WHERE id = :cid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"tid": str(tenant_id), "cid": str(call_id)},
             )
             call = row.mappings().first()
             if call and call["caller_phone"]:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO callback_tasks
                             (tenant_id, id, store_id, call_record_id, customer_id,
                              callback_phone, reason, status)
                         VALUES
                             (:tid, :task_id, :sid, :cid, :cust_id,
                              :phone, 'missed_call', 'pending')
-                    """),
+                    """
+                    ),
                     {
                         "tid": str(tenant_id),
                         "task_id": str(uuid.uuid4()),
@@ -319,14 +345,16 @@ class CallCenterService:
 
         task_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO callback_tasks
                     (tenant_id, id, store_id, call_record_id, customer_id,
                      callback_phone, reason, status, assigned_to, scheduled_at, notes)
                 VALUES
                     (:tid, :task_id, :sid, :crid, :cust_id,
                      :phone, :reason, 'pending', :assigned, :scheduled, :notes)
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "task_id": str(task_id),
@@ -360,14 +388,16 @@ class CallCenterService:
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE callback_tasks
                 SET status       = 'completed',
                     completed_at = :now,
                     notes        = COALESCE(:notes, notes),
                     updated_at   = :now
                 WHERE id = :tid_task AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "tid_task": str(task_id),
@@ -419,14 +449,16 @@ class CallCenterService:
         params["offset"] = offset
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, caller_phone, caller_name, call_type, duration_sec,
                        status, customer_id, agent_ext, started_at, ended_at, notes
                 FROM call_records
                 WHERE {where}
                 ORDER BY started_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings().all()]
@@ -448,7 +480,8 @@ class CallCenterService:
 
         d = target_date or date.today()
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, caller_phone, caller_name, customer_id, agent_ext,
                        started_at, notes
                 FROM call_records
@@ -457,7 +490,8 @@ class CallCenterService:
                       AND started_at::date = :d
                       AND is_deleted = FALSE
                 ORDER BY started_at DESC
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "sid": str(store_id), "d": d},
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -487,13 +521,15 @@ class CallCenterService:
             params["st"] = status
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, call_record_id, customer_id, callback_phone, reason,
                        status, assigned_to, scheduled_at, completed_at, notes, created_at
                 FROM callback_tasks
                 WHERE {where}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -526,7 +562,8 @@ class CallCenterService:
         date_cond = period_filter.get(period, period_filter["today"])
 
         row = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*)                                         AS total_calls,
                     COUNT(*) FILTER (WHERE status = 'answered')      AS answered,
@@ -545,7 +582,8 @@ class CallCenterService:
                 WHERE tenant_id = :tid AND store_id = :sid
                       AND {date_cond}
                       AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "sid": str(store_id)},
         )
         stats = row.mappings().first()

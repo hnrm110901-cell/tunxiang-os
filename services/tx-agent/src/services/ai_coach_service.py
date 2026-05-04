@@ -510,7 +510,8 @@ class AICoachService:
         tid = UUID(tenant_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_coaching_logs
                 SET user_feedback = :feedback,
                     feedback_at = :now,
@@ -519,7 +520,8 @@ class AICoachService:
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "feedback": feedback,
                 "now": now,
@@ -587,21 +589,24 @@ class AICoachService:
 
         # 总数
         count_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS total
                 FROM sop_coaching_logs cl
                 WHERE cl.tenant_id = :tenant_id
                   AND cl.store_id = :store_id
                   AND cl.is_deleted = FALSE
                   {filters}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         # 分页数据
         data_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     cl.id,
                     cl.store_id,
@@ -619,7 +624,8 @@ class AICoachService:
                   {filters}
                 ORDER BY cl.coaching_date DESC, cl.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = data_result.fetchall()
@@ -657,7 +663,8 @@ class AICoachService:
         cid = UUID(coaching_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     cl.id,
                     cl.tenant_id,
@@ -676,7 +683,8 @@ class AICoachService:
                 WHERE cl.id = :coaching_id
                   AND cl.tenant_id = :tenant_id
                   AND cl.is_deleted = FALSE
-            """),
+            """
+            ),
             {"coaching_id": cid, "tenant_id": tid},
         )
         row = result.fetchone()
@@ -993,7 +1001,8 @@ class AICoachService:
             mem_clause = ":memories_used"
 
         await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO sop_coaching_logs (
                     id, tenant_id, store_id, user_id,
                     coaching_type, slot_code, coaching_date,
@@ -1005,7 +1014,8 @@ class AICoachService:
                     :context_snapshot::jsonb, {mem_clause}, :recommendations::jsonb,
                     :created_at, FALSE
                 )
-            """),
+            """
+            ),
             params,
         )
         await self.db.flush()

@@ -38,7 +38,8 @@ class OptimizationWorker:
 
         # 查找所有evaluating状态的优化记录
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT col.id, col.tenant_id, col.campaign_id,
                        col.marketing_task_id, col.ab_test_id,
                        col.optimization_round
@@ -47,7 +48,8 @@ class OptimizationWorker:
                   AND col.is_deleted = FALSE
                 ORDER BY col.created_at ASC
                 LIMIT 100
-            """),
+            """
+            ),
         )
         rows = result.mappings().all()
 
@@ -118,7 +120,8 @@ class OptimizationWorker:
         """
         # 从marketing_task_executions和coupon_send_logs汇总
         result = await db.execute(
-            text("""
+            text(
+                """
                 WITH task_metrics AS (
                     SELECT
                         COALESCE(mt.content->>'ab_variant', 'a') AS variant,
@@ -136,7 +139,8 @@ class OptimizationWorker:
                     GROUP BY COALESCE(mt.content->>'ab_variant', 'a')
                 )
                 SELECT * FROM task_metrics
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "campaign_id": str(campaign_id)},
         )
         rows = {str(r["variant"]): dict(r) for r in result.mappings().all()}

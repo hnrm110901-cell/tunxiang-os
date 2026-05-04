@@ -61,7 +61,8 @@ async def governance_dashboard(
     await _set_tenant(db, tenant_id)
 
     # 在职人数统计（按品牌/区域）
-    headcount_q = text("""
+    headcount_q = text(
+        """
         SELECT
             COALESCE(s.brand, '未知品牌') AS brand,
             COALESCE(s.city, '未知') AS region,
@@ -73,10 +74,12 @@ async def governance_dashboard(
           AND COALESCE(e.is_active, true) = true
         GROUP BY s.brand, s.city
         ORDER BY headcount DESC
-    """)
+    """
+    )
 
     # 平均出勤率（近30天）
-    attendance_q = text("""
+    attendance_q = text(
+        """
         SELECT
             COUNT(CASE WHEN da.status = 'normal' THEN 1 END)::float
             / GREATEST(COUNT(*), 1) AS avg_attendance_rate
@@ -84,10 +87,12 @@ async def governance_dashboard(
         WHERE da.tenant_id = CAST(:tenant_id AS uuid)
           AND COALESCE(da.is_deleted, false) = false
           AND da.date >= CURRENT_DATE - 30
-    """)
+    """
+    )
 
     # 人均产出（近30天 — 从 orders 或 mv_store_pnl 聚合）
-    productivity_q = text("""
+    productivity_q = text(
+        """
         SELECT
             COALESCE(SUM(o.total_fen), 0)::bigint AS total_revenue_fen,
             COUNT(DISTINCT e.id) AS active_employees
@@ -100,7 +105,8 @@ async def governance_dashboard(
         WHERE e.tenant_id = CAST(:tenant_id AS uuid)
           AND e.is_deleted = false
           AND COALESCE(e.is_active, true) = true
-    """)
+    """
+    )
 
     try:
         hc_result = await db.execute(headcount_q, {"tenant_id": tenant_id})
@@ -138,7 +144,8 @@ async def governance_dashboard(
         productivity_per_person_fen = 0
 
     # 人工成本率（近30天薪资合计 / 近30天营收合计）
-    payroll_q = text("""
+    payroll_q = text(
+        """
         SELECT
             COALESCE(SUM(ps.total_salary_fen), 0)::bigint AS total_salary_fen
         FROM payroll_summaries ps
@@ -147,7 +154,8 @@ async def governance_dashboard(
           AND ps.status IN ('confirmed', 'paid')
           AND (ps.period_year * 100 + ps.period_month) >=
               (EXTRACT(YEAR FROM CURRENT_DATE - 30)::int * 100 + EXTRACT(MONTH FROM CURRENT_DATE - 30)::int)
-    """)
+    """
+    )
     try:
         payroll_result = await db.execute(payroll_q, {"tenant_id": tenant_id})
         payroll_row = payroll_result.mappings().first()
@@ -184,7 +192,8 @@ async def governance_benchmark(
     await _set_tenant(db, tenant_id)
 
     if metric == "attendance_rate":
-        q = text("""
+        q = text(
+            """
             SELECT
                 da.store_id,
                 COALESCE(s.name, da.store_id) AS store_name,
@@ -197,9 +206,11 @@ async def governance_benchmark(
               AND da.date >= CURRENT_DATE - 30
             GROUP BY da.store_id, s.name
             ORDER BY metric_value DESC
-        """)
+        """
+        )
     elif metric == "productivity":
-        q = text("""
+        q = text(
+            """
             SELECT
                 e.store_id::text AS store_id,
                 COALESCE(s.name, e.store_id::text) AS store_name,
@@ -214,9 +225,11 @@ async def governance_benchmark(
               AND e.is_deleted = false AND COALESCE(e.is_active, true) = true
             GROUP BY e.store_id, s.name
             ORDER BY metric_value DESC
-        """)
+        """
+        )
     elif metric == "work_hours":
-        q = text("""
+        q = text(
+            """
             SELECT
                 da.store_id,
                 COALESCE(s.name, da.store_id) AS store_name,
@@ -229,7 +242,8 @@ async def governance_benchmark(
               AND da.work_hours IS NOT NULL
             GROUP BY da.store_id, s.name
             ORDER BY metric_value DESC
-        """)
+        """
+        )
     else:
         # labor_cost_rate — 需要薪资数据，暂 mock
         return _ok(
@@ -285,7 +299,8 @@ async def governance_staffing(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    q = text("""
+    q = text(
+        """
         SELECT
             s.id::text AS store_id,
             s.name AS store_name,
@@ -299,7 +314,8 @@ async def governance_staffing(
           AND COALESCE(s.is_deleted, false) = false
         GROUP BY s.id, s.name, s.staffing_target
         ORDER BY s.name
-    """)
+    """
+    )
 
     try:
         result = await db.execute(q, {"tenant_id": tenant_id})
@@ -351,7 +367,8 @@ async def governance_risk_stores(
     await _set_tenant(db, tenant_id)
 
     # 出勤率 + 迟到率
-    att_q = text("""
+    att_q = text(
+        """
         SELECT
             da.store_id,
             COALESCE(s.name, da.store_id) AS store_name,
@@ -366,10 +383,12 @@ async def governance_risk_stores(
           AND COALESCE(da.is_deleted, false) = false
           AND da.date >= CURRENT_DATE - 30
         GROUP BY da.store_id, s.name
-    """)
+    """
+    )
 
     # 合规预警率
-    alert_q = text("""
+    alert_q = text(
+        """
         SELECT
             ca.store_id,
             COUNT(CASE WHEN ca.status = 'open' THEN 1 END)::float
@@ -378,7 +397,8 @@ async def governance_risk_stores(
         WHERE ca.tenant_id = CAST(:tenant_id AS uuid)
           AND ca.created_at >= CURRENT_DATE - 30
         GROUP BY ca.store_id
-    """)
+    """
+    )
 
     try:
         att_result = await db.execute(att_q, {"tenant_id": tenant_id})
@@ -396,7 +416,8 @@ async def governance_risk_stores(
         log.warning("governance_risk_alert_failed", error=str(exc))
 
     # 各门店薪资（近30天，用于计算成本偏差率）
-    store_salary_q = text("""
+    store_salary_q = text(
+        """
         SELECT
             ps.store_id::text AS store_id,
             COALESCE(SUM(ps.total_salary_fen), 0)::bigint AS store_salary_fen
@@ -407,7 +428,8 @@ async def governance_risk_stores(
           AND (ps.period_year * 100 + ps.period_month) >=
               (EXTRACT(YEAR FROM CURRENT_DATE - 30)::int * 100 + EXTRACT(MONTH FROM CURRENT_DATE - 30)::int)
         GROUP BY ps.store_id
-    """)
+    """
+    )
     salary_map: dict[str, int] = {}
     try:
         salary_result = await db.execute(store_salary_q, {"tenant_id": tenant_id})

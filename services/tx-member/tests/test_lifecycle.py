@@ -33,6 +33,7 @@ from services.lifecycle_service import (  # noqa: E402
 
 # ── 工具 ──────────────────────────────────────────────────────
 
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -59,6 +60,7 @@ def _make_customer(
 
 
 # ── Fixture ───────────────────────────────────────────────────
+
 
 @pytest.fixture
 def tenant_id() -> str:
@@ -269,10 +271,11 @@ class TestBatchReclassify:
             ),
         ]
 
-        with patch.object(service, "_fetch_all_members", return_value=customers), \
-             patch.object(service, "_update_member_stage", new_callable=AsyncMock), \
-             patch.object(service, "_record_event", new_callable=AsyncMock), \
-             patch.object(service, "trigger_intervention", new_callable=AsyncMock):
+        with patch.object(service, "_fetch_all_members", return_value=customers), patch.object(
+            service, "_update_member_stage", new_callable=AsyncMock
+        ), patch.object(service, "_record_event", new_callable=AsyncMock), patch.object(
+            service, "trigger_intervention", new_callable=AsyncMock
+        ):
             result = await service.batch_reclassify(tenant_id, mock_db)
 
         assert "new" in result
@@ -287,9 +290,7 @@ class TestBatchReclassify:
         assert result["changed"] == 2  # dormant 和 churned 发生了变更
 
     @pytest.mark.asyncio
-    async def test_batch_reclassify_records_events_for_changed(
-        self, service, tenant_id, mock_db
-    ):
+    async def test_batch_reclassify_records_events_for_changed(self, service, tenant_id, mock_db):
         """批量重分类：只对阶段变更的会员记录事件"""
         cid = str(uuid.uuid4())
         customers = [
@@ -305,10 +306,11 @@ class TestBatchReclassify:
         record_event_mock = AsyncMock()
         trigger_mock = AsyncMock()
 
-        with patch.object(service, "_fetch_all_members", return_value=customers), \
-             patch.object(service, "_update_member_stage", new_callable=AsyncMock), \
-             patch.object(service, "_record_event", record_event_mock), \
-             patch.object(service, "trigger_intervention", trigger_mock):
+        with patch.object(service, "_fetch_all_members", return_value=customers), patch.object(
+            service, "_update_member_stage", new_callable=AsyncMock
+        ), patch.object(service, "_record_event", record_event_mock), patch.object(
+            service, "trigger_intervention", trigger_mock
+        ):
             await service.batch_reclassify(tenant_id, mock_db)
 
         record_event_mock.assert_called_once()
@@ -333,13 +335,9 @@ class TestTriggerIntervention:
             "is_active": True,
         }
 
-        with patch.object(service, "_get_lifecycle_config", return_value=config), \
-             patch.object(
-                 service, "_issue_coupon_to_member", new_callable=AsyncMock
-             ) as mock_issue, \
-             patch.object(
-                 service, "_send_wecom_message", new_callable=AsyncMock
-             ) as mock_wecom:
+        with patch.object(service, "_get_lifecycle_config", return_value=config), patch.object(
+            service, "_issue_coupon_to_member", new_callable=AsyncMock
+        ) as mock_issue, patch.object(service, "_send_wecom_message", new_callable=AsyncMock) as mock_wecom:
             result = await service.trigger_intervention(
                 member_id=member_id,
                 new_stage=LifecycleStage.DORMANT,
@@ -352,9 +350,7 @@ class TestTriggerIntervention:
         assert result["action_taken"] == "coupon_sent"
 
     @pytest.mark.asyncio
-    async def test_intervention_failure_does_not_block(
-        self, service, tenant_id, mock_db
-    ):
+    async def test_intervention_failure_does_not_block(self, service, tenant_id, mock_db):
         """营销触发失败不阻塞分类流程"""
         member_id = str(uuid.uuid4())
         config = {
@@ -365,12 +361,11 @@ class TestTriggerIntervention:
             "is_active": True,
         }
 
-        with patch.object(service, "_get_lifecycle_config", return_value=config), \
-             patch.object(
-                 service,
-                 "_issue_coupon_to_member",
-                 side_effect=RuntimeError("coupon API down"),
-             ):
+        with patch.object(service, "_get_lifecycle_config", return_value=config), patch.object(
+            service,
+            "_issue_coupon_to_member",
+            side_effect=RuntimeError("coupon API down"),
+        ):
             # 不抛出异常
             result = await service.trigger_intervention(
                 member_id=member_id,
@@ -388,9 +383,7 @@ class TestTriggerIntervention:
 
 class TestChurnedWecom:
     @pytest.mark.asyncio
-    async def test_churned_triggers_wecom_and_large_coupon(
-        self, service, tenant_id, mock_db
-    ):
+    async def test_churned_triggers_wecom_and_large_coupon(self, service, tenant_id, mock_db):
         """流失会员 → 企微消息 + 大额复活券"""
         member_id = str(uuid.uuid4())
         config = {
@@ -401,13 +394,9 @@ class TestChurnedWecom:
             "is_active": True,
         }
 
-        with patch.object(service, "_get_lifecycle_config", return_value=config), \
-             patch.object(
-                 service, "_send_wecom_message", new_callable=AsyncMock
-             ) as mock_wecom, \
-             patch.object(
-                 service, "_issue_coupon_to_member", new_callable=AsyncMock
-             ) as mock_issue:
+        with patch.object(service, "_get_lifecycle_config", return_value=config), patch.object(
+            service, "_send_wecom_message", new_callable=AsyncMock
+        ) as mock_wecom, patch.object(service, "_issue_coupon_to_member", new_callable=AsyncMock) as mock_issue:
             result = await service.trigger_intervention(
                 member_id=member_id,
                 new_stage=LifecycleStage.CHURNED,
@@ -431,12 +420,11 @@ class TestChurnedWecom:
             "is_active": True,
         }
 
-        with patch.object(service, "_get_lifecycle_config", return_value=config), \
-             patch.object(
-                 service,
-                 "_send_wecom_message",
-                 side_effect=RuntimeError("企微 API 超时"),
-             ):
+        with patch.object(service, "_get_lifecycle_config", return_value=config), patch.object(
+            service,
+            "_send_wecom_message",
+            side_effect=RuntimeError("企微 API 超时"),
+        ):
             result = await service.trigger_intervention(
                 member_id=member_id,
                 new_stage=LifecycleStage.CHURNED,
@@ -453,15 +441,11 @@ class TestChurnedWecom:
 
 class TestLifecycleEventRecording:
     @pytest.mark.asyncio
-    async def test_record_event_stores_stage_change(
-        self, service, tenant_id, mock_db
-    ):
+    async def test_record_event_stores_stage_change(self, service, tenant_id, mock_db):
         """阶段变更时记录 lifecycle_events"""
         member_id = str(uuid.uuid4())
 
-        with patch.object(
-            service, "_insert_lifecycle_event", new_callable=AsyncMock
-        ) as mock_insert:
+        with patch.object(service, "_insert_lifecycle_event", new_callable=AsyncMock) as mock_insert:
             await service._record_event(
                 member_id=member_id,
                 tenant_id=tenant_id,
@@ -483,9 +467,7 @@ class TestLifecycleEventRecording:
         """流失→再次消费 → reactivated 阶段记录"""
         member_id = str(uuid.uuid4())
 
-        with patch.object(
-            service, "_insert_lifecycle_event", new_callable=AsyncMock
-        ) as mock_insert:
+        with patch.object(service, "_insert_lifecycle_event", new_callable=AsyncMock) as mock_insert:
             await service._record_event(
                 member_id=member_id,
                 tenant_id=tenant_id,
@@ -522,9 +504,7 @@ class TestTenantIsolation:
         assert service._compute_stage(c2) == LifecycleStage.CHURNED
 
     @pytest.mark.asyncio
-    async def test_batch_reclassify_filters_by_tenant(
-        self, service, tenant_id, other_tenant_id, mock_db
-    ):
+    async def test_batch_reclassify_filters_by_tenant(self, service, tenant_id, other_tenant_id, mock_db):
         """批量重分类只处理指定 tenant 的会员"""
         own_customer = _make_customer(
             first_order_at=_days_ago(60),
@@ -533,24 +513,20 @@ class TestTenantIsolation:
             tenant_id=tenant_id,
         )
 
-        with patch.object(
-            service, "_fetch_all_members", return_value=[own_customer]
-        ) as mock_fetch, \
-             patch.object(service, "_update_member_stage", new_callable=AsyncMock), \
-             patch.object(service, "_record_event", new_callable=AsyncMock), \
-             patch.object(service, "trigger_intervention", new_callable=AsyncMock):
+        with patch.object(service, "_fetch_all_members", return_value=[own_customer]) as mock_fetch, patch.object(
+            service, "_update_member_stage", new_callable=AsyncMock
+        ), patch.object(service, "_record_event", new_callable=AsyncMock), patch.object(
+            service, "trigger_intervention", new_callable=AsyncMock
+        ):
             await service.batch_reclassify(tenant_id, mock_db)
 
         # _fetch_all_members 应使用 tenant_id 参数过滤
         mock_fetch.assert_called_once()
         call_args = mock_fetch.call_args
-        assert call_args.kwargs.get("tenant_id") == tenant_id or \
-               call_args.args[0] == tenant_id
+        assert call_args.kwargs.get("tenant_id") == tenant_id or call_args.args[0] == tenant_id
 
     @pytest.mark.asyncio
-    async def test_get_lifecycle_stats_scoped_to_tenant(
-        self, service, tenant_id, mock_db
-    ):
+    async def test_get_lifecycle_stats_scoped_to_tenant(self, service, tenant_id, mock_db):
         """get_lifecycle_stats 返回的统计数据范围限定在指定 tenant"""
         mock_result = {
             "new": 5,
@@ -561,13 +537,8 @@ class TestTenantIsolation:
             "total": 38,
         }
 
-        with patch.object(
-            service, "_query_stage_counts", new_callable=AsyncMock,
-            return_value=mock_result
-        ):
-            stats = await service.get_lifecycle_stats(
-                tenant_id=tenant_id, db=mock_db
-            )
+        with patch.object(service, "_query_stage_counts", new_callable=AsyncMock, return_value=mock_result):
+            stats = await service.get_lifecycle_stats(tenant_id=tenant_id, db=mock_db)
 
         assert stats["total"] == 38
         assert stats["new"] == 5
@@ -589,13 +560,8 @@ class TestLifecycleStats:
             "total": 100,
         }
 
-        with patch.object(
-            service, "_query_stage_counts", new_callable=AsyncMock,
-            return_value=mock_result
-        ):
-            stats = await service.get_lifecycle_stats(
-                tenant_id=tenant_id, db=mock_db
-            )
+        with patch.object(service, "_query_stage_counts", new_callable=AsyncMock, return_value=mock_result):
+            stats = await service.get_lifecycle_stats(tenant_id=tenant_id, db=mock_db)
 
         assert "ratios" in stats
         assert abs(stats["ratios"]["active"] - 0.4) < 0.001
@@ -605,17 +571,18 @@ class TestLifecycleStats:
         """传入 store_id 时统计限定到门店维度"""
         store_id = str(uuid.uuid4())
         mock_result = {
-            "new": 2, "active": 8, "dormant": 3,
-            "churned": 1, "reactivated": 0, "total": 14,
+            "new": 2,
+            "active": 8,
+            "dormant": 3,
+            "churned": 1,
+            "reactivated": 0,
+            "total": 14,
         }
 
         with patch.object(
-            service, "_query_stage_counts", new_callable=AsyncMock,
-            return_value=mock_result
+            service, "_query_stage_counts", new_callable=AsyncMock, return_value=mock_result
         ) as mock_query:
-            await service.get_lifecycle_stats(
-                tenant_id=tenant_id, store_id=store_id, db=mock_db
-            )
+            await service.get_lifecycle_stats(tenant_id=tenant_id, store_id=store_id, db=mock_db)
 
         call_kwargs = mock_query.call_args.kwargs
         assert call_kwargs.get("store_id") == store_id

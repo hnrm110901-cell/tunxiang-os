@@ -231,14 +231,16 @@ class TableCardLearningEngine:
             from sqlalchemy import text
 
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT MIN(clicked_at)
                     FROM table_card_click_logs
                     WHERE tenant_id = :tenant_id
                       AND store_id = :store_id
                       AND field_key = :field_key
                       AND meal_period = :meal_period
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "store_id": store_id,

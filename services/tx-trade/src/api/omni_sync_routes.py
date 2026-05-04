@@ -215,7 +215,8 @@ async def push_menu_to_platforms(
         # 写任务记录
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO delivery_menu_sync_tasks
                         (id, tenant_id, store_id, platform, sync_mode, items_count,
                          items_snapshot, status, created_at)
@@ -223,7 +224,8 @@ async def push_menu_to_platforms(
                         (:id, :tid, :sid, :platform, :mode, :cnt,
                          :items::jsonb, :status, :now)
                     ON CONFLICT (id) DO NOTHING
-                """),
+                """
+                ),
                 {
                     "id": task_id,
                     "tid": tenant_id,
@@ -331,14 +333,16 @@ async def sync_sold_out(
         log_id = str(uuid.uuid4())
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO delivery_soldout_sync_log
                         (id, tenant_id, store_id, platform, dish_id, dish_name,
                          action, reason, success, error_msg, synced_at)
                     VALUES
                         (:id, :tid, :sid, :platform, :dish_id, :dish_name,
                          'soldout', :reason, :success, :error_msg, :now)
-                """),
+                """
+                ),
                 {
                     "id": log_id,
                     "tid": tenant_id,
@@ -444,14 +448,16 @@ async def restore_sold_out(
         log_id = str(uuid.uuid4())
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO delivery_soldout_sync_log
                         (id, tenant_id, store_id, platform, dish_id, dish_name,
                          action, reason, success, error_msg, synced_at)
                     VALUES
                         (:id, :tid, :sid, :platform, :dish_id, :dish_name,
                          'restore', NULL, :success, :error_msg, :now)
-                """),
+                """
+                ),
                 {
                     "id": log_id,
                     "tid": tenant_id,
@@ -538,7 +544,8 @@ async def list_online_orders(
 
     # 查 aggregator_orders 表（外卖聚合订单）
     rows_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 id::text AS order_id,
                 platform_key AS platform,
@@ -557,20 +564,23 @@ async def list_online_orders(
               {platform_filter}
             ORDER BY created_at ASC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
 
     count_params = {k: v for k, v in params.items() if k not in ("limit", "offset")}
     count_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*)
             FROM aggregator_orders
             WHERE tenant_id = :tid::uuid
               AND store_id = :sid
               AND status = :status
               {platform_filter}
-        """),
+        """
+        ),
         count_params,
     )
     total: int = count_result.scalar() or 0
@@ -640,7 +650,8 @@ async def accept_online_order(
 
     # 查询订单
     row_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 id::text AS order_id,
                 platform_key AS platform,
@@ -655,7 +666,8 @@ async def accept_online_order(
             FROM aggregator_orders
             WHERE id = :oid::uuid
               AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     row = row_result.mappings().first()
@@ -673,13 +685,15 @@ async def accept_online_order(
 
     # 更新状态
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE aggregator_orders
             SET status = 'confirmed',
                 accepted_at = :now,
                 estimated_ready_minutes = :minutes
             WHERE id = :oid::uuid
-        """),
+        """
+        ),
         {"oid": order_id, "now": _now(), "minutes": body.estimated_minutes},
     )
     await db.commit()
@@ -803,12 +817,14 @@ async def reject_online_order(
     tenant_id = _get_tenant_id(request)
 
     row_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id::text AS order_id, platform_key AS platform,
                    platform_order_id, status
             FROM aggregator_orders
             WHERE id = :oid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     row = row_result.mappings().first()
@@ -823,14 +839,16 @@ async def reject_online_order(
     platform: str = row["platform"] or "meituan"
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE aggregator_orders
             SET status = 'rejected',
                 rejected_at = :now,
                 reject_reason_code = :code,
                 reject_reason_desc = :desc
             WHERE id = :oid::uuid
-        """),
+        """
+        ),
         {
             "oid": order_id,
             "now": _now(),
@@ -905,7 +923,8 @@ async def refund_online_order(
     tenant_id = _get_tenant_id(request)
 
     row_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 id::text AS order_id,
                 platform_key AS platform,
@@ -916,7 +935,8 @@ async def refund_online_order(
                 status
             FROM aggregator_orders
             WHERE id = :oid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     row = row_result.mappings().first()
@@ -936,14 +956,16 @@ async def refund_online_order(
     refund_fen: int = body.refund_amount_fen if body.refund_amount_fen > 0 else total_fen
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE aggregator_orders
             SET status = 'refunded',
                 refunded_at = :now,
                 refund_amount_fen = :refund_fen,
                 refund_reason = :reason
             WHERE id = :oid::uuid
-        """),
+        """
+        ),
         {
             "oid": order_id,
             "now": _now(),

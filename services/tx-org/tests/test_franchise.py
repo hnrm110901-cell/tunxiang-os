@@ -16,6 +16,7 @@ from datetime import date, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+
 from services.tx_org.src.models.franchise import (
     Franchisee,
     FranchiseeStatus,
@@ -228,9 +229,9 @@ def test_royalty_no_tiers_high_revenue():
 
 def _tiered_franchisee() -> Franchisee:
     """阶梯配置：
-      [0, 100000)  → 5%（基础费率）
-      [100000, 500000) → 4%
-      [500000, ∞)  → 3%
+    [0, 100000)  → 5%（基础费率）
+    [100000, 500000) → 4%
+    [500000, ∞)  → 3%
     """
     return make_franchisee(
         royalty_rate=0.05,

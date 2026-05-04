@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
@@ -67,13 +67,15 @@ class SatisfactionService:
         # 自动关联 journey
         if journey_id is None and order_id is not None:
             jr = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM customer_journey_timings
                     WHERE order_id = :order_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
                     ORDER BY created_at DESC LIMIT 1
-                """),
+                """
+                ),
                 {"order_id": str(order_id), "tenant_id": str(tenant_id)},
             )
             found = jr.scalar_one_or_none()
@@ -81,7 +83,8 @@ class SatisfactionService:
                 journey_id = found
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO satisfaction_ratings
                     (tenant_id, store_id, order_id, journey_id,
                      overall_score, food_score, service_score, speed_score,
@@ -93,7 +96,8 @@ class SatisfactionService:
                 RETURNING id, tenant_id, store_id, order_id, journey_id,
                           overall_score, food_score, service_score, speed_score,
                           comment, source, is_negative, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -121,9 +125,7 @@ class SatisfactionService:
 
         # 差评告警
         if overall_score <= 2:
-            await self._trigger_negative_alert(
-                db, store_id, tenant_id, rating_id, order_id, overall_score, comment
-            )
+            await self._trigger_negative_alert(db, store_id, tenant_id, rating_id, order_id, overall_score, comment)
 
         return {
             "id": str(row["id"]),
@@ -160,7 +162,8 @@ class SatisfactionService:
         try:
             # 尝试写入 notifications 表
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO notifications
                         (tenant_id, store_id, title, body, category, severity, metadata)
                     VALUES
@@ -170,7 +173,8 @@ class SatisfactionService:
                             'order_id', :order_id::TEXT,
                             'overall_score', :score
                          ))
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": str(store_id),
@@ -225,7 +229,8 @@ class SatisfactionService:
 
         # 1) 总体评分 + 四维度均值
         score_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                              AS total_ratings,
                     ROUND(AVG(overall_score)::NUMERIC, 2) AS overall_avg,
@@ -241,7 +246,8 @@ class SatisfactionService:
                   AND created_at >= :date_from::DATE
                   AND created_at < (:date_to::DATE + INTERVAL '1 day')
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -261,7 +267,8 @@ class SatisfactionService:
 
         # 2) 评分分布
         dist_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT overall_score, COUNT(*) AS cnt
                 FROM satisfaction_ratings
                 WHERE store_id = :store_id
@@ -271,7 +278,8 @@ class SatisfactionService:
                   AND is_deleted = FALSE
                 GROUP BY overall_score
                 ORDER BY overall_score
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -279,14 +287,12 @@ class SatisfactionService:
                 "date_to": date_to,
             },
         )
-        distribution = {
-            int(row["overall_score"]): int(row["cnt"])
-            for row in dist_result.mappings().all()
-        }
+        distribution = {int(row["overall_score"]): int(row["cnt"]) for row in dist_result.mappings().all()}
 
         # 3) 差评评语词频（简单中文分词：按标点和空格分割）
         comment_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT comment
                 FROM satisfaction_ratings
                 WHERE store_id = :store_id
@@ -297,7 +303,8 @@ class SatisfactionService:
                   AND comment IS NOT NULL
                   AND comment != ''
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -305,14 +312,13 @@ class SatisfactionService:
                 "date_to": date_to,
             },
         )
-        negative_comments = [
-            row["comment"] for row in comment_result.mappings().all()
-        ]
+        negative_comments = [row["comment"] for row in comment_result.mappings().all()]
         top_keywords = self._extract_keywords(negative_comments)
 
         # 4) 每日趋势
         trend_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     DATE(created_at) AS rating_date,
                     COUNT(*) AS cnt,
@@ -326,7 +332,8 @@ class SatisfactionService:
                   AND is_deleted = FALSE
                 GROUP BY DATE(created_at)
                 ORDER BY DATE(created_at)
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -378,11 +385,50 @@ class SatisfactionService:
         import re
 
         stop_words = {
-            "的", "了", "是", "在", "我", "有", "和", "就", "不", "人",
-            "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去",
-            "你", "会", "着", "没有", "看", "好", "自己", "这", "他", "她",
-            "吗", "这个", "那个", "什么", "怎么", "为什么", "但是", "还是",
-            "可以", "没", "太", "真", "比较", "非常",
+            "的",
+            "了",
+            "是",
+            "在",
+            "我",
+            "有",
+            "和",
+            "就",
+            "不",
+            "人",
+            "都",
+            "一",
+            "一个",
+            "上",
+            "也",
+            "很",
+            "到",
+            "说",
+            "要",
+            "去",
+            "你",
+            "会",
+            "着",
+            "没有",
+            "看",
+            "好",
+            "自己",
+            "这",
+            "他",
+            "她",
+            "吗",
+            "这个",
+            "那个",
+            "什么",
+            "怎么",
+            "为什么",
+            "但是",
+            "还是",
+            "可以",
+            "没",
+            "太",
+            "真",
+            "比较",
+            "非常",
         }
         counter: Counter[str] = Counter()
         for comment in comments:
@@ -392,10 +438,7 @@ class SatisfactionService:
                 if token not in stop_words:
                     counter[token] += 1
 
-        return [
-            {"keyword": kw, "count": cnt}
-            for kw, cnt in counter.most_common(top_n)
-        ]
+        return [{"keyword": kw, "count": cnt} for kw, cnt in counter.most_common(top_n)]
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     #  get_negative_alerts — 差评告警列表
@@ -418,7 +461,8 @@ class SatisfactionService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     sr.id,
                     sr.order_id,
@@ -441,7 +485,8 @@ class SatisfactionService:
                   AND sr.is_deleted = FALSE
                 ORDER BY sr.created_at DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -462,9 +507,9 @@ class SatisfactionService:
                 "comment": row["comment"],
                 "source": row["source"],
                 "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "elapsed_since_minutes": round(
-                    (datetime.now(timezone.utc) - row["created_at"]).total_seconds() / 60, 1
-                ) if row["created_at"] else None,
+                "elapsed_since_minutes": round((datetime.now(timezone.utc) - row["created_at"]).total_seconds() / 60, 1)
+                if row["created_at"]
+                else None,
             }
             for row in result.mappings().all()
         ]

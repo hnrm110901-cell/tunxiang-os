@@ -244,10 +244,7 @@ def parse_voice_inventory_text(raw_text: str, item_list: list) -> dict:
     arabic_match = re.search(arabic_pattern, text)
 
     # 再尝试中文数字（含"点"小数）
-    cn_pattern = (
-        r"([零一二三四五六七八九十百千壹贰叁肆伍陆柒捌玖拾佰]+"
-        r"(?:点[零一二三四五六七八九]+)?)"
-    )
+    cn_pattern = r"([零一二三四五六七八九十百千壹贰叁肆伍陆柒捌玖拾佰]+" r"(?:点[零一二三四五六七八九]+)?)"
     cn_match = re.search(cn_pattern, text)
 
     # ── 步骤2：提取单位 ───────────────────────────────────────────────────────
@@ -476,7 +473,8 @@ async def create_voice_count_session(
 
     # 拉取待盘物料列表（含当前库存量作为预期值）
     items_rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT i.ingredient_id AS item_id,
                    i.ingredient_name AS item_name,
                    i.unit,
@@ -492,7 +490,8 @@ async def create_voice_count_session(
               {category_filter_sql}
               {warehouse_filter_sql}
             ORDER BY i.category, i.ingredient_name
-        """),
+        """
+        ),
         params,
     )
     item_list = [dict(r._mapping) for r in items_rows.fetchall()]
@@ -502,7 +501,8 @@ async def create_voice_count_session(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO voice_count_sessions (
                     id, tenant_id, store_id, warehouse_id, count_type,
                     category_filter, item_snapshot, operator_id,
@@ -512,7 +512,8 @@ async def create_voice_count_session(
                     :category_filter::jsonb, :item_snapshot::jsonb, :operator_id,
                     'open', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": session_id,
                 "tenant_id": x_tenant_id,
@@ -558,7 +559,8 @@ async def get_voice_count_session(
 ) -> dict:
     """获取盘点会话状态（含已录入进度）。"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT s.id, s.store_id, s.warehouse_id, s.count_type,
                    s.category_filter, s.status, s.operator_id,
                    s.created_at, s.updated_at,
@@ -571,7 +573,8 @@ async def get_voice_count_session(
                 GROUP BY session_id
             ) e ON e.session_id = s.id
             WHERE s.id = :session_id AND s.tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     session = row.fetchone()
@@ -589,11 +592,13 @@ async def close_voice_count_session(
 ) -> dict:
     """关闭盘点会话（不提交，仅标记为已关闭）。"""
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE voice_count_sessions
             SET status = 'closed', updated_at = :now
             WHERE id = :session_id AND tenant_id = :tenant_id AND status = 'open'
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id, "now": datetime.now(timezone.utc)},
     )
     await db.commit()
@@ -620,11 +625,13 @@ async def submit_voice_entry(
     """
     # 验证会话
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, item_snapshot, status
             FROM voice_count_sessions
             WHERE id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     session = row.fetchone()
@@ -683,11 +690,13 @@ async def confirm_entry(
 
     # 验证会话和物料
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_id, item_snapshot, status
             FROM voice_count_sessions
             WHERE id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     session = row.fetchone()
@@ -712,7 +721,8 @@ async def confirm_entry(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO voice_count_entries (
                     id, tenant_id, session_id, item_id, item_name,
                     quantity, unit, source, original_text,
@@ -730,7 +740,8 @@ async def confirm_entry(
                     original_text = EXCLUDED.original_text,
                     updated_at = EXCLUDED.updated_at
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "id": entry_id,
                 "tenant_id": x_tenant_id,
@@ -791,13 +802,15 @@ async def list_entries(
         _err("盘点会话不存在", code=404)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, item_id, item_name, quantity, unit, source,
                    original_text, created_at, updated_at
             FROM voice_count_entries
             WHERE session_id = :session_id AND tenant_id = :tenant_id
             ORDER BY updated_at DESC
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     entries = [dict(r._mapping) for r in rows.fetchall()]
@@ -813,10 +826,12 @@ async def delete_entry(
 ) -> dict:
     """删除某条录入记录（可重新录入）。"""
     result = await db.execute(
-        text("""
+        text(
+            """
             DELETE FROM voice_count_entries
             WHERE id = :entry_id AND session_id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"entry_id": entry_id, "session_id": session_id, "tenant_id": x_tenant_id},
     )
     await db.commit()
@@ -841,11 +856,13 @@ async def get_variance(
     返回每项物料的预期值、实盘值、差异量（正=盘盈，负=盘亏）和差异金额（分）。
     """
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, item_snapshot, store_id, status
             FROM voice_count_sessions
             WHERE id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     session = row.fetchone()
@@ -860,11 +877,13 @@ async def get_variance(
 
     # 拉取已录入数量
     entries_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT item_id, quantity, unit
             FROM voice_count_entries
             WHERE session_id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     entry_map = {r[0]: {"quantity": r[1], "unit": r[2]} for r in entries_rows.fetchall()}
@@ -872,11 +891,13 @@ async def get_variance(
     # 查询物料成本价（用于计算差异金额）
     item_ids = [i["item_id"] for i in item_list]
     cost_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT ingredient_id, COALESCE(avg_cost_fen, 0) AS cost_fen
             FROM ingredients
             WHERE ingredient_id = ANY(:item_ids) AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"item_ids": item_ids, "tenant_id": x_tenant_id},
     )
     cost_map = {str(r[0]): r[1] for r in cost_rows.fetchall()}
@@ -944,12 +965,14 @@ async def submit_voice_count(
       7. 旁路写入事件总线
     """
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_id, warehouse_id, count_type, item_snapshot,
                    operator_id, status
             FROM voice_count_sessions
             WHERE id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     session = row.fetchone()
@@ -966,11 +989,13 @@ async def submit_voice_count(
 
     # 拉取已录入明细
     entries_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT item_id, item_name, quantity, unit, source
             FROM voice_count_entries
             WHERE session_id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": x_tenant_id},
     )
     entries = [dict(r._mapping) for r in entries_rows.fetchall()]
@@ -979,11 +1004,13 @@ async def submit_voice_count(
     # 查询成本价
     item_ids = [i["item_id"] for i in item_list]
     cost_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT ingredient_id, COALESCE(avg_cost_fen, 0) AS cost_fen
             FROM ingredients
             WHERE ingredient_id = ANY(:item_ids) AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"item_ids": item_ids, "tenant_id": x_tenant_id},
     )
     cost_map = {str(r[0]): r[1] for r in cost_rows.fetchall()}
@@ -1025,7 +1052,8 @@ async def submit_voice_count(
     try:
         # 写入盘点单主表
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO inventory_count_sheets (
                     id, tenant_id, store_id, warehouse_id, sheet_no,
                     count_type, session_id, operator_id, total_items,
@@ -1037,7 +1065,8 @@ async def submit_voice_count(
                     :variance_items, :total_variance_amount_fen,
                     :items::jsonb, 'submitted', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": count_sheet_id,
                 "tenant_id": x_tenant_id,
@@ -1060,7 +1089,8 @@ async def submit_voice_count(
             if entry_map.get(ci["item_id"]):
                 # 仅更新已录入的物料
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE inventory_stock
                         SET current_quantity = :counted,
                             last_count_at = :now,
@@ -1068,7 +1098,8 @@ async def submit_voice_count(
                         WHERE ingredient_id = :item_id
                           AND store_id = :store_id
                           AND tenant_id = :tenant_id
-                    """),
+                    """
+                    ),
                     {
                         "counted": ci["counted"],
                         "item_id": ci["item_id"],
@@ -1080,11 +1111,13 @@ async def submit_voice_count(
 
         # 更新会话状态 → submitted
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE voice_count_sessions
                 SET status = 'submitted', updated_at = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"session_id": session_id, "tenant_id": x_tenant_id, "now": now},
         )
         await db.commit()

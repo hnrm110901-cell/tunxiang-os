@@ -66,12 +66,14 @@ async def verify_coupon(
         {"tid": x_tenant_id},
     )
     cred_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT app_id, app_secret FROM delivery_platform_configs
             WHERE tenant_id = :tid::uuid AND store_id = :sid::uuid
               AND platform = 'xiaohongshu' AND is_active = TRUE
             LIMIT 1
-        """),
+        """
+        ),
         {"tid": x_tenant_id, "sid": body.store_id},
     )
     cred_row = cred_result.mappings().first()
@@ -114,12 +116,14 @@ async def list_verifications(
         {"tid": x_tenant_id},
     )
     cred_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT app_id, app_secret FROM delivery_platform_configs
             WHERE tenant_id = :tid::uuid AND store_id = :sid::uuid
               AND platform = 'xiaohongshu' AND is_active = TRUE
             LIMIT 1
-        """),
+        """
+        ),
         {"tid": x_tenant_id, "sid": store_id},
     )
     cred_row = cred_result.mappings().first()
@@ -155,7 +159,8 @@ async def bind_poi(
 
     # UPSERT — 一店一POI
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO xhs_poi_mappings
                 (id, tenant_id, store_id, xhs_poi_id, xhs_shop_name,
                  sync_status, created_at, updated_at)
@@ -167,7 +172,8 @@ async def bind_poi(
                 xhs_shop_name = EXCLUDED.xhs_shop_name,
                 sync_status = 'pending',
                 updated_at = NOW()
-        """),
+        """
+        ),
         {
             "id": uuid.uuid4(),
             "tid": tid,
@@ -200,11 +206,13 @@ async def get_poi_binding(
         {"tid": x_tenant_id},
     )
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT xhs_poi_id, xhs_shop_name, sync_status, last_synced_at
             FROM xhs_poi_mappings
             WHERE tenant_id = :tid AND store_id = :sid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": uuid.UUID(x_tenant_id), "sid": uuid.UUID(store_id)},
     )
     mapping = row.fetchone()
@@ -242,11 +250,13 @@ async def xhs_webhook(request: Request) -> dict:
 
                 async with async_session_factory() as db:
                     await db.execute(
-                        _text("""
+                        _text(
+                            """
                             UPDATE xhs_coupon_verifications
                             SET status = 'refunded', updated_at = NOW()
                             WHERE coupon_code = :code
-                        """),
+                        """
+                        ),
                         {"code": coupon_code},
                     )
                     await db.commit()

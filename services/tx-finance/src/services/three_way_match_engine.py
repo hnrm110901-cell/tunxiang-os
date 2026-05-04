@@ -710,14 +710,16 @@ class ThreeWayMatchEngine:
         pid = uuid.UUID(purchase_order_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, supplier_id, store_id, order_number,
                        status, total_amount_fen, items, created_at
                 FROM supply_orders
                 WHERE id = :po_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"po_id": pid, "tenant_id": tid},
         )
         row = result.mappings().first()
@@ -737,14 +739,16 @@ class ThreeWayMatchEngine:
 
         # 查收货单
         ro_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, purchase_order_id, status, received_at
                 FROM receiving_orders
                 WHERE purchase_order_id = :po_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                   AND status = 'confirmed'
-            """),
+            """
+            ),
             {"po_id": pid, "tenant_id": tid},
         )
         ro_rows = ro_result.mappings().all()
@@ -755,12 +759,14 @@ class ThreeWayMatchEngine:
         orders: list[dict] = []
         for ro in ro_rows:
             ri_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT ingredient_name, unit, ordered_qty, received_qty, unit_price_fen
                     FROM receiving_items
                     WHERE receiving_order_id = :ro_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"ro_id": ro["id"], "tenant_id": tid},
             )
             items = [dict(r) for r in ri_result.mappings().all()]
@@ -785,7 +791,8 @@ class ThreeWayMatchEngine:
         pid = uuid.UUID(purchase_order_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, purchase_order_id, invoice_no,
                        amount_fen, status, issued_at, items
                 FROM purchase_invoices
@@ -793,7 +800,8 @@ class ThreeWayMatchEngine:
                   AND tenant_id = :tenant_id
                   AND status = 'confirmed'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"po_id": pid, "tenant_id": tid},
         )
         rows = result.mappings().all()

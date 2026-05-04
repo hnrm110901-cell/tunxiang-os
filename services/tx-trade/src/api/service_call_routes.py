@@ -130,7 +130,8 @@ async def create_service_call(
     call_id = uuid.uuid4()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO service_calls (
                 id, tenant_id, store_id, table_session_id,
                 call_type, content,
@@ -145,7 +146,8 @@ async def create_service_call(
                 :now, :now, :now
             )
             RETURNING *
-        """),
+        """
+        ),
         {
             "id": call_id,
             "tenant_id": tid,
@@ -164,18 +166,21 @@ async def create_service_call(
 
     # 同步更新会话的 service_call_count
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dining_sessions
             SET service_call_count = service_call_count + 1,
                 updated_at = :now
             WHERE id = :session_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"now": now, "session_id": body.table_session_id, "tenant_id": tid},
     )
 
     # 写入会话事件流
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO dining_session_events (
                 id, tenant_id, store_id, table_session_id,
                 event_type, payload, operator_type, occurred_at
@@ -183,7 +188,8 @@ async def create_service_call(
                 gen_random_uuid(), :tenant_id, :store_id, :session_id,
                 :event_type, :payload::jsonb, :op_type, NOW()
             )
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": body.store_id,
@@ -249,7 +255,8 @@ async def get_pending_calls(
         params["call_type"] = call_type
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 sc.*,
                 ds.session_no,
@@ -262,7 +269,8 @@ async def get_pending_calls(
               AND sc.status     = 'pending'
               {type_filter}
             ORDER BY sc.called_at ASC
-        """),
+        """
+        ),
         params,
     )
     calls = [dict(r) for r in result.mappings().all()]
@@ -278,12 +286,14 @@ async def get_session_calls(
     """获取某堂食会话的所有服务呼叫历史（含已处理）。"""
     tid = _get_tenant_id(request)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT * FROM service_calls
             WHERE table_session_id = :session_id
               AND tenant_id        = :tenant_id
             ORDER BY called_at DESC
-        """),
+        """
+        ),
         {"session_id": session_id, "tenant_id": tid},
     )
     return _ok([dict(r) for r in result.mappings().all()])
@@ -305,7 +315,8 @@ async def handle_call(
     now = _now_utc()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE service_calls
             SET status           = 'handled',
                 handled_by       = :handled_by,
@@ -316,7 +327,8 @@ async def handle_call(
               AND tenant_id = :tenant_id
               AND status    IN ('pending', 'handling')
             RETURNING *
-        """),
+        """
+        ),
         {"handled_by": body.handled_by, "now": now, "call_id": call_id, "tenant_id": tid},
     )
     row = result.mappings().one_or_none()
@@ -343,7 +355,8 @@ async def batch_handle_calls(
     now = _now_utc()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE service_calls
             SET status           = 'handled',
                 handled_by       = :handled_by,
@@ -354,7 +367,8 @@ async def batch_handle_calls(
               AND tenant_id = :tenant_id
               AND status    IN ('pending', 'handling')
             RETURNING id
-        """),
+        """
+        ),
         {
             "handled_by": body.handled_by,
             "now": now,
@@ -384,13 +398,15 @@ async def cancel_call(
     now = _now_utc()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE service_calls
             SET status = 'cancelled', updated_at = :now
             WHERE id = :call_id AND tenant_id = :tenant_id
               AND status = 'pending'
             RETURNING id
-        """),
+        """
+        ),
         {"now": now, "call_id": call_id, "tenant_id": tid},
     )
     if result.rowcount == 0:
@@ -421,7 +437,8 @@ async def get_store_service_stats(
     }
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 sc.call_type,
                 COUNT(*)                                    AS total_calls,
@@ -436,7 +453,8 @@ async def get_store_service_stats(
               AND {date_filter}
             GROUP BY sc.call_type
             ORDER BY total_calls DESC
-        """),
+        """
+        ),
         params,
     )
     stats = [dict(r) for r in result.mappings().all()]

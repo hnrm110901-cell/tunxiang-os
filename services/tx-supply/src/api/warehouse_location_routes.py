@@ -95,9 +95,7 @@ async def update_zone(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.update_zone(
-            zone_id=zone_id, body=body, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.update_zone(zone_id=zone_id, body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except ZoneNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -112,9 +110,7 @@ async def zone_utilization(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.compute_zone_utilization(
-            zone_id=zone_id, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.compute_zone_utilization(zone_id=zone_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except WarehouseLocationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -170,9 +166,7 @@ async def abc_suggestion(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.suggest_abc_optimization(
-            store_id=store_id, tenant_id=x_tenant_id, db=db, days=days
-        )
+        data = await svc.suggest_abc_optimization(store_id=store_id, tenant_id=x_tenant_id, db=db, days=days)
         return {"ok": True, "data": data, "error": None}
     except WarehouseLocationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -185,9 +179,7 @@ async def auto_allocate(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.auto_allocate_location(
-            body=body, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.auto_allocate_location(body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except TemperatureMismatchError as exc:
         return _err("temperature_mismatch", str(exc))
@@ -206,9 +198,7 @@ async def move_location(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.move_between_locations(
-            body=body, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.move_between_locations(body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except InsufficientInventoryError as exc:
         return _err("insufficient_inventory", str(exc))

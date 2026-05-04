@@ -89,12 +89,14 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
     try:
         # 1. 获取所有活跃门店
         stores_result = await db.execute(
-            text("""
+            text(
+                """
             SELECT id, store_name, region, city
             FROM stores
             WHERE status = 'active'
             ORDER BY store_name
-        """)
+        """
+            )
         )
         stores = stores_result.mappings().all()
 
@@ -106,13 +108,15 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
 
         # 2. 合规预警统计（open 状态告警数，按 store_id 分组）
         alerts_result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT store_id::text, COUNT(*) AS open_count
             FROM compliance_alerts
             WHERE store_id::text IN ({store_ids_sql})
               AND status = 'open'
             GROUP BY store_id
-        """)
+        """
+            )
         )
         alerts_by_store: dict[str, int] = {
             row["store_id"]: int(row["open_count"]) for row in alerts_result.mappings().all()
@@ -120,7 +124,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
 
         # 3. 近7天 vs 前7天 销售额（分）
         sales_result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 store_id::text,
                 SUM(CASE WHEN created_at >= NOW() - INTERVAL '7 days'
@@ -133,7 +138,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
               AND status = 'paid'
               AND created_at >= NOW() - INTERVAL '14 days'
             GROUP BY store_id
-        """)
+        """
+            )
         )
         sales_by_store: dict[str, dict] = {
             row["store_id"]: {
@@ -145,7 +151,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
 
         # 4. 培训完成率（join employees 获取 store_id）
         training_result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 e.store_id::text,
                 COUNT(*) AS total_trainings,
@@ -154,7 +161,8 @@ async def _fetch_store_health_list(db: AsyncSession) -> list[dict]:
             JOIN employees e ON et.employee_id = e.id
             WHERE e.store_id::text IN ({store_ids_sql})
             GROUP BY e.store_id
-        """)
+        """
+            )
         )
         training_by_store: dict[str, dict] = {
             row["store_id"]: {

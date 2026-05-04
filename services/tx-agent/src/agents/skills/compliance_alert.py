@@ -87,7 +87,8 @@ async def _svc_scan_documents(
 ) -> list[dict[str, Any]]:
     today = date.today()
     bound_uuid, _ = _bind_store(store_id)
-    q = text("""
+    q = text(
+        """
         SELECT e.id::text AS employee_id, e.emp_name, e.store_id::text AS store_id,
                e.health_cert_expiry, e.id_card_expiry
         FROM employees e
@@ -109,7 +110,8 @@ async def _svc_scan_documents(
             COALESCE(e.id_card_expiry, DATE '9999-12-31')
         )
         LIMIT 200
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,
@@ -144,7 +146,8 @@ async def _svc_scan_performance(
     store_id: Optional[str],
 ) -> list[dict[str, Any]]:
     bound_uuid, _ = _bind_store(store_id)
-    q = text("""
+    q = text(
+        """
         SELECT e.id::text AS employee_id, e.emp_name, e.store_id::text AS store_id,
                e.performance_score
         FROM employees e
@@ -163,7 +166,8 @@ async def _svc_scan_performance(
           )
         ORDER BY e.performance_score
         LIMIT 200
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,
@@ -217,7 +221,8 @@ async def _svc_scan_attendance(
     store_id: Optional[str],
 ) -> list[dict[str, Any]]:
     _, bound_store_text = _bind_store(store_id)
-    q = text("""
+    q = text(
+        """
         SELECT da.id::text AS attendance_id, da.employee_id,
                da.store_id::text AS store_id, da.date, da.status,
                COALESCE(da.late_minutes, 0) AS late_minutes,
@@ -238,7 +243,8 @@ async def _svc_scan_attendance(
           )
         ORDER BY da.date DESC, da.status
         LIMIT 300
-    """)
+    """
+    )
     try:
         result = await db.execute(
             q,

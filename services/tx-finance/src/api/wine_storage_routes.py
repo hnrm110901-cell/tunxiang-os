@@ -122,7 +122,8 @@ async def store_wine(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_wine_storage (
                     tenant_id, store_id, customer_id, source_order_id,
                     wine_name, wine_category, quantity, original_qty,
@@ -135,7 +136,8 @@ async def store_wine(
                     'stored', NOW(), :expires_at, :operator_id::UUID, :photo_url, :notes
                 )
                 RETURNING id, status, stored_at, expires_at, quantity
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "store_id": str(body.store_id),
@@ -158,7 +160,8 @@ async def store_wine(
 
         # 写入操作日志
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_wine_storage_logs (
                     tenant_id, storage_id, action, quantity_change,
                     related_order_id, operator_id, remark
@@ -166,7 +169,8 @@ async def store_wine(
                     :tenant_id::UUID, :storage_id::UUID, 'store', :quantity_change,
                     :related_order_id::UUID, :operator_id::UUID, :remark
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "storage_id": storage_id,
@@ -242,11 +246,13 @@ async def retrieve_wine(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, quantity, status, customer_id, wine_name, store_id
                 FROM biz_wine_storage
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(sid), "tenant_id": str(tid)},
         )
         storage = fetch.mappings().first()
@@ -275,14 +281,16 @@ async def retrieve_wine(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_wine_storage
                 SET quantity = :new_qty,
                     status = :new_status,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                 RETURNING id, quantity, status
-            """),
+            """
+            ),
             {
                 "new_qty": new_qty,
                 "new_status": new_status,
@@ -294,7 +302,8 @@ async def retrieve_wine(
 
         # 写入操作日志（取酒为负数）
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_wine_storage_logs (
                     tenant_id, storage_id, action, quantity_change,
                     related_order_id, operator_id, remark
@@ -302,7 +311,8 @@ async def retrieve_wine(
                     :tenant_id::UUID, :storage_id::UUID, 'retrieve', :quantity_change,
                     :related_order_id, :operator_id::UUID, :remark
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "storage_id": storage_id,
@@ -370,11 +380,13 @@ async def extend_storage(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, expires_at, status
                 FROM biz_wine_storage
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(sid), "tenant_id": str(tid)},
         )
         storage = fetch.mappings().first()
@@ -396,21 +408,24 @@ async def extend_storage(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_wine_storage
                 SET expires_at = :new_expires,
                     status = CASE WHEN status = 'expired' THEN 'stored' ELSE status END,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                 RETURNING id, expires_at, status
-            """),
+            """
+            ),
             {"new_expires": new_expires, "id": str(sid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
 
         # 写入操作日志
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_wine_storage_logs (
                     tenant_id, storage_id, action, quantity_change,
                     operator_id, remark
@@ -418,7 +433,8 @@ async def extend_storage(
                     :tenant_id::UUID, :storage_id::UUID, 'extend', 0,
                     :operator_id::UUID, :remark
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "storage_id": storage_id,
@@ -466,7 +482,8 @@ async def get_storage(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, customer_id, source_order_id,
                        wine_name, wine_category, quantity, original_qty, unit,
                        estimated_value_fen, cabinet_position, status,
@@ -474,7 +491,8 @@ async def get_storage(
                        created_at, updated_at
                 FROM biz_wine_storage
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(sid), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -487,14 +505,16 @@ async def get_storage(
 
     try:
         logs_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, action, quantity_change, related_order_id,
                        operator_id, remark, created_at
                 FROM biz_wine_storage_logs
                 WHERE storage_id = :storage_id::UUID AND tenant_id = :tenant_id::UUID
                 ORDER BY created_at DESC
                 LIMIT 20
-            """),
+            """
+            ),
             {"storage_id": storage_id, "tenant_id": str(tid)},
         )
         logs = [_serialize_row(dict(r)) for r in logs_result.mappings().all()]
@@ -543,14 +563,16 @@ async def list_by_customer(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, wine_name, wine_category, quantity, original_qty,
                        unit, cabinet_position, status, stored_at, expires_at
                 FROM biz_wine_storage
                 WHERE {where_sql}
                 ORDER BY stored_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -606,14 +628,16 @@ async def list_by_store(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, customer_id, wine_name, wine_category, quantity,
                        unit, cabinet_position, status, stored_at, expires_at
                 FROM biz_wine_storage
                 WHERE {where_sql}
                 ORDER BY stored_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -657,14 +681,16 @@ async def expiring_report(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, customer_id, wine_name, wine_category,
                        quantity, unit, cabinet_position, expires_at,
                        EXTRACT(DAY FROM expires_at - NOW())::INTEGER AS days_remaining
                 FROM biz_wine_storage
                 WHERE {where_sql}
                 ORDER BY expires_at ASC
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in result.mappings().all()]
@@ -698,7 +724,8 @@ async def summary_report(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     wine_category,
                     COUNT(*) AS storage_count,
@@ -710,13 +737,15 @@ async def summary_report(
                   AND status IN ('stored', 'partially_retrieved')
                 GROUP BY wine_category
                 ORDER BY wine_category
-            """),
+            """
+            ),
             {"tenant_id": str(tid), "store_id": str(sid)},
         )
         by_category = [_serialize_row(dict(row)) for row in result.mappings().all()]
 
         total_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_count,
                     COALESCE(SUM(quantity), 0) AS total_quantity,
@@ -725,7 +754,8 @@ async def summary_report(
                 WHERE tenant_id = :tenant_id::UUID
                   AND store_id = :store_id::UUID
                   AND status IN ('stored', 'partially_retrieved')
-            """),
+            """
+            ),
             {"tenant_id": str(tid), "store_id": str(sid)},
         )
         totals = _serialize_row(dict(total_result.mappings().first()))

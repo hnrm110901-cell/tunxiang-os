@@ -272,7 +272,8 @@ class PayrollEngine:
             params["store_id"] = str(store_id)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE payroll_records_v2
                 SET status = 'confirmed',
                     confirmed_at = :confirmed_at,
@@ -283,7 +284,8 @@ class PayrollEngine:
                   AND status = 'draft'
                   AND is_deleted = FALSE
                   {where_store}
-            """),
+            """
+            ),
             params,
         )
         count: int = result.rowcount  # type: ignore[assignment]
@@ -312,7 +314,8 @@ class PayrollEngine:
 
         id_list = [str(pid) for pid in payroll_ids]
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE payroll_records_v2
                 SET status = 'paid',
                     paid_at = NOW(),
@@ -321,7 +324,8 @@ class PayrollEngine:
                   AND id = ANY(:ids)
                   AND status = 'confirmed'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "ids": id_list},
         )
         count: int = result.rowcount  # type: ignore[assignment]
@@ -347,7 +351,8 @@ class PayrollEngine:
             PayrollSummary（总人数、总薪资、社保合计、实发合计，以及按岗位分组统计）
         """
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                        AS employee_count,
                     COALESCE(SUM(gross_salary_fen), 0) AS total_gross_fen,
@@ -359,7 +364,8 @@ class PayrollEngine:
                   AND period_year = :year
                   AND period_month = :month
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -371,7 +377,8 @@ class PayrollEngine:
 
         # 按岗位分组（关联 employees 表，如存在）
         by_pos_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(e.role_name, 'unknown')  AS position,
                     COUNT(*)                           AS headcount,
@@ -389,7 +396,8 @@ class PayrollEngine:
                   AND p.is_deleted = FALSE
                 GROUP BY e.role_name
                 ORDER BY gross_fen DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -426,7 +434,8 @@ class PayrollEngine:
             Payslip 或 None（未找到）
         """
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT *
                 FROM payroll_records_v2
                 WHERE tenant_id = :tenant_id
@@ -435,7 +444,8 @@ class PayrollEngine:
                   AND period_month = :month
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "employee_id": str(employee_id),
@@ -617,7 +627,8 @@ class PayrollEngine:
     ) -> List[Dict[str, Any]]:
         """从 DB 读取门店员工薪资配置（当前有效配置）"""
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     e.id               AS employee_id,
                     esc.scheme_id,
@@ -641,7 +652,8 @@ class PayrollEngine:
                 WHERE e.tenant_id = :tenant_id
                   AND e.store_id = :store_id
                   AND e.is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -669,7 +681,8 @@ class PayrollEngine:
         - early_leave_count: 早退次数（从 clock_records 获取，降级到 0）
         """
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ar.employee_id,
                     COUNT(*) FILTER (WHERE ar.absence_type IS NULL)        AS work_days,
@@ -690,7 +703,8 @@ class PayrollEngine:
                   AND EXTRACT(MONTH FROM ar.work_date) = :month
                   AND ar.is_deleted = FALSE
                 GROUP BY ar.employee_id
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "store_id": str(store_id),
@@ -703,7 +717,8 @@ class PayrollEngine:
         # 尝试从 clock_records 补充迟到/早退次数（表可能不存在，安全降级）
         try:
             late_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         cr.employee_id,
                         COUNT(*) FILTER (WHERE cr.is_late = TRUE)        AS late_count,
@@ -719,7 +734,8 @@ class PayrollEngine:
                       AND EXTRACT(MONTH FROM cr.clock_date) = :month
                       AND cr.is_deleted = FALSE
                     GROUP BY cr.employee_id
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": str(store_id),
@@ -758,7 +774,8 @@ class PayrollEngine:
     ) -> Optional[SocialInsuranceConfig]:
         """读取最新生效的社保配置（优先 DB，降级到内置默认值）"""
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT *
                 FROM social_insurance_configs
                 WHERE tenant_id = :tenant_id
@@ -766,7 +783,8 @@ class PayrollEngine:
                   AND is_deleted = FALSE
                 ORDER BY effective_from DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "period_start": period_start.isoformat()},
         )
         mapping = row.mappings().first()
@@ -791,7 +809,8 @@ class PayrollEngine:
         """将计算结果写入 payroll_records_v2（有则更新草稿，无则插入）"""
         for rec in records:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO payroll_records_v2 (
                         tenant_id, store_id, employee_id,
                         period_year, period_month,
@@ -827,7 +846,8 @@ class PayrollEngine:
                         net_salary_fen     = EXCLUDED.net_salary_fen,
                         updated_at         = NOW()
                     WHERE payroll_records_v2.status = 'draft'
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(rec.tenant_id),
                     "store_id": str(rec.store_id),

@@ -213,12 +213,14 @@ class LoginBruteForceProtection:
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT locked_until, failed_login_count
                         FROM users
                         WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"username": username},
                 )
                 row = result.mappings().first()
@@ -242,32 +244,38 @@ class LoginBruteForceProtection:
             async with async_session_factory() as db:
                 # 先递增计数
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE users
                         SET failed_login_count = failed_login_count + 1,
                             updated_at = NOW()
                         WHERE username = :username AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {"username": username},
                 )
                 # 查询最新计数以决定是否锁定
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT failed_login_count FROM users
                         WHERE username = :username AND is_deleted = FALSE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"username": username},
                 )
                 row = result.mappings().first()
                 if row and (row.get("failed_login_count") or 0) >= _MAX_LOGIN_FAILS:
                     await db.execute(
-                        text("""
+                        text(
+                            """
                             UPDATE users
                             SET locked_until = NOW() + INTERVAL '15 minutes',
                                 updated_at = NOW()
                             WHERE username = :username AND is_deleted = FALSE
-                        """),
+                        """
+                        ),
                         {"username": username},
                     )
                     logger.warning(
@@ -287,14 +295,16 @@ class LoginBruteForceProtection:
         try:
             async with async_session_factory() as db:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE users
                         SET failed_login_count = 0,
                             locked_until = NULL,
                             last_login_at = NOW(),
                             updated_at = NOW()
                         WHERE username = :username AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {"username": username},
                 )
                 await db.commit()
@@ -309,11 +319,13 @@ class LoginBruteForceProtection:
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT locked_until FROM users
                         WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"username": username},
                 )
                 row = result.mappings().first()
@@ -420,13 +432,15 @@ async def _load_user_dict_by_username(username: str) -> Optional[dict]:
     try:
         async with async_session_factory() as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, username, name, role,
                            mfa_enabled, mfa_secret_enc, mfa_backup_codes
                     FROM users
                     WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"username": username},
             )
             row = result.mappings().first()
@@ -459,13 +473,15 @@ async def _load_user_dict_by_id(user_id: str) -> Optional[dict]:
     try:
         async with async_session_factory() as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, username, name, role,
                            mfa_enabled, mfa_secret_enc, mfa_backup_codes
                     FROM users
                     WHERE id = :user_id AND is_deleted = FALSE AND is_active = TRUE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"user_id": user_id},
             )
             row = result.mappings().first()
@@ -517,11 +533,13 @@ async def _issue_tokens(
     try:
         async with async_session_factory() as db:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO refresh_tokens (jti, user_id, tenant_id, issued_at, expires_at, ip_address, user_agent)
                     VALUES (:jti, :user_id, :tenant_id, NOW(), :expires_at, :ip_address, :user_agent)
                     ON CONFLICT (jti) DO NOTHING
-                """),
+                """
+                ),
                 {
                     "jti": jti,
                     "user_id": user_id,
@@ -604,13 +622,15 @@ async def login(body: LoginBody, request: Request):
     try:
         async with async_session_factory() as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, username, name, role,
                            password_hash, mfa_enabled, mfa_secret_enc, mfa_backup_codes
                     FROM users
                     WHERE username = :username AND is_deleted = FALSE AND is_active = TRUE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"username": username},
             )
             db_user_row = result.mappings().first()
@@ -808,11 +828,13 @@ async def mfa_verify(body: MFAVerifyBody, request: Request):
                         {"tid": user.get("tenant_id", "")},
                     )
                     await db.execute(
-                        text("""
+                        text(
+                            """
                             UPDATE users
                             SET mfa_backup_codes = :codes::jsonb, updated_at = NOW()
                             WHERE username = :username AND is_deleted = FALSE
-                        """),
+                        """
+                        ),
                         {
                             "codes": json.dumps(hashed_codes, ensure_ascii=False),
                             "username": username,
@@ -920,12 +942,14 @@ async def refresh_token(body: RefreshBody, request: Request):
     try:
         async with async_session_factory() as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT jti, user_id, tenant_id, expires_at, revoked_at
                     FROM refresh_tokens
                     WHERE jti = :jti
                     LIMIT 1
-                """),
+                """
+                ),
                 {"jti": jti},
             )
             db_token_row = result.mappings().first()
@@ -958,12 +982,14 @@ async def refresh_token(body: RefreshBody, request: Request):
     try:
         async with async_session_factory() as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, tenant_id, username, name, role, mfa_enabled
                     FROM users
                     WHERE id = :user_id AND is_deleted = FALSE AND is_active = TRUE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"user_id": user_id},
             )
             row = result.mappings().first()
@@ -1106,12 +1132,14 @@ async def me(request: Request):
         try:
             async with async_session_factory() as db:
                 result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, tenant_id, username, name, role, mfa_enabled
                         FROM users
                         WHERE id = :user_id AND is_deleted = FALSE AND is_active = TRUE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"user_id": user_id},
                 )
                 row = result.mappings().first()
@@ -1260,7 +1288,8 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
                 {"tid": user.get("tenant_id", "")},
             )
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE users
                     SET mfa_enabled = TRUE,
                         mfa_secret_enc = :mfa_secret_enc,
@@ -1268,7 +1297,8 @@ async def mfa_enable(body: MFASetupEnableBody, request: Request):
                         mfa_verified_at = :mfa_verified_at,
                         updated_at = NOW()
                     WHERE id = :user_id AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "mfa_secret_enc": pending_secret,
                     "mfa_backup_codes": json.dumps(backup_codes_hashed, ensure_ascii=False),

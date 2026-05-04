@@ -62,14 +62,16 @@ async def upload_document(
             # 幂等检查：如 file_hash 已存在则直接返回
             if file_hash:
                 existing = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id::text, title, status, created_at
                         FROM knowledge_documents
                         WHERE tenant_id = :tenant_id::uuid
                           AND file_hash = :file_hash
                           AND is_deleted = FALSE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"tenant_id": tenant_id, "file_hash": file_hash},
                 )
                 row = existing.fetchone()
@@ -94,7 +96,8 @@ async def upload_document(
             # 插入新记录
             doc_id = str(uuid4())
             insert_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO knowledge_documents
                         (id, tenant_id, title, source_type, file_path, file_hash,
                          status, collection, metadata, created_by)
@@ -102,7 +105,8 @@ async def upload_document(
                         (:id::uuid, :tenant_id::uuid, :title, :source_type, :file_path,
                          :file_hash, 'processing', :collection, :metadata::jsonb, :created_by)
                     RETURNING id::text, title, status, created_at
-                """),
+                """
+                ),
                 {
                     "id": doc_id,
                     "tenant_id": tenant_id,
@@ -186,18 +190,21 @@ async def list_documents(
                 params["status"] = status
 
             count_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT COUNT(*) AS total
                     FROM knowledge_documents
                     WHERE tenant_id = :tenant_id::uuid
                     {filters}
-                """),
+                """
+                ),
                 params,
             )
             total = count_result.scalar() or 0
 
             rows_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         id::text            AS id,
                         title               AS title,
@@ -217,7 +224,8 @@ async def list_documents(
                     {filters}
                     ORDER BY created_at DESC
                     LIMIT :limit OFFSET :offset
-                """),
+                """
+                ),
                 params,
             )
             rows = rows_result.fetchall()
@@ -273,7 +281,8 @@ async def delete_document(
     try:
         async with TenantSession(tenant_id) as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE knowledge_documents
                     SET is_deleted = TRUE,
                         updated_at = NOW()
@@ -281,7 +290,8 @@ async def delete_document(
                       AND tenant_id = :tenant_id::uuid
                       AND is_deleted = FALSE
                     RETURNING id::text AS id
-                """),
+                """
+                ),
                 {"doc_id": document_id, "tenant_id": tenant_id},
             )
             row = result.fetchone()

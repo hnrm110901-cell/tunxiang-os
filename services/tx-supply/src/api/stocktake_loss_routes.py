@@ -16,6 +16,7 @@
 每个端点：读取 X-Tenant-ID + SET LOCAL app.tenant_id；
 统一响应 {ok, data, error}。
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -436,5 +437,3 @@ async def writeoff_route(
         raise _fail(409, str(exc))
     except CaseValidationError as exc:
         raise _fail(400, str(exc))
-
-

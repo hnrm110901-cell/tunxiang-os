@@ -98,7 +98,8 @@ async def kds_sessions(
     total = count_r.scalar() or 0
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 bs.id,
                 bs.store_id,
@@ -124,7 +125,8 @@ async def kds_sessions(
             WHERE {w}
             ORDER BY bs.session_date ASC, bs.created_at ASC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         params,
     )
     items = [_serialize(dict(r)) for r in result.mappings().all()]
@@ -151,7 +153,8 @@ async def session_dishes(
         raise HTTPException(status_code=404, detail="场次不存在")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 bkd.id,
                 bkd.session_id,
@@ -167,7 +170,8 @@ async def session_dishes(
             FROM banquet_kds_dishes bkd
             WHERE bkd.session_id = :sid::UUID AND bkd.is_deleted = FALSE
             ORDER BY bkd.sequence_no ASC, bkd.created_at ASC
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     items = [_serialize(dict(r)) for r in result.mappings().all()]
@@ -182,12 +186,14 @@ async def session_dishes(
 async def _init_kds_dishes_from_plan(db: AsyncSession, session_id: str, tenant_id: str) -> list[dict]:
     """从排菜方案初始化 KDS 菜品记录（懒加载）。"""
     sess_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT bs.menu_plan_id, mp.dishes
             FROM banquet_sessions bs
             LEFT JOIN banquet_menu_plans mp ON mp.id = bs.menu_plan_id
             WHERE bs.id = :sid::UUID AND bs.is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     sess = sess_r.mappings().first()
@@ -198,7 +204,8 @@ async def _init_kds_dishes_from_plan(db: AsyncSession, session_id: str, tenant_i
     items = []
     for seq, d in enumerate(dishes, start=1):
         r = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_kds_dishes
                     (tenant_id, session_id, dish_id, dish_name, total_qty, served_qty,
                      serve_status, sequence_no)
@@ -206,7 +213,8 @@ async def _init_kds_dishes_from_plan(db: AsyncSession, session_id: str, tenant_i
                     (:tid::UUID, :sid::UUID, :did, :dname, :qty, 0, 'pending', :seq)
                 RETURNING id, dish_id, dish_name, total_qty, served_qty, serve_status,
                           sequence_no, called_at, served_at, notes
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "sid": session_id,
@@ -236,11 +244,13 @@ async def serve_dish(
 ):
     """将菜品状态推进：pending→serving 或 serving→served。"""
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_name, total_qty, served_qty, serve_status
             FROM banquet_kds_dishes
             WHERE id = :did::UUID AND session_id = :sid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"did": dish_id, "sid": session_id},
     )
     row = row_r.mappings().first()
@@ -262,7 +272,8 @@ async def serve_dish(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE banquet_kds_dishes
             SET served_qty   = :qty,
                 serve_status = :st,
@@ -270,7 +281,8 @@ async def serve_dish(
                 notes        = COALESCE(:notes, notes),
                 updated_at   = :now
             WHERE id = :did::UUID
-        """),
+        """
+        ),
         {
             "qty": new_served_qty,
             "st": new_status,
@@ -334,14 +346,16 @@ async def call_kitchen(
     if body.dish_id:
         # 叫特定菜品
         r = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_kds_dishes
                 SET called_at  = :now,
                     serve_status = CASE WHEN serve_status = 'pending' THEN 'serving' ELSE serve_status END,
                     updated_at = :now
                 WHERE id = :did::UUID AND session_id = :sid::UUID AND is_deleted = FALSE
                 RETURNING id, dish_name, serve_status
-            """),
+            """
+            ),
             {"now": now, "did": body.dish_id, "sid": session_id},
         )
         updated = r.mappings().first()
@@ -351,7 +365,8 @@ async def call_kitchen(
     else:
         # 叫全部 pending 菜品
         r = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_kds_dishes
                 SET called_at    = :now,
                     serve_status = 'serving',
@@ -360,7 +375,8 @@ async def call_kitchen(
                   AND serve_status = 'pending'
                   AND is_deleted = FALSE
                 RETURNING id, dish_name
-            """),
+            """
+            ),
             {"now": now, "sid": session_id},
         )
         called_dishes = [{"id": str(row["id"]), "dish_name": row["dish_name"]} for row in r.mappings().all()]
@@ -403,10 +419,12 @@ async def session_progress(
     tenant_id: str = Depends(_tid),
 ):
     sess_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, contact_name, guest_count, table_count, status
             FROM banquet_sessions WHERE id = :sid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     sess = sess_r.mappings().first()
@@ -414,7 +432,8 @@ async def session_progress(
         raise HTTPException(status_code=404, detail="场次不存在")
 
     prog_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*)                                            AS total_dishes,
                 COUNT(*) FILTER (WHERE serve_status = 'served')    AS served_dishes,
@@ -424,7 +443,8 @@ async def session_progress(
                 COALESCE(SUM(served_qty), 0)                       AS served_qty
             FROM banquet_kds_dishes
             WHERE session_id = :sid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     prog = dict(prog_r.mappings().first())

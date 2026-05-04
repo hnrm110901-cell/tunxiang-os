@@ -21,29 +21,22 @@ All monetary amounts in fen (分).
 
 from __future__ import annotations
 
-import math
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import date, datetime, timedelta
+from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from services.tx_agent.src.config.malaysia_holidays import (
-    get_high_impact_periods,
-    get_holidays_by_year,
-    get_holiday_by_name,
-    get_state_specific_holidays,
-)
 from services.tx_agent.src.config.malaysia_cuisine_profiles import (
     get_cuisine_by_state,
     get_cuisine_profile,
-    MALAYSIA_MEAL_PERIODS,
+)
+from services.tx_agent.src.config.malaysia_holidays import (
+    get_holidays_by_year,
 )
 from services.tx_agent.src.config.malaysia_ingredients import (
-    get_ingredient,
     get_perishable_ingredients,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
@@ -140,12 +133,18 @@ class MalaysiaForecastingService:
 
             # Fetch historical baseline for this day-of-week
             historical_baseline = await self._get_daily_baseline(
-                store_id, tenant_id, day_of_week, db,
+                store_id,
+                tenant_id,
+                day_of_week,
+                db,
             )
 
             # Calculate holiday multiplier
             holiday_impact = self._calculate_holiday_multiplier(
-                day_str, active_holidays, day_of_week, cuisine_mix,
+                day_str,
+                active_holidays,
+                day_of_week,
+                cuisine_mix,
             )
 
             # Calculate seasonality modifier
@@ -153,9 +152,7 @@ class MalaysiaForecastingService:
 
             # Composite forecast
             base_revenue = holiday_impact.get("base_revenue_fen", historical_baseline)
-            final_revenue = int(
-                round(base_revenue * holiday_impact["composite_multiplier"] * seasonality_mod)
-            )
+            final_revenue = int(round(base_revenue * holiday_impact["composite_multiplier"] * seasonality_mod))
 
             daily_forecast = {
                 "date": day_str,
@@ -184,10 +181,7 @@ class MalaysiaForecastingService:
             "forecast_period": {"from": date_from, "to": date_to},
             "daily_forecasts": daily_forecasts,
             "total_expected_revenue_fen": total_expected_revenue_fen,
-            "holiday_impacts": [
-                {"name": h["name"], "date": h["date"], "impact": h["impact"]}
-                for h in active_holidays
-            ],
+            "holiday_impacts": [{"name": h["name"], "date": h["date"], "impact": h["impact"]} for h in active_holidays],
             "confidence": overall_confidence,
             "model": "malaysia_forecast_v1",
         }
@@ -215,7 +209,10 @@ class MalaysiaForecastingService:
         cuisine_mix = ["malay", "chinese", "indian"]
 
         result = self._calculate_holiday_multiplier(
-            date, active_holidays, day_of_week, cuisine_mix,
+            date,
+            active_holidays,
+            day_of_week,
+            cuisine_mix,
         )
 
         # Add preparation recommendations
@@ -251,7 +248,11 @@ class MalaysiaForecastingService:
 
         # Get sales forecast to drive ingredient demand
         sales_forecast = await self.forecast_sales(
-            store_id, tenant_id, date_from, date_to, db,
+            store_id,
+            tenant_id,
+            date_from,
+            date_to,
+            db,
         )
 
         # Get current inventory levels
@@ -270,7 +271,10 @@ class MalaysiaForecastingService:
 
             # Estimate daily usage based on cuisine mix and forecast
             daily_usage = self._estimate_daily_usage(
-                ing_key, ing_profile, cuisine_mix, sales_forecast,
+                ing_key,
+                ing_profile,
+                cuisine_mix,
+                sales_forecast,
             )
             total_needed = daily_usage * days_ahead
             recommended_order = max(0.0, total_needed - current)
@@ -278,19 +282,21 @@ class MalaysiaForecastingService:
             # Apply seasonal price factor
             price_factor = ing_profile.get("seasonal_price_fluctuation", {}).get("jan-dec", 1.0)
 
-            predictions.append({
-                "ingredient_key": ing_key,
-                "ingredient_name_ms": ing_profile["local_names"]["ms"],
-                "unit": ing_profile["unit"],
-                "current_stock": round(current, 2),
-                "estimated_daily_usage": round(daily_usage, 2),
-                "total_needed_days_ahead": round(total_needed, 2),
-                "recommended_order_quantity": round(recommended_order, 2),
-                "seasonal_price_factor": price_factor,
-                "shelf_life_days": ing_profile.get("shelf_life_days", 7),
-                "is_perishable": True,
-                "supplier_options": ing_profile.get("typical_suppliers", [])[:3],
-            })
+            predictions.append(
+                {
+                    "ingredient_key": ing_key,
+                    "ingredient_name_ms": ing_profile["local_names"]["ms"],
+                    "unit": ing_profile["unit"],
+                    "current_stock": round(current, 2),
+                    "estimated_daily_usage": round(daily_usage, 2),
+                    "total_needed_days_ahead": round(total_needed, 2),
+                    "recommended_order_quantity": round(recommended_order, 2),
+                    "seasonal_price_factor": price_factor,
+                    "shelf_life_days": ing_profile.get("shelf_life_days", 7),
+                    "is_perishable": True,
+                    "supplier_options": ing_profile.get("typical_suppliers", [])[:3],
+                }
+            )
 
         return predictions
 
@@ -346,18 +352,20 @@ class MalaysiaForecastingService:
             category_boost = holiday.get("category_boost", {})
             boosted_cuisines = [k for k, v in category_boost.items() if v >= 0.15]
 
-            recommendations.append({
-                "holiday": holiday["name"],
-                "days_until": holiday["days_until"],
-                "impact": holiday["impact"],
-                "cuisine_trend": cuisine_trend,
-                "suggested_dishes": suggested_dishes[:5],
-                "boosted_cuisines": boosted_cuisines,
-                "action": "promote" if holiday["impact"] in ("high", "medium") else "observe",
-                "prep_lead_days": holiday.get("prep_lead_days", 0),
-                "dine_in_boost": holiday.get("dine_in_boost", 0.0),
-                "takeaway_boost": holiday.get("takeaway_boost", 0.0),
-            })
+            recommendations.append(
+                {
+                    "holiday": holiday["name"],
+                    "days_until": holiday["days_until"],
+                    "impact": holiday["impact"],
+                    "cuisine_trend": cuisine_trend,
+                    "suggested_dishes": suggested_dishes[:5],
+                    "boosted_cuisines": boosted_cuisines,
+                    "action": "promote" if holiday["impact"] in ("high", "medium") else "observe",
+                    "prep_lead_days": holiday.get("prep_lead_days", 0),
+                    "dine_in_boost": holiday.get("dine_in_boost", 0.0),
+                    "takeaway_boost": holiday.get("takeaway_boost", 0.0),
+                }
+            )
 
         return recommendations
 
@@ -476,11 +484,13 @@ class MalaysiaForecastingService:
         """Fetch store metadata (state, cuisine type) from DB."""
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT city, district, region, store_metadata
                     FROM stores
                     WHERE id = :store_id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id},
             )
             row_data = row.mappings().one_or_none()
@@ -511,7 +521,8 @@ class MalaysiaForecastingService:
         """Fetch historical daily revenue baseline for a given day-of-week."""
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT AVG(final_amount_fen) as avg_revenue
                     FROM orders
                     WHERE store_id = :store_id
@@ -519,7 +530,8 @@ class MalaysiaForecastingService:
                       AND EXTRACT(DOW FROM order_time AT TIME ZONE 'Asia/Kuala_Lumpur') = :dow
                       AND order_time >= NOW() - INTERVAL ':lookback days'
                       AND status = 'completed'
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -549,13 +561,15 @@ class MalaysiaForecastingService:
         stock: dict[str, float] = {}
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT ingredient_name, current_quantity
                     FROM ingredients
                     WHERE store_id = :store_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"store_id": store_id, "tenant_id": tenant_id},
             )
             for row in rows.mappings():
@@ -584,14 +598,40 @@ class MalaysiaForecastingService:
         """
         # Cuisine-to-ingredient category affinity weights
         cuisine_ing_weight: dict[str, dict[str, float]] = {
-            "malay": {"herbs": 0.15, "spices": 0.12, "poultry": 0.20, "coconut": 0.15,
-                      "condiments": 0.05, "oils": 0.03, "grains": 0.10},
-            "chinese": {"poultry": 0.15, "vegetables": 0.10, "noodles": 0.12, "condiments": 0.08,
-                        "oils": 0.05, "seafood": 0.10, "soy_products": 0.05},
-            "indian": {"spices": 0.15, "poultry": 0.10, "grains": 0.12, "dairy_alternatives": 0.08,
-                       "oils": 0.05, "herbs": 0.05},
-            "fusion": {"herbs": 0.08, "spices": 0.05, "poultry": 0.10, "vegetables": 0.08,
-                       "fruits": 0.05, "condiments": 0.05},
+            "malay": {
+                "herbs": 0.15,
+                "spices": 0.12,
+                "poultry": 0.20,
+                "coconut": 0.15,
+                "condiments": 0.05,
+                "oils": 0.03,
+                "grains": 0.10,
+            },
+            "chinese": {
+                "poultry": 0.15,
+                "vegetables": 0.10,
+                "noodles": 0.12,
+                "condiments": 0.08,
+                "oils": 0.05,
+                "seafood": 0.10,
+                "soy_products": 0.05,
+            },
+            "indian": {
+                "spices": 0.15,
+                "poultry": 0.10,
+                "grains": 0.12,
+                "dairy_alternatives": 0.08,
+                "oils": 0.05,
+                "herbs": 0.05,
+            },
+            "fusion": {
+                "herbs": 0.08,
+                "spices": 0.05,
+                "poultry": 0.10,
+                "vegetables": 0.08,
+                "fruits": 0.05,
+                "condiments": 0.05,
+            },
         }
 
         category = ing_profile.get("category", "")
@@ -602,10 +642,7 @@ class MalaysiaForecastingService:
             total_weight += weights.get(category, 0.05) / max(len(cuisine_mix), 1)
 
         daily_forecast = sales_forecast.get("daily_forecasts", [])
-        avg_daily_revenue = (
-            sum(d["predicted_revenue_fen"] for d in daily_forecast)
-            / max(len(daily_forecast), 1)
-        )
+        avg_daily_revenue = sum(d["predicted_revenue_fen"] for d in daily_forecast) / max(len(daily_forecast), 1)
 
         # Simplified: revenue * category weight / unit_price gives volume
         # Rough estimate: 0.5% of revenue goes to this ingredient category

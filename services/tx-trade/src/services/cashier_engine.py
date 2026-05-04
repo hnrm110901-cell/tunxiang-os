@@ -1195,7 +1195,8 @@ class CashierEngine:
         """
         # 查询 DB：找到该顾客在当前租户下余额充足的活跃储值账户
         sva_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, balance_fen, frozen_fen
                 FROM stored_value_accounts
                 WHERE member_id  = :member_id::uuid
@@ -1204,7 +1205,8 @@ class CashierEngine:
                   AND (balance_fen - frozen_fen) >= :amount
                 ORDER BY balance_fen DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "member_id": customer_id,
                 "tenant_id": str(self.tenant_id),

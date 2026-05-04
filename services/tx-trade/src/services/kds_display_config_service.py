@@ -38,7 +38,8 @@ class KdsDisplayConfigService:
         """
         # 查询所有匹配的配置（station + store 级）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, station_id, config_key, config_value
                 FROM kds_display_configs
                 WHERE tenant_id  = :tenant_id
@@ -46,7 +47,8 @@ class KdsDisplayConfigService:
                   AND config_key = :config_key
                   AND is_deleted = FALSE
                 ORDER BY station_id NULLS LAST
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "config_key": config_key},
         )
         rows = result.fetchall()
@@ -111,7 +113,8 @@ class KdsDisplayConfigService:
         """
         config_id = str(uuid.uuid4())
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO kds_display_configs (
                     tenant_id, id, store_id, station_id, config_key, config_value
                 ) VALUES (
@@ -127,7 +130,8 @@ class KdsDisplayConfigService:
                     config_value = EXCLUDED.config_value,
                     updated_at   = now()
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": config_id,
@@ -163,7 +167,8 @@ class KdsDisplayConfigService:
         从 kds_piecework_records 中提取 distinct practice_names。
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT practice_names
                 FROM kds_piecework_records
                 WHERE tenant_id = :tenant_id
@@ -173,7 +178,8 @@ class KdsDisplayConfigService:
                   AND is_deleted = FALSE
                 ORDER BY practice_names
                 LIMIT 200
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         rows = result.fetchall()
@@ -213,7 +219,8 @@ class KdsDisplayConfigService:
         where_practices = " OR ".join(conditions)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT DISTINCT dish_id, dish_name, practice_names
                 FROM kds_piecework_records
                 WHERE tenant_id = :tenant_id
@@ -222,7 +229,8 @@ class KdsDisplayConfigService:
                   AND is_deleted = FALSE
                 ORDER BY dish_name
                 LIMIT 100
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -251,7 +259,8 @@ class KdsDisplayConfigService:
         """
         # 配置
         configs_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT config_key, config_value, station_id
                 FROM kds_display_configs
                 WHERE tenant_id = :tenant_id
@@ -259,7 +268,8 @@ class KdsDisplayConfigService:
                   AND (station_id = :station_id OR station_id IS NULL)
                   AND is_deleted = FALSE
                 ORDER BY station_id NULLS LAST
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,

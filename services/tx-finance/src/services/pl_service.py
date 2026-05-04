@@ -403,7 +403,8 @@ class PLService:
           stored_value / topup → 储值充值
           其他 → other
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 o.order_type,
                 COALESCE(SUM(o.final_amount_fen), 0) AS revenue_fen
@@ -415,7 +416,8 @@ class PLService:
               AND o.order_time <= :end_dt
               AND o.is_deleted = false
             GROUP BY o.order_type
-        """)
+        """
+        )
         from datetime import datetime, timezone
 
         start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
@@ -479,7 +481,8 @@ class PLService:
 
         返回 (food_cost_fen, is_estimated, estimated_reason)
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT COALESCE(SUM(cs.raw_material_cost), 0)::BIGINT AS food_cost_fen
             FROM cost_snapshots cs
             JOIN orders o ON o.id = cs.order_id
@@ -488,7 +491,8 @@ class PLService:
               AND o.order_time >= :start_dt
               AND o.order_time <= :end_dt
               AND o.is_deleted = false
-        """)
+        """
+        )
         from datetime import datetime, timezone
 
         start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
@@ -589,7 +593,8 @@ class PLService:
         db: AsyncSession,
     ) -> list[uuid.UUID]:
         """查询品牌下所有激活门店 ID"""
-        sql = text("""
+        sql = text(
+            """
             SELECT id
             FROM stores
             WHERE brand_id  = :brand_id
@@ -597,7 +602,8 @@ class PLService:
               AND is_active = true
               AND is_deleted = false
             ORDER BY store_name
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {"brand_id": brand_id, "tenant_id": str(tenant_id)},

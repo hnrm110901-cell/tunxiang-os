@@ -46,14 +46,16 @@ class ForgeRuntimeService:
     async def get_policy(self, db: AsyncSession, app_id: str) -> dict:
         """获取应用的运行时策略，不存在则创建默认 T0 策略"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, trust_tier, allowed_entities, allowed_actions,
                        denied_actions, token_budget_daily, rate_limit_rpm,
                        sandbox_mode, kill_switch, auto_downgrade_threshold,
                        created_at, updated_at
                 FROM forge_runtime_policies
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         row = result.mappings().first()
@@ -63,7 +65,8 @@ class ForgeRuntimeService:
 
         # 不存在 → 创建默认 T0 策略
         default_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_runtime_policies
                     (id, tenant_id, app_id, trust_tier,
                      allowed_entities, allowed_actions, denied_actions,
@@ -79,7 +82,8 @@ class ForgeRuntimeService:
                           denied_actions, token_budget_daily, rate_limit_rpm,
                           sandbox_mode, kill_switch, auto_downgrade_threshold,
                           created_at, updated_at
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         new_row = default_result.mappings().one()
@@ -120,7 +124,8 @@ class ForgeRuntimeService:
         set_clause = ", ".join(set_parts)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_runtime_policies
                 SET {set_clause}, updated_at = NOW()
                 WHERE app_id = :app_id AND is_deleted = false
@@ -128,7 +133,8 @@ class ForgeRuntimeService:
                           denied_actions, token_budget_daily, rate_limit_rpm,
                           sandbox_mode, kill_switch, auto_downgrade_threshold,
                           updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()
@@ -149,12 +155,14 @@ class ForgeRuntimeService:
     ) -> dict:
         """激活熔断开关 — 立即禁止应用所有操作"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_runtime_policies
                 SET kill_switch = true, updated_at = NOW()
                 WHERE app_id = :app_id AND is_deleted = false
                 RETURNING app_id, trust_tier, kill_switch, updated_at
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         row = result.mappings().first()
@@ -164,7 +172,8 @@ class ForgeRuntimeService:
         # 记录 P0 违规
         violation_id = f"vio_{uuid4().hex[:12]}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_runtime_violations
                     (id, tenant_id, violation_id, app_id, agent_id,
                      violation_type, severity, context,
@@ -175,7 +184,8 @@ class ForgeRuntimeService:
                      'kill_switched', 'P0',
                      :context::jsonb,
                      false, NOW())
-            """),
+            """
+            ),
             {
                 "violation_id": violation_id,
                 "app_id": app_id,
@@ -212,12 +222,14 @@ class ForgeRuntimeService:
     ) -> dict:
         """解除熔断开关"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_runtime_policies
                 SET kill_switch = false, updated_at = NOW()
                 WHERE app_id = :app_id AND is_deleted = false
                 RETURNING app_id, trust_tier, kill_switch, updated_at
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         row = result.mappings().first()
@@ -356,7 +368,8 @@ class ForgeRuntimeService:
 
         violation_id = f"vio_{uuid4().hex[:12]}"
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_runtime_violations
                     (id, tenant_id, violation_id, app_id, agent_id,
                      violation_type, severity, context,
@@ -369,7 +382,8 @@ class ForgeRuntimeService:
                      false, NOW())
                 RETURNING violation_id, app_id, agent_id, violation_type,
                           severity, context, resolved, created_at
-            """),
+            """
+            ),
             {
                 "violation_id": violation_id,
                 "app_id": app_id,
@@ -391,25 +405,29 @@ class ForgeRuntimeService:
 
         # 自动降级检查：最近 7 天 P1+ 违规数
         threshold_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT auto_downgrade_threshold
                 FROM forge_runtime_policies
                 WHERE app_id = :app_id AND is_deleted = false
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         threshold_row = threshold_result.mappings().first()
         auto_threshold = threshold_row["auto_downgrade_threshold"] if threshold_row else 3
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM forge_runtime_violations
                 WHERE app_id = :app_id
                   AND is_deleted = false
                   AND severity IN ('P0', 'P1')
                   AND created_at >= NOW() - INTERVAL '7 days'
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         p1_plus_count = count_result.scalar_one()
@@ -461,7 +479,8 @@ class ForgeRuntimeService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT violation_id, app_id, agent_id, violation_type,
                        severity, context, resolved, resolved_at,
                        resolved_by, created_at
@@ -469,7 +488,8 @@ class ForgeRuntimeService:
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -485,7 +505,8 @@ class ForgeRuntimeService:
     ) -> dict:
         """标记违规已解决"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_runtime_violations
                 SET resolved = true,
                     resolved_at = NOW(),
@@ -494,7 +515,8 @@ class ForgeRuntimeService:
                 WHERE violation_id = :violation_id AND is_deleted = false
                 RETURNING violation_id, app_id, violation_type, severity,
                           resolved, resolved_at, resolved_by
-            """),
+            """
+            ),
             {"violation_id": violation_id, "resolved_by": resolved_by},
         )
         row = result.mappings().first()

@@ -56,9 +56,7 @@ def validate_tenant_id(tenant_id: str | None) -> str:
     try:
         uuid.UUID(candidate)
     except ValueError as exc:
-        raise TenantIDInvalid(
-            f"X-Tenant-ID is not a valid UUID: {candidate!r}"
-        ) from exc
+        raise TenantIDInvalid(f"X-Tenant-ID is not a valid UUID: {candidate!r}") from exc
     return candidate
 
 

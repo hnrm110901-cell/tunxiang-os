@@ -125,7 +125,8 @@ jobs:
           pip install --quiet \
             pytest pytest-asyncio \
             pydantic fastapi httpx \
-            sqlalchemy structlog
+            sqlalchemy structlog asyncpg \
+            pyyaml aiosqlite
 
       - name: Run ${{ matrix.group }}
         run: |

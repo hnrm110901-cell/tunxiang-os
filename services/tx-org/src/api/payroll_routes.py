@@ -188,7 +188,8 @@ async def create_payroll_config(
     """创建薪资配置"""
     await _set_rls(db, x_tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO payroll_configs (
             tenant_id, store_id, employee_role, salary_type,
             base_salary_fen, hourly_rate_fen,
@@ -203,7 +204,8 @@ async def create_payroll_config(
             :kpi_bonus_max_fen, :effective_from, :effective_to, :is_active
         )
         RETURNING id
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -298,12 +300,14 @@ async def delete_payroll_config(
     """软删除薪资配置（is_deleted=true）"""
     await _set_rls(db, x_tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE payroll_configs
         SET is_deleted = true, updated_at = now()
         WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
         RETURNING id
-    """)
+    """
+    )
     result = await db.execute(sql, {"id": config_id, "tenant_id": x_tenant_id})
     row = result.fetchone()
     if not row:
@@ -392,7 +396,8 @@ async def create_payroll_record(
 
     snapshot_json = json.dumps(req.calc_snapshot) if req.calc_snapshot else None
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO payroll_records (
             tenant_id, store_id, employee_id,
             pay_period_start, pay_period_end,
@@ -409,7 +414,8 @@ async def create_payroll_record(
             'draft', :payment_method, :notes, :calc_snapshot::jsonb
         )
         RETURNING id
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -465,10 +471,12 @@ async def get_payroll_record(
     record_row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT * FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+                ),
                 {"id": record_id, "tenant_id": x_tenant_id},
             )
         )
@@ -482,11 +490,13 @@ async def get_payroll_record(
     lines = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT * FROM payroll_line_items
                 WHERE record_id = :record_id AND tenant_id = :tenant_id
                 ORDER BY created_at
-            """),
+            """
+                ),
                 {"record_id": record_id, "tenant_id": x_tenant_id},
             )
         )
@@ -516,10 +526,12 @@ async def approve_payroll_record(
     row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT id, status FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+                ),
                 {"id": record_id, "tenant_id": x_tenant_id},
             )
         )
@@ -534,7 +546,8 @@ async def approve_payroll_record(
 
     now = datetime.now(tz=timezone.utc)
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE payroll_records
             SET status = 'approved',
                 approved_by = :approved_by,
@@ -542,7 +555,8 @@ async def approve_payroll_record(
                 updated_at = now()
             WHERE id = :id AND tenant_id = :tenant_id
             RETURNING id, status, approved_by, approved_at
-        """),
+        """
+        ),
         {
             "id": record_id,
             "tenant_id": x_tenant_id,
@@ -573,10 +587,12 @@ async def void_payroll_record(
     row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT id, status FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+                ),
                 {"id": record_id, "tenant_id": x_tenant_id},
             )
         )
@@ -590,12 +606,14 @@ async def void_payroll_record(
         raise _err("薪资单已是 voided 状态")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE payroll_records
             SET status = 'voided', updated_at = now()
             WHERE id = :id AND tenant_id = :tenant_id
             RETURNING id, status
-        """),
+        """
+        ),
         {"id": record_id, "tenant_id": x_tenant_id},
     )
     updated = result.mappings().first()
@@ -638,7 +656,8 @@ async def calculate_payroll(
     config_row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT * FROM payroll_configs
                 WHERE tenant_id = :tenant_id
                   AND is_active = true
@@ -649,7 +668,8 @@ async def calculate_payroll(
                   CASE WHEN store_id = :store_id THEN 0 ELSE 1 END,
                   effective_from DESC
                 LIMIT 1
-            """),
+            """
+                ),
                 {
                     "tenant_id": effective_tenant,
                     "store_id": req.store_id,
@@ -728,7 +748,8 @@ async def calculate_payroll(
     pay_period_end = date(req.year, req.month, last_day)
 
     # ── 8. 插入 payroll_record ───────────────────────────────────────────
-    insert_record_sql = text("""
+    insert_record_sql = text(
+        """
         INSERT INTO payroll_records (
             tenant_id, store_id, employee_id,
             pay_period_start, pay_period_end,
@@ -745,7 +766,8 @@ async def calculate_payroll(
             'draft', :payment_method, :notes, :calc_snapshot::jsonb
         )
         RETURNING id
-    """)
+    """
+    )
     record_result = await db.execute(
         insert_record_sql,
         {
@@ -863,7 +885,8 @@ async def calculate_payroll(
 
     # 批量插入明细行
     if line_items:
-        insert_item_sql = text("""
+        insert_item_sql = text(
+            """
             INSERT INTO payroll_line_items (
                 tenant_id, record_id, item_type, item_name,
                 amount_fen, quantity, unit_price_fen, notes
@@ -871,7 +894,8 @@ async def calculate_payroll(
                 :tenant_id, :record_id, :item_type, :item_name,
                 :amount_fen, :quantity, :unit_price_fen, :notes
             )
-        """)
+        """
+        )
         for item in line_items:
             await db.execute(
                 insert_item_sql,
@@ -939,10 +963,12 @@ async def list_payroll_line_items(
     # 验证薪资单归属
     exists = (
         await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM payroll_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": record_id, "tenant_id": x_tenant_id},
         )
     ).first()
@@ -953,11 +979,13 @@ async def list_payroll_line_items(
     rows = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
                 SELECT * FROM payroll_line_items
                 WHERE record_id = :record_id AND tenant_id = :tenant_id
                 ORDER BY created_at
-            """),
+            """
+                ),
                 {"record_id": record_id, "tenant_id": x_tenant_id},
             )
         )

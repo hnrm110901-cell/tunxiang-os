@@ -139,14 +139,16 @@ async def batch_recognize(
     )
 
     success_count = sum(1 for r in results if r.get("ok"))
-    return _ok({
-        "results": results,
-        "summary": {
-            "total": len(body.image_urls),
-            "success": success_count,
-            "failed": len(body.image_urls) - success_count,
-        },
-    })
+    return _ok(
+        {
+            "results": results,
+            "summary": {
+                "total": len(body.image_urls),
+                "success": success_count,
+                "failed": len(body.image_urls) - success_count,
+            },
+        }
+    )
 
 
 @router.post("/{result_id}/verify")

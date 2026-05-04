@@ -96,7 +96,8 @@ class BanquetVenueService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_venues (
                     id, tenant_id, store_id, venue_name, venue_type,
                     floor, max_tables, max_guests, base_fee_fen,
@@ -108,7 +109,8 @@ class BanquetVenueService:
                     :facilities_json, :description, :photos_json,
                     TRUE, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": venue_id,
                 "tenant_id": self._tenant_id,
@@ -176,7 +178,8 @@ class BanquetVenueService:
         where = " AND ".join(conditions)
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, venue_name, venue_type, floor,
                        max_tables, max_guests, base_fee_fen,
                        facilities_json, description, is_active,
@@ -184,7 +187,8 @@ class BanquetVenueService:
                 FROM banquet_venues
                 WHERE {where}
                 ORDER BY floor ASC NULLS LAST, venue_name ASC
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -211,10 +215,12 @@ class BanquetVenueService:
     async def get_venue(self, venue_id: str) -> dict:
         """获取单个厅房详情。"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM banquet_venues
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": venue_id, "tenant_id": self._tenant_id},
         )
         row = result.mappings().first()
@@ -275,11 +281,13 @@ class BanquetVenueService:
         updates["tenant_id"] = self._tenant_id
 
         await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE banquet_venues
                 SET {set_clauses}
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             updates,
         )
         await self._db.flush()
@@ -318,7 +326,8 @@ class BanquetVenueService:
         slot_condition = self._build_slot_conflict_condition(time_slot)
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, lead_id, booking_date, time_slot, status, held_until
                 FROM banquet_venue_bookings
                 WHERE venue_id = :venue_id
@@ -326,7 +335,8 @@ class BanquetVenueService:
                   AND booking_date = :booking_date
                   AND status IN ('held', 'confirmed')
                   AND ({slot_condition})
-            """),
+            """
+            ),
             {
                 "venue_id": venue_id,
                 "tenant_id": self._tenant_id,
@@ -388,7 +398,8 @@ class BanquetVenueService:
         held_until = now + timedelta(hours=hold_hours)
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_venue_bookings (
                     id, tenant_id, venue_id, lead_id, booking_date,
                     time_slot, status, held_until, created_at, updated_at
@@ -396,7 +407,8 @@ class BanquetVenueService:
                     :id, :tenant_id, :venue_id, :lead_id, :booking_date,
                     :time_slot, 'held', :held_until, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": booking_id,
                 "tenant_id": self._tenant_id,
@@ -436,11 +448,13 @@ class BanquetVenueService:
     async def confirm_booking(self, booking_id: str) -> dict:
         """确认预订：held → confirmed。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, venue_id, lead_id, booking_date, time_slot, status
                 FROM banquet_venue_bookings
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": booking_id, "tenant_id": self._tenant_id},
         )
         booking = row.mappings().first()
@@ -451,11 +465,13 @@ class BanquetVenueService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_venue_bookings
                 SET status = 'confirmed', held_until = NULL, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": booking_id, "tenant_id": self._tenant_id, "now": now},
         )
         await self._db.flush()
@@ -484,11 +500,13 @@ class BanquetVenueService:
     ) -> dict:
         """释放预订：held/confirmed → released。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, venue_id, lead_id, booking_date, time_slot, status
                 FROM banquet_venue_bookings
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": booking_id, "tenant_id": self._tenant_id},
         )
         booking = row.mappings().first()
@@ -499,11 +517,13 @@ class BanquetVenueService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_venue_bookings
                 SET status = 'released', release_reason = :reason, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": booking_id,
                 "tenant_id": self._tenant_id,
@@ -557,7 +577,8 @@ class BanquetVenueService:
         # 查询日期范围内所有预订
         # 用 ANY 数组绑定避免 SQL 注入
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT venue_id, booking_date, time_slot, status
                 FROM banquet_venue_bookings
                 WHERE tenant_id = :tenant_id
@@ -566,7 +587,8 @@ class BanquetVenueService:
                   AND booking_date <= :date_to
                   AND status IN ('held', 'confirmed')
                 ORDER BY venue_id, booking_date, time_slot
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "venue_ids": venue_ids,
@@ -632,7 +654,8 @@ class BanquetVenueService:
         now = _now_utc()
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_venue_bookings
                 SET status = 'released',
                     release_reason = 'auto_expired',
@@ -641,7 +664,8 @@ class BanquetVenueService:
                   AND status = 'held'
                   AND held_until < :now
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id, "now": now},
         )
         released = result.fetchall()
@@ -685,7 +709,8 @@ class BanquetVenueService:
         venue_ids = [v["id"] for v in venues]
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT venue_id, time_slot, COUNT(*) AS cnt
                 FROM banquet_venue_bookings
                 WHERE tenant_id = :tenant_id
@@ -694,7 +719,8 @@ class BanquetVenueService:
                   AND booking_date <= :date_to
                   AND status = 'confirmed'
                 GROUP BY venue_id, time_slot
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "venue_ids": venue_ids,

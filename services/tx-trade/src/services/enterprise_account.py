@@ -35,7 +35,8 @@ class EnterpriseAccountService:
     async def _get_enterprise_row(self, enterprise_id: str) -> dict:
         """按 ID 查询企业行，不存在或非本租户时抛 ValueError。"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, name, contact,
                        credit_limit_fen, used_fen, billing_cycle, status,
                        created_at, updated_at
@@ -43,7 +44,8 @@ class EnterpriseAccountService:
                 WHERE id = :eid::uuid
                   AND tenant_id = :tid::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"eid": enterprise_id, "tid": self.tenant_id},
         )
         row = result.mappings().fetchone()
@@ -68,7 +70,8 @@ class EnterpriseAccountService:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO enterprise_accounts
                         (tenant_id, name, contact, credit_limit_fen, billing_cycle)
                     VALUES
@@ -76,7 +79,8 @@ class EnterpriseAccountService:
                     RETURNING id::text, tenant_id::text, name, contact,
                               credit_limit_fen, used_fen, billing_cycle, status,
                               created_at, updated_at
-                """),
+                """
+                ),
                 {
                     "tid": self.tenant_id,
                     "name": name,
@@ -117,7 +121,8 @@ class EnterpriseAccountService:
 
         try:
             result = await self.db.execute(
-                text(f"""
+                text(
+                    f"""
                     UPDATE enterprise_accounts
                     SET {", ".join(set_clauses)}
                     WHERE id = :eid::uuid
@@ -126,7 +131,8 @@ class EnterpriseAccountService:
                     RETURNING id::text, tenant_id::text, name, contact,
                               credit_limit_fen, used_fen, billing_cycle, status,
                               created_at, updated_at
-                """),
+                """
+                ),
                 params,
             )
             row = result.mappings().fetchone()
@@ -152,14 +158,16 @@ class EnterpriseAccountService:
     async def list_enterprises(self) -> list[dict]:
         """列表查询本租户下所有活跃企业客户"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, name, contact,
                        credit_limit_fen, used_fen, billing_cycle, status,
                        created_at, updated_at
                 FROM enterprise_accounts
                 WHERE tenant_id = :tid::uuid AND is_deleted = FALSE
                 ORDER BY name
-            """),
+            """
+            ),
             {"tid": self.tenant_id},
         )
         return [dict(row) for row in result.mappings().all()]
@@ -179,7 +187,8 @@ class EnterpriseAccountService:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO enterprise_agreement_prices
                         (tenant_id, enterprise_id, dish_id, price_fen)
                     VALUES
@@ -188,7 +197,8 @@ class EnterpriseAccountService:
                     DO UPDATE SET price_fen = EXCLUDED.price_fen, updated_at = NOW()
                     RETURNING id::text, tenant_id::text, enterprise_id::text,
                               dish_id, price_fen, created_at, updated_at
-                """),
+                """
+                ),
                 {
                     "tid": self.tenant_id,
                     "eid": enterprise_id,
@@ -219,14 +229,16 @@ class EnterpriseAccountService:
     ) -> Optional[dict]:
         """查询协议价，不存在返回 None"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, enterprise_id::text,
                        dish_id, price_fen, created_at, updated_at
                 FROM enterprise_agreement_prices
                 WHERE tenant_id = :tid::uuid
                   AND enterprise_id = :eid::uuid
                   AND dish_id = :dish
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id, "dish": dish_id},
         )
         row = result.mappings().fetchone()
@@ -279,10 +291,12 @@ class EnterpriseAccountService:
 
         # 幂等检查：同一订单不重复签单
         existing = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM enterprise_sign_records
                 WHERE tenant_id = :tid::uuid AND order_id = :oid::uuid
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "oid": order_id},
         )
         if existing.fetchone():
@@ -290,7 +304,8 @@ class EnterpriseAccountService:
 
         # 原子扣额度 + 写签单记录
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE enterprise_accounts
                 SET used_fen   = used_fen + :amount,
                     updated_at = NOW()
@@ -299,16 +314,19 @@ class EnterpriseAccountService:
                   AND status = 'active'
                   AND (credit_limit_fen - used_fen) >= :amount
                 RETURNING id, credit_limit_fen, used_fen
-            """),
+            """
+            ),
             {"amount": amount_fen, "eid": enterprise_id, "tid": self.tenant_id},
         )
         row = result.fetchone()
         if row is None:
             check = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT credit_limit_fen, used_fen FROM enterprise_accounts
                     WHERE id = :eid::uuid AND tenant_id = :tid::uuid
-                """),
+                """
+                ),
                 {"eid": enterprise_id, "tid": self.tenant_id},
             )
             acct = check.fetchone()
@@ -323,12 +341,14 @@ class EnterpriseAccountService:
             }
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO enterprise_sign_records
                     (id, tenant_id, enterprise_id, order_id, signer_name, amount_fen)
                 VALUES
                     (gen_random_uuid(), :tid::uuid, :eid::uuid, :oid::uuid, :signer, :amount)
-            """),
+            """
+            ),
             {
                 "tid": self.tenant_id,
                 "eid": enterprise_id,
@@ -352,14 +372,16 @@ class EnterpriseAccountService:
         """查询企业签单记录"""
         await self._get_enterprise_row(enterprise_id)  # 校验企业存在
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, enterprise_id::text,
                        order_id::text, signer_name, amount_fen, status,
                        settled_at, created_at, updated_at
                 FROM enterprise_sign_records
                 WHERE tenant_id = :tid::uuid AND enterprise_id = :eid::uuid
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id},
         )
         return [dict(row) for row in result.mappings().all()]

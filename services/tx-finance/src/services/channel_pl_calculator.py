@@ -115,7 +115,8 @@ class ChannelPLCalculator:
         if channel_id:
             params["channel_id"] = channel_id
 
-        delivery_sql = text(f"""
+        delivery_sql = text(
+            f"""
             SELECT
                 d.sales_channel                         AS channel_id,
                 COUNT(*)                                AS order_count,
@@ -128,7 +129,8 @@ class ChannelPLCalculator:
               AND DATE(d.created_at) BETWEEN :start_date::DATE AND :end_date::DATE
               {where_channel}
             GROUP BY d.sales_channel
-        """)
+        """
+        )
 
         result = await db.execute(delivery_sql, params)
         rows = result.mappings().all()
@@ -194,7 +196,8 @@ class ChannelPLCalculator:
         """从 order_items 查询食材成本（如表不存在则返回 0）"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(oi.food_cost_fen), 0) AS total_food_cost
                     FROM order_items oi
                     JOIN delivery_orders d ON d.id = oi.order_id
@@ -203,7 +206,8 @@ class ChannelPLCalculator:
                       AND d.sales_channel = :channel_id
                       AND d.status = 'completed'
                       AND DATE(d.created_at) BETWEEN :start_date::DATE AND :end_date::DATE
-                """),
+                """
+                ),
                 {
                     "store_id": str(store_id),
                     "tenant_id": str(tenant_id),
@@ -235,13 +239,15 @@ class ChannelPLCalculator:
         """
         # 1. 读取账单
         bill_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, platform, bill_period, bill_type,
                        gross_amount_fen, raw_data
                 FROM platform_bills
                 WHERE id = :bill_id::UUID
                   AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"bill_id": str(bill_id), "tenant_id": str(tenant_id)},
         )
         bill = bill_row.mappings().first()
@@ -267,7 +273,8 @@ class ChannelPLCalculator:
             period_filter = "DATE(d.created_at AT TIME ZONE 'Asia/Shanghai') = :bill_period::DATE"
 
         sys_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT platform_order_id, total_fen, id AS internal_order_id
                 FROM delivery_orders d
                 WHERE d.store_id = :store_id::UUID
@@ -275,7 +282,8 @@ class ChannelPLCalculator:
                   AND d.platform = :platform
                   AND d.status = 'completed'
                   AND {period_filter}
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -337,7 +345,8 @@ class ChannelPLCalculator:
         if discrepancies:
             for d in discrepancies:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO settlement_discrepancies (
                             tenant_id, store_id, platform, bill_id,
                             platform_order_id, internal_order_id,
@@ -350,7 +359,8 @@ class ChannelPLCalculator:
                             :discrepancy_type, 'open'
                         )
                         ON CONFLICT DO NOTHING
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": str(tenant_id),
                         "store_id": str(store_id),
@@ -366,11 +376,13 @@ class ChannelPLCalculator:
 
         # 5. 更新账单状态
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE platform_bills
                 SET status = 'reconciled', updated_at = NOW()
                 WHERE id = :bill_id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"bill_id": str(bill_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
@@ -417,7 +429,8 @@ class ChannelPLCalculator:
         window_start = today - timedelta(days=days_ahead)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     platform,
                     DATE(created_at AT TIME ZONE 'Asia/Shanghai') AS order_date,
@@ -429,7 +442,8 @@ class ChannelPLCalculator:
                   AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= :window_start::DATE
                 GROUP BY platform, DATE(created_at AT TIME ZONE 'Asia/Shanghai')
                 ORDER BY order_date
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -457,7 +471,8 @@ class ChannelPLCalculator:
 
             # UPSERT 到 receivable_forecasts
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO receivable_forecasts (
                         tenant_id, store_id, platform,
                         order_date, expected_receive_date, expected_amount_fen, status
@@ -473,7 +488,8 @@ class ChannelPLCalculator:
                             WHEN receivable_forecasts.actual_receive_date IS NOT NULL THEN 'received'
                             ELSE EXCLUDED.status
                         END
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": str(store_id),
@@ -523,7 +539,8 @@ class ChannelPLCalculator:
             params["platform"] = platform
 
         summary_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*)                                        AS total_count,
                     COUNT(*) FILTER (WHERE sd.status = 'open')     AS open_count,
@@ -532,7 +549,8 @@ class ChannelPLCalculator:
                 WHERE sd.store_id = :store_id::UUID
                   AND sd.tenant_id = :tenant_id::UUID
                   {platform_filter}
-            """),
+            """
+            ),
             params,
         )
         summary = summary_result.mappings().first()
@@ -550,13 +568,15 @@ class ChannelPLCalculator:
             bill_params["platform"] = platform
 
         bill_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COALESCE(SUM(gross_amount_fen), 0) AS total_bill_fen
                 FROM platform_bills
                 WHERE store_id = :store_id::UUID
                   AND tenant_id = :tenant_id::UUID
                   {platform_filter.replace("sd.platform", "platform") if platform else ""}
-            """),
+            """
+            ),
             bill_params,
         )
         bill_row = bill_result.mappings().first()

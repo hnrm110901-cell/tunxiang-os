@@ -212,10 +212,7 @@ class SubsidyService:
         # 先校验资格
         eligibility = await self.check_eligibility(tenant_id, program)
         if not eligibility["eligible"]:
-            raise ValueError(
-                f"商户 {tenant_id} 不符合 {program} 补贴资格: "
-                + "; ".join(eligibility["reasons"])
-            )
+            raise ValueError(f"商户 {tenant_id} 不符合 {program} 补贴资格: " + "; ".join(eligibility["reasons"]))
 
         prog = SUBSIDY_PROGRAMS[program]
         subsidy_amount = min(
@@ -229,7 +226,8 @@ class SubsidyService:
         expires_at = now.replace(year=now.year + 1)  # 默认有效期 1 年
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO tenant_subsidies
                     (id, tenant_id, program, status, subsidy_rate,
                      monthly_fee_fen, subsidy_amount_fen,
@@ -238,7 +236,8 @@ class SubsidyService:
                     (:id, :tid, :program, 'active', :rate,
                      :fee, :amount,
                      :now, :expires, 'MY')
-            """),
+            """
+            ),
             {
                 "id": subsidy_id,
                 "tid": self._tid,
@@ -307,7 +306,8 @@ class SubsidyService:
 
         # 查询该商户所有活跃补贴
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, program, subsidy_rate, monthly_fee_fen,
                        subsidy_amount_fen, status
                 FROM tenant_subsidies
@@ -315,7 +315,8 @@ class SubsidyService:
                   AND status = 'active'
                   AND expires_at >= :now
                 ORDER BY applied_at DESC
-            """),
+            """
+            ),
             {"tid": self._tid, "now": datetime.now(timezone.utc)},
         )
         rows = result.fetchall()
@@ -338,13 +339,15 @@ class SubsidyService:
         for row in rows:
             total_base_fee_fen += row.monthly_fee_fen
             total_subsidy_fen += row.subsidy_amount_fen
-            active_subsidies.append({
-                "subsidy_id": str(row.id),
-                "program": row.program,
-                "subsidy_rate": float(row.subsidy_rate),
-                "monthly_fee_fen": row.monthly_fee_fen,
-                "subsidy_amount_fen": row.subsidy_amount_fen,
-            })
+            active_subsidies.append(
+                {
+                    "subsidy_id": str(row.id),
+                    "program": row.program,
+                    "subsidy_rate": float(row.subsidy_rate),
+                    "monthly_fee_fen": row.monthly_fee_fen,
+                    "subsidy_amount_fen": row.subsidy_amount_fen,
+                }
+            )
 
         payable_fen = max(0, total_base_fee_fen - total_subsidy_fen)
 
@@ -419,7 +422,8 @@ class SubsidyService:
             }
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO subsidy_bills
                     (id, tenant_id, period_start, period_end,
                      base_fee_fen, subsidy_fen, payable_fen, status,
@@ -428,7 +432,8 @@ class SubsidyService:
                     (:id, :tid, :pstart, :pend,
                      :bfee, :sub, :pay, 'pending',
                      'MY')
-            """),
+            """
+            ),
             {
                 "id": bill_id,
                 "tid": self._tid,
@@ -480,7 +485,8 @@ class SubsidyService:
 
         # 查询活跃补贴
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, program, subsidy_rate, monthly_fee_fen,
                        subsidy_amount_fen, applied_at, expires_at, status
                 FROM tenant_subsidies
@@ -488,18 +494,21 @@ class SubsidyService:
                   AND status = 'active'
                   AND expires_at >= :now
                 ORDER BY applied_at DESC
-            """),
+            """
+            ),
             {"tid": self._tid, "now": now},
         )
         active_rows = result.fetchall()
 
         # 查询累计节省
         total_saved = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(subsidy_fen), 0) AS total_saved
                 FROM subsidy_bills
                 WHERE tenant_id = :tid AND status = 'paid'
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         total_saved_fen = total_saved.fetchone().total_saved
@@ -507,14 +516,16 @@ class SubsidyService:
         # 当前周期账单
         current_bill = None
         bill_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, period_start, period_end, base_fee_fen,
                        subsidy_fen, payable_fen, status
                 FROM subsidy_bills
                 WHERE tenant_id = :tid AND status = 'pending'
                 ORDER BY period_start DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         bill_row = bill_result.fetchone()
@@ -563,10 +574,12 @@ class SubsidyService:
     async def _check_ssm_verified(self, tenant_id: str) -> bool:
         """检查商户是否已完成 SSM 验证"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT ssm_verified FROM tenants
                 WHERE id = :tid
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         row = result.fetchone()
@@ -580,14 +593,16 @@ class SubsidyService:
           - 服务业：营收 ≤ RM20 百万 或 员工 ≤ 75 人
         """
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     annual_revenue_fen,
                     employee_count,
                     industry_sector
                 FROM tenants
                 WHERE id = :tid
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         row = result.fetchone()
@@ -613,12 +628,14 @@ class SubsidyService:
     async def _check_existing_subsidy(self, tenant_id: str, program: str) -> Optional[dict[str, Any]]:
         """检查商户是否已有该方案的补贴"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM tenant_subsidies
                 WHERE tenant_id = :tid AND program = :prog
                   AND status IN ('active', 'pending')
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": self._tid, "prog": program},
         )
         row = result.fetchone()
@@ -629,10 +646,12 @@ class SubsidyService:
     async def _check_bumiputera(self, tenant_id: str) -> bool:
         """检查是否 Bumiputera 企业"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT is_bumiputera FROM tenants
                 WHERE id = :tid
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         row = result.fetchone()
@@ -641,10 +660,12 @@ class SubsidyService:
     async def _check_registered_6months(self, tenant_id: str) -> bool:
         """检查企业是否已注册满 6 个月"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT incorporation_date FROM tenants
                 WHERE id = :tid
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         row = result.fetchone()
@@ -665,11 +686,13 @@ class SubsidyService:
         SMC 定义：营收 < RM300,000 或 员工 < 5 人
         """
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT annual_revenue_fen, employee_count
                 FROM tenants
                 WHERE id = :tid
-            """),
+            """
+            ),
             {"tid": self._tid},
         )
         row = result.fetchone()

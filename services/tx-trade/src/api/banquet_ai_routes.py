@@ -1,4 +1,5 @@
 """宴会AI + KPI看板 API"""
+
 from datetime import date as date_cls
 from typing import AsyncGenerator, Optional
 

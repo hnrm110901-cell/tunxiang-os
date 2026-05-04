@@ -118,7 +118,8 @@ class PaymentRoutingEngine:
           - priority DESC
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT channel_name
                 FROM payment_channel_configs
                 WHERE tenant_id = :tenant_id::UUID
@@ -129,7 +130,8 @@ class PaymentRoutingEngine:
                   CASE WHEN store_id = :store_id::UUID THEN 0 ELSE 1 END,
                   priority DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "method": method.value},
         )
         row = result.fetchone()

@@ -115,9 +115,7 @@ class TestPaymentSagaIdempotency:
         )
 
         # 第二次必须命中幂等缓存，返回状态为 done
-        assert result2["status"] == "done", (
-            f"重复支付回调必须返回幂等结果，实际状态: {result2['status']}"
-        )
+        assert result2["status"] == "done", f"重复支付回调必须返回幂等结果，实际状态: {result2['status']}"
         # 网关只被调用一次（幂等保护）
         # TODO: 确认 mock_execute 的调用模式后精确化此断言
         # assert gw.create_payment.call_count == 1, "幂等保护：支付网关只能被调用一次"
@@ -141,10 +139,7 @@ class TestPaymentSagaIdempotency:
             if "INSERT INTO payment_sagas" in stmt_str:
                 execution_count += 1
                 if execution_count > 1:
-                    raise IntegrityError(
-                        "unique_violation: idempotency_key",
-                        None, None
-                    )
+                    raise IntegrityError("unique_violation: idempotency_key", None, None)
             return result
 
         db = _make_mock_db()
@@ -210,8 +205,7 @@ class TestPaymentSagaRollback:
         )
 
         assert result["status"] in ("failed", "compensated"), (
-            f"支付网关失败时，Saga 状态必须是 failed 或 compensated，"
-            f"实际: {result['status']}"
+            f"支付网关失败时，Saga 状态必须是 failed 或 compensated，" f"实际: {result['status']}"
         )
         assert result.get("error") is not None, "失败时必须返回错误原因，方便收银员排查"
 
@@ -238,6 +232,7 @@ class TestPaymentSagaRollback:
             # S3: 更新订单状态为 completed 时模拟 DB 故障
             if "UPDATE orders" in stmt_str and "completed" in str(params or {}):
                 from sqlalchemy.exc import OperationalError
+
                 raise OperationalError("DB connection lost", None, None)
             return result
 
@@ -248,20 +243,14 @@ class TestPaymentSagaRollback:
         svc = PaymentSagaService(db=db, tenant_id=TENANT_ID, payment_gateway=gw)
 
         # 验证补偿路径的前提条件：网关支付成功、退款接口可用
-        assert gw.create_payment.return_value["status"] == "success", (
-            "测试前提：支付网关应返回成功"
-        )
-        assert gw.refund.return_value["status"] == "refunded", (
-            "测试前提：退款接口应可用"
-        )
+        assert gw.create_payment.return_value["status"] == "success", "测试前提：支付网关应返回成功"
+        assert gw.refund.return_value["status"] == "refunded", "测试前提：退款接口应可用"
 
         # 验证 S3 失败时的补偿逻辑框架：
         # 1. 支付成功（S2 通过）
         # 2. 完成订单（S3）时 DB 异常
         # 3. 应自动触发退款（补偿）
-        payment_result = await gw.create_payment(
-            method="wechat", amount_fen=8800
-        )
+        payment_result = await gw.create_payment(method="wechat", amount_fen=8800)
         assert payment_result["status"] == "success", "S2 支付应成功"
 
         # 模拟 S3 失败后调用退款
@@ -270,9 +259,7 @@ class TestPaymentSagaRollback:
             amount_fen=8800,
             reason="S3_DB_FAILURE",
         )
-        assert refund_result["status"] == "refunded", (
-            "S3失败后退款应成功，防止「已扣款但订单未完成」的死账"
-        )
+        assert refund_result["status"] == "refunded", "S3失败后退款应成功，防止「已扣款但订单未完成」的死账"
 
     @pytest.mark.asyncio
     async def test_refund_reverses_balance_inventory_points(self):
@@ -298,9 +285,7 @@ class TestPaymentSagaRollback:
 
         # 验证：余额退回
         new_balance = 0 + refund_amount_fen  # 假设退到原账户
-        assert new_balance == 1200000, (
-            f"退款后余额应为 12000 元（1200000分），实际: {new_balance}"
-        )
+        assert new_balance == 1200000, f"退款后余额应为 12000 元（1200000分），实际: {new_balance}"
 
         # 验证：积分回滚
         new_points = 0 + points_restored
@@ -337,15 +322,11 @@ class TestPaymentSagaRollback:
         }
 
         # 验证：崩溃恢复逻辑应该能识别 paying 状态的挂起 Saga
-        assert crashed_saga["step"] == SagaStep.PAYING, (
-            "崩溃前 Saga 应处于 paying 状态"
-        )
+        assert crashed_saga["step"] == SagaStep.PAYING, "崩溃前 Saga 应处于 paying 状态"
 
         # 模拟查询支付网关确认实际状态
         gw = _make_mock_gateway(payment_success=True)
-        gateway_status = await gw.create_payment(
-            method="wechat", amount_fen=crashed_saga["amount_fen"]
-        )
+        gateway_status = await gw.create_payment(method="wechat", amount_fen=crashed_saga["amount_fen"])
 
         # 恢复逻辑：如果网关确认已扣款，应继续完成订单（S3）
         if gateway_status["status"] == "success":
@@ -353,9 +334,7 @@ class TestPaymentSagaRollback:
         else:
             recovered_step = SagaStep.FAILED  # 未扣款则标记失败
 
-        assert recovered_step == SagaStep.COMPLETING, (
-            "网关确认已扣款时，恢复逻辑应继续 S3（完成订单），不应重复扣款"
-        )
+        assert recovered_step == SagaStep.COMPLETING, "网关确认已扣款时，恢复逻辑应继续 S3（完成订单），不应重复扣款"
 
     @pytest.mark.asyncio
     async def test_wechat_pay_notify_processed_once(self):
@@ -406,14 +385,18 @@ class TestPaymentSagaStateTransitions:
     def test_saga_step_constants_defined(self):
         """SagaStep 包含所有必要状态常量"""
         from services.tx_trade.src.services.payment_saga_service import SagaStep
+
         required_states = {
-            "VALIDATING", "PAYING", "COMPLETING",
-            "DONE", "COMPENSATING", "COMPENSATED", "FAILED",
+            "VALIDATING",
+            "PAYING",
+            "COMPLETING",
+            "DONE",
+            "COMPENSATING",
+            "COMPENSATED",
+            "FAILED",
         }
         for state in required_states:
-            assert hasattr(SagaStep, state), (
-                f"SagaStep 缺少状态常量: {state}，这会导致崩溃恢复逻辑出错"
-            )
+            assert hasattr(SagaStep, state), f"SagaStep 缺少状态常量: {state}，这会导致崩溃恢复逻辑出错"
 
     def test_pending_timeout_minutes_reasonable(self):
         """挂起 Saga 的超时阈值合理（5分钟）
@@ -422,6 +405,7 @@ class TestPaymentSagaStateTransitions:
         若超时时间太长，资金会被占用过久。
         """
         from services.tx_trade.src.services.payment_saga_service import _PENDING_TIMEOUT_MINUTES
-        assert 1 <= _PENDING_TIMEOUT_MINUTES <= 30, (
-            f"挂起 Saga 超时阈值应在 1-30 分钟内，实际: {_PENDING_TIMEOUT_MINUTES} 分钟"
-        )
+
+        assert (
+            1 <= _PENDING_TIMEOUT_MINUTES <= 30
+        ), f"挂起 Saga 超时阈值应在 1-30 分钟内，实际: {_PENDING_TIMEOUT_MINUTES} 分钟"

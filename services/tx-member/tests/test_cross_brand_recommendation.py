@@ -330,8 +330,14 @@ def test_recommendation_score_sorting():
 def test_migration_v221_exists():
     """v221 迁移文件应存在且包含正确表名"""
     migration_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "shared",
-        "db-migrations", "versions", "v222_cross_brand_recommendation.py",
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v222_cross_brand_recommendation.py",
     )
     assert os.path.exists(migration_path), f"迁移文件不存在: {migration_path}"
 

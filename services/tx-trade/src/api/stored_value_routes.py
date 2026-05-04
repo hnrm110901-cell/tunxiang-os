@@ -121,12 +121,14 @@ async def _get_or_create_account(
 ) -> dict:
     """查找或创建储值账户，返回账户行 dict"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, balance_fen, frozen_fen, total_recharged_fen, total_consumed_fen
             FROM stored_value_accounts
             WHERE tenant_id = :tid AND member_id = :mid AND is_deleted = FALSE
             LIMIT 1
-        """),
+        """
+        ),
         {"tid": tenant_id, "mid": member_id},
     )
     rec = row.mappings().first()
@@ -136,12 +138,14 @@ async def _get_or_create_account(
     # 创建新账户
     new_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stored_value_accounts
                 (id, tenant_id, member_id, balance_fen, frozen_fen,
                  total_recharged_fen, total_consumed_fen)
             VALUES (:id, :tid, :mid, 0, 0, 0, 0)
-        """),
+        """
+        ),
         {"id": new_id, "tid": tenant_id, "mid": member_id},
     )
     return {
@@ -171,7 +175,8 @@ async def _write_transaction(
 ) -> str:
     txn_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stored_value_transactions
                 (id, tenant_id, account_id, member_id, order_id,
                  type, amount_fen, balance_before_fen, balance_after_fen,
@@ -180,7 +185,8 @@ async def _write_transaction(
                 (:id, :tid, :aid, :mid, :oid,
                  :tp, :amt, :bbf, :baf,
                  :opid, :note, :pm, :epid)
-        """),
+        """
+        ),
         {
             "id": txn_id,
             "tid": tenant_id,
@@ -216,14 +222,16 @@ async def get_stored_value(
     await db.commit()
 
     txn_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, type, amount_fen, balance_before_fen, balance_after_fen,
                    operator_id, note, payment_method, order_id, created_at
             FROM stored_value_transactions
             WHERE tenant_id = :tid AND member_id = :mid
             ORDER BY created_at DESC
             LIMIT 20
-        """),
+        """
+        ),
         {"tid": tenant_id, "mid": member_id},
     )
     transactions = [dict(r) for r in txn_rows.mappings()]
@@ -268,13 +276,15 @@ async def recharge(
 
     # 更新账户余额
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stored_value_accounts SET
                 balance_fen         = balance_fen + :total,
                 total_recharged_fen = total_recharged_fen + :total,
                 updated_at          = NOW()
             WHERE id = :aid
-        """),
+        """
+        ),
         {"total": total_credit, "aid": account_id},
     )
 
@@ -331,7 +341,8 @@ async def consume(
     # ── 原子扣款：WHERE 条件确保余额充足，防止并发超扣 ──────────────────
     # 使用 RETURNING 同时获取扣款前后余额，避免额外查询
     upd_result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE stored_value_accounts SET
                 balance_fen        = balance_fen - :amt,
                 total_consumed_fen = total_consumed_fen + :amt,
@@ -340,7 +351,8 @@ async def consume(
               AND (balance_fen - frozen_fen) >= :amt
             RETURNING balance_fen + :amt AS balance_before_fen,
                       balance_fen        AS balance_after_fen
-        """),
+        """
+        ),
         {"amt": body.amount_fen, "aid": account_id},
     )
     row = upd_result.mappings().first()
@@ -408,11 +420,13 @@ async def refund(
 
     # 校验原始消费流水
     orig_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, account_id, amount_fen, type
             FROM stored_value_transactions
             WHERE id = :txn_id AND tenant_id = :tid
-        """),
+        """
+        ),
         {"txn_id": body.transaction_id, "tid": tenant_id},
     )
     orig = orig_row.mappings().first()
@@ -437,13 +451,15 @@ async def refund(
     balance_after = balance_before + body.amount_fen
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stored_value_accounts SET
                 balance_fen        = balance_fen + :amt,
                 total_consumed_fen = GREATEST(total_consumed_fen - :amt, 0),
                 updated_at         = NOW()
             WHERE id = :aid
-        """),
+        """
+        ),
         {"amt": body.amount_fen, "aid": account_id},
     )
 

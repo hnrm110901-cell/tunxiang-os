@@ -53,13 +53,15 @@ async def create_group_order(
     expires_at = now + timedelta(hours=2)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO group_orders
                 (id, tenant_id, initiator_id, store_id, table_id,
                  invite_code, status, member_count, created_at, expires_at)
             VALUES (:gid, :tid, :iid, :sid, :tbl,
                     :code, 'open', 1, :now, :exp)
-        """),
+        """
+        ),
         {
             "gid": group_id,
             "tid": tenant_id,
@@ -75,11 +77,13 @@ async def create_group_order(
     # 发起人自动作为第一个成员
     member_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO group_order_members
                 (id, tenant_id, group_id, customer_id, role, joined_at)
             VALUES (:mid, :tid, :gid, :cid, 'creator', :now)
-        """),
+        """
+        ),
         {"mid": member_id, "tid": tenant_id, "gid": group_id, "cid": initiator_id, "now": now},
     )
     await db.flush()
@@ -122,11 +126,13 @@ async def join_group_order(
 
     # 校验拼单状态
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT status, expires_at, member_count
             FROM group_orders
             WHERE id = :gid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"gid": group_id, "tid": tenant_id},
     )
     group = row.mappings().first()
@@ -139,10 +145,12 @@ async def join_group_order(
 
     # 检查是否已加入
     exist_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM group_order_members
             WHERE group_id = :gid AND customer_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"gid": group_id, "cid": customer_id, "tid": tenant_id},
     )
     if exist_row.scalar():
@@ -151,20 +159,24 @@ async def join_group_order(
     now = _now_utc()
     member_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO group_order_members
                 (id, tenant_id, group_id, customer_id, role, joined_at)
             VALUES (:mid, :tid, :gid, :cid, 'member', :now)
-        """),
+        """
+        ),
         {"mid": member_id, "tid": tenant_id, "gid": group_id, "cid": customer_id, "now": now},
     )
 
     new_count = group["member_count"] + 1
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE group_orders SET member_count = :cnt, updated_at = :now
             WHERE id = :gid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cnt": new_count, "gid": group_id, "tid": tenant_id, "now": now},
     )
     await db.flush()
@@ -218,13 +230,15 @@ async def send_gift(
     import json
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO gifts
                 (id, tenant_id, sender_id, receiver_phone, gift_type,
                  gift_config, share_code, status, created_at, expires_at)
             VALUES (:gid, :tid, :sid, :phone, :gtype,
                     :cfg::jsonb, :code, 'pending', :now, :exp)
-        """),
+        """
+        ),
         {
             "gid": gift_id,
             "tid": tenant_id,
@@ -286,13 +300,15 @@ async def create_share_link(
     expires_at = now + timedelta(days=30)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO share_links
                 (id, tenant_id, customer_id, campaign_type,
                  referral_code, click_count, convert_count, created_at, expires_at)
             VALUES (:lid, :tid, :cid, :ctype,
                     :code, 0, 0, :now, :exp)
-        """),
+        """
+        ),
         {
             "lid": link_id,
             "tid": tenant_id,
@@ -350,10 +366,12 @@ async def track_referral(
 
     # 查是否已存在推荐关系
     exist_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM referrals
             WHERE referrer_id = :rid AND new_customer_id = :nid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"rid": referrer_id, "nid": new_customer_id, "tid": tenant_id},
     )
     if exist_row.scalar():
@@ -361,12 +379,14 @@ async def track_referral(
 
     # 记录推荐关系
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO referrals
                 (id, tenant_id, referrer_id, new_customer_id,
                  referrer_reward_points, referee_reward_points, created_at)
             VALUES (:rid, :tid, :refid, :nid, 10, 10, :now)
-        """),
+        """
+        ),
         {
             "rid": referral_id,
             "tid": tenant_id,
@@ -378,19 +398,23 @@ async def track_referral(
 
     # 发放积分给推荐人
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards SET points = points + 10, updated_at = :now
             WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": referrer_id, "tid": tenant_id, "now": now},
     )
 
     # 发放积分给被推荐人
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards SET points = points + 10, updated_at = :now
             WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": new_customer_id, "tid": tenant_id, "now": now},
     )
     await db.flush()
@@ -430,11 +454,13 @@ async def get_social_stats(
 
     # 推荐人数
     ref_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as cnt, COALESCE(SUM(referrer_reward_points), 0) as reward
             FROM referrals
             WHERE referrer_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     ref_data = ref_row.mappings().first()
@@ -443,22 +469,26 @@ async def get_social_stats(
 
     # 拼单次数
     group_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as cnt
             FROM group_order_members
             WHERE customer_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     group_count = group_row.scalar() or 0
 
     # 送礼次数
     gift_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as cnt
             FROM gifts
             WHERE sender_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     gift_count = gift_row.scalar() or 0

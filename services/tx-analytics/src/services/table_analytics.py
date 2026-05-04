@@ -40,14 +40,16 @@ async def calculate_turnover_rate(
 
     # 使用原生 SQL 查询 tables 表中该门店的桌台数
     total_tables_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as cnt
             FROM tables
             WHERE store_id = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = false
               AND is_active = true
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     total_tables = total_tables_result.scalar() or 0
@@ -57,7 +59,8 @@ async def calculate_turnover_rate(
     day_end = day_start + timedelta(days=1)
 
     orders_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*) as total_seated,
                 AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 60) as avg_duration_min
@@ -68,7 +71,8 @@ async def calculate_turnover_rate(
               AND created_at < :day_end
               AND status IN ('paid', 'pending_payment')
               AND is_deleted = false
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -127,7 +131,8 @@ async def get_table_heatmap(
 
     # 查询当日各桌台各小时的订单分布
     heatmap_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 t.table_no,
                 EXTRACT(HOUR FROM o.created_at) as hour,
@@ -141,7 +146,8 @@ async def get_table_heatmap(
               AND o.is_deleted = false
             GROUP BY t.table_no, EXTRACT(HOUR FROM o.created_at)
             ORDER BY t.table_no, hour
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,
@@ -226,7 +232,8 @@ async def get_room_revenue_analysis(
 
     # 包厢 = area 含 "包间"/"包厢"/"VIP"
     room_revenue_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 t.table_no,
                 t.area,
@@ -247,7 +254,8 @@ async def get_room_revenue_analysis(
               AND (t.area LIKE '%%包间%%' OR t.area LIKE '%%包厢%%' OR t.area LIKE '%%VIP%%')
             GROUP BY t.table_no, t.area, t.min_consume_fen
             ORDER BY t.table_no
-        """),
+        """
+        ),
         {
             "store_id": store_id,
             "tenant_id": tenant_id,

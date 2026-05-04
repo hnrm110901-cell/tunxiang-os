@@ -149,7 +149,8 @@ class ChannelMappingService:
 
         where_extra = "AND m.dish_id IS NULL" if unmapped_only else ""
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     m.id,
                     m.platform,
@@ -167,7 +168,8 @@ class ChannelMappingService:
                   AND m.platform  = :platform
                   {where_extra}
                 ORDER BY m.is_active DESC, m.created_at DESC
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid, "platform": platform},
         )
         rows = result.fetchall()
@@ -206,7 +208,8 @@ class ChannelMappingService:
         did = uuid.UUID(dish_id) if dish_id else None
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO platform_dish_mappings
                     (tenant_id, store_id, platform, platform_item_id,
                      platform_item_name, dish_id, platform_price_fen,
@@ -226,7 +229,8 @@ class ChannelMappingService:
                 RETURNING
                     id, platform, platform_item_id, platform_item_name,
                     dish_id, platform_price_fen, platform_sku_name, is_active
-            """),
+            """
+            ),
             {
                 "tid": self._tenant_uuid,
                 "sid": sid,
@@ -290,7 +294,8 @@ class ChannelMappingService:
 
         # 未映射的平台条目
         unmapped_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT platform_item_id, platform_item_name
                 FROM platform_dish_mappings
                 WHERE tenant_id = :tid
@@ -299,7 +304,8 @@ class ChannelMappingService:
                   AND dish_id IS NULL
                   AND is_active = true
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid, "platform": platform},
         )
         unmapped_rows = unmapped_result.fetchall()
@@ -309,7 +315,8 @@ class ChannelMappingService:
 
         # 内部菜品候选（当前门店 + 集团通用）
         dish_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_name
                 FROM dishes
                 WHERE tenant_id = :tid
@@ -317,7 +324,8 @@ class ChannelMappingService:
                   AND is_available = true
                   AND is_deleted = false
                 ORDER BY dish_name
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid},
         )
         dish_rows = dish_result.fetchall()
@@ -397,13 +405,15 @@ class ChannelMappingService:
 
         # 获取当前最大版本号
         ver_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(MAX(version_no), 0)
                 FROM channel_menu_versions
                 WHERE tenant_id  = :tid
                   AND store_id   = :sid
                   AND channel_id = :channel_id
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid, "channel_id": channel_id},
         )
         current_max = ver_result.scalar() or 0
@@ -411,14 +421,16 @@ class ChannelMappingService:
 
         # 将 draft→archived 已有 published 版本
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE channel_menu_versions
                 SET status = 'archived'
                 WHERE tenant_id  = :tid
                   AND store_id   = :sid
                   AND channel_id = :channel_id
                   AND status     = 'published'
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid, "channel_id": channel_id},
         )
 
@@ -436,7 +448,8 @@ class ChannelMappingService:
         )
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO channel_menu_versions
                     (tenant_id, store_id, channel_id, version_no,
                      dish_overrides, published_at, published_by, status)
@@ -444,7 +457,8 @@ class ChannelMappingService:
                     (:tid, :sid, :channel_id, :version_no,
                      :dish_overrides::jsonb, NOW(), :published_by, 'published')
                 RETURNING id, version_no, dish_overrides, published_at, published_by, status
-            """),
+            """
+            ),
             {
                 "tid": self._tenant_uuid,
                 "sid": sid,
@@ -485,12 +499,14 @@ class ChannelMappingService:
 
         # 查找目标版本
         ver_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, channel_id, version_no,
                        dish_overrides, published_at, published_by, status
                 FROM channel_menu_versions
                 WHERE id = :vid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"vid": vid, "tid": self._tenant_uuid},
         )
         row = ver_result.fetchone()
@@ -502,24 +518,28 @@ class ChannelMappingService:
 
         # 将当前 published 版本归档
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE channel_menu_versions
                 SET status = 'archived'
                 WHERE tenant_id  = :tid
                   AND store_id   = :sid
                   AND channel_id = :channel_id
                   AND status     = 'published'
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": store_id_val, "channel_id": channel_id_val},
         )
 
         # 将目标版本重新 published
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE channel_menu_versions
                 SET status = 'published', published_at = NOW()
                 WHERE id = :vid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"vid": vid, "tid": self._tenant_uuid},
         )
 
@@ -551,7 +571,8 @@ class ChannelMappingService:
 
         # 查最新 published 版本的 overrides
         ver_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT dish_overrides
                 FROM channel_menu_versions
                 WHERE tenant_id  = :tid
@@ -560,7 +581,8 @@ class ChannelMappingService:
                   AND status     = 'published'
                 ORDER BY version_no DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid, "channel_id": channel_id},
         )
         ver_row = ver_result.fetchone()
@@ -598,14 +620,16 @@ class ChannelMappingService:
 
         # 获取所有有 published 版本的渠道
         chan_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT channel_id
                 FROM channel_menu_versions
                 WHERE tenant_id = :tid
                   AND store_id  = :sid
                   AND status    = 'published'
                 ORDER BY channel_id
-            """),
+            """
+            ),
             {"tid": self._tenant_uuid, "sid": sid},
         )
         channels = [r[0] for r in chan_result.fetchall()]
@@ -617,7 +641,8 @@ class ChannelMappingService:
         channel_overrides: dict[str, list[dict]] = {}
         for ch in channels:
             ver_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT dish_overrides
                     FROM channel_menu_versions
                     WHERE tenant_id  = :tid
@@ -626,7 +651,8 @@ class ChannelMappingService:
                       AND status     = 'published'
                     ORDER BY version_no DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": self._tenant_uuid, "sid": sid, "channel_id": ch},
             )
             ver_row = ver_result.fetchone()
@@ -653,11 +679,13 @@ class ChannelMappingService:
             params[f"did_{i}"] = uuid.UUID(did)
 
         d_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, dish_name, price_fen
                 FROM dishes
                 WHERE tenant_id = :tid AND id IN ({placeholders})
-            """),
+            """
+            ),
             params,
         )
         for d_id, d_name, d_price in d_result.fetchall():
@@ -720,24 +748,28 @@ class ChannelMappingService:
             params["channel_id"] = channel_id
 
         count_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*)
                 FROM channel_menu_versions
                 WHERE tenant_id = :tid AND store_id = :sid {where_channel}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         list_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, channel_id, version_no,
                        dish_overrides, published_at, published_by, status
                 FROM channel_menu_versions
                 WHERE tenant_id = :tid AND store_id = :sid {where_channel}
                 ORDER BY version_no DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         versions = [

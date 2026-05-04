@@ -17,6 +17,7 @@ from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 import services.tx_supply.src.services.stocktake_service as svc
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ def _mock_execute_result(db: MagicMock, rows: List[Dict[str, Any]]) -> None:
 # Fixture: 每个测试前重置全局 DB 模式缓存
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def reset_db_mode():
     """每个测试前清除全局 DB 模式缓存，避免测试间状态污染"""
@@ -90,6 +92,7 @@ def reset_db_mode():
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 1: create_stocktake — DB 模式
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_create_stocktake_db_mode():
@@ -142,6 +145,7 @@ async def test_create_stocktake_db_mode():
 # Test 2: create_stocktake — 内存降级模式
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_create_stocktake_memory_fallback():
     """DB 不可用时，create_stocktake 应降级到内存模式"""
@@ -185,6 +189,7 @@ async def test_create_stocktake_memory_fallback():
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 3: record_count — DB 模式，正常录入
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_record_count_db_mode():
@@ -249,6 +254,7 @@ async def test_record_count_db_mode():
 # Test 4: record_count — 状态异常
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_record_count_wrong_status():
     """盘点单状态非 in_progress 时，record_count 应返回错误"""
@@ -294,6 +300,7 @@ async def test_record_count_wrong_status():
 # Test 5: record_count — 盘点单不存在
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_record_count_not_found():
     """盘点单不存在时，record_count 应返回 not found 错误"""
@@ -337,6 +344,7 @@ async def test_record_count_not_found():
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 6: finalize_stocktake — 内存降级模式（全流程）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_finalize_stocktake_memory_mode():
@@ -416,6 +424,7 @@ async def test_finalize_stocktake_memory_mode():
 # Test 7: get_stocktake_history — 内存模式
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_stocktake_history_memory():
     """内存模式下 get_stocktake_history 应按 store_id 过滤并倒序"""
@@ -468,6 +477,7 @@ async def test_get_stocktake_history_memory():
 # Test 8: _check_db_mode 缓存
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_check_db_mode_cached():
     """_check_db_mode 结果应被缓存，第二次调用不再执行 SQL"""
@@ -498,6 +508,7 @@ async def test_check_db_mode_cached():
 # ─────────────────────────────────────────────────────────────────────────────
 # Test 9: tenant_id 安全性 — set_config 必须在 DB 操作前调用
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_set_tenant_called_before_db_ops():

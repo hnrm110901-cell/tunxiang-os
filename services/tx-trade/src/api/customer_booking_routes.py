@@ -116,7 +116,8 @@ async def create_booking(
     try:
         await _set_tenant(db, tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_bookings
                     (tenant_id, store_id, customer_name, customer_phone,
                      party_size, booking_date, booking_time, table_type,
@@ -126,7 +127,8 @@ async def create_booking(
                      :party_size, :booking_date, :booking_time, :table_type,
                      :special_request, :source)
                 RETURNING id, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": req.store_id,
@@ -183,7 +185,8 @@ async def list_bookings(
     try:
         await _set_tenant(db, tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, customer_name, customer_phone,
                        party_size, booking_date, booking_time, table_type,
                        special_request, status, source,
@@ -194,7 +197,8 @@ async def list_bookings(
                   AND is_deleted = FALSE
                 ORDER BY booking_date, booking_time
                 LIMIT 50
-            """),
+            """
+            ),
             {"store_id": store_id},
         )
         items = [
@@ -234,7 +238,8 @@ async def cancel_booking(
     try:
         await _set_tenant(db, tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_bookings
                 SET status = 'cancelled',
                     cancelled_at = NOW(),
@@ -243,7 +248,8 @@ async def cancel_booking(
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"bid": booking_id},
         )
         await db.commit()
@@ -297,21 +303,24 @@ async def take_queue(
 
         # 生成当日流水号（A001 格式）
         count_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM queue_tickets
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND store_id = :sid::UUID
                   AND created_at::DATE = CURRENT_DATE
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": req.store_id},
         )
         today_count = (count_row.scalar() or 0) + 1
         ticket_no = "A" + str(today_count).zfill(3)
 
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO queue_tickets
                     (tenant_id, store_id, ticket_no, customer_name, customer_phone,
                      party_size, queue_type)
@@ -319,7 +328,8 @@ async def take_queue(
                     (:tenant_id, :store_id, :ticket_no, :customer_name, :customer_phone,
                      :party_size, :queue_type)
                 RETURNING id, status, created_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": req.store_id,
@@ -335,14 +345,16 @@ async def take_queue(
 
         # 前方等待数
         waiting_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM queue_tickets
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND store_id = :sid::UUID
                   AND status = 'waiting'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": req.store_id},
         )
         ahead = max(0, (waiting_row.scalar() or 1) - 1)
@@ -385,7 +397,8 @@ async def my_ticket(
     try:
         await _set_tenant(db, tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, ticket_no, customer_name, customer_phone,
                        party_size, queue_type, status,
                        called_at, seated_at, cancelled_at, wait_minutes,
@@ -394,7 +407,8 @@ async def my_ticket(
                 WHERE id = :tid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": ticket_id},
         )
         rec = row.mappings().first()
@@ -403,7 +417,8 @@ async def my_ticket(
 
         # 前方等待数
         ahead_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt
                 FROM queue_tickets
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
@@ -412,7 +427,8 @@ async def my_ticket(
                   AND queue_type = :qt
                   AND created_at < :created_at
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "sid": str(rec["store_id"]),
                 "qt": rec["queue_type"],
@@ -457,7 +473,8 @@ async def cancel_queue(
     try:
         await _set_tenant(db, tenant_id)
         row = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE queue_tickets
                 SET status = 'cancelled',
                     cancelled_at = NOW(),
@@ -466,7 +483,8 @@ async def cancel_queue(
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND is_deleted = FALSE
                 RETURNING id, ticket_no
-            """),
+            """
+            ),
             {"tid": ticket_id},
         )
         await db.commit()

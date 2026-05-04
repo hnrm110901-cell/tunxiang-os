@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import structlog
@@ -41,12 +41,8 @@ class ResolveAlertRequest(BaseModel):
 
 
 class ThresholdUpdateRequest(BaseModel):
-    warning_pct: Optional[float] = Field(
-        None, ge=1.0, le=50.0, description="警告阈值(%)"
-    )
-    critical_pct: Optional[float] = Field(
-        None, ge=5.0, le=80.0, description="严重阈值(%)"
-    )
+    warning_pct: Optional[float] = Field(None, ge=1.0, le=50.0, description="警告阈值(%)")
+    critical_pct: Optional[float] = Field(None, ge=5.0, le=80.0, description="严重阈值(%)")
 
 
 class FeedbackRequest(BaseModel):
@@ -57,9 +53,7 @@ class FeedbackRequest(BaseModel):
     actual_consumed_qty: Optional[float] = Field(None, ge=0, description="实际消耗量")
     waste_qty: float = Field(0.0, ge=0, description="浪费量")
     feedback_date: Optional[str] = Field(None, description="反馈日期 YYYY-MM-DD")
-    weather_condition: Optional[str] = Field(
-        None, description="天气: sunny/cloudy/rainy/heavy_rain/snow"
-    )
+    weather_condition: Optional[str] = Field(None, description="天气: sunny/cloudy/rainy/heavy_rain/snow")
     is_holiday: bool = Field(False, description="是否节假日")
     holiday_name: Optional[str] = Field(None, max_length=50, description="节假日名称")
 

@@ -119,7 +119,8 @@ async def _query_revenue_trend(db: AsyncSession, tenant_id: uuid.UUID, store_id:
     params["start"] = this_month_start.isoformat()
     params["end"] = now.isoformat()
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COALESCE(SUM(total_amount), 0) AS revenue,
                    COUNT(DISTINCT DATE(created_at)) AS days
             FROM orders
@@ -127,7 +128,8 @@ async def _query_revenue_trend(db: AsyncSession, tenant_id: uuid.UUID, store_id:
               AND status = 'completed'
               AND created_at BETWEEN :start AND :end
               {store_filter}
-        """),
+        """
+        ),
         params,
     )
     row = r.fetchone()
@@ -144,7 +146,8 @@ async def _query_revenue_trend(db: AsyncSession, tenant_id: uuid.UUID, store_id:
     if store_id:
         params2["store_id"] = store_id
     r2 = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COALESCE(SUM(total_amount), 0) AS revenue,
                    COUNT(DISTINCT DATE(created_at)) AS days
             FROM orders
@@ -152,7 +155,8 @@ async def _query_revenue_trend(db: AsyncSession, tenant_id: uuid.UUID, store_id:
               AND status = 'completed'
               AND created_at BETWEEN :start AND :end
               {store_filter}
-        """),
+        """
+        ),
         params2,
     )
     row2 = r2.fetchone()
@@ -190,27 +194,31 @@ async def _query_cost_control(db: AsyncSession, tenant_id: uuid.UUID, store_id: 
         params["store_id"] = store_id
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COALESCE(SUM(total_amount), 0) AS revenue
             FROM orders
             WHERE tenant_id = :tenant_id
               AND status = 'completed'
               AND created_at BETWEEN :start AND :end
               {store_filter}
-        """),
+        """
+        ),
         params,
     )
     revenue = float(r.scalar() or 0)
 
     r2 = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COALESCE(SUM(amount), 0) AS cost
             FROM cost_records
             WHERE tenant_id = :tenant_id
               AND cost_type IN ('ingredient', 'labor')
               AND recorded_at BETWEEN :start AND :end
               {store_filter}
-        """),
+        """
+        ),
         params,
     )
     cost = float(r2.scalar() or 0)
@@ -244,7 +252,8 @@ async def _query_customer_satisfaction(db: AsyncSession, tenant_id: uuid.UUID, s
         params["store_id"] = store_id
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE status='completed') AS completed,
                 COUNT(*) FILTER (WHERE status='refunded') AS refunded
@@ -252,7 +261,8 @@ async def _query_customer_satisfaction(db: AsyncSession, tenant_id: uuid.UUID, s
             WHERE tenant_id = :tenant_id
               AND created_at BETWEEN :start AND :end
               {store_filter}
-        """),
+        """
+        ),
         params,
     )
     row = r.fetchone()
@@ -289,7 +299,8 @@ async def _query_operational_efficiency(db: AsyncSession, tenant_id: uuid.UUID, 
         params["store_id"] = store_id
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT AVG(
                 EXTRACT(EPOCH FROM (finished_at - created_at)) / 60.0
             ) AS avg_minutes
@@ -298,7 +309,8 @@ async def _query_operational_efficiency(db: AsyncSession, tenant_id: uuid.UUID, 
               AND status = 'done'
               AND created_at BETWEEN :start AND :end
               {store_filter}
-        """),
+        """
+        ),
         params,
     )
     avg_minutes = float(r.scalar() or 0) or 18.0  # 无数据则设默认18分钟
@@ -330,7 +342,8 @@ async def _query_inventory_health(db: AsyncSession, tenant_id: uuid.UUID, store_
     params["now"] = now.isoformat()
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*) AS expiry_count
             FROM inventory_items
             WHERE tenant_id = :tenant_id
@@ -338,7 +351,8 @@ async def _query_inventory_health(db: AsyncSession, tenant_id: uuid.UUID, store_
               AND expires_at > :now
               AND expires_at <= :expiry_threshold
               {store_filter}
-        """),
+        """
+        ),
         params,
     )
     expiry_count = int(r.scalar() or 0)
@@ -438,7 +452,8 @@ async def _get_health_data(
             "since": thirty_days_ago.isoformat(),
         }
         r_fs = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'open' AND severity = 'critical') AS open_critical,
                     COUNT(*) FILTER (WHERE status = 'open' AND severity = 'high')     AS open_high,
@@ -448,7 +463,8 @@ async def _get_health_data(
                 WHERE tenant_id = :tid
                   AND created_at >= :since
                   {store_filter}
-            """),
+            """
+            ),
             p_fs,
         )
         row_fs = r_fs.fetchone()
@@ -468,7 +484,8 @@ async def _get_health_data(
             "since": thirty_days_ago.isoformat(),
         }
         r_svc = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'paid')     AS paid,
                     COUNT(*)                                     AS total
@@ -476,7 +493,8 @@ async def _get_health_data(
                 WHERE tenant_id = :tid
                   AND created_at >= :since
                   {store_filter}
-            """),
+            """
+            ),
             p_svc,
         )
         row_svc = r_svc.fetchone()
@@ -503,7 +521,8 @@ async def _get_health_data(
             "since": thirty_days_ago.isoformat(),
         }
         r_ops = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'present') AS present,
                     COUNT(*)                                    AS total
@@ -511,7 +530,8 @@ async def _get_health_data(
                 WHERE tenant_id = :tid
                   AND work_date >= :since
                   {store_filter}
-            """),
+            """
+            ),
             p_ops,
         )
         row_ops = r_ops.fetchone()
@@ -536,7 +556,8 @@ async def _get_health_data(
         # employee_trainings 通过 employees 表 JOIN 获取 store_id
         if store_id:
             r_tr = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*) FILTER (WHERE et.status = 'completed') AS completed,
                         COUNT(*)                                          AS total
@@ -545,19 +566,22 @@ async def _get_health_data(
                     WHERE et.tenant_id = :tid
                       AND e.store_id = :store_id
                       AND et.created_at >= :since
-                """),
+                """
+                ),
                 {**params_base, "since": thirty_days_ago.isoformat()},
             )
         else:
             r_tr = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*) FILTER (WHERE status = 'completed') AS completed,
                         COUNT(*)                                      AS total
                     FROM employee_trainings
                     WHERE tenant_id = :tid
                       AND created_at >= :since
-                """),
+                """
+                ),
                 {"tid": tid, "since": thirty_days_ago.isoformat()},
             )
         row_tr = r_tr.fetchone()

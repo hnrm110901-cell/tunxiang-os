@@ -8,11 +8,12 @@
 
 from __future__ import annotations
 
-import logging
 import math
 import uuid
 from datetime import date, timedelta
 from typing import Protocol
+
+import structlog
 
 from .prophet_baseline import (
     HistoricalGmvRepository,
@@ -26,7 +27,7 @@ from .schemas import (
 )
 from .sonnet_narrator import ActivityROINarrator, ModelRouterLike
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ─── 增量模型（v1：硬编码） ──────────────────────────────────────────────────
@@ -39,13 +40,13 @@ logger = logging.getLogger(__name__)
 # TODO(D3b-v2): 接入 mv_channel_margin / mv_store_pnl 后改为按门店/品牌动态学习
 
 ACTIVITY_LIFT_TABLE: dict[str, dict[str, float]] = {
-    "full_reduction":       {"lift_factor": 1.18, "margin_rate": 0.45, "ci_width": 0.10},
-    "member_day":           {"lift_factor": 1.25, "margin_rate": 0.50, "ci_width": 0.08},
-    "douyin_groupon":       {"lift_factor": 1.40, "margin_rate": 0.30, "ci_width": 0.15},
-    "xiaohongshu_coupon":   {"lift_factor": 1.15, "margin_rate": 0.42, "ci_width": 0.12},
-    "wechat_groupon":       {"lift_factor": 1.22, "margin_rate": 0.38, "ci_width": 0.10},
-    "second_half_off":      {"lift_factor": 1.20, "margin_rate": 0.40, "ci_width": 0.10},
-    "free_dish":            {"lift_factor": 1.10, "margin_rate": 0.35, "ci_width": 0.12},
+    "full_reduction": {"lift_factor": 1.18, "margin_rate": 0.45, "ci_width": 0.10},
+    "member_day": {"lift_factor": 1.25, "margin_rate": 0.50, "ci_width": 0.08},
+    "douyin_groupon": {"lift_factor": 1.40, "margin_rate": 0.30, "ci_width": 0.15},
+    "xiaohongshu_coupon": {"lift_factor": 1.15, "margin_rate": 0.42, "ci_width": 0.12},
+    "wechat_groupon": {"lift_factor": 1.22, "margin_rate": 0.38, "ci_width": 0.10},
+    "second_half_off": {"lift_factor": 1.20, "margin_rate": 0.40, "ci_width": 0.10},
+    "free_dish": {"lift_factor": 1.10, "margin_rate": 0.35, "ci_width": 0.12},
     "limited_time_special": {"lift_factor": 1.12, "margin_rate": 0.45, "ci_width": 0.10},
 }
 

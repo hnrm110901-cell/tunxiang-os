@@ -35,30 +35,36 @@ async def intent_search(
 
     # Record search log
     await db.execute(
-        text("""INSERT INTO forge.search_logs
+        text(
+            """INSERT INTO forge.search_logs
                 (tenant_id, search_id, query)
-                VALUES (:tid, :search_id, :query)"""),
+                VALUES (:tid, :search_id, :query)"""
+        ),
         {"tid": x_tenant_id, "search_id": search_id, "query": body.query},
     )
     await db.commit()
 
     # Full-text search on apps
     apps = await db.execute(
-        text("""SELECT app_id, app_name, description, category, avg_rating, install_count
+        text(
+            """SELECT app_id, app_name, description, category, avg_rating, install_count
                 FROM forge.apps
                 WHERE tenant_id = :tid AND is_deleted = false
                   AND (app_name ILIKE :q OR description ILIKE :q OR category ILIKE :q)
-                ORDER BY install_count DESC LIMIT 20"""),
+                ORDER BY install_count DESC LIMIT 20"""
+        ),
         {"tid": x_tenant_id, "q": f"%{body.query}%"},
     )
 
     # Matching combos
     combos = await db.execute(
-        text("""SELECT combo_id, combo_name, description, use_case, target_role, synergy_score
+        text(
+            """SELECT combo_id, combo_name, description, use_case, target_role, synergy_score
                 FROM forge.app_combos
                 WHERE tenant_id = :tid
                   AND (combo_name ILIKE :q OR use_case ILIKE :q OR description ILIKE :q)
-                ORDER BY synergy_score DESC LIMIT 10"""),
+                ORDER BY synergy_score DESC LIMIT 10"""
+        ),
         {"tid": x_tenant_id, "q": f"%{body.query}%"},
     )
 
@@ -83,9 +89,11 @@ async def record_search_click(
     """记录搜索结果点击."""
     await _set_tenant(db, x_tenant_id)
     await db.execute(
-        text("""INSERT INTO forge.search_clicks
+        text(
+            """INSERT INTO forge.search_clicks
                 (tenant_id, search_id, clicked_app_id)
-                VALUES (:tid, :search_id, :app_id)"""),
+                VALUES (:tid, :search_id, :app_id)"""
+        ),
         {"tid": x_tenant_id, "search_id": search_id, "app_id": body.clicked_app_id},
     )
     await db.commit()
@@ -106,32 +114,38 @@ async def search_analytics(
     params = {"tid": x_tenant_id, "days": days}
 
     total = await db.execute(
-        text("""SELECT COUNT(*) AS total_searches,
+        text(
+            """SELECT COUNT(*) AS total_searches,
                     COUNT(DISTINCT query) AS unique_queries
                 FROM forge.search_logs
                 WHERE tenant_id = :tid
-                  AND created_at >= NOW() - INTERVAL '1 day' * :days"""),
+                  AND created_at >= NOW() - INTERVAL '1 day' * :days"""
+        ),
         params,
     )
 
     top_queries = await db.execute(
-        text("""SELECT query, COUNT(*) AS count
+        text(
+            """SELECT query, COUNT(*) AS count
                 FROM forge.search_logs
                 WHERE tenant_id = :tid
                   AND created_at >= NOW() - INTERVAL '1 day' * :days
-                GROUP BY query ORDER BY count DESC LIMIT 20"""),
+                GROUP BY query ORDER BY count DESC LIMIT 20"""
+        ),
         params,
     )
 
     click_rate = await db.execute(
-        text("""SELECT
+        text(
+            """SELECT
                     COUNT(DISTINCT sl.search_id) AS searches_with_clicks,
                     (SELECT COUNT(*) FROM forge.search_logs
                      WHERE tenant_id = :tid
                        AND created_at >= NOW() - INTERVAL '1 day' * :days) AS total
                 FROM forge.search_clicks sl
                 WHERE sl.tenant_id = :tid
-                  AND sl.created_at >= NOW() - INTERVAL '1 day' * :days"""),
+                  AND sl.created_at >= NOW() - INTERVAL '1 day' * :days"""
+        ),
         params,
     )
 
@@ -166,10 +180,12 @@ async def list_combos(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.app_combos
+        text(
+            f"""SELECT * FROM forge.app_combos
                 WHERE {where}
                 ORDER BY synergy_score DESC, install_count DESC
-                LIMIT :limit OFFSET :offset"""),
+                LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -191,19 +207,23 @@ async def role_recommendations(
         raise HTTPException(status_code=400, detail=f"invalid role, must be one of: {', '.join(valid_roles)}")
 
     apps = await db.execute(
-        text("""SELECT app_id, app_name, description, category, avg_rating
+        text(
+            """SELECT app_id, app_name, description, category, avg_rating
                 FROM forge.apps
                 WHERE tenant_id = :tid AND is_deleted = false
                   AND target_roles @> ARRAY[:role]::text[]
-                ORDER BY avg_rating DESC LIMIT 20"""),
+                ORDER BY avg_rating DESC LIMIT 20"""
+        ),
         {"tid": x_tenant_id, "role": role},
     )
 
     combos = await db.execute(
-        text("""SELECT combo_id, combo_name, description, use_case, synergy_score
+        text(
+            """SELECT combo_id, combo_name, description, use_case, synergy_score
                 FROM forge.app_combos
                 WHERE tenant_id = :tid AND target_role = :role
-                ORDER BY synergy_score DESC LIMIT 10"""),
+                ORDER BY synergy_score DESC LIMIT 10"""
+        ),
         {"tid": x_tenant_id, "role": role},
     )
 

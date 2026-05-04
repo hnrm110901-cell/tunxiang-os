@@ -38,7 +38,8 @@ async def _get_avg_check(store_id: str, tenant_id: str, db: AsyncSession) -> flo
     """获取门店近30天平均客单价（分）"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(AVG(total_amount_fen), 0)
                 FROM orders
                 WHERE tenant_id = :tenant_id::uuid
@@ -46,7 +47,8 @@ async def _get_avg_check(store_id: str, tenant_id: str, db: AsyncSession) -> flo
                   AND is_deleted = FALSE
                   AND created_at >= NOW() - INTERVAL '30 days'
                   AND total_amount_fen > 0
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         return float(result.scalar() or 0)
@@ -59,12 +61,14 @@ async def _get_store_list(tenant_id: str, db: AsyncSession) -> list[dict]:
     """获取租户下所有门店"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, store_name, city
                 FROM stores
                 WHERE tenant_id = :tenant_id::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         return [{"store_id": r[0], "store_name": r[1], "city": r[2]} for r in result.fetchall()]

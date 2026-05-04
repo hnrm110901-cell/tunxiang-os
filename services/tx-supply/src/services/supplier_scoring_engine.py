@@ -260,7 +260,8 @@ class SupplierScoringEngine:
         """
         # ── 1. delivery_rate：按时交货率 ──────────────────────────────────
         # purchasing_orders: status='received', actual_delivery_date <= promised_date
-        delivery_sql = text("""
+        delivery_sql = text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE actual_delivery_date <= promised_date) AS on_time_cnt,
                 COUNT(*) AS total_cnt
@@ -269,10 +270,12 @@ class SupplierScoringEngine:
               AND supplier_id = :supplier_id::TEXT
               AND created_at::DATE BETWEEN :start AND :end
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
         # ── 2. quality_rate：收货验收合格率 ──────────────────────────────
-        quality_sql = text("""
+        quality_sql = text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE quality_status = 'passed') AS passed_cnt,
                 COUNT(*) AS total_cnt
@@ -281,10 +284,12 @@ class SupplierScoringEngine:
               AND supplier_id = :supplier_id::TEXT
               AND received_at::DATE BETWEEN :start AND :end
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
         # ── 3. price_stability：价格波动率（低波动 = 高稳定性）────────────
-        price_sql = text("""
+        price_sql = text(
+            """
             SELECT
                 STDDEV(unit_price_fen) / NULLIF(AVG(unit_price_fen), 0) AS price_cv
             FROM purchasing_orders
@@ -293,10 +298,12 @@ class SupplierScoringEngine:
               AND created_at::DATE BETWEEN :start AND :end
               AND is_deleted = FALSE
               AND unit_price_fen > 0
-        """)
+        """
+        )
 
         # ── 4. response_speed：平均响应天数（需求到确认单）─────────────────
-        response_sql = text("""
+        response_sql = text(
+            """
             SELECT
                 AVG(EXTRACT(EPOCH FROM (confirmed_at - created_at)) / 86400.0) AS avg_response_days
             FROM purchasing_orders
@@ -305,10 +312,12 @@ class SupplierScoringEngine:
               AND created_at::DATE BETWEEN :start AND :end
               AND is_deleted = FALSE
               AND confirmed_at IS NOT NULL
-        """)
+        """
+        )
 
         # ── 5. compliance_rate：合规文件提交率 ──────────────────────────
-        compliance_sql = text("""
+        compliance_sql = text(
+            """
             SELECT
                 COUNT(*) FILTER (WHERE compliance_docs_submitted = TRUE) AS compliant_cnt,
                 COUNT(*) AS total_cnt
@@ -317,7 +326,8 @@ class SupplierScoringEngine:
               AND supplier_id = :supplier_id::TEXT
               AND received_at::DATE BETWEEN :start AND :end
               AND is_deleted = FALSE
-        """)
+        """
+        )
 
         params = {
             "tenant_id": tenant_id,
@@ -379,7 +389,8 @@ class SupplierScoringEngine:
         db: Any,  # AsyncSession
     ) -> Optional[str]:
         """将评分记录写入 supplier_score_history，返回新行的 UUID。"""
-        insert_sql = text("""
+        insert_sql = text(
+            """
             INSERT INTO supplier_score_history (
                 tenant_id, supplier_id,
                 period_start, period_end,
@@ -394,7 +405,8 @@ class SupplierScoringEngine:
                 :composite_score, :ai_insight
             )
             RETURNING id::TEXT
-        """)
+        """
+        )
         try:
             result = await db.execute(insert_sql, record)
             row = result.fetchone()
@@ -419,7 +431,8 @@ class SupplierScoringEngine:
         db: Any,
     ) -> list[dict[str, Any]]:
         """查询供应商最近 N 期历史评分。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 id::TEXT, period_start, period_end, composite_score,
                 delivery_rate, quality_rate, price_stability,
@@ -430,7 +443,8 @@ class SupplierScoringEngine:
               AND is_deleted = FALSE
             ORDER BY period_start DESC
             LIMIT :limit
-        """)
+        """
+        )
         try:
             rows = (
                 await db.execute(
@@ -458,14 +472,16 @@ class SupplierScoringEngine:
         db: Any,
     ) -> bool:
         """判断是否为当月首次评分（用于决定是否触发 AI 洞察月报）。"""
-        sql = text("""
+        sql = text(
+            """
             SELECT COUNT(*) AS cnt
             FROM supplier_score_history
             WHERE tenant_id = :tenant_id
               AND supplier_id = :supplier_id::UUID
               AND DATE_TRUNC('month', period_start) = DATE_TRUNC('month', :period_start)
               AND is_deleted = FALSE
-        """)
+        """
+        )
         try:
             row = (
                 await db.execute(

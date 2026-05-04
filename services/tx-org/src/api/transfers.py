@@ -141,7 +141,8 @@ async def api_create_transfer(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO employee_transfers (
                     id, tenant_id, employee_id, employee_name,
                     from_store_id, from_store_name,
@@ -157,7 +158,8 @@ async def api_create_transfer(
                     :reason, 'pending', false,
                     :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": transfer_id,
                 "tenant_id": uuid.UUID(x_tenant_id),
@@ -233,7 +235,8 @@ async def api_list_transfers(
         total = count_res.scalar() or 0
 
         rows_res = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, employee_id, employee_name,
                        from_store_id, from_store_name,
                        to_store_id, to_store_name,
@@ -244,7 +247,8 @@ async def api_list_transfers(
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {**params, "size": size, "offset": (page - 1) * size},
         )
         items = [_row_to_dict(r) for r in rows_res.fetchall()]
@@ -266,10 +270,12 @@ async def api_approve_transfer(
     """审批借调单（pending → approved）。"""
     try:
         cur = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM employee_transfers
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": transfer_id, "tenant_id": uuid.UUID(x_tenant_id)},
         )
         row = cur.fetchone()
@@ -291,14 +297,16 @@ async def api_approve_transfer(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE employee_transfers
                 SET status = 'approved',
                     approved_by = :approver_id,
                     approved_at = :now,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "approver_id": req.approver_id,
                 "now": now,
@@ -315,7 +323,8 @@ async def api_approve_transfer(
     # 返回更新后的记录
     try:
         res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, employee_id, employee_name,
                        from_store_id, from_store_name,
                        to_store_id, to_store_name,
@@ -324,7 +333,8 @@ async def api_approve_transfer(
                        created_at, updated_at
                 FROM employee_transfers
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": transfer_id, "tenant_id": uuid.UUID(x_tenant_id)},
         )
         updated = _row_to_dict(res.fetchone())

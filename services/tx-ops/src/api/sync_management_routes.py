@@ -264,13 +264,15 @@ async def list_sync_logs(
             total: int = count_row.scalar() or 0
 
             rows = await conn.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT id, status, store_id, payload, created_at
                     FROM   operation_logs
                     WHERE  {where_clause}
                     ORDER  BY created_at DESC
                     LIMIT  :limit OFFSET :offset
-                """),  # noqa: S608
+                """
+                ),  # noqa: S608
                 params,
             )
             items = []

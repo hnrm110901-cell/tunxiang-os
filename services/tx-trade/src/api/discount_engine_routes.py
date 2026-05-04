@@ -319,14 +319,16 @@ async def _insert_discount_log(
 
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO checkout_discount_log
                 (id, tenant_id, order_id, base_amount_fen,
                  applied_discounts, total_saved_fen, final_amount_fen, conflicts)
             VALUES
                 (:id, :tid::uuid, :order_id::uuid, :base,
                  :applied::jsonb, :saved, :final, :conflicts::jsonb)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -506,7 +508,8 @@ async def create_discount_rule(
         )
         rule_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO discount_rules
                     (id, tenant_id, store_id, name, priority, type,
                      can_stack_with, apply_order, is_active, description)
@@ -514,7 +517,8 @@ async def create_discount_rule(
                     (:id, :tid::uuid, :store_id::uuid,
                      :name, :priority, :type,
                      :can_stack_with::text[], :apply_order, TRUE, :description)
-            """),
+            """
+            ),
             {
                 "id": rule_id,
                 "tid": tenant_id,
@@ -595,13 +599,15 @@ async def update_discount_rule(
             params["description"] = req.description
 
         result = await db.execute(
-            text(f"""  # noqa: S608 — mock SQL, not user input
+            text(
+                f"""  # noqa: S608 — mock SQL, not user input
                 UPDATE discount_rules
                 SET {", ".join(set_clauses)}
                 WHERE id = :rule_id::uuid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                 RETURNING id
-            """),
+            """
+            ),
             params,
         )
         if not result.fetchone():

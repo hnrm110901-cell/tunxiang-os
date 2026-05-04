@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -154,13 +154,15 @@ async def bind_channel(
 
             # ── 1. 幂等检查 ──────────────────────────────────────────────────
             existing = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, customer_id, binding_status, phone_hash
                     FROM member_channel_bindings
                     WHERE tenant_id = :tenant_id
                       AND channel_type = :channel_type
                       AND channel_openid = :channel_openid
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_uuid),
                     "channel_type": req.channel_type,
@@ -192,7 +194,8 @@ async def bind_channel(
 
             if phone_hash:
                 phone_match = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT customer_id, COUNT(DISTINCT customer_id) AS cnt
                         FROM member_channel_bindings
                         WHERE tenant_id = :tenant_id
@@ -200,7 +203,8 @@ async def bind_channel(
                           AND binding_status = 'active'
                         GROUP BY customer_id
                         LIMIT 2
-                    """),
+                    """
+                    ),
                     {"tenant_id": str(tenant_uuid), "phone_hash": phone_hash},
                 )
                 phone_rows = phone_match.fetchall()
@@ -237,14 +241,16 @@ async def bind_channel(
             binding_status = "active"
             if phone_hash and not merge_happened:
                 conflict_check = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) AS cnt
                         FROM member_channel_bindings
                         WHERE tenant_id = :tenant_id
                           AND phone_hash = :phone_hash
                           AND customer_id != :customer_id
                           AND binding_status = 'active'
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": str(tenant_uuid),
                         "phone_hash": phone_hash,
@@ -256,7 +262,8 @@ async def bind_channel(
 
             # ── 4. 写入绑定记录 ───────────────────────────────────────────────
             insert_result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO member_channel_bindings
                         (tenant_id, customer_id, channel_type, channel_openid,
                          phone_hash, binding_status, extra)
@@ -264,7 +271,8 @@ async def bind_channel(
                         (:tenant_id, :customer_id, :channel_type, :channel_openid,
                          :phone_hash, :binding_status, :extra::jsonb)
                     RETURNING id, customer_id, binding_status
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_uuid),
                     "customer_id": str(resolved_customer_id),
@@ -320,7 +328,8 @@ async def unbind_channel(
             await _set_tenant(db, x_tenant_id)
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE member_channel_bindings
                     SET binding_status = 'unbound',
                         updated_at = NOW()
@@ -329,7 +338,8 @@ async def unbind_channel(
                       AND channel_openid = :channel_openid
                       AND binding_status != 'unbound'
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_uuid),
                     "channel_type": req.channel_type,
@@ -377,7 +387,8 @@ async def merge_golden_ids(
 
             # 迁移 source → target 的所有绑定
             migrate_result = await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE member_channel_bindings
                     SET customer_id = :target_customer_id,
                         updated_at = NOW()
@@ -385,7 +396,8 @@ async def merge_golden_ids(
                       AND customer_id = :source_customer_id
                       AND binding_status = 'active'
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_uuid),
                     "source_customer_id": str(source_uuid),
@@ -396,14 +408,16 @@ async def merge_golden_ids(
 
             # 写合并日志
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO golden_id_merge_logs
                         (tenant_id, source_customer_id, target_customer_id,
                          merge_reason, merge_metadata, operator_id)
                     VALUES
                         (:tenant_id, :source, :target, :reason,
                          :metadata::jsonb, :operator_id)
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_uuid),
                     "source": str(source_uuid),
@@ -460,18 +474,21 @@ async def list_conflicts(
             await _set_tenant(db, x_tenant_id)
 
             total_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS total
                     FROM member_channel_bindings
                     WHERE tenant_id = :tenant_id
                       AND binding_status = 'conflict'
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_uuid)},
             )
             total = total_result.scalar() or 0
 
             items_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, customer_id, channel_type, channel_openid,
                            phone_hash, created_at
                     FROM member_channel_bindings
@@ -479,7 +496,8 @@ async def list_conflicts(
                       AND binding_status = 'conflict'
                     ORDER BY created_at DESC
                     LIMIT :size OFFSET :offset
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_uuid), "size": size, "offset": offset},
             )
             items = [
@@ -525,13 +543,15 @@ async def resolve_conflict(
 
             # 查冲突记录
             conflict_row_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, channel_type, channel_openid
                     FROM member_channel_bindings
                     WHERE id = :conflict_id
                       AND tenant_id = :tenant_id
                       AND binding_status = 'conflict'
-                """),
+                """
+                ),
                 {"conflict_id": str(conflict_uuid), "tenant_id": str(tenant_uuid)},
             )
             conflict_row = conflict_row_result.fetchone()
@@ -540,7 +560,8 @@ async def resolve_conflict(
 
             # 将同 openid 的其他冲突绑定设为 unbound，保留的设为 active
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE member_channel_bindings
                     SET binding_status = CASE
                             WHEN customer_id = :keep_customer_id THEN 'active'
@@ -553,7 +574,8 @@ async def resolve_conflict(
                       AND channel_type = :channel_type
                       AND channel_openid = :channel_openid
                       AND binding_status = 'conflict'
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_uuid),
                     "keep_customer_id": str(keep_uuid),
@@ -601,7 +623,8 @@ async def get_channel_stats(
             await _set_tenant(db, x_tenant_id)
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         channel_type,
                         COUNT(*) FILTER (WHERE binding_status = 'active') AS active_count,
@@ -612,7 +635,8 @@ async def get_channel_stats(
                     WHERE tenant_id = :tenant_id
                     GROUP BY channel_type
                     ORDER BY channel_type
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_uuid)},
             )
             rows = result.fetchall()
@@ -672,14 +696,16 @@ async def get_customer_channels(
             await _set_tenant(db, x_tenant_id)
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, channel_type, channel_openid, binding_status,
                            created_at, updated_at
                     FROM member_channel_bindings
                     WHERE tenant_id = :tenant_id
                       AND customer_id = :customer_id
                     ORDER BY created_at DESC
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_uuid), "customer_id": str(customer_uuid)},
             )
             rows = result.fetchall()
@@ -740,12 +766,14 @@ async def batch_import_bindings(
                 try:
                     # 幂等检查
                     existing = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT id FROM member_channel_bindings
                             WHERE tenant_id = :tenant_id
                               AND channel_type = :channel_type
                               AND channel_openid = :channel_openid
-                        """),
+                        """
+                        ),
                         {
                             "tenant_id": str(tenant_uuid),
                             "channel_type": item.channel_type,
@@ -760,14 +788,16 @@ async def batch_import_bindings(
                     resolved_customer_id = uuid.uuid4()
                     if phone_hash:
                         phone_match = await db.execute(
-                            text("""
+                            text(
+                                """
                                 SELECT customer_id
                                 FROM member_channel_bindings
                                 WHERE tenant_id = :tenant_id
                                   AND phone_hash = :phone_hash
                                   AND binding_status = 'active'
                                 LIMIT 1
-                            """),
+                            """
+                            ),
                             {"tenant_id": str(tenant_uuid), "phone_hash": phone_hash},
                         )
                         phone_row = phone_match.fetchone()
@@ -775,14 +805,16 @@ async def batch_import_bindings(
                             resolved_customer_id = phone_row.customer_id
 
                     await db.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO member_channel_bindings
                                 (tenant_id, customer_id, channel_type, channel_openid,
                                  phone_hash, binding_status, extra)
                             VALUES
                                 (:tenant_id, :customer_id, :channel_type, :channel_openid,
                                  :phone_hash, 'active', :extra::jsonb)
-                        """),
+                        """
+                        ),
                         {
                             "tenant_id": str(tenant_uuid),
                             "customer_id": str(resolved_customer_id),

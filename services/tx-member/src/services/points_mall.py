@@ -126,14 +126,16 @@ async def list_mall_items(
     total = cnt_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT mi.id, mi.name, mi.category, mi.points_cost,
                    mi.stock, mi.image_url, mi.description
             FROM mall_items mi
             {where_clause}
             ORDER BY mi.sort_order ASC, mi.created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -179,11 +181,13 @@ async def exchange_item(
 
     # 1. 检查商品库存
     item_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, points_cost, stock
             FROM mall_items
             WHERE id = :iid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"iid": item_id, "tid": tenant_id},
     )
     item = item_row.mappings().first()
@@ -196,11 +200,13 @@ async def exchange_item(
 
     # 2. 检查会员积分余额
     bal_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id as card_id, points
             FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     card = bal_row.mappings().first()
@@ -214,30 +220,36 @@ async def exchange_item(
 
     # 3. 扣积分
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards SET points = points - :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pts": points_cost, "cid": str(card["card_id"]), "tid": tenant_id, "now": now},
     )
 
     # 4. 库存-1
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE mall_items SET stock = stock - 1, updated_at = :now
             WHERE id = :iid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"iid": item_id, "tid": tenant_id, "now": now},
     )
 
     # 5. 创建兑换记录
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO exchange_records
                 (id, tenant_id, customer_id, item_id, item_name,
                  points_cost, status, created_at)
             VALUES (:eid, :tid, :cid, :iid, :name, :pts, 'confirmed', :now)
-        """),
+        """
+        ),
         {
             "eid": exchange_id,
             "tid": tenant_id,
@@ -252,11 +264,13 @@ async def exchange_item(
     # 6. 记录积分流水
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'spend', 'exchange', :pts, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -306,22 +320,26 @@ async def get_exchange_history(
     offset = (page - 1) * size
 
     cnt_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM exchange_records
             WHERE customer_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     total = cnt_row.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, item_id, item_name, points_cost, status, created_at
             FROM exchange_records
             WHERE customer_id = :cid AND tenant_id = :tid
             ORDER BY created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id, "lim": size, "off": offset},
     )
     items = [
@@ -382,7 +400,8 @@ async def create_mall_item(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO mall_items
                 (id, tenant_id, name, category, points_cost,
                  stock, image_url, description, sort_order,
@@ -390,7 +409,8 @@ async def create_mall_item(
             VALUES (:iid, :tid, :name, :cat, :pts,
                     :stock, :img, :desc, 0,
                     false, :now, :now)
-        """),
+        """
+        ),
         {
             "iid": item_id,
             "tid": tenant_id,
@@ -441,7 +461,8 @@ async def get_achievement_list(
 
     # 查询客户指标
     metrics_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE((SELECT COUNT(*) FROM orders
                           WHERE customer_id = :cid AND tenant_id = :tid
@@ -453,7 +474,8 @@ async def get_achievement_list(
                           WHERE customer_id = :cid AND tenant_id = :tid), 0) as share_count,
                 COALESCE((SELECT COUNT(*) FROM reviews
                           WHERE customer_id = :cid AND tenant_id = :tid), 0) as review_count
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     metrics = metrics_row.mappings().first()
@@ -462,10 +484,12 @@ async def get_achievement_list(
 
     # 已获得的成就
     earned_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT achievement_id FROM customer_achievements
             WHERE customer_id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     earned_ids = {str(r[0]) for r in earned_row.fetchall()}
@@ -520,10 +544,12 @@ async def check_birthday_privilege(
 
     # 查客户生日
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT birthday FROM customers
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     result = row.mappings().first()
@@ -552,11 +578,13 @@ async def check_birthday_privilege(
     if eligible:
         # 检查是否已领取过
         used_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM birthday_rewards
                 WHERE customer_id = :cid AND tenant_id = :tid
                   AND reward_year = :year AND reward_month = :month
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id, "year": _now_utc().year, "month": current_month},
         )
         already_claimed = used_row.scalar() is not None

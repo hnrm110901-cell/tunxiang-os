@@ -238,8 +238,7 @@ class TestRateLimitTenantScoped:
 
         # 关键断言：tenant_B 的请求 不应 因为 tenant_A 的窗口被限流
         assert resp_competitor.status_code == 200, (
-            f"跨租户限流污染！tenant_B 在 tenant_A 同 device 的窗口内被误伤："
-            f"{resp_competitor.text}"
+            f"跨租户限流污染！tenant_B 在 tenant_A 同 device 的窗口内被误伤：{resp_competitor.text}"
         )
 
         # 限流缓存中应有 2 个 key（tenant_xuji:device, tenant_competitor:device）
@@ -304,10 +303,7 @@ class TestLocalStorageTamperingBlocked:
 
         # 关键：绝对不允许 INSERT 执行（即使有 set_config 也不应到 INSERT）
         insert_calls = [(s, p) for s, p in captured if "INSERT INTO pos_crash_reports" in s]
-        assert len(insert_calls) == 0, (
-            f"严重：跨租户 INSERT 被执行了！攻击成功污染 pos_crash_reports："
-            f"{insert_calls}"
-        )
+        assert len(insert_calls) == 0, f"严重：跨租户 INSERT 被执行了！攻击成功污染 pos_crash_reports：{insert_calls}"
         # set_config 也不应执行（拦截发生在 RLS 之前，防御深度第一道关）
         set_config_calls = [(s, p) for s, p in captured if "set_config" in s]
         assert len(set_config_calls) == 0

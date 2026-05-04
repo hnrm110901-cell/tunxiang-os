@@ -131,9 +131,12 @@ class TestChannelDisputeServiceTier2:
         """claim ≤ threshold + type 可 auto_accept → state=auto_accepted，发 2 条事件。"""
         req = _build_open_request(claimed_amount_fen=3000)  # < 5000
         # service 层先 SELECT 后 INSERT；模拟 INSERT 后 DB 返回的行 state=auto_accepted
-        new_row = _row(req, state="auto_accepted",
-                       decision_reason="auto_accept under threshold (claim=3000 <= threshold=5000)",
-                       decision_at=datetime.now(timezone.utc))
+        new_row = _row(
+            req,
+            state="auto_accepted",
+            decision_reason="auto_accept under threshold (claim=3000 <= threshold=5000)",
+            decision_at=datetime.now(timezone.utc),
+        )
 
         emitted_events = []
 
@@ -144,17 +147,14 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(
-            svc._repo, "get_by_external", AsyncMock(return_value=None)
-        ), patch.object(
-            svc._repo, "insert", AsyncMock(return_value=new_row)
-        ) as mock_insert, patch(
-            "src.services.channel_dispute_service.emit_event", new=fake_emit
+        with (
+            patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)),
+            patch.object(svc._repo, "insert", AsyncMock(return_value=new_row)) as mock_insert,
+            patch("src.services.channel_dispute_service.emit_event", new=fake_emit),
         ):
-            record, created = await svc.open_dispute(
-                req, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN
-            )
+            record, created = await svc.open_dispute(req, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN)
             import asyncio as _aio
+
             pending = [t for t in _aio.all_tasks() if t is not _aio.current_task()]
             await _aio.gather(*pending, return_exceptions=True)
 
@@ -185,17 +185,14 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(
-            svc._repo, "get_by_external", AsyncMock(return_value=None)
-        ), patch.object(
-            svc._repo, "insert", AsyncMock(return_value=new_row)
-        ) as mock_insert, patch(
-            "src.services.channel_dispute_service.emit_event", new=fake_emit
+        with (
+            patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)),
+            patch.object(svc._repo, "insert", AsyncMock(return_value=new_row)) as mock_insert,
+            patch("src.services.channel_dispute_service.emit_event", new=fake_emit),
         ):
-            record, created = await svc.open_dispute(
-                req, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN
-            )
+            record, created = await svc.open_dispute(req, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN)
             import asyncio as _aio
+
             pending = [t for t in _aio.all_tasks() if t is not _aio.current_task()]
             await _aio.gather(*pending, return_exceptions=True)
 
@@ -231,12 +228,10 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(
-            svc._repo, "get", AsyncMock(return_value=existing_row)
-        ), patch.object(
-            svc._repo, "resolve", AsyncMock(return_value=resolved_row)
-        ) as mock_resolve, patch(
-            "src.services.channel_dispute_service.emit_event", new=fake_emit
+        with (
+            patch.object(svc._repo, "get", AsyncMock(return_value=existing_row)),
+            patch.object(svc._repo, "resolve", AsyncMock(return_value=resolved_row)) as mock_resolve,
+            patch("src.services.channel_dispute_service.emit_event", new=fake_emit),
         ):
             record = await svc.resolve_dispute(
                 dispute_id=str(existing_row["id"]),
@@ -245,6 +240,7 @@ class TestChannelDisputeServiceTier2:
                 operator_id=operator_id,
             )
             import asyncio as _aio
+
             pending = [t for t in _aio.all_tasks() if t is not _aio.current_task()]
             await _aio.gather(*pending, return_exceptions=True)
 
@@ -257,9 +253,7 @@ class TestChannelDisputeServiceTier2:
         assert ka["decision_reason"] == "customer provided photo evidence"
         assert ka["decision_by"] == operator_id
         # 事件
-        assert any(
-            e["event_type"].value == "channel.dispute_resolved" for e in emitted_events
-        )
+        assert any(e["event_type"].value == "channel.dispute_resolved" for e in emitted_events)
 
     @pytest.mark.asyncio
     async def test_resolve_already_resolved_dispute_returns_409(self):
@@ -270,11 +264,10 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(
-            svc._repo, "get", AsyncMock(return_value=already_row)
-        ), patch.object(
-            svc._repo, "resolve", AsyncMock()
-        ) as mock_resolve:
+        with (
+            patch.object(svc._repo, "get", AsyncMock(return_value=already_row)),
+            patch.object(svc._repo, "resolve", AsyncMock()) as mock_resolve,
+        ):
             with pytest.raises(DisputeAlreadyResolvedError):
                 await svc.resolve_dispute(
                     dispute_id=str(already_row["id"]),

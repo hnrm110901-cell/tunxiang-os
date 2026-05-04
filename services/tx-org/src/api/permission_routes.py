@@ -243,7 +243,8 @@ async def get_role_limits(
     """查询角色的所有限制配置"""
     tenant_id = _get_tenant(x_tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             id, role_name, level,
             max_discount_rate, max_wipeoff_fen, max_gift_fen_v2 AS max_gift_fen,
@@ -253,7 +254,8 @@ async def get_role_limits(
         WHERE id = :role_id
           AND tenant_id = :tenant_id
           AND is_deleted = FALSE
-    """)
+    """
+    )
     result = await db.execute(sql, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     row = result.mappings().first()
 
@@ -291,10 +293,12 @@ async def update_role_limits(
     tenant_id = _get_tenant(x_tenant_id)
 
     # 1. 查询被修改角色的当前级别
-    sql_target = text("""
+    sql_target = text(
+        """
         SELECT id, level FROM role_configs
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-    """)
+    """
+    )
     target_result = await db.execute(sql_target, {"role_id": str(role_id), "tenant_id": str(tenant_id)})
     target_row = target_result.mappings().first()
     if target_row is None:
@@ -348,14 +352,16 @@ async def update_role_limits(
     set_clauses = ", ".join(f"{col} = :{col}" for col in updates)
     params = {**updates, "role_id": str(role_id), "tenant_id": str(tenant_id)}
 
-    sql_update = text(f"""
+    sql_update = text(
+        f"""
         UPDATE role_configs
         SET {set_clauses}, updated_at = NOW()
         WHERE id = :role_id AND tenant_id = :tenant_id AND is_deleted = FALSE
         RETURNING id, role_name, level, max_discount_rate,
                   max_wipeoff_fen, max_gift_fen_v2 AS max_gift_fen,
                   data_query_days, can_void_order, can_modify_price, can_override_discount
-    """)
+    """
+    )
     update_result = await db.execute(sql_update, params)
     updated_row = update_result.mappings().first()
     await db.commit()

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -110,7 +110,8 @@ async def get_cross_brand_profile(
 
             # 查询该 golden_id 关联的所有品牌会员链接
             links_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT cbl.brand_id, cbl.brand_member_id,
                            cbl.created_at AS link_created_at
                     FROM cross_brand_member_links cbl
@@ -118,7 +119,8 @@ async def get_cross_brand_profile(
                       AND cbl.tenant_id = :tenant_id
                       AND cbl.is_deleted = FALSE
                     ORDER BY cbl.created_at
-                """),
+                """
+                ),
                 {"golden_id": golden_id, "tenant_id": x_tenant_id},
             )
             links = links_result.fetchall()
@@ -142,12 +144,14 @@ async def get_cross_brand_profile(
 
                 # 积分汇总
                 points_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COALESCE(SUM(balance), 0) AS total_points
                         FROM member_points
                         WHERE tenant_id = :tenant_id
                           AND customer_id = :member_id
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "member_id": brand_member_id},
                 )
                 brand_points = points_result.scalar() or 0
@@ -155,13 +159,15 @@ async def get_cross_brand_profile(
 
                 # 储值余额
                 sv_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COALESCE(SUM(balance_fen), 0) AS sv_balance
                         FROM stored_value_cards
                         WHERE tenant_id = :tenant_id
                           AND customer_id = :member_id
                           AND status = 'active'
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "member_id": brand_member_id},
                 )
                 brand_sv = sv_result.scalar() or 0
@@ -169,14 +175,16 @@ async def get_cross_brand_profile(
 
                 # 消费统计
                 order_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) AS order_count,
                                COALESCE(SUM(total_fen), 0) AS spend_fen
                         FROM orders
                         WHERE tenant_id = :tenant_id
                           AND customer_id = :member_id
                           AND status = 'paid'
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "member_id": brand_member_id},
                 )
                 order_row = order_result.fetchone()
@@ -187,13 +195,15 @@ async def get_cross_brand_profile(
 
                 # 偏好标签
                 pref_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT DISTINCT tag
                         FROM member_preference_tags
                         WHERE tenant_id = :tenant_id
                           AND customer_id = :member_id
                         LIMIT 10
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "member_id": brand_member_id},
                 )
                 brand_prefs = [r.tag for r in pref_result.fetchall()]
@@ -269,14 +279,16 @@ async def merge_cross_brand_member(
 
             # 查找源品牌会员（通过 phone_hash）
             source_member = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT customer_id
                     FROM member_channel_bindings
                     WHERE tenant_id = :tenant_id
                       AND phone_hash = :phone_hash
                       AND binding_status = 'active'
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "phone_hash": phone_hash},
             )
             source_row = source_member.fetchone()
@@ -288,14 +300,16 @@ async def merge_cross_brand_member(
 
             # 查找目标品牌会员
             target_member = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT customer_id
                     FROM member_channel_bindings
                     WHERE tenant_id = :tenant_id
                       AND phone_hash = :phone_hash
                       AND binding_status = 'active'
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "phone_hash": phone_hash},
             )
             target_row = target_member.fetchone()
@@ -310,14 +324,16 @@ async def merge_cross_brand_member(
 
             # 检查是否已有 golden_id
             existing_link = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT golden_id
                     FROM cross_brand_member_links
                     WHERE tenant_id = :tenant_id
                       AND brand_member_id = :member_id
                       AND is_deleted = FALSE
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "member_id": source_customer_id},
             )
             existing_row = existing_link.fetchone()
@@ -325,7 +341,8 @@ async def merge_cross_brand_member(
 
             # 插入/更新源品牌链接
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO cross_brand_member_links
                         (id, tenant_id, golden_id, brand_id, brand_member_id, phone_hash)
                     VALUES
@@ -333,7 +350,8 @@ async def merge_cross_brand_member(
                     ON CONFLICT (tenant_id, brand_id, brand_member_id)
                         WHERE is_deleted = FALSE
                     DO UPDATE SET golden_id = :golden_id, updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tenant_id": x_tenant_id,
@@ -346,7 +364,8 @@ async def merge_cross_brand_member(
 
             # 插入/更新目标品牌链接
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO cross_brand_member_links
                         (id, tenant_id, golden_id, brand_id, brand_member_id, phone_hash)
                     VALUES
@@ -354,7 +373,8 @@ async def merge_cross_brand_member(
                     ON CONFLICT (tenant_id, brand_id, brand_member_id)
                         WHERE is_deleted = FALSE
                     DO UPDATE SET golden_id = :golden_id, updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tenant_id": x_tenant_id,
@@ -410,19 +430,22 @@ async def get_cross_brand_stats(
 
             # 总会员数（distinct golden_id）
             total_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(DISTINCT golden_id) AS total_members
                     FROM cross_brand_member_links
                     WHERE tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id},
             )
             total_members = total_result.scalar() or 0
 
             # 共享会员（消费 2+ 品牌的 golden_id 数）
             shared_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS shared_members
                     FROM (
                         SELECT golden_id
@@ -432,7 +455,8 @@ async def get_cross_brand_stats(
                         GROUP BY golden_id
                         HAVING COUNT(DISTINCT brand_id) >= 2
                     ) sub
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id},
             )
             shared_members = shared_result.scalar() or 0
@@ -445,7 +469,8 @@ async def get_cross_brand_stats(
 
             # 各品牌会员数
             brand_stats_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT brand_id,
                            COUNT(DISTINCT golden_id) AS member_count,
                            COUNT(DISTINCT brand_member_id) AS account_count
@@ -454,7 +479,8 @@ async def get_cross_brand_stats(
                       AND is_deleted = FALSE
                     GROUP BY brand_id
                     ORDER BY member_count DESC
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id},
             )
             brand_stats = [
@@ -511,14 +537,16 @@ async def transfer_points_cross_brand(
 
             # 查找两个品牌的会员链接
             from_link = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT brand_member_id
                     FROM cross_brand_member_links
                     WHERE tenant_id = :tenant_id
                       AND golden_id = :golden_id
                       AND brand_id = :brand_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "tenant_id": x_tenant_id,
                     "golden_id": req.golden_id,
@@ -533,14 +561,16 @@ async def transfer_points_cross_brand(
                 )
 
             to_link = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT brand_member_id
                     FROM cross_brand_member_links
                     WHERE tenant_id = :tenant_id
                       AND golden_id = :golden_id
                       AND brand_id = :brand_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "tenant_id": x_tenant_id,
                     "golden_id": req.golden_id,
@@ -559,12 +589,14 @@ async def transfer_points_cross_brand(
 
             # 检查源品牌积分余额
             balance_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COALESCE(SUM(balance), 0) AS available_points
                     FROM member_points
                     WHERE tenant_id = :tenant_id
                       AND customer_id = :member_id
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "member_id": from_member_id},
             )
             available = balance_result.scalar() or 0
@@ -579,14 +611,16 @@ async def transfer_points_cross_brand(
 
             # 扣减源品牌积分
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO member_points
                         (id, tenant_id, customer_id, balance, change_amount,
                          change_type, change_reason, created_at)
                     VALUES
                         (:id, :tenant_id, :member_id, -:points, -:points,
                          'cross_brand_transfer_out', :reason, NOW())
-                """),
+                """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tenant_id": x_tenant_id,
@@ -598,14 +632,16 @@ async def transfer_points_cross_brand(
 
             # 增加目标品牌积分
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO member_points
                         (id, tenant_id, customer_id, balance, change_amount,
                          change_type, change_reason, created_at)
                     VALUES
                         (:id, :tenant_id, :member_id, :points, :points,
                          'cross_brand_transfer_in', :reason, NOW())
-                """),
+                """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tenant_id": x_tenant_id,

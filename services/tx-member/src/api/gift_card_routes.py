@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
-from services.gift_card import (
+
+from ..services.gift_card import (
     activate_cards,
     batch_create_cards,
     create_gift_card_type,

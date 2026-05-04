@@ -40,6 +40,7 @@ from models.approval_flow import (
     RecordAction,
     StepCondition,
 )
+
 from services.approval_engine import ApprovalEngine
 
 # ── 测试夹具 ──────────────────────────────────────────────────────────────────
@@ -122,9 +123,7 @@ def _make_db(
         mock_result.mappings.return_value.first.return_value = (
             flow_def if flow_def else (instance if instance else None)
         )
-        mock_result.mappings.return_value.fetchall.return_value = (
-            [instance] if instance else []
-        )
+        mock_result.mappings.return_value.fetchall.return_value = [instance] if instance else []
         mock_result.scalar.return_value = 0
         return mock_result
 
@@ -451,10 +450,7 @@ class TestApprovalEngineApprove:
             )
 
         # 应通知发起人审批通过
-        assert any(
-            n["recipient_id"] == INITIATOR_ID and "通过" in n["title"]
-            for n in notifications
-        )
+        assert any(n["recipient_id"] == INITIATOR_ID and "通过" in n["title"] for n in notifications)
 
     @pytest.mark.asyncio
     async def test_approve_raises_on_non_pending(self):
@@ -528,10 +524,7 @@ class TestApprovalEngineReject:
             )
 
         # 应通知发起人被拒绝
-        assert any(
-            n["recipient_id"] == INITIATOR_ID and "拒绝" in n["title"]
-            for n in notifications
-        )
+        assert any(n["recipient_id"] == INITIATOR_ID and "拒绝" in n["title"] for n in notifications)
         db.commit.assert_called_once()
 
     @pytest.mark.asyncio
@@ -749,6 +742,7 @@ class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_cross_tenant_instance_not_found(self):
         """不同租户的审批实例不可见"""
+
         # DB 返回 None 模拟 RLS 隔离
         async def mock_execute(stmt, params=None):
             result = MagicMock()

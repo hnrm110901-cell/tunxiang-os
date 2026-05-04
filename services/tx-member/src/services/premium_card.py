@@ -140,7 +140,8 @@ async def _sync_member_level(
     待 Ontology 正式添加 member_level 列后替换 SQL。
     """
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM premium_cards
             WHERE customer_id = :cid
               AND tenant_id = :tid
@@ -148,7 +149,8 @@ async def _sync_member_level(
               AND status = 'active'
               AND (expires_at IS NULL OR expires_at > :now)
               AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id, "now": _now_utc()},
     )
     active_period_count = row.scalar() or 0
@@ -156,7 +158,8 @@ async def _sync_member_level(
     if active_period_count > 0:
         # 提升为 gold（最低）
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customers
                 SET extra = jsonb_set(
                     COALESCE(extra, '{}'),
@@ -165,7 +168,8 @@ async def _sync_member_level(
                 ),
                 updated_at = :now
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id, "now": _now_utc()},
         )
         logger.info(
@@ -195,14 +199,16 @@ async def list_templates(
         where += " AND is_active = true"
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, name, card_type, price_fen,
                    total_uses, period_type,
                    benefits::text, valid_days, is_active, sort_order
             FROM premium_card_templates
             WHERE {where}
             ORDER BY sort_order ASC, created_at DESC
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     templates = []
@@ -262,7 +268,8 @@ async def create_template(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_card_templates
                 (id, tenant_id, name, card_type, price_fen,
                  total_uses, period_type, benefits,
@@ -273,7 +280,8 @@ async def create_template(
                  :total_uses, :period_type, :benefits::jsonb,
                  :valid_days, true, :sort_order,
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": template_id,
             "tid": tenant_id,
@@ -335,13 +343,15 @@ async def purchase_card(
 
     # 查模板
     tpl_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, card_type, price_fen,
                    total_uses, period_type,
                    benefits::text, valid_days, is_active
             FROM premium_card_templates
             WHERE id = :tid_param AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid_param": template_id, "tid": tenant_id},
     )
     tpl = tpl_row.mappings().first()
@@ -382,7 +392,8 @@ async def purchase_card(
     benefits_json = tpl["benefits"] or "[]"
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_cards
                 (id, tenant_id, template_id, customer_id, store_id,
                  card_type, status,
@@ -399,7 +410,8 @@ async def purchase_card(
                  :now, :expires_at,
                  '{}',
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": card_id,
             "tid": tenant_id,
@@ -476,13 +488,15 @@ async def use_count_card(
 
     # 加行锁查卡
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, customer_id, card_type, status,
                    remaining_uses, expires_at
             FROM premium_cards
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
             FOR UPDATE
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     card = row.mappings().first()
@@ -499,11 +513,13 @@ async def use_count_card(
     if card["expires_at"] and card["expires_at"] < now:
         # 过期但 status 未更新，修正
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE premium_cards
                 SET status = 'expired', updated_at = :now
                 WHERE id = :cid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"cid": card_id, "tid": tenant_id, "now": now},
         )
         await db.flush()
@@ -514,13 +530,15 @@ async def use_count_card(
     new_status = "expired" if uses_after == 0 else "active"
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE premium_cards
             SET remaining_uses = :uses_after,
                 status = :status,
                 updated_at = :now
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "uses_after": uses_after,
             "status": new_status,
@@ -532,7 +550,8 @@ async def use_count_card(
 
     usage_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_card_usages
                 (id, tenant_id, card_id, customer_id, store_id, order_id,
                  usage_type, benefit_type,
@@ -545,7 +564,8 @@ async def use_count_card(
                  :uses_before, :uses_after,
                  :now, :operator_id,
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": usage_id,
             "tid": tenant_id,
@@ -623,7 +643,8 @@ async def check_benefit(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT pc.id, pc.card_type, pc.status,
                    pc.period_end, pc.expires_at,
                    pc.period_used_benefits::text,
@@ -632,7 +653,8 @@ async def check_benefit(
             JOIN premium_card_templates pct ON pct.id = pc.template_id
                 AND pct.tenant_id = pc.tenant_id
             WHERE pc.id = :cid AND pc.tenant_id = :tid AND pc.is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     card = row.mappings().first()
@@ -711,12 +733,14 @@ async def use_benefit(
 
     # 加行锁
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, customer_id, period_used_benefits::text
             FROM premium_cards
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
             FOR UPDATE
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     card = row.mappings().first()
@@ -729,12 +753,14 @@ async def use_benefit(
 
     now = _now_utc()
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE premium_cards
             SET period_used_benefits = :used_benefits::jsonb,
                 updated_at = :now
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "used_benefits": json.dumps(used_dict),
             "cid": card_id,
@@ -745,7 +771,8 @@ async def use_benefit(
 
     usage_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_card_usages
                 (id, tenant_id, card_id, customer_id, store_id, order_id,
                  usage_type, benefit_type,
@@ -758,7 +785,8 @@ async def use_benefit(
                  NULL, NULL,
                  :now, :operator_id,
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": usage_id,
             "tid": tenant_id,
@@ -813,7 +841,8 @@ async def renew_period(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT pc.id, pc.customer_id, pc.card_type,
                    pc.status, pc.period_end, pc.expires_at,
                    pct.period_type
@@ -822,7 +851,8 @@ async def renew_period(
                 AND pct.tenant_id = pc.tenant_id
             WHERE pc.id = :cid AND pc.tenant_id = :tid AND pc.is_deleted = false
             FOR UPDATE
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     card = row.mappings().first()
@@ -849,7 +879,8 @@ async def renew_period(
     )
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE premium_cards
             SET period_start = :period_start,
                 period_end = :period_end,
@@ -859,7 +890,8 @@ async def renew_period(
                 status = 'active',
                 updated_at = :now
             WHERE id = :cid AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "period_start": new_period_start,
             "period_end": new_period_end,
@@ -873,7 +905,8 @@ async def renew_period(
 
     usage_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_card_usages
                 (id, tenant_id, card_id, customer_id, store_id, order_id,
                  usage_type, benefit_type,
@@ -886,7 +919,8 @@ async def renew_period(
                  NULL, NULL,
                  :now, NULL,
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": usage_id,
             "tid": tenant_id,
@@ -942,7 +976,8 @@ async def get_expiring_cards(
     deadline = now + timedelta(days=days_ahead)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT pc.id, pc.customer_id, pc.card_type, pc.status,
                    pc.remaining_uses, pc.expires_at,
                    pc.period_end, pc.next_renewal_at,
@@ -966,7 +1001,8 @@ async def get_expiring_cards(
               )
             ORDER BY pc.expires_at ASC NULLS LAST,
                      pc.next_renewal_at ASC NULLS LAST
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "deadline": deadline,
@@ -1014,7 +1050,8 @@ async def list_customer_cards(
         where += " AND pc.status = 'active'"
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT pc.id, pc.card_type, pc.status,
                    pc.remaining_uses, pc.total_uses,
                    pc.period_start, pc.period_end, pc.next_renewal_at,
@@ -1028,7 +1065,8 @@ async def list_customer_cards(
                 AND pct.tenant_id = pc.tenant_id
             WHERE {where}
             ORDER BY pc.purchased_at DESC
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
 
@@ -1064,7 +1102,8 @@ async def get_card_detail(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT pc.id, pc.customer_id, pc.store_id,
                    pc.card_type, pc.status,
                    pc.remaining_uses, pc.total_uses,
@@ -1078,7 +1117,8 @@ async def get_card_detail(
             JOIN premium_card_templates pct ON pct.id = pc.template_id
                 AND pct.tenant_id = pc.tenant_id
             WHERE pc.id = :cid AND pc.tenant_id = :tid AND pc.is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     card = row.mappings().first()
@@ -1111,16 +1151,19 @@ async def get_card_usage_history(
     offset = (page - 1) * size
 
     count_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM premium_card_usages
             WHERE card_id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     total = count_row.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, usage_type, benefit_type,
                    uses_before, uses_after,
                    store_id, order_id, operator_id,
@@ -1129,7 +1172,8 @@ async def get_card_usage_history(
             WHERE card_id = :cid AND tenant_id = :tid AND is_deleted = false
             ORDER BY used_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id, "size": size, "offset": offset},
     )
 
@@ -1172,13 +1216,15 @@ async def purchase_annual_card(
         raise ValueError(f"invalid_plan_id:{plan_id}")
 
     existing = await db.execute(
-        text("""
+        text(
+            """
             SELECT id FROM premium_cards
             WHERE customer_id = :cid AND tenant_id = :tid
               AND status = 'active' AND (expires_at IS NULL OR expires_at > :now)
               AND is_deleted = false
             ORDER BY expires_at DESC LIMIT 1
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id, "now": _now_utc()},
     )
     if existing.mappings().first():
@@ -1189,7 +1235,8 @@ async def purchase_annual_card(
     end_date = now + timedelta(days=plan["duration_days"])
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_cards
                 (id, tenant_id, customer_id, template_id, store_id,
                  card_type, status,
@@ -1206,7 +1253,8 @@ async def purchase_annual_card(
                  :now, :expires_at,
                  '{}',
                  :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": card_id,
             "tid": tenant_id,
@@ -1290,13 +1338,15 @@ async def gift_card(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO premium_card_gifts
                 (id, tenant_id, sender_id, receiver_phone, plan_id,
                  price_fen, redeem_code, status, created_at, updated_at, is_deleted)
             VALUES (:id, :tid, :sid, :phone, :pid,
                     :price, :code, 'pending', :now, :now, false)
-        """),
+        """
+        ),
         {
             "id": gift_id,
             "tid": tenant_id,

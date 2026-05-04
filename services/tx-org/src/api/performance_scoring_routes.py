@@ -176,14 +176,16 @@ async def list_performance_periods(
         total = count_res.scalar() or 0
 
         rows_res = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, period_type, period_key, status,
                        participant_count, avg_score, created_at
                 FROM performance_periods
                 WHERE {where}
                 ORDER BY period_key DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {**params, "size": size, "offset": offset},
         )
         items = [
@@ -229,24 +231,28 @@ async def create_performance_period(
     try:
         # 检查是否已存在同期
         exists_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM performance_periods
                 WHERE tenant_id = :tid AND period_key = :period_key
-            """),
+            """
+            ),
             {"tid": tid, "period_key": body.period_key},
         )
         if exists_res.fetchone():
             raise HTTPException(status_code=409, detail=f"考核周期 {body.period_key} 已存在")
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO performance_periods
                     (id, tenant_id, name, period_type, period_key,
                      status, participant_count, created_at, updated_at)
                 VALUES
                     (:id, :tid, :name, :period_type, :period_key,
                      'in_progress', 0, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": period_id,
                 "tid": tid,
@@ -305,7 +311,8 @@ async def batch_evaluate(
             import json
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO performance_evaluations
                         (id, tenant_id, period_id, employee_id, role,
                          kpi_scores, weighted_score, grade,
@@ -321,7 +328,8 @@ async def batch_evaluate(
                         grade = EXCLUDED.grade,
                         supervisor_comment = EXCLUDED.supervisor_comment,
                         evaluated_at = EXCLUDED.evaluated_at
-                """),
+                """
+                ),
                 {
                     "id": eval_id,
                     "tid": tid,
@@ -358,7 +366,8 @@ async def batch_evaluate(
         scores_list = [r["weighted_score"] for r in results]
         avg_score = round(sum(scores_list) / len(scores_list), 2) if scores_list else 0.0
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE performance_periods
                 SET participant_count = (
                     SELECT COUNT(DISTINCT employee_id) FROM performance_evaluations
@@ -370,7 +379,8 @@ async def batch_evaluate(
                 ),
                 updated_at = :now
                 WHERE id = :period_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"period_id": period_id, "tid": tid, "now": now},
         )
         await db.commit()
@@ -403,14 +413,16 @@ async def get_period_results(
 
     try:
         rows_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT e.employee_id, e.role, e.kpi_scores,
                        e.weighted_score, e.grade, e.supervisor_comment,
                        e.evaluated_at
                 FROM performance_evaluations e
                 WHERE e.period_id = :period_id AND e.tenant_id = :tid
                 ORDER BY e.weighted_score DESC
-            """),
+            """
+            ),
             {"period_id": period_id, "tid": tid},
         )
         rows = rows_res.fetchall()
@@ -482,7 +494,8 @@ async def get_employee_performance_history(
         import json
 
         rows_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT e.period_id, p.period_key, p.period_type, p.name as period_name,
                        e.role, e.kpi_scores, e.weighted_score, e.grade,
                        e.supervisor_comment, e.evaluated_at
@@ -492,7 +505,8 @@ async def get_employee_performance_history(
                 WHERE e.tenant_id = :tid AND e.employee_id = :eid
                 ORDER BY p.period_key DESC
                 LIMIT :periods
-            """),
+            """
+            ),
             {"tid": tid, "eid": employee_id, "periods": periods},
         )
         rows = rows_res.fetchall()
@@ -561,23 +575,27 @@ async def get_performance_stats(
         # 查最新/指定周期
         if period_key:
             period_res = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, period_key, name, status
                     FROM performance_periods
                     WHERE tenant_id = :tid AND period_key = :period_key
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": tid, "period_key": period_key},
             )
         else:
             period_res = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, period_key, name, status
                     FROM performance_periods
                     WHERE tenant_id = :tid
                     ORDER BY period_key DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": tid},
             )
         period_row = period_res.fetchone()
@@ -588,11 +606,13 @@ async def get_performance_stats(
         current_period_id = str(period_row.id)
 
         rows_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT weighted_score, grade
                 FROM performance_evaluations
                 WHERE tenant_id = :tid AND period_id = :period_id
-            """),
+            """
+            ),
             {"tid": tid, "period_id": current_period_id},
         )
         rows = rows_res.fetchall()
@@ -849,7 +869,8 @@ async def get_my_pending_reviews(
     try:
         # 查所有在该周期应被评审但尚未被当前评审人评审的员工
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT e.id AS employee_id, e.emp_name, e.role, e.store_id,
                        s.store_name,
                        rs.id AS score_id, rs.status AS score_status
@@ -862,7 +883,8 @@ async def get_my_pending_reviews(
                 WHERE e.tenant_id = :tid AND e.is_deleted = FALSE
                     AND e.status = 'active'
                 ORDER BY rs.status ASC NULLS FIRST, e.emp_name
-            """),
+            """
+            ),
             {"tid": tid, "cid": cycle_id, "rid": reviewer_id},
         )
         items = []

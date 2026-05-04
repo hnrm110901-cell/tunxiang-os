@@ -858,7 +858,8 @@ class AttendanceComplianceLogService:
             total = 0
 
         offset = (page - 1) * size
-        data_q = text(f"""
+        data_q = text(
+            f"""
             SELECT id::text, employee_id::text, employee_name, store_id::text,
                    check_date, violation_type, severity, detail,
                    status, confirmed_by::text, confirmed_at, appeal_reason,
@@ -867,7 +868,8 @@ class AttendanceComplianceLogService:
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """)
+        """
+        )
         params["limit"] = size
         params["offset"] = offset
 
@@ -889,7 +891,8 @@ class AttendanceComplianceLogService:
     async def get_violation(self, log_id: str) -> dict[str, Any] | None:
         """获取单条违规详情"""
         await _set_tenant(self._db, self._tenant_id)
-        q = text("""
+        q = text(
+            """
             SELECT id::text, employee_id::text, employee_name, store_id::text,
                    check_date, violation_type, severity, detail,
                    status, confirmed_by::text, confirmed_at, appeal_reason,
@@ -898,7 +901,8 @@ class AttendanceComplianceLogService:
             WHERE id = CAST(:log_id AS uuid)
               AND tenant_id = CAST(:tenant_id AS uuid)
               AND is_deleted = false
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 q,
@@ -920,7 +924,8 @@ class AttendanceComplianceLogService:
     async def confirm_violation(self, log_id: str, confirmer_id: str) -> dict[str, Any]:
         """确认违规"""
         await _set_tenant(self._db, self._tenant_id)
-        q = text("""
+        q = text(
+            """
             UPDATE attendance_compliance_logs
             SET status = 'confirmed',
                 confirmed_by = CAST(:confirmer_id AS uuid),
@@ -931,7 +936,8 @@ class AttendanceComplianceLogService:
               AND is_deleted = false
               AND status = 'pending'
             RETURNING id::text
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 q,
@@ -950,7 +956,8 @@ class AttendanceComplianceLogService:
     async def dismiss_violation(self, log_id: str, reason: str) -> dict[str, Any]:
         """驳回/申诉违规"""
         await _set_tenant(self._db, self._tenant_id)
-        q = text("""
+        q = text(
+            """
             UPDATE attendance_compliance_logs
             SET status = 'dismissed',
                 appeal_reason = :reason,
@@ -960,7 +967,8 @@ class AttendanceComplianceLogService:
               AND is_deleted = false
               AND status IN ('pending', 'confirmed')
             RETURNING id::text
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 q,
@@ -987,7 +995,8 @@ class AttendanceComplianceLogService:
         else:
             end_date_str = f"{y}-{m_num + 1:02d}-01"
 
-        q = text("""
+        q = text(
+            """
             SELECT violation_type, severity, status, COUNT(*) AS cnt
             FROM attendance_compliance_logs
             WHERE tenant_id = CAST(:tenant_id AS uuid)
@@ -996,7 +1005,8 @@ class AttendanceComplianceLogService:
               AND check_date < CAST(:end AS date)
             GROUP BY violation_type, severity, status
             ORDER BY violation_type, severity
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 q,
@@ -1040,7 +1050,8 @@ class AttendanceComplianceLogService:
         detail: dict[str, Any],
     ) -> None:
         """将检测结果写入 attendance_compliance_logs 表"""
-        q = text("""
+        q = text(
+            """
             INSERT INTO attendance_compliance_logs
                 (tenant_id, employee_id, employee_name, store_id, check_date,
                  violation_type, severity, detail, status)
@@ -1048,7 +1059,8 @@ class AttendanceComplianceLogService:
                 (CAST(:tenant_id AS uuid), CAST(:employee_id AS uuid), :employee_name,
                  CAST(:store_id AS uuid), CAST(:check_date AS date),
                  :violation_type, :severity, CAST(:detail AS jsonb), 'pending')
-        """)
+        """
+        )
         try:
             await self._db.execute(
                 q,

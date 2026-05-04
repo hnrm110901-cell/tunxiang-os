@@ -119,10 +119,12 @@ class BanquetOrderService:
 
         # 获取报价单总金额
         quote_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT total_fen FROM banquet_quotes
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": quote_id, "tenant_id": self._tenant_id},
         )
         quote = quote_row.mappings().first()
@@ -137,7 +139,8 @@ class BanquetOrderService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_orders (
                     id, tenant_id, banquet_no, lead_id, quote_id, store_id,
                     venue_id, event_type, event_name, event_date, time_slot,
@@ -155,7 +158,8 @@ class BanquetOrderService:
                     :special_requests, 'draft',
                     :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": banquet_id,
                 "tenant_id": self._tenant_id,
@@ -194,7 +198,8 @@ class BanquetOrderService:
 
         # 关联厅房预订
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_venue_bookings
                 SET banquet_id = :banquet_id, updated_at = :now
                 WHERE venue_id = :venue_id
@@ -202,7 +207,8 @@ class BanquetOrderService:
                   AND booking_date = :event_date
                   AND tenant_id = :tenant_id
                   AND status IN ('held', 'confirmed')
-            """),
+            """
+            ),
             {
                 "banquet_id": banquet_id,
                 "venue_id": venue_id,
@@ -267,10 +273,12 @@ class BanquetOrderService:
             raise ValueError(f"无效状态: {new_status}，可选: {BANQUET_STATUSES}")
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, banquet_no FROM banquet_orders
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": banquet_id, "tenant_id": self._tenant_id},
         )
         banquet = row.mappings().first()
@@ -287,11 +295,13 @@ class BanquetOrderService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_orders
                 SET status = :new_status, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": banquet_id,
                 "tenant_id": self._tenant_id,
@@ -341,7 +351,8 @@ class BanquetOrderService:
         """插入状态变更日志。"""
         log_id = str(uuid.uuid4())
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_status_logs (
                     id, tenant_id, banquet_id, status,
                     operator_id, reason, created_at
@@ -349,7 +360,8 @@ class BanquetOrderService:
                     :id, :tenant_id, :banquet_id, :status,
                     :operator_id, :reason, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": log_id,
                 "tenant_id": self._tenant_id,
@@ -414,12 +426,14 @@ class BanquetOrderService:
             raise ValueError("定金金额必须大于0")
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, total_amount_fen, deposit_amount_fen,
                        deposit_paid_fen
                 FROM banquet_orders
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": banquet_id, "tenant_id": self._tenant_id},
         )
         banquet = row.mappings().first()
@@ -441,7 +455,8 @@ class BanquetOrderService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_orders
                 SET deposit_paid_fen = :new_paid,
                     deposit_paid_at = :now,
@@ -449,7 +464,8 @@ class BanquetOrderService:
                     balance_fen = :balance_fen,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": banquet_id,
                 "tenant_id": self._tenant_id,
@@ -487,7 +503,8 @@ class BanquetOrderService:
     async def get_banquet(self, banquet_id: str) -> dict:
         """获取宴会详情，含厅房信息和状态日志数量。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT o.*,
                        v.venue_name, v.venue_type, v.floor AS venue_floor,
                        (SELECT COUNT(*) FROM banquet_status_logs sl
@@ -497,7 +514,8 @@ class BanquetOrderService:
                 LEFT JOIN banquet_venues v
                     ON v.id = o.venue_id AND v.tenant_id = o.tenant_id
                 WHERE o.id = :id AND o.tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": banquet_id, "tenant_id": self._tenant_id},
         )
         b = row.mappings().first()
@@ -585,7 +603,8 @@ class BanquetOrderService:
         params["offset"] = offset
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT o.id, o.banquet_no, o.store_id, o.event_type,
                        o.event_name, o.event_date, o.time_slot,
                        o.host_name, o.guest_count, o.table_count,
@@ -598,7 +617,8 @@ class BanquetOrderService:
                 WHERE {where}
                 ORDER BY o.event_date ASC, o.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -631,22 +651,26 @@ class BanquetOrderService:
         """获取宴会状态变更时间线。"""
         # 验证宴会存在
         check = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM banquet_orders
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": banquet_id, "tenant_id": self._tenant_id},
         )
         if not check.first():
             raise ValueError(f"宴会不存在: {banquet_id}")
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, operator_id, reason, created_at
                 FROM banquet_status_logs
                 WHERE banquet_id = :banquet_id AND tenant_id = :tenant_id
                 ORDER BY created_at ASC
-            """),
+            """
+            ),
             {"banquet_id": banquet_id, "tenant_id": self._tenant_id},
         )
         rows = result.mappings().all()
@@ -665,7 +689,8 @@ class BanquetOrderService:
     async def get_day_schedule(self, store_id: str, date: str) -> dict:
         """获取门店某日所有宴会排程。"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT o.id, o.banquet_no, o.event_type, o.event_name,
                        o.time_slot, o.host_name, o.guest_count, o.table_count,
                        o.status,
@@ -684,7 +709,8 @@ class BanquetOrderService:
                         WHEN 'full_day' THEN 0
                     END,
                     v.venue_name
-            """),
+            """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": self._tenant_id,
@@ -741,11 +767,13 @@ class BanquetOrderService:
             raise ValueError("取消原因不能为空")
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, venue_id, lead_id, event_date, banquet_no
                 FROM banquet_orders
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": banquet_id, "tenant_id": self._tenant_id},
         )
         banquet = row.mappings().first()
@@ -760,14 +788,16 @@ class BanquetOrderService:
 
         # 更新宴会状态
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_orders
                 SET status = 'cancelled',
                     cancelled_at = :now,
                     cancel_reason = :reason,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": banquet_id,
                 "tenant_id": self._tenant_id,
@@ -788,7 +818,8 @@ class BanquetOrderService:
         # 释放厅房预订
         if banquet["venue_id"]:
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_venue_bookings
                     SET status = 'released',
                         release_reason = :reason,
@@ -796,7 +827,8 @@ class BanquetOrderService:
                     WHERE banquet_id = :banquet_id
                       AND tenant_id = :tenant_id
                       AND status IN ('held', 'confirmed')
-                """),
+                """
+                ),
                 {
                     "banquet_id": banquet_id,
                     "tenant_id": self._tenant_id,
@@ -845,7 +877,8 @@ class BanquetOrderService:
 
         # 总数和营收
         summary_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_banquets,
                     COALESCE(SUM(CASE WHEN status NOT IN ('cancelled') THEN total_amount_fen ELSE 0 END), 0) AS total_revenue_fen,
@@ -857,7 +890,8 @@ class BanquetOrderService:
                   AND store_id = :store_id
                   AND event_date >= :date_from
                   AND event_date <= :date_to
-            """),
+            """
+            ),
             params,
         )
         s = summary_row.mappings().first()
@@ -869,7 +903,8 @@ class BanquetOrderService:
 
         # 按宴会类型分布
         type_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT event_type, COUNT(*) AS cnt,
                        COALESCE(SUM(total_amount_fen), 0) AS revenue_fen
                 FROM banquet_orders
@@ -880,7 +915,8 @@ class BanquetOrderService:
                   AND status NOT IN ('cancelled')
                 GROUP BY event_type
                 ORDER BY revenue_fen DESC
-            """),
+            """
+            ),
             params,
         )
         by_type = [
@@ -894,7 +930,8 @@ class BanquetOrderService:
 
         # 线索转化率（同期）
         lead_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_leads,
                     COUNT(CASE WHEN status = 'won' THEN 1 END) AS won_leads
@@ -904,7 +941,8 @@ class BanquetOrderService:
                   AND created_at >= :date_from
                   AND created_at <= :date_to
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             params,
         )
         lr = lead_row.mappings().first()

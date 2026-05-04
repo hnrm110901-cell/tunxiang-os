@@ -42,9 +42,7 @@ class ApplicationRepository:
                 tenant_id=str(tenant_id),
                 code=payload.get("code"),
             )
-            raise ApplicationAlreadyExists(
-                f"application with code={payload.get('code')!r} already exists"
-            ) from exc
+            raise ApplicationAlreadyExists(f"application with code={payload.get('code')!r} already exists") from exc
         return application
 
     async def get_by_id(self, tenant_id: UUID, application_id: UUID) -> Application | None:
@@ -73,11 +71,7 @@ class ApplicationRepository:
         if size > 200:
             size = 200
 
-        base = (
-            select(Application)
-            .where(Application.tenant_id == tenant_id)
-            .where(Application.is_deleted.is_(False))
-        )
+        base = select(Application).where(Application.tenant_id == tenant_id).where(Application.is_deleted.is_(False))
         count_stmt = (
             select(func.count())
             .select_from(Application)

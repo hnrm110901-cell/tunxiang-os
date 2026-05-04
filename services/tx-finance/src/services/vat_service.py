@@ -72,7 +72,8 @@ class VATService:
         cb = uuid.UUID(created_by) if created_by else None
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO vat_declarations
                     (tenant_id, store_id, period, period_type,
                      tax_rate, gross_revenue_fen, output_tax_fen,
@@ -95,7 +96,8 @@ class VATService:
                           payable_tax_fen, paid_tax_fen, status,
                           filed_at, paid_at, nuonuo_declaration_no,
                           note, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "sid": sid,
@@ -123,7 +125,8 @@ class VATService:
         """查询申报单（不含进项发票列表）"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, period, period_type, tax_rate,
                        gross_revenue_fen, output_tax_fen, input_tax_fen,
                        payable_tax_fen, paid_tax_fen, status,
@@ -131,7 +134,8 @@ class VATService:
                        note, created_at, updated_at
                 FROM vat_declarations
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(declaration_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -183,14 +187,16 @@ class VATService:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE vat_declarations
                 SET status = 'filed',
                     filed_at = :now,
                     nuonuo_declaration_no = COALESCE(:nuonuo, nuonuo_declaration_no),
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "now": now,
                 "nuonuo": nuonuo_declaration_no,
@@ -218,12 +224,14 @@ class VATService:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE vat_declarations
                 SET status = 'paid', paid_at = :now,
                     paid_tax_fen = :paid, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"now": now, "paid": paid_tax_fen, "id": uuid.UUID(declaration_id), "tid": self._tid},
         )
         await self.db.flush()
@@ -260,7 +268,8 @@ class VATService:
 
         inv_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO vat_input_invoices
                     (id, tenant_id, declaration_id, invoice_no, invoice_date,
                      supplier_name, supplier_tax_no, amount_fen, tax_rate,
@@ -274,7 +283,8 @@ class VATService:
                     amount_fen    = EXCLUDED.amount_fen,
                     input_tax_fen = EXCLUDED.input_tax_fen,
                     invoice_date  = EXCLUDED.invoice_date
-            """),
+            """
+            ),
             {
                 "id": inv_id,
                 "tid": self._tid,
@@ -318,11 +328,13 @@ class VATService:
         """验证/驳回进项发票，重算申报单应纳税额"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, declaration_id, invoice_no, status
                 FROM vat_input_invoices
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(invoice_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -334,13 +346,15 @@ class VATService:
         now = datetime.now(timezone.utc)
         new_status = "verified" if verified else "rejected"
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE vat_input_invoices
                 SET status = :status,
                     verified_at = CASE WHEN :verified THEN :now ELSE NULL END,
                     rejection_reason = :reason
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "status": new_status,
                 "verified": verified,
@@ -359,14 +373,16 @@ class VATService:
         """查询申报单的进项发票列表"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, invoice_no, invoice_date, supplier_name, supplier_tax_no,
                        amount_fen, tax_rate, input_tax_fen, invoice_type,
                        status, verified_at, rejection_reason, created_at
                 FROM vat_input_invoices
                 WHERE tenant_id = :tid AND declaration_id = :did
                 ORDER BY invoice_date, invoice_no
-            """),
+            """
+            ),
             {"tid": self._tid, "did": uuid.UUID(declaration_id)},
         )
         return [self._invoice_row(r) for r in result.fetchall()]
@@ -394,13 +410,15 @@ class VATService:
             return 0
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_amount_fen), 0) AS revenue
                 FROM orders
                 WHERE tenant_id = :tid AND store_id = :sid
                   AND status = 'paid'
                   AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', :period_date::date)
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "sid": store_id,
@@ -413,25 +431,29 @@ class VATService:
     async def _recalc_declaration_tax(self, declaration_id: str) -> None:
         """重算申报单 input_tax_fen 和 payable_tax_fen（排除 rejected 发票）"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(input_tax_fen), 0) AS total_input
                 FROM vat_input_invoices
                 WHERE tenant_id = :tid AND declaration_id = :did
                   AND status != 'rejected'
-            """),
+            """
+            ),
             {"tid": self._tid, "did": uuid.UUID(declaration_id)},
         )
         row = result.fetchone()
         total_input = int(row.total_input) if row else 0
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE vat_declarations
                 SET input_tax_fen = :input,
                     payable_tax_fen = GREATEST(0, output_tax_fen - :input),
                     updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"input": total_input, "id": uuid.UUID(declaration_id), "tid": self._tid},
         )
 

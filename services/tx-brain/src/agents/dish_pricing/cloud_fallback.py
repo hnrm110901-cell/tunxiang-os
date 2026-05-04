@@ -99,9 +99,8 @@ class DishPricingCloudFallback:
         return {
             "recommended_price_fen": int(parsed.get("recommended_price_fen", req.base_price_fen)),
             "confidence": float(parsed.get("confidence", 0.50)),
-            "reasoning_signals": parsed.get("signals", []) or [
-                {"name": "cloud_reasoning", "delta": parsed.get("reasoning", "n/a")}
-            ],
+            "reasoning_signals": parsed.get("signals", [])
+            or [{"name": "cloud_reasoning", "delta": parsed.get("reasoning", "n/a")}],
             "model_version": "cloud-fallback-v0",
             "computed_at_ms": int(time.time() * 1000),
             "floor_protected": False,  # service 层会再 check

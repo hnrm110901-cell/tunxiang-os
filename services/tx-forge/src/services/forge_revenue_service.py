@@ -36,11 +36,13 @@ class ForgeRevenueService:
         """记录一笔收入流水，自动计算平台抽成。"""
         # 查应用定价模型
         app_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, app_name, pricing_model, developer_id
                 FROM forge_apps
                 WHERE app_id = :app_id
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         app_row = app_result.mappings().first()
@@ -56,7 +58,8 @@ class ForgeRevenueService:
 
         # 插入流水
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_revenue_entries
                     (app_id, payer_tenant_id, amount_fen, platform_fee_fen,
                      developer_payout_fen, fee_rate, pricing_model)
@@ -65,7 +68,8 @@ class ForgeRevenueService:
                      :developer_payout_fen, :fee_rate, :pricing_model)
                 RETURNING id, app_id, amount_fen, platform_fee_fen,
                           developer_payout_fen, fee_rate, pricing_model, created_at
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "payer_tenant_id": payer_tenant_id,
@@ -80,11 +84,13 @@ class ForgeRevenueService:
 
         # 累加应用总收入
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_apps
                 SET revenue_total_fen = revenue_total_fen + :amount_fen
                 WHERE app_id = :app_id
-            """),
+            """
+            ),
             {"amount_fen": amount_fen, "app_id": app_id},
         )
         await db.commit()
@@ -106,7 +112,8 @@ class ForgeRevenueService:
     ) -> dict:
         """汇总开发者名下所有应用的收入。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     a.app_id,
                     a.app_name,
@@ -120,7 +127,8 @@ class ForgeRevenueService:
                 WHERE a.developer_id = :developer_id
                 GROUP BY a.app_id, a.app_name, a.pricing_model
                 ORDER BY app_revenue_fen DESC
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         app_breakdown = [dict(r) for r in result.mappings().all()]
@@ -149,7 +157,8 @@ class ForgeRevenueService:
     ) -> dict:
         """单应用收入汇总。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     a.app_name,
                     a.pricing_model,
@@ -162,7 +171,8 @@ class ForgeRevenueService:
                 LEFT JOIN forge_revenue_entries r ON r.app_id = a.app_id
                 WHERE a.app_id = :app_id
                 GROUP BY a.app_name, a.pricing_model, a.install_count
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         row = result.mappings().first()
@@ -186,7 +196,8 @@ class ForgeRevenueService:
         """申请提现，校验可用余额。"""
         # 可用余额 = 累计分润 - 已完成提现
         balance_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(
                         (SELECT SUM(r.developer_payout_fen)
@@ -200,7 +211,8 @@ class ForgeRevenueService:
                          WHERE p.developer_id = :developer_id
                            AND p.status IN ('pending', 'processing', 'completed')), 0
                     ) AS available_balance_fen
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         available = int(balance_result.scalar_one())
@@ -214,7 +226,8 @@ class ForgeRevenueService:
         payout_id = f"pay_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_payouts
                     (payout_id, developer_id, amount_fen, bank_account,
                      status, requested_at)
@@ -223,7 +236,8 @@ class ForgeRevenueService:
                      'pending', NOW())
                 RETURNING payout_id, developer_id, amount_fen,
                           bank_account, status, requested_at
-            """),
+            """
+            ),
             {
                 "payout_id": payout_id,
                 "developer_id": developer_id,
@@ -245,13 +259,15 @@ class ForgeRevenueService:
     async def get_payout_history(self, db: AsyncSession, developer_id: str) -> list[dict]:
         """查询开发者提现历史。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT payout_id, amount_fen, bank_account, status,
                        requested_at, completed_at, failure_reason
                 FROM forge_payouts
                 WHERE developer_id = :developer_id
                 ORDER BY requested_at DESC
-            """),
+            """
+            ),
             {"developer_id": developer_id},
         )
         return [dict(r) for r in result.mappings().all()]

@@ -155,7 +155,8 @@ class CostTracker:
         """
         from sqlalchemy import text
 
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO model_call_logs
                 (id, tenant_id, task_type, model,
                  input_tokens, output_tokens, cost_usd,
@@ -165,7 +166,8 @@ class CostTracker:
                  :input_tokens, :output_tokens, :cost_usd,
                  :duration_ms, :success, :error_type, :request_id, :created_at)
             ON CONFLICT (request_id) DO NOTHING
-        """)
+        """
+        )
         try:
             await db.execute(
                 sql,
@@ -212,7 +214,8 @@ class CostTracker:
         """
         from sqlalchemy import text
 
-        aggregate_sql = text("""
+        aggregate_sql = text(
+            """
             SELECT
                 COUNT(*)                    AS call_count,
                 SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success_count,
@@ -223,9 +226,11 @@ class CostTracker:
             WHERE tenant_id = :tenant_id
               AND created_at >= :start_dt
               AND created_at <  :end_dt
-        """)
+        """
+        )
 
-        by_model_sql = text("""
+        by_model_sql = text(
+            """
             SELECT
                 model,
                 COUNT(*)          AS call_count,
@@ -236,7 +241,8 @@ class CostTracker:
               AND created_at <  :end_dt
             GROUP BY model
             ORDER BY cost_usd DESC
-        """)
+        """
+        )
 
         params = {
             "tenant_id": tenant_id,
@@ -942,13 +948,9 @@ class ModelRouter:
             raise ValueError("complete_with_cache: system_blocks 必须为非空 list[dict]")
 
         # 至少要有一个 cache_control 块，否则 cache 无意义
-        has_cache_block = any(
-            isinstance(b, dict) and b.get("cache_control") for b in system_blocks
-        )
+        has_cache_block = any(isinstance(b, dict) and b.get("cache_control") for b in system_blocks)
         if not has_cache_block:
-            raise ValueError(
-                "complete_with_cache: 至少一个 system_block 需带 cache_control={'type':'ephemeral'}"
-            )
+            raise ValueError("complete_with_cache: 至少一个 system_block 需带 cache_control={'type':'ephemeral'}")
 
         model = self._strategy.select_model(task_type, urgency)
         req_id = request_id or str(uuid.uuid4())

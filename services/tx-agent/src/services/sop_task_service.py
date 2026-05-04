@@ -212,7 +212,8 @@ class SOPTaskService:
         template_id = uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sop_templates (
                     id, tenant_id, template_name, store_format,
                     description, is_default, version
@@ -220,7 +221,8 @@ class SOPTaskService:
                     :id, :tenant_id, :template_name, :store_format,
                     :description, :is_default, 1
                 )
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": tid,
@@ -264,7 +266,8 @@ class SOPTaskService:
             params["store_format"] = store_format
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id, template_name, store_format, description,
                     is_default, version, created_at, updated_at
@@ -273,7 +276,8 @@ class SOPTaskService:
                   AND is_deleted = FALSE
                   {format_filter}
                 ORDER BY is_default DESC, created_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -298,14 +302,16 @@ class SOPTaskService:
 
         # 模板基础信息
         tpl_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, template_name, store_format, description,
                        is_default, version, created_at, updated_at
                 FROM sop_templates
                 WHERE id = :template_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         tpl = tpl_result.fetchone()
@@ -314,7 +320,8 @@ class SOPTaskService:
 
         # 时段列表
         slots_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, slot_code, slot_name, start_time, end_time, sort_order
                 FROM sop_time_slots
                 WHERE template_id = :template_id
@@ -322,7 +329,8 @@ class SOPTaskService:
                   AND is_deleted = FALSE
                   AND is_active = TRUE
                 ORDER BY sort_order
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         slots = [
@@ -339,7 +347,8 @@ class SOPTaskService:
 
         # 任务列表
         tasks_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id, slot_id, task_code, task_name, task_type,
                     target_role, priority, duration_min, instructions,
@@ -350,7 +359,8 @@ class SOPTaskService:
                   AND is_deleted = FALSE
                   AND is_active = TRUE
                 ORDER BY sort_order
-            """),
+            """
+            ),
             {"template_id": tpl_id, "tenant_id": tid},
         )
         tasks = [
@@ -481,7 +491,8 @@ class SOPTaskService:
         slot_id = uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sop_time_slots (
                     id, tenant_id, template_id, slot_code, slot_name,
                     start_time, end_time, sort_order
@@ -489,7 +500,8 @@ class SOPTaskService:
                     :id, :tenant_id, :template_id, :slot_code, :slot_name,
                     :start_time, :end_time, :sort_order
                 )
-            """),
+            """
+            ),
             {
                 "id": slot_id,
                 "tenant_id": tid,
@@ -542,7 +554,8 @@ class SOPTaskService:
         task_id = uuid4()
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sop_tasks (
                     id, tenant_id, template_id, slot_id,
                     task_code, task_name, task_type, target_role,
@@ -556,7 +569,8 @@ class SOPTaskService:
                     :checklist_items, :condition_logic, :auto_complete,
                     :sort_order
                 )
-            """),
+            """
+            ),
             {
                 "id": task_id,
                 "tenant_id": tid,
@@ -639,21 +653,24 @@ class SOPTaskService:
 
         # 总数
         count_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS total
                 FROM sop_task_instances ti
                 WHERE ti.tenant_id = :tenant_id
                   AND ti.store_id = :store_id
                   AND ti.is_deleted = FALSE
                   {filters}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         # 数据
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     ti.id AS instance_id,
                     ti.task_id,
@@ -681,7 +698,8 @@ class SOPTaskService:
                   {filters}
                 ORDER BY ti.instance_date DESC, td.sort_order
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -721,7 +739,8 @@ class SOPTaskService:
         iid = UUID(instance_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ti.id AS instance_id,
                     ti.task_id,
@@ -752,7 +771,8 @@ class SOPTaskService:
                 WHERE ti.id = :instance_id
                   AND ti.tenant_id = :tenant_id
                   AND ti.is_deleted = FALSE
-            """),
+            """
+            ),
             {"instance_id": iid, "tenant_id": tid},
         )
         row = result.fetchone()
@@ -799,7 +819,8 @@ class SOPTaskService:
 
         # 原子状态转换：WHERE 同时校验旧状态，防止并发竞态
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_task_instances
                 SET status = 'in_progress',
                     assignee_id = :assignee_id,
@@ -810,7 +831,8 @@ class SOPTaskService:
                   AND status = 'pending'
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "instance_id": iid,
                 "tenant_id": tid,
@@ -858,7 +880,8 @@ class SOPTaskService:
 
         # 原子状态转换：WHERE 同时校验旧状态
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_task_instances
                 SET status = 'completed',
                     completed_at = :now,
@@ -870,7 +893,8 @@ class SOPTaskService:
                   AND status IN ('in_progress', 'pending')
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "instance_id": iid,
                 "tenant_id": tid,
@@ -918,10 +942,12 @@ class SOPTaskService:
 
         # 检查当前状态
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT status FROM sop_task_instances
                 WHERE id = :instance_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"instance_id": iid, "tenant_id": tid},
         )
         row = result.fetchone()
@@ -931,13 +957,15 @@ class SOPTaskService:
             raise ValueError(f"任务状态不允许跳过: {row.status}")
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_task_instances
                 SET status = 'skipped',
                     skip_reason = :reason,
                     updated_at = :now
                 WHERE id = :instance_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "instance_id": iid,
                 "tenant_id": tid,

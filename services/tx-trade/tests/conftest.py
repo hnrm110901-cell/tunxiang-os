@@ -84,9 +84,7 @@ def app():
 @pytest_asyncio.fixture
 async def client(app):
     """每个测试函数获得一个独立的 AsyncClient。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 

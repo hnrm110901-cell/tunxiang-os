@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from tx_vietnam.src.api.vat_routes import router as vat_router
 
 app = FastAPI(

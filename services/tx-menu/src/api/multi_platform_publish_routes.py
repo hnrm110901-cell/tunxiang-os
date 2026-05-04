@@ -46,16 +46,12 @@ def _svc(db: AsyncSession, tenant_id: str) -> MultiPlatformPublishService:
 
 class PublishAllReq(BaseModel):
     store_id: str
-    dish_ids: Optional[list[str]] = Field(
-        None, description="菜品ID列表, null时发布全部active菜品"
-    )
+    dish_ids: Optional[list[str]] = Field(None, description="菜品ID列表, null时发布全部active菜品")
 
 
 class PublishPlatformReq(BaseModel):
     store_id: str
-    dish_ids: Optional[list[str]] = Field(
-        None, description="菜品ID列表, null时发布全部"
-    )
+    dish_ids: Optional[list[str]] = Field(None, description="菜品ID列表, null时发布全部")
 
 
 # ─── 端点 ───

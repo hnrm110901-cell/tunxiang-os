@@ -109,7 +109,8 @@ class ReviewCollectorService:
 
             try:
                 result = await self._db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO review_intel (
                             id, tenant_id, source, source_store_id,
                             is_own_store, content, rating,
@@ -122,7 +123,8 @@ class ReviewCollectorService:
                             :review_date, :collected_at
                         )
                         ON CONFLICT DO NOTHING
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tenant_id": str(tenant_id),

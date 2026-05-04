@@ -344,7 +344,8 @@ async def create_certification(
     exam_items = json.dumps(EXAM_TEMPLATES[body.position], ensure_ascii=False)
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO position_certifications
             (id, tenant_id, employee_id, store_id, position,
              exam_items, total_score, passed, certified_at, expires_at,
@@ -356,7 +357,8 @@ async def create_certification(
         RETURNING id, tenant_id, employee_id, store_id, position,
                   exam_items, total_score, passed, certified_at, expires_at,
                   certifier_id, retake_count, notes, created_at, updated_at
-    """)
+    """
+    )
     row = await db.execute(
         sql,
         {
@@ -399,7 +401,8 @@ async def certification_dashboard(
     params["now"] = now
     params["now_plus_30"] = now + timedelta(days=30)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             count(*) AS total,
             count(*) FILTER (WHERE passed = true) AS passed_count,
@@ -409,12 +412,14 @@ async def certification_dashboard(
             ROUND(AVG(retake_count)::numeric, 2) AS avg_retake
         FROM position_certifications
         WHERE tenant_id = :tid AND is_deleted = false {store_filter}
-    """)
+    """
+    )
     row = await db.execute(sql, params)
     summary = dict(row.fetchone()._mapping)
 
     # 按岗位分布
-    sql2 = text(f"""
+    sql2 = text(
+        f"""
         SELECT position,
                count(*) AS total,
                count(*) FILTER (WHERE passed = true) AS passed_count,
@@ -422,19 +427,22 @@ async def certification_dashboard(
         FROM position_certifications
         WHERE tenant_id = :tid AND is_deleted = false {store_filter}
         GROUP BY position ORDER BY position
-    """)
+    """
+    )
     rows2 = await db.execute(sql2, params)
     by_position = [dict(r._mapping) for r in rows2]
 
     # 补考统计
-    sql3 = text(f"""
+    sql3 = text(
+        f"""
         SELECT
             count(*) FILTER (WHERE retake_count >= 1) AS retake_once,
             count(*) FILTER (WHERE retake_count >= 2) AS retake_twice_plus,
             MAX(retake_count) AS max_retake
         FROM position_certifications
         WHERE tenant_id = :tid AND is_deleted = false {store_filter}
-    """)
+    """
+    )
     row3 = await db.execute(sql3, params)
     retake_stats = dict(row3.fetchone()._mapping)
 
@@ -468,7 +476,8 @@ async def expiring_certifications(
     if store_id:
         params["store_id"] = store_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT id, employee_id, store_id, position, total_score,
                certified_at, expires_at, retake_count
         FROM position_certifications
@@ -477,7 +486,8 @@ async def expiring_certifications(
           AND expires_at BETWEEN :now AND :deadline
           {store_filter}
         ORDER BY expires_at ASC
-    """)
+    """
+    )
     rows = await db.execute(sql, params)
     items = [dict(r._mapping) for r in rows]
 
@@ -494,13 +504,15 @@ async def get_certification(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT id, tenant_id, employee_id, store_id, position,
                exam_items, total_score, passed, certified_at, expires_at,
                certifier_id, retake_count, notes, created_at, updated_at
         FROM position_certifications
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-    """)
+    """
+    )
     row = await db.execute(sql, {"id": cert_id, "tid": tenant_id})
     record = row.fetchone()
     if not record:
@@ -537,12 +549,14 @@ async def update_certification(
     if len(sets) == 1:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    sql = text(f"""
+    sql = text(
+        f"""
         UPDATE position_certifications
         SET {", ".join(sets)}
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id, notes, expires_at, updated_at
-    """)
+    """
+    )
     row = await db.execute(sql, params)
     updated = row.fetchone()
     if not updated:
@@ -565,10 +579,12 @@ async def submit_exam_item(
     await _set_tenant(db, tenant_id)
 
     # 先取出当前 exam_items 以校验索引
-    fetch_sql = text("""
+    fetch_sql = text(
+        """
         SELECT exam_items FROM position_certifications
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-    """)
+    """
+    )
     row = await db.execute(fetch_sql, {"id": cert_id, "tid": tenant_id})
     record = row.fetchone()
     if not record:
@@ -581,7 +597,8 @@ async def submit_exam_item(
     exam_date = body.exam_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # 使用 jsonb_set 逐字段更新
-    sql = text("""
+    sql = text(
+        """
         UPDATE position_certifications
         SET exam_items = jsonb_set(
                 jsonb_set(
@@ -599,7 +616,8 @@ async def submit_exam_item(
             updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING exam_items
-    """)
+    """
+    )
     idx_str = str(item_idx)
     result = await db.execute(
         sql,
@@ -639,10 +657,12 @@ async def finalize_certification(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    fetch_sql = text("""
+    fetch_sql = text(
+        """
         SELECT exam_items, retake_count FROM position_certifications
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-    """)
+    """
+    )
     row = await db.execute(fetch_sql, {"id": cert_id, "tid": tenant_id})
     record = row.fetchone()
     if not record:
@@ -687,12 +707,14 @@ async def finalize_certification(
         sets.append("certifier_id = :certifier_id")
         params["certifier_id"] = certifier_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         UPDATE position_certifications
         SET {", ".join(sets)}
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id, total_score, passed, certified_at, expires_at, certifier_id, updated_at
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     updated = result.fetchone()
     if not updated:
@@ -714,10 +736,12 @@ async def retake_certification(
     await _set_tenant(db, tenant_id)
 
     # 先取出当前 exam_items
-    fetch_sql = text("""
+    fetch_sql = text(
+        """
         SELECT exam_items FROM position_certifications
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-    """)
+    """
+    )
     row = await db.execute(fetch_sql, {"id": cert_id, "tid": tenant_id})
     record = row.fetchone()
     if not record:
@@ -732,7 +756,8 @@ async def retake_certification(
         item["examiner_id"] = None
         item["exam_date"] = None
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE position_certifications
         SET retake_count = retake_count + 1,
             exam_items = :exam_items::jsonb,
@@ -743,7 +768,8 @@ async def retake_certification(
             updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id, retake_count, exam_items, updated_at
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -776,12 +802,14 @@ async def delete_certification(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE position_certifications
         SET is_deleted = true, updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND is_deleted = false
         RETURNING id
-    """)
+    """
+    )
     row = await db.execute(sql, {"id": cert_id, "tid": tenant_id, "now": datetime.now(timezone.utc)})
     deleted = row.fetchone()
     if not deleted:

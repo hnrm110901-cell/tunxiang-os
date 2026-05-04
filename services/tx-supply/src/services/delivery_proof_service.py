@@ -59,6 +59,7 @@ from ..models.delivery_proof import (
 # delivery_temperature_logs/_alerts 不匹配）。
 try:
     from ..services import delivery_temperature_service as _temperature_service
+
     _TEMP_SERVICE_AVAILABLE = True
 except ImportError:  # pragma: no cover — 防御性导入
     _temperature_service = None  # type: ignore[assignment]
@@ -71,13 +72,11 @@ log = structlog.get_logger(__name__)
 # 常量与异常
 # ──────────────────────────────────────────────────────────────────────
 
-MAX_SIGNATURE_SIZE_BYTES = 200 * 1024          # 200KB
-MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024    # 5MB
+MAX_SIGNATURE_SIZE_BYTES = 200 * 1024  # 200KB
+MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024  # 5MB
 
 _DEFAULT_LOCAL_DIR = "/tmp/tunxiang-supply-uploads"  # noqa: S108 - 仅 dev mock，由 env 覆盖
-_LOCAL_UPLOAD_DIR = Path(
-    os.environ.get("TX_SUPPLY_LOCAL_UPLOAD_DIR", _DEFAULT_LOCAL_DIR)
-)
+_LOCAL_UPLOAD_DIR = Path(os.environ.get("TX_SUPPLY_LOCAL_UPLOAD_DIR", _DEFAULT_LOCAL_DIR))
 _OBJECT_STORE_BUCKET = os.environ.get("TX_SUPPLY_OBJECT_STORE_BUCKET", "tunxiang-supply")
 _OBJECT_STORE_SCHEME = os.environ.get("TX_SUPPLY_OBJECT_STORE_SCHEME", "s3")
 
@@ -127,9 +126,7 @@ def _parse_data_url(data_url: str) -> tuple[str, bytes]:
         DeliveryProofError: 格式不正确或 base64 解码失败。
     """
     if not isinstance(data_url, str) or not data_url.startswith("data:"):
-        raise DeliveryProofError(
-            "invalid base64 payload: must start with 'data:<mime>;base64,...'"
-        )
+        raise DeliveryProofError("invalid base64 payload: must start with 'data:<mime>;base64,...'")
 
     try:
         header, body = data_url.split(",", 1)
@@ -139,7 +136,7 @@ def _parse_data_url(data_url: str) -> tuple[str, bytes]:
     if ";base64" not in header:
         raise DeliveryProofError("invalid base64 payload: missing ';base64' marker")
 
-    mime_type = header[len("data:"):].split(";", 1)[0].strip().lower()
+    mime_type = header[len("data:") :].split(";", 1)[0].strip().lower()
     if not mime_type:
         raise DeliveryProofError("invalid base64 payload: empty mime type")
 
@@ -250,13 +247,9 @@ async def submit_signature(
 
     mime_type, raw = _parse_data_url(signature_base64)
     if mime_type not in _VALID_SIGNATURE_MIME:
-        raise DeliveryProofError(
-            f"signature mime must be one of {_VALID_SIGNATURE_MIME}, got {mime_type}"
-        )
+        raise DeliveryProofError(f"signature mime must be one of {_VALID_SIGNATURE_MIME}, got {mime_type}")
     if len(raw) > MAX_SIGNATURE_SIZE_BYTES:
-        raise DeliveryProofError(
-            f"signature image size {len(raw)} exceeds limit {MAX_SIGNATURE_SIZE_BYTES}"
-        )
+        raise DeliveryProofError(f"signature image size {len(raw)} exceeds limit {MAX_SIGNATURE_SIZE_BYTES}")
 
     delivery_uuid = _to_uuid(delivery_id)
     tenant_uuid = _to_uuid(tenant_id)
@@ -264,32 +257,22 @@ async def submit_signature(
 
     # 二次防御：检查唯一约束（DB 已加约束，但我们用业务异常包装）
     existing = await db.execute(
-        text(
-            "SELECT id FROM delivery_receipts "
-            "WHERE tenant_id = :tid AND delivery_id = :did LIMIT 1"
-        ),
+        text("SELECT id FROM delivery_receipts WHERE tenant_id = :tid AND delivery_id = :did LIMIT 1"),
         {"tid": tenant_uuid, "did": delivery_uuid},
     )
     if existing.first() is not None:
-        raise DeliveryProofError(
-            f"delivery {delivery_id} already signed; receipt is immutable"
-        )
+        raise DeliveryProofError(f"delivery {delivery_id} already signed; receipt is immutable")
 
     # 解析 store_id（从 distribution_orders；缺失时回退到 nil uuid 让上层报错）
     store_row = await db.execute(
-        text(
-            "SELECT target_store_id FROM distribution_orders "
-            "WHERE id = :did AND tenant_id = :tid LIMIT 1"
-        ),
+        text("SELECT target_store_id FROM distribution_orders WHERE id = :did AND tenant_id = :tid LIMIT 1"),
         {"did": delivery_uuid, "tid": tenant_uuid},
     )
     store_data = store_row.first()
     if store_data is None:
         # 不强行要求一定存在 distribution_orders（可能是模拟测试或未来其他来源）
         # 但要求传入 store_id 通过 device_info 兜底——此处直接报错更安全
-        raise DeliveryProofError(
-            f"distribution_order {delivery_id} not found in current tenant"
-        )
+        raise DeliveryProofError(f"distribution_order {delivery_id} not found in current tenant")
     store_uuid = store_data[0]
 
     upload_meta = upload_to_object_storage(
@@ -301,7 +284,8 @@ async def submit_signature(
     receipt_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO delivery_receipts (
                 id, tenant_id, delivery_id, store_id,
                 signer_name, signer_role, signer_phone,
@@ -315,7 +299,8 @@ async def submit_signature(
                 :lat, :lng,
                 CAST(:dinfo AS JSONB), :notes, :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": receipt_id,
             "tid": tenant_uuid,
@@ -338,13 +323,15 @@ async def submit_signature(
     # 反写到 store_receiving_confirmations（best-effort）
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE store_receiving_confirmations
                 SET receipt_id = :rid
                 WHERE tenant_id = :tid
                   AND distribution_order_id = :did
                   AND receipt_id IS NULL
-            """),
+            """
+            ),
             {"rid": receipt_id, "tid": tenant_uuid, "did": delivery_uuid},
         )
     except (ProgrammingError, DBAPIError, SQLAlchemyError) as exc:
@@ -439,7 +426,8 @@ async def record_damage(
     damage_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO delivery_damage_records (
                 id, tenant_id, delivery_id, item_id, ingredient_id, batch_no,
                 damage_type, damaged_qty, unit_cost_fen,
@@ -451,7 +439,8 @@ async def record_damage(
                 :descr, :sev, :rby,
                 :now, 'PENDING', :now, :now, false
             )
-        """),
+        """
+        ),
         {
             "id": damage_id,
             "tid": tenant_uuid,
@@ -472,10 +461,7 @@ async def record_damage(
 
     # 读回 damage_amount_fen（Computed 列）
     row = await db.execute(
-        text(
-            "SELECT damage_amount_fen FROM delivery_damage_records "
-            "WHERE id = :id AND tenant_id = :tid"
-        ),
+        text("SELECT damage_amount_fen FROM delivery_damage_records WHERE id = :id AND tenant_id = :tid"),
         {"id": damage_id, "tid": tenant_uuid},
     )
     fetched = row.first()
@@ -549,27 +535,20 @@ async def attach_file(
 
     mime_type, raw = _parse_data_url(file_base64)
     if len(raw) > MAX_ATTACHMENT_SIZE_BYTES:
-        raise DeliveryProofError(
-            f"attachment size {len(raw)} exceeds limit {MAX_ATTACHMENT_SIZE_BYTES}"
-        )
+        raise DeliveryProofError(f"attachment size {len(raw)} exceeds limit {MAX_ATTACHMENT_SIZE_BYTES}")
 
     tenant_uuid = _to_uuid(tenant_id)
     entity_uuid = _to_uuid(entity_id)
     await _set_tenant(db, tenant_id)
 
     # 校验 entity 存在（在当前租户）
-    table = (
-        "delivery_receipts" if entity_type == EntityType.RECEIPT.value
-        else "delivery_damage_records"
-    )
+    table = "delivery_receipts" if entity_type == EntityType.RECEIPT.value else "delivery_damage_records"
     exists = await db.execute(
         text(f"SELECT 1 FROM {table} WHERE id = :id AND tenant_id = :tid LIMIT 1"),
         {"id": entity_uuid, "tid": tenant_uuid},
     )
     if exists.first() is None:
-        raise DeliveryProofError(
-            f"{entity_type} {entity_id} not found in current tenant"
-        )
+        raise DeliveryProofError(f"{entity_type} {entity_id} not found in current tenant")
 
     upload_meta = upload_to_object_storage(
         tenant_id=tenant_id,
@@ -581,7 +560,8 @@ async def attach_file(
     att_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO delivery_attachments (
                 id, tenant_id, entity_type, entity_id,
                 file_url, file_type, file_size, file_name, thumbnail_url,
@@ -593,7 +573,8 @@ async def attach_file(
                 :captured, :lat, :lng,
                 :uby, :now, :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": att_id,
             "tid": tenant_uuid,
@@ -649,7 +630,8 @@ async def get_receipt(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, delivery_id, store_id, signer_name, signer_role, signer_phone,
                    signed_at, signature_image_url,
                    signature_location_lat, signature_location_lng,
@@ -657,7 +639,8 @@ async def get_receipt(
             FROM delivery_receipts
             WHERE tenant_id = :tid AND delivery_id = :did
             LIMIT 1
-        """),
+        """
+        ),
         {"tid": tenant_uuid, "did": delivery_uuid},
     )
     rec = row.first()
@@ -751,7 +734,8 @@ async def get_complete_proof(
 
     # 损坏
     damage_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, delivery_id, item_id, ingredient_id, batch_no, damage_type,
                    damaged_qty, unit_cost_fen, damage_amount_fen,
                    description, severity, reported_by, reported_at,
@@ -760,7 +744,8 @@ async def get_complete_proof(
             FROM delivery_damage_records
             WHERE tenant_id = :tid AND delivery_id = :did AND is_deleted = false
             ORDER BY reported_at DESC
-        """),
+        """
+        ),
         {"tid": tenant_uuid, "did": delivery_uuid},
     )
     damages = [_serialize_damage(r) for r in damage_rows.fetchall()]
@@ -770,14 +755,16 @@ async def get_complete_proof(
     receipt_attach: list[dict[str, Any]] = []
     if receipt is not None:
         att_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, entity_type, entity_id, file_url, file_type, file_size,
                        file_name, thumbnail_url, captured_at, gps_lat, gps_lng,
                        uploaded_by, uploaded_at
                 FROM delivery_attachments
                 WHERE tenant_id = :tid AND entity_type = 'RECEIPT' AND entity_id = :eid
                 ORDER BY uploaded_at DESC
-            """),
+            """
+            ),
             {"tid": tenant_uuid, "eid": _to_uuid(receipt["receipt_id"])},
         )
         receipt_attach = [_serialize_attachment(r) for r in att_rows.fetchall()]
@@ -786,7 +773,8 @@ async def get_complete_proof(
     if damage_ids:
         # 用 ANY 而不是 IN，避免大数组语法问题
         att_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, entity_type, entity_id, file_url, file_type, file_size,
                        file_name, thumbnail_url, captured_at, gps_lat, gps_lng,
                        uploaded_by, uploaded_at
@@ -795,7 +783,8 @@ async def get_complete_proof(
                   AND entity_type = 'DAMAGE'
                   AND entity_id = ANY(:eids)
                 ORDER BY uploaded_at DESC
-            """),
+            """
+            ),
             {"tid": tenant_uuid, "eids": damage_ids},
         )
         damage_attach = [_serialize_attachment(r) for r in att_rows.fetchall()]
@@ -829,11 +818,7 @@ async def get_complete_proof(
             )
 
     # 总样本数：优先取 TASK-3 给的 timeline_full_count（抽样前），否则回退到抽样长度
-    temperature_full_count = (
-        temperature_summary.get("sample_count")
-        if isinstance(temperature_summary, dict)
-        else None
-    )
+    temperature_full_count = temperature_summary.get("sample_count") if isinstance(temperature_summary, dict) else None
     if temperature_full_count is None:
         temperature_full_count = len(temperature_evidence)
 
@@ -841,12 +826,8 @@ async def get_complete_proof(
         "delivery_id": delivery_id,
         "has_signature": receipt is not None,
         "damage_count": len(damages),
-        "pending_damage_count": sum(
-            1 for d in damages if d["resolution_status"] == ResolutionStatus.PENDING.value
-        ),
-        "total_damage_amount_fen": sum(
-            (d["damage_amount_fen"] or 0) for d in damages
-        ),
+        "pending_damage_count": sum(1 for d in damages if d["resolution_status"] == ResolutionStatus.PENDING.value),
+        "total_damage_amount_fen": sum((d["damage_amount_fen"] or 0) for d in damages),
         "attachment_count": len(receipt_attach) + len(damage_attach),
         # 向后兼容字段：原值含义为温度记录条数
         "temperature_record_count": int(temperature_full_count or 0),
@@ -907,17 +888,15 @@ async def list_pending_damages(
 
     join_clause = ""
     if store_id is not None:
-        join_clause = (
-            " JOIN distribution_orders o "
-            "ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
-        )
+        join_clause = " JOIN distribution_orders o ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
         where.append("o.target_store_id = :sid")
         params["sid"] = _to_uuid(store_id)
 
     where_sql = " AND ".join(where)
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT d.id, d.delivery_id, d.item_id, d.ingredient_id, d.batch_no,
                    d.damage_type, d.damaged_qty, d.unit_cost_fen, d.damage_amount_fen,
                    d.description, d.severity, d.reported_by, d.reported_at,
@@ -928,17 +907,20 @@ async def list_pending_damages(
             WHERE {where_sql}
             ORDER BY d.reported_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [_serialize_damage(r) for r in rows.fetchall()]
 
     count_row = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*) FROM delivery_damage_records d
             {join_clause}
             WHERE {where_sql}
-        """),
+        """
+        ),
         {k: v for k, v in params.items() if k not in ("limit", "offset")},
     )
     total = count_row.scalar_one()
@@ -976,36 +958,35 @@ async def resolve_damage(
     财务侧 projector 据此自动开红字凭证（不直接调用财务服务）。
     """
     if action not in _TERMINAL_ACTIONS:
-        raise DeliveryProofError(
-            f"invalid action {action!r}; must be one of {_TERMINAL_ACTIONS}"
-        )
+        raise DeliveryProofError(f"invalid action {action!r}; must be one of {_TERMINAL_ACTIONS}")
 
     tenant_uuid = _to_uuid(tenant_id)
     damage_uuid = _to_uuid(damage_id)
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT delivery_id, resolution_status, damage_type, damaged_qty,
                    unit_cost_fen, damage_amount_fen, severity, ingredient_id, batch_no
             FROM delivery_damage_records
             WHERE id = :id AND tenant_id = :tid AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {"id": damage_uuid, "tid": tenant_uuid},
     )
     record = row.first()
     if record is None:
         raise DeliveryProofError(f"damage record {damage_id} not found")
     if record[1] != ResolutionStatus.PENDING.value:
-        raise DeliveryProofError(
-            f"damage {damage_id} already resolved as {record[1]}; cannot re-resolve"
-        )
+        raise DeliveryProofError(f"damage {damage_id} already resolved as {record[1]}; cannot re-resolve")
 
     delivery_uuid = record[0]
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE delivery_damage_records
             SET resolution_status = :status,
                 resolve_action = :ract,
@@ -1014,7 +995,8 @@ async def resolve_damage(
                 resolved_at = :now,
                 updated_at = :now
             WHERE id = :id AND tenant_id = :tid
-        """),
+        """
+        ),
         {
             "status": action,
             "ract": resolve_action_code,
@@ -1103,10 +1085,7 @@ async def get_damage_stats(
 
     join_clause = ""
     if store_id is not None:
-        join_clause = (
-            " JOIN distribution_orders o "
-            "ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
-        )
+        join_clause = " JOIN distribution_orders o ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
         where.append("o.target_store_id = :sid")
         params["sid"] = _to_uuid(store_id)
 
@@ -1114,21 +1093,24 @@ async def get_damage_stats(
 
     # 总览
     total_row = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*),
                    COALESCE(SUM(d.damage_amount_fen), 0),
                    COUNT(DISTINCT d.delivery_id)
             FROM delivery_damage_records d
             {join_clause}
             WHERE {where_sql}
-        """),
+        """
+        ),
         params,
     )
     total_count, total_amount, distinct_delivery = total_row.first()
 
     # 按 damage_type
     type_rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT d.damage_type, COUNT(*),
                    COALESCE(SUM(d.damage_amount_fen), 0)
             FROM delivery_damage_records d
@@ -1136,47 +1118,43 @@ async def get_damage_stats(
             WHERE {where_sql}
             GROUP BY d.damage_type
             ORDER BY COUNT(*) DESC
-        """),
+        """
+        ),
         params,
     )
-    by_type = [
-        {"damage_type": r[0], "count": int(r[1]), "amount_fen": int(r[2])}
-        for r in type_rows.fetchall()
-    ]
+    by_type = [{"damage_type": r[0], "count": int(r[1]), "amount_fen": int(r[2])} for r in type_rows.fetchall()]
 
     # 按 severity
     sev_rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT d.severity, COUNT(*),
                    COALESCE(SUM(d.damage_amount_fen), 0)
             FROM delivery_damage_records d
             {join_clause}
             WHERE {where_sql}
             GROUP BY d.severity
-        """),
+        """
+        ),
         params,
     )
-    by_severity = [
-        {"severity": r[0], "count": int(r[1]), "amount_fen": int(r[2])}
-        for r in sev_rows.fetchall()
-    ]
+    by_severity = [{"severity": r[0], "count": int(r[1]), "amount_fen": int(r[2])} for r in sev_rows.fetchall()]
 
     # 按 resolution_status
     status_rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT d.resolution_status, COUNT(*),
                    COALESCE(SUM(d.damage_amount_fen), 0)
             FROM delivery_damage_records d
             {join_clause}
             WHERE {where_sql}
             GROUP BY d.resolution_status
-        """),
+        """
+        ),
         params,
     )
-    by_status = [
-        {"status": r[0], "count": int(r[1]), "amount_fen": int(r[2])}
-        for r in status_rows.fetchall()
-    ]
+    by_status = [{"status": r[0], "count": int(r[1]), "amount_fen": int(r[2])} for r in status_rows.fetchall()]
 
     return {
         "from_date": from_date.isoformat() if from_date else None,
