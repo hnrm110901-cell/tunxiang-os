@@ -8,7 +8,7 @@
 设计原则：
   - 所有表包含 tenant_id + RLS 策略
   - 金额单位：分（BIGINT）
-  - 配合 tx-pay (:8013) 服务使用
+  - 配合 tx-pay (:8016) 服务使用
 
 Revision ID: v206c
 Revises: v205
