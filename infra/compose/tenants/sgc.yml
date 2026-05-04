@@ -1,12 +1,32 @@
 # ============================================================
-# 屯象OS 租户 Override — 尚宫厨 (sgc)
+# 屯象OS 租户身份层 — 尚宫厨 (sgc)
 # ============================================================
-# 用法（叠加 demo env）:
+# 本文件是 **纯商户身份层**，只承载与该商户绑定的：
+#   - 独占数据库（tunxiang_sgc）
+#   - 商户编码 / 租户ID / 品牌名 env
+#   - 商户专属种子（scripts/seed_sgc.py，含宴会预订）
+#   - 独占 volume / network 命名空间
+#
+# 本文件 **不再承载**：
+#   - host 端口映射（生产部署各家在自己的 VM/服务器上跑，
+#     端口走默认 8000/5432/6379 等，docker-network 内部直连即可，
+#     外部访问由各 VM 的 nginx/反代自配）
+#   - 端口偏移（同机多实例联调请叠加 special/multi-host-dev.yml）
+#
+# 生产场景用法（独立部署，无偏移）:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/prod.yml \
+#                  -f infra/compose/tenants/sgc.yml up -d
+#
+# 演示场景用法:
 #   docker compose -f infra/compose/base.yml \
 #                  -f infra/compose/envs/demo.yml \
 #                  -f infra/compose/tenants/sgc.yml up -d
 #
-# 端口偏移：+200（postgres=5632, redis=6381, gateway=8200, web=5373-5375）
+# 同机多家联调（dev 专用，不要叠加到生产）:
+#   见 infra/compose/special/multi-host-dev.yml 与
+#   .env.sgc.dev.example
+#
 # KPI 重点：宴会客单价 / 订金收款率 / 人力成本占比
 # ============================================================
 
@@ -22,67 +42,54 @@ services:
       POSTGRES_USER: tunxiang
       POSTGRES_PASSWORD: tunxiang_sgc_2024
       POSTGRES_DB: tunxiang_sgc
-    ports: !override
-      - "5632:5432"
     volumes:
       - sgc_pg_data:/var/lib/postgresql/data
       - ../docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
 
-  redis:
-    ports: !override
-      - "6381:6379"
-
   gateway:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8200:8000"
 
   tx-trade:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8201:8001"
 
   tx-menu:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8202:8002"
 
   tx-member:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8203:8003"
 
   tx-ops:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8205:8005"
 
   tx-finance:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8207:8007"
 
   tx-analytics:
     environment:
       <<: *sgc-env
-    ports: !override
-      - "8209:8009"
 
+  # 种子数据：迁移完成后执行 sgc 专属 seed
+  # profiles: [seed] —— 默认不启动；需要播种时显式 `--profile seed`
+  # （生产部署只在初始化时跑一次，独立部署也不需要常驻此 service）
+  # 依赖的 migrate 服务由 envs/demo.yml 提供；prod 场景因 profile 不激活
+  # 而被 compose 整体丢弃，不会触发 depends_on 校验。
   seed-data:
     image: python:3.11-slim
     working_dir: /app
     restart: "no"
+    profiles:
+      - seed
     command: >
       sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
              sqlalchemy asyncpg psycopg2-binary httpx &&
              python3 /app/scripts/seed_sgc.py &&
-             echo '✅ sgc 种子数据植入完成（含宴会预订）'"
+             echo 'sgc 种子数据植入完成（含宴会预订）'"
     environment:
       DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_sgc_2024@postgres:5432/tunxiang_sgc
       PYTHONPATH: /app
@@ -102,36 +109,27 @@ services:
 
   web-admin:
     environment:
-      VITE_API_BASE_URL: http://localhost:8200
       VITE_MERCHANT_CODE: sgc
       VITE_TENANT_ID: sgc-demo-tenant
     volumes: !override
       - ../../apps/web-admin:/app
       - sgc_web_admin_nm:/app/node_modules
-    ports: !override
-      - "5373:5173"
 
   web-pos:
     environment:
-      VITE_API_BASE_URL: http://localhost:8200
       VITE_MERCHANT_CODE: sgc
       VITE_TENANT_ID: sgc-demo-tenant
     volumes: !override
       - ../../apps/web-pos:/app
       - sgc_web_pos_nm:/app/node_modules
-    ports: !override
-      - "5374:5174"
 
   web-kds:
     environment:
-      VITE_API_BASE_URL: http://localhost:8200
       VITE_MERCHANT_CODE: sgc
       VITE_TENANT_ID: sgc-demo-tenant
     volumes: !override
       - ../../apps/web-kds:/app
       - sgc_web_kds_nm:/app/node_modules
-    ports: !override
-      - "5375:5175"
 
 volumes:
   sgc_pg_data:

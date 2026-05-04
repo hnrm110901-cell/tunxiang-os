@@ -1,24 +1,31 @@
 # ============================================================
-# 屯象OS 租户 Override — 尝在一起 (czyz)
+# 屯象OS 租户身份层 — 尝在一起 (czyz)
 # ============================================================
-# 用法（叠加 demo env）:
+# 本文件是 **纯商户身份层**，只承载与该商户绑定的：
+#   - 独占数据库（tunxiang_czyz）
+#   - 商户编码 / 租户ID / 品牌名 env
+#   - 商户专属种子（scripts/seed_czyz.py）
+#   - 独占 volume / network 命名空间
+#
+# 本文件 **不再承载**：
+#   - host 端口映射（生产部署各家在自己的 VM/服务器上跑，
+#     端口走默认 8000/5432/6379 等，docker-network 内部直连即可，
+#     外部访问由各 VM 的 nginx/反代自配）
+#   - 端口偏移（同机多实例联调请叠加 special/multi-host-dev.yml）
+#
+# 生产场景用法（独立部署，无偏移）:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/prod.yml \
+#                  -f infra/compose/tenants/czyz.yml up -d
+#
+# 演示场景用法:
 #   docker compose -f infra/compose/base.yml \
 #                  -f infra/compose/envs/demo.yml \
 #                  -f infra/compose/tenants/czyz.yml up -d
 #
-# 端口偏移：${CZYZ_PORT_OFFSET:-0}（默认 0 = 与 demo/dev 互斥）
-#
-# TODO(创始人决策): czyz 端口偏移值。
-#   现状: 偏移=0，host 端口 5432/6379/8000/5173-5175 与 dev/demo 完全冲撞，
-#         三租户并行时只有 zqx(+100)/sgc(+200) 能起，czyz 占默认槽位互斥。
-#   建议方向：
-#     A) +50  → host 端口 5482/6429/8050/5223-5225（与 dev/demo 错开，
-#               与 zqx/sgc 也不冲突）
-#     B) +300 → host 端口 5732/6679/8300/5473-5475（更安全的远偏移）
-#     C) 保持 0 → 默认运行 czyz 时不并发其它租户，部署简单
-#   等用户确认后把 CZYZ_PORT_OFFSET 默认值改成所选方案。
-#   当前用 ENV 变量化让脚本可临时覆盖：
-#     CZYZ_PORT_OFFSET=50 docker compose -f ... up -d
+# 同机多家联调（dev 专用，不要叠加到生产）:
+#   见 infra/compose/special/multi-host-dev.yml 与
+#   .env.czyz.dev.example
 #
 # KPI 重点：翻台率 / 出餐时间 / 座位利用率
 # ============================================================
@@ -35,69 +42,54 @@ services:
       POSTGRES_USER: tunxiang
       POSTGRES_PASSWORD: tunxiang_czyz_2024
       POSTGRES_DB: tunxiang_czyz
-    # 端口偏移：CZYZ_PORT_OFFSET 默认 0（与 dev/demo 互斥，待创始人决策）
-    ports: !override
-      - "${CZYZ_HOST_PG_PORT:-5432}:5432"
     volumes:
       - czyz_pg_data:/var/lib/postgresql/data
       - ../docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
 
-  redis:
-    ports: !override
-      - "${CZYZ_HOST_REDIS_PORT:-6379}:6379"
-
   gateway:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_GATEWAY_PORT:-8000}:8000"
 
   tx-trade:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_TRADE_PORT:-8001}:8001"
 
   tx-menu:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_MENU_PORT:-8002}:8002"
 
   tx-member:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_MEMBER_PORT:-8003}:8003"
 
   tx-ops:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_OPS_PORT:-8005}:8005"
 
   tx-finance:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_FINANCE_PORT:-8007}:8007"
 
   tx-analytics:
     environment:
       <<: *czyz-env
-    ports: !override
-      - "${CZYZ_HOST_ANALYTICS_PORT:-8009}:8009"
 
   # 种子数据：迁移完成后执行 czyz 专属 seed
+  # profiles: [seed] —— 默认不启动；需要播种时显式 `--profile seed`
+  # （生产部署只在初始化时跑一次，独立部署也不需要常驻此 service）
+  # 依赖的 migrate 服务由 envs/demo.yml 提供；prod 场景因 profile 不激活
+  # 而被 compose 整体丢弃，不会触发 depends_on 校验。
   seed-data:
     image: python:3.11-slim
     working_dir: /app
     restart: "no"
+    profiles:
+      - seed
     command: >
       sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
              sqlalchemy asyncpg psycopg2-binary httpx &&
              python3 /app/scripts/seed_czyz.py &&
-             echo '✅ czyz 种子数据植入完成'"
+             echo 'czyz 种子数据植入完成'"
     environment:
       DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_czyz_2024@postgres:5432/tunxiang_czyz
       PYTHONPATH: /app
@@ -117,36 +109,27 @@ services:
 
   web-admin:
     environment:
-      VITE_API_BASE_URL: http://localhost:${CZYZ_HOST_GATEWAY_PORT:-8000}
       VITE_MERCHANT_CODE: czyz
       VITE_TENANT_ID: czyz-demo-tenant
     volumes: !override
       - ../../apps/web-admin:/app
       - czyz_web_admin_nm:/app/node_modules
-    ports: !override
-      - "${CZYZ_HOST_WEB_ADMIN_PORT:-5173}:5173"
 
   web-pos:
     environment:
-      VITE_API_BASE_URL: http://localhost:${CZYZ_HOST_GATEWAY_PORT:-8000}
       VITE_MERCHANT_CODE: czyz
       VITE_TENANT_ID: czyz-demo-tenant
     volumes: !override
       - ../../apps/web-pos:/app
       - czyz_web_pos_nm:/app/node_modules
-    ports: !override
-      - "${CZYZ_HOST_WEB_POS_PORT:-5174}:5174"
 
   web-kds:
     environment:
-      VITE_API_BASE_URL: http://localhost:${CZYZ_HOST_GATEWAY_PORT:-8000}
       VITE_MERCHANT_CODE: czyz
       VITE_TENANT_ID: czyz-demo-tenant
     volumes: !override
       - ../../apps/web-kds:/app
       - czyz_web_kds_nm:/app/node_modules
-    ports: !override
-      - "${CZYZ_HOST_WEB_KDS_PORT:-5175}:5175"
 
 volumes:
   czyz_pg_data:
