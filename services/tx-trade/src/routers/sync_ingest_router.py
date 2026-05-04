@@ -2,7 +2,8 @@
 
 端点：
   POST /api/v1/sync/ingest  — 接收边缘推送的 ChangeRecord 变更，验证并应用到云端 PG
-  GET  /api/v1/sync/changes — 返回云端自 since 后的变更列表（供边缘拉取）
+  GET  /api/v1/sync/changes — 返回云端自 since 后的变更列表（供边缘拉取，旧契约）
+  GET  /api/v1/sync/pull    — SyncToken (ts+seq) 双键增量拉取（v147 events 表，新契约）
 
 设计原则：
   - 多租户：所有操作通过 X-Tenant-ID 隔离，强制 tenant_id 过滤
@@ -88,6 +89,32 @@ class ChangesResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class PullEventOut(BaseModel):
+    """v147 events 表事件（边缘 SyncToken 消费契约）
+
+    字段命名与 edge.SyncToken.filter_unseen 对齐：
+      - seq: events.sequence_num（BIGINT）
+      - ts:  events.recorded_at（ISO 8601）
+      - 其他字段透传，供边缘业务投影器消费
+    """
+
+    seq: int
+    ts: str
+    event_id: str
+    event_type: str
+    stream_id: str
+    stream_type: str
+    store_id: Optional[str] = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PullResponse(BaseModel):
+    items: List[PullEventOut]
+    count: int
+    max_seq: int
 
 
 # ─── 依赖：获取租户 ID ────────────────────────────────────────────────────
@@ -321,6 +348,140 @@ async def get_cloud_changes(
         since=since,
         page=page,
         count=len(items),
+    )
+    return {"ok": True, "data": response.model_dump()}
+
+
+@router.get(
+    "/pull",
+    summary="SyncToken 双键增量拉取（v147 events 表）",
+    description=(
+        "边缘 Mac mini 通过 (since_ts, since_seq) 复合游标增量拉取云端事件。\n\n"
+        "- 数据源：v147 `events` 表（Event Sourcing）\n"
+        "- 游标语义：返回 (recorded_at > since_ts) OR (recorded_at = since_ts AND sequence_num > since_seq)\n"
+        "- 同租户 + 同门店强制过滤；store_id 为空只返回租户级事件\n"
+        "- LIMIT 500（边缘按 max_seq/last_ts 持久化 SyncToken，下一轮续传）"
+    ),
+)
+async def pull_events(
+    store_id: str = Query(description="门店 ID（UUID）"),
+    since_ts: str = Query(
+        default="1970-01-01T00:00:00+00:00",
+        description="ISO 8601 时间戳，复合游标的时间分量",
+    ),
+    since_seq: int = Query(
+        default=0,
+        ge=0,
+        description="复合游标的序列号分量，用于同 ts 内事件的 tiebreaker",
+    ),
+    limit: int = Query(default=500, ge=1, le=500),
+    tenant_id: str = Depends(_require_tenant),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        since_dt = datetime.fromisoformat(since_ts)
+        if since_dt.tzinfo is None:
+            since_dt = since_dt.replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid 'since_ts' timestamp: {exc}",
+        )
+
+    try:
+        result = await db.execute(
+            text(
+                """
+                SELECT event_id, sequence_num, recorded_at,
+                       event_type, stream_id, stream_type,
+                       store_id, payload, metadata
+                FROM events
+                WHERE tenant_id = :tenant_id
+                  AND store_id = :store_id
+                  AND (
+                    recorded_at > :since_ts
+                    OR (recorded_at = :since_ts AND sequence_num > :since_seq)
+                  )
+                ORDER BY recorded_at ASC, sequence_num ASC
+                LIMIT :limit
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "since_ts": since_dt,
+                "since_seq": since_seq,
+                "limit": limit,
+            },
+        )
+        keys = list(result.keys())
+        rows = result.all()
+    except OperationalError:
+        # events 表不存在（非 v147+ 环境），返回空
+        logger.warning(
+            "sync_ingest.events_table_missing",
+            msg="events table not found, returning empty list",
+        )
+        return {
+            "ok": True,
+            "data": PullResponse(items=[], count=0, max_seq=since_seq).model_dump(),
+        }
+    except SQLAlchemyError as exc:
+        logger.error(
+            "sync_ingest.pull_db_error",
+            error=str(exc),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Database error")
+
+    items: List[PullEventOut] = []
+    max_seq = since_seq
+    for row in rows:
+        d = dict(zip(keys, row))
+        seq_val = int(d.get("sequence_num", 0))
+        if seq_val > max_seq:
+            max_seq = seq_val
+
+        recorded_at = d["recorded_at"]
+        ts_str = recorded_at.isoformat() if isinstance(recorded_at, datetime) else str(recorded_at)
+
+        payload = d.get("payload") or {}
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+        meta = d.get("metadata") or {}
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except (json.JSONDecodeError, ValueError):
+                meta = {}
+
+        items.append(
+            PullEventOut(
+                seq=seq_val,
+                ts=ts_str,
+                event_id=str(d["event_id"]),
+                event_type=str(d["event_type"]),
+                stream_id=str(d["stream_id"]),
+                stream_type=str(d["stream_type"]),
+                store_id=str(d["store_id"]) if d.get("store_id") else None,
+                payload=payload,
+                metadata=meta,
+            )
+        )
+
+    response = PullResponse(items=items, count=len(items), max_seq=max_seq)
+
+    logger.info(
+        "sync_ingest.pull_done",
+        tenant_id=tenant_id,
+        store_id=store_id,
+        since_ts=since_ts,
+        since_seq=since_seq,
+        returned=len(items),
+        max_seq=max_seq,
     )
     return {"ok": True, "data": response.model_dump()}
 
