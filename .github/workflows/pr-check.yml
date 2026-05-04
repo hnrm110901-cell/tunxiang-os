@@ -55,7 +55,7 @@ jobs:
               shared/db-migrations/*)
                 HAS_MIGRATION=true
                 ;;
-              infra/*|docker-compose*|Dockerfile*|nginx/*)
+              infra/*|Dockerfile*|nginx/*)
                 HAS_INFRA=true
                 ;;
               edge/*)

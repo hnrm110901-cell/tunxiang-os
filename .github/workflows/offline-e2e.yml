@@ -11,7 +11,7 @@ on:
     paths:
       - 'apps/web-pos/**'
       - 'e2e/**'
-      - 'infra/docker/docker-compose.toxiproxy.yml'
+      - 'infra/compose/special/toxiproxy.yml'
       - 'infra/docker/toxiproxy/**'
       - '.github/workflows/offline-e2e.yml'
   schedule:

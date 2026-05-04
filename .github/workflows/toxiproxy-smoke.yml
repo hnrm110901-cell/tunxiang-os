@@ -44,7 +44,11 @@ jobs:
 
       - name: Start toxiproxy
         run: |
-          docker compose -f infra/docker/docker-compose.toxiproxy.yml up -d toxiproxy
+          docker compose \
+            -f infra/compose/base.yml \
+            -f infra/compose/envs/dev.yml \
+            -f infra/compose/special/toxiproxy.yml \
+            up -d toxiproxy
           # 等 toxiproxy admin 就绪
           for i in {1..30}; do
             if curl -sf http://localhost:8474/version >/dev/null 2>&1; then
@@ -67,5 +71,9 @@ jobs:
       - name: Tear down toxiproxy
         if: always()
         run: |
-          docker compose -f infra/docker/docker-compose.toxiproxy.yml down -v || true
+          docker compose \
+            -f infra/compose/base.yml \
+            -f infra/compose/envs/dev.yml \
+            -f infra/compose/special/toxiproxy.yml \
+            down -v || true
           docker network rm docker_txos-dev || true
