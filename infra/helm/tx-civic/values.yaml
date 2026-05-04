@@ -82,3 +82,10 @@ pdb:
   enabled: false
   minAvailable: ""
   maxUnavailable: 1
+
+# P0.6 工件 4 — NetworkPolicy（默认禁用，启用前需画清楚服务依赖图）
+# docs/infra/service-dependency-graph.md（待补）
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
