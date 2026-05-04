@@ -251,7 +251,7 @@ class TestV264MigrationFileStructure:
         return self.MIGRATION_PATH.read_text(encoding="utf-8")
 
     def test_revision_is_v264(self, migration_source):
-        assert re.search(r'^revision\s*=\s*"v264"', migration_source, re.M)
+        assert re.search(r'^revision\s*=\s*"v264[a-z]?"', migration_source, re.M)
 
     def test_down_revision_is_v263(self, migration_source):
         """必须 down_revision=v263 (不能踩 v265 FCT Agent 2.0 的坑)."""

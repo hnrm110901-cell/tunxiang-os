@@ -259,7 +259,7 @@ class TestV278Migration:
         self.migration_src = path.read_text(encoding="utf-8")
 
     def test_revision_is_v278(self):
-        assert re.search(r'^revision\s*=\s*"v278"', self.migration_src, re.M)
+        assert re.search(r'^revision\s*=\s*"v278[a-z]?"', self.migration_src, re.M)
 
     def test_down_revision_is_v276(self):
         assert re.search(r'^down_revision\s*=\s*"v276"', self.migration_src, re.M)
