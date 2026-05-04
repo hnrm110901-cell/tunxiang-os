@@ -36,7 +36,7 @@ SERVER_VERSION = "0.1.0"
 AGENT_API_BASE = os.environ.get("TX_AGENT_API_BASE", "http://localhost:8000")
 
 # tx-pay backend URL (支付中枢)
-TX_PAY_API_BASE = os.environ.get("TX_PAY_API_BASE", "http://localhost:8013")
+TX_PAY_API_BASE = os.environ.get("TX_PAY_API_BASE", "http://localhost:8016")
 
 # ---------------------------------------------------------------------------
 # Bootstrap Agent runtime (in-process for local dev, HTTP for production)
@@ -299,7 +299,7 @@ async def _execute_tool(tool_name: str, arguments: dict) -> str:
             types = _event_bus.get_all_event_types()
             return json.dumps({"event_types": types})
 
-    # --- Payment Nexus actions (tx-pay:8013 via HTTP) ---
+    # --- Payment Nexus actions (tx-pay:8016 via HTTP) ---
     elif agent_id == "payment_nexus":
         return await _execute_payment_tool(action, arguments)
 
