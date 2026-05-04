@@ -1,0 +1,90 @@
+# tx-forge — Forge 外部 ISV 应用市场（Tier 3）
+#
+# ⚠️ TODO（P0-2 合并时复审）:
+#   tx-forge 的 service 定义在另一分支（feat/p0-forge-compose）尚未合并到
+#   infra/compose/base.yml；任务规格暂用 8013 作为容器内端口。base.yml 中
+#   8013 已被 tunxiang-api 占用，但 K8s 通过独立 Service ClusterIP 隔离，
+#   容器内同号不构成冲突。P0-2 合并 base.yml 时必须复审：
+#     - 是否改 tx-forge 端口（如 8020+）以避免容器内同号引发的 dev/compose 困惑
+#     - 是否统一 image tag（与 tx-devforge / 其他 forge 系镜像 tag 协同）
+#   届时同步更新本 values.yaml 与 docs/infra/port-allocation-2026-05.md。
+#
+# 与 tx-devforge（DevForge 内部研发平台 :8017）严格区分：
+#   - tx-forge      = 外部 ISV 应用市场
+#   - tx-devforge   = 内部研发平台
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-forge
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  # ⚠️ TODO: 端口暂用 8013（容器内）；P0-2 合并时复审是否需调整
+  port: 8013
+  targetPort: 8013
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-forge-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8013
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8013
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：Forge 服务 Pod 分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
