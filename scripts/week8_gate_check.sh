@@ -231,14 +231,14 @@ check_7_security_zero() {
         fi
     fi
 
-    # 7c: 端口冲突 — 用静态扫描所有 docker-compose ports 项
+    # 7c: 端口冲突 — P0.5 后 compose 收敛到 infra/compose/，dev 主文件是 envs/dev.yml
     local port_dups
-    port_dups=$(grep -hE '^\s*-\s*"[0-9]+:[0-9]+"' infra/docker/docker-compose*.yml 2>/dev/null \
+    port_dups=$(grep -hE '^\s*-\s*"[0-9]+:[0-9]+"' infra/compose/base.yml infra/compose/envs/*.yml 2>/dev/null \
         | grep -oE '^\s*-\s*"[0-9]+' | grep -oE '[0-9]+' | sort | uniq -d | head -5 || true)
     if [[ -n "${port_dups}" ]]; then
-        # 多 compose 文件之间允许重叠（不同环境用不同 file），仅当主 dev 文件内重复才告警
+        # 多 env 文件之间允许重叠（不同环境用不同 file），仅当 dev 主文件内重复才告警
         local dev_dups
-        dev_dups=$(grep -hE '^\s*-\s*"[0-9]+:[0-9]+"' infra/docker/docker-compose.dev.yml 2>/dev/null \
+        dev_dups=$(grep -hE '^\s*-\s*"[0-9]+:[0-9]+"' infra/compose/envs/dev.yml 2>/dev/null \
             | grep -oE '^\s*-\s*"[0-9]+' | grep -oE '[0-9]+' | sort | uniq -d | head -5 || true)
         if [[ -n "${dev_dups}" ]]; then
             issues+=("ports(dev: ${dev_dups})")
