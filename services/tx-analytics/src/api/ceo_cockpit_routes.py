@@ -18,7 +18,6 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
