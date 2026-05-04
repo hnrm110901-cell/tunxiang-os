@@ -31,13 +31,14 @@ Prompt Cache 策略（与 D4a/D4b 同模式）
 from __future__ import annotations
 
 import json
-import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 SONNET_CACHED_MODEL = "claude-sonnet-4-7"
 CACHE_HIT_TARGET = 0.75
@@ -332,7 +333,7 @@ def parse_sonnet_response(
             cleaned = cleaned.rsplit("```", 1)[0].strip()
         payload = json.loads(cleaned)
     except (json.JSONDecodeError, ValueError, IndexError) as exc:
-        logger.warning("sonnet_budget_parse_failed error=%s text=%s", exc, text[:200])
+        logger.warning("sonnet_budget_parse_failed", error=str(exc), text=text[:200])
 
     reasoning = str(payload.get("reasoning", text[:300]))
     confidence = float(payload.get("confidence", 0.5))
@@ -443,7 +444,7 @@ class BudgetForecastService:
                     **token_stats,
                 )
             except Exception as exc:  # noqa: BLE001
-                logger.warning("sonnet_budget_invoke_failed error=%s", exc)
+                logger.warning("sonnet_budget_invoke_failed", error=str(exc))
                 forecast = self._fallback_forecast(history, store_id or "", target_year, target_month)
 
         # 5. 校验毛利底线硬约束
@@ -511,7 +512,7 @@ class BudgetForecastService:
             )
             rows = result.mappings().all()
         except Exception as exc:  # noqa: BLE001
-            logger.warning("budget_alert_query_failed error=%s", exc)
+            logger.warning("budget_alert_query_failed", error=str(exc))
             return alerts
 
         for row in rows:
@@ -563,7 +564,7 @@ class BudgetForecastService:
             )
             recent_rows = result2.mappings().all()
         except Exception as exc:  # noqa: BLE001
-            logger.warning("budget_consecutive_query_failed error=%s", exc)
+            logger.warning("budget_consecutive_query_failed", error=str(exc))
             return alerts
 
         consecutive_overspend = sum(1 for r in recent_rows if float(r.get("rate", 0)) > 1.0)
@@ -711,7 +712,7 @@ class BudgetForecastService:
             )
             rows = result.mappings().all()
         except Exception as exc:  # noqa: BLE001
-            logger.warning("budget_history_query_failed error=%s", exc)
+            logger.warning("budget_history_query_failed", error=str(exc))
             return bundle
 
         # 按 (year, month) 分组
@@ -812,9 +813,10 @@ class BudgetForecastService:
             # 强制下调到 38%
             adjusted_fen = int(revenue_fen * 0.38)
             logger.warning(
-                "budget_forecast_margin_violation ratio=%.2f adjusted_to=0.38 store=%s",
-                ratio,
-                forecast.store_id,
+                "budget_forecast_margin_violation",
+                ratio=round(ratio, 2),
+                adjusted_to=0.38,
+                store=forecast.store_id,
             )
             ingredient_cat.predicted_amount_fen = adjusted_fen
             ingredient_cat.upper_bound_fen = min(
@@ -980,15 +982,15 @@ class BudgetForecastService:
             )
             await db.commit()
             logger.info(
-                "budget_forecast_saved store=%s target=%d-%02d confidence=%.2f model=%s",
-                store_id,
-                forecast.target_year,
-                forecast.target_month,
-                forecast.confidence,
-                forecast.model_id,
+                "budget_forecast_saved",
+                store=store_id,
+                target_year=forecast.target_year,
+                target_month=forecast.target_month,
+                confidence=round(forecast.confidence, 2),
+                model=forecast.model_id,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("budget_forecast_save_failed error=%s", exc)
+            logger.warning("budget_forecast_save_failed", error=str(exc))
             # 留痕失败不阻断主业务
 
     @staticmethod
@@ -1043,7 +1045,7 @@ async def get_latest_forecast(
         )
         row = result.mappings().first()
     except Exception as exc:  # noqa: BLE001
-        logger.warning("get_latest_forecast_failed error=%s", exc)
+        logger.warning("get_latest_forecast_failed", error=str(exc))
         return None
 
     if not row:
