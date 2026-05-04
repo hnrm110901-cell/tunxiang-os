@@ -632,6 +632,11 @@ from .api.reservation_invitation_routes import (
 
 app.include_router(reservation_invitation_router)
 
+# ── W12-5：TV 菜单屏后端（25 端点，对齐前端 menuWallApi.ts 25 函数）──
+from .api.tv_menu_routes import router as tv_menu_router
+
+app.include_router(tv_menu_router)
+
 
 @app.get("/health")
 async def health():
