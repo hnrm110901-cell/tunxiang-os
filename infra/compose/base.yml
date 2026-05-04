@@ -1,0 +1,445 @@
+# ============================================================
+# 屯象OS Compose Base — 16 服务公共定义（唯一权威源）
+# ============================================================
+# 用法（必须叠加 envs/<env>.yml）：
+#   docker compose -f infra/compose/base.yml -f infra/compose/envs/dev.yml up -d
+#
+# 端口分配（与 CLAUDE.md §五 项目结构 严格一致）：
+#   ─────────────────────────────────────────────────────────
+#   宪法规定的 14 个核心服务（端口写死，不得违反）：
+#     gateway       :8000
+#     tx-trade      :8001
+#     tx-menu       :8002
+#     tx-member     :8003
+#     tx-growth     :8004
+#     tx-ops        :8005
+#     tx-supply     :8006
+#     tx-finance    :8007
+#     tx-agent      :8008
+#     tx-analytics  :8009
+#     tx-brain      :8010
+#     tx-intel      :8011
+#     tx-org        :8012
+#     tx-civic      :8014
+#
+#   宪法未规定但已在用（P0.5 收敛阶段决议）：
+#     tunxiang-api  :8013  ← 遗留 API 兼容层（infra-dev/staging 既定）
+#     tx-pay        :8016  ← P0-1 (feat/p0-pay-port-unify) 已决议
+#     tx-devforge   :8017  ← DevForge 内部研发平台
+#     tx-expense    :8015  ← 费控（来自 root-dev，宪法未列入但代码已在）
+#
+#   P0.5 阶段 A 端口冲突修复：
+#     ⚠️ tx-predict   :8019 ← 原 8013 与 tunxiang-api 冲突 → 改 8019（空闲口）
+#     ⚠️ mcp-server   :8018 ← 原 8014 与 tx-civic 宪法冲突 → 改 8018（空闲口）
+#                              tx-civic 是 CLAUDE.md 宪法规定的 8014，不可让
+#     ⚠️ tx-forge（未合并 P0-2 分支）：拟在 8013 容器内端口 → 与 tunxiang-api
+#       冲突，待 rebase 后改 base 端口或与 tunxiang-api 二选一保留；本 base
+#       不预先收纳，由 P0-2 合并时单独处理
+#
+# 上述端口决策已写入 docs/infra/port-allocation-2026-05.md（阶段 E 出表）。
+#
+# 重整原则：
+#   - base.yml 只声明：image / build context / 内部端口 / 公共 env / volumes /
+#     network / depends_on / healthcheck / restart / labels
+#   - 主机端口暴露、profile、image tag pin、资源限制 等属于环境/部署模式差异，
+#     全部放到 envs/*.yml 或 special/*.yml override
+#   - tenant 端口偏移 通过 tenants/*.yml 提供变量化端口块（覆盖 base 默认）
+#   - 所有 service 必须打 label tunxiang.env=${TUNXIANG_ENV:-base}
+#     让 scripts/env-manager.sh 的 docker ps --filter "label=tunxiang.env=" 工作
+# ============================================================
+
+x-build: &build-defaults
+  context: ../..   # 相对 infra/compose/，对应仓库根 tunxiang-os/
+
+x-svc: &svc-defaults
+  restart: unless-stopped
+  networks:
+    - txos-net
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "3"
+  labels:
+    tunxiang.env: "${TUNXIANG_ENV:-base}"
+
+x-env: &common-env
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required — set in .env or env override}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  PYTHONPATH: /app
+  PYTHONUNBUFFERED: "1"
+  TZ: Asia/Shanghai
+  TX_ENV: ${TX_ENV:-base}
+
+services:
+  # ── 基础设施 ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tunxiang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-tunxiang_os}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ../docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tunxiang}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-base}"
+
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-base}"
+
+  # ── API Gateway :8000 ─────────────────────────────────────
+  gateway:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      <<: *common-env
+      TX_TRADE_URL:     http://tx-trade:8001
+      TX_MENU_URL:      http://tx-menu:8002
+      TX_MEMBER_URL:    http://tx-member:8003
+      TX_GROWTH_URL:    http://tx-growth:8004
+      TX_OPS_URL:       http://tx-ops:8005
+      TX_SUPPLY_URL:    http://tx-supply:8006
+      TX_FINANCE_URL:   http://tx-finance:8007
+      TX_AGENT_URL:     http://tx-agent:8008
+      TX_ANALYTICS_URL: http://tx-analytics:8009
+      TX_BRAIN_URL:     http://tx-brain:8010
+      TX_INTEL_URL:     http://tx-intel:8011
+      TX_ORG_URL:       http://tx-org:8012
+      TX_CIVIC_URL:     http://tx-civic:8014
+      TX_EXPENSE_URL:   http://tx-expense:8015
+      TX_PAY_URL:       http://tx-pay:8016
+      TX_DEVFORGE_URL:  http://tx-devforge:8017
+      TX_MCP_URL:       http://mcp-server:8018
+      TX_PREDICT_URL:   http://tx-predict:8019
+      TX_TUNXIANG_API_URL: http://tunxiang-api:8013
+      WECOM_CORP_ID:        ${WECOM_CORP_ID:-}
+      WECOM_AGENT_ID:       ${WECOM_AGENT_ID:-}
+      WECOM_SECRET:         ${WECOM_SECRET:-}
+      WECOM_CALLBACK_TOKEN: ${WECOM_CALLBACK_TOKEN:-}
+      TX_JWT_SECRET_KEY:       ${TX_JWT_SECRET_KEY:?TX_JWT_SECRET_KEY is required}
+      TX_MFA_ENCRYPT_KEY:      ${TX_MFA_ENCRYPT_KEY:-}
+      TX_FIELD_ENCRYPTION_KEY: ${TX_FIELD_ENCRYPTION_KEY:-}
+      TX_INTEGRITY_SECRET:     ${TX_INTEGRITY_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── 交易履约 :8001 ────────────────────────────────────────
+  tx-trade:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-trade/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 菜品菜单 :8002 ────────────────────────────────────────
+  tx-menu:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-menu/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 会员CDP :8003 ─────────────────────────────────────────
+  tx-member:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-member/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 增长营销 :8004 ────────────────────────────────────────
+  tx-growth:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-growth/Dockerfile
+    environment:
+      <<: *common-env
+      MINIAPP_BASE_URL: ${MINIAPP_BASE_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 运营流程 :8005 ────────────────────────────────────────
+  tx-ops:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-ops/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 供应链 :8006 ──────────────────────────────────────────
+  tx-supply:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-supply/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 财务结算 :8007 ────────────────────────────────────────
+  tx-finance:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-finance/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Agent OS :8008 ────────────────────────────────────────
+  tx-agent:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-agent/Dockerfile
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 经营分析 :8009 ────────────────────────────────────────
+  tx-analytics:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-analytics/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── AI决策 :8010 ──────────────────────────────────────────
+  tx-brain:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-brain/Dockerfile
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── 商业智能 :8011 ────────────────────────────────────────
+  tx-intel:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-intel/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 组织人事 :8012 ────────────────────────────────────────
+  tx-org:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-org/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 遗留 API 兼容层 :8013 ─────────────────────────────────
+  # 注：宪法未列入 14 个核心服务，但代码层（services/tunxiang-api/）已存在
+  # 端口决议：保留 8013（infra-dev/staging 既定，最少破坏）
+  tunxiang-api:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tunxiang-api/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 城市监管平台 :8014 ────────────────────────────────────────
+  tx-civic:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-civic/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 费控 :8015 ───────────────────────────────────────────
+  # 注：宪法未列入，但 root-dev 已实现（services/tx-expense/）
+  tx-expense:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-expense/Dockerfile
+    environment:
+      <<: *common-env
+      SUPABASE_URL:        ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      OCR_PROVIDER:        ${OCR_PROVIDER:-baidu}
+      BAIDU_OCR_API_KEY:   ${BAIDU_OCR_API_KEY:-}
+      BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
+      TAX_VERIFY_API_URL:  ${TAX_VERIFY_API_URL:-}
+      TAX_VERIFY_API_KEY:  ${TAX_VERIFY_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── 支付中枢 :8016 ──────────────────────────────────────────
+  tx-pay:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-pay/Dockerfile
+    environment:
+      <<: *common-env
+      PAY_NOTIFY_BASE_URL: ${PAY_NOTIFY_BASE_URL:-https://api.tunxiang.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── DevForge 内部研发平台 :8017 ───────────────────────────────
+  # 注意：与 tx-forge（外部 ISV 应用市场，未合并 P0-2 分支）严格区分
+  tx-devforge:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-devforge/Dockerfile
+    environment:
+      <<: *common-env
+      DEVFORGE_DATABASE_URL: ${DEVFORGE_DATABASE_URL:?DEVFORGE_DATABASE_URL is required}
+      DEVFORGE_PORT: "8017"
+      DEVFORGE_LOG_LEVEL: ${DEVFORGE_LOG_LEVEL:-INFO}
+      DEVFORGE_JWT_SECRET: ${TX_JWT_SECRET_KEY:?TX_JWT_SECRET_KEY is required — DEVFORGE_JWT_SECRET falls back}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8017/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── MCP Protocol Server :8018 ────────────────────────────────
+  # 端口决议：原 8014 与 tx-civic（宪法 8014）冲突 → 改 8018（空闲）
+  mcp-server:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/mcp-server/Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── 预测引擎 :8019 ────────────────────────────────────────
+  # 端口决议：原 8013 与 tunxiang-api 冲突 → 改 8019（空闲）
+  # 宪法未规定 tx-predict 端口，可自由调整
+  tx-predict:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-predict/Dockerfile
+    environment:
+      <<: *common-env
+      HEFENG_API_KEY: ${HEFENG_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  txos-net:
+    driver: bridge
