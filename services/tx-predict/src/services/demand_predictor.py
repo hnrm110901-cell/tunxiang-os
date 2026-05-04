@@ -428,7 +428,7 @@ class DemandPredictor:
                     WHERE o.tenant_id = :tenant_id::uuid
                       AND o.store_id = :store_id::uuid
                       AND o.is_deleted = FALSE
-                      AND o.created_at >= NOW() - INTERVAL ':days days'
+                      AND o.created_at >= NOW() - make_interval(days => :days)
                     GROUP BY oi.dish_id, d.dish_name, d.category, sale_date
                     ORDER BY oi.dish_id, sale_date
                 """),
