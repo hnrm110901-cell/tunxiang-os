@@ -337,7 +337,7 @@ class TrafficPredictor:
                     WHERE tenant_id = :tenant_id::uuid
                       AND store_id = :store_id::uuid
                       AND is_deleted = FALSE
-                      AND created_at >= NOW() - INTERVAL ':days days'
+                      AND created_at >= NOW() - make_interval(days => :days)
                     GROUP BY weekday, hour
                     ORDER BY weekday, hour
                 """),
