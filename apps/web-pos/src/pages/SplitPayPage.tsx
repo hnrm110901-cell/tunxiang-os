@@ -362,16 +362,14 @@ export function SplitPayPage() {
           <button
             onClick={handleConfirm}
             disabled={remainingFen !== 0 || submitting}
+            {...tf.handlers}
             style={{
               width: '100%', padding: 16, border: 'none', borderRadius: 12,
               background: remainingFen === 0 && !submitting ? '#FF6B35' : '#444',
               color: '#fff', fontSize: 20, fontWeight: 'bold', marginTop: 'auto',
               cursor: remainingFen === 0 && !submitting ? 'pointer' : 'not-allowed',
-              minHeight: 72, transition: 'transform 200ms ease',
+              minHeight: 72, transition: 'transform 200ms ease', ...tf.style,
             }}
-            onPointerDown={(e) => { if (remainingFen === 0 && !submitting) e.currentTarget.style.transform = 'scale(0.97)'; }}
-            onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-            onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           >
             {submitting ? '处理中...' : remainingFen === 0 ? '确认结账' : `还需分摊 ${fen2yuan(remainingFen)}`}
           </button>
