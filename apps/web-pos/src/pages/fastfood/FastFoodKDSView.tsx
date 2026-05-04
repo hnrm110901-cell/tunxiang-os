@@ -22,6 +22,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../api/index';
+import { KdsTimeline, deriveStageDurations } from '../../components/KdsTimeline';
+import { VoiceCommandBar, matchVoiceCommand } from '../../components/VoiceCommandBar';
 
 // ─── Design Tokens ───
 const C = {
@@ -118,6 +120,11 @@ export function FastFoodKDSView() {
   const [, forceUpdate] = useState(0); // timer-driven re-render for elapsed time
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+  const [viewMode, setViewMode] = useState<'cards' | 'timeline'>('cards'); // Phase 2: 出餐节奏引擎
+  const [focusedOrderIdx, setFocusedOrderIdx] = useState(0); // 语音控制：当前聚焦的订单
+  const [speakText, setSpeakText] = useState<string | null>(null); // 语音播报文本
 
   // ─── Tick every second to refresh elapsed times ───
   useEffect(() => {
@@ -171,8 +178,9 @@ export function FastFoodKDSView() {
         // localStorage might not be available
       }
 
-      // Remove from list after 3 seconds
+      // Remove from list after 3 seconds (guard against unmount)
       setTimeout(() => {
+        if (!mountedRef.current) return;
         setOrders(prev => prev.filter(o => o.fast_food_order_id !== order.fast_food_order_id));
       }, 3000);
     } catch (err) {
@@ -214,147 +222,243 @@ export function FastFoodKDSView() {
             待出餐 {pendingOrders.length}
           </span>
         </div>
-        <button
-          onClick={() => navigate('/fastfood')}
-          style={{ padding: '8px 16px', background: '#1A3A48', color: C.text, border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
-        >
-          返回收银
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* 视图切换：卡片 / 时间线 */}
+          <div style={{ display: 'flex', gap: 4, background: '#0B1A20', borderRadius: 8, padding: 3 }}>
+            <button
+              onClick={() => setViewMode('cards')}
+              style={{
+                padding: '6px 14px', minHeight: 32,
+                background: viewMode === 'cards' ? C.accent : 'transparent',
+                color: viewMode === 'cards' ? C.white : C.muted,
+                border: 'none', borderRadius: 6,
+                fontSize: 13, fontWeight: viewMode === 'cards' ? 700 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              📋 卡片
+            </button>
+            <button
+              onClick={() => setViewMode('timeline')}
+              style={{
+                padding: '6px 14px', minHeight: 32,
+                background: viewMode === 'timeline' ? C.accent : 'transparent',
+                color: viewMode === 'timeline' ? C.white : C.muted,
+                border: 'none', borderRadius: 6,
+                fontSize: 13, fontWeight: viewMode === 'timeline' ? 700 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              📊 时间线
+            </button>
+          </div>
+          <button
+            onClick={() => navigate('/fastfood')}
+            style={{ padding: '8px 16px', background: '#1A3A48', color: C.text, border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
+          >
+            返回收银
+          </button>
+        </div>
       </div>
 
-      <div style={{ flex: 1, padding: 16, display: 'flex', gap: 16, overflow: 'hidden' }}>
-
-        {/* Pending / Preparing column */}
-        <div style={{ flex: 3, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
-          <div style={{ color: C.muted, fontSize: 14, marginBottom: 8, fontWeight: 600 }}>
-            制作中 ({pendingOrders.length})
-          </div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: 12,
-            overflowY: 'auto',
-            flex: 1,
-            alignContent: 'start',
-          }}>
-            {pendingOrders.map(order => (
-              <div
-                key={order.fast_food_order_id}
-                style={{
-                  background: C.card,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 12,
-                  padding: 16,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
-                {/* Order header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ color: C.accent, fontSize: 32, fontWeight: 900 }}>
-                    #{order.call_number}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <div style={{
-                      background: ORDER_TYPE_COLOR[order.order_type] || C.muted,
-                      color: C.white,
-                      borderRadius: 6,
-                      padding: '2px 8px',
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}>
-                      {ORDER_TYPE_LABEL[order.order_type] || order.order_type}
-                    </div>
-                    <div style={{ color: urgencyColor(order.created_at), fontSize: 13, fontWeight: 600 }}>
-                      {elapsedLabel(order.created_at)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {order.items.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: C.text, fontSize: 14 }}>{item.dish_name}</span>
-                      <span style={{
-                        background: '#1A3A48',
-                        color: C.white,
-                        borderRadius: 4,
-                        padding: '1px 8px',
-                        fontSize: 14,
-                        fontWeight: 700,
-                        minWidth: 28,
-                        textAlign: 'center',
-                      }}>
-                        ×{item.qty}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Ready button */}
-                <button
-                  onClick={() => markReady(order)}
-                  disabled={loadingIds.has(order.fast_food_order_id)}
-                  style={{
-                    height: 48,
-                    background: loadingIds.has(order.fast_food_order_id) ? C.muted : C.success,
-                    color: C.white,
-                    border: 'none',
-                    borderRadius: 8,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    cursor: loadingIds.has(order.fast_food_order_id) ? 'not-allowed' : 'pointer',
-                    transition: 'background 200ms',
-                    marginTop: 4,
-                  }}
-                  onPointerDown={e => { if (!loadingIds.has(order.fast_food_order_id)) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                  onPointerUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-                  onPointerLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-                >
-                  {loadingIds.has(order.fast_food_order_id) ? '处理中...' : '出餐 ✓'}
-                </button>
-              </div>
-            ))}
-
-            {pendingOrders.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: C.dimText, padding: 60, fontSize: 18 }}>
-                暂无待出餐订单
-              </div>
-            )}
-          </div>
+      {viewMode === 'timeline' ? (
+        <div style={{ flex: 1, padding: 16, overflow: 'auto' }}>
+          <KdsTimeline
+            orders={[
+              ...pendingOrders.map((o) => ({
+                id: o.fast_food_order_id,
+                callNumber: o.call_number,
+                orderType: o.order_type,
+                status: o.status,
+                items: o.items.map((i) => ({ name: i.dish_name, qty: i.qty })),
+                createdAt: o.created_at,
+                readyAt: o.ready_at,
+                stageDurations: deriveStageDurations(o.created_at, o.ready_at, o.status),
+              })),
+              ...readyOrders.map((o) => ({
+                id: o.fast_food_order_id,
+                callNumber: o.call_number,
+                orderType: o.order_type,
+                status: o.status,
+                items: o.items.map((i) => ({ name: i.dish_name, qty: i.qty })),
+                createdAt: o.created_at,
+                readyAt: o.ready_at,
+                stageDurations: deriveStageDurations(o.created_at, o.ready_at, o.status),
+              })),
+            ]}
+            expectedTimeSec={600}
+          />
         </div>
+      ) : (
+        <div style={{ flex: 1, padding: 16, display: 'flex', gap: 16, overflow: 'hidden' }}>
 
-        {/* Ready (called) column */}
-        {readyOrders.length > 0 && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 180 }}>
+          {/* Pending / Preparing column */}
+          <div style={{ flex: 3, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
             <div style={{ color: C.muted, fontSize: 14, marginBottom: 8, fontWeight: 600 }}>
-              已叫号 ({readyOrders.length})
+              制作中 ({pendingOrders.length})
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
-              {readyOrders.map(order => (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 12,
+              overflowY: 'auto',
+              flex: 1,
+              alignContent: 'start',
+            }}>
+              {pendingOrders.map(order => (
                 <div
                   key={order.fast_food_order_id}
                   style={{
                     background: C.card,
                     border: `1px solid ${C.border}`,
-                    borderRadius: 10,
-                    padding: '12px 16px',
-                    opacity: 0.6,
-                    textAlign: 'center',
+                    borderRadius: 12,
+                    padding: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
                   }}
                 >
-                  <div style={{ color: C.success, fontSize: 28, fontWeight: 700 }}>
-                    #{order.call_number}
+                  {/* Order header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ color: C.accent, fontSize: 32, fontWeight: 900 }}>
+                      #{order.call_number}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <div style={{
+                        background: ORDER_TYPE_COLOR[order.order_type] || C.muted,
+                        color: C.white,
+                        borderRadius: 6,
+                        padding: '2px 8px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}>
+                        {ORDER_TYPE_LABEL[order.order_type] || order.order_type}
+                      </div>
+                      <div style={{ color: urgencyColor(order.created_at), fontSize: 13, fontWeight: 600 }}>
+                        {elapsedLabel(order.created_at)}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>已出餐</div>
+
+                  {/* Items */}
+                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {order.items.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: C.text, fontSize: 14 }}>{item.dish_name}</span>
+                        <span style={{
+                          background: '#1A3A48',
+                          color: C.white,
+                          borderRadius: 4,
+                          padding: '1px 8px',
+                          fontSize: 14,
+                          fontWeight: 700,
+                          minWidth: 28,
+                          textAlign: 'center',
+                        }}>
+                          ×{item.qty}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Ready button */}
+                  <button
+                    onClick={() => markReady(order)}
+                    disabled={loadingIds.has(order.fast_food_order_id)}
+                    style={{
+                      height: 48,
+                      background: loadingIds.has(order.fast_food_order_id) ? C.muted : C.success,
+                      color: C.white,
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      cursor: loadingIds.has(order.fast_food_order_id) ? 'not-allowed' : 'pointer',
+                      transition: 'background 200ms',
+                      marginTop: 4,
+                    }}
+                    onPointerDown={e => { if (!loadingIds.has(order.fast_food_order_id)) e.currentTarget.style.transform = 'scale(0.97)'; }}
+                    onPointerUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    onPointerLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                  >
+                    {loadingIds.has(order.fast_food_order_id) ? '处理中...' : '出餐 ✓'}
+                  </button>
                 </div>
               ))}
+
+              {pendingOrders.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: C.dimText, padding: 60, fontSize: 18 }}>
+                  暂无待出餐订单
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Ready (called) column */}
+          {readyOrders.length > 0 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 180 }}>
+              <div style={{ color: C.muted, fontSize: 14, marginBottom: 8, fontWeight: 600 }}>
+                已叫号 ({readyOrders.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
+                {readyOrders.map(order => (
+                  <div
+                    key={order.fast_food_order_id}
+                    style={{
+                      background: C.card,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 10,
+                      padding: '12px 16px',
+                      opacity: 0.6,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ color: C.success, fontSize: 28, fontWeight: 700 }}>
+                      #{order.call_number}
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>已出餐</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 语音指令条 — KDS 出餐语音控制 */}
+      <VoiceCommandBar
+        context="KDS出餐"
+        position="bottom-right"
+        speakText={speakText}
+        onCommand={(cmd) => {
+          const action = matchVoiceCommand(cmd.text, 'KDS出餐');
+          if (!action) return;
+          const idx = Math.min(focusedOrderIdx, pendingOrders.length - 1);
+          switch (action) {
+            case 'mark_ready':
+            case 'call_number':
+              if (pendingOrders.length > 0) {
+                markReady(pendingOrders[idx]);
+                setFocusedOrderIdx(Math.max(0, pendingOrders.length - 2));
+              }
+              break;
+            case 'next_order':
+              if (pendingOrders.length > 0) {
+                const next = (focusedOrderIdx + 1) % pendingOrders.length;
+                setFocusedOrderIdx(next);
+                setSpeakText(
+                  pendingOrders[next]
+                    ? `请查看${pendingOrders[next].call_number}号`
+                    : '无更多订单',
+                );
+              }
+              break;
+            case 'skip_order':
+              setFocusedOrderIdx((i) => Math.min(i + 1, pendingOrders.length - 1));
+              break;
+          }
+        }}
+      />
     </div>
   );
 }

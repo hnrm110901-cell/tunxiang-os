@@ -61,7 +61,7 @@ export function ReceptionLoginPage({ onLogin }: ReceptionLoginPageProps) {
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{
             width: 60, height: 60, borderRadius: 15,
-            background: 'linear-gradient(135deg, #FF6B2C, #FF8F5E)',
+            background: 'linear-gradient(135deg, #FF6B35, #FF8F5E)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 16,
           }}>TX</div>
@@ -115,7 +115,7 @@ export function ReceptionLoginPage({ onLogin }: ReceptionLoginPageProps) {
             style={{
               width: '100%', height: 56, borderRadius: 12, border: 'none',
               background: (!loading && username && password)
-                ? 'linear-gradient(135deg, #FF6B2C, #FF8F5E)'
+                ? 'linear-gradient(135deg, #FF6B35, #FF8F5E)'
                 : '#E8E6E1',
               color: (!loading && username && password) ? '#fff' : '#B4B2A9',
               fontSize: 17, fontWeight: 700,

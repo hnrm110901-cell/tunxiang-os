@@ -1,6 +1,6 @@
 /**
  * TxLineChart -- 纯SVG折线/面积图
- * 品牌色 #FF6B2C，深色主题适配，响应式宽度
+ * 品牌色 #FF6B35，深色主题适配，响应式宽度
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 
@@ -21,7 +21,7 @@ interface Props {
 
 // ─── 默认色板（品牌色为首） ───
 
-const PALETTE = ['#FF6B2C', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6'];
+const PALETTE = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6'];
 
 // ─── 工具函数 ───
 
@@ -270,7 +270,7 @@ export function TxLineChart({ data, height = 240, showArea = false, unit = '' }:
             y1={pad.top}
             x2={tooltip.x}
             y2={height - pad.bottom}
-            stroke="#FF6B2C"
+            stroke="#FF6B35"
             strokeWidth={1}
             strokeDasharray="4,3"
             opacity={0.5}

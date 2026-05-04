@@ -13,7 +13,7 @@ const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B2C',
+  accent: '#FF6B35',
   green: '#0F6E56',
   muted: '#64748b',
   text: '#e2e8f0',

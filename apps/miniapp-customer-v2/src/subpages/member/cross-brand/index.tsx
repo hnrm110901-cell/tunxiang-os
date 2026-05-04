@@ -15,7 +15,7 @@ import { txRequest } from '../../../utils/request'
 import { useStoreInfo } from '../../../store/useStoreInfo'
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   gold: '#C5A347',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

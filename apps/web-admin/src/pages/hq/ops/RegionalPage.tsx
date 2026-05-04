@@ -232,7 +232,7 @@ export function RegionalPage() {
                 style={{
                   padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                   fontSize: 12, fontWeight: 600,
-                  background: statusFilter === s ? '#FF6B2C' : '#0B1A20',
+                  background: statusFilter === s ? '#FF6B35' : '#0B1A20',
                   color: statusFilter === s ? '#fff' : '#999',
                 }}
               >
@@ -257,7 +257,7 @@ export function RegionalPage() {
                     style={{
                       padding: 12, borderRadius: 8, cursor: 'pointer',
                       background: isSelected ? '#1a2a33' : '#0B1A20',
-                      border: isSelected ? '1px solid #FF6B2C40' : '1px solid transparent',
+                      border: isSelected ? '1px solid #FF6B3540' : '1px solid transparent',
                       transition: 'all 0.15s ease',
                     }}
                   >
@@ -305,8 +305,8 @@ export function RegionalPage() {
                   <div style={{
                     position: 'absolute', left: -17, top: 6,
                     width: 10, height: 10, borderRadius: '50%',
-                    background: i === 0 ? '#FF6B2C' : '#1a2a33',
-                    border: `2px solid ${i === 0 ? '#FF6B2C' : '#555'}`,
+                    background: i === 0 ? '#FF6B35' : '#1a2a33',
+                    border: `2px solid ${i === 0 ? '#FF6B35' : '#555'}`,
                   }} />
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 4 }}>
                     {item.time} | {item.operator}
@@ -349,7 +349,7 @@ export function RegionalPage() {
                   }}>
                     <span style={{
                       width: 24, textAlign: 'center', fontSize: 14, fontWeight: 'bold',
-                      color: s.rank <= 3 ? '#FF6B2C' : '#666',
+                      color: s.rank <= 3 ? '#FF6B35' : '#666',
                     }}>
                       {s.rank}
                     </span>

@@ -23,6 +23,9 @@ import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
 import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
 import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
 import { ShortcutOverlay } from '../components/ShortcutOverlay';
+import { SmartSidebar } from '../components/SmartSidebar';
+import { VoiceCommandBar, matchVoiceCommand } from '../components/VoiceCommandBar';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 
 // ─── 扩展菜品类型（增加活鲜/套餐字段）────────────────────────────────────────
 
@@ -135,6 +138,7 @@ const FALLBACK_DISHES: ExtendedDishItem[] = [
 ];
 
 const STORE_ID = import.meta.env.VITE_STORE_ID || '11111111-1111-1111-1111-111111111111';
+const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
 // ─── 数据转换 ─────────────────────────────────────────────────────────────────
 
@@ -164,10 +168,13 @@ export function CashierPage() {
   const store = useOrderStore();
   const { items, totalFen, discountFen, orderId } = store;
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [dishes, setDishes] = useState<ExtendedDishItem[]>(FALLBACK_DISHES);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [showHelpPanel, setShowHelpPanel] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const tf = useTouchFeedback();
 
   // 活鲜弹层状态
   const [seafoodSheet, setSeafoodSheet] = useState<{
@@ -244,7 +251,7 @@ export function CashierPage() {
       !orderId && tableNo
         ? createOrder(STORE_ID, tableNo)
             .then((res) => store.setOrder(res.order_id, res.order_no, tableNo))
-            .catch((e) => console.error('开单失败(离线模式):', e))
+            .catch((e) => { console.error('开单失败:', e); setError('开单失败，请重试或使用离线模式'); })
         : Promise.resolve(),
     ]).finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -431,7 +438,7 @@ export function CashierPage() {
   // ── 渲染 ─────────────────────────────────────────────────────────────────────
 
   return (
-    <>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* Alt键快捷键浮层 */}
       <ShortcutOverlay visible={altPressed} shortcuts={shortcuts} />
       {/* Ctrl+/ 快捷键帮助面板 */}
@@ -440,7 +447,7 @@ export function CashierPage() {
         onClose={() => setShowHelpPanel(false)}
         activeKey={activeKey}
       />
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--tx-bg, #0B1A20)', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--tx-bg, #0B1A20)', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif' }}>
 
       {/* ── 顶部：返回 + 搜索 + 桌号信息 ── */}
       <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -467,9 +474,28 @@ export function CashierPage() {
         <div style={{ flexShrink: 0, textAlign: 'right' }}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>桌号: {tableNo}</div>
           {loading && <span style={{ color: '#faad14', fontSize: 13 }}>开单中...</span>}
+          {error && <span style={{ color: '#EB5757', fontSize: 13 }}>{error}</span>}
           {store.orderNo && <span style={{ color: '#52c41a', fontSize: 13 }}>{store.orderNo}</span>}
         </div>
       </div>
+
+      {/* 错误横幅 — 非阻塞，不影响离线使用 */}
+      {error && !loading && (
+        <div style={{
+          margin: '0 16px 8px', padding: '8px 14px', borderRadius: 8,
+          background: 'rgba(235,87,87,0.1)', border: '1px solid rgba(235,87,87,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ color: '#EB5757', fontSize: 13 }}>{error}</span>
+          <button onClick={() => { setError(null); setLoading(true); createOrder(STORE_ID, tableNo).then((res) => { store.setOrder(res.order_id, res.order_no, tableNo); setError(null); }).catch((e) => { console.error(e); setError('开单失败，请重试'); }).finally(() => setLoading(false)); }} style={{
+            padding: '4px 12px', borderRadius: 6, border: '1px solid #EB5757',
+            background: 'transparent', color: '#EB5757', cursor: 'pointer', fontSize: 12,
+            minHeight: 32,
+          }}>
+            重试
+          </button>
+        </div>
+      )}
 
       {/* ── 分类导航 ── */}
       {!searchQuery && (
@@ -555,6 +581,25 @@ export function CashierPage() {
         />
       )}
     </div>
-    </>
+      <SmartSidebar open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} storeId={STORE_ID} tenantId={TENANT_ID} />
+      <VoiceCommandBar
+        context="收银台"
+        position="bottom-right"
+        onCommand={(cmd) => {
+          const action = matchVoiceCommand(cmd.text, '收银台');
+          switch (action) {
+            case 'open_table': navigate('/tables'); break;
+            case 'view_tables': case 'open_command_palette': navigate('/tables'); break;
+            case 'quick_cash': navigate('/quick-cashier'); break;
+            case 'go_dashboard': navigate('/dashboard'); break;
+            case 'go_reservations': navigate('/reservations'); break;
+            case 'go_queue': navigate('/queue'); break;
+            case 'go_shift': navigate('/shift'); break;
+            case 'toggle_sidebar': setSidebarOpen((v) => !v); break;
+            case 'print_receipt': break; // 需要 orderId 上下文
+          }
+        }}
+      />
+    </div>
   );
 }

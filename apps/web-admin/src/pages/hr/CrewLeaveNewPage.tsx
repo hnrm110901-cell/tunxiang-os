@@ -1,5 +1,4 @@
-import { Result } from 'antd';
-
+import { PlaceholderPage } from '../../components/PlaceholderPage';
 export function CrewLeaveNewPage() {
-  return <Result status="info" title="页面开发中" subTitle="Crew Leave New — 待实现" />;
+  return <PlaceholderPage title="请假申请" subtitle="Crew Leave New" backTo="/hr" backLabel="返回人事管理" />;
 }

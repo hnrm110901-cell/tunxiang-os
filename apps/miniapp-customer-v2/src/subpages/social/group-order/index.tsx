@@ -17,7 +17,7 @@ import { useStoreInfo } from '../../../store/useStoreInfo'
 import { useUserStore } from '../../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryBg: 'rgba(255,107,44,0.12)',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

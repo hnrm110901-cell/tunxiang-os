@@ -14,7 +14,7 @@ import { OrderPage } from './pages/OrderPage';
 import { SettlePage } from './pages/SettlePage';
 import { ShiftPage } from './pages/ShiftPage';
 import { TableMapPage } from './pages/TableMapPage';
-import { ReservationPage } from './pages/ReservationPage';
+import { ReservationPage, ReservationIndexView, ReservationDetailView, ReservationFormView } from './pages/ReservationPage';
 import { OpenTablePage } from './pages/OpenTablePage';
 import { ExceptionPage } from './pages/ExceptionPage';
 import { POSDashboardPage } from './pages/POSDashboardPage';
@@ -47,6 +47,8 @@ import { CallNumberScreen } from './pages/fastfood/CallNumberScreen';
 import { FastFoodKDSView } from './pages/fastfood/FastFoodKDSView';
 import { PrintManagerPage } from './pages/PrintManagerPage';  // 模块4.2 打印管理可视化中心
 import { BanquetDepositPage } from './pages/BanquetDepositPage';  // 模块4.1 宴会定金管理
+import { StoreTwinPage } from './pages/StoreTwinPage';  // Phase 3: 门店数字孪生
+import { CommandPalette } from './components/CommandPalette';  // Cmd+K 命令面板
 
 const STORE_ID: string =
   (window as unknown as Record<string, unknown>).__STORE_ID__ as string || '';
@@ -124,6 +126,7 @@ function AppLayout() {
   return (
     <div style={{ minHeight: '100vh', background: '#111827' }}>
       <OfflineBridge />
+      <CommandPalette />
       {/* 训练模式橙色横幅 — 训练模式激活时固定在顶部 */}
       {isTrainingMode && (
         <TrainingModeBanner
@@ -143,7 +146,12 @@ function AppLayout() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<POSDashboardPage />} />
         <Route path="/tables" element={<TableMapPage />} />
-        <Route path="/reservations" element={<ReservationPage />} />
+        <Route path="/reservations" element={<ReservationPage />}>
+          <Route index element={<ReservationIndexView />} />
+          <Route path="new" element={<ReservationFormView />} />
+          <Route path=":id" element={<ReservationDetailView />} />
+          <Route path=":id/edit" element={<ReservationFormView />} />
+        </Route>
         <Route path="/open-table/:tableNo" element={<OpenTablePage />} />
         <Route path="/cashier/:tableNo" element={<CashierPage />} />
         <Route path="/order/:orderId" element={<CashierBoundary><OrderPage /></CashierBoundary>} />
@@ -186,6 +194,8 @@ function AppLayout() {
         <Route path="/banquet-deposit" element={<BanquetDepositPage />} />
         {/* ─── 模块4.2: 打印管理可视化中心 ─── */}
         <Route path="/print-manager" element={<PrintManagerPage />} />
+        {/* ─── Phase 3: 门店数字孪生 ─── */}
+        <Route path="/store-twin" element={<StoreTwinPage />} />
       </Routes>
     </div>
   );

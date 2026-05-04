@@ -752,7 +752,7 @@ export function LiveMenuEditorPage() {
             key={cat}
             onClick={() => setActiveCategory(cat)}
             style={{
-              height: 40,
+              height: 44,
               padding: '0 16px',
               borderRadius: 20,
               border: 'none',

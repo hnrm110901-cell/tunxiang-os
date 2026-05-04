@@ -516,7 +516,7 @@ function ConfigManagerTab({ storeId }: { storeId: string }) {
           <button
             style={{
               ...BTN_BASE,
-              width: 48, height: 28, minHeight: 28,
+              width: 48, height: 44, minHeight: 44,
               borderRadius: 14,
               background: overwrite ? C.success : C.cardAlt,
               padding: 0,

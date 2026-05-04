@@ -12,7 +12,7 @@ import { txFetchData } from '../../../api';
 const BG_0 = '#0d1e28';
 const BG_1 = '#1a2a33';
 const BG_2 = '#223344';
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';

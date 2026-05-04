@@ -198,7 +198,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <span style={{ color: 'var(--brand, #ff6b2c)', fontWeight: 600 }}>{text.slice(idx, idx + query.length)}</span>
+      <span style={{ color: 'var(--brand, #FF6B35)', fontWeight: 600 }}>{text.slice(idx, idx + query.length)}</span>
       {text.slice(idx + query.length)}
     </>
   );

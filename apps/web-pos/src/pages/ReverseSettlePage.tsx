@@ -148,12 +148,12 @@ export function ReverseSettlePage() {
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
               borderRadius: 8, fontSize: 16,
               background: isCurrent ? '#1A3A48' : 'transparent',
-              color: isCurrent ? '#FF6B2C' : isPast ? '#0F6E56' : '#555',
+              color: isCurrent ? '#FF6B35' : isPast ? '#0F6E56' : '#555',
               fontWeight: isCurrent ? 'bold' : 'normal',
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: isCurrent ? '#FF6B2C' : isPast ? '#0F6E56' : '#333',
+                background: isCurrent ? '#FF6B35' : isPast ? '#0F6E56' : '#333',
                 color: '#fff', fontSize: 16, fontWeight: 'bold', flexShrink: 0,
               }}>
                 {isPast ? '✓' : i + 1}
@@ -191,13 +191,13 @@ export function ReverseSettlePage() {
                   borderRadius: 12, background: '#112228', color: '#fff',
                   outline: 'none', boxSizing: 'border-box',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B2C'; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = '#333'; }}
               />
               <button
                 onClick={handleSearch}
                 style={{
-                  padding: '16px 32px', background: '#FF6B2C', border: 'none',
+                  padding: '16px 32px', background: '#FF6B35', border: 'none',
                   borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer',
                   minHeight: 56, fontWeight: 'bold', transition: 'transform 200ms ease',
                 }}
@@ -246,7 +246,7 @@ export function ReverseSettlePage() {
                       <span>优惠</span><span>-{fen2yuan(order.discountFen)}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 'bold', color: '#FF6B2C' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 'bold', color: '#FF6B35' }}>
                     <span>实付</span><span>{fen2yuan(order.totalFen - order.discountFen)}</span>
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export function ReverseSettlePage() {
                     style={{
                       width: '100%', padding: 16, marginBottom: 12, borderRadius: 12, textAlign: 'left',
                       background: selectedReason === r.key ? '#1A3A48' : '#112B36',
-                      border: selectedReason === r.key ? '2px solid #FF6B2C' : '2px solid transparent',
+                      border: selectedReason === r.key ? '2px solid #FF6B35' : '2px solid transparent',
                       color: '#fff', cursor: 'pointer', transition: 'transform 200ms ease, border-color 200ms ease',
                       minHeight: 56,
                     }}
@@ -286,7 +286,7 @@ export function ReverseSettlePage() {
                       borderRadius: 12, background: '#112228', color: '#fff',
                       minHeight: 80, resize: 'none', boxSizing: 'border-box', outline: 'none',
                     }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B2C'; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = '#333'; }}
                   />
                 )}
@@ -295,7 +295,7 @@ export function ReverseSettlePage() {
                 onClick={() => selectedReason && setStep('auth')}
                 disabled={!selectedReason}
                 style={{
-                  width: '100%', padding: 16, background: selectedReason ? '#FF6B2C' : '#444',
+                  width: '100%', padding: 16, background: selectedReason ? '#FF6B35' : '#444',
                   border: 'none', borderRadius: 12, color: '#fff', fontSize: 18, fontWeight: 'bold',
                   cursor: selectedReason ? 'pointer' : 'not-allowed', minHeight: 56,
                   transition: 'transform 200ms ease',
@@ -331,7 +331,7 @@ export function ReverseSettlePage() {
                 <span style={{ color: '#8899A6' }}>订单号</span><span>{order.orderNo}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#8899A6' }}>金额</span><span style={{ color: '#FF6B2C', fontWeight: 'bold' }}>{fen2yuan(order.totalFen - order.discountFen)}</span>
+                <span style={{ color: '#8899A6' }}>金额</span><span style={{ color: '#FF6B35', fontWeight: 'bold' }}>{fen2yuan(order.totalFen - order.discountFen)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#8899A6' }}>原因</span><span>{REVERSE_REASONS.find(r => r.key === selectedReason)?.label}</span>
@@ -352,7 +352,7 @@ export function ReverseSettlePage() {
                 borderRadius: 12, background: '#112228', color: '#fff',
                 boxSizing: 'border-box', outline: 'none', letterSpacing: 8,
               }}
-              onFocus={(e) => { if (!authError) e.currentTarget.style.borderColor = '#FF6B2C'; }}
+              onFocus={(e) => { if (!authError) e.currentTarget.style.borderColor = '#FF6B35'; }}
               onBlur={(e) => { if (!authError) e.currentTarget.style.borderColor = '#333'; }}
             />
             {authError && (
@@ -404,7 +404,7 @@ export function ReverseSettlePage() {
               <button
                 onClick={() => navigate('/tables')}
                 style={{
-                  flex: 1, padding: 16, background: '#FF6B2C', border: 'none', borderRadius: 12,
+                  flex: 1, padding: 16, background: '#FF6B35', border: 'none', borderRadius: 12,
                   color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                   transition: 'transform 200ms ease',
                 }}
@@ -417,8 +417,8 @@ export function ReverseSettlePage() {
               <button
                 onClick={() => navigate(`/cashier/${order.tableNo}`)}
                 style={{
-                  flex: 1, padding: 16, background: '#112B36', border: '2px solid #FF6B2C', borderRadius: 12,
-                  color: '#FF6B2C', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
+                  flex: 1, padding: 16, background: '#112B36', border: '2px solid #FF6B35', borderRadius: 12,
+                  color: '#FF6B35', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                   transition: 'transform 200ms ease',
                 }}
                 onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}

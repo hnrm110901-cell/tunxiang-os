@@ -54,7 +54,7 @@ interface PendingCountData {
 // ─── 常量配置 ────────────────────────────────────────────────────────────────
 
 const TYPE_CONFIG: Record<ApprovalType, { label: string; color: string; icon: string }> = {
-  discount:     { label: '折扣审批', color: '#FF6B2C', icon: '⚡' },
+  discount:     { label: '折扣审批', color: '#FF6B35', icon: '⚡' },
   refund:       { label: '退款审批', color: '#ff4d4f', icon: '↩' },
   price_adjust: { label: '调价审批', color: '#1890ff', icon: '📊' },
   leave:        { label: '请假审批', color: '#722ed1', icon: '🗓' },
@@ -71,7 +71,7 @@ const STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string }> = 
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string }> = {
   low:      { label: 'LOW',      color: '#52c41a' },
   medium:   { label: 'MEDIUM',   color: '#faad14' },
-  high:     { label: 'HIGH',     color: '#FF6B2C' },
+  high:     { label: 'HIGH',     color: '#FF6B35' },
   critical: { label: 'CRITICAL', color: '#ff4d4f' },
 };
 
@@ -196,7 +196,7 @@ function ApprovalCard({
       style={{
         padding: 14, borderRadius: 8, cursor: 'pointer',
         background: isSelected ? 'rgba(255,107,44,0.08)' : '#0B1A20',
-        border: isSelected ? '1px solid #FF6B2C' : '1px solid #1a2a33',
+        border: isSelected ? '1px solid #FF6B35' : '1px solid #1a2a33',
         transition: 'all .15s',
       }}
     >
@@ -685,7 +685,7 @@ export function ApprovalCenterPage() {
           {(statsData?.pending_mine ?? 0) > 0 && (
             <span style={{
               padding: '2px 10px', borderRadius: 10, fontSize: 12,
-              background: 'rgba(255,107,44,0.15)', color: '#FF6B2C', fontWeight: 600,
+              background: 'rgba(255,107,44,0.15)', color: '#FF6B35', fontWeight: 600,
             }}>{statsData!.pending_mine} 待审</span>
           )}
         </h2>
@@ -694,7 +694,7 @@ export function ApprovalCenterPage() {
             <button key={t} onClick={() => setTab(t)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: tab === t ? '#FF6B2C' : '#1a2a33',
+              background: tab === t ? '#FF6B35' : '#1a2a33',
               color: tab === t ? '#fff' : '#999',
             }}>{t === 'pending' ? '待我审批' : '我发起的'}</button>
           ))}
@@ -706,7 +706,7 @@ export function ApprovalCenterPage() {
         <StatCard
           title="待我审批"
           value={statsData?.pending_mine ?? '—'}
-          color="#FF6B2C"
+          color="#FF6B35"
           loading={statsLoading}
         />
         <StatCard

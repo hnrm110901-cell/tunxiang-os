@@ -364,8 +364,8 @@ export function FastFoodPage() {
                   <button
                     onClick={() => removeFromCart(item.dishId)}
                     style={{
-                      width: 32, height: 32, background: '#1A3A48', color: C.text,
-                      border: 'none', borderRadius: '50%', fontSize: 18, cursor: 'pointer',
+                      width: 44, height: 44, background: '#1A3A48', color: C.text,
+                      border: 'none', borderRadius: '50%', fontSize: 22, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >−</button>
@@ -375,8 +375,8 @@ export function FastFoodPage() {
                   <button
                     onClick={() => addToCart({ id: item.dishId, name: item.name, priceFen: item.priceFen, category: '', kitchenStation: '', isAvailable: true })}
                     style={{
-                      width: 32, height: 32, background: C.accent, color: C.white,
-                      border: 'none', borderRadius: '50%', fontSize: 18, cursor: 'pointer',
+                      width: 44, height: 44, background: C.accent, color: C.white,
+                      border: 'none', borderRadius: '50%', fontSize: 22, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >+</button>

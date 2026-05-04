@@ -19,7 +19,7 @@ const NAV_ITEMS: { key: Page; label: string }[] = [
   { key: 'sandbox', label: '沙箱' },
 ];
 
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 
 const styles: Record<string, React.CSSProperties> = {
   nav: {

@@ -86,7 +86,7 @@ export function TopbarHQ({ onToggleAgent, userName, userRole, onLogout }: Topbar
           {/* 用户头像 */}
           <div style={{
             width: 28, height: 28, borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--brand, #ff6b2c), var(--purple, #a855f7))',
+            background: 'linear-gradient(135deg, var(--brand, #FF6B35), var(--purple, #a855f7))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 12, fontWeight: 'bold', color: '#fff',
           }}>{avatarChar}</div>

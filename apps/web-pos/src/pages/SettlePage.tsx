@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import {
   printReceipt as apiPrintReceipt,
@@ -108,6 +109,7 @@ export function SettlePage() {
   const { items, totalFen, discountFen, tableNo, orderId, applyDiscount, clear } = useOrderStore();
   const finalFen = totalFen - discountFen;
   const [paying, setPaying] = useState(false);
+  const tf = useTouchFeedback();
 
   // 折扣 AI 分析抽屉状态
   const [discountSheetVisible, setDiscountSheetVisible] = useState(false);
@@ -329,7 +331,7 @@ export function SettlePage() {
           </div>
         )}
 
-        <div style={{ marginTop: 16, fontSize: 24, fontWeight: 'bold', color: '#FF6B2C', textAlign: 'right' }}>
+        <div style={{ marginTop: 16, fontSize: 24, fontWeight: 'bold', color: '#FF6B35', textAlign: 'right' }}>
           应付: {fen2yuan(billingRules ? finalFen + billingRules.service_fee_fen : finalFen)}
           {billingRules && billingRules.service_fee_fen > 0 && (
             <span style={{ fontSize: 14, color: '#8A94A4', marginLeft: 8, fontWeight: 400 }}>
@@ -368,6 +370,7 @@ export function SettlePage() {
                 type="button"
                 onClick={() => handleDiscountPress(preset)}
                 disabled={items.length === 0}
+                {...tf.handlers}
                 style={{
                   padding: '10px 16px',
                   minHeight: 48,
@@ -380,6 +383,7 @@ export function SettlePage() {
                   cursor: items.length === 0 ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                   opacity: items.length === 0 ? 0.4 : 1,
+                  ...tf.style,
                 }}
               >
                 {preset.label}
@@ -397,10 +401,12 @@ export function SettlePage() {
             key={m.key}
             onClick={() => handlePay(m.key)}
             disabled={paying}
+            {...tf.handlers}
             style={{
               padding: 16, border: 'none', borderRadius: 8,
               background: paying ? '#444' : m.color, color: '#fff', fontSize: 18,
               cursor: paying ? 'not-allowed' : 'pointer',
+              ...tf.style,
             }}
           >
             {paying ? '处理中...' : m.label}
@@ -410,19 +416,22 @@ export function SettlePage() {
         <div style={{ borderTop: '1px solid #333', paddingTop: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button
             onClick={() => navigate(`/credit-pay/${orderId || 'temp'}`)}
-            style={{ padding: 14, border: '1px solid #722ed1', borderRadius: 8, background: 'transparent', color: '#722ed1', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+            {...tf.handlers}
+            style={{ padding: 14, border: '1px solid #722ed1', borderRadius: 8, background: 'transparent', color: '#722ed1', cursor: 'pointer', fontSize: 16, minHeight: 48, ...tf.style }}
           >
             企业挂账
           </button>
           <button
             onClick={() => navigate(`/split-pay/${orderId || 'temp'}`)}
-            style={{ padding: 14, border: '1px solid #1677FF', borderRadius: 8, background: 'transparent', color: '#1677FF', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+            {...tf.handlers}
+            style={{ padding: 14, border: '1px solid #1677FF', borderRadius: 8, background: 'transparent', color: '#1677FF', cursor: 'pointer', fontSize: 16, minHeight: 48, ...tf.style }}
           >
             拆单结账
           </button>
           <button
             onClick={() => navigate(`/tax-invoice/${orderId || 'temp'}`)}
-            style={{ padding: 14, border: '1px solid #faad14', borderRadius: 8, background: 'transparent', color: '#faad14', cursor: 'pointer', fontSize: 16, minHeight: 48 }}
+            {...tf.handlers}
+            style={{ padding: 14, border: '1px solid #faad14', borderRadius: 8, background: 'transparent', color: '#faad14', cursor: 'pointer', fontSize: 16, minHeight: 48, ...tf.style }}
           >
             开具发票
           </button>
@@ -444,7 +453,8 @@ export function SettlePage() {
 
         <button
           onClick={() => navigate(-1)}
-          style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 12 }}
+          {...tf.handlers}
+          style={{ padding: 12, border: '1px solid #444', borderRadius: 8, background: 'transparent', color: '#999', cursor: 'pointer', marginTop: 12, ...tf.style }}
         >
           返回修改
         </button>

@@ -12,7 +12,7 @@ interface DishCardProps {
 }
 
 const TAG_COLORS: Record<string, string> = {
-  signature: '#FF6B2C',
+  signature: '#FF6B35',
   new: '#22C55E',
   spicy1: '#F59E0B',
   spicy2: '#EF4444',

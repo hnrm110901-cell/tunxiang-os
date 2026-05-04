@@ -862,7 +862,7 @@ function DetailDrawer({
                           border: 'none',
                           fontSize: 11,
                           fontWeight: 600,
-                          background: trendRange === r ? '#FF6B2C' : '#0B1A20',
+                          background: trendRange === r ? '#FF6B35' : '#0B1A20',
                           color: trendRange === r ? '#fff' : '#999',
                           cursor: 'pointer',
                         }}
@@ -1212,7 +1212,7 @@ export function StoreHealthRadarPage() {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: filterLevel === opt.value ? '#FF6B2C' : '#0B1A20',
+                  background: filterLevel === opt.value ? '#FF6B35' : '#0B1A20',
                   color: filterLevel === opt.value ? '#fff' : '#999',
                 }}
               >
@@ -1233,7 +1233,7 @@ export function StoreHealthRadarPage() {
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
-              background: viewMode === 'card' ? '#FF6B2C' : 'transparent',
+              background: viewMode === 'card' ? '#FF6B35' : 'transparent',
               color: viewMode === 'card' ? '#fff' : '#999',
             }}
           >
@@ -1248,7 +1248,7 @@ export function StoreHealthRadarPage() {
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
-              background: viewMode === 'map' ? '#FF6B2C' : 'transparent',
+              background: viewMode === 'map' ? '#FF6B35' : 'transparent',
               color: viewMode === 'map' ? '#fff' : '#999',
             }}
           >

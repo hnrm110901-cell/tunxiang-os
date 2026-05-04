@@ -135,7 +135,7 @@ export function FinanceAnalysisPage() {
   // 趋势图数据准备
   const trendLabels = revenueTrend.map(r => r.month);
   const revTrendDatasets = trendLabels.length > 0 ? [
-    { name: '堂食', values: revenueTrend.map(r => r.dine_in), color: '#FF6B2C' },
+    { name: '堂食', values: revenueTrend.map(r => r.dine_in), color: '#FF6B35' },
     { name: '外卖', values: revenueTrend.map(r => r.delivery), color: '#185FA5' },
     { name: '宴席', values: revenueTrend.map(r => r.banquet), color: '#0F6E56' },
   ] : [];
@@ -163,7 +163,7 @@ export function FinanceAnalysisPage() {
             <button key={d} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: period === d ? '#FF6B2C' : '#1a2a33',
+              background: period === d ? '#FF6B35' : '#1a2a33',
               color: period === d ? '#fff' : '#999',
             }} onClick={() => setPeriod(d)}>
               {d}
@@ -180,7 +180,7 @@ export function FinanceAnalysisPage() {
       {/* 汇总卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { label: '总营收', value: formatMoney(totalRevenue), color: '#FF6B2C' },
+          { label: '总营收', value: formatMoney(totalRevenue), color: '#FF6B35' },
           { label: '总利润', value: formatMoney(totalProfit), color: '#0F6E56' },
           { label: '平均毛利率', value: `${avgMargin.toFixed(1)}%`, color: '#185FA5' },
           { label: '折扣总额', value: formatMoney(totalDiscount), color: '#BA7517' },
@@ -270,7 +270,7 @@ export function FinanceAnalysisPage() {
                     <div style={{ height: 10, borderRadius: 5, background: '#0B1A20', overflow: 'hidden' }}>
                       <div style={{
                         width: `${pm.percent}%`, height: '100%', borderRadius: 5,
-                        background: '#FF6B2C', opacity: 0.6 + (pm.percent / 100) * 0.4,
+                        background: '#FF6B35', opacity: 0.6 + (pm.percent / 100) * 0.4,
                         transition: 'width 0.6s ease',
                       }} />
                     </div>
@@ -375,7 +375,7 @@ export function FinanceAnalysisPage() {
               <tbody>
                 {storeProfits.map((s) => (
                   <tr key={s.rank} style={{ borderTop: '1px solid #1a2a33' }}>
-                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: '#FF6B2C' }}>{s.rank}</td>
+                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: '#FF6B35' }}>{s.rank}</td>
                     <td style={{ padding: '10px 4px', color: '#ccc' }}>{s.name}</td>
                     <td style={{ padding: '10px 4px', textAlign: 'right', color: '#fff' }}>
                       {formatMoney(s.revenue)}

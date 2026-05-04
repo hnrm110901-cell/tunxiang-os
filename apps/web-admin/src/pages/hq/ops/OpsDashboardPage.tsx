@@ -139,7 +139,7 @@ export function OpsDashboardPage() {
             <button key={d} onClick={() => setDateRange(d)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: dateRange === d ? '#FF6B2C' : '#1a2a33',
+              background: dateRange === d ? '#FF6B35' : '#1a2a33',
               color: dateRange === d ? '#fff' : '#999',
             }}>
               {dateLabels[d]}
@@ -153,7 +153,7 @@ export function OpsDashboardPage() {
         {kpis.map((kpi) => (
           <div key={kpi.label} style={{
             background: '#112228', borderRadius: 8, padding: 20,
-            borderLeft: '3px solid #FF6B2C',
+            borderLeft: '3px solid #FF6B35',
           }}>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
             <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fff' }}>{kpi.formatted}</div>
@@ -175,7 +175,7 @@ export function OpsDashboardPage() {
           data={{
             labels: hourLabels,
             datasets: [
-              { name: '今日', values: todaySlice, color: '#FF6B2C' },
+              { name: '今日', values: todaySlice, color: '#FF6B35' },
               { name: '昨日', values: yesterdaySlice, color: '#185FA5' },
             ],
           }}
@@ -196,7 +196,7 @@ export function OpsDashboardPage() {
                 <button key={dim} onClick={() => setRankDimension(dim)} style={{
                   padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: rankDimension === dim ? '#FF6B2C' : '#0B1A20',
+                  background: rankDimension === dim ? '#FF6B35' : '#0B1A20',
                   color: rankDimension === dim ? '#fff' : '#999',
                 }}>
                   {RANK_LABELS[dim]}
@@ -225,7 +225,7 @@ export function OpsDashboardPage() {
                     : s.turnover_rate.toFixed(1);
                 return (
                   <tr key={s.store_id} style={{ borderTop: '1px solid #1a2a33' }}>
-                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: s.rank <= 3 ? '#FF6B2C' : '#666' }}>{s.rank}</td>
+                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: s.rank <= 3 ? '#FF6B35' : '#666' }}>{s.rank}</td>
                     <td style={{ padding: '10px 4px' }}>{s.store_name}</td>
                     <td style={{ padding: '10px 4px', textAlign: 'right', fontWeight: 600 }}>{dimValue}</td>
                     <td style={{ padding: '10px 4px', textAlign: 'right', color: '#999' }}>{s.order_count}</td>

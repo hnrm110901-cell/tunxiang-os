@@ -1,6 +1,6 @@
 /**
  * web-hub v2.0 — 顶部工作模式导航 + 双栏 Workspace 布局
- * 深色主题：--bg #0A1418, --surface #0E1E24, --orange #FF6B2C
+ * 深色主题：--bg #0A1418, --surface #0E1E24, --orange #FF6B35
  */
 import {
   BrowserRouter,
@@ -60,7 +60,7 @@ const C = {
   text: '#E6EDF1',
   text2: '#94A8B3',
   text3: '#647985',
-  orange: '#FF6B2C',
+  orange: '#FF6B35',
   green: '#22C55E',
   yellow: '#F59E0B',
   red: '#EF4444',

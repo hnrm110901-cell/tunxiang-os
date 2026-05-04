@@ -22,7 +22,7 @@ export function ShortageReportModal({ visible, ingredientName, currentStock, uni
         </div>
 
         <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.8, marginBottom: 16 }}>
-          <div>食材：<b style={{ color: '#FF6B2C' }}>{ingredientName}</b></div>
+          <div>食材：<b style={{ color: '#FF6B35' }}>{ingredientName}</b></div>
           <div>当前库存：<b style={{ color: currentStock <= 0 ? '#ff4d4f' : '#faad14' }}>{currentStock} {unit}</b></div>
         </div>
 
@@ -41,7 +41,7 @@ export function ShortageReportModal({ visible, ingredientName, currentStock, uni
             🚨 紧急采购
           </button>
           <button onClick={() => onSubmit('normal', Number((document.getElementById('shortage-qty') as HTMLInputElement)?.value || 10))}
-            style={{ flex: 1, padding: 10, background: '#FF6B2C', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: 10, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
             常规补货
           </button>
         </div>

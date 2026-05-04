@@ -16,7 +16,7 @@ const BORDER2 = '#23485a';
 const TEXT = '#E6EDF1';
 const TEXT2 = '#94A8B3';
 const TEXT3 = '#647985';
-const ORANGE = '#FF6B2C';
+const ORANGE = '#FF6B35';
 
 // ── 类型定义 ──
 

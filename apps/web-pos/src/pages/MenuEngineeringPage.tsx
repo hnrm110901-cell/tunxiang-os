@@ -631,7 +631,7 @@ export function MenuEngineeringPage() {
               key={cat}
               onClick={() => setCategory(cat === '全部' ? '' : cat)}
               style={{
-                height:     40,
+                height:     44,
                 padding:    '0 14px',
                 borderRadius: 20,
                 border:     'none',

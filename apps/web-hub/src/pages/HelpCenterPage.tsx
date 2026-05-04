@@ -83,7 +83,7 @@ const s = {
   faqQuestion: (isOpen: boolean) => ({
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '14px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 500,
-    color: isOpen ? '#FF6B2C' : '#E0E0E0', transition: 'color 0.2s',
+    color: isOpen ? '#FF6B35' : '#E0E0E0', transition: 'color 0.2s',
     background: 'transparent', border: 'none', width: '100%', textAlign: 'left' as const,
   }) as React.CSSProperties,
   faqArrow: (isOpen: boolean) => ({
@@ -105,18 +105,18 @@ const s = {
   } as React.CSSProperties,
   docModule: {
     display: 'inline-block', padding: '1px 8px', borderRadius: 4,
-    fontSize: 11, fontWeight: 600, background: '#FF6B2C22', color: '#FF6B2C', marginBottom: 6,
+    fontSize: 11, fontWeight: 600, background: '#FF6B3522', color: '#FF6B35', marginBottom: 6,
   } as React.CSSProperties,
   docTitle: { fontSize: 13, color: '#E0E0E0', fontWeight: 500 } as React.CSSProperties,
 
   /* 在线客服 + 意见反馈 */
   actionRow: { display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' as const } as React.CSSProperties,
   btn: {
-    background: '#FF6B2C', color: '#FFF', border: 'none', borderRadius: 8,
+    background: '#FF6B35', color: '#FFF', border: 'none', borderRadius: 8,
     padding: '12px 28px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   } as React.CSSProperties,
   btnOutline: {
-    background: 'transparent', color: '#FF6B2C', border: '1px solid #FF6B2C', borderRadius: 8,
+    background: 'transparent', color: '#FF6B35', border: '1px solid #FF6B35', borderRadius: 8,
     padding: '12px 28px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   } as React.CSSProperties,
 
@@ -131,7 +131,7 @@ const s = {
   videoThumb: {
     width: '100%', height: 135, background: '#162D38',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 36, color: '#FF6B2C', position: 'relative' as const,
+    fontSize: 36, color: '#FF6B35', position: 'relative' as const,
   } as React.CSSProperties,
   videoDuration: {
     position: 'absolute' as const, bottom: 8, right: 8,
@@ -154,7 +154,7 @@ const s = {
   modalPlayer: {
     width: '100%', height: 280, background: '#162D38', borderRadius: 8,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 48, color: '#FF6B2C', marginBottom: 16,
+    fontSize: 48, color: '#FF6B35', marginBottom: 16,
   } as React.CSSProperties,
   modalClose: {
     background: 'transparent', border: '1px solid #6B8A97', borderRadius: 6,
@@ -212,7 +212,7 @@ export function HelpCenterPage() {
               target="_blank"
               rel="noopener noreferrer"
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = '#FF6B2C';
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = '#FF6B35';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLAnchorElement).style.borderColor = '#1A3540';
@@ -250,7 +250,7 @@ export function HelpCenterPage() {
               role="button"
               tabIndex={0}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = '#FF6B2C';
+                (e.currentTarget as HTMLDivElement).style.borderColor = '#FF6B35';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLDivElement).style.borderColor = '#1A3540';

@@ -965,6 +965,12 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
           onClick={() => navigate('/shift')}
         />
         <ShortcutButton
+          label="鸟瞰"
+          emoji="🗺️"
+          color="#722ed1"
+          onClick={() => navigate('/store-twin')}
+        />
+        <ShortcutButton
           label="异常"
           emoji="⚠️"
           color="#A32D2D"

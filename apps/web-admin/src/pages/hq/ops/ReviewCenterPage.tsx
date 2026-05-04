@@ -88,7 +88,7 @@ export function ReviewCenterPage() {
             <button key={p} onClick={() => setPeriod(p)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: period === p ? '#FF6B2C' : '#1a2a33',
+              background: period === p ? '#FF6B35' : '#1a2a33',
               color: period === p ? '#fff' : '#999',
             }}>{p === 'day' ? '日复盘' : p === 'week' ? '周复盘' : '月复盘'}</button>
           ))}
@@ -102,7 +102,7 @@ export function ReviewCenterPage() {
       {/* 复盘摘要 */}
       <div style={{
         background: '#112228', borderRadius: 8, padding: 20, marginBottom: 16,
-        borderLeft: '4px solid #FF6B2C',
+        borderLeft: '4px solid #FF6B35',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>{summary.period}</div>
@@ -207,7 +207,7 @@ export function ReviewCenterPage() {
                   {c.tags.map((t) => (
                     <span key={t} style={{
                       fontSize: 10, padding: '0px 6px', borderRadius: 3,
-                      background: 'rgba(255,107,44,0.1)', color: '#FF6B2C',
+                      background: 'rgba(255,107,44,0.1)', color: '#FF6B35',
                     }}>{t}</span>
                   ))}
                 </div>

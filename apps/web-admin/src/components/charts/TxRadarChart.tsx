@@ -1,7 +1,7 @@
 /**
  * TxRadarChart -- 纯SVG雷达图
  * 用于员工绩效卡等场景
- * 品牌色 #FF6B2C，深色主题适配
+ * 品牌色 #FF6B35，深色主题适配
  */
 
 interface Dimension {
@@ -21,7 +21,7 @@ interface Props {
   size?: number;
 }
 
-const PALETTE = ['#FF6B2C', '#185FA5', '#0F6E56', '#BA7517'];
+const PALETTE = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517'];
 
 export function TxRadarChart({ dimensions, datasets, size = 240 }: Props) {
   if (!dimensions.length || !datasets.length) {

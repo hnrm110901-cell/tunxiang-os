@@ -251,7 +251,7 @@ export function PLReportPage() {
   // 饼图数据
   const pieSlices: PieSlice[] = report
     ? [
-        { label: '食材成本', value: report.costs.food_cost_fen, color: '#FF6B2C' },
+        { label: '食材成本', value: report.costs.food_cost_fen, color: '#FF6B35' },
         { label: '人工成本', value: report.costs.labor_cost_fen, color: '#185FA5' },
         { label: '房租及摊销', value: report.costs.rent_fen, color: '#0F6E56' },
         { label: '水电气', value: report.costs.utilities_fen, color: '#BA7517' },
@@ -268,7 +268,7 @@ export function PLReportPage() {
           label: '营业收入',
           value: `¥${fenToYuan(report.revenue.total_fen)}`,
           sub: null as string | null,
-          color: '#FF6B2C',
+          color: '#FF6B35',
           trend: null as 'up' | 'down' | null,
         },
         {
@@ -365,7 +365,7 @@ export function PLReportPage() {
               style={{
                 padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 600,
-                background: datePreset === d ? '#FF6B2C' : '#1a2a33',
+                background: datePreset === d ? '#FF6B35' : '#1a2a33',
                 color: datePreset === d ? '#fff' : '#999',
                 transition: 'background .15s',
               }}
@@ -406,7 +406,7 @@ export function PLReportPage() {
             style={{
               padding: '6px 18px', borderRadius: 6, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: 12, fontWeight: 700,
-              background: loading ? '#2a3a43' : '#FF6B2C',
+              background: loading ? '#2a3a43' : '#FF6B35',
               color: loading ? '#666' : '#fff',
               transition: 'background .15s',
             }}
@@ -537,7 +537,7 @@ export function PLReportPage() {
                       <tr key={i} style={{
                         background: rowBg,
                         borderTop: (isSubtotal || isProfit || isNet) ? '1px solid #2a3a43' : '1px solid #162028',
-                        borderBottom: isNet ? '2px solid #FF6B2C' : undefined,
+                        borderBottom: isNet ? '2px solid #FF6B35' : undefined,
                       }}>
                         <td style={{
                           padding: `${isSectionRow ? 10 : 8}px 20px`,
@@ -549,7 +549,7 @@ export function PLReportPage() {
                           {isSectionRow && (
                             <span style={{
                               display: 'inline-block', width: 3, height: 12,
-                              background: '#FF6B2C', borderRadius: 2,
+                              background: '#FF6B35', borderRadius: 2,
                               marginRight: 8, verticalAlign: 'middle',
                             }} />
                           )}

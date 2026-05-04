@@ -87,7 +87,7 @@ const PERIOD_LABELS: Record<Period, string> = { day: '日', week: '周', month: 
 const PERIOD_TO_DAYS: Record<Period, number> = { day: 7, week: 28, month: 30 };
 
 const STORE_COLORS = [
-  '#FF6B2C', '#00C9A7', '#4A9EFF', '#FFB347', '#B97BFF',
+  '#FF6B35', '#00C9A7', '#4A9EFF', '#FFB347', '#B97BFF',
   '#FF6B8A', '#36CFC9', '#FAAD14', '#73D13D', '#FF7875',
 ];
 
@@ -98,7 +98,7 @@ const BG_CARD2 = '#112228';
 const COLOR_TEXT = '#e0e8ef';
 const COLOR_MUTED = '#6b8a9a';
 const COLOR_BORDER = '#243542';
-const COLOR_PRIMARY = '#FF6B2C';
+const COLOR_PRIMARY = '#FF6B35';
 const COLOR_SUCCESS = '#0F6E56';
 const COLOR_WARNING = '#BA7517';
 const COLOR_DANGER = '#A32D2D';

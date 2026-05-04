@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 
 interface Endpoint {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';

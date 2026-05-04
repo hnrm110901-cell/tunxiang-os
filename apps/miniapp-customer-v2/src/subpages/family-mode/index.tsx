@@ -15,7 +15,7 @@ import Taro from '@tarojs/taro'
 import { useUserStore } from '../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   kids: '#FF9F0A',       // 儿童模式主色
   kidsBg: '#FFF8E1',
   elder: '#185FA5',      // 适老模式主色

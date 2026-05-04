@@ -74,8 +74,8 @@ export function OpenTablePage() {
           <div key={cat} onClick={() => setActiveCat(cat)} style={{
             padding: '12px 8px', textAlign: 'center', fontSize: 13, cursor: 'pointer',
             background: activeCat === cat ? '#0B1A20' : 'transparent',
-            color: activeCat === cat ? '#FF6B2C' : '#999',
-            borderLeft: activeCat === cat ? '3px solid #FF6B2C' : '3px solid transparent',
+            color: activeCat === cat ? '#FF6B35' : '#999',
+            borderLeft: activeCat === cat ? '3px solid #FF6B35' : '3px solid transparent',
           }}>
             {cat}
           </div>
@@ -103,10 +103,10 @@ export function OpenTablePage() {
               textAlign: 'center', position: 'relative',
             }}>
               {d.tags?.map(t => (
-                <span key={t} style={{ position: 'absolute', top: 4, right: 4, fontSize: 9, padding: '1px 4px', borderRadius: 4, background: '#FF6B2C', color: '#fff' }}>{t}</span>
+                <span key={t} style={{ position: 'absolute', top: 4, right: 4, fontSize: 9, padding: '1px 4px', borderRadius: 4, background: '#FF6B35', color: '#fff' }}>{t}</span>
               ))}
               <div style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 4 }}>{d.name}</div>
-              <div style={{ color: '#FF6B2C', fontWeight: 'bold' }}>¥{d.price}</div>
+              <div style={{ color: '#FF6B35', fontWeight: 'bold' }}>¥{d.price}</div>
             </div>
           ))}
         </div>
@@ -119,18 +119,18 @@ export function OpenTablePage() {
           {store.items.map(item => (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid #1a2a33' }}>
               <span>{item.name}</span>
-              <span style={{ color: '#FF6B2C' }}>×{item.quantity} ¥{(item.priceFen * item.quantity / 100).toFixed(0)}</span>
+              <span style={{ color: '#FF6B35' }}>×{item.quantity} ¥{(item.priceFen * item.quantity / 100).toFixed(0)}</span>
             </div>
           ))}
         </div>
         <div style={{ borderTop: '1px solid #333', paddingTop: 8, marginTop: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 'bold', color: '#FF6B2C', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 'bold', color: '#FF6B35', marginBottom: 8 }}>
             <span>合计</span><span>¥{(total / 100).toFixed(0)}</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => navigate(`/tables`)} style={{ flex: 1, padding: 10, background: '#333', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>返回</button>
             <button onClick={() => navigate(`/settle/${store.orderId || 'temp'}`)} disabled={itemCount === 0}
-              style={{ flex: 2, padding: 10, background: itemCount > 0 ? '#FF6B2C' : '#444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 15 }}>
+              style={{ flex: 2, padding: 10, background: itemCount > 0 ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 15 }}>
               下单结算
             </button>
           </div>

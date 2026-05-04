@@ -97,7 +97,7 @@ export function DishAnalysisPage() {
             <button key={key} onClick={() => setTab(key)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: tab === key ? '#FF6B2C' : '#1a2a33',
+              background: tab === key ? '#FF6B35' : '#1a2a33',
               color: tab === key ? '#fff' : '#999',
             }}>{label}</button>
           ))}
@@ -136,7 +136,7 @@ export function DishAnalysisPage() {
                       <span style={{
                         width: 24, height: 24, borderRadius: '50%', fontSize: 11, fontWeight: 700,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: d.rank <= 3 ? '#FF6B2C' : '#1a2a33',
+                        background: d.rank <= 3 ? '#FF6B35' : '#1a2a33',
                         color: d.rank <= 3 ? '#fff' : '#999',
                       }}>{d.rank}</span>
                       <span style={{ fontSize: 13 }}>{d.name}</span>
@@ -165,7 +165,7 @@ export function DishAnalysisPage() {
                       <span style={{
                         width: 24, height: 24, borderRadius: '50%', fontSize: 11, fontWeight: 700,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: d.rank <= 3 ? '#FF6B2C' : '#1a2a33',
+                        background: d.rank <= 3 ? '#FF6B35' : '#1a2a33',
                         color: d.rank <= 3 ? '#fff' : '#999',
                       }}>{d.rank}</span>
                       <span style={{ fontSize: 13 }}>{d.name}</span>

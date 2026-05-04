@@ -9,7 +9,7 @@ const C = {
   bg: '#0A1418', surface: '#0E1E24', surface2: '#132932', surface3: '#1A3540',
   border: '#1A3540', border2: '#23485a',
   text: '#E6EDF1', text2: '#94A8B3', text3: '#647985',
-  orange: '#FF6B2C', green: '#22C55E', yellow: '#F59E0B', red: '#EF4444', blue: '#3B82F6', purple: '#A855F7',
+  orange: '#FF6B35', green: '#22C55E', yellow: '#F59E0B', red: '#EF4444', blue: '#3B82F6', purple: '#A855F7',
 };
 
 // ── 类型 ──

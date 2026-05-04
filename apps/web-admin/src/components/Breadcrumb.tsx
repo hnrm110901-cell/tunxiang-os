@@ -238,7 +238,7 @@ export function Breadcrumb() {
                   transition: 'color 0.15s',
                 }}
                 onMouseEnter={(e) => {
-                  if (crumb.path) e.currentTarget.style.color = 'var(--brand, #ff6b2c)';
+                  if (crumb.path) e.currentTarget.style.color = 'var(--brand, #FF6B35)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = 'var(--text-3, #999)';

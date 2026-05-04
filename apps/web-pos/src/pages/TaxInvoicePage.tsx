@@ -160,12 +160,12 @@ export function TaxInvoicePage() {
               display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
               borderRadius: 8, fontSize: 16, marginBottom: 4,
               background: isCurrent ? '#1A3A48' : 'transparent',
-              color: isCurrent ? '#FF6B2C' : isPast ? '#0F6E56' : '#555',
+              color: isCurrent ? '#FF6B35' : isPast ? '#0F6E56' : '#555',
               fontWeight: isCurrent ? 'bold' : 'normal',
             }}>
               <div style={{
                 width: 26, height: 26, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: isCurrent ? '#FF6B2C' : isPast ? '#0F6E56' : '#333',
+                background: isCurrent ? '#FF6B35' : isPast ? '#0F6E56' : '#333',
                 color: '#fff', fontSize: 16, fontWeight: 'bold', flexShrink: 0,
               }}>
                 {isPast ? '✓' : i + 1}
@@ -179,7 +179,7 @@ export function TaxInvoicePage() {
         <div style={{ marginTop: 'auto', background: '#0B1A20', borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 16, color: '#8899A6', marginBottom: 8 }}>订单信息</div>
           <div style={{ fontSize: 16, marginBottom: 4 }}>订单号: {orderId || '--'}</div>
-          <div style={{ fontSize: 20, fontWeight: 'bold', color: '#FF6B2C' }}>开票金额: {fen2yuan(orderAmountFen)}</div>
+          <div style={{ fontSize: 20, fontWeight: 'bold', color: '#FF6B35' }}>开票金额: {fen2yuan(orderAmountFen)}</div>
         </div>
 
         <button
@@ -213,7 +213,7 @@ export function TaxInvoicePage() {
                   onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   <div style={{
-                    width: 56, height: 56, borderRadius: 12, background: '#FF6B2C', color: '#fff',
+                    width: 56, height: 56, borderRadius: 12, background: '#FF6B35', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 24, fontWeight: 'bold', flexShrink: 0,
                   }}>
@@ -331,7 +331,7 @@ export function TaxInvoicePage() {
               <button
                 onClick={handleNext}
                 style={{
-                  flex: 2, padding: 16, background: '#FF6B2C', border: 'none', borderRadius: 12,
+                  flex: 2, padding: 16, background: '#FF6B35', border: 'none', borderRadius: 12,
                   color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                   transition: 'transform 200ms ease',
                 }}
@@ -384,7 +384,7 @@ export function TaxInvoicePage() {
                 disabled={submitting}
                 style={{
                   flex: 2, padding: 16, border: 'none', borderRadius: 12,
-                  background: submitting ? '#444' : '#FF6B2C',
+                  background: submitting ? '#444' : '#FF6B35',
                   color: '#fff', fontSize: 20, fontWeight: 'bold',
                   cursor: submitting ? 'not-allowed' : 'pointer', minHeight: 56,
                   transition: 'transform 200ms ease',
@@ -419,12 +419,12 @@ export function TaxInvoicePage() {
               }
             </div>
             <div style={{ fontSize: 16, color: '#8899A6', marginBottom: 32 }}>
-              发票金额: <span style={{ color: '#FF6B2C', fontWeight: 'bold' }}>{fen2yuan(orderAmountFen)}</span>
+              发票金额: <span style={{ color: '#FF6B35', fontWeight: 'bold' }}>{fen2yuan(orderAmountFen)}</span>
             </div>
             <button
               onClick={() => navigate(-1)}
               style={{
-                padding: '16px 48px', background: '#FF6B2C', border: 'none', borderRadius: 12,
+                padding: '16px 48px', background: '#FF6B35', border: 'none', borderRadius: 12,
                 color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                 transition: 'transform 200ms ease',
               }}
@@ -467,7 +467,7 @@ function FormField(props: {
           borderRadius: 12, background: '#112228', color: '#fff',
           boxSizing: 'border-box', outline: 'none',
         }}
-        onFocus={(e) => { if (!props.error) e.currentTarget.style.borderColor = '#FF6B2C'; }}
+        onFocus={(e) => { if (!props.error) e.currentTarget.style.borderColor = '#FF6B35'; }}
         onBlur={(e) => { if (!props.error) e.currentTarget.style.borderColor = '#333'; }}
       />
       {props.error && (
@@ -481,7 +481,7 @@ function InfoRow(props: { label: string; value: string; highlight?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1A3A48', fontSize: 16 }}>
       <span style={{ color: '#8899A6' }}>{props.label}</span>
-      <span style={{ fontWeight: props.highlight ? 'bold' : 'normal', color: props.highlight ? '#FF6B2C' : '#fff' }}>
+      <span style={{ fontWeight: props.highlight ? 'bold' : 'normal', color: props.highlight ? '#FF6B35' : '#fff' }}>
         {props.value}
       </span>
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  Types

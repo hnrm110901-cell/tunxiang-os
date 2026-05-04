@@ -13,7 +13,7 @@ const s = {
     border: '1px solid #1A3540',
   } as React.CSSProperties,
   cardLabel: { fontSize: 12, color: '#6B8A97', marginBottom: 6 } as React.CSSProperties,
-  cardValue: { fontSize: 28, fontWeight: 700, color: '#FF6B2C' } as React.CSSProperties,
+  cardValue: { fontSize: 28, fontWeight: 700, color: '#FF6B35' } as React.CSSProperties,
   row: { display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' as const } as React.CSSProperties,
   section: {
     flex: '1 1 320px', background: '#0D2129', borderRadius: 10, padding: 20,
@@ -22,7 +22,7 @@ const s = {
   sectionTitle: { fontSize: 14, fontWeight: 600, color: '#FFFFFF', marginBottom: 16 } as React.CSSProperties,
   toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 } as React.CSSProperties,
   btnSec: {
-    background: 'transparent', color: '#FF6B2C', border: '1px solid #FF6B2C', borderRadius: 6,
+    background: 'transparent', color: '#FF6B35', border: '1px solid #FF6B35', borderRadius: 6,
     padding: '6px 14px', fontSize: 12, cursor: 'pointer', marginLeft: 6,
   } as React.CSSProperties,
   table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 } as React.CSSProperties,

@@ -12,7 +12,7 @@ import { txFetchData } from '../../../api/index';
 // ---- 颜色常量（保留现有深色主题）----
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';

@@ -5,7 +5,7 @@
 import { useState } from 'react';
 
 // ---- 颜色常量 ----
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 const BG_BAR = '#112228';
 const BG_RISK = '#ff4d4f';
 const BG_EXPAND = '#0B1A20';

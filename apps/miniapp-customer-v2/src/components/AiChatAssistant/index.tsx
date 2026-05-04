@@ -17,7 +17,7 @@ import { useUserStore } from '../../store/useUserStore'
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   primaryBg: 'rgba(255,107,44,0.12)',
   aiBlue: '#185FA5',
   aiBlueBg: 'rgba(24,95,165,0.08)',

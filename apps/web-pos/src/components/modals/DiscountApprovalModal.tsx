@@ -28,7 +28,7 @@ export function DiscountApprovalModal({ visible, orderNo, discountRate, marginBe
         </div>
 
         <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.8, marginBottom: 16 }}>
-          <div>订单 <b>{orderNo}</b> 申请折扣率 <b style={{ color: '#FF6B2C' }}>{(discountRate * 100).toFixed(0)}%</b></div>
+          <div>订单 <b>{orderNo}</b> 申请折扣率 <b style={{ color: '#FF6B35' }}>{(discountRate * 100).toFixed(0)}%</b></div>
           <div>折扣前毛利率：<b>{(marginBefore * 100).toFixed(1)}%</b></div>
           <div>折扣后毛利率：<b style={{ color: marginAfter < threshold ? '#ff4d4f' : '#52c41a' }}>{(marginAfter * 100).toFixed(1)}%</b></div>
           <div>毛利底线阈值：<b>{(threshold * 100).toFixed(0)}%</b></div>
@@ -43,7 +43,7 @@ export function DiscountApprovalModal({ visible, orderNo, discountRate, marginBe
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onReject} style={{ flex: 1, padding: 10, background: '#333', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>驳回</button>
           <button onClick={() => onApprove((document.getElementById('approval-reason') as HTMLTextAreaElement)?.value || '')}
-            style={{ flex: 1, padding: 10, background: isViolation ? '#ff4d4f' : '#FF6B2C', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: 10, background: isViolation ? '#ff4d4f' : '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
             {isViolation ? '强制审批' : '批准'}
           </button>
         </div>

@@ -154,7 +154,7 @@ const S = {
     marginBottom: 16,
   } as React.CSSProperties,
   pmBtn: (active: boolean): React.CSSProperties => ({
-    height: 42,
+    height: 44,
     borderRadius: 8,
     border: `2px solid ${active ? '#FF6B35' : '#D5D2CC'}`,
     background: active ? '#FFF5F0' : '#FFF',

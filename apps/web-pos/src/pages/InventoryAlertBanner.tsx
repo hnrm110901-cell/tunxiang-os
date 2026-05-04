@@ -184,8 +184,8 @@ export function InventoryAlertBanner({ storeId }: InventoryAlertBannerProps) {
       <button
         onClick={() => navigate('/live-menu')}
         style={{
-          height: 36,
-          padding: '0 16px',
+          height: 44,
+          padding: '0 20px',
           background: '#FF6B35',
           color: '#fff',
           border: 'none',

@@ -637,6 +637,24 @@ export async function listAgents(): Promise<Array<{ agent_id: string; agent_name
   return txFetch('/api/v1/agent/agents');
 }
 
+/** Agent 自然语言指令执行（Phase 2 — Command Palette Agent 查询） */
+export async function agentExecute(
+  instruction: string,
+  context: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  return txFetch('/api/v1/agent/execute', {
+    method: 'POST',
+    body: JSON.stringify({
+      instruction,
+      context,
+      tenant_id: import.meta.env.VITE_TENANT_ID || '',
+      store_id: import.meta.env.VITE_STORE_ID || '',
+      priority: 'medium',
+      async_mode: false,
+    }),
+  });
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  POS 崩溃遥测上报（A1 安全修复 — 不再读 localStorage tenant_id）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

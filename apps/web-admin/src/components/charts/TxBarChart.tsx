@@ -19,7 +19,7 @@ interface Props {
   unit?: string;
 }
 
-const PALETTE = ['#FF6B2C', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6'];
+const PALETTE = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6'];
 
 function formatValue(v: number, unit?: string): string {
   if (unit === '%') return `${v.toFixed(1)}%`;

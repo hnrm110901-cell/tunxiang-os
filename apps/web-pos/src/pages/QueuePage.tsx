@@ -2,6 +2,7 @@
  * 排队管理页 — 取号/叫号/排队列表/统计
  */
 import { useState } from 'react';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 
 /* ---------- Types ---------- */
 interface QueueItem {
@@ -34,6 +35,7 @@ export function QueuePage() {
   const [queue, setQueue] = useState<QueueItem[]>(initialQueue);
   const [showTakeNumber, setShowTakeNumber] = useState(false);
   const [selectedSize, setSelectedSize] = useState(2);
+  const tf = useTouchFeedback();
 
   const waitingList = queue.filter(q => q.status === 'waiting' || q.status === 'called');
   const avgWait = waitingList.length > 0
@@ -79,15 +81,17 @@ export function QueuePage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, color: '#fff' }}>排队管理</h1>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={callNext} style={{
+          <button onClick={callNext} {...tf.handlers} style={{
             padding: '8px 20px', background: '#1890ff', color: '#fff',
             border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 'bold',
+            ...tf.style,
           }}>
             叫下一位
           </button>
-          <button onClick={() => setShowTakeNumber(true)} style={{
+          <button onClick={() => setShowTakeNumber(true)} {...tf.handlers} style={{
             padding: '8px 20px', background: '#52c41a', color: '#fff',
             border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 'bold',
+            ...tf.style,
           }}>
             取号
           </button>
@@ -134,21 +138,24 @@ export function QueuePage() {
             <span style={{ color: statusColor[item.status], fontSize: 13 }}>{statusLabel[item.status]}</span>
             <div style={{ display: 'flex', gap: 6 }}>
               {item.status === 'waiting' && (
-                <button onClick={() => handleCall(item.id)} style={{
-                  padding: '4px 12px', background: '#1890ff', color: '#fff',
-                  border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                <button onClick={() => handleCall(item.id)} {...tf.handlers} style={{
+                  padding: '8px 14px', background: '#1890ff', color: '#fff',
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                  minHeight: 40, ...tf.style,
                 }}>叫号</button>
               )}
               {item.status === 'called' && (
-                <button onClick={() => handleSeat(item.id)} style={{
-                  padding: '4px 12px', background: '#52c41a', color: '#fff',
-                  border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                <button onClick={() => handleSeat(item.id)} {...tf.handlers} style={{
+                  padding: '8px 14px', background: '#52c41a', color: '#fff',
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                  minHeight: 40, ...tf.style,
                 }}>入座</button>
               )}
               {(item.status === 'waiting' || item.status === 'called') && (
-                <button onClick={() => handleAbandon(item.id)} style={{
-                  padding: '4px 12px', background: 'transparent', color: '#ff4d4f',
-                  border: '1px solid #ff4d4f', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                <button onClick={() => handleAbandon(item.id)} {...tf.handlers} style={{
+                  padding: '8px 14px', background: 'transparent', color: '#ff4d4f',
+                  border: '1px solid #ff4d4f', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                  minHeight: 40, ...tf.style,
                 }}>放弃</button>
               )}
             </div>
@@ -177,9 +184,10 @@ export function QueuePage() {
               <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>{s.pax}人 · 已等{s.wait}分钟</span>
               <div style={{ fontSize: 12, color: '#185FA5', marginTop: 2 }}>→ 推荐 {s.table}台({s.tableSize}人) · {s.desc}</div>
             </div>
-            <button style={{
+            <button {...tf.handlers} style={{
               padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: '#FF6B35', color: '#fff', fontWeight: 600, fontSize: 13, minHeight: 44,
+              ...tf.style,
             }}>立即叫号</button>
           </div>
         ))}
@@ -197,11 +205,12 @@ export function QueuePage() {
               <div style={{ fontSize: 13, color: '#8899A6', marginBottom: 8 }}>用餐人数</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {[1, 2, 3, 4, 5, 6, 8, 10].map(n => (
-                  <button key={n} onClick={() => setSelectedSize(n)} style={{
+                  <button key={n} onClick={() => setSelectedSize(n)} {...tf.handlers} style={{
                     width: 50, height: 40, borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 'bold',
                     background: selectedSize === n ? '#1890ff' : '#1A3A48',
                     color: selectedSize === n ? '#fff' : '#aaa',
                     border: selectedSize === n ? '2px solid #1890ff' : '1px solid #2A4A58',
+                    ...tf.style,
                   }}>
                     {n}人
                   </button>
@@ -212,13 +221,15 @@ export function QueuePage() {
               {selectedSize > 4 ? 'A区（大桌）' : 'B区（小桌）'} - 预计等待 {waitingList.length * 8} 分钟
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleTakeNumber} style={{
+              <button onClick={handleTakeNumber} {...tf.handlers} style={{
                 flex: 1, padding: '10px 0', background: '#52c41a', color: '#fff',
                 border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 15, fontWeight: 'bold',
+                ...tf.style,
               }}>确认取号</button>
-              <button onClick={() => setShowTakeNumber(false)} style={{
+              <button onClick={() => setShowTakeNumber(false)} {...tf.handlers} style={{
                 flex: 1, padding: '10px 0', background: '#1A3A48', color: '#aaa',
                 border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 15,
+                ...tf.style,
               }}>取消</button>
             </div>
           </div>

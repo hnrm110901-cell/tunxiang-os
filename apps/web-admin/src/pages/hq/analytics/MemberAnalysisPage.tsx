@@ -131,7 +131,7 @@ export function MemberAnalysisPage() {
 
   const growthLabels = growthTrend.map(g => g.month);
   const growthDatasets = growthLabels.length > 0 ? [
-    { name: '累计会员', values: growthTrend.map(g => g.total), color: '#FF6B2C' },
+    { name: '累计会员', values: growthTrend.map(g => g.total), color: '#FF6B35' },
     { name: '新增会员', values: growthTrend.map(g => g.new_members), color: '#0F6E56' },
   ] : [];
 
@@ -145,7 +145,7 @@ export function MemberAnalysisPage() {
             <button key={d} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: period === d ? '#FF6B2C' : '#1a2a33',
+              background: period === d ? '#FF6B35' : '#1a2a33',
               color: period === d ? '#fff' : '#999',
             }} onClick={() => setPeriod(d)}>
               {d}
@@ -340,7 +340,7 @@ export function MemberAnalysisPage() {
                     <span style={{ fontSize: 11, color: '#185FA5' }}>{member.suggestedAction}</span>
                     <button style={{
                       padding: '3px 10px', borderRadius: 4, border: 'none',
-                      background: '#FF6B2C20', color: '#FF6B2C',
+                      background: '#FF6B3520', color: '#FF6B35',
                       cursor: 'pointer', fontWeight: 600, fontSize: 10,
                     }}>
                       执行

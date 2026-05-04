@@ -1,5 +1,4 @@
-import { Result } from 'antd';
-
+import { PlaceholderPage } from '../../components/PlaceholderPage';
 export function CrewMySchedulePage() {
-  return <Result status="info" title="页面开发中" subTitle="Crew My Schedule — 待实现" />;
+  return <PlaceholderPage title="我的排班" subtitle="Crew My Schedule" backTo="/hr" backLabel="返回人事管理" />;
 }

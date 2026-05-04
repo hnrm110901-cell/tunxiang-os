@@ -162,7 +162,7 @@ export function CruiseMonitorPage() {
           : kpiList.map((kpi) => (
               <div key={kpi.label} style={{
                 background: '#112228', borderRadius: 8, padding: 16,
-                borderLeft: '3px solid #FF6B2C',
+                borderLeft: '3px solid #FF6B35',
               }}>
                 <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
@@ -206,7 +206,7 @@ export function CruiseMonitorPage() {
                 style={{
                   padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: tableFilter === key ? '#FF6B2C' : '#0B1A20',
+                  background: tableFilter === key ? '#FF6B35' : '#0B1A20',
                   color: tableFilter === key ? '#fff' : '#999',
                 }}
               >

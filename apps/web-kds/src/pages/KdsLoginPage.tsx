@@ -60,7 +60,7 @@ export function KdsLoginPage({ onLogin }: KdsLoginPageProps) {
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{
             width: 72, height: 72, borderRadius: 18,
-            background: 'linear-gradient(135deg, #FF6B2C, #FF8F5E)',
+            background: 'linear-gradient(135deg, #FF6B35, #FF8F5E)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 28, fontWeight: 900, color: '#fff', marginBottom: 20,
           }}>KDS</div>
@@ -114,7 +114,7 @@ export function KdsLoginPage({ onLogin }: KdsLoginPageProps) {
             style={{
               width: '100%', height: 80, borderRadius: 16, border: 'none',
               background: (!loading && username && password)
-                ? 'linear-gradient(135deg, #FF6B2C, #FF8F5E)'
+                ? 'linear-gradient(135deg, #FF6B35, #FF8F5E)'
                 : 'rgba(255,107,44,0.2)',
               color: '#fff', fontSize: 24, fontWeight: 700,
               cursor: (!loading && username && password) ? 'pointer' : 'not-allowed',

@@ -109,7 +109,7 @@ export function POSReportsPage() {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 26, height: 26, borderRadius: '50%', fontSize: 13, fontWeight: 'bold',
-                background: d.rank <= 3 ? '#FF6B2C' : '#1A3A48',
+                background: d.rank <= 3 ? '#FF6B35' : '#1A3A48',
                 color: d.rank <= 3 ? '#fff' : '#8899A6',
               }}>{d.rank}</span>
               <span style={{ fontSize: 14, color: '#fff' }}>{d.name}</span>

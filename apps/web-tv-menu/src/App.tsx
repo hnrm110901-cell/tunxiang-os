@@ -9,7 +9,7 @@ import AdminConfig from './pages/AdminConfig';
 /** 全局CSS变量 — 大屏深色主题 */
 const globalStyles = `
   :root {
-    --tx-primary: #FF6B2C;
+    --tx-primary: #FF6B35;
     --tx-primary-hover: #FF8555;
     --tx-primary-active: #E55A28;
     --tx-primary-light: rgba(255, 107, 44, 0.15);

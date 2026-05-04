@@ -52,7 +52,7 @@ interface DeptLoadData {
 const PEAK_CONFIG: Record<PeakLevel, { label: string; color: string; bg: string; desc: string }> = {
   normal:  { label: '正常',    color: '#0F6E56', bg: '#0F6E5630', desc: '客流平稳，各档口运转正常' },
   busy:    { label: '繁忙',    color: '#BA7517', bg: '#BA751730', desc: '客流上升，部分档口压力较大' },
-  peak:    { label: '高峰',    color: '#FF6B2C', bg: '#FF6B2C30', desc: '高峰时段，需要加派人手' },
+  peak:    { label: '高峰',    color: '#FF6B35', bg: '#FF6B3530', desc: '高峰时段，需要加派人手' },
   extreme: { label: '极端高峰', color: '#A32D2D', bg: '#A32D2D30', desc: '客流爆满，启动应急预案' },
 };
 
@@ -168,7 +168,7 @@ export function PeakMonitorPage() {
           {peakData.kpi.map((kpi) => (
             <div key={kpi.label} style={{
               background: '#112228', borderRadius: 8, padding: 16,
-              borderLeft: '3px solid #FF6B2C',
+              borderLeft: '3px solid #FF6B35',
             }}>
               <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
@@ -251,8 +251,8 @@ export function PeakMonitorPage() {
               </div>
               <div style={{
                 marginTop: 12, padding: 10, borderRadius: 8,
-                background: '#FF6B2C15', border: '1px solid #FF6B2C40',
-                fontSize: 13, color: '#FF6B2C', textAlign: 'center',
+                background: '#FF6B3515', border: '1px solid #FF6B3540',
+                fontSize: 13, color: '#FF6B35', textAlign: 'center',
               }}>
                 总等位 {peakData.waiting.reduce((s, w) => s + w.count, 0)} 桌 /
                 约 {peakData.waiting.reduce((s, w) => s + w.count, 0) * 3} 人
@@ -288,7 +288,7 @@ export function PeakMonitorPage() {
                   </div>
                   <div style={{ fontSize: 13, color: '#ccc' }}>{s.reason}</div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                    建议加派: <span style={{ color: '#FF6B2C' }}>{s.suggestedStaff}</span>
+                    建议加派: <span style={{ color: '#FF6B35' }}>{s.suggestedStaff}</span>
                   </div>
                 </div>
                 <button style={{
@@ -332,7 +332,7 @@ export function PeakMonitorPage() {
             onClick={() => setQuickMode(!quickMode)}
             style={{
               padding: '10px 24px', borderRadius: 8, border: 'none',
-              background: quickMode ? '#A32D2D' : '#FF6B2C',
+              background: quickMode ? '#A32D2D' : '#FF6B35',
               color: '#fff', cursor: 'pointer',
               fontWeight: 600, fontSize: 13,
             }}

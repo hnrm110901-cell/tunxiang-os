@@ -61,6 +61,8 @@ export function TableMapPage() {
   const [filterArea, setFilterArea] = useState<string>('全部');
   const [showPanel, setShowPanel] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
 
   /* ── 键盘快捷键（桌台地图）── */
   const { altPressed, shortcuts, activeKey } = useKeyboardShortcuts([
@@ -95,15 +97,20 @@ export function TableMapPage() {
 
   /** 从后端加载桌台状态 */
   const loadTables = useCallback(async () => {
+    setTableLoading(true);
+    setTableError(null);
     try {
       const storeId = import.meta.env.VITE_STORE_ID || '';
       const data = await fetchTableStatus(storeId);
       if (data.tables && data.tables.length > 0) {
         setTables(data.tables);
+      } else {
+        setTables([]);
       }
     } catch {
-      // 离线模式使用 mock 数据
+      setTableError('桌台数据加载失败');
     }
+    setTableLoading(false);
   }, []);
 
   useEffect(() => {
@@ -196,6 +203,16 @@ export function TableMapPage() {
           {/* 快捷键帮助按钮（F5=刷新、Escape=关闭面板 等快捷键提示）*/}
           <KeyboardHelpTrigger onClick={() => setShowHelpPanel((v) => !v)} />
           <button
+            onClick={() => navigate('/store-twin')}
+            style={{
+              minHeight: 48, padding: '8px 16px',
+              background: C.card, border: `1px solid ${C.purple}`, borderRadius: 8,
+              color: C.purple, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            鸟瞰
+          </button>
+          <button
             onClick={() => navigate('/quick-cashier')}
             style={{
               minHeight: 48, padding: '8px 20px',
@@ -207,13 +224,14 @@ export function TableMapPage() {
           </button>
           <button
             onClick={loadTables}
+            disabled={tableLoading}
             style={{
               minHeight: 48, padding: '8px 16px',
               background: C.card, border: `1px solid ${C.border}`, borderRadius: 8,
-              color: C.text, fontSize: 16, cursor: 'pointer',
+              color: tableLoading ? C.muted : C.text, fontSize: 16, cursor: tableLoading ? 'wait' : 'pointer',
             }}
           >
-            刷新 [F5]
+            {tableLoading ? '刷新中...' : '刷新 [F5]'}
           </button>
         </div>
       </div>
@@ -259,6 +277,29 @@ export function TableMapPage() {
 
       {/* 桌台网格 */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 20px 20px' }}>
+        {tableError && (
+          <div style={{
+            padding: 12, marginBottom: 12, borderRadius: 8,
+            background: 'rgba(235,87,87,0.12)', border: '1px solid rgba(235,87,87,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span style={{ color: '#EB5757', fontSize: 14 }}>{tableError}，显示离线数据</span>
+            <button onClick={loadTables} style={{
+              padding: '6px 14px', borderRadius: 6, border: '1px solid #EB5757',
+              background: 'transparent', color: '#EB5757', cursor: 'pointer', fontSize: 13,
+              minHeight: 36,
+            }}>重试</button>
+          </div>
+        )}
+        {!tableLoading && filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, color: C.muted }}>
+            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }}>🏠</div>
+            <div style={{ fontSize: 16, marginBottom: 8 }}>该区域暂未配置桌台</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
+              {tables.length === 0 ? '请在系统设置中配置桌台布局' : '请切换其他区域查看'}
+            </div>
+          </div>
+        ) : (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
@@ -273,6 +314,7 @@ export function TableMapPage() {
             />
           ))}
         </div>
+        )}
       </div>
 
       {/* 操作面板 */}

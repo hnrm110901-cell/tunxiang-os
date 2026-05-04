@@ -370,7 +370,7 @@ export function ExceptionPage() {
 function FilterBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} style={{
-      padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer', minHeight: 32,
+      padding: '8px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', minHeight: 44,
       background: active ? 'rgba(255,107,53,0.15)' : 'transparent',
       border: active ? '1px solid #FF6B35' : '1px solid #333',
       color: active ? '#FF6B35' : '#9CA3AF',

@@ -109,7 +109,7 @@ const RANGE_OPTIONS: { key: TimeRange; label: string; days: number }[] = [
 ];
 
 const DEFAULT_METRICS: MetricConfig[] = [
-  { key: 'revenue_fen', label: '营收', unit: '元', color: '#FF6B2C', enabled: true },
+  { key: 'revenue_fen', label: '营收', unit: '元', color: '#FF6B35', enabled: true },
   { key: 'avg_ticket_fen', label: '客单价', unit: '元', color: '#185FA5', enabled: false },
   { key: 'margin_pct', label: '毛利率', unit: '%', color: '#0F6E56', enabled: false },
   { key: 'turnover_rate', label: '翻台率', unit: '次', color: '#BA7517', enabled: false },
@@ -336,7 +336,7 @@ function SVGLineChart({ labels, datasets, height = 300 }: LineChartProps) {
         {/* Tooltip竖线 */}
         {tooltip && (
           <line x1={tooltip.x} y1={pad.top} x2={tooltip.x} y2={height - pad.bottom}
-            stroke="#FF6B2C" strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
+            stroke="#FF6B35" strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
         )}
       </svg>
 
@@ -603,7 +603,7 @@ export function TrendAnalysisPage() {
             <button key={r.key} onClick={() => setTimeRange(r.key)} style={{
               padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: timeRange === r.key ? '#FF6B2C' : '#1a2a33',
+              background: timeRange === r.key ? '#FF6B35' : '#1a2a33',
               color: timeRange === r.key ? '#fff' : '#999',
             }}>
               {r.label}
@@ -665,7 +665,7 @@ export function TrendAnalysisPage() {
           </h3>
           <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#666', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 16, height: 2, background: '#FF6B2C', display: 'inline-block' }} />
+              <span style={{ width: 16, height: 2, background: '#FF6B35', display: 'inline-block' }} />
               实际值
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

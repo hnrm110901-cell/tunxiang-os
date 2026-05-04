@@ -89,7 +89,7 @@ const COLOR = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B2C',
+  accent: '#FF6B35',
   green: '#22c55e',
   yellow: '#facc15',
   muted: '#64748b',

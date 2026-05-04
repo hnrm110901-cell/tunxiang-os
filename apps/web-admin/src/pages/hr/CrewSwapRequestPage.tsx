@@ -1,5 +1,4 @@
-import { Result } from 'antd';
-
+import { PlaceholderPage } from '../../components/PlaceholderPage';
 export function CrewSwapRequestPage() {
-  return <Result status="info" title="页面开发中" subTitle="Crew Swap Request — 待实现" />;
+  return <PlaceholderPage title="换班申请" subtitle="Crew Swap Request" backTo="/hr" backLabel="返回人事管理" />;
 }

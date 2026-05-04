@@ -1,6 +1,6 @@
 /**
  * TxPieChart -- CSS conic-gradient 饼图/环形图
- * 品牌色 #FF6B2C，深色主题，响应式
+ * 品牌色 #FF6B35，深色主题，响应式
  */
 
 interface Segment {
@@ -17,7 +17,7 @@ interface Props {
   title?: string; // 中心文字（环形图时显示）
 }
 
-const PALETTE = ['#FF6B2C', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6', '#EC4899', '#14B8A6'];
+const PALETTE = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6', '#EC4899', '#14B8A6'];
 
 function formatValue(v: number, unit?: string): string {
   if (unit === '%') return `${v.toFixed(1)}%`;

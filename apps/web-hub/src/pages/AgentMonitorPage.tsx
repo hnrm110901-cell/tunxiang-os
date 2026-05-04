@@ -11,7 +11,7 @@ import { hubGet } from '../api/hubApi';
 const BG_0 = '#0B1A20';
 const BG_1 = '#0D2129';
 const BG_2 = '#1A3540';
-const BRAND = '#FF6B2C';
+const BRAND = '#FF6B35';
 const GREEN = '#22C55E';
 const RED = '#EF4444';
 const YELLOW = '#F59E0B';

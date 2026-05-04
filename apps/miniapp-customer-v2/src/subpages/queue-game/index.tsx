@@ -17,7 +17,7 @@ import { txRequest } from '../../utils/request'
 import { useUserStore } from '../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B2C',
+  primary: '#FF6B35',
   gold: '#C5A347',
   success: '#34C759',
   danger: '#FF3B30',

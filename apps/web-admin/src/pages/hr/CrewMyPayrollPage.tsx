@@ -1,5 +1,4 @@
-import { Result } from 'antd';
-
+import { PlaceholderPage } from '../../components/PlaceholderPage';
 export function CrewMyPayrollPage() {
-  return <Result status="info" title="页面开发中" subTitle="Crew My Payroll — 待实现" />;
+  return <PlaceholderPage title="我的薪资" subtitle="Crew My Payroll" backTo="/hr" backLabel="返回人事管理" />;
 }

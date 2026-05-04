@@ -428,7 +428,7 @@ export function OrderPage() {
               <button
                 type="button"
                 onClick={() => { setShowNoteModal(item.id); setNoteText(item.notes); }}
-                style={{ marginTop: 4, padding: '2px 8px', background: 'transparent', border: '1px solid #333', borderRadius: 4, color: '#6B7280', fontSize: 12, cursor: 'pointer' }}
+                style={{ marginTop: 4, padding: '6px 14px', background: 'transparent', border: '1px solid #333', borderRadius: 6, color: '#6B7280', fontSize: 13, cursor: 'pointer', minHeight: 36 }}
               >
                 {item.notes ? '改备注' : '+ 备注'}
               </button>
@@ -536,7 +536,7 @@ function CategoryBtn({ label, count, active, onClick }: { label: string; count: 
 }
 
 const qtyBtnStyle: React.CSSProperties = {
-  width: 36, height: 36, borderRadius: '50%', border: '1px solid #555',
-  background: 'transparent', color: '#fff', fontSize: 20, fontWeight: 600,
-  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 36,
+  width: 44, height: 44, borderRadius: '50%', border: '1px solid #555',
+  background: 'transparent', color: '#fff', fontSize: 22, fontWeight: 600,
+  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 44,
 };

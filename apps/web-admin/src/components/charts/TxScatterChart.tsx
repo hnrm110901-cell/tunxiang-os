@@ -1,7 +1,7 @@
 /**
  * TxScatterChart -- 纯SVG散点图（四象限）
  * 用于菜品四象限分析（销量 vs 毛利率）
- * 品牌色 #FF6B2C，深色主题适配
+ * 品牌色 #FF6B35，深色主题适配
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 
@@ -132,7 +132,7 @@ export function TxScatterChart({
   const midY = (yMin + yMax) / 2;
 
   const getQuadrantColor = (point: DataPoint) => {
-    if (!showQuadrants) return point.color || '#FF6B2C';
+    if (!showQuadrants) return point.color || '#FF6B35';
     const isRight = point.x >= midX;
     const isTop = point.y >= midY;
     if (isRight && isTop) return QUADRANT_COLORS[0];

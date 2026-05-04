@@ -1,7 +1,7 @@
 /**
  * TxHeatmap -- 纯CSS热力图网格
  * 时段 x 桌台/档口，颜色深浅表示数值
- * 品牌色 #FF6B2C，深色主题适配
+ * 品牌色 #FF6B35，深色主题适配
  */
 import { Fragment, useState } from 'react';
 
@@ -34,7 +34,7 @@ export function TxHeatmap({
   data,
   height,
   unit = '',
-  colorRange = ['#112228', '#FF6B2C'],
+  colorRange = ['#112228', '#FF6B35'],
 }: Props) {
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
 
@@ -94,7 +94,7 @@ export function TxHeatmap({
                     transform: isHover ? 'scale(1.08)' : 'scale(1)',
                     position: 'relative',
                     zIndex: isHover ? 2 : 1,
-                    border: isHover ? '1px solid #FF6B2C' : '1px solid transparent',
+                    border: isHover ? '1px solid #FF6B35' : '1px solid transparent',
                   }}
                 >
                   {isHover && (
