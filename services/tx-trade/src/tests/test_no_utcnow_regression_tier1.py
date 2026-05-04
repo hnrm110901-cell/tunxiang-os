@@ -38,6 +38,8 @@ _SCAN_DIRS = (
 _ALLOWLIST = {
     # 测试文件自身（含本文件的字面字符串）
     "services/tx-trade/src/tests/test_no_utcnow_regression_tier1.py",
+    # PJ.3 守门测试 docstring 含字面 datetime.utcnow() 字符串描述场景
+    "services/tx-trade/src/tests/test_codemod_tzinfo_residue_pj3_tier1.py",
 }
 
 
