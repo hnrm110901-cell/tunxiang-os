@@ -1,3 +1,30 @@
+## 2026-05-04 W12-3 LWW-Register 接线 OfflineSyncService（Tier 1 — 4h 离线零丢失）
+
+### 今日完成
+- [migrate] v393_sync_checkpoints_token — 给 v036 sync_checkpoints 表增量增加 last_pull_token TEXT + last_pull_token_ts TIMESTAMPTZ + 审计索引（保留 v036 RLS/索引完整）
+- [feat(edge/sync-engine)] offline_sync_service.resolve_conflict 替换 server_wins 占位 → 字段级 LWW-Register 决策（调 lww_register.resolve_lww）
+- [feat(edge/sync-engine)] 字段策略表 LWW_FIELDS / MONETARY_FIELDS / LIST_FIELDS：金额字段强制 server_wins（PN-Counter 语义），列表字段 server_wins（顺序敏感），其它默认 server_wins 兜底
+- [feat(edge/sync-engine)] ConflictResolution 增加 field_decisions / merged_payload 字段供审计，决策结果以 _lww_resolution 子对象写回 order_data 不覆盖原始字段
+- [feat(edge/sync-engine)] _push_single_order 从云端 409 响应捕获 server_payload（兼容 server_payload + order_data 双 key）
+- [feat(edge/sync-engine)] load_sync_token / save_sync_token 公开方法 — 从 v393 持久化 SyncToken 恢复，无新列时降级到 v036 字段（向后兼容）
+- [feat(edge/sync-engine)] pull_updates 用 SyncToken.filter_unseen 二次过滤已见事件 + GREATEST UPSERT 防止并发回退
+- [test(edge/sync-engine)] test_offline_sync_service_integration.py — 22 用例（含 4h 离线 200 单 N+M=零丢失场景）
+- [docs] 决策表：status/桌号/会员绑定/备注 → LWW；*_fen 金额字段 → server_wins；items_data/payments_data → server_wins；缺失 payload → server_wins 兜底
+
+### 数据变化
+- 迁移版本：v392 → v393（sync_checkpoints 增量 2 列）
+- 修改服务：edge/sync-engine（offline_sync_service.py +327 行）
+- 新增测试：22 个（test_offline_sync_service_integration.py）
+
+### 遗留问题
+- 集成测试在沙盒 shell 内 pytest 被禁用，未在本次会话运行；需在标准 dev 环境 pytest edge/sync-engine/tests/ -v 验证全绿
+- pull_updates 接口契约扩展 since_ts query param，云端 sync API 需同步支持（云端实现为 W12-4 范围）
+- LIST_FIELDS（items_data / payments_data）暂走 server_wins，长期应迁移到 RGA/Logoot CRDT
+
+### 明日计划
+- 跑 pytest edge/sync-engine/tests/ 全绿确认（23 LWW + 22 集成 = 45 用例）
+- 灰度部署 v393 迁移到 DEMO 环境（徐记海鲜数据），手动跑 4h 断网 200 单回放主流程
+
 ## 2026-05-04 积分系统 Tier 1 补全（路由接服务层 + 跨店结算 + FIFO 过期 + 毛利硬约束）
 
 ### 今日完成
