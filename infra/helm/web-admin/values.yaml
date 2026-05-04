@@ -27,6 +27,10 @@ resources:
 
 # 前端构建时注入的环境变量（写入nginx env配置）
 configMap:
+  # P0.6 工件 5 — 是否启用本 chart 模板生成 ConfigMap
+  # web-admin 既有 ConfigMap（由 deployment 直接引用 .Values.configMap.name）
+  # 默认禁用，避免与既有 ConfigMap 重名/重复创建。
+  enabled: false
   name: web-admin-config
   data:
     VITE_API_BASE_URL: https://api.tunxiangos.cn

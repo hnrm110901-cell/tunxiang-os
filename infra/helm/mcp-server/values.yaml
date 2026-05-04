@@ -90,3 +90,8 @@ networkPolicy:
   enabled: false
   ingress: []
   egress: []
+
+# P0.6 工件 5 — 额外 ConfigMap（默认禁用，启用后通过 envFrom 注入 deployment）
+configMap:
+  enabled: false
+  data: {}
