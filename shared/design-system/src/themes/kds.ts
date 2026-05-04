@@ -1,6 +1,7 @@
 /**
  * 屯象OS · KDS 高对比主题
  * 纯黑背景 + 超大字号 + 时间三色灯
+ * KDS 零品牌色原则 — 不出现暖橙
  */
 export const kdsTheme = {
   // 纯黑背景（最高对比度）
@@ -26,12 +27,12 @@ export const kdsTheme = {
   '--tx-kds-amber':       '#F59E0B',   // 5-10分钟：警告
   '--tx-kds-red':         '#EF4444',   // > 10分钟：超时
 
-  // 品牌色
-  '--tx-accent':          '#0AAF9A',
-  '--tx-accent-hover':    '#26C9B4',
-  '--tx-accent-active':   '#4DD3C2',
-  '--tx-accent-soft':     'rgba(10,175,154,0.20)',
-  '--tx-accent-bg':       'rgba(10,175,154,0.10)',
+  // 中性 accent（KDS 零品牌色原则 — 不出现暖橙）
+  '--tx-accent':          '#888888',
+  '--tx-accent-hover':    '#AAAAAA',
+  '--tx-accent-active':   '#CCCCCC',
+  '--tx-accent-soft':     'rgba(255,255,255,0.10)',
+  '--tx-accent-bg':       'rgba(255,255,255,0.05)',
 
   // 语义色（KDS高亮度版本）
   '--tx-success':         '#22C55E',

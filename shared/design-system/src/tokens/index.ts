@@ -1,7 +1,7 @@
 /**
  * 屯象OS Design Tokens
  * 品牌: 屯象 TUN XIANG · 餐饮人的好伙伴
- * v2 设计系统 — 深色主题 + Mint #0AAF9A 主色
+ * v3 设计系统 — 深色背景 + 暖橙 #FF6B35 CTA 色
  *
  * 使用方式:
  *   import { colors, typography, spacing } from '@tunxiang/design-system/tokens';
@@ -50,7 +50,7 @@ export function injectTokens(shell?: ShellType) {
     '--border':          neutral[200],
     // 语义色
     '--accent':          brand[500],
-    '--accent-soft':     'rgba(10,175,154,0.08)',
+    '--accent-soft':     'rgba(255,107,53,0.08)',
     '--accent-hover':    brand[600],
     '--accent-active':   brand[700],
     '--accent-bg':       brand[50],
@@ -78,12 +78,12 @@ export function injectTokens(shell?: ShellType) {
     '--text-tertiary':   dark.t3,         // 38%
     // 边框
     '--border':          dark.border,     // 8%
-    // 语义色 (Mint accent)
-    '--accent':          brand[500],      // #0AAF9A
-    '--accent-soft':     'rgba(10,175,154,0.15)',
+    // 语义色 (暖橙 accent #FF6B35)
+    '--accent':          brand[500],      // #FF6B35
+    '--accent-soft':     'rgba(255,107,53,0.15)',
     '--accent-hover':    brand[400],
     '--accent-active':   brand[300],
-    '--accent-bg':       'rgba(10,175,154,0.10)',
+    '--accent-bg':       'rgba(255,107,53,0.10)',
     '--green':           '#34D399',
     '--red':             '#F87171',
     '--yellow':          '#FBBF24',
@@ -101,7 +101,7 @@ export function injectTokens(shell?: ShellType) {
 
   // ── 静态变量（不随主题变化）──
   const staticVars: Record<string, string> = {
-    // Brand色阶（mint主色）
+    // Brand色阶（兼容旧名 `--tx-mint-*`，实际值为暖橙）
     '--tx-mint-50':  brand[50],  '--tx-mint-100': brand[100], '--tx-mint-200': brand[200],
     '--tx-mint-300': brand[300], '--tx-mint-400': brand[400], '--tx-mint-500': brand[500],
     '--tx-mint-600': brand[600], '--tx-mint-700': brand[700], '--tx-mint-800': brand[800],
