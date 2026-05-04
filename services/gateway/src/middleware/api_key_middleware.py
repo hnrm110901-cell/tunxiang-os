@@ -15,7 +15,6 @@
 """
 
 import os
-from typing import Optional
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware

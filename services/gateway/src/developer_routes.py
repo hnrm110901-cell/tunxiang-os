@@ -4,15 +4,15 @@
 需要 JWT 认证（管理员或开发者角色）。
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.apikeys.src.key_service import APIKeyNotFoundError, APIKeyPermissionError, APIKeyService
 from shared.ontology.src.database import get_async_session
-from shared.apikeys.src.key_service import APIKeyService, APIKeyNotFoundError, APIKeyPermissionError
 
 logger = structlog.get_logger(__name__)
 
