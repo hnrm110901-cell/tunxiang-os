@@ -30,6 +30,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -42,6 +43,8 @@ from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
@@ -341,6 +344,18 @@ async def create_contract(
         row = result.mappings().first()
 
         logger.info("franchise_contract_created", tenant_id=x_tenant_id, contract_id=new_id, contract_no=contract_no)
+
+        asyncio.create_task(emit_event(
+            event_type=FranchiseEventType.CONTRACT_SIGNED,
+            tenant_id=x_tenant_id,
+            stream_id=new_id,
+            payload={
+                "franchisee_id": body.franchisee_id,
+                "contract_no": contract_no,
+                "contract_type": body.contract_type,
+            },
+            source_service="tx-org",
+        ))
         return {"ok": True, "data": dict(row)}
 
     except HTTPException:

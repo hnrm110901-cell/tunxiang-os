@@ -10,11 +10,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import structlog
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 
 from ..models.franchise import (
     Franchisee,
@@ -165,6 +169,14 @@ class FranchiseService:
             )
 
         log.info("franchise.create_franchisee", franchisee_id=str(new_id))
+
+        asyncio.create_task(emit_event(
+            event_type=FranchiseEventType.APPLIED,
+            tenant_id=tenant_id,
+            stream_id=str(new_id),
+            payload={"franchisee_name": franchisee_name},
+            source_service="tx-org",
+        ))
         return franchisee
 
     @staticmethod
@@ -293,6 +305,21 @@ class FranchiseService:
 
         franchisee.status = new_status
         log.info("franchise.update_status")
+
+        _status_event_map = {
+            FranchiseeStatus.ACTIVE: FranchiseEventType.ACTIVATED,
+            FranchiseeStatus.SUSPENDED: FranchiseEventType.SUSPENDED,
+            FranchiseeStatus.TERMINATED: FranchiseEventType.TERMINATED,
+        }
+        event_type = _status_event_map.get(new_status)
+        if event_type:
+            asyncio.create_task(emit_event(
+                event_type=event_type,
+                tenant_id=tenant_id,
+                stream_id=str(franchisee_id),
+                payload={"status": new_status},
+                source_service="tx-org",
+            ))
         return franchisee
 
     @staticmethod
@@ -698,6 +725,14 @@ class FranchiseService:
         bill.status = RoyaltyBillStatus.PAID
         bill.paid_at = datetime.now()
         log.info("franchise.bill_paid")
+
+        asyncio.create_task(emit_event(
+            event_type=FranchiseEventType.FEE_PAID,
+            tenant_id=tenant_id,
+            stream_id=str(bill_id),
+            payload={"franchisee_id": str(bill.franchisee_id), "status": "paid"},
+            source_service="tx-org",
+        ))
         return bill
 
     @staticmethod
