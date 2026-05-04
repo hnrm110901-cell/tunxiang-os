@@ -9,11 +9,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/daily-ops", tags=["daily-ops"])
 
@@ -110,7 +111,7 @@ async def create_opening_checklist(
         result = await svc(store_id, date.today(), x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.put("/stores/{store_id}/opening/checklist/{checklist_id}/items/{item_id}")
@@ -138,7 +139,7 @@ async def check_opening_item(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/stores/{store_id}/opening/status")
@@ -168,7 +169,7 @@ async def approve_opening(
         result = await svc(store_id, body.manager_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -222,7 +223,7 @@ async def report_exception(
         result = await svc(store_id, body.type, body.detail, body.reporter_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/exceptions/{exception_id}/escalate")
@@ -239,7 +240,7 @@ async def escalate_exception(
         result = await svc(exception_id, body.to_level, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/exceptions/{exception_id}/resolve")
@@ -256,7 +257,7 @@ async def resolve_exception(
         result = await svc(exception_id, body.resolution, body.resolver_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/stores/{store_id}/exceptions")
@@ -290,7 +291,7 @@ async def create_closing_checklist(
         result = await svc(store_id, date.today(), x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/{store_id}/closing/stocktake")
@@ -335,7 +336,7 @@ async def finalize_closing(
         result = await svc(store_id, body.manager_id, x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
