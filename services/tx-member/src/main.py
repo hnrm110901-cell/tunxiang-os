@@ -23,7 +23,7 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from workers.rfm_updater import RFMEventListener, RFMUpdater
+from .workers.rfm_updater import RFMEventListener, RFMUpdater
 
 from shared.events.event_publisher import MemberEventPublisher
 from shared.ontology.src.database import async_session_factory, init_db
