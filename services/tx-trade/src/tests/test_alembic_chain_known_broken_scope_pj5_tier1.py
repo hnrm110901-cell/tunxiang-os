@@ -50,7 +50,6 @@ from scripts.check_alembic_chain import (
     collect_revisions_with_duplicates,
 )
 
-
 # ─── helpers ───────────────────────────────────────────────────────────────
 
 
@@ -77,9 +76,7 @@ def _write_migration(
         )
     else:
         rev_line = f'revision = "{revision}"'
-        down_line = (
-            f'down_revision = "{down_revision}"' if down_revision is not None else "down_revision = None"
-        )
+        down_line = f'down_revision = "{down_revision}"' if down_revision is not None else "down_revision = None"
 
     name = filename or f"{revision}_stub.py"
     p = versions_dir / name
@@ -144,10 +141,7 @@ def test_scenario_new_rev_referencing_whitelist_fails(tmp_path: Path) -> None:
     revisions = collect_revisions(versions)
     errors, warnings = check_chain(revisions)
 
-    assert any(
-        "v500_new_pollutant" in e and "v301_refund_requests" in e and "KNOWN_BROKEN" in e
-        for e in errors
-    ), (
+    assert any("v500_new_pollutant" in e and "v301_refund_requests" in e and "KNOWN_BROKEN" in e for e in errors), (
         f"expected scope-guard error for v500_new_pollutant → v301_refund_requests, "
         f"got errors={errors} warnings={warnings}"
     )
@@ -173,9 +167,7 @@ def test_scenario_downstream_of_legacy_child_is_normal_chain(tmp_path: Path) -> 
     revisions = collect_revisions(versions)
     errors, warnings = check_chain(revisions)
 
-    assert errors == [], (
-        f"downstream of declared child must pass, got errors: {errors}"
-    )
+    assert errors == [], f"downstream of declared child must pass, got errors: {errors}"
     # The only warning should be the v311 → orphan-parent edge.
     assert any("v311" in w and "v310_mv_performance_indexes" in w for w in warnings), (
         f"expected pre-existing warning for v311, got: {warnings}"
@@ -203,9 +195,7 @@ def test_scenario_whitelist_to_whitelist_link_is_allowed(tmp_path: Path) -> None
     errors, warnings = check_chain(revisions)
 
     assert errors == [], f"whitelist→whitelist must not error, got: {errors}"
-    assert len(warnings) == 3, (
-        f"expected exactly 3 pre-existing warnings, got {len(warnings)}: {warnings}"
-    )
+    assert len(warnings) == 3, f"expected exactly 3 pre-existing warnings, got {len(warnings)}: {warnings}"
 
 
 # ─── scenario 4: clean chain → pass ───────────────────────────────────────
@@ -241,9 +231,9 @@ def test_scenario_new_orphan_parent_still_fails(tmp_path: Path) -> None:
     revisions = collect_revisions(versions)
     errors, _ = check_chain(revisions)
 
-    assert any(
-        "v700_orphan_consumer" in e and "v699_does_not_exist" in e for e in errors
-    ), f"new orphan parent should fail with error, got: {errors}"
+    assert any("v700_orphan_consumer" in e and "v699_does_not_exist" in e for e in errors), (
+        f"new orphan parent should fail with error, got: {errors}"
+    )
 
 
 # ─── auxiliary: KNOWN_BROKEN constant sanity ──────────────────────────────
@@ -272,16 +262,12 @@ def test_known_broken_children_match_main_baseline() -> None:
     扫一遍 shared/db-migrations/versions 真实文件，确认白名单孩子集合与磁盘吻合。
     若新增/删减引用孤儿的文件，需同步更新 KNOWN_BROKEN_CHILDREN，否则 CI 红。
     """
-    versions_dir = (
-        Path(__file__).resolve().parents[4] / "shared" / "db-migrations" / "versions"
-    )
+    versions_dir = Path(__file__).resolve().parents[4] / "shared" / "db-migrations" / "versions"
     if not versions_dir.is_dir():
         pytest.skip(f"versions dir not present in this checkout: {versions_dir}")
 
     revisions = collect_revisions(versions_dir)
-    actual_children = {
-        rev for rev, down in revisions.items() if down in KNOWN_BROKEN_PARENTS
-    }
+    actual_children = {rev for rev, down in revisions.items() if down in KNOWN_BROKEN_PARENTS}
     assert set(KNOWN_BROKEN_CHILDREN) == actual_children, (
         f"KNOWN_BROKEN_CHILDREN drift vs disk: "
         f"missing={actual_children - set(KNOWN_BROKEN_CHILDREN)}, "
@@ -292,9 +278,8 @@ def test_known_broken_children_match_main_baseline() -> None:
 def test_known_broken_union_is_disjoint_partition() -> None:
     """KNOWN_BROKEN union helper 应等于 PARENTS ∪ CHILDREN，且两集合不相交。"""
     assert KNOWN_BROKEN == KNOWN_BROKEN_PARENTS | KNOWN_BROKEN_CHILDREN
-    assert (KNOWN_BROKEN_PARENTS & KNOWN_BROKEN_CHILDREN) == frozenset(), (
-        f"a rev cannot be both an orphan parent and a declared child: "
-        f"{KNOWN_BROKEN_PARENTS & KNOWN_BROKEN_CHILDREN}"
+    assert frozenset() == (KNOWN_BROKEN_PARENTS & KNOWN_BROKEN_CHILDREN), (
+        f"a rev cannot be both an orphan parent and a declared child: {KNOWN_BROKEN_PARENTS & KNOWN_BROKEN_CHILDREN}"
     )
 
 
@@ -310,9 +295,7 @@ def test_duplicate_revisions_detected(tmp_path: Path) -> None:
     _write_migration(versions, "v200", down_revision="v199", filename="v200_b.py")
 
     _, dups = collect_revisions_with_duplicates(versions)
-    assert any(rev == "v200" for rev, _ in dups), (
-        f"duplicate v200 should be flagged, got: {dups}"
-    )
+    assert any(rev == "v200" for rev, _ in dups), f"duplicate v200 should be flagged, got: {dups}"
 
 
 def test_v148_double_branch_is_intentionally_allowed(tmp_path: Path) -> None:
