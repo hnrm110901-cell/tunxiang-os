@@ -1,3 +1,46 @@
+## 2026-05-04 23:55  PD.2 Tier 1 Docker Runner（115/115 全绿基线）
+
+### 本次会话目标
+PG.1.1 完成后继续推 PD.2：把"本地 Py 3.9 跑不动"的 Tier 1 测试用 Docker 跑通，
+固化为可复用脚本，建立 W8 验收"Tier 1 全绿"的客观基线。
+
+### 完成状态
+- [x] scripts/run_tier1_tests.sh — Docker python:3.11-slim 容器 + 最小依赖
+- [x] 逐文件 docker run（避免跨文件 sys.path 污染：service 各自 src/ insert 后会
+      shadow 掉后续 service 的同名 services.* 包）
+- [x] 跑通 8 个核心 Tier 1 模块 / 115 测试 / 全绿：
+      - tx-member  test_points_tier1                  29 测试 ✅
+      - tx-trade   test_order_state_machine_tier1     17 测试 ✅
+      - tx-trade   test_payment_saga_tier1             9 测试 ✅
+      - tx-trade   test_wine_storage_tier1             7 测试 ✅
+      - tx-trade   test_rls_isolation_tier1            5 测试 ✅
+      - tx-org     test_royalty_calculator_tier1      13 测试 ✅
+      - tx-finance test_invoice_tier1                 12 测试 ✅
+      - edge       test_offline_sync_crdt             23 测试 ✅
+
+### 关键决策
+- **逐文件 docker run（而非单容器一次跑全部）**：实测一次跑发现 33 失败，根因是
+  不同 service 的 test_*.py 用 `sys.path.insert(0, "../")` 把各自 src/ 加到
+  path 头部，先加载的 service 把后续 service 的 `services.*` namespace 包 shadow
+  掉。逐文件跑每次容器进程独立，sys.path 重置，问题消失。
+- **依赖最小集**：pytest / pytest-asyncio / structlog / sqlalchemy / fastapi /
+  pydantic / httpx 即可覆盖 8 个核心模块所有 import；不装 asyncpg/cryptography
+  等编译重依赖。
+- **不复用 services/*/Dockerfile**：那些设计目标是生产部署（带服务启动），跑测
+  试需要的 image 更轻量，临时 docker run python:3.11-slim 即可。
+
+### 下一步
+- 把剩余 38 个 *tier1* 文件名约定的测试逐项跑过，扩展脚本默认列表
+- W8 Go/No-Go 第 1 项"Tier 1 全绿"：客观证据已就位（脚本 + 8 模块基线）
+
+### 已知风险
+- 仅覆盖 8 个文件 = ~17%（46 个 *tier1* 文件中），其余 38 个未跑（CI 上跑过但
+  本地无证据）。下个会话扩展。
+- 部分 tier1 文件可能依赖 asyncpg/真实 PG（`@pytest.mark.integration`），
+  纯 Docker 跑不通，需 docker-compose 起 PG 容器配合。
+
+---
+
 ## 2026-05-04 22:35  PG/PI/P2.2 后续会话收尾（7 PR admin merge）
 
 ### 本次会话目标
