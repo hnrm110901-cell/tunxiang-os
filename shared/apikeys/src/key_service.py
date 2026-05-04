@@ -1,10 +1,10 @@
 """API Key CRUD 服务 — 管理第三方开发者密钥"""
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .key_generator import generate_api_key, hash_api_key
@@ -24,8 +24,6 @@ VALID_PERMISSIONS = {
     "finance:read",
     "webhooks:manage",
 }
-
-API_KEYS_TABLE = "api_keys"
 
 
 class APIKeyNotFoundError(LookupError):
@@ -64,9 +62,9 @@ class APIKeyService:
         key_id = uuid.uuid4()
 
         await self.db.execute(
-            f"INSERT INTO {API_KEYS_TABLE} "
-            f"(id, tenant_id, name, key_prefix, key_hash, permissions, rate_limit_rps, status, expires_at) "
-            f"VALUES (:id, :tenant_id, :name, :key_prefix, :key_hash, :permissions, :rps, 'active', :expires_at)",
+            "INSERT INTO api_keys "
+            "(id, tenant_id, name, key_prefix, key_hash, permissions, rate_limit_rps, status, expires_at) "
+            "VALUES (:id, :tenant_id, :name, :key_prefix, :key_hash, :permissions, :rps, 'active', :expires_at)",
             {
                 "id": key_id,
                 "tenant_id": self.tenant_id,
@@ -101,11 +99,11 @@ class APIKeyService:
     async def list_keys(self) -> list[dict[str, Any]]:
         """列出租户下所有 API 密钥（不返回 full_key）。"""
         result = await self.db.execute(
-            f"SELECT id, name, key_prefix, permissions, rate_limit_rps, "
-            f"status, expires_at, last_used_at, created_at "
-            f"FROM {API_KEYS_TABLE} "
-            f"WHERE tenant_id = :tenant_id AND is_deleted = FALSE "
-            f"ORDER BY created_at DESC",
+            "SELECT id, name, key_prefix, permissions, rate_limit_rps, "
+            "status, expires_at, last_used_at, created_at "
+            "FROM api_keys "
+            "WHERE tenant_id = :tenant_id AND is_deleted = FALSE "
+            "ORDER BY created_at DESC",
             {"tenant_id": self.tenant_id},
         )
         rows = result.fetchall()
@@ -114,9 +112,9 @@ class APIKeyService:
     async def revoke_key(self, key_id: uuid.UUID) -> None:
         """吊销 API 密钥。"""
         result = await self.db.execute(
-            f"UPDATE {API_KEYS_TABLE} SET status = 'revoked', updated_at = :now "
-            f"WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE "
-            f"RETURNING id",
+            "UPDATE api_keys SET status = 'revoked', updated_at = :now "
+            "WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE "
+            "RETURNING id",
             {
                 "id": key_id,
                 "tenant_id": self.tenant_id,
@@ -139,10 +137,10 @@ class APIKeyService:
         key_prefix = full_key[:10]
 
         result = await db.execute(
-            f"SELECT id, tenant_id, name, key_hash, permissions, rate_limit_rps, "
-            f"status, expires_at "
-            f"FROM {API_KEYS_TABLE} "
-            f"WHERE key_prefix = :prefix AND is_deleted = FALSE",
+            "SELECT id, tenant_id, name, key_hash, permissions, rate_limit_rps, "
+            "status, expires_at "
+            "FROM api_keys "
+            "WHERE key_prefix = :prefix AND is_deleted = FALSE",
             {"prefix": key_prefix},
         )
         row = result.fetchone()
@@ -161,7 +159,7 @@ class APIKeyService:
 
         # 更新 last_used_at
         await db.execute(
-            f"UPDATE {API_KEYS_TABLE} SET last_used_at = :now WHERE id = :id",
+            "UPDATE api_keys SET last_used_at = :now WHERE id = :id",
             {"now": datetime.now(timezone.utc), "id": row.id},
         )
         await db.commit()
