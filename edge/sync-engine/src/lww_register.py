@@ -37,7 +37,7 @@ LWW-Register 算法：
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Generic, Iterable, Optional, TypeVar
 
@@ -282,9 +282,7 @@ class SyncToken:
 
             if ts is None:
                 continue
-            if ts > self.last_seen_ts:
-                result.append(e)
-            elif ts == self.last_seen_ts and seq_val > self.last_seen_seq:
+            if ts > self.last_seen_ts or ts == self.last_seen_ts and seq_val > self.last_seen_seq:
                 result.append(e)
         return result
 
@@ -376,7 +374,9 @@ class OfflineQueueReplay:
             self._state[key] = new
             logger.info(
                 "offline_replay.applied_initial",
-                stream_id=stream_id, field=field, node_id=node_id,
+                stream_id=stream_id,
+                field=field,
+                node_id=node_id,
             )
             return ReplayResult(applied=True, winner_value=value, winner_node_id=node_id, reason="initial")
 
@@ -386,8 +386,10 @@ class OfflineQueueReplay:
         if not applied:
             logger.info(
                 "offline_replay.local_lost_to_remote",
-                stream_id=stream_id, field=field,
-                local_ts=timestamp.isoformat(), remote_ts=existing.timestamp.isoformat(),
+                stream_id=stream_id,
+                field=field,
+                local_ts=timestamp.isoformat(),
+                remote_ts=existing.timestamp.isoformat(),
                 winner_node=winner.node_id,
             )
         return ReplayResult(

@@ -13,6 +13,7 @@
 独立 worker（`services/tx-member/src/workers/rfm_outreach_worker.py` 后续 PR）
 消费 status 变化驱动。
 """
+
 from __future__ import annotations
 
 import logging

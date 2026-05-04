@@ -51,7 +51,7 @@ class CrisisResponderAgent(SkillAgent):
     # 纯舆情PR分析，不触发毛利/食安/客户体验业务约束
     constraint_scope = set()
     constraint_waived_reason = (
-        "危机响应Agent纯舆情PR分析与回应生成，输出回应草稿供运营审核，" "不直接操作毛利/食安/客户体验三条业务约束维度"
+        "危机响应Agent纯舆情PR分析与回应生成，输出回应草稿供运营审核，不直接操作毛利/食安/客户体验三条业务约束维度"
     )
 
     def get_supported_actions(self) -> list[str]:
@@ -183,9 +183,7 @@ class CrisisResponderAgent(SkillAgent):
                 "prompt_used": prompt,
                 "brand_name": brand_name,
             },
-            reasoning=(
-                f"为{brand_name}在{platform}的{alert_type_desc}生成{tone}回应草稿，" f"共{len(response_draft)}字"
-            ),
+            reasoning=(f"为{brand_name}在{platform}的{alert_type_desc}生成{tone}回应草稿，共{len(response_draft)}字"),
             confidence=0.8,
         )
 
@@ -248,9 +246,7 @@ class CrisisResponderAgent(SkillAgent):
                 "escalation_ids": [a["alert_id"] for a in breached_sla],
             },
             reasoning=(
-                f"监控 {total_monitored} 条预警，"
-                f"{len(breached_sla)} 条已超SLA，"
-                f"{len(approaching_sla)} 条即将超期"
+                f"监控 {total_monitored} 条预警，{len(breached_sla)} 条已超SLA，{len(approaching_sla)} 条即将超期"
             ),
             confidence=0.95,
         )

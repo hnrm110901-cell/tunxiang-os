@@ -22,6 +22,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_voucher_lines_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -220,7 +221,7 @@ class TestVoucherLinesConstraints:
             self.migration_src,
         )
         assert len(exclusive_clauses) >= 2, (
-            "互斥 CHECK 需要至少两个分支 '借=0 AND 贷>0' 和 '借>0 AND 贷=0', " "两个分支都含 '> 0' 才能拒 0/0"
+            "互斥 CHECK 需要至少两个分支 '借=0 AND 贷>0' 和 '借>0 AND 贷=0', 两个分支都含 '> 0' 才能拒 0/0"
         )
         for clause in exclusive_clauses[:2]:
             assert ">" in clause, f"分支 {clause} 缺少 > 0 条件, 不能拒 0/0"
@@ -307,7 +308,7 @@ class TestVoucherLinesRLS:
         assert tenant_col is not None, "tenant_id 列定义未找到"
         col_def = tenant_col.group(1)
         assert "nullable=False" in col_def, (
-            "tenant_id 必须 nullable=False, " "否则 NULL 行可被恶意租户通过 unset app.tenant_id 读到"
+            "tenant_id 必须 nullable=False, 否则 NULL 行可被恶意租户通过 unset app.tenant_id 读到"
         )
 
 
@@ -387,7 +388,7 @@ class TestV266MigrationFileStructure:
         )
         assert len(func_bodies) == 2, "upgrade + downgrade 函数应都存在"
         combined = "\n".join(func_bodies)
-        assert not re.search(
-            r"CREATE\s+INDEX\s+CONCURRENTLY", combined, re.I
-        ), "v266 是新空表, DDL 不应含 CREATE INDEX CONCURRENTLY"
+        assert not re.search(r"CREATE\s+INDEX\s+CONCURRENTLY", combined, re.I), (
+            "v266 是新空表, DDL 不应含 CREATE INDEX CONCURRENTLY"
+        )
         assert "autocommit_block" not in combined, "v266 新空表不需要 autocommit_block() — 这是给老表 CONCURRENTLY 用的"

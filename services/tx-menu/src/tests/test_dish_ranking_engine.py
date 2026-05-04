@@ -36,9 +36,9 @@ class TestRankingReturnScores:
         required_factors = {"volume", "margin", "reorder", "satisfaction", "trend"}
         for dish in items:
             assert "scores" in dish, f"菜品 {dish.get('dish_name')} 缺少 scores 字段"
-            assert required_factors == set(
-                dish["scores"].keys()
-            ), f"菜品 {dish.get('dish_name')} 因子不完整: {dish['scores'].keys()}"
+            assert required_factors == set(dish["scores"].keys()), (
+                f"菜品 {dish.get('dish_name')} 因子不完整: {dish['scores'].keys()}"
+            )
 
     def test_composite_score_between_0_and_1(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}")
@@ -75,9 +75,9 @@ class TestRankingReturnScores:
         valid_tags = {"明星菜品", "现金牛", "问题菜品", "瘦狗", "潜力菜品"}
         for dish in items:
             assert "recommendation_tag" in dish
-            assert (
-                dish["recommendation_tag"] in valid_tags
-            ), f"菜品 {dish['dish_name']} 标签 {dish['recommendation_tag']} 不在允许集合中"
+            assert dish["recommendation_tag"] in valid_tags, (
+                f"菜品 {dish['dish_name']} 标签 {dish['recommendation_tag']} 不在允许集合中"
+            )
 
     def test_limit_parameter_works(self):
         resp = client.get(f"/api/v1/menu/ranking/dishes?store_id={STORE_ID}&limit=5")
@@ -231,9 +231,9 @@ class TestMatrixQuadrantCoverage:
         resp = client.get(f"/api/v1/menu/ranking/health-report?store_id={STORE_ID}")
         items = resp.json()["data"]["attention_needed"]
         for item in items:
-            assert (
-                item["composite_score"] < 0.30
-            ), f"菜品 {item['dish_name']} 综合分 {item['composite_score']} 不应进入关注列表（应 < 0.30）"
+            assert item["composite_score"] < 0.30, (
+                f"菜品 {item['dish_name']} 综合分 {item['composite_score']} 不应进入关注列表（应 < 0.30）"
+            )
 
     def test_trends_endpoint_returns_series(self):
         resp = client.get("/api/v1/menu/ranking/trends?dish_id=dish-001&days=7")

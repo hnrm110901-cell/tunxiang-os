@@ -66,10 +66,7 @@ class SalesTarget(BaseModel):
     target_value: int = Field(
         ...,
         ge=0,
-        description=(
-            "目标值；金额类（_fen 后缀）单位为分（整数），"
-            "其他为计数值（同样是整数）"
-        ),
+        description=("目标值；金额类（_fen 后缀）单位为分（整数），其他为计数值（同样是整数）"),
     )
     parent_target_id: UUID | None = Field(
         default=None,

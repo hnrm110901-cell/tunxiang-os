@@ -34,6 +34,7 @@ system prompt 固定 ~3000 tokens（BOM 行业基准 + 成本分析 SOP + 输出
   messages/system/cache_control 完整结构，便于生产 wire Anthropic SDK
 - **降级**：invoker=None → 规则引擎生成 top-3 cause，不阻塞流程
 """
+
 from __future__ import annotations
 
 import json

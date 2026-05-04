@@ -7,7 +7,6 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
 from services.salary_item_library import (
     SALARY_ITEMS,
     compute_salary_by_items,

@@ -32,6 +32,7 @@
     B. CI lint 规则: 禁止新代码写 total_amount 不写 total_amount_fen.
     C. 回归测试: 所有写入路径的端到端校验两字段同步.
 """
+
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any
@@ -215,7 +216,7 @@ class FinancialVoucher(Base):
         Index("idx_financial_vouchers_status", "tenant_id", "status"),
         # v268 CHECK: voided=TRUE → voided_at + voided_by 必填 (审计留痕)
         CheckConstraint(
-            "voided = FALSE " "OR (voided = TRUE AND voided_at IS NOT NULL AND voided_by IS NOT NULL)",
+            "voided = FALSE OR (voided = TRUE AND voided_at IS NOT NULL AND voided_by IS NOT NULL)",
             name="chk_voucher_void_consistency",
         ),
         # v272 CHECK: 红冲互斥 — 一张凭证不能既是红冲又被红冲 (防红冲链)
@@ -225,7 +226,7 @@ class FinancialVoucher(Base):
         ),
         # v280 CHECK: 红字凭证 (red_flush_of 非空) 必须有 red_flush_operator + at
         CheckConstraint(
-            "red_flush_of_voucher_id IS NULL " "OR (red_flush_operator_id IS NOT NULL AND red_flushed_at IS NOT NULL)",
+            "red_flush_of_voucher_id IS NULL OR (red_flush_operator_id IS NOT NULL AND red_flushed_at IS NOT NULL)",
             name="chk_voucher_red_flush_audit",
         ),
         # v278 CHECK: source_period 两列同时 NULL 或同时非空 (跨期调账元数据一致性)
@@ -445,7 +446,7 @@ class FinancialVoucherLine(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "(debit_fen = 0 AND credit_fen > 0) " "OR (debit_fen > 0 AND credit_fen = 0)",
+            "(debit_fen = 0 AND credit_fen > 0) OR (debit_fen > 0 AND credit_fen = 0)",
             name="chk_fvl_debit_credit_exclusive",
         ),
         CheckConstraint(

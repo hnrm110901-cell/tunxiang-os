@@ -19,6 +19,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_accounting_periods_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -40,7 +41,6 @@ from models.accounting_period import (  # type: ignore  # noqa: E402
     AccountingPeriod,
     month_range,
 )
-
 from services.accounting_period_service import (  # type: ignore  # noqa: E402
     AccountingPeriodService,
 )

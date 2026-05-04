@@ -37,8 +37,8 @@ from typing import Awaitable, Callable, Optional
 from uuid import UUID
 
 import structlog
-
 from services.task_dispatch_service import TaskDispatchService
+
 from shared.ontology.src.extensions.tasks import Task, TaskType
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)

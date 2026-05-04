@@ -15,9 +15,6 @@ from datetime import date, datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_agent.src.config.malaysia_cuisine_profiles import (
     get_cuisine_by_state,
     get_cuisine_profile,
@@ -30,6 +27,8 @@ from services.tx_agent.src.config.malaysia_ingredients import (
     get_halal_certified_ingredients,
     get_perishable_ingredients,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
@@ -357,7 +356,7 @@ class AIInsightsService:
             f"马来西亚雇佣法要求每周工时 ≤ {EMPLOYMENT_ACT_MAX_HOURS_PER_WEEK}h，"
             f"加班 ≤ {EMPLOYMENT_ACT_MAX_OT_PER_MONTH}h/月"
         )
-        recommendations.append("法定节假日（Hari Raya/CNY/Deepavali/Christmas等）加班费率3倍，" "建议优先使用自愿加班")
+        recommendations.append("法定节假日（Hari Raya/CNY/Deepavali/Christmas等）加班费率3倍，建议优先使用自愿加班")
 
         result = {
             "store_id": store_id,
@@ -667,9 +666,7 @@ class AIInsightsService:
                 rec_type = "menu_reposition"
                 risk = "low"
             elif sst_rate > 0 and sst_impact > 0:
-                reason = (
-                    f"SST {int(sst_rate * 100)}% 含税影响约 RM {sst_impact / 100:.2f}，" f"建议在菜单上明确标注含税价"
-                )
+                reason = f"SST {int(sst_rate * 100)}% 含税影响约 RM {sst_impact / 100:.2f}，建议在菜单上明确标注含税价"
                 rec_type = "price_increase"
                 suggested_price = price_fen
                 risk = "low"
@@ -866,7 +863,7 @@ class AIInsightsService:
                 savings = int(wasted * 10)  # 粗略估算
             elif waste_pct >= WASTE_MODERATE_THRESHOLD:
                 severity = "moderate"
-                action = f"{ing_name} 浪费率 {waste_pct:.1%}。" f"建议优化库存周转和份量控制"
+                action = f"{ing_name} 浪费率 {waste_pct:.1%}。建议优化库存周转和份量控制"
                 savings = int(wasted * 5)
             else:
                 continue

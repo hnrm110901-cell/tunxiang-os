@@ -18,7 +18,6 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
-
 from services.self_order_engine import (
     PREPARATION_STEPS,
     STEP_KEY_TO_INDEX,

@@ -12,7 +12,6 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
 from services.calendar_signal import CalendarSignalService
 from services.competitor_monitor import CompetitorMonitorService
 from services.consumer_insight import ConsumerInsightService

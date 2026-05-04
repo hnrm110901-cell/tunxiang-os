@@ -11,6 +11,7 @@
   8. v266 迁移静态验证（RLS + status 枚举 + CHECK 约束）
   9. ModelRouter 注册 rfm_outreach_message task_type
 """
+
 from __future__ import annotations
 
 import os

@@ -12,6 +12,7 @@
   - 连续超限合并：12:00:01 超限 → 12:00:30 超限 → 一条告警 duration=29s
   - 异常处理只用具体类型，禁止 broad except
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -337,7 +337,7 @@ def test_referral_stats() -> None:
     for field in numeric_fields:
         assert field in data, f"统计接口缺少字段：{field}"
         value = data[field]
-        assert isinstance(
-            value, (int, float)
-        ), f"字段 {field} 应为数值类型，实际为 {type(value).__name__}（值：{value}）"
+        assert isinstance(value, (int, float)), (
+            f"字段 {field} 应为数值类型，实际为 {type(value).__name__}（值：{value}）"
+        )
         assert value >= 0, f"字段 {field} 不应为负数，实际：{value}"

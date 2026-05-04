@@ -44,8 +44,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-
 from services.sales_crm_service import SalesCRMError, SalesCRMService
+
 from shared.ontology.src.database import async_session_factory
 
 log = structlog.get_logger(__name__)

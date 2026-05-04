@@ -17,6 +17,7 @@
 执行：
   pytest services/tx-finance/src/tests/test_d4c_budget_forecast.py -v
 """
+
 from __future__ import annotations
 
 import os

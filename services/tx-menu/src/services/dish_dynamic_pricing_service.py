@@ -25,6 +25,7 @@
 - Sonnet validate 是"红/黄/绿灯"而非直接否决：high risk 店长必须二审
 - **≤ 15% 调价幅度**与 CLAUDE.md §9"客户体验"隐含的价格稳定性吻合
 """
+
 from __future__ import annotations
 
 import math
@@ -485,7 +486,7 @@ async def transition_status(
         text(
             f"""
         UPDATE dish_pricing_suggestions
-        SET {', '.join(set_clauses)}
+        SET {", ".join(set_clauses)}
         WHERE id = CAST(:id AS uuid)
           AND tenant_id = CAST(:tenant_id AS uuid)
           AND status IN ({from_placeholders})

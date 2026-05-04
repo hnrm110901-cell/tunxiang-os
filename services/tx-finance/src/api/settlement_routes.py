@@ -20,11 +20,11 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel
+from services.channel_pl_calculator import ChannelPLCalculator
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.channel_pl_calculator import ChannelPLCalculator
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)

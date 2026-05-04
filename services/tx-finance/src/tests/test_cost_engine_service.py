@@ -15,7 +15,6 @@ from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from services.tx_finance.src.services.cost_engine_service import (
     CostEngineService,
     DailyCostReport,
@@ -135,9 +134,9 @@ class TestCalculateCostHealthScore:
         rates = [0.20, 0.28, 0.30, 0.32, 0.36, 0.40, 0.50]
         scores = [calculate_cost_health_score(r).score for r in rates]
         for i in range(len(scores) - 1):
-            assert (
-                scores[i] >= scores[i + 1]
-            ), f"score({rates[i]})={scores[i]} should >= score({rates[i + 1]})={scores[i + 1]}"
+            assert scores[i] >= scores[i + 1], (
+                f"score({rates[i]})={scores[i]} should >= score({rates[i + 1]})={scores[i + 1]}"
+            )
 
     def test_to_dict_structure(self):
         """to_dict 包含所有必要字段"""

@@ -23,6 +23,7 @@
 - 不自己实现 Prophet 算法（太重）：只做薄封装 + fallback
 - 训练窗口 90 天起步，短期门店用 moving_average (MAPE 高的接受)
 """
+
 from __future__ import annotations
 
 import logging

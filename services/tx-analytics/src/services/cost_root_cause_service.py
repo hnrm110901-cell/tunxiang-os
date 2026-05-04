@@ -109,9 +109,9 @@ class CostRootCauseService:
         diff_pct = actual_pct - benchmark_pct
 
         if is_over_budget:
-            summary = f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%)," f"超标{diff_pct:.1f}%"
+            summary = f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%),超标{diff_pct:.1f}%"
         else:
-            summary = f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%)," f"在合理范围内"
+            summary = f"食材成本率{actual_pct:.1f}%(基准{benchmark_pct:.0f}%),在合理范围内"
 
         # 4. 根因分析（仅超标时执行全部维度）
         root_causes: list[dict[str, Any]] = []
@@ -254,7 +254,7 @@ class CostRootCauseService:
                 {
                     "dimension": "category",
                     "detail": (
-                        f"{row['category']}品类成本环比上涨" f"{change_rate * 100:.1f}%," f"增加{delta_fen / 100:.2f}元"
+                        f"{row['category']}品类成本环比上涨{change_rate * 100:.1f}%,增加{delta_fen / 100:.2f}元"
                     ),
                     "category": row["category"],
                     "current_cost_fen": current_fen,
@@ -640,7 +640,7 @@ class CostRootCauseService:
                     {
                         "dimension": "operation",
                         "sub_type": "waste",
-                        "detail": (f"期间报损{waste_count}次," f"损耗成本{waste_cost_fen / 100:.2f}元"),
+                        "detail": (f"期间报损{waste_count}次,损耗成本{waste_cost_fen / 100:.2f}元"),
                         "waste_cost_fen": waste_cost_fen,
                         "waste_count": waste_count,
                         "impact_fen": waste_cost_fen,
@@ -691,7 +691,7 @@ class CostRootCauseService:
                         "dimension": "operation",
                         "sub_type": "overuse",
                         "detail": (
-                            f"实际用量超出理论配方约" f"{overuse_rate * 100:.1f}%," f"超量成本{overuse_fen / 100:.2f}元"
+                            f"实际用量超出理论配方约{overuse_rate * 100:.1f}%,超量成本{overuse_fen / 100:.2f}元"
                         ),
                         "actual_usage_fen": actual_usage_fen,
                         "theoretical_usage_fen": theoretical_usage_fen,

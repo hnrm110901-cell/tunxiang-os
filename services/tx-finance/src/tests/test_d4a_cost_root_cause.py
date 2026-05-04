@@ -12,6 +12,7 @@
   9. v279 迁移静态校验（status 枚举 + 唯一约束 + cache_read 字段 + RLS）
   10. ModelRouter 注册 cost_root_cause_analysis
 """
+
 from __future__ import annotations
 
 import json

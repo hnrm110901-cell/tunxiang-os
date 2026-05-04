@@ -22,9 +22,6 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
@@ -35,6 +32,8 @@ from services.payroll_engine import (
     count_work_days,
     derive_hourly_rate,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 

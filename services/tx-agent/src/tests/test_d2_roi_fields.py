@@ -11,6 +11,7 @@
      （交由 DB CHECK 约束，v264 迁移已加）
   6. v264 / v265 迁移 SQL 静态验证（构造 Alembic env，不实际跑）
 """
+
 from __future__ import annotations
 
 import os

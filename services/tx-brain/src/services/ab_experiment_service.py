@@ -12,6 +12,7 @@
   · shared 是 pure functions（不查 DB）
   · 本 service 从 DB 读 ArmStats 并调用 shared 函数
 """
+
 from __future__ import annotations
 
 import json
@@ -689,7 +690,7 @@ class ABExperimentService:
             text(
                 f"""
                 UPDATE ab_experiments SET
-                    {', '.join(set_clauses)}
+                    {", ".join(set_clauses)}
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
@@ -741,7 +742,7 @@ class ABExperimentService:
             text(
                 f"""
                 UPDATE ab_experiment_arms SET
-                    {', '.join(updates)},
+                    {", ".join(updates)},
                     last_stats_refreshed_at = NOW()
                 WHERE id = CAST(:arm_id AS uuid)
             """

@@ -16,6 +16,7 @@
 注：本服务**同步**处理（webhook 调用直接完成 canonical 写入）。实际部署建议改
 异步：webhook 端点只校验 + 存原始 event + 200 响应；worker 拉事件做 canonical。
 """
+
 from __future__ import annotations
 
 import hashlib

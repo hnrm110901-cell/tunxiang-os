@@ -314,7 +314,7 @@ class AllianceService:
         if today_total + points_amount > daily_limit:
             raise AllianceServiceError(
                 "daily_limit_exceeded",
-                f"每日兑换限额 {daily_limit}，今日已兑换 {today_total}，" f"本次请求 {points_amount} 超出限额",
+                f"每日兑换限额 {daily_limit}，今日已兑换 {today_total}，本次请求 {points_amount} 超出限额",
             )
 
         return daily_limit

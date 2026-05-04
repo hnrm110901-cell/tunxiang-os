@@ -11,7 +11,6 @@ from collections import Counter
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from services.improvement_recommender import (
     _RECOMMENDATION_TEMPLATES,
     _THEME_KEYWORDS,

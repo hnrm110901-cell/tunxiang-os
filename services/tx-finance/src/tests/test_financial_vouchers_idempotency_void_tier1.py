@@ -21,6 +21,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_vouchers_idempotency_void_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -246,10 +247,7 @@ class TestV268MigrationFileStructure:
             r".*?WHERE\s+event_id\s+IS\s+NOT\s+NULL\s+AND\s+event_type\s+IS\s+NOT\s+NULL",
             self.migration_src,
             re.S | re.I,
-        ), (
-            "uq_fv_tenant_event 必须是 partial WHERE "
-            "event_id IS NOT NULL AND event_type IS NOT NULL (防 NULL 幂等失效)"
-        )
+        ), "uq_fv_tenant_event 必须是 partial WHERE event_id IS NOT NULL AND event_type IS NOT NULL (防 NULL 幂等失效)"
 
     def test_concurrently_used_for_all_indexes(self):
         """老表索引必须 CONCURRENTLY (不阻塞日结 DML)."""
@@ -260,8 +258,7 @@ class TestV268MigrationFileStructure:
             re.I,
         )
         assert len(create_index_stmts) >= 3, (
-            f"期望 3+ CREATE INDEX 语句 (uq_fv_tenant_event + ix_fv_event + ix_fv_voided_at), "
-            f"实际 {create_index_stmts}"
+            f"期望 3+ CREATE INDEX 语句 (uq_fv_tenant_event + ix_fv_event + ix_fv_voided_at), 实际 {create_index_stmts}"
         )
         # 所有 CREATE INDEX 都必须带 CONCURRENTLY (老表刚需)
         concurrent_count = len(
@@ -286,9 +283,9 @@ class TestV268MigrationFileStructure:
             re.S | re.M,
         )
         assert upgrade_body is not None
-        assert "autocommit_block" in upgrade_body.group(
-            1
-        ), "autocommit_block() 必须在 upgrade() 里, 否则 CONCURRENTLY 会跑失败"
+        assert "autocommit_block" in upgrade_body.group(1), (
+            "autocommit_block() 必须在 upgrade() 里, 否则 CONCURRENTLY 会跑失败"
+        )
 
     def test_downgrade_drops_indexes_concurrently(self):
         """downgrade 也应 CONCURRENTLY DROP (避免锁表)."""
@@ -317,6 +314,6 @@ class TestV268MigrationFileStructure:
         """ORM 的 __table_args__ 必须镜像 DB 层 CHECK (提供应用层早期校验)."""
         orm_path = Path(__file__).resolve().parents[1] / "models" / "voucher.py"
         orm_src = orm_path.read_text(encoding="utf-8")
-        assert (
-            "chk_voucher_void_consistency" in orm_src
-        ), "ORM __table_args__ 必须含 CheckConstraint 以供 SQLAlchemy 在 flush 前校验"
+        assert "chk_voucher_void_consistency" in orm_src, (
+            "ORM __table_args__ 必须含 CheckConstraint 以供 SQLAlchemy 在 flush 前校验"
+        )

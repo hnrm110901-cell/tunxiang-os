@@ -490,7 +490,7 @@ async def test_xujihaixian_mark_synced_already_synced_returns_false_no_overwrite
     # Step3：cloud_order_id 必须保持原值（双扣费防护核心断言）
     row_after_retry = await svc.get(offline_id)
     assert row_after_retry["cloud_order_id"] == original_cloud, (
-        f"cloud_order_id 被覆盖：原={original_cloud} 现={row_after_retry['cloud_order_id']} " "→ 资金双扣费风险！"
+        f"cloud_order_id 被覆盖：原={original_cloud} 现={row_after_retry['cloud_order_id']} → 资金双扣费风险！"
     )
     assert row_after_retry["state"] == MappingState.SYNCED.value, "state 不得回退"
 
@@ -824,9 +824,9 @@ async def test_xujihaixian_sync_failure_20_attempts_triggers_dead_letter():
         offline_order_id=offline_id,
         last_error="edge_unreachable_attempt_20",
     )
-    assert (
-        final_attempts == DEAD_LETTER_MAX_ATTEMPTS
-    ), f"达 {DEAD_LETTER_MAX_ATTEMPTS} 次必须落 dead_letter，得 {final_attempts}"
+    assert final_attempts == DEAD_LETTER_MAX_ATTEMPTS, (
+        f"达 {DEAD_LETTER_MAX_ATTEMPTS} 次必须落 dead_letter，得 {final_attempts}"
+    )
 
     await svc.mark_dead_letter(
         offline_order_id=offline_id,
@@ -960,13 +960,13 @@ async def test_xujihaixian_manual_resolve_appends_audit_signal_in_reason():
     row = await svc.get(offline_id)
     assert row is not None
     # 仍保留 dead_letter（不删除条目）
-    assert (
-        row["state"] == MappingState.DEAD_LETTER.value
-    ), "manual_resolve 不允许改 state=resolved/deleted（CLAUDE.md §13 禁吞单）"
+    assert row["state"] == MappingState.DEAD_LETTER.value, (
+        "manual_resolve 不允许改 state=resolved/deleted（CLAUDE.md §13 禁吞单）"
+    )
     # dead_letter_reason 前缀含审计标记
     reason = row["dead_letter_reason"]
     assert reason.startswith("manual_resolved:mgr-xuji-001:"), (
-        f"dead_letter_reason 必须含 'manual_resolved:{{uid}}:{{note}}' 前缀，" f"得：{reason}"
+        f"dead_letter_reason 必须含 'manual_resolved:{{uid}}:{{note}}' 前缀，得：{reason}"
     )
     assert "max_attempts_exceeded" in reason, "原 reason 必须保留在前缀之后供审计追溯"
 
@@ -1024,9 +1024,9 @@ async def test_xujihaixian_manual_retry_resets_attempts_and_state_to_pending():
     row = await svc.get(offline_id)
     assert row["state"] == MappingState.PENDING.value, "manual_retry 必须把 state 推回 pending 让 Flusher 重新捡起"
     assert row["sync_attempts"] == 0, "重试必须重置 sync_attempts=0，否则下一轮会立即再次触发死信"
-    assert row["dead_letter_reason"].startswith(
-        "manual_retry_by:mgr-shao-007|prev:"
-    ), f"dead_letter_reason 必须保留人工重试痕迹，得：{row['dead_letter_reason']}"
+    assert row["dead_letter_reason"].startswith("manual_retry_by:mgr-shao-007|prev:"), (
+        f"dead_letter_reason 必须保留人工重试痕迹，得：{row['dead_letter_reason']}"
+    )
 
     # 拒绝对 pending 条目重复 manual_retry
     not_ok = await svc.manual_retry(

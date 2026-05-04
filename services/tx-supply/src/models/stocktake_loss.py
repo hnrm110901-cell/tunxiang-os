@@ -11,6 +11,7 @@
                           ↓
                        REJECTED（终态）
 """
+
 from __future__ import annotations
 
 import uuid

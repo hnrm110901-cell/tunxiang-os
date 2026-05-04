@@ -10,7 +10,6 @@
 """
 
 import pytest
-
 from services.tx_trade.src.services.dish_practice_service import (
     DEFAULT_PRACTICE_TEMPLATES,
     build_customizations,

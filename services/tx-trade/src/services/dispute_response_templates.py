@@ -17,6 +17,7 @@
   3. 商家选一个 → 渲染变量 → 可编辑 → 提交
   4. 记录 merchant_response_template_id 用于后续转化率分析
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

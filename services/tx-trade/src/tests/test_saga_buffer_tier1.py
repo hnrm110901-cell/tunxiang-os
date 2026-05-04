@@ -25,6 +25,7 @@ Tier1 铁律（CLAUDE.md §17/§20）：
 
 数据约定：徐记海鲜长沙店（tenant_A）/ 韶山店（tenant_B）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -377,9 +378,9 @@ async def test_xujihaixian_cross_tenant_buffer_isolation(tmp_buffer_path: Path):
 
         # get 跨租户必须返回 None
         a_key = "settle:A-0"
-        assert (
-            await buf.get(a_key, tenant_id=XUJI_SHAOSHAN_TENANT) is None
-        ), "tenant_B 不得读取 tenant_A 条目（行级隔离铁律）"
+        assert await buf.get(a_key, tenant_id=XUJI_SHAOSHAN_TENANT) is None, (
+            "tenant_B 不得读取 tenant_A 条目（行级隔离铁律）"
+        )
         assert await buf.get(a_key, tenant_id=XUJI_CHANGSHA_TENANT) is not None
 
         # stats 租户独立
@@ -828,7 +829,7 @@ async def test_xujihaixian_memory_mode_disk_recovery_replays_to_sqlite(
         assert buf_restart.is_memory_mode is False
         ready = await buf_restart.flush_ready(tenant_id=XUJI_CHANGSHA_TENANT, limit=10)
         keys = sorted(e.idempotency_key for e in ready)
-        assert keys == [ikey1, ikey2], f"重启后必须能从 SQLite 取回两条 replay 数据（防数据丢失），" f"实际 keys={keys}"
+        assert keys == [ikey1, ikey2], f"重启后必须能从 SQLite 取回两条 replay 数据（防数据丢失），实际 keys={keys}"
     finally:
         await buf_restart.close()
 

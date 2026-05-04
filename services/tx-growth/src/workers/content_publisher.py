@@ -14,10 +14,9 @@ S3W11-12 Smart Content Factory
 import json
 
 import structlog
+from services.channel_engine import ChannelEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from services.channel_engine import ChannelEngine
 
 logger = structlog.get_logger(__name__)
 

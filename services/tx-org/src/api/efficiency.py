@@ -5,10 +5,6 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.labor_efficiency_service import (
     INDUSTRY_BENCHMARKS,
     compare_stores,
@@ -18,6 +14,10 @@ from services.labor_efficiency_service import (
     get_manager_view,
     get_staff_view,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)

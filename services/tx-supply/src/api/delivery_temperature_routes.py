@@ -10,6 +10,7 @@
   POST /api/v1/supply/delivery/temperature-thresholds                创建阈值
   GET  /api/v1/supply/delivery/temperature-thresholds                列出阈值
 """
+
 from __future__ import annotations
 
 from datetime import datetime

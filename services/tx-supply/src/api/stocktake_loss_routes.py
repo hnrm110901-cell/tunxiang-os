@@ -16,6 +16,7 @@
 每个端点：读取 X-Tenant-ID + SET LOCAL app.tenant_id；
 统一响应 {ok, data, error}。
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -40,7 +41,6 @@ try:
         SubmitForApprovalPayload,
         WriteoffPayload,
     )
-
     from services.stocktake_loss_service import (  # type: ignore[no-redef]
         ApprovalPermissionError,
         CaseNotFoundError,

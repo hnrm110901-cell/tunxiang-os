@@ -25,6 +25,7 @@
 - 人工确认（plan_generated → human_confirmed）：对触达数量 > 50 时强制
   人工审核，避免 Agent 自作主张群发骚扰客户
 """
+
 from __future__ import annotations
 
 import logging

@@ -28,14 +28,13 @@ import structlog
 if TYPE_CHECKING:
     import redis.asyncio as aioredis  # noqa: F401 — 仅供类型注解
 from models.journey_instance import JourneyInstance
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.journey_orchestrator import (
     _journey_executions,
     _journeys,
 )
 from services.roi_attribution import ROIAttributionService
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 _roi_service = ROIAttributionService()
 

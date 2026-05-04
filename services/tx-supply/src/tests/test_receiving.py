@@ -6,7 +6,6 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
 from services.receiving_service import (
     confirm_transfer,
     create_receiving,

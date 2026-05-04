@@ -159,7 +159,7 @@ class ReservationInvitationService:
         record = await self._load(invitation_id, tenant_id)
         if not _is_valid_transition(record.status, InvitationStatus.SENT):
             raise InvalidInvitationTransitionError(
-                f"invitation {invitation_id} in status {record.status.value} " f"cannot transition to sent"
+                f"invitation {invitation_id} in status {record.status.value} cannot transition to sent"
             )
         now = sent_at or datetime.now(timezone.utc)
         updated = record.model_copy(
@@ -208,7 +208,7 @@ class ReservationInvitationService:
         record = await self._load(invitation_id, tenant_id)
         if not _is_valid_transition(record.status, InvitationStatus.CONFIRMED):
             raise InvalidInvitationTransitionError(
-                f"invitation {invitation_id} in status {record.status.value} " f"cannot transition to confirmed"
+                f"invitation {invitation_id} in status {record.status.value} cannot transition to confirmed"
             )
         now = confirmed_at or datetime.now(timezone.utc)
         updated = record.model_copy(
@@ -247,7 +247,7 @@ class ReservationInvitationService:
         record = await self._load(invitation_id, tenant_id)
         if not _is_valid_transition(record.status, InvitationStatus.FAILED):
             raise InvalidInvitationTransitionError(
-                f"invitation {invitation_id} in status {record.status.value} " f"cannot transition to failed"
+                f"invitation {invitation_id} in status {record.status.value} cannot transition to failed"
             )
         now = datetime.now(timezone.utc)
         updated = record.model_copy(

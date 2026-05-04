@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
-
 from services.points_mall_v2 import (
     cleanup_expired_orders,
     cleanup_expired_products,

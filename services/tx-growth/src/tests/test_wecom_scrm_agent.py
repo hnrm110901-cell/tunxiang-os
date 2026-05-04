@@ -31,9 +31,9 @@ class TestBirthdayUpcomingList:
         items = resp.json()["data"]["items"]
         assert len(items) > 0
         for member in items:
-            assert (
-                member["days_until"] <= days_ahead
-            ), f"会员 {member['name']} 生日还有 {member['days_until']} 天，超出 days_ahead={days_ahead}"
+            assert member["days_until"] <= days_ahead, (
+                f"会员 {member['name']} 生日还有 {member['days_until']} 天，超出 days_ahead={days_ahead}"
+            )
 
     def test_each_member_has_recommend_template(self):
         resp = client.get("/api/v1/growth/scrm-agent/birthday/upcoming?days_ahead=7")
@@ -41,9 +41,9 @@ class TestBirthdayUpcomingList:
         valid_templates = {"default", "vip", "super_vip"}
         for member in items:
             assert "recommend_template" in member, f"会员 {member['name']} 缺少 recommend_template 字段"
-            assert (
-                member["recommend_template"] in valid_templates
-            ), f"会员 {member['name']} 的模板 {member['recommend_template']} 不在允许集合"
+            assert member["recommend_template"] in valid_templates, (
+                f"会员 {member['name']} 的模板 {member['recommend_template']} 不在允许集合"
+            )
 
     def test_members_sorted_by_days_until(self):
         resp = client.get("/api/v1/growth/scrm-agent/birthday/upcoming?days_ahead=7")
@@ -123,9 +123,9 @@ class TestDormantMemberList:
         items = resp.json()["data"]["items"]
         for member in items:
             if member["dormant_days"] > 180:
-                assert (
-                    member["predicted_response_rate"] < 0.15
-                ), f"会员 {member['name']} 沉睡 {member['dormant_days']} 天，响应率 {member['predicted_response_rate']} 应 < 0.15"
+                assert member["predicted_response_rate"] < 0.15, (
+                    f"会员 {member['name']} 沉睡 {member['dormant_days']} 天，响应率 {member['predicted_response_rate']} 应 < 0.15"
+                )
 
     def test_60_90_days_response_rate_range(self):
         """60-90天沉睡且历史消费>3000元的响应率应在合理范围内"""
@@ -133,9 +133,9 @@ class TestDormantMemberList:
         items = resp.json()["data"]["items"]
         mid_dormant = [m for m in items if 60 <= m["dormant_days"] <= 90]
         for member in mid_dormant:
-            assert (
-                member["predicted_response_rate"] >= 0.15
-            ), f"会员 {member['name']} 60-90天沉睡，响应率过低: {member['predicted_response_rate']}"
+            assert member["predicted_response_rate"] >= 0.15, (
+                f"会员 {member['name']} 60-90天沉睡，响应率过低: {member['predicted_response_rate']}"
+            )
 
     def test_dormant_filter_by_min_spend(self):
         resp_low = client.get("/api/v1/growth/scrm-agent/dormant/list?dormant_days=60&min_historical_spend_fen=1000000")

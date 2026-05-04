@@ -701,7 +701,7 @@ class CEOCockpitService:
                         "severity": "critical",
                         "title": f"{loss_row['dish_name']}已亏",
                         "description": (
-                            f"{loss_row['dish_name']}今日累计亏损" f"\u00a5{loss_yuan} \u2192 建议下架或提价\u00a55"
+                            f"{loss_row['dish_name']}今日累计亏损\u00a5{loss_yuan} \u2192 建议下架或提价\u00a55"
                         ),
                         "action_label": "调整菜品",
                         "metadata": {
@@ -769,7 +769,7 @@ class CEOCockpitService:
                         "severity": "warning",
                         "title": "明日预计缺货",
                         "description": (
-                            f"库存仅剩{float(low_stock_row['days_remaining'])}天用量" f" \u2192 采购单已生成待确认"
+                            f"库存仅剩{float(low_stock_row['days_remaining'])}天用量 \u2192 采购单已生成待确认"
                         ),
                         "action_label": "确认采购",
                         "metadata": {
@@ -816,7 +816,7 @@ class CEOCockpitService:
                         "severity": "info",
                         "title": f"{dormant_count}名VIP超30天未来",
                         "description": (
-                            f"{dormant_count}名VIP客户超30天未消费" f" \u2192 发券预计回流{estimated_recall}人"
+                            f"{dormant_count}名VIP客户超30天未消费 \u2192 发券预计回流{estimated_recall}人"
                         ),
                         "action_label": "发送召回券",
                         "metadata": {
@@ -869,7 +869,7 @@ class CEOCockpitService:
                             "action_type": "waste_alert",
                             "severity": "warning",
                             "title": f"损耗率{waste_rate:.0%}超标",
-                            "description": (f"今日损耗率{waste_rate:.0%}(目标<5%)" f" \u2192 需定位到具体班次"),
+                            "description": (f"今日损耗率{waste_rate:.0%}(目标<5%) \u2192 需定位到具体班次"),
                             "action_label": "查看详情",
                             "metadata": {
                                 "waste_rate": round(waste_rate * 100, 1),
@@ -899,7 +899,7 @@ class CEOCockpitService:
                             "action_type": "delivery_adjust",
                             "severity": "warning",
                             "title": f"{channel_name}外卖亏损",
-                            "description": (f"{channel_name}单均亏\u00a5{avg_loss_yuan}" f" \u2192 建议调整满减门槛"),
+                            "description": (f"{channel_name}单均亏\u00a5{avg_loss_yuan} \u2192 建议调整满减门槛"),
                             "action_label": "调整满减",
                             "metadata": {
                                 "channel": ch["channel"],

@@ -215,7 +215,7 @@ class SalesTargetRepository:
                    target_value, parent_target_id, notes, created_by,
                    created_at, updated_at
             FROM sales_targets
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             ORDER BY period_start DESC
             """
         )
@@ -251,7 +251,7 @@ class SalesTargetRepository:
                    target_value, parent_target_id, notes, created_by,
                    created_at, updated_at
             FROM sales_targets
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             ORDER BY period_start DESC
             """
         )
@@ -551,7 +551,7 @@ class SalesTargetRepository:
                     "sales_target_store_level_metric_rejected_individual",
                     metric_type=metric_type,
                     employee_id=str(employee_id),
-                    reason=("门店级指标不支持按个人员工聚合，" "请使用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建门店级目标"),
+                    reason=("门店级指标不支持按个人员工聚合，请使用 STORE_LEVEL_SENTINEL_EMPLOYEE_ID 建门店级目标"),
                 )
                 return 0
             return await self._aggregate_store_level_from_view(
@@ -625,7 +625,7 @@ class SalesTargetRepository:
             f"""
             SELECT {metric_to_sql[metric_type]} AS actual
             FROM mv_store_pnl
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             """
         )
         try:
@@ -715,7 +715,7 @@ class SalesTargetRepository:
             f"""
             SELECT {metric_sql[metric_type]} AS actual
             FROM events
-            WHERE {' AND '.join(clauses)}
+            WHERE {" AND ".join(clauses)}
             """
         )
         try:

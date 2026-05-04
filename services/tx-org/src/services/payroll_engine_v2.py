@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from models.payroll_record import PayrollRecord, PayrollRecordStatus, StoreSalarySummary
-
 from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine import (
     compute_absence_deduction,

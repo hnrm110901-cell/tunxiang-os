@@ -13,10 +13,10 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 import structlog
+from services.growth_cross_brand_service import GrowthCrossBrandService
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.growth_cross_brand_service import GrowthCrossBrandService
 from shared.events.src.emitter import emit_event
 
 GROWTH_EVT_PREFIX = "growth"

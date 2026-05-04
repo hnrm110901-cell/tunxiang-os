@@ -114,9 +114,9 @@ def test_realtime_member_check_suspicious():
 
     # recommendation 包含"审批"或"拒绝"（二选一均可）
     recommendation: str = data["recommendation"]
-    assert (
-        "审批" in recommendation or "拒绝" in recommendation
-    ), f"recommendation 应包含'审批'或'拒绝'，实际：{recommendation}"
+    assert "审批" in recommendation or "拒绝" in recommendation, (
+        f"recommendation 应包含'审批'或'拒绝'，实际：{recommendation}"
+    )
 
     # reason 说明超出阈值
     reason: str = data["reason"]

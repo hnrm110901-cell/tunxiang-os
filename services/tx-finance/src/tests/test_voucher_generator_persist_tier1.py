@@ -15,6 +15,7 @@ Tier 级别:
 运行:
   pytest src/tests/test_voucher_generator_persist_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -34,6 +35,7 @@ from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
 )
 from services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
+
 from shared.adapters.erp.src.base import (  # type: ignore  # noqa: E402
     ERPPushResult,
     ERPType,
@@ -287,14 +289,14 @@ class TestRecordPushResultNoCommit:
         code_only = "\n".join(code_only_lines)
 
         # 检查: 实际调用 (await db.commit() / await session.commit() 等)
-        assert not _re.search(
-            r"await\s+(?:db|session)\.commit\s*\(", code_only
-        ), "_record_push_result 代码体不应 await db.commit() (破坏事务边界)"
+        assert not _re.search(r"await\s+(?:db|session)\.commit\s*\(", code_only), (
+            "_record_push_result 代码体不应 await db.commit() (破坏事务边界)"
+        )
 
         # 应改为 flush
-        assert _re.search(
-            r"await\s+(?:db|session)\.flush\s*\(", code_only
-        ), "_record_push_result 应用 await db.flush() 替代 commit"
+        assert _re.search(r"await\s+(?:db|session)\.flush\s*\(", code_only), (
+            "_record_push_result 应用 await db.flush() 替代 commit"
+        )
 
 
 class TestPersistAndPush:
@@ -428,7 +430,6 @@ class TestPersistRespectsPeriodCheck:
         from unittest.mock import AsyncMock as AM
 
         from models.accounting_period import STATUS_CLOSED, AccountingPeriod
-
         from services.accounting_period_service import AccountingPeriodService
 
         period_svc = AM(spec=AccountingPeriodService)

@@ -9,6 +9,7 @@
   GET  /api/v1/finance/budget/forecast/summary
     按 status + business_type 聚合 + Prompt Cache 命中率
 """
+
 from __future__ import annotations
 
 from datetime import date as date_cls

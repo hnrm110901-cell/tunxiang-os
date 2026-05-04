@@ -443,9 +443,7 @@ class SMEOnboardingService:
         return {
             "registered": True,
             "einvoice_id": einvoice_id,
-            "message": (
-                "Successfully registered for LHDN MyInvois e-Invoice. " "You can now issue electronic invoices."
-            ),
+            "message": ("Successfully registered for LHDN MyInvois e-Invoice. You can now issue electronic invoices."),
         }
 
     # ─── 持久化 ──────────────────────────────────────────────────

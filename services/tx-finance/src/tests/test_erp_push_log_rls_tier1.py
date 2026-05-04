@@ -12,6 +12,7 @@ DB 层行为由 DEV Postgres 端到端脚本覆盖.
 运行:
   pytest src/tests/test_erp_push_log_rls_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os

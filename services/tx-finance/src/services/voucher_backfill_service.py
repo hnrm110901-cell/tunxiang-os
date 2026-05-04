@@ -31,6 +31,7 @@ entries JSONB 格式兼容:
   - 借贷不平衡 → 默认跳过 + 告警 (可选 strict 模式 raise)
   - 零金额 entries → 跳过 (DB CHECK 拒)
 """
+
 from __future__ import annotations
 
 import uuid
@@ -189,7 +190,7 @@ class VoucherBackfillService:
         total_debit = sum(p["debit_fen"] for p in valid_parsed)
         total_credit = sum(p["credit_fen"] for p in valid_parsed)
         if total_debit != total_credit:
-            msg = f"借贷不平衡: debit_fen={total_debit} " f"!= credit_fen={total_credit}"
+            msg = f"借贷不平衡: debit_fen={total_debit} != credit_fen={total_credit}"
             if strict:
                 raise ValueError(msg)
             report.skipped_unbalanced += 1

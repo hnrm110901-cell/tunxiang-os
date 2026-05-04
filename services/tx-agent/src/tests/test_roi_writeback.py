@@ -12,6 +12,7 @@
   - 不连真实 PostgreSQL；migration SQL 通过字符串/AST 断言检查
   - writeback 测试使用 AsyncMock session，聚焦 _apply_roi_fields 分支
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -439,9 +440,9 @@ class TestRoiFlagRegistration:
         assert roi_flag is not None, "agent.roi.writeback 未在 agent_flags.yaml 注册"
         assert roi_flag["defaultValue"] is False
         for env in ("dev", "test", "uat", "pilot", "prod"):
-            assert (
-                roi_flag["environments"].get(env) is False
-            ), f"{env} 环境不得默认开启 agent.roi.writeback（需创始人签字后手动开）"
+            assert roi_flag["environments"].get(env) is False, (
+                f"{env} 环境不得默认开启 agent.roi.writeback（需创始人签字后手动开）"
+            )
 
 
 # ─────────────────────────────────────────────────────────────────

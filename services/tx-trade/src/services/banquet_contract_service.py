@@ -396,7 +396,7 @@ class BanquetContractService:
         except Exception as exc:  # noqa: BLE001
             if _is_unique_violation(exc):
                 raise ApprovalAlreadyRecordedError(
-                    f"approval already recorded for contract_id={log.contract_id} " f"role={log.role.value}"
+                    f"approval already recorded for contract_id={log.contract_id} role={log.role.value}"
                 ) from exc
             raise
 

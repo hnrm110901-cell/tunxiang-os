@@ -103,14 +103,14 @@ def _fake_usage(cache_read: int = 3000, input_tokens: int = 500) -> dict[str, in
 
 def test_skill_registered_in_registry() -> None:
     assert CostRootCauseAgent in ALL_SKILL_AGENTS, (
-        "CostRootCauseAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 " "ALL_SKILL_AGENTS 列表中注册"
+        "CostRootCauseAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 ALL_SKILL_AGENTS 列表中注册"
     )
 
 
 def test_scope_is_margin() -> None:
-    assert CostRootCauseAgent.constraint_scope == {
-        "margin"
-    }, f"D4a 成本根因必须且只声明 margin scope，实际：{CostRootCauseAgent.constraint_scope}"
+    assert CostRootCauseAgent.constraint_scope == {"margin"}, (
+        f"D4a 成本根因必须且只声明 margin scope，实际：{CostRootCauseAgent.constraint_scope}"
+    )
 
 
 def test_agent_metadata() -> None:
@@ -227,9 +227,9 @@ async def test_prompt_cache_hit_ratio_reports_75pct() -> None:
     assert usage["cache_read_input_tokens"] == 3000
     assert usage["input_tokens"] == 500
     # 比率应由 ModelRouter 层计算并透传出来
-    assert (
-        usage["cache_hit_ratio"] > 0.75
-    ), f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
+    assert usage["cache_hit_ratio"] > 0.75, (
+        f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -263,9 +263,9 @@ async def test_model_router_called_with_sonnet_4_7() -> None:
 
     fake_router.complete_with_cache.assert_awaited_once()
     kwargs = fake_router.complete_with_cache.await_args.kwargs
-    assert (
-        kwargs["task_type"] == "cost_root_cause"
-    ), f"task_type 必须是 'cost_root_cause'（route 到 Sonnet 4.7），实际：{kwargs.get('task_type')}"
+    assert kwargs["task_type"] == "cost_root_cause", (
+        f"task_type 必须是 'cost_root_cause'（route 到 Sonnet 4.7），实际：{kwargs.get('task_type')}"
+    )
     assert kwargs["tenant_id"] == TENANT_ID
     # 系统提示必须为 list[dict] 且至少一个块含 cache_control
     system_blocks = kwargs["system_blocks"]

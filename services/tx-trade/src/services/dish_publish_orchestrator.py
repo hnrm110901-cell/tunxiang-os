@@ -16,6 +16,7 @@
   · 真实部署：`asyncio.gather(*platforms, return_exceptions=True)` 并发
     但要注意各平台 rate limit；此处保守串行
 """
+
 from __future__ import annotations
 
 import json

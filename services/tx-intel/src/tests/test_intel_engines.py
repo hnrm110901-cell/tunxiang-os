@@ -12,7 +12,6 @@
 """
 
 import pytest
-
 from services.competitor_monitor import CompetitorMonitorService
 from services.consumer_insight import ConsumerInsightService
 from services.intel_report_engine import IntelReportEngine

@@ -249,7 +249,7 @@ async def spend_points(
         if not margin_check["allowed"]:
             return _err(
                 422,
-                f"margin_floor_violation:{margin_check['reason']};" f"max_offset_fen={margin_check['max_offset_fen']}",
+                f"margin_floor_violation:{margin_check['reason']};max_offset_fen={margin_check['max_offset_fen']}",
             )
 
     try:

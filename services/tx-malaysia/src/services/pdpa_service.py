@@ -585,7 +585,7 @@ class PDPAService:
 
         sql = f"""
             UPDATE customers
-            SET {', '.join(set_clauses)}
+            SET {", ".join(set_clauses)}
             WHERE id = :cid AND tenant_id = :tid
         """
 
@@ -645,7 +645,7 @@ class PDPAService:
 
         sql = f"""
             UPDATE customers
-            SET {', '.join(set_clauses)}
+            SET {", ".join(set_clauses)}
             WHERE id = :cid AND tenant_id = :tid
         """
 

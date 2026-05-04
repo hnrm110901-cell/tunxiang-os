@@ -125,7 +125,7 @@ def _distribute_int_by_weights(total: int, weights: list[Decimal]) -> list[int]:
         # 余数按小数部分从大到小分配
         fracs = sorted(
             range(len(raw)),
-            key=lambda i: (raw[i] - Decimal(floors[i])),
+            key=lambda i: raw[i] - Decimal(floors[i]),
             reverse=True,
         )
         for i in range(remainder):
@@ -134,7 +134,7 @@ def _distribute_int_by_weights(total: int, weights: list[Decimal]) -> list[int]:
         # 理论不应发生，但作防御：对整数类权重可能多分
         extras = sorted(
             range(len(raw)),
-            key=lambda i: (Decimal(floors[i]) - raw[i]),
+            key=lambda i: Decimal(floors[i]) - raw[i],
             reverse=True,
         )
         for i in range(-remainder):
@@ -377,7 +377,7 @@ class SalesTargetService:
                     target_value=int(day_value),
                     store_id=store_id,
                     parent_target_id=month_parent_uuid,
-                    notes=(f"auto: decomposed from month_target " f"{month_target_id_raw}"),
+                    notes=(f"auto: decomposed from month_target {month_target_id_raw}"),
                 )
                 children.append(day_target)
                 d_cursor += timedelta(days=1)

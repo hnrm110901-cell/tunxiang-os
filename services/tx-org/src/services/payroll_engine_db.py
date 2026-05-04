@@ -19,9 +19,6 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine import (
     compute_absence_deduction,
@@ -35,6 +32,9 @@ from services.payroll_engine import (
     derive_hourly_rate,
 )
 from services.social_insurance import SocialInsuranceCalculator
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.events import OrgEventType, UniversalPublisher
 
 log = structlog.get_logger(__name__)

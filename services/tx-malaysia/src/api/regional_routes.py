@@ -89,7 +89,7 @@ async def get_region_config(
     if region is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Unsupported market: {market}. " f"Supported: CN, MY, ID, VN",
+            detail=f"Unsupported market: {market}. Supported: CN, MY, ID, VN",
         )
 
     return {

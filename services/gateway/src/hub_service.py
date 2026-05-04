@@ -2171,7 +2171,7 @@ async def hub_update_incident(db: AsyncSession, incident_id: str, updates: dict[
         sql = text(
             f"""
             UPDATE hub_tickets
-            SET {', '.join(set_clauses)}
+            SET {", ".join(set_clauses)}
             WHERE id = :iid AND NOT COALESCE(is_deleted, false)
             """
         )

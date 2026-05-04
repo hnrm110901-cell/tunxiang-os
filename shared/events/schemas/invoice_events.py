@@ -5,6 +5,7 @@
 
 演进规则: 只加不改
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -19,9 +20,9 @@ class InvoiceType(str, Enum):
     """发票类型枚举."""
 
     FULLY_ELECTRONIC = "fully_electronic"  # 全电发票 (金税四期)
-    ELECTRONIC = "electronic"              # 普通电子发票
-    PAPER = "paper"                        # 纸质发票
-    SPECIAL = "special"                    # 专用发票
+    ELECTRONIC = "electronic"  # 普通电子发票
+    PAPER = "paper"  # 纸质发票
+    SPECIAL = "special"  # 专用发票
 
 
 class InvoiceVerifiedPayload(OntologyEvent):

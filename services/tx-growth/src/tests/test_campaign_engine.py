@@ -29,7 +29,6 @@ from campaigns.report_draw import clear_report_entries
 from campaigns.report_draw import execute as report_execute
 from campaigns.sign_in import execute as sign_in_execute
 from campaigns.stored_value_gift import execute as sv_execute
-
 from services.campaign_engine import (
     CampaignEngine,
     RewardEngine,

@@ -16,6 +16,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_voucher_period_check_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -36,7 +37,6 @@ from models.accounting_period import (  # type: ignore  # noqa: E402
     month_range,
 )
 from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
-
 from services.accounting_period_service import (  # type: ignore  # noqa: E402
     AccountingPeriodService,
 )
@@ -656,9 +656,9 @@ class TestW2BIdempotencyBeforePeriodCheck:
         writable_indices = [i for i, v in enumerate(call_order) if v == "is_date_writable"]
         assert execute_indices, "execute 应被调用"
         assert writable_indices, "is_date_writable 应被调用 (幂等 miss 路径)"
-        assert max(execute_indices) < min(
-            writable_indices
-        ), f"幂等预查 execute 应在账期校验之前, 实际调用顺序: {call_order}"
+        assert max(execute_indices) < min(writable_indices), (
+            f"幂等预查 execute 应在账期校验之前, 实际调用顺序: {call_order}"
+        )
 
     # ── 场景 7: event_id miss + 账期 open → INSERT 路径全走到 ─────────
 

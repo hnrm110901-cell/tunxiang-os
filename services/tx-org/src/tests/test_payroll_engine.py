@@ -3,7 +3,6 @@
 """
 
 import pytest
-
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,

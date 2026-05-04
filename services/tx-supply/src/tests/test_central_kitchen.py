@@ -17,7 +17,6 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-
 from services.delivery_route_service import DeliveryRouteService
 from services.production_plan_service import (
     ProductionPlanService,

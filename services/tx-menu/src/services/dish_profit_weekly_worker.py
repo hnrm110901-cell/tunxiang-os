@@ -272,7 +272,7 @@ class DishProfitWeeklyWorker:
             lines.append("|------|------|------|----------|")
             for c in bcg_changes:
                 arrow = "↑" if c["to"] in ("star", "cash_cow") else "↓"
-                lines.append(f"| {c['dish_name']} " f"| {c['from_label']} " f"| {c['to_label']} " f"| {arrow} |")
+                lines.append(f"| {c['dish_name']} | {c['from_label']} | {c['to_label']} | {arrow} |")
             lines.append("")
         else:
             lines.append("## BCG象限变动")

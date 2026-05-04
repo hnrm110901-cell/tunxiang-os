@@ -20,9 +20,9 @@ from typing import Annotated
 import httpx
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.voucher_generator import VoucherGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.voucher_generator import VoucherGenerator
 from shared.adapters.erp.src import (
     ERPType,
     get_erp_adapter,

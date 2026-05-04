@@ -98,8 +98,7 @@ class FakeModelRouter:
     def __init__(self, response_text: str | None = None, raise_exc: Exception | None = None):
         self.response_text = response_text or json.dumps(
             {
-                "narrative": "建议谨慎启动本次满减活动。预算约 2000 元，预期增量 GMV 约 8000 元，"
-                "相对客单未明显稀释。",
+                "narrative": "建议谨慎启动本次满减活动。预算约 2000 元，预期增量 GMV 约 8000 元，相对客单未明显稀释。",
                 "caveats": ["假动作风险：会员日老客本就消费", "毛利侵蚀：满减幅度需复核"],
             },
             ensure_ascii=False,

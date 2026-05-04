@@ -143,7 +143,7 @@ class DeliveryDamageRecord(TenantBase):
     damage_amount_fen: Mapped[Optional[int]] = mapped_column(
         BigInteger,
         Computed(
-            "CASE WHEN unit_cost_fen IS NULL THEN NULL " "ELSE (damaged_qty * unit_cost_fen)::BIGINT END",
+            "CASE WHEN unit_cost_fen IS NULL THEN NULL ELSE (damaged_qty * unit_cost_fen)::BIGINT END",
             persisted=True,
         ),
         nullable=True,

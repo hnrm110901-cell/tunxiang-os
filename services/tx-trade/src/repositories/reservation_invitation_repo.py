@@ -34,24 +34,20 @@ class InvitationRepositoryBase(ABC):
     """邀请函/核餐外呼 Repository 抽象接口。"""
 
     @abstractmethod
-    async def insert(self, record: InvitationRecord) -> InvitationRecord:
-        ...
+    async def insert(self, record: InvitationRecord) -> InvitationRecord: ...
 
     @abstractmethod
-    async def get_by_id(self, invitation_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[InvitationRecord]:
-        ...
+    async def get_by_id(self, invitation_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[InvitationRecord]: ...
 
     @abstractmethod
-    async def update(self, record: InvitationRecord) -> InvitationRecord:
-        ...
+    async def update(self, record: InvitationRecord) -> InvitationRecord: ...
 
     @abstractmethod
     async def list_by_reservation(
         self,
         tenant_id: uuid.UUID,
         reservation_id: uuid.UUID,
-    ) -> list[InvitationRecord]:
-        ...
+    ) -> list[InvitationRecord]: ...
 
     @abstractmethod
     async def list_by_customer(
@@ -60,8 +56,7 @@ class InvitationRepositoryBase(ABC):
         customer_id: uuid.UUID,
         *,
         limit: int = 50,
-    ) -> list[InvitationRecord]:
-        ...
+    ) -> list[InvitationRecord]: ...
 
 
 # ──────────────────────────────────────────────────────────────────────────

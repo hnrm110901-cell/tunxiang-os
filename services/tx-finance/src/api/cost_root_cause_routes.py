@@ -10,6 +10,7 @@
     查询：?months_back=3
     出参：按店/月聚合 + prompt cache hit rate 累计
 """
+
 from __future__ import annotations
 
 from datetime import date as date_cls

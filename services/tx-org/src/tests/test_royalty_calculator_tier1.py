@@ -340,8 +340,7 @@ def test_no_float_intermediate_in_high_value_tiered_calculation():
     revenue_fen = 10_000_000_000  # 1 亿元
     result = RoyaltyCalculator.calculate_fen(revenue_fen, franchisee)
     assert result == 306_000_000, (
-        f"1 亿元阶梯应精确得 306 万元（306_000_000 分），实际 {result}。"
-        f" 差额 {result - 306_000_000} 分会触发对账失败。"
+        f"1 亿元阶梯应精确得 306 万元（306_000_000 分），实际 {result}。 差额 {result - 306_000_000} 分会触发对账失败。"
     )
     assert isinstance(result, int)
 

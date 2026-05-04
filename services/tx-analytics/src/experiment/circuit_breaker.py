@@ -67,8 +67,7 @@ class CoreMetricsProvider(Protocol):
 
 
 class ExperimentDefinitionWriter(Protocol):
-    async def disable_experiment(self, tenant_id: str, experiment_key: str, reason: str) -> bool:
-        ...
+    async def disable_experiment(self, tenant_id: str, experiment_key: str, reason: str) -> bool: ...
 
 
 class CircuitBreakerEvaluator:

@@ -133,9 +133,9 @@ class CalendarSignalService:
                 trigger["action"] = "trigger_segment_journey"
                 trigger["target_segment"] = evt["target_segment"]
                 trigger["suggested_journey"] = evt.get("suggested_journey", "banquet_repurchase_v1")
-                trigger[
-                    "description"
-                ] = f"{evt['name']}即将到来，建议对{evt['target_segment']}客户群发起{evt['name']}主题旅程"
+                trigger["description"] = (
+                    f"{evt['name']}即将到来，建议对{evt['target_segment']}客户群发起{evt['name']}主题旅程"
+                )
             elif evt["type"] == "industry" and evt.get("seasonal_dish"):
                 trigger["action"] = "seasonal_promotion"
                 trigger["seasonal_dish"] = evt["seasonal_dish"]

@@ -21,9 +21,9 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from services.tx_finance.src.services.pl_report import PLReportService
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.tx_finance.src.services.pl_report import PLReportService
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)

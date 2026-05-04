@@ -1022,7 +1022,7 @@ class DynamicPricingAIService:
             direction = "加" if adj_value > 0 else "减"
             return f"{name}: {direction}{abs(adj_value)}%"
         direction = "加" if adj_value > 0 else "减"
-        return f"{name}: {direction}{abs(adj_value)/100:.2f}元"
+        return f"{name}: {direction}{abs(adj_value) / 100:.2f}元"
 
     @staticmethod
     def _extract_price_bound(

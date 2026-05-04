@@ -251,7 +251,7 @@ class BanquetContractAgent(SkillAgent):
                 "generation_ms": generation_ms,
             },
             reasoning=(
-                f"合同已生成 tables={tables} total={total_amount_fen/100:.2f}元 " f"deposit_ratio={deposit_ratio}"
+                f"合同已生成 tables={tables} total={total_amount_fen / 100:.2f}元 deposit_ratio={deposit_ratio}"
             ),
         )
 
@@ -483,7 +483,7 @@ class BanquetContractAgent(SkillAgent):
                 signature_provider="placeholder",
             )
             final_status = signed.status
-            reasoning = f"总额 {total_amount_fen/100:.2f}元 < 10W 且非婚宴 → 自动过审"
+            reasoning = f"总额 {total_amount_fen / 100:.2f}元 < 10W 且非婚宴 → 自动过审"
             next_role = None
         else:
             # 若调用方附带 approval_action，则写入一条审批日志并推进下一节点
@@ -641,7 +641,7 @@ class BanquetContractAgent(SkillAgent):
                 final_status = ContractStatus.PENDING_APPROVAL
                 next_role = ApprovalRole(full_chain[0]["role"])
                 reasoning = (
-                    f"总额 {total_amount_fen/100:.2f}元 / banquet_type={banquet_type.value} "
+                    f"总额 {total_amount_fen / 100:.2f}元 / banquet_type={banquet_type.value} "
                     f"→ 路由到 {next_role.value}"
                 )
 

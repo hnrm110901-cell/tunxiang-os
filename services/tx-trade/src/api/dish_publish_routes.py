@@ -28,6 +28,7 @@
   GET  /api/v1/trade/delivery/publish/{dish_id}/tasks
     发布任务历史
 """
+
 from __future__ import annotations
 
 import logging

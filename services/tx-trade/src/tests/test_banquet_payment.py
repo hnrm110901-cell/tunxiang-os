@@ -84,9 +84,9 @@ class TestCreateBanquetOrder:
         order = create_test_order(client, headers, total_fen=total, deposit_rate=0.30)
 
         expected_deposit = round(total * 0.30)
-        assert (
-            abs(order["deposit_fen"] - expected_deposit) <= 1
-        ), f"定金计算错误：expected={expected_deposit}, got={order['deposit_fen']}"
+        assert abs(order["deposit_fen"] - expected_deposit) <= 1, (
+            f"定金计算错误：expected={expected_deposit}, got={order['deposit_fen']}"
+        )
 
     def test_balance_equals_total_minus_deposit(self, client: TestClient, headers: dict):
         """balance_fen = total_fen - deposit_fen。"""

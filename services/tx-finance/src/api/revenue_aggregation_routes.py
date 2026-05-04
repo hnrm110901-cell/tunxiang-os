@@ -17,10 +17,10 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from services.revenue_aggregation_service import RevenueAggregationService
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.revenue_aggregation_service import RevenueAggregationService
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)

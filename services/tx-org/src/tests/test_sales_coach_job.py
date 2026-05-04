@@ -52,7 +52,7 @@ _emitter_mod = types.ModuleType("shared.events.src.emitter")
 _evt_types_mod = types.ModuleType("shared.events.src.event_types")
 
 _emitter_mod.emit_event = _fake_emit_event
-_emitter_mod.emits = lambda *a, **k: (lambda f: f)
+_emitter_mod.emits = lambda *a, **k: lambda f: f
 
 
 class _SalesCoachEventType:

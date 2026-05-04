@@ -10,10 +10,6 @@ from typing import AsyncGenerator, List, Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.store_transfer_service import (
     compute_cost_split,
     compute_time_split,
@@ -21,6 +17,10 @@ from services.store_transfer_service import (
     generate_detail_report,
     generate_summary_report,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import TenantIDInvalid, TenantIDMissing, get_db_with_tenant
 
 logger = structlog.get_logger(__name__)

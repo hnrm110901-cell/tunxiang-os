@@ -5,7 +5,6 @@
 
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
-
 from services.tx_supply.src.services import traceability
 
 router = APIRouter(prefix="/api/v1/supply/trace", tags=["traceability"])

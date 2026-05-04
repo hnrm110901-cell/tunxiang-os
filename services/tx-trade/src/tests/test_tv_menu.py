@@ -1,7 +1,6 @@
 """TV Menu Wall 测试"""
 
 import pytest
-
 from services.tx_trade_src_services import tv_menu_service as svc
 
 

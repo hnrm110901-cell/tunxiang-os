@@ -18,6 +18,7 @@ RBAC：
   - payment_saga_service.PaymentSagaService.execute 的 idempotency 短路
   - A1 tradeApi.ts 合约：idempotency_key = `settle:{orderId}`
 """
+
 from __future__ import annotations
 
 from typing import Optional

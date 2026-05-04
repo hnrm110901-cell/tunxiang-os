@@ -29,6 +29,7 @@
 Service 层硬编码 model_id=claude-sonnet-4-7 覆盖 ModelRouter 默认值，
 走 Anthropic Prompt Cache beta。
 """
+
 from __future__ import annotations
 
 import json
@@ -551,7 +552,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                 risk_type="compliance_breach",
                 severity=severity,
                 delta_fen=labor_pred - _median(labor_costs),
-                evidence=f"人工占营收 {labor_ratio*100:.1f}%，超法规红线 30%",
+                evidence=f"人工占营收 {labor_ratio * 100:.1f}%，超法规红线 30%",
                 legal_flag=True,
             )
         )
@@ -573,7 +574,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                 risk_type="cost_overrun",
                 severity=severity,
                 delta_fen=food_pred - _median(food_costs),
-                evidence=f"食材占营收 {food_ratio*100:.1f}%，超行业红线 45%",
+                evidence=f"食材占营收 {food_ratio * 100:.1f}%，超行业红线 45%",
                 legal_flag=True,
             )
         )
@@ -597,7 +598,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                     risk_type="margin_compression",
                     severity="medium" if margin >= 0 else "critical",
                     delta_fen=net_pred - _median([m.net_fen for m in history]),
-                    evidence=f"预测净利率 {margin*100:.1f}% 比历史中位数 {hist_median*100:.1f}% 低 {(hist_median-margin)*100:.1f}pp",
+                    evidence=f"预测净利率 {margin * 100:.1f}% 比历史中位数 {hist_median * 100:.1f}% 低 {(hist_median - margin) * 100:.1f}pp",
                     legal_flag=False,
                 )
             )
@@ -616,7 +617,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                     risk_type="cost_overrun",
                     severity="medium",
                     delta_fen=current - med,
-                    evidence=f"{item} 环比涨幅 {((current-med)/med)*100:.1f}%，超 {COST_OVERRUN_THRESHOLD_PCT*100:.0f}% 阈值",
+                    evidence=f"{item} 环比涨幅 {((current - med) / med) * 100:.1f}%，超 {COST_OVERRUN_THRESHOLD_PCT * 100:.0f}% 阈值",
                     legal_flag=False,
                 )
             )
@@ -635,7 +636,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
     result.preventive_actions = actions
     result.sonnet_analysis = (
         f"[规则引擎] 基于 {len(history)} 个月历史中位数 × 近期趋势系数预测。"
-        f"预测营收 {rev_pred/100:.0f}元，净利 {net_pred/100:.0f}元（{margin*100:.1f}%）。"
+        f"预测营收 {rev_pred / 100:.0f}元，净利 {net_pred / 100:.0f}元（{margin * 100:.1f}%）。"
         f"共识别 {len(risks)} 个 variance 风险。"
     )
 

@@ -7,7 +7,6 @@
   - GET  /api/v1/my/insights/pricing              定价优化建议
 """
 
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -20,8 +20,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, field_validator
-
 from services.roi_attribution import ROIAttributionService
+
 from shared.ontology.src.database import async_session_factory
 
 log = structlog.get_logger(__name__)

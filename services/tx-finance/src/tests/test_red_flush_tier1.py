@@ -18,6 +18,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_red_flush_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -33,7 +34,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore  # noqa: E402
-
 from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
 )
@@ -796,9 +796,9 @@ class TestV272MigrationFileStructure:
                 re.I,
             )
         )
-        assert concurrent_count == len(
-            create_index_stmts
-        ), f"老表 {len(create_index_stmts)} 个 CREATE INDEX 全需 CONCURRENTLY"
+        assert concurrent_count == len(create_index_stmts), (
+            f"老表 {len(create_index_stmts)} 个 CREATE INDEX 全需 CONCURRENTLY"
+        )
 
     def test_orm_has_check_constraint_mirror(self):
         """ORM __table_args__ 必须镜像 DB CHECK (flush 前校验)."""

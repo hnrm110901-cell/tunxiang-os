@@ -912,7 +912,7 @@ async def acknowledge_alert(
     await _set_tenant(db, tenant_id)
 
     found = await db.execute(
-        text("SELECT id, status FROM price_alerts " "WHERE id = :aid AND tenant_id = :tid AND is_deleted = false"),
+        text("SELECT id, status FROM price_alerts WHERE id = :aid AND tenant_id = :tid AND is_deleted = false"),
         {"aid": str(alert_id), "tid": str(tenant_id)},
     )
     row = found.mappings().one_or_none()

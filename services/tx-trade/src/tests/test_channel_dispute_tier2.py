@@ -147,9 +147,11 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)), patch.object(
-            svc._repo, "insert", AsyncMock(return_value=new_row)
-        ) as mock_insert, patch("src.services.channel_dispute_service.emit_event", new=fake_emit):
+        with (
+            patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)),
+            patch.object(svc._repo, "insert", AsyncMock(return_value=new_row)) as mock_insert,
+            patch("src.services.channel_dispute_service.emit_event", new=fake_emit),
+        ):
             record, created = await svc.open_dispute(req, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN)
             import asyncio as _aio
 
@@ -183,9 +185,11 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)), patch.object(
-            svc._repo, "insert", AsyncMock(return_value=new_row)
-        ) as mock_insert, patch("src.services.channel_dispute_service.emit_event", new=fake_emit):
+        with (
+            patch.object(svc._repo, "get_by_external", AsyncMock(return_value=None)),
+            patch.object(svc._repo, "insert", AsyncMock(return_value=new_row)) as mock_insert,
+            patch("src.services.channel_dispute_service.emit_event", new=fake_emit),
+        ):
             record, created = await svc.open_dispute(req, auto_accept_threshold_fen=DEFAULT_AUTO_ACCEPT_THRESHOLD_FEN)
             import asyncio as _aio
 
@@ -224,9 +228,11 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(svc._repo, "get", AsyncMock(return_value=existing_row)), patch.object(
-            svc._repo, "resolve", AsyncMock(return_value=resolved_row)
-        ) as mock_resolve, patch("src.services.channel_dispute_service.emit_event", new=fake_emit):
+        with (
+            patch.object(svc._repo, "get", AsyncMock(return_value=existing_row)),
+            patch.object(svc._repo, "resolve", AsyncMock(return_value=resolved_row)) as mock_resolve,
+            patch("src.services.channel_dispute_service.emit_event", new=fake_emit),
+        ):
             record = await svc.resolve_dispute(
                 dispute_id=str(existing_row["id"]),
                 decision="accepted",
@@ -258,9 +264,10 @@ class TestChannelDisputeServiceTier2:
         db = _make_db()
         svc = ChannelDisputeService(db, tenant_id=TENANT_A)
 
-        with patch.object(svc._repo, "get", AsyncMock(return_value=already_row)), patch.object(
-            svc._repo, "resolve", AsyncMock()
-        ) as mock_resolve:
+        with (
+            patch.object(svc._repo, "get", AsyncMock(return_value=already_row)),
+            patch.object(svc._repo, "resolve", AsyncMock()) as mock_resolve,
+        ):
             with pytest.raises(DisputeAlreadyResolvedError):
                 await svc.resolve_dispute(
                     dispute_id=str(already_row["id"]),

@@ -4,7 +4,6 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from services.repository import AnalyticsRepository
 
 TENANT_ID = str(uuid.uuid4())

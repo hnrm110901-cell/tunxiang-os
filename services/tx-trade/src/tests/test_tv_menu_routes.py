@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-
 from services.tx_trade.src.main import app  # type: ignore
 
 TENANT = "11111111-1111-1111-1111-111111111111"

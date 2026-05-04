@@ -467,9 +467,9 @@ def test_reconcile_discrepancy_amount_is_integer(client):
     for disc in items:
         amount = disc["discrepancy_amount_fen"]
         # 必须是整数类型（int）
-        assert isinstance(
-            amount, int
-        ), f"discrepancy_amount_fen 必须为整数，实际类型：{type(amount).__name__}，值：{amount}"
+        assert isinstance(amount, int), (
+            f"discrepancy_amount_fen 必须为整数，实际类型：{type(amount).__name__}，值：{amount}"
+        )
         # 不允许 None
         assert amount is not None
         # 金额必须 >= 0

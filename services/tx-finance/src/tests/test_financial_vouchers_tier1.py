@@ -14,6 +14,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_vouchers_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -305,9 +306,9 @@ class TestV264MigrationFileStructure:
 
     def test_index_uses_concurrently(self, migration_source):
         """DBA 风险 #1 修复: CREATE INDEX 必须用 CONCURRENTLY, 不阻塞 DML."""
-        assert (
-            "CREATE INDEX CONCURRENTLY" in migration_source
-        ), "索引必须 CONCURRENTLY 创建, 否则阻塞千万级表的所有 INSERT/UPDATE"
+        assert "CREATE INDEX CONCURRENTLY" in migration_source, (
+            "索引必须 CONCURRENTLY 创建, 否则阻塞千万级表的所有 INSERT/UPDATE"
+        )
         assert "autocommit_block()" in migration_source, "CONCURRENTLY 必须脱离 alembic 主事务, 用 autocommit_block"
 
     def test_downgrade_has_null_period_guard(self, migration_source):

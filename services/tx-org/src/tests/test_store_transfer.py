@@ -3,7 +3,6 @@
 """
 
 import pytest
-
 from services.store_transfer_service import (
     approve_transfer_order,
     compute_cost_split,

@@ -107,7 +107,6 @@ def _get_redis_client():
     """尝试获取 Redis 客户端，失败时返回 None（降级模式）。"""
     try:
         import redis.asyncio as aioredis
-
         from shared.ontology.src.config import settings
 
         return aioredis.from_url(settings.redis_url, decode_responses=True)

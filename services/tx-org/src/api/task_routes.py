@@ -28,8 +28,6 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from repositories.task_repo import PgTaskRepository
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.task_dispatch_service import (
     CancelReasonRequired,
     EscalationChainMissing,
@@ -37,6 +35,8 @@ from services.task_dispatch_service import (
     TaskNotFound,
     TaskTerminalStateError,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 from shared.ontology.src.extensions.tasks import Task, TaskStatus, TaskType
 

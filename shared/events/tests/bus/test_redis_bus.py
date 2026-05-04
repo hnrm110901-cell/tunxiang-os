@@ -10,6 +10,7 @@
 
 使用 fakeredis.aioredis 作为内存 Redis, 不依赖真实 Redis 实例.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -27,6 +28,7 @@ from shared.events.schemas.base import OntologyEvent
 # ----------------------------------------------------------------------
 # 测试用 payload
 # ----------------------------------------------------------------------
+
 
 class _OrderPaid(OntologyEvent):
     order_id: str
@@ -89,6 +91,7 @@ def _make_envelope(
 # §1 构造 + topic 命名
 # ======================================================================
 
+
 class TestRedisStreamsEventBusConstruction:
     async def test_bus_instantiates_with_client(self, bus: RedisStreamsEventBus) -> None:
         assert isinstance(bus, RedisStreamsEventBus)
@@ -114,18 +117,15 @@ class TestRedisStreamsEventBusConstruction:
 # §2 publish: XADD + 序列化 + MAXLEN
 # ======================================================================
 
+
 class TestRedisStreamsEventBusPublish:
-    async def test_publish_returns_stream_entry_id(
-        self, bus: RedisStreamsEventBus
-    ) -> None:
+    async def test_publish_returns_stream_entry_id(self, bus: RedisStreamsEventBus) -> None:
         env = _make_envelope()
         entry_id = await bus.publish(env)
         assert isinstance(entry_id, str)
         assert "-" in entry_id  # Redis 格式 "ms-seq"
 
-    async def test_publish_writes_to_correct_topic(
-        self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_publish_writes_to_correct_topic(self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis) -> None:
         tenant = uuid4()
         env = _make_envelope(tenant_id=tenant, aggregate_type="order")
         await bus.publish(env)
@@ -179,15 +179,11 @@ class TestRedisStreamsEventBusPublish:
         event_ids_in_stream = [e[1]["event_id"] for e in entries]
         assert event_ids_in_stream == [e.event_id for e in envs]
 
-    async def test_publish_respects_custom_maxlen(
-        self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_publish_respects_custom_maxlen(self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis) -> None:
         """maxlen 参数传入 XADD."""
         for _ in range(5):
             await bus.publish(_make_envelope(), maxlen=3)
-        length = await fake_redis.xlen(
-            f"ontology.{_make_envelope().tenant_id}.order"
-        )
+        length = await fake_redis.xlen(f"ontology.{_make_envelope().tenant_id}.order")
         # MAXLEN ~ 是近似, 长度应该 <= 几个批次
         assert length >= 0  # 只要命令未出错即可
 
@@ -195,6 +191,7 @@ class TestRedisStreamsEventBusPublish:
 # ======================================================================
 # §3 subscribe: XREADGROUP + handler dispatch + deserialization
 # ======================================================================
+
 
 class TestRedisStreamsEventBusSubscribe:
     async def test_subscribe_creates_consumer_group(
@@ -285,11 +282,7 @@ class TestRedisStreamsEventBusSubscribe:
             received.append(env)
             done.set()
 
-        sub_task = asyncio.create_task(
-            bus.subscribe(
-                consumer_group="g-inv", topics=[topic], handler=handler
-            )
-        )
+        sub_task = asyncio.create_task(bus.subscribe(consumer_group="g-inv", topics=[topic], handler=handler))
         await asyncio.sleep(0.05)
 
         payload = _InvoiceVerified(invoice_no="INV-1", amount_fen=1000)
@@ -318,33 +311,26 @@ class TestRedisStreamsEventBusSubscribe:
 # §4 ack: XACK
 # ======================================================================
 
+
 class TestRedisStreamsEventBusAck:
-    async def test_ack_removes_from_pending_queue(
-        self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_ack_removes_from_pending_queue(self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis) -> None:
         tenant = uuid4()
         topic = f"ontology.{tenant}.order"
 
         # 先创建 group
-        await fake_redis.xgroup_create(
-            topic, "g-ack", id="0", mkstream=True
-        )
+        await fake_redis.xgroup_create(topic, "g-ack", id="0", mkstream=True)
 
         # 发布事件
         env = _make_envelope(tenant_id=tenant)
         entry_id = await bus.publish(env)
 
         # 消费但不 ack
-        entries = await fake_redis.xreadgroup(
-            "g-ack", "consumer-1", {topic: ">"}, count=10
-        )
+        entries = await fake_redis.xreadgroup("g-ack", "consumer-1", {topic: ">"}, count=10)
         pending_before = await fake_redis.xpending(topic, "g-ack")
         assert pending_before["pending"] >= 1
 
         # ACK
-        await bus.ack(
-            topic=topic, consumer_group="g-ack", event_id=entry_id
-        )
+        await bus.ack(topic=topic, consumer_group="g-ack", event_id=entry_id)
         pending_after = await fake_redis.xpending(topic, "g-ack")
         assert pending_after["pending"] < pending_before["pending"]
 
@@ -353,10 +339,9 @@ class TestRedisStreamsEventBusAck:
 # §5 replay: XRANGE after_event_id + limit
 # ======================================================================
 
+
 class TestRedisStreamsEventBusReplay:
-    async def test_replay_all_from_start(
-        self, bus: RedisStreamsEventBus
-    ) -> None:
+    async def test_replay_all_from_start(self, bus: RedisStreamsEventBus) -> None:
         tenant = uuid4()
         published = []
         for i in range(3):
@@ -372,9 +357,7 @@ class TestRedisStreamsEventBusReplay:
         assert len(collected) == 3
         assert [c.aggregate_id for c in collected] == [p.aggregate_id for p in published]
 
-    async def test_replay_with_limit(
-        self, bus: RedisStreamsEventBus
-    ) -> None:
+    async def test_replay_with_limit(self, bus: RedisStreamsEventBus) -> None:
         tenant = uuid4()
         for i in range(5):
             await bus.publish(_make_envelope(tenant_id=tenant, aggregate_id=f"o-{i}"))
@@ -384,9 +367,7 @@ class TestRedisStreamsEventBusReplay:
             collected.append(env)
         assert len(collected) == 2
 
-    async def test_replay_deserializes_payload(
-        self, bus: RedisStreamsEventBus
-    ) -> None:
+    async def test_replay_deserializes_payload(self, bus: RedisStreamsEventBus) -> None:
         tenant = uuid4()
         env = _make_envelope(tenant_id=tenant)
         await bus.publish(env)
@@ -401,10 +382,9 @@ class TestRedisStreamsEventBusReplay:
 # §6 close: 幂等
 # ======================================================================
 
+
 class TestRedisStreamsEventBusClose:
-    async def test_close_is_idempotent(
-        self, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_close_is_idempotent(self, fake_redis: FakeAsyncRedis) -> None:
         b = RedisStreamsEventBus(
             redis_client=fake_redis,
             schema_registry=SCHEMA_REGISTRY,
@@ -418,10 +398,9 @@ class TestRedisStreamsEventBusClose:
 # §7 错误路径 / 边缘用例
 # ======================================================================
 
+
 class TestRedisStreamsEventBusErrorPaths:
-    async def test_deserialize_unknown_event_type_raises(
-        self, bus: RedisStreamsEventBus
-    ) -> None:
+    async def test_deserialize_unknown_event_type_raises(self, bus: RedisStreamsEventBus) -> None:
         """_fields_to_envelope 遇到未注册 event_type 抛 ValueError."""
         fake_fields = {
             "event_id": "e-1",
@@ -438,18 +417,14 @@ class TestRedisStreamsEventBusErrorPaths:
         with pytest.raises(ValueError, match="未注册的 event_type"):
             bus._fields_to_envelope(fake_fields)
 
-    async def test_ensure_group_is_idempotent(
-        self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_ensure_group_is_idempotent(self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis) -> None:
         """重复建 group 不抛异常 (BUSYGROUP 分支)."""
         topic = "test-busygroup-topic"
         await bus._ensure_group(topic, "dup-group")
         # 第二次调用应走 BUSYGROUP 吞异常分支
         await bus._ensure_group(topic, "dup-group")
 
-    async def test_subscribe_acks_poisoned_message(
-        self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_subscribe_acks_poisoned_message(self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis) -> None:
         """subscribe 遇到无法反序列化的事件, 仍 ACK 避免无限重投."""
         tenant = uuid4()
         topic = f"ontology.{tenant}.order"
@@ -529,16 +504,12 @@ class TestRedisStreamsEventBusErrorPaths:
         pending = await fake_redis.xpending(topic, "fail-g")
         assert pending["pending"] >= 1
 
-    async def test_replay_with_after_event_id(
-        self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis
-    ) -> None:
+    async def test_replay_with_after_event_id(self, bus: RedisStreamsEventBus, fake_redis: FakeAsyncRedis) -> None:
         """replay 支持从指定 event_id 之后开始."""
         tenant = uuid4()
         ids: list[str] = []
         for i in range(3):
-            entry_id = await bus.publish(
-                _make_envelope(tenant_id=tenant, aggregate_id=f"o-{i}")
-            )
+            entry_id = await bus.publish(_make_envelope(tenant_id=tenant, aggregate_id=f"o-{i}"))
             ids.append(entry_id)
 
         topic = f"ontology.{tenant}.order"

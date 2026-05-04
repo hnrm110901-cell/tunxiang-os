@@ -30,7 +30,6 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from services.alliance_service import AllianceService, AllianceServiceError
 
 TENANT_ID = str(uuid.uuid4())

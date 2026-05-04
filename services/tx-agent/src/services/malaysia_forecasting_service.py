@@ -25,9 +25,6 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_agent.src.config.malaysia_cuisine_profiles import (
     get_cuisine_by_state,
     get_cuisine_profile,
@@ -38,6 +35,8 @@ from services.tx_agent.src.config.malaysia_holidays import (
 from services.tx_agent.src.config.malaysia_ingredients import (
     get_perishable_ingredients,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 

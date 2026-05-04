@@ -922,9 +922,9 @@ async def test_lock_schedule_concurrent_double_lock_prevented(
     # 失败方因 v283 UNIQUE 冲突或候补队列命中（两种情况都合法）
     # 若是 DB 冲突：schedule_conflict=True；若是 queue 命中：False 但 queued_contract_ids 非空
     loser = losers[0]
-    assert (
-        loser.data.get("schedule_conflict") is True or len(loser.data.get("queued_contract_ids", [])) > 0
-    ), "C-2 fail: 失败方既无 DB 冲突标记也无候补队列"
+    assert loser.data.get("schedule_conflict") is True or len(loser.data.get("queued_contract_ids", [])) > 0, (
+        "C-2 fail: 失败方既无 DB 冲突标记也无候补队列"
+    )
 
 
 @pytest.mark.asyncio

@@ -15,7 +15,6 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
 import structlog
-
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,

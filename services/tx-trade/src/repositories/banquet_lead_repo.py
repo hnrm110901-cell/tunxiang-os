@@ -39,16 +39,13 @@ class BanquetLeadRepositoryBase(ABC):
     """宴会商机 Repository 抽象接口。"""
 
     @abstractmethod
-    async def insert(self, lead: BanquetLead) -> BanquetLead:
-        ...
+    async def insert(self, lead: BanquetLead) -> BanquetLead: ...
 
     @abstractmethod
-    async def get_by_id(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetLead]:
-        ...
+    async def get_by_id(self, lead_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[BanquetLead]: ...
 
     @abstractmethod
-    async def update(self, lead: BanquetLead) -> BanquetLead:
-        ...
+    async def update(self, lead: BanquetLead) -> BanquetLead: ...
 
     @abstractmethod
     async def list_by_sales_employee(
@@ -59,8 +56,7 @@ class BanquetLeadRepositoryBase(ABC):
         stage: Optional[LeadStage] = None,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetLead], int]:
-        ...
+    ) -> tuple[list[BanquetLead], int]: ...
 
     @abstractmethod
     async def list_by_stage(
@@ -70,8 +66,7 @@ class BanquetLeadRepositoryBase(ABC):
         *,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetLead], int]:
-        ...
+    ) -> tuple[list[BanquetLead], int]: ...
 
     @abstractmethod
     async def list_by_source_channel(
@@ -81,8 +76,7 @@ class BanquetLeadRepositoryBase(ABC):
         *,
         offset: int = 0,
         limit: int = 50,
-    ) -> tuple[list[BanquetLead], int]:
-        ...
+    ) -> tuple[list[BanquetLead], int]: ...
 
     @abstractmethod
     async def bulk_funnel_counts(
@@ -91,8 +85,7 @@ class BanquetLeadRepositoryBase(ABC):
         period_start: datetime,
         period_end: datetime,
         group_by: str,
-    ) -> list[dict[str, Any]]:
-        ...
+    ) -> list[dict[str, Any]]: ...
 
     @abstractmethod
     async def bulk_source_attribution(
@@ -100,8 +93,7 @@ class BanquetLeadRepositoryBase(ABC):
         tenant_id: uuid.UUID,
         period_start: datetime,
         period_end: datetime,
-    ) -> list[dict[str, Any]]:
-        ...
+    ) -> list[dict[str, Any]]: ...
 
 
 # ──────────────────────────────────────────────────────────────────────────

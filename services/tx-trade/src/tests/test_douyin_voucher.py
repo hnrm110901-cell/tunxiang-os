@@ -23,6 +23,7 @@ os.environ["TX_AUTH_ENABLED"] = "false"
 from unittest.mock import AsyncMock
 
 from services.tx_trade.src.api.douyin_voucher_routes import _RETRY_QUEUE, router
+
 from shared.ontology.src.database import get_db
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -287,9 +288,9 @@ class TestReconciliationReport:
         data = resp.json()
         report = data["data"]
 
-        assert isinstance(
-            report["discrepancy_amount_fen"], int
-        ), f"discrepancy_amount_fen 应为整数，实际类型: {type(report['discrepancy_amount_fen'])}"
+        assert isinstance(report["discrepancy_amount_fen"], int), (
+            f"discrepancy_amount_fen 应为整数，实际类型: {type(report['discrepancy_amount_fen'])}"
+        )
 
     def test_reconciliation_counts_consistency(self):
         """local_count/matched/unmatched 数值应保持一致性"""

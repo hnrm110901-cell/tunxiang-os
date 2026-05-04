@@ -18,11 +18,11 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+from services.review_replier import ReviewReplier
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.review_replier import ReviewReplier
 from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)

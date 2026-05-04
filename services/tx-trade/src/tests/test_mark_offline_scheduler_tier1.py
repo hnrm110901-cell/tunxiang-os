@@ -144,6 +144,6 @@ async def test_xujihaixian_scheduler_survives_db_error_does_not_die():
             await mark_offline_scheduler_loop(fake_session_factory, interval_sec=60)
 
     # 验证：第一轮异常未杀死 task，第二轮成功调用
-    assert (
-        fake_global.await_count == 2
-    ), f"DB 闪断后 task 必须继续，期望 2 次 global 调用，实际 {fake_global.await_count}"
+    assert fake_global.await_count == 2, (
+        f"DB 闪断后 task 必须继续，期望 2 次 global 调用，实际 {fake_global.await_count}"
+    )

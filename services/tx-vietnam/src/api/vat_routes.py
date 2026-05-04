@@ -66,7 +66,7 @@ async def calculate_vat(body: dict[str, Any]) -> dict:
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid VAT category: {category_str}. Must be one of: " f"{[c.value for c in VATCategory]}",
+            detail=f"Invalid VAT category: {category_str}. Must be one of: {[c.value for c in VATCategory]}",
         ) from exc
 
     try:

@@ -5,7 +5,6 @@
 from datetime import date, datetime
 
 import pytest
-
 from services.workflow_engine import (
     WorkflowStatus,
     build_approval_chain,

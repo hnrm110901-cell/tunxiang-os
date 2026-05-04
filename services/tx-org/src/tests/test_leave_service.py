@@ -5,7 +5,6 @@
 from datetime import datetime
 
 import pytest
-
 from services.leave_service import (
     compute_annual_leave_quota,
     compute_balance_after_deduction,

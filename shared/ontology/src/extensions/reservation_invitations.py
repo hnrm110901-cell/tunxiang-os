@@ -94,10 +94,7 @@ class InvitationRecord(BaseModel):
     )
     payload: dict[str, Any] = Field(
         default_factory=dict,
-        description=(
-            "通道附加上下文 JSON：短信模板 / 微信 template_id / "
-            "外呼话术脚本ID / Whisper 识别结果等"
-        ),
+        description=("通道附加上下文 JSON：短信模板 / 微信 template_id / 外呼话术脚本ID / Whisper 识别结果等"),
     )
     source_event_id: UUID | None = Field(
         default=None,

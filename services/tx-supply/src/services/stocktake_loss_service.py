@@ -18,6 +18,7 @@
   - 案件号生成：调用 PG fn_next_loss_case_no(tenant_id, date) advisory lock
   - 审批链规则：< 5000 元（500000 分）= 1 节点；< 50000 元 = 2 节点；否则 = 3 节点
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -208,11 +209,7 @@ async def _transition_status(
         params[col] = val
 
     await db.execute(
-        text(
-            f"UPDATE stocktake_loss_cases "
-            f"SET {', '.join(sets)} "
-            f"WHERE id = :cid::uuid AND tenant_id = :tid::uuid"
-        ),
+        text(f"UPDATE stocktake_loss_cases SET {', '.join(sets)} WHERE id = :cid::uuid AND tenant_id = :tid::uuid"),
         params,
     )
     log.info(
@@ -863,7 +860,7 @@ async def approve(
     node = await _find_current_pending_node(db, case_id, tenant_id)
     if node["approver_role"] != approver_role.value:
         raise ApprovalPermissionError(
-            f"Role mismatch: node requires {node['approver_role']}, " f"got {approver_role.value}"
+            f"Role mismatch: node requires {node['approver_role']}, got {approver_role.value}"
         )
 
     now = datetime.now(timezone.utc)
@@ -956,7 +953,7 @@ async def reject(
     node = await _find_current_pending_node(db, case_id, tenant_id)
     if node["approver_role"] != approver_role.value:
         raise ApprovalPermissionError(
-            f"Role mismatch: node requires {node['approver_role']}, " f"got {approver_role.value}"
+            f"Role mismatch: node requires {node['approver_role']}, got {approver_role.value}"
         )
 
     now = datetime.now(timezone.utc)

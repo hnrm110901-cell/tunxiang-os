@@ -101,8 +101,6 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import text
-
 from services.growth_brand_service import GrowthBrandService
 from services.growth_cross_brand_service import GrowthCrossBrandService
 from services.growth_experiment_service import GrowthExperimentService
@@ -112,6 +110,8 @@ from services.growth_repair_service import GrowthRepairService
 from services.growth_store_capability_service import GrowthStoreCapabilityService
 from services.growth_suggestion_service import GrowthSuggestionService
 from services.growth_touch_service import GrowthTouchService
+from sqlalchemy import text
+
 from shared.ontology.src.database import async_session_factory
 
 logger = structlog.get_logger(__name__)

@@ -20,9 +20,8 @@ from datetime import datetime, timezone
 from typing import Any, List
 
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from shared.ontology.src.database import Depends, HTTPException, Request
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 

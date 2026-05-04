@@ -22,10 +22,10 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from services.permission_service import PermissionService
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.permission_service import PermissionService
 from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)

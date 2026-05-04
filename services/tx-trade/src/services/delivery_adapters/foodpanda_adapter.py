@@ -3,6 +3,7 @@
 字段映射参考 Foodpanda Merchant API (马来西亚)。
 签名算法：HMAC-SHA256（shared_secret 为 key，payload 为 data）。
 """
+
 from __future__ import annotations
 
 import hashlib

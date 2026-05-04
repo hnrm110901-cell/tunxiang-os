@@ -40,6 +40,7 @@ Referenced ADRs:
   - CLAUDE.md §20: 测试基于真实餐厅场景
   - W1.2 docstring: voided/event_id 设计原因
 """
+
 from __future__ import annotations
 
 import uuid
@@ -102,14 +103,12 @@ class VoucherLineInput:
     def __post_init__(self) -> None:
         if self.debit_fen < 0 or self.credit_fen < 0:
             raise ValueError(
-                f"分录 {self.account_code} 借贷必须非负 " f"(debit={self.debit_fen}, credit={self.credit_fen})"
+                f"分录 {self.account_code} 借贷必须非负 (debit={self.debit_fen}, credit={self.credit_fen})"
             )
         both_zero = self.debit_fen == 0 and self.credit_fen == 0
         both_nonzero = self.debit_fen > 0 and self.credit_fen > 0
         if both_zero or both_nonzero:
-            raise ValueError(
-                f"分录 {self.account_code} 借贷互斥 " f"(debit={self.debit_fen}, credit={self.credit_fen})"
-            )
+            raise ValueError(f"分录 {self.account_code} 借贷互斥 (debit={self.debit_fen}, credit={self.credit_fen})")
 
 
 @dataclass
@@ -206,7 +205,7 @@ class FinancialVoucherService:
         # 应用层显式校验比 DB 层错误消息更友好 + 防误用.
         if payload.event_id is not None and (payload.event_type is None or not str(payload.event_type).strip()):
             raise ValueError(
-                "event_id 非空时 event_type 必填 " "(幂等键需要 (tenant_id, event_type, event_id) 完整三元组)"
+                "event_id 非空时 event_type 必填 (幂等键需要 (tenant_id, event_type, event_id) 完整三元组)"
             )
 
         # [BLOCKER-B5] 租户上下文断言
@@ -225,7 +224,7 @@ class FinancialVoucherService:
         total_debit_fen = sum(l.debit_fen for l in payload.lines)
         total_credit_fen = sum(l.credit_fen for l in payload.lines)
         if total_debit_fen != total_credit_fen:
-            raise ValueError(f"借贷不平衡 (fen 整数零容忍): " f"debit={total_debit_fen} != credit={total_credit_fen}")
+            raise ValueError(f"借贷不平衡 (fen 整数零容忍): debit={total_debit_fen} != credit={total_credit_fen}")
         if total_debit_fen == 0:
             raise ValueError("凭证借贷总额均为 0, 无会计意义")
 
@@ -426,7 +425,7 @@ class FinancialVoucherService:
             raise ValueError(f"凭证 {original.voucher_no} 已作废, 不能再红冲")
         if original.has_been_red_flushed:
             raise ValueError(
-                f"凭证 {original.voucher_no} 已被红冲 " f"(→ {original.red_flushed_by_voucher_id}), 不可重复红冲"
+                f"凭证 {original.voucher_no} 已被红冲 (→ {original.red_flushed_by_voucher_id}), 不可重复红冲"
             )
         if original.is_red_flush_voucher:
             raise ValueError(f"凭证 {original.voucher_no} 本身是红冲凭证, 不能再被红冲 (防递归)")
@@ -577,9 +576,9 @@ class FinancialVoucherService:
             )
 
         if not (2020 <= payload.source_period_year <= 2100):
-            raise ValueError(f"source_period_year 越界: {payload.source_period_year} " f"(应在 2020-2100)")
+            raise ValueError(f"source_period_year 越界: {payload.source_period_year} (应在 2020-2100)")
         if not (1 <= payload.source_period_month <= 12):
-            raise ValueError(f"source_period_month 越界: {payload.source_period_month} " f"(应在 1-12)")
+            raise ValueError(f"source_period_month 越界: {payload.source_period_month} (应在 1-12)")
 
         # 2. 源期间必须在过去 — 语义正确性防护
         # 允许源期间 = 当前凭证月份的场景 (同期内补录) 作为边界, 但禁止源期间 > 当期

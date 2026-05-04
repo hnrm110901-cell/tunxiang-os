@@ -257,7 +257,7 @@ async def submit_signature(
 
     # 二次防御：检查唯一约束（DB 已加约束，但我们用业务异常包装）
     existing = await db.execute(
-        text("SELECT id FROM delivery_receipts " "WHERE tenant_id = :tid AND delivery_id = :did LIMIT 1"),
+        text("SELECT id FROM delivery_receipts WHERE tenant_id = :tid AND delivery_id = :did LIMIT 1"),
         {"tid": tenant_uuid, "did": delivery_uuid},
     )
     if existing.first() is not None:
@@ -265,7 +265,7 @@ async def submit_signature(
 
     # 解析 store_id（从 distribution_orders；缺失时回退到 nil uuid 让上层报错）
     store_row = await db.execute(
-        text("SELECT target_store_id FROM distribution_orders " "WHERE id = :did AND tenant_id = :tid LIMIT 1"),
+        text("SELECT target_store_id FROM distribution_orders WHERE id = :did AND tenant_id = :tid LIMIT 1"),
         {"did": delivery_uuid, "tid": tenant_uuid},
     )
     store_data = store_row.first()
@@ -461,7 +461,7 @@ async def record_damage(
 
     # 读回 damage_amount_fen（Computed 列）
     row = await db.execute(
-        text("SELECT damage_amount_fen FROM delivery_damage_records " "WHERE id = :id AND tenant_id = :tid"),
+        text("SELECT damage_amount_fen FROM delivery_damage_records WHERE id = :id AND tenant_id = :tid"),
         {"id": damage_id, "tid": tenant_uuid},
     )
     fetched = row.first()
@@ -888,7 +888,7 @@ async def list_pending_damages(
 
     join_clause = ""
     if store_id is not None:
-        join_clause = " JOIN distribution_orders o " "ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
+        join_clause = " JOIN distribution_orders o ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
         where.append("o.target_store_id = :sid")
         params["sid"] = _to_uuid(store_id)
 
@@ -1085,7 +1085,7 @@ async def get_damage_stats(
 
     join_clause = ""
     if store_id is not None:
-        join_clause = " JOIN distribution_orders o " "ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
+        join_clause = " JOIN distribution_orders o ON o.id = d.delivery_id AND o.tenant_id = d.tenant_id"
         where.append("o.target_store_id = :sid")
         params["sid"] = _to_uuid(store_id)
 

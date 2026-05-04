@@ -361,7 +361,7 @@ class DailyScorecardService:
             top_str = highlights_arr[0] if highlights_arr else "无"
             imp_str = improvements_arr[0] if improvements_arr else "无"
 
-            body = f"今日得分{score:.0f}分(排名{rank}/{total_emp}), " f"TOP:{top_str}, 待改善:{imp_str}"
+            body = f"今日得分{score:.0f}分(排名{rank}/{total_emp}), TOP:{top_str}, 待改善:{imp_str}"
             title = f"【日得分卡】{name} {target_date.isoformat()}"
 
             try:

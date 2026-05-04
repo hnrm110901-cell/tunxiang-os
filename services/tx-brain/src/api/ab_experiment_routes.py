@@ -15,6 +15,7 @@
 
 熔断 sweep 设计为租户级同步调用；生产环境建议 cron 定时调用。
 """
+
 from __future__ import annotations
 
 from datetime import datetime

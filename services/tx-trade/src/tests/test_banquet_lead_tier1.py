@@ -526,9 +526,9 @@ class TestDepositRefundInvalidates:
         stage_changed_events = [e for e in emitted if e["event_type"].value == "banquet.lead_stage_changed"]
         assert len(stage_changed_events) >= 1, "应至少发射一条 lead_stage_changed（order→invalid）"
         last_change = stage_changed_events[-1]
-        assert (
-            last_change["causation_id"] == deposit_event_id
-        ), "独立验证 P1-3：lead_stage_changed.causation_id 必须等于 deposit_event_id"
+        assert last_change["causation_id"] == deposit_event_id, (
+            "独立验证 P1-3：lead_stage_changed.causation_id 必须等于 deposit_event_id"
+        )
         assert last_change["payload"]["next_stage"] == "invalid"
 
     @pytest.mark.asyncio
@@ -574,7 +574,7 @@ class TestDepositRefundInvalidates:
         assert len(stage_events) == 1, "单次 deposit 退款只应触发一次 stage_changed（幂等）"
         stage_evt = stage_events[0]
         assert stage_evt["causation_id"] == deposit_event_id, (
-            f"causation_id 不匹配：expected {deposit_event_id}, " f"got {stage_evt['causation_id']}"
+            f"causation_id 不匹配：expected {deposit_event_id}, got {stage_evt['causation_id']}"
         )
         # stream_id 是 lead_id，payload.next_stage=invalid
         assert stage_evt["stream_id"] == str(lead.lead_id)

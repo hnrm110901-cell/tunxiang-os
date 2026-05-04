@@ -3,6 +3,7 @@
 T5.1.3 在此包下展开具体事件 payload 定义.
 基类见 base.OntologyEvent.
 """
+
 from .base import OntologyEvent
 from .finance_events import CashFlowSnapshotPayload
 from .invoice_events import InvoiceType, InvoiceVerifiedPayload

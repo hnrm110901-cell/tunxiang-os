@@ -21,6 +21,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_voucher_service_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -34,7 +35,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
-
 from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
     VoucherCreateInput,

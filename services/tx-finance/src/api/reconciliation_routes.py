@@ -19,9 +19,6 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.three_way_match_engine import (
     BatchMatchResult,
     MatchResult,
@@ -31,6 +28,9 @@ from services.three_way_match_engine import (
     ThreeWayMatchError,
     VarianceItem,
 )
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger()

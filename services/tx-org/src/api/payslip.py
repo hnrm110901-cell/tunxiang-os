@@ -11,10 +11,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
@@ -28,6 +24,10 @@ from services.payroll_engine import (
     derive_hourly_rate,
     summarize_payroll,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/org", tags=["payslips"])

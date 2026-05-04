@@ -36,7 +36,6 @@ from agents.skills.rfm_outreach import (  # noqa: E402
     TargetSegmentOutput,
 )
 from prompts.rfm_outreach import build_cached_system_blocks  # noqa: E402
-
 from services.model_router import ModelSelectionStrategy  # noqa: E402
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
@@ -132,13 +131,13 @@ def _fake_usage(cache_read: int = 3000, input_tokens: int = 500) -> dict[str, in
 
 def test_rfm_outreach_registered() -> None:
     assert RfmOutreachAgent in ALL_SKILL_AGENTS, (
-        "RfmOutreachAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 " "ALL_SKILL_AGENTS 列表中注册"
+        "RfmOutreachAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 ALL_SKILL_AGENTS 列表中注册"
     )
 
 
 def test_scope_is_margin_and_experience() -> None:
     assert RfmOutreachAgent.constraint_scope == {"margin", "experience"}, (
-        f"D3a RFM 触达必须声明 margin + experience 双 scope，" f"实际：{RfmOutreachAgent.constraint_scope}"
+        f"D3a RFM 触达必须声明 margin + experience 双 scope，实际：{RfmOutreachAgent.constraint_scope}"
     )
 
 
@@ -306,7 +305,7 @@ async def test_model_router_called_with_haiku_4_5() -> None:
     fake_router.complete_with_cache.assert_awaited_once()
     kwargs = fake_router.complete_with_cache.await_args.kwargs
     assert kwargs["task_type"] == "rfm_outreach", (
-        f"task_type 必须是 'rfm_outreach'（路由到 Haiku 4.5），" f"实际：{kwargs.get('task_type')}"
+        f"task_type 必须是 'rfm_outreach'（路由到 Haiku 4.5），实际：{kwargs.get('task_type')}"
     )
     assert kwargs["tenant_id"] == TENANT_ID
     # 系统提示必须为 list[dict] 且至少一个块含 cache_control
@@ -352,9 +351,9 @@ async def test_prompt_cache_hit_ratio_reports_correctly() -> None:
     usage = result.data["usage"]
     assert usage["cache_read_input_tokens"] == 3000
     assert usage["input_tokens"] == 500
-    assert (
-        usage["cache_hit_ratio"] > 0.75
-    ), f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
+    assert usage["cache_hit_ratio"] > 0.75, (
+        f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -388,7 +387,7 @@ async def test_decision_log_records_improved_kpi_repurchase_rate() -> None:
     assert roi is not None
     improved_kpi = roi["improved_kpi"]
     assert improved_kpi["metric"] == "repurchase_rate", (
-        f"D3a 触达必须回写 repurchase_rate 为 improved_kpi.metric，" f"实际：{improved_kpi.get('metric')}"
+        f"D3a 触达必须回写 repurchase_rate 为 improved_kpi.metric，实际：{improved_kpi.get('metric')}"
     )
     assert improved_kpi["delta_pct"] > 0
     # 触达不防损，prevented_loss_fen 应为 None
@@ -419,8 +418,7 @@ def test_no_broad_except() -> None:
         # `except Exception:` / `except BaseException:` 不允许
         if isinstance(exc_type, ast.Name):
             assert exc_type.id not in ("Exception", "BaseException"), (
-                f"broad `except {exc_type.id}:` 在 rfm_outreach.py:{node.lineno} —— "
-                f"§十四 新代码禁止 except Exception"
+                f"broad `except {exc_type.id}:` 在 rfm_outreach.py:{node.lineno} —— §十四 新代码禁止 except Exception"
             )
         if isinstance(exc_type, ast.Tuple):
             for elt in exc_type.elts:

@@ -6,8 +6,6 @@
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.finance_analytics import (
     coupon_cost_analysis,
     discount_structure,
@@ -15,6 +13,8 @@ from services.finance_analytics import (
     revenue_composition,
     store_profit_analysis,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)

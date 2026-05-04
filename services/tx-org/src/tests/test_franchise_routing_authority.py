@@ -130,6 +130,7 @@ from httpx import ASGITransport, AsyncClient  # noqa: E402
 from services.tx_org.src.api.franchise_router import router as v2_router  # noqa: E402
 from services.tx_org.src.api.franchise_routes import router as v1_router  # noqa: E402
 from services.tx_org.src.api.franchise_v5_routes import router as v5_router  # noqa: E402
+
 from shared.ontology.src.database import get_db  # noqa: E402
 
 # 模拟 main.py 的注册顺序（v5 先于 v1/v2 — 防御性兜底）

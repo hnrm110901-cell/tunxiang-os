@@ -12,6 +12,7 @@
   9. v277 迁移静态校验（RLS + CHECK + 索引 + status 枚举）
   10. ModelRouter 注册 campaign_roi_forecast → MODERATE
 """
+
 from __future__ import annotations
 
 import os
@@ -295,7 +296,7 @@ async def test_analyze_with_invoker_uses_sonnet_response():
 
     async def mock_sonnet(prompt: str, model_id: str) -> str:
         invoked.append({"prompt": prompt, "model": model_id})
-        return "活动增量显著，建议沉淀模板。\n" "action1|5000|high\n" "action2|2000|med\n"
+        return "活动增量显著，建议沉淀模板。\naction1|5000|high\naction2|2000|med\n"
 
     service = CampaignROIForecastService(sonnet_invoker=mock_sonnet)
     forecast = ForecastResult(model="prophet", baseline_total_fen=100000, confidence=0.9)

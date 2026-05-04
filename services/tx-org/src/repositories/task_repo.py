@@ -71,22 +71,18 @@ class TaskRepository(Protocol):
         """
         ...
 
-    async def get(self, task_id: UUID, tenant_id: UUID) -> Optional[Task]:
-        ...
+    async def get(self, task_id: UUID, tenant_id: UUID) -> Optional[Task]: ...
 
-    async def update(self, task: Task) -> Task:
-        ...
+    async def update(self, task: Task) -> Task: ...
 
-    async def query(self, q: TaskQuery) -> list[Task]:
-        ...
+    async def query(self, q: TaskQuery) -> list[Task]: ...
 
     async def query_overdue_pending(
         self,
         *,
         now: datetime,
         tenant_id: Optional[UUID] = None,
-    ) -> list[Task]:
-        ...
+    ) -> list[Task]: ...
 
     async def find_by_idempotency_key(
         self,
@@ -96,8 +92,7 @@ class TaskRepository(Protocol):
         assignee_employee_id: UUID,
         customer_id: Optional[UUID],
         due_at: datetime,
-    ) -> Optional[Task]:
-        ...
+    ) -> Optional[Task]: ...
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@
 审计字段 3 组 (closed_* / reopened_* / locked_*) 由状态机方法赋值,
 DB CHECK 强制 status='closed' 时 closed_at/by 非空, status='locked' 时 locked_at/by 非空.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -125,11 +126,11 @@ class AccountingPeriod(Base):
             name="chk_ap_date_range",
         ),
         CheckConstraint(
-            "status != 'closed' " "OR (closed_at IS NOT NULL AND closed_by IS NOT NULL)",
+            "status != 'closed' OR (closed_at IS NOT NULL AND closed_by IS NOT NULL)",
             name="chk_ap_closed_audit",
         ),
         CheckConstraint(
-            "status != 'locked' " "OR (locked_at IS NOT NULL AND locked_by IS NOT NULL)",
+            "status != 'locked' OR (locked_at IS NOT NULL AND locked_by IS NOT NULL)",
             name="chk_ap_locked_audit",
         ),
         Index(
@@ -180,9 +181,7 @@ class AccountingPeriod(Base):
         前置: status=='open'.
         """
         if self.status != STATUS_OPEN:
-            raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} " f"不支持月结 (需 open)"
-            )
+            raise ValueError(f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} 不支持月结 (需 open)")
         if not reason or not reason.strip():
             raise ValueError("月结原因必填 (审计留痕)")
 
@@ -202,12 +201,10 @@ class AccountingPeriod(Base):
         前置: status=='closed'.
         """
         if self.status == STATUS_LOCKED:
-            raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 已年结锁定, " f"不可重开 (只能追加红冲凭证)"
-            )
+            raise ValueError(f"账期 {self.period_year}-{self.period_month:02d} 已年结锁定, 不可重开 (只能追加红冲凭证)")
         if self.status != STATUS_CLOSED:
             raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} " f"不支持重开 (需 closed)"
+                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} 不支持重开 (需 closed)"
             )
         if not reason or not reason.strip():
             raise ValueError("重开原因必填 (审计留痕)")
@@ -229,8 +226,7 @@ class AccountingPeriod(Base):
         """
         if self.status != STATUS_CLOSED:
             raise ValueError(
-                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} "
-                f"不支持年结锁定 (需先月结 closed)"
+                f"账期 {self.period_year}-{self.period_month:02d} 状态 {self.status} 不支持年结锁定 (需先月结 closed)"
             )
         if not reason or not reason.strip():
             raise ValueError("年结锁定原因必填 (审计留痕)")

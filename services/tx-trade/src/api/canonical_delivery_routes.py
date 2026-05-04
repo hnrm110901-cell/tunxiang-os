@@ -13,6 +13,7 @@
     查询参数：platform / store_id / status / date_from / date_to / page / size
     出参：分页列表
 """
+
 from __future__ import annotations
 
 import logging
@@ -72,7 +73,7 @@ async def ingest_canonical(
     if req.platform not in list_supported_platforms():
         raise HTTPException(
             status_code=400,
-            detail=f"platform 未注册 transformer: {req.platform!r}，" f"支持 {list_supported_platforms()}",
+            detail=f"platform 未注册 transformer: {req.platform!r}，支持 {list_supported_platforms()}",
         )
 
     # 1. 转换

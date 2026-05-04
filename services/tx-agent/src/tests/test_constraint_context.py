@@ -576,14 +576,14 @@ def test_batch_5_compliance_skills_declare_scope():
     for cls in (ComplianceAlertAgent, AttendanceComplianceAgent, AttendanceRecoveryAgent, TurnoverRiskAgent):
         assert cls.constraint_scope == set(), f"{cls.__name__} 应为空 scope (豁免)"
         assert cls.constraint_waived_reason is not None, f"{cls.__name__} 缺 waived_reason"
-        assert (
-            len(cls.constraint_waived_reason) >= 30
-        ), f"{cls.__name__} waived_reason 长度 {len(cls.constraint_waived_reason)} < 30"
+        assert len(cls.constraint_waived_reason) >= 30, (
+            f"{cls.__name__} waived_reason 长度 {len(cls.constraint_waived_reason)} < 30"
+        )
         # 禁用黑名单空洞说辞
         for blacklist in ("N/A", "不适用", "跳过"):
-            assert (
-                blacklist not in cls.constraint_waived_reason
-            ), f"{cls.__name__} waived_reason 包含黑名单说辞 {blacklist}"
+            assert blacklist not in cls.constraint_waived_reason, (
+                f"{cls.__name__} waived_reason 包含黑名单说辞 {blacklist}"
+            )
 
     # 3 个真实 scope
     assert WorkforcePlannerAgent.constraint_scope == {"margin"}

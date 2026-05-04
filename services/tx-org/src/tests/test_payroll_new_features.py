@@ -24,7 +24,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from uuid import uuid4
 
 import pytest
-
 from services.income_tax import IncomeTaxCalculator
 from services.payroll_engine import (
     compute_absence_deduction,

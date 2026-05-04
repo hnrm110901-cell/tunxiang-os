@@ -19,6 +19,7 @@ Tier 级别: 🔴 Tier 1 (资金安全 / 金税四期审计红线)
 事务边界:
   与 FinancialVoucherService 一致: service 只 flush 不 commit. 调用方持边界.
 """
+
 from __future__ import annotations
 
 import uuid

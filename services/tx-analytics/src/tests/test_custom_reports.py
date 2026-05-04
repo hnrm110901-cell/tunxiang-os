@@ -343,9 +343,9 @@ class TestNarrativeTemplatePreview:
         brand_focus = data.get("brand_focus", "")
 
         keywords = [kw.strip() for kw in brand_focus.split("/") if kw.strip()]
-        assert any(
-            kw in narrative for kw in keywords
-        ), f"叙事文本应包含品牌侧重关键词 {keywords} 之一\n实际叙事：{narrative}"
+        assert any(kw in narrative for kw in keywords), (
+            f"叙事文本应包含品牌侧重关键词 {keywords} 之一\n实际叙事：{narrative}"
+        )
 
     def test_preview_returns_template_metadata(self) -> None:
         resp = client.post("/api/v1/analytics/narrative-templates/tpl-003/preview")

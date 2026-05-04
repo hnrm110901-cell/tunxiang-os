@@ -92,8 +92,7 @@ class BaseDeliveryDispatchAdapter(ABC):
     def __init__(self, store_config: ProviderConfigSnapshot) -> None:
         if store_config.provider != self.provider:
             raise ValueError(
-                f"adapter {self.__class__.__name__} expects provider={self.provider!r}, "
-                f"got {store_config.provider!r}"
+                f"adapter {self.__class__.__name__} expects provider={self.provider!r}, got {store_config.provider!r}"
             )
         self.config = store_config
 

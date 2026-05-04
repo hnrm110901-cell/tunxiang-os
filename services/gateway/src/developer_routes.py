@@ -3,6 +3,7 @@
 供 ISV/开发者自助管理集成凭证。
 需要 JWT 认证（管理员或开发者角色）。
 """
+
 import uuid
 from datetime import datetime
 from typing import Any

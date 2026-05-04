@@ -519,8 +519,7 @@ class SalesCoachAgent(SkillAgent):
                 "remediations": remediations,
             },
             reasoning=(
-                f"目标 {target_id} 达成率 {rate}（偏差 {deviation}），"
-                f"{'触发' if has_gap else '未触发'}阈值 {threshold}"
+                f"目标 {target_id} 达成率 {rate}（偏差 {deviation}），{'触发' if has_gap else '未触发'}阈值 {threshold}"
             ),
             confidence=0.85 if has_gap else 0.9,
         )
@@ -641,8 +640,7 @@ class SalesCoachAgent(SkillAgent):
                 "unmaintained_vip_ids": unmaintained_vip,
             },
             reasoning=(
-                f"沉睡占比 {dormant_ratio}"
-                f"{'（>阈值 ' + str(dormant_threshold) + '，已告警）' if dormant_alert else ''}"
+                f"沉睡占比 {dormant_ratio}{'（>阈值 ' + str(dormant_threshold) + '，已告警）' if dormant_alert else ''}"
             ),
             confidence=0.9,
         )

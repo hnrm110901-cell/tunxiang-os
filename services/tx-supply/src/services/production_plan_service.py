@@ -13,15 +13,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_supply.src.models.central_kitchen import (
     DeliveryItemORM,
     DeliveryTripORM,
     ProductionPlanORM,
     ProductionTaskORM,
 )
+from sqlalchemy import and_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
 

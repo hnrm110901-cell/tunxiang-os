@@ -25,6 +25,7 @@
     任意中间态 → escalated (人工介入)
     任意 → error (异常)
 """
+
 from __future__ import annotations
 
 import json
@@ -260,7 +261,7 @@ class DisputeService:
         if was_new:
             await self._insert_system_message(
                 dispute_id=dispute_id,
-                content=(f"异议单已创建。类型：{inp.dispute_type}，" f"商家需在 {deadline.isoformat()} 前响应。"),
+                content=(f"异议单已创建。类型：{inp.dispute_type}，商家需在 {deadline.isoformat()} 前响应。"),
             )
         await self._db.commit()
 
@@ -572,7 +573,7 @@ class DisputeService:
     def _assert_transition(self, current: str, target: str) -> None:
         allowed = ALLOWED_TRANSITIONS.get(current, set())
         if target not in allowed:
-            raise DisputeError(f"状态转换 {current} → {target} 不允许。" f"允许的目标：{sorted(allowed) or '(终态)'}")
+            raise DisputeError(f"状态转换 {current} → {target} 不允许。允许的目标：{sorted(allowed) or '(终态)'}")
 
     async def _insert_message(
         self,

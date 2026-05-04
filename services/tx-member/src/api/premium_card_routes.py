@@ -23,11 +23,11 @@
 import uuid
 from typing import Optional
 
+import services.premium_card as svc
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import services.premium_card as svc
 from shared.ontology.src.database import get_db_with_tenant
 from shared.security.src.error_handler import safe_http_exception
 

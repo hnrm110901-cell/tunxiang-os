@@ -10,6 +10,7 @@
   POST /api/v1/menu/dish/pricing/revert/{id}  → reverted
   GET  /api/v1/menu/dish/pricing/summary      按 store 聚合
 """
+
 from __future__ import annotations
 
 from datetime import date as date_cls

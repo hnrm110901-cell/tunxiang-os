@@ -23,7 +23,6 @@ from shared.ontology.src.database import get_db
 
 try:
     from repositories.customer_lifecycle_repo import CustomerLifecycleRepository
-
     from services.customer_lifecycle_fsm import CustomerLifecycleFSM
 except ImportError:  # pragma: no cover
     from ..repositories.customer_lifecycle_repo import (  # type: ignore[no-redef]

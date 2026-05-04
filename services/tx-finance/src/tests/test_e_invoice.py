@@ -320,12 +320,12 @@ def test_tax_ledger_summary():
         body = resp.json()
         assert body["ok"] is True
         data = body["data"]
-        assert isinstance(
-            data.get("total_invoice_amount_fen"), int
-        ), f"total_invoice_amount_fen 应为整数，实际为 {type(data.get('total_invoice_amount_fen'))}"
-        assert isinstance(
-            data.get("sales_tax_amount_fen"), int
-        ), f"sales_tax_amount_fen 应为整数，实际为 {type(data.get('sales_tax_amount_fen'))}"
+        assert isinstance(data.get("total_invoice_amount_fen"), int), (
+            f"total_invoice_amount_fen 应为整数，实际为 {type(data.get('total_invoice_amount_fen'))}"
+        )
+        assert isinstance(data.get("sales_tax_amount_fen"), int), (
+            f"sales_tax_amount_fen 应为整数，实际为 {type(data.get('sales_tax_amount_fen'))}"
+        )
     elif resp.status_code == 404:
         # tax-ledger 端点尚未在当前路由文件注册 — 测试认知到此情况
         pytest.skip("tax-ledger 端点尚未注册，待 Y-B3 完整实现后启用")

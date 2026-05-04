@@ -20,15 +20,14 @@ from datetime import datetime, timezone
 from enum import Enum
 
 import structlog
-from sqlalchemy import and_, select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from services.tx_supply.src.models.distribution import (
     DistributionItem,
     DistributionPlan,
     DistributionTrip,
     DistributionWarehouse,
 )
+from sqlalchemy import and_, select, text, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger()
 

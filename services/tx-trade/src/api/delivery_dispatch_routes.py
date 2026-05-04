@@ -293,7 +293,7 @@ async def create_dispatch(
     if not api_result.success:
         _err(
             502,
-            f"配送商下单失败 [{api_result.error_code or 'UNKNOWN'}]: " f"{api_result.error_message or '未知错误'}",
+            f"配送商下单失败 [{api_result.error_code or 'UNKNOWN'}]: {api_result.error_message or '未知错误'}",
         )
 
     # 3. 持久化

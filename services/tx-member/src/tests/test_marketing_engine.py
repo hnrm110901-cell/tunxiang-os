@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
 from main import app
-
 from services.marketing_engine import (
     apply_schemes_in_order,
     calculate_add_on,

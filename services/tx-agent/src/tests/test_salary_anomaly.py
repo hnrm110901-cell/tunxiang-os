@@ -106,17 +106,17 @@ def _fake_usage(cache_read: int = 3000, input_tokens: int = 500) -> dict[str, in
 
 
 def test_skill_registered_in_registry() -> None:
-    assert (
-        SalaryAnomalyAgent in ALL_SKILL_AGENTS
-    ), "SalaryAnomalyAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 ALL_SKILL_AGENTS 列表中注册"
+    assert SalaryAnomalyAgent in ALL_SKILL_AGENTS, (
+        "SalaryAnomalyAgent 必须在 services/tx-agent/src/agents/skills/__init__.py 的 ALL_SKILL_AGENTS 列表中注册"
+    )
     assert "salary_anomaly" in SKILL_REGISTRY, "salary_anomaly agent_id 必须出现在 SKILL_REGISTRY 映射中"
     assert SKILL_REGISTRY["salary_anomaly"] is SalaryAnomalyAgent
 
 
 def test_scope_is_margin() -> None:
-    assert SalaryAnomalyAgent.constraint_scope == {
-        "margin"
-    }, f"D4b 薪资异常必须且只声明 margin scope（人力成本率 → 毛利底线），实际：{SalaryAnomalyAgent.constraint_scope}"
+    assert SalaryAnomalyAgent.constraint_scope == {"margin"}, (
+        f"D4b 薪资异常必须且只声明 margin scope（人力成本率 → 毛利底线），实际：{SalaryAnomalyAgent.constraint_scope}"
+    )
 
 
 def test_agent_metadata() -> None:
@@ -274,9 +274,9 @@ async def test_prompt_cache_hit_ratio_reports_correctly() -> None:
     assert usage["cache_read_input_tokens"] == 3000
     assert usage["input_tokens"] == 500
     # 比率应由 ModelRouter 层计算并透传出来
-    assert (
-        usage["cache_hit_ratio"] > 0.75
-    ), f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
+    assert usage["cache_hit_ratio"] > 0.75, (
+        f"cache_hit_ratio={usage['cache_hit_ratio']} 应 > 0.75（Anthropic 推荐阈值）"
+    )
     # roi 中也应透传 cache_hit_ratio
     assert result.data["roi"]["roi_evidence"]["cache_hit_ratio"] > 0.75
 
@@ -310,9 +310,9 @@ async def test_model_router_called_with_sonnet_4_7() -> None:
 
     fake_router.complete_with_cache.assert_awaited_once()
     kwargs = fake_router.complete_with_cache.await_args.kwargs
-    assert (
-        kwargs["task_type"] == "salary_anomaly"
-    ), f"task_type 必须是 'salary_anomaly'（route 到 Sonnet 4.7），实际：{kwargs.get('task_type')}"
+    assert kwargs["task_type"] == "salary_anomaly", (
+        f"task_type 必须是 'salary_anomaly'（route 到 Sonnet 4.7），实际：{kwargs.get('task_type')}"
+    )
     assert kwargs["tenant_id"] == TENANT_ID
     # 系统提示必须为 list[dict] 且至少一个块含 cache_control
     system_blocks = kwargs["system_blocks"]
@@ -369,9 +369,9 @@ async def test_decision_log_records_prevented_loss_fen() -> None:
         # 传入的 roi（kwargs）含 prevented_loss_fen = 45000 + 60000 = 105000
         call_kwargs = mock_write.await_args.kwargs
         roi = call_kwargs["roi"]
-        assert (
-            roi["prevented_loss_fen"] == 105000
-        ), f"roi.prevented_loss_fen 应 = 45000 + 60000 = 105000，实际 {roi['prevented_loss_fen']}"
+        assert roi["prevented_loss_fen"] == 105000, (
+            f"roi.prevented_loss_fen 应 = 45000 + 60000 = 105000，实际 {roi['prevented_loss_fen']}"
+        )
         # improved_kpi 写入 labor_cost_ratio
         assert roi["improved_kpi"]["metric"] == "labor_cost_ratio"
         # saved_labor_hours 固定 2.0

@@ -84,9 +84,9 @@ class TestSupplierListNotSilentMock:
         # 直接测试 mock 数据本身的标注
         for supplier in MOCK_SUPPLIERS:
             assert "_data_source" in supplier, f"Mock 供应商 {supplier.get('id')} 缺少 _data_source 标注"
-            assert (
-                supplier["_data_source"] == "mock"
-            ), f"Mock 供应商 _data_source 应为 'mock'，实际为 '{supplier['_data_source']}'"
+            assert supplier["_data_source"] == "mock", (
+                f"Mock 供应商 _data_source 应为 'mock'，实际为 '{supplier['_data_source']}'"
+            )
 
     def test_supplier_list_mock_has_required_fields(self):
         """Mock 供应商必须包含 id/name/rating/total_orders/portal_status"""
@@ -143,9 +143,9 @@ class TestSupplierListNotSilentMock:
 
         # 确认只有在异常处理块内才返回 mock 数据
         assert '_data_source": "mock"' in source or '_data_source": "mock"' in source, "mock 数据标注代码应存在于路由中"
-        assert (
-            "OperationalError" in source or "InterfaceError" in source
-        ), "路由必须捕获 OperationalError/InterfaceError 才能触发 mock 降级"
+        assert "OperationalError" in source or "InterfaceError" in source, (
+            "路由必须捕获 OperationalError/InterfaceError 才能触发 mock 降级"
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -188,9 +188,9 @@ class TestRFQQuoteSubmit:
         data = resp.json()
         assert data["ok"] is True, f"ok 应为 True: {data}"
         assert data["data"]["status"] == "quoted", f"status 应为 'quoted'，实际为 '{data['data']['status']}'"
-        assert (
-            data["data"]["quoted_price_fen"] == 50000
-        ), f"quoted_price_fen 应为 50000，实际为 {data['data']['quoted_price_fen']}"
+        assert data["data"]["quoted_price_fen"] == 50000, (
+            f"quoted_price_fen 应为 50000，实际为 {data['data']['quoted_price_fen']}"
+        )
         assert data["data"]["quote_valid_until"] == "2026-04-30"
 
     def test_rfq_quote_submit_status_change_from_pending(self):

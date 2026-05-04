@@ -122,7 +122,7 @@ def to_myt(utc_dt: datetime) -> datetime:
         ValueError: If utc_dt is naive (no timezone info).
     """
     if utc_dt.tzinfo is None:
-        raise ValueError("Naive datetime provided. Supply a timezone-aware datetime " "or use utcfromtimestamp().")
+        raise ValueError("Naive datetime provided. Supply a timezone-aware datetime or use utcfromtimestamp().")
     return utc_dt.astimezone(MYT)
 
 

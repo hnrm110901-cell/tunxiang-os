@@ -50,7 +50,7 @@ class Application(Base, TenantMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "code", name="uq_devforge_applications_tenant_code"),
         CheckConstraint(
-            "resource_type IN ('backend_service','frontend_app','edge_image'," "'adapter','data_asset')",
+            "resource_type IN ('backend_service','frontend_app','edge_image','adapter','data_asset')",
             name="ck_devforge_applications_resource_type",
         ),
         Index(

@@ -665,7 +665,7 @@ class ReservationConciergeAgent(SkillAgent):
             constraint_scope={"experience"},
         )
 
-        reasoning = f"外呼 outcome={outcome.value}，推理层={inference_layer}，" f"距原定到店 {delta_minutes:.0f} 分钟"
+        reasoning = f"外呼 outcome={outcome.value}，推理层={inference_layer}，距原定到店 {delta_minutes:.0f} 分钟"
         inv.reasoning = reasoning
         inv.confidence = confidence
         inv.inference_layer = inference_layer

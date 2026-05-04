@@ -25,12 +25,12 @@ from typing import Any, Optional
 
 import httpx
 import structlog
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 # W12-3 LWW-Register 接线（lww_register.py 已 23 测试全绿）
 from lww_register import LWWValue, SyncToken, resolve_lww
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 logger = structlog.get_logger()
 
@@ -43,39 +43,45 @@ logger = structlog.get_logger()
 #   - 其它未列字段：默认 server_wins（保守兜底）
 
 # LWW 字段：末次写入即真相的状态/标量字段
-LWW_FIELDS: frozenset[str] = frozenset({
-    "status",            # 订单状态（open/paid/cancelled/refunded）
-    "table_no",          # 桌号
-    "table_id",          # 桌台 ID
-    "customer_id",       # 顾客绑定
-    "member_id",         # 会员绑定
-    "notes",             # 备注
-    "remark",            # 备注（兼容字段名）
-    "operator_id",       # 经手人
-    "channel",           # 渠道
-})
+LWW_FIELDS: frozenset[str] = frozenset(
+    {
+        "status",  # 订单状态（open/paid/cancelled/refunded）
+        "table_no",  # 桌号
+        "table_id",  # 桌台 ID
+        "customer_id",  # 顾客绑定
+        "member_id",  # 会员绑定
+        "notes",  # 备注
+        "remark",  # 备注（兼容字段名）
+        "operator_id",  # 经手人
+        "channel",  # 渠道
+    }
+)
 
 # 金额字段：PN-Counter 语义，禁止走 LWW，必须服务端为准
-MONETARY_FIELDS: frozenset[str] = frozenset({
-    "total_amount_fen",
-    "subtotal_fen",
-    "discount_fen",
-    "tax_fen",
-    "tip_fen",
-    "paid_fen",
-    "refund_fen",
-    "service_fee_fen",
-    "delivery_fee_fen",
-    "balance_fen",
-})
+MONETARY_FIELDS: frozenset[str] = frozenset(
+    {
+        "total_amount_fen",
+        "subtotal_fen",
+        "discount_fen",
+        "tax_fen",
+        "tip_fen",
+        "paid_fen",
+        "refund_fen",
+        "service_fee_fen",
+        "delivery_fee_fen",
+        "balance_fen",
+    }
+)
 
 # 顺序敏感列表：暂走 server_wins（应使用 RGA/Logoot，未来扩展）
-LIST_FIELDS: frozenset[str] = frozenset({
-    "items_data",
-    "items",
-    "payments_data",
-    "payments",
-})
+LIST_FIELDS: frozenset[str] = frozenset(
+    {
+        "items_data",
+        "items",
+        "payments_data",
+        "payments",
+    }
+)
 
 # ─── 环境配置 ──────────────────────────────────────────────────────────────
 
@@ -666,14 +672,16 @@ class OfflineSyncService:
                     """),
                     {
                         **{k: v for k, v in params.items() if k != "conflict_reason"},
-                        "patch": _json_dumps({
-                            "_lww_resolution": {
-                                "merged_payload": merged_payload,
-                                "field_decisions": field_decisions,
-                                "server_order_id": server_order_id,
-                                "resolved_at": now.isoformat(),
-                            },
-                        }),
+                        "patch": _json_dumps(
+                            {
+                                "_lww_resolution": {
+                                    "merged_payload": merged_payload,
+                                    "field_decisions": field_decisions,
+                                    "server_order_id": server_order_id,
+                                    "resolved_at": now.isoformat(),
+                                },
+                            }
+                        ),
                     },
                 )
 

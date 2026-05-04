@@ -11,6 +11,7 @@
     查询：?months_back=6
     出参：按月/活动类型聚合 ROI 视图
 """
+
 from __future__ import annotations
 
 import logging

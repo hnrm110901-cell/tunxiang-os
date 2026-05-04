@@ -837,7 +837,7 @@ class ReputationMonitor:
         # 降级模板
         if alert_type == "rating_drop":
             drop = trigger_data.get("drop", 0)
-            return f"品牌在{alert_data.get('platform', '平台')}的评分" f"近24小时下降{drop}分，需关注。"
+            return f"品牌在{alert_data.get('platform', '平台')}的评分近24小时下降{drop}分，需关注。"
         count = trigger_data.get("negative_count", 0)
         ratio = trigger_data.get("spike_ratio", 0)
         return (

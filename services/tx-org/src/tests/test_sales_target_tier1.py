@@ -56,7 +56,7 @@ async def _fake_emit_event(**kwargs):  # noqa: D401
 
 
 _emitter_mod.emit_event = _fake_emit_event
-_emitter_mod.emits = lambda *a, **k: (lambda f: f)
+_emitter_mod.emits = lambda *a, **k: lambda f: f
 
 
 class _SalesTargetEventType:
@@ -566,7 +566,7 @@ async def test_decompose_year_to_months_sum_equals_year(fake_db, service):
     for m in months:
         m_days = [d for d in days if d["parent_target_id"] == m["target_id"]]
         assert sum(d["target_value"] for d in m_days) == m["target_value"], (
-            f"月 {m['period_start']} 日加和 {sum(d['target_value'] for d in m_days)} " f"!= 月目标 {m['target_value']}"
+            f"月 {m['period_start']} 日加和 {sum(d['target_value'] for d in m_days)} != 月目标 {m['target_value']}"
         )
 
 
@@ -924,10 +924,10 @@ async def test_aggregate_filters_by_employee_id(fake_db, service):
     ach_b = await service.get_achievement(fake_db, tenant_id=TENANT_A, target_id=t_b["target_id"])
 
     assert int(ach_a["actual_value"]) == 30_000, (
-        "销售经理 A 的 actual 必须只含归属 A 的订单（30,000），" f"实际 {ach_a['actual_value']}"
+        f"销售经理 A 的 actual 必须只含归属 A 的订单（30,000），实际 {ach_a['actual_value']}"
     )
     assert int(ach_b["actual_value"]) == 70_000, (
-        "销售经理 B 的 actual 必须只含归属 B 的订单（70,000），" f"实际 {ach_b['actual_value']}"
+        f"销售经理 B 的 actual 必须只含归属 B 的订单（70,000），实际 {ach_b['actual_value']}"
     )
     # 关键：两人 actual_value 不能相同（历史 bug 会让两人都=100,000）
     assert ach_a["actual_value"] != ach_b["actual_value"], "同店多销售经理不能共享门店全额 actual（P0-2 回归）"

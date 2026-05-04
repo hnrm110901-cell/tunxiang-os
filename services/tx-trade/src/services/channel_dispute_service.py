@@ -314,8 +314,7 @@ class ChannelDisputeService:
         decision_at: Optional[datetime] = None
         if is_auto_acceptable:
             decision_reason = (
-                f"auto_accept under threshold (claim={req.claimed_amount_fen}"
-                f" <= threshold={auto_accept_threshold_fen})"
+                f"auto_accept under threshold (claim={req.claimed_amount_fen} <= threshold={auto_accept_threshold_fen})"
             )
             decision_at = datetime.now(timezone.utc)
 

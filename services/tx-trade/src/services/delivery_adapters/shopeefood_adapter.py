@@ -3,6 +3,7 @@
 字段映射参考 ShopeeFood Partner API (马来西亚)。
 签名算法：HMAC-SHA256（app_secret 为 key，按字典序排序的 query params + body 为 data）。
 """
+
 from __future__ import annotations
 
 import hashlib

@@ -22,6 +22,7 @@
   GET  /api/v1/trade/delivery/xhs/events
     查询 webhook 事件历史（含签名失败/transform 失败）
 """
+
 from __future__ import annotations
 
 import logging
