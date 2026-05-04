@@ -15,11 +15,11 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import date, timedelta
+from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
