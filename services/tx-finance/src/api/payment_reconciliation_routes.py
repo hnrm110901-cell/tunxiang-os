@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -95,10 +96,7 @@ def _validate_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> 
     try:
         uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"X-Tenant-ID 格式错误: {exc}",
-        ) from exc
+        raise safe_http_exception(400, "X-Tenant-ID 格式错误", exc) from exc
     return x_tenant_id
 
 
@@ -106,17 +104,11 @@ def _validate_date_range(start_date: str, end_date: str) -> tuple[date, date]:
     try:
         d_start = date.fromisoformat(start_date)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"start_date 格式错误: {start_date}，请使用 YYYY-MM-DD",
-        ) from exc
+        raise safe_http_exception(400, "start_date 格式错误，请使用 YYYY-MM-DD", exc) from exc
     try:
         d_end = date.fromisoformat(end_date)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"end_date 格式错误: {end_date}，请使用 YYYY-MM-DD",
-        ) from exc
+        raise safe_http_exception(400, "end_date 格式错误，请使用 YYYY-MM-DD", exc) from exc
     if d_start > d_end:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -129,10 +121,7 @@ def _validate_uuid(value: str, field_name: str) -> str:
     try:
         uuid.UUID(value)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"{field_name} 格式错误: {exc}",
-        ) from exc
+        raise safe_http_exception(400, f"{field_name} 格式错误", exc) from exc
     return value
 
 

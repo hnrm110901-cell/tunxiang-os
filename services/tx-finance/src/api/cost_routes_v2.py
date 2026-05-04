@@ -21,6 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["finance-costs-v2"])
@@ -103,7 +104,7 @@ def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
         return uuid.UUID(val)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"无效的 {field_name}: {val}") from exc
+        raise safe_http_exception(400, f"{field_name} 格式错误", exc) from exc
 
 
 def _parse_date_param(d: str) -> date:
@@ -112,7 +113,7 @@ def _parse_date_param(d: str) -> date:
     try:
         return date.fromisoformat(d)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"日期格式错误: {d}，请使用 YYYY-MM-DD") from exc
+        raise safe_http_exception(400, "日期格式错误，请使用 YYYY-MM-DD", exc) from exc
 
 
 # ─── POST /costs — 录入成本记录 ───────────────────────────────────────────────
@@ -144,7 +145,7 @@ async def create_cost_item(
         try:
             ref_id = str(uuid.UUID(body.reference_id))
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=f"reference_id 格式错误: {body.reference_id}") from exc
+            raise safe_http_exception(400, "reference_id 格式错误", exc) from exc
 
     result = await db.execute(
         text("""

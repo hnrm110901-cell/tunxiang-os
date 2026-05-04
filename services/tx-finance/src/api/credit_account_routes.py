@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import CreditEventType
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -42,7 +43,7 @@ def _parse_uuid(val: str, field_name: str) -> uuid.UUID:
     try:
         return uuid.UUID(val)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"无效的 {field_name}: {val}") from exc
+        raise safe_http_exception(400, f"{field_name} 格式错误", exc) from exc
 
 
 def _serialize_row(row: dict) -> dict:
@@ -305,7 +306,7 @@ async def get_agreement(
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
 
     if row is None:
-        raise HTTPException(status_code=404, detail=f"协议不存在: {agreement_id}")
+        raise HTTPException(status_code=404, detail="协议不存在")
 
     return {"ok": True, "data": _serialize_row(dict(row)), "error": None}
 
@@ -344,12 +345,12 @@ async def charge_credit(
         raise HTTPException(status_code=500, detail="查询协议失败") from exc
 
     if agreement is None:
-        raise HTTPException(status_code=404, detail=f"协议不存在: {agreement_id}")
+        raise HTTPException(status_code=404, detail="协议不存在")
 
     if agreement["status"] != "active":
         raise HTTPException(
             status_code=409,
-            detail=f"协议状态 {agreement['status']} 不允许挂账消费",
+            detail="协议状态不允许挂账消费",
         )
 
     available = agreement["credit_limit_fen"] - agreement["used_amount_fen"]
@@ -626,7 +627,7 @@ async def pay_bill(
         raise HTTPException(status_code=500, detail="查询账单失败") from exc
 
     if bill is None:
-        raise HTTPException(status_code=404, detail=f"账单不存在: {bill_id}")
+        raise HTTPException(status_code=404, detail="账单不存在")
 
     if bill["status"] == "paid":
         raise HTTPException(status_code=409, detail="账单已还清，无需重复还款")
@@ -635,7 +636,7 @@ async def pay_bill(
     if body.pay_amount_fen > unpaid:
         raise HTTPException(
             status_code=400,
-            detail=f"还款金额 {body.pay_amount_fen} 超过未还金额 {unpaid}（分）",
+            detail="还款金额超过未还金额",
         )
 
     new_paid = bill["paid_amount_fen"] + body.pay_amount_fen
@@ -757,7 +758,7 @@ async def get_statement(
         )
         agreement = agr_result.mappings().first()
         if agreement is None:
-            raise HTTPException(status_code=404, detail=f"协议不存在: {agreement_id}")
+            raise HTTPException(status_code=404, detail="协议不存在")
 
         # 消费明细
         count_result = await db.execute(
