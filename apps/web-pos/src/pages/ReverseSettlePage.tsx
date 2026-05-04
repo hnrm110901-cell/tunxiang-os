@@ -167,7 +167,8 @@ export function ReverseSettlePage() {
         <div style={{ marginTop: 'auto' }}>
           <button
             onClick={() => navigate(-1)}
-            style={{ width: '100%', padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 56 }}
+            {...tf.handlers}
+            style={{ width: '100%', padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 56, ...tf.style }}
           >
             返回
           </button>
@@ -405,14 +406,12 @@ export function ReverseSettlePage() {
             <div style={{ display: 'flex', gap: 12 }}>
               <button
                 onClick={() => navigate('/tables')}
+                {...tf.handlers}
                 style={{
                   flex: 1, padding: 16, background: '#FF6B35', border: 'none', borderRadius: 12,
                   color: '#fff', fontSize: 18, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
-                  transition: 'transform 200ms ease',
+                  transition: 'transform 200ms ease', ...tf.style,
                 }}
-                onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 返回桌台
               </button>
