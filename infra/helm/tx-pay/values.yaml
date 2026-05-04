@@ -1,0 +1,81 @@
+# tx-pay — 支付中枢微服务（Tier 1：资金链路，零容忍）
+# 高可用配置：replicaCount=2，支付链路不允许单点故障
+# 端口决议：P0-1（feat/p0-pay-port-unify）已决议为 8016
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-pay
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8016
+  targetPort: 8016
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 1
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # 支付回调通知 Base URL（默认值，生产环境通过 Secret 覆盖）
+  PAY_NOTIFY_BASE_URL: "https://api.tunxiang.com"
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-pay-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY,
+  #       WECHAT_PAY_KEY, ALIPAY_KEY, UNIONPAY_KEY, PAY_NOTIFY_BASE_URL
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8016
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8016
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：支付服务 Pod 必须分散到不同节点，防止单节点故障影响资金链路
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
