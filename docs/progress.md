@@ -1,3 +1,39 @@
+## 2026-05-04 22:35  PG/PI/P2.2 后续会话收尾（7 PR admin merge）
+
+### 本次会话目标
+延续 v6 审计修复总会话，收尾 in-flight PR + 主分支基建欠债 + 加盟域事件总线收口
++ 多智能体并发协议固化。
+
+### 完成状态
+- [x] PR #145 PI.1 — alembic chain 断链 + KNOWN_BROKEN 白名单（SECURITY）
+- [x] PR #146 PG.4 — GET /api/v1/sync/pull SyncToken 双键增量（Tier1）
+- [x] PR #147 PG.6 — v396 加盟 6 表 last_event_id（Tier1）
+- [x] PR #148 PG.2 — datetime.utcnow codemod 第二轮 17 文件（refactor）
+- [x] PR #149 PG.5 — 加盟历史 backfill 脚本（Tier1 财务）
+- [x] PR #155 P2.2 — 消除 f-string SQL 拼接 + S608 守门（SECURITY）
+- [x] PR #156 PG.3 — 多智能体并发开发协议 v1（docs）
+- [ ] PD.2 积分 22 测试 — 需 Docker Python 3.11+
+- [ ] PE.2 阶梯费率对账 — 需客户协作
+
+### 关键决策
+- **KNOWN_BROKEN 白名单制**：CI 容忍历史断链 + 文档化，不阻塞当前 PR
+- **注入式接口**：PG.5 backfill 接受 db_execute/db_update/emit_event 函数注入
+  → 29 测试 0.06s 完成，零 DB 依赖
+- **守门测试"先窄后宽"**：P2.2 守门测仅守实际改过的 3 文件，不强制全仓收紧
+- **gh api 兜底**：proxy 502 雪崩时立即切 `gh api -X PUT /contents`，全程稳定
+
+### 下一步
+- 跑 PD.2（Docker 起 Python 3.11+ 镜像）/ PE.2（与客户对账）
+- 评估 v397 next migration（事件总线 Phase 2 物化视图重建？）
+- 监测 backfill_franchise_events 真跑时事件流速率
+
+### 已知风险
+- v396 + PG.5 backfill 真跑前需先 DEMO 环境跑 --dry-run 看计划
+- 多智能体协议 v1 是 living document，下个会话踩到新坑后必须升级条款
+- shared/apikeys 现已零 f-string SQL，但全仓仍 ~394 处需后续大批量 codemod
+
+---
+
 ## 2026-05-04 14:30  tx-org 加盟分润计算器金额单位统一（分 + Decimal）
 
 ### 本次会话目标
