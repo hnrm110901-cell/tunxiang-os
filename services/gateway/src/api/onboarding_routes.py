@@ -28,6 +28,8 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..response import ok
 
 logger = structlog.get_logger(__name__)
@@ -650,4 +652,4 @@ async def _do_import(tenant_id: str, pkg: dict) -> dict:
 
     except Exception as exc:  # noqa: BLE001 — 最外层兜底，记录并抛出500
         logger.error("onboarding_import_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"配置导入失败: {exc}")
+        raise safe_http_exception(500, "配置导入失败", exc)
