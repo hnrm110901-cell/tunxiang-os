@@ -64,9 +64,9 @@ podAntiAffinity:
   enabled: true
 
 serviceAccount:
-  create: false
+  create: true
   name: ""
-
+  annotations: {}
 podAnnotations: {}
 
 nodeSelector: {}

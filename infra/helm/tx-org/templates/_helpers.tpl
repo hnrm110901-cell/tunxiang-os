@@ -47,3 +47,14 @@ Selector labels.
 app.kubernetes.io/name: {{ include "tx-org.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Create the name of the service account to use.
+*/}}
+{{- define "tx-org.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "tx-org.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
