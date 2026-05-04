@@ -66,8 +66,7 @@ def test_v396_no_blocking_create_index() -> None:
     pattern = re.compile(r"CREATE\s+INDEX\s+(?!CONCURRENTLY\b)", re.IGNORECASE)
     matches = [m.group(0) for m in pattern.finditer(code)]
     assert not matches, (
-        f"v396 仍存在阻塞型 CREATE INDEX（未带 CONCURRENTLY）：{matches}\n"
-        "生产部署期间会阻塞加盟相关 API 写入。"
+        f"v396 仍存在阻塞型 CREATE INDEX（未带 CONCURRENTLY）：{matches}\n生产部署期间会阻塞加盟相关 API 写入。"
     )
 
 
@@ -91,8 +90,7 @@ def test_v396_downgrade_drop_index_concurrently() -> None:
     """downgrade 也必须用 DROP INDEX CONCURRENTLY IF EXISTS 保持对称且不阻塞。"""
     text = _read_v396()
     assert "DROP INDEX CONCURRENTLY IF EXISTS" in text, (
-        "v396 downgrade() 必须使用 DROP INDEX CONCURRENTLY IF EXISTS — "
-        "回滚时同样不应阻塞加盟表写入。"
+        "v396 downgrade() 必须使用 DROP INDEX CONCURRENTLY IF EXISTS — 回滚时同样不应阻塞加盟表写入。"
     )
 
 
@@ -101,9 +99,7 @@ def test_v396_downgrade_no_blocking_drop_index() -> None:
     code = _strip_comments_and_docstring(_read_v396())
     pattern = re.compile(r"DROP\s+INDEX\s+(?!CONCURRENTLY\b)", re.IGNORECASE)
     matches = [m.group(0) for m in pattern.finditer(code)]
-    assert not matches, (
-        f"v396 downgrade 仍存在阻塞型 DROP INDEX（未带 CONCURRENTLY）：{matches}"
-    )
+    assert not matches, f"v396 downgrade 仍存在阻塞型 DROP INDEX（未带 CONCURRENTLY）：{matches}"
 
 
 # ──────────────── 守门 4：六张加盟表索引覆盖完整 ────────────────
