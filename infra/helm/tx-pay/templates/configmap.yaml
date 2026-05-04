@@ -1,0 +1,25 @@
+{{/*
+ConfigMap — 默认 disabled（deployment 仍用 .Values.env 直接注入，向后兼容）。
+启用后业务可在 deployment 中通过：
+  envFrom:
+    - configMapRef:
+        name: {{ include "tx-pay.fullname" . }}-extra
+来加载 key-value。本 P0.6 不修改 deployment.yaml。
+
+values.yaml 期望字段：
+  configMap:
+    enabled: false
+    data: {}           # key-value 自由填，如 FEATURE_X: "true"
+*/}}
+{{- if .Values.configMap.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-pay.fullname" . }}-extra
+  labels:
+    {{- include "tx-pay.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.configMap.data }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}
