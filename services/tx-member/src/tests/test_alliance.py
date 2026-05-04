@@ -383,9 +383,8 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_create_partner(self):
         """验证 POST /partners 路由创建合作伙伴"""
-        from unittest.mock import MagicMock
 
-        from api.alliance_routes import api_create_partner, CreatePartnerReq
+        from api.alliance_routes import CreatePartnerReq, api_create_partner
 
         body = CreatePartnerReq(
             partner_name="肯德基",
@@ -426,7 +425,7 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_exchange_points(self):
         """验证 POST /exchange 路由积分兑换"""
-        from api.alliance_routes import api_exchange_points, ExchangePointsReq
+        from api.alliance_routes import ExchangePointsReq, api_exchange_points
 
         body = ExchangePointsReq(
             customer_id=CUSTOMER_A,
