@@ -80,11 +80,11 @@ serviceAccount:
   name: ""
   annotations: {}
 
-# P0.6 工件 3 — PodDisruptionBudget（Tier 2：maxUnavailable=1）
+# P0.6 工件 3 — PodDisruptionBudget（Tier 1：minAvailable=1，对齐 CLAUDE.md §17 宪法）
 pdb:
   enabled: true
-  minAvailable: ""
-  maxUnavailable: 1
+  minAvailable: 1
+  maxUnavailable: ""
 
 # P0.6 工件 4 — NetworkPolicy（默认禁用，启用前需画清楚服务依赖图）
 # docs/infra/service-dependency-graph.md（待补）
