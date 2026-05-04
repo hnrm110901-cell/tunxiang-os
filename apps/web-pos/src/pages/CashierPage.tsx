@@ -239,6 +239,8 @@ export function CashierPage() {
   ], { activeContext: 'cashier' });
 
   // 加载菜品（API优先，失败回退 mock）+ 自动开单
+  // 空 deps 安全: STORE_ID 是模块常量, tableNo/orderId 从路由参数派生（React Router
+  // 在参数变化时 re-mount 组件），store.setOrder 是 Zustand 稳定引用。
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -254,7 +256,8 @@ export function CashierPage() {
             .catch((e) => { console.error('开单失败:', e); setError('开单失败，请重试或使用离线模式'); })
         : Promise.resolve(),
     ]).finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── 分类列表 ────────────────────────────────────────────────────────────────
 
@@ -299,7 +302,9 @@ export function CashierPage() {
 
     // 普通菜品 → 直接加入订单
     handleAddNormalDish(dish);
-  }, [items, orderId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // items/orderId 在 zustand store 中，incl 可避免重复加菜但需 store.getState() 根治
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, orderId]);
 
   const handleAddNormalDish = useCallback(async (dish: ExtendedDishItem) => {
     const existing = items.find((i) => i.dishId === dish.id);

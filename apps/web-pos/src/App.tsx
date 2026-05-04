@@ -48,6 +48,7 @@ import { FastFoodKDSView } from './pages/fastfood/FastFoodKDSView';
 import { PrintManagerPage } from './pages/PrintManagerPage';  // 模块4.2 打印管理可视化中心
 import { BanquetDepositPage } from './pages/BanquetDepositPage';  // 模块4.1 宴会定金管理
 import { StoreTwinPage } from './pages/StoreTwinPage';  // Phase 3: 门店数字孪生
+import { A2UIDemoPage } from './pages/A2UIDemoPage';  // Phase 3: A2UI 组件演示
 import { CommandPalette } from './components/CommandPalette';  // Cmd+K 命令面板
 
 const STORE_ID: string =
@@ -196,6 +197,7 @@ function AppLayout() {
         <Route path="/print-manager" element={<PrintManagerPage />} />
         {/* ─── Phase 3: 门店数字孪生 ─── */}
         <Route path="/store-twin" element={<StoreTwinPage />} />
+        <Route path="/a2ui-demo" element={<A2UIDemoPage />} />
       </Routes>
     </div>
   );

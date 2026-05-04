@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { fetchTableStatus, type TableStatus } from '../api/posOpsApi';
 import { OrderActionPanel } from './OrderActionPanel';
 import { StatusBar, TableCard } from '@tx-ds/biz';
@@ -63,6 +64,7 @@ export function TableMapPage() {
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [tableLoading, setTableLoading] = useState(false);
   const [tableError, setTableError] = useState<string | null>(null);
+  const tf = useTouchFeedback();
 
   /* ── 键盘快捷键（桌台地图）── */
   const { altPressed, shortcuts, activeKey } = useKeyboardShortcuts([
@@ -177,10 +179,12 @@ export function TableMapPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <button
             onClick={() => navigate('/dashboard')}
+            {...tf.handlers}
             style={{
               minHeight: 48, minWidth: 48, padding: '8px 16px',
               background: C.card, border: `1px solid ${C.border}`, borderRadius: 8,
               color: C.text, fontSize: 16, cursor: 'pointer',
+              ...tf.style,
             }}
           >
             {'<'} 返回
@@ -204,20 +208,24 @@ export function TableMapPage() {
           <KeyboardHelpTrigger onClick={() => setShowHelpPanel((v) => !v)} />
           <button
             onClick={() => navigate('/store-twin')}
+            {...tf.handlers}
             style={{
               minHeight: 48, padding: '8px 16px',
               background: C.card, border: `1px solid ${C.purple}`, borderRadius: 8,
               color: C.purple, fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              ...tf.style,
             }}
           >
             鸟瞰
           </button>
           <button
             onClick={() => navigate('/quick-cashier')}
+            {...tf.handlers}
             style={{
               minHeight: 48, padding: '8px 20px',
               background: C.accent, border: 'none', borderRadius: 8,
               color: C.white, fontSize: 16, fontWeight: 700, cursor: 'pointer',
+              ...tf.style,
             }}
           >
             快速收银
@@ -225,10 +233,12 @@ export function TableMapPage() {
           <button
             onClick={loadTables}
             disabled={tableLoading}
+            {...tf.handlers}
             style={{
               minHeight: 48, padding: '8px 16px',
               background: C.card, border: `1px solid ${C.border}`, borderRadius: 8,
               color: tableLoading ? C.muted : C.text, fontSize: 16, cursor: tableLoading ? 'wait' : 'pointer',
+              ...tf.style,
             }}
           >
             {tableLoading ? '刷新中...' : '刷新 [F5]'}
@@ -247,12 +257,14 @@ export function TableMapPage() {
             <button
               key={area}
               onClick={() => setFilterArea(area)}
+              {...tf.handlers}
               style={{
                 minHeight: 48, padding: '8px 20px', border: 'none',
                 background: filterArea === area ? C.accent : C.card,
                 color: filterArea === area ? C.white : C.muted,
                 fontSize: 16, fontWeight: filterArea === area ? 700 : 400,
                 cursor: 'pointer', transition: 'background 200ms ease',
+                ...tf.style,
               }}
             >
               {area}

@@ -10,8 +10,6 @@
  *   🟡 偏慢 (5-10min)    #F59E0B
  *   🔴 超时 (> 10min)    #EF4444
  */
-import { useMemo } from 'react';
-
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
 interface TimelineOrder {
@@ -78,15 +76,15 @@ const PACING_LABEL = { normal: '正常', slow: '偏慢', overdue: '超时' };
 // ─── Component ──────────────────────────────────────────────────────────────────
 
 export function KdsTimeline({ orders, expectedTimeSec = 600 }: KdsTimelineProps) {
-  // 按紧急程度排序：超时 → 偏慢 → 正常
-  const sorted = useMemo(() => {
-    const withPacing = orders.map((o) => {
-      const total = elapsedSec(o.createdAt);
-      return { ...o, totalSec: total, pacing: pacingLevel(total, expectedTimeSec) };
-    });
-    const orderMap = { overdue: 0, slow: 1, normal: 2 };
-    return withPacing.sort((a, b) => orderMap[a.pacing] - orderMap[b.pacing] || b.totalSec - a.totalSec);
-  }, [orders, expectedTimeSec]);
+  // 每帧重新计算（父组件 1s ticker 驱动），确保耗时实时更新
+  const withPacing = orders.map((o) => {
+    const total = elapsedSec(o.createdAt);
+    return { ...o, totalSec: total, pacing: pacingLevel(total, expectedTimeSec) };
+  });
+  const orderMap: Record<string, number> = { overdue: 0, slow: 1, normal: 2 };
+  const sorted = [...withPacing].sort(
+    (a, b) => orderMap[a.pacing] - orderMap[b.pacing] || b.totalSec - a.totalSec,
+  );
 
   if (sorted.length === 0) {
     return (

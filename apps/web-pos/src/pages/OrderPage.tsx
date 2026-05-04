@@ -12,6 +12,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { createOrder, addItem as apiAddItem, removeItem as apiRemoveItem, getOrder } from '../api/tradeApi';
 import { fetchDishes, fetchCategories, type DishItem } from '../api/menuApi';
@@ -107,6 +108,7 @@ export function OrderPage() {
   const [searchText, setSearchText] = useState('');
   const [tableNo, setTableNo] = useState(store.tableNo || '');
   const [showRecommend, setShowRecommend] = useState(true);
+  const tf = useTouchFeedback();
 
   // 弹层
   const [seafoodSheet, setSeafoodSheet] = useState<{ visible: boolean; dish: ExtendedDishItem | null }>({ visible: false, dish: null });
@@ -273,9 +275,11 @@ export function OrderPage() {
         <button
           type="button"
           onClick={() => navigate('/tables')}
+          {...tf.handlers}
           style={{
             padding: '14px 8px', background: 'transparent', border: 'none', borderBottom: '1px solid #1a2a33',
             color: '#9CA3AF', fontSize: 14, cursor: 'pointer', textAlign: 'center', minHeight: 48,
+            ...tf.style,
           }}
         >
           ← 桌台
@@ -420,9 +424,9 @@ export function OrderPage() {
                   <div style={{ fontSize: 14, color: '#FF6B35', marginTop: 3, fontWeight: 500 }}>{fen2yuan(item.priceFen * item.quantity)}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <button type="button" onClick={() => handleQtyChange(item.id, -1)} style={qtyBtnStyle}>−</button>
+                  <button type="button" onClick={() => handleQtyChange(item.id, -1)} {...tf.handlers} style={{ ...qtyBtnStyle, ...tf.style }}>−</button>
                   <span style={{ fontSize: 18, fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
-                  <button type="button" onClick={() => handleQtyChange(item.id, +1)} style={qtyBtnStyle}>+</button>
+                  <button type="button" onClick={() => handleQtyChange(item.id, +1)} {...tf.handlers} style={{ ...qtyBtnStyle, ...tf.style }}>+</button>
                 </div>
               </div>
               <button
@@ -447,10 +451,10 @@ export function OrderPage() {
             <span>合计</span><span>{fen2yuan(finalFen)}</span>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={handleHoldOrder} style={{ flex: 1, padding: '14px 0', background: '#1a2a33', color: '#fff', border: '1px solid #333', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 52 }}>
+            <button type="button" onClick={handleHoldOrder} {...tf.handlers} style={{ flex: 1, padding: '14px 0', background: '#1a2a33', color: '#fff', border: '1px solid #333', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 52, ...tf.style }}>
               挂单
             </button>
-            <button type="button" onClick={handleSubmitOrder} disabled={items.length === 0} style={{ flex: 2, padding: '14px 0', background: items.length > 0 ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 600, cursor: items.length > 0 ? 'pointer' : 'not-allowed', minHeight: 52 }}>
+            <button type="button" onClick={handleSubmitOrder} disabled={items.length === 0} {...tf.handlers} style={{ flex: 2, padding: '14px 0', background: items.length > 0 ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 600, cursor: items.length > 0 ? 'pointer' : 'not-allowed', minHeight: 52, ...tf.style }}>
               下单结算
             </button>
           </div>
