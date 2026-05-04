@@ -306,15 +306,16 @@ class UnifiedSendScheduler:
                 SELECT 1 FROM notification_tasks
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
-                  AND scheduled_at > NOW() - INTERVAL ':hours hours'
+                  AND scheduled_at > NOW() - make_interval(hours => :hours)
                   AND status NOT IN ('failed', 'cancelled')
                   AND is_deleted = FALSE
                 LIMIT 1
-            """.replace(":hours", str(GLOBAL_COOLDOWN_HOURS))
+            """
             ),
             {
                 "tenant_id": str(tenant_id),
                 "customer_id": str(customer_id),
+                "hours": GLOBAL_COOLDOWN_HOURS,
             },
         )
         return result.first() is not None
