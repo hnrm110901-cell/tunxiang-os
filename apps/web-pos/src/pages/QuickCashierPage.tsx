@@ -21,6 +21,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
+import { VoiceCommandBar, matchVoiceCommand } from '../components/VoiceCommandBar';
 import { fetchDishes, fetchCategories, type DishItem } from '../api/menuApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
 import { formatPrice } from '@tx-ds/utils';
@@ -1396,6 +1397,17 @@ export function QuickCashierPage() {
         onCashInputChange={val =>
           setPayModal(prev => ({ ...prev, cashInputStr: val }))
         }
+      />
+
+      <VoiceCommandBar
+        context="快餐收银"
+        position="bottom-right"
+        onCommand={(cmd) => {
+          const action = matchVoiceCommand(cmd.text, '收银台');
+          if (action === 'quick_cash' && cart.length > 0) {
+            setShowPayModal(true);
+          }
+        }}
       />
     </div>
   );
