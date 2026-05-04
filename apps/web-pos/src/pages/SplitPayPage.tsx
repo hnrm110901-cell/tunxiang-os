@@ -163,11 +163,9 @@ export function SplitPayPage() {
                   color: '#fff', cursor: step === 'select' ? 'pointer' : 'default',
                   transition: 'transform 200ms ease, border-color 200ms ease',
                   opacity: step !== 'select' ? 0.7 : 1,
-                  minHeight: 56,
+                  minHeight: 56, ...tf.style,
                 }}
-                onPointerDown={(e) => { if (step === 'select') e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                {...tf.handlers}
               >
                 {/* 勾选框 */}
                 <div style={{
@@ -206,7 +204,8 @@ export function SplitPayPage() {
           <div style={{ display: 'flex', gap: 12 }}>
             <button
               onClick={() => navigate(-1)}
-              style={{ flex: 1, padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer', minHeight: 56 }}
+              {...tf.handlers}
+              style={{ flex: 1, padding: 16, background: '#333', border: 'none', borderRadius: 12, color: '#fff', fontSize: 18, cursor: 'pointer', minHeight: 56, ...tf.style }}
             >
               返回
             </button>
@@ -214,16 +213,14 @@ export function SplitPayPage() {
               <button
                 onClick={() => selectedItemIds.size > 0 && setStep('pay')}
                 disabled={selectedItemIds.size === 0}
+                {...tf.handlers}
                 style={{
                   flex: 2, padding: 16, border: 'none', borderRadius: 12, color: '#fff',
                   fontSize: 18, fontWeight: 'bold', minHeight: 56,
                   background: selectedItemIds.size > 0 ? '#FF6B35' : '#444',
                   cursor: selectedItemIds.size > 0 ? 'pointer' : 'not-allowed',
-                  transition: 'transform 200ms ease',
+                  transition: 'transform 200ms ease', ...tf.style,
                 }}
-                onPointerDown={(e) => { if (selectedItemIds.size > 0) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 去支付
               </button>
@@ -297,15 +294,13 @@ export function SplitPayPage() {
                   <button
                     key={m.key}
                     onClick={() => setActiveMethod(m.key)}
+                    {...tf.handlers}
                     style={{
                       padding: 12, borderRadius: 8, border: activeMethod === m.key ? '2px solid #FF6B35' : '2px solid transparent',
                       background: activeMethod === m.key ? '#1A3A48' : '#112B36',
                       color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 48,
-                      transition: 'transform 200ms ease',
+                      transition: 'transform 200ms ease', ...tf.style,
                     }}
-                    onPointerDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                    onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                    onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     {m.label}
                   </button>
@@ -342,16 +337,14 @@ export function SplitPayPage() {
               <button
                 onClick={addPayment}
                 disabled={!activeMethod || !customAmountStr}
+                {...tf.handlers}
                 style={{
                   width: '100%', padding: 14, border: 'none', borderRadius: 12, fontSize: 18,
                   background: activeMethod && customAmountStr ? '#1677FF' : '#444',
                   color: '#fff', cursor: activeMethod && customAmountStr ? 'pointer' : 'not-allowed',
                   marginBottom: 12, minHeight: 56, fontWeight: 'bold',
-                  transition: 'transform 200ms ease',
+                  transition: 'transform 200ms ease', ...tf.style,
                 }}
-                onPointerDown={(e) => { if (activeMethod && customAmountStr) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                onPointerUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onPointerLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 添加分摊
               </button>
