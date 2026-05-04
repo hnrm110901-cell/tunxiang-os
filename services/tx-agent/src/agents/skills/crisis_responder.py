@@ -3,7 +3,6 @@
 舆情危机评估、AI生成回应草稿、SLA临期自动升级。
 """
 
-import json
 from typing import Any
 
 import structlog

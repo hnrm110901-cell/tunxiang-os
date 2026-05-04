@@ -21,29 +21,22 @@ All monetary amounts in fen (分).
 
 from __future__ import annotations
 
-import math
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import date, datetime, timedelta
+from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from services.tx_agent.src.config.malaysia_holidays import (
-    get_high_impact_periods,
-    get_holidays_by_year,
-    get_holiday_by_name,
-    get_state_specific_holidays,
-)
 from services.tx_agent.src.config.malaysia_cuisine_profiles import (
     get_cuisine_by_state,
     get_cuisine_profile,
-    MALAYSIA_MEAL_PERIODS,
+)
+from services.tx_agent.src.config.malaysia_holidays import (
+    get_holidays_by_year,
 )
 from services.tx_agent.src.config.malaysia_ingredients import (
-    get_ingredient,
     get_perishable_ingredients,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
 
