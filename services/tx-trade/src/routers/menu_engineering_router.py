@@ -122,7 +122,7 @@ async def get_engineering_analysis(
         from shared.ontology.src.database import async_session_factory  # type: ignore[import]
         from shared.ontology.src.entities import Dish, Order, OrderItem  # type: ignore[import]
 
-        since = _dt.datetime.now(datetime.timezone.utc) - _dt.timedelta(days=days)
+        since = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=days)
 
         async with async_session_factory() as session:
             # 子查询：统计周期内每个 dish_id 的销量合计
