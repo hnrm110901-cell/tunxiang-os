@@ -14,15 +14,11 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-
-from shared.events.src.emitter import emit_event
-from shared.events.src.event_types import FranchiseEventType
 
 from ..services.franchise_settlement_service import (
     FranchiseeStatement,
@@ -112,14 +108,6 @@ async def generate_settlement(
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-    asyncio.create_task(emit_event(
-        event_type=FranchiseEventType.SETTLEMENT_GENERATED,
-        tenant_id=tenant_id,
-        stream_id=req.franchisee_id,
-        payload={"year": req.year, "month": req.month},
-        source_service="tx-org",
-    ))
     return _ok(settlement.model_dump(mode="json"))
 
 
@@ -198,14 +186,6 @@ async def mark_as_paid(
         raise HTTPException(status_code=404, detail=str(e))
     except InvalidStatusTransitionError as e:
         raise HTTPException(status_code=409, detail=str(e))
-
-    asyncio.create_task(emit_event(
-        event_type=FranchiseEventType.FEE_PAID,
-        tenant_id=tenant_id,
-        stream_id=settlement_id,
-        payload={"payment_ref": req.payment_ref, "status": "paid"},
-        source_service="tx-org",
-    ))
     return _ok({"settlement_id": settlement_id, "status": "paid"})
 
 
