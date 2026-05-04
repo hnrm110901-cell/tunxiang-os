@@ -7,7 +7,7 @@ import json
 import os
 import re
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -821,7 +821,7 @@ _SERVICE_PORTS = {
 
 async def hub_list_services() -> list[dict[str, Any]]:
     """17 个微服务列表 + 健康状态 — 并行 HTTP GET 各服务 /health"""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     async def _check_health(name: str, port: int) -> dict[str, Any]:
         try:
@@ -871,7 +871,7 @@ async def hub_get_service(name: str) -> Optional[dict[str, Any]]:
     if name not in _SERVICES:
         return None
     port = _SERVICE_PORTS.get(name, 8000)
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     status = "unhealthy"
     version = "unknown"
     extra: dict[str, Any] = {}
@@ -1050,7 +1050,7 @@ async def hub_stream_events(db: AsyncSession) -> Any:
                 yield f"event: {event_type}\ndata: {json.dumps(event_payload, ensure_ascii=False)}\n\n"
             if not fetched:
                 # 无新事件时发送心跳
-                yield f"event: heartbeat\ndata: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+                yield f"event: heartbeat\ndata: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
         except (SQLAlchemyError, OperationalError) as exc:
             log.warning("hub_stream_events.db_error", error=str(exc))
             yield f"event: error\ndata: {json.dumps({'type': 'error', 'message': '事件流暂时不可用'})}\n\n"
@@ -1224,7 +1224,7 @@ async def hub_customer_health(db: AsyncSession, customer_id: str) -> Optional[di
         "health_score": round(weighted_total, 1),
         "risk_level": "low" if weighted_total >= 80 else ("medium" if weighted_total >= 60 else "high"),
         "dimensions": dimensions,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -1277,8 +1277,8 @@ _MOCK_PLAYBOOKS: list[dict[str, Any]] = [
         "description": "新客户从签约到上线的完整流程：环境准备→数据迁移→培训→试运行→正式上线",
         "steps": 8, "avg_duration_days": 14, "success_rate": 92.0,
         "trigger": "manual", "target_types": ["customer"],
-        "created_at": (datetime.utcnow() - timedelta(days=120)).isoformat(),
-        "last_run": (datetime.utcnow() - timedelta(days=3)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=120)).isoformat(),
+        "last_run": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
         "total_runs": 12,
     },
     {
@@ -1286,8 +1286,8 @@ _MOCK_PLAYBOOKS: list[dict[str, Any]] = [
         "description": "上线后首月密集关怀：每日数据检查→周回顾→问题快速响应→满月总结",
         "steps": 6, "avg_duration_days": 30, "success_rate": 88.0,
         "trigger": "auto", "target_types": ["customer"],
-        "created_at": (datetime.utcnow() - timedelta(days=100)).isoformat(),
-        "last_run": (datetime.utcnow() - timedelta(days=7)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=100)).isoformat(),
+        "last_run": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(),
         "total_runs": 8,
     },
     {
@@ -1295,8 +1295,8 @@ _MOCK_PLAYBOOKS: list[dict[str, Any]] = [
         "description": "每季度与客户进行业务回顾：指标分析→健康分解读→优化建议→下季规划",
         "steps": 5, "avg_duration_days": 7, "success_rate": 95.0,
         "trigger": "scheduled", "target_types": ["customer"],
-        "created_at": (datetime.utcnow() - timedelta(days=90)).isoformat(),
-        "last_run": (datetime.utcnow() - timedelta(days=15)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=90)).isoformat(),
+        "last_run": (datetime.now(timezone.utc) - timedelta(days=15)).isoformat(),
         "total_runs": 18,
     },
     {
@@ -1304,8 +1304,8 @@ _MOCK_PLAYBOOKS: list[dict[str, Any]] = [
         "description": "到期前60天启动续约流程：健康评估→价值总结→报价→谈判→签约",
         "steps": 5, "avg_duration_days": 45, "success_rate": 85.0,
         "trigger": "auto", "target_types": ["customer"],
-        "created_at": (datetime.utcnow() - timedelta(days=80)).isoformat(),
-        "last_run": (datetime.utcnow() - timedelta(days=10)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=80)).isoformat(),
+        "last_run": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
         "total_runs": 6,
     },
     {
@@ -1313,8 +1313,8 @@ _MOCK_PLAYBOOKS: list[dict[str, Any]] = [
         "description": "P0级别Incident自动响应：告警→拉群→指挥官就位→根因分析→修复→Postmortem",
         "steps": 7, "avg_duration_days": 1, "success_rate": 100.0,
         "trigger": "auto", "target_types": ["customer", "edge"],
-        "created_at": (datetime.utcnow() - timedelta(days=60)).isoformat(),
-        "last_run": (datetime.utcnow() - timedelta(days=14)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=60)).isoformat(),
+        "last_run": (datetime.now(timezone.utc) - timedelta(days=14)).isoformat(),
         "total_runs": 4,
     },
     {
@@ -1322,8 +1322,8 @@ _MOCK_PLAYBOOKS: list[dict[str, Any]] = [
         "description": "SLO跌破阈值时自动触发：诊断→资源调配→优化→验证→恢复确认",
         "steps": 5, "avg_duration_days": 3, "success_rate": 90.0,
         "trigger": "auto", "target_types": ["customer", "store", "edge"],
-        "created_at": (datetime.utcnow() - timedelta(days=45)).isoformat(),
-        "last_run": (datetime.utcnow() - timedelta(days=5)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=45)).isoformat(),
+        "last_run": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
         "total_runs": 10,
     },
 ]
@@ -1580,7 +1580,7 @@ async def hub_run_customer_playbook(
         "customer_id": customer_id,
         "customer_name": customer.get("name", "unknown"),
         "status": "running",
-        "triggered_at": datetime.utcnow().isoformat(),
+        "triggered_at": datetime.now(timezone.utc).isoformat(),
         "triggered_by": "manual",
     }
 
@@ -1605,7 +1605,7 @@ async def hub_customer_journey(db: AsyncSession, customer_id: str) -> Optional[d
     else:
         current = "onboarding"
     current_idx = stages.index(current) if current in stages else 1
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return {
         "customer_id": customer_id,
         "customer_name": customer.get("name", "unknown"),
@@ -1632,8 +1632,8 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["tx-trade", "gateway"],
         "affected_customers": ["c002", "c001"],
         "description": "美团 Adapter webhook 证书过期导致全部订单无法同步",
-        "created_at": (datetime.utcnow() - timedelta(days=14)).isoformat(),
-        "resolved_at": (datetime.utcnow() - timedelta(days=14, hours=-2)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=14)).isoformat(),
+        "resolved_at": (datetime.now(timezone.utc) - timedelta(days=14, hours=-2)).isoformat(),
         "duration_minutes": 120,
     },
     {
@@ -1642,8 +1642,8 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["tx-trade", "gateway"],
         "affected_customers": ["c002", "c003", "c004"],
         "description": "高峰期并发连接超限，POS收银中断约15分钟",
-        "created_at": (datetime.utcnow() - timedelta(days=7)).isoformat(),
-        "resolved_at": (datetime.utcnow() - timedelta(days=7, hours=-1)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(),
+        "resolved_at": (datetime.now(timezone.utc) - timedelta(days=7, hours=-1)).isoformat(),
         "duration_minutes": 60,
     },
     {
@@ -1652,7 +1652,7 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["edge/mac-station"],
         "affected_customers": ["c005"],
         "description": "湘粤楼天心区店Mac mini无心跳，疑似断电或网络故障",
-        "created_at": (datetime.utcnow() - timedelta(hours=26)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(hours=26)).isoformat(),
         "resolved_at": None,
         "duration_minutes": None,
     },
@@ -1662,7 +1662,7 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["gateway"],
         "affected_customers": ["c002", "c006"],
         "description": "饿了么开放平台限流策略变更导致同步延迟",
-        "created_at": (datetime.utcnow() - timedelta(days=3)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
         "resolved_at": None,
         "duration_minutes": None,
     },
@@ -1672,8 +1672,8 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["tx-member"],
         "affected_customers": ["c001"],
         "description": "徐记海鲜部分门店积分倍率未生效，影响约200笔订单",
-        "created_at": (datetime.utcnow() - timedelta(days=10)).isoformat(),
-        "resolved_at": (datetime.utcnow() - timedelta(days=9)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
+        "resolved_at": (datetime.now(timezone.utc) - timedelta(days=9)).isoformat(),
         "duration_minutes": 480,
     },
     {
@@ -1682,7 +1682,7 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["tx-trade"],
         "affected_customers": ["c004"],
         "description": "尚宫厨后厨出餐屏WebSocket连接不稳定",
-        "created_at": (datetime.utcnow() - timedelta(hours=6)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat(),
         "resolved_at": None,
         "duration_minutes": None,
     },
@@ -1692,8 +1692,8 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["tx-ops", "tx-finance"],
         "affected_customers": ["c003"],
         "description": "最黔线2家门店日结金额与POS统计差异>0.5%",
-        "created_at": (datetime.utcnow() - timedelta(days=5)).isoformat(),
-        "resolved_at": (datetime.utcnow() - timedelta(days=4)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
+        "resolved_at": (datetime.now(timezone.utc) - timedelta(days=4)).isoformat(),
         "duration_minutes": 720,
     },
     {
@@ -1702,7 +1702,7 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
         "affected_services": ["edge/mac-station", "edge/sync-engine"],
         "affected_customers": ["c001", "c002", "c003", "c004", "c006"],
         "description": "Tailscale控制面异常导致6个边缘节点同时失联",
-        "created_at": (datetime.utcnow() - timedelta(hours=1)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
         "resolved_at": None,
         "duration_minutes": None,
     },
@@ -1711,11 +1711,11 @@ _MOCK_INCIDENTS: list[dict[str, Any]] = [
 
 def _incident_timeline_from_ticket(inc: dict[str, Any]) -> list[dict[str, Any]]:
     """从 ticket 数据组装基础 Incident 时间线"""
-    created_at = inc.get("created_at", datetime.utcnow().isoformat())
+    created_at = inc.get("created_at", datetime.now(timezone.utc).isoformat())
     try:
         base_time = datetime.fromisoformat(created_at)
     except (ValueError, TypeError):
-        base_time = datetime.utcnow()
+        base_time = datetime.now(timezone.utc)
     commander = inc.get("commander", "system")
     events = [
         {"timestamp": base_time.isoformat(), "event": "incident.declared", "actor": "system", "detail": {"title": inc.get("title", ""), "priority": inc.get("priority", "")}},
@@ -1793,7 +1793,7 @@ async def hub_create_incident(db: AsyncSession, data: dict[str, Any]) -> dict[st
         max_val = max_r.scalar()
         next_num = (int(max_val) + 1) if max_val is not None else 1
         inc_id = f"INC-{next_num:03d}"
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         affected_services = data.get("affected_services", [])
         affected_customers = data.get("affected_customers", [])
@@ -1840,7 +1840,7 @@ async def hub_create_incident(db: AsyncSession, data: dict[str, Any]) -> dict[st
     except (SQLAlchemyError, OperationalError) as exc:
         log.warning("hub_create_incident.db_error", error=str(exc))
         inc_id = f"INC-{uuid.uuid4().hex[:6]}"
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         return {
             "id": inc_id,
             "title": data["title"],
@@ -2009,7 +2009,7 @@ async def hub_incident_postmortem(db: AsyncSession, incident_id: str) -> Optiona
             {"action": "更新 Runbook", "owner": inc.get("commander", "待分配"), "due_date": None, "status": "pending"},
             {"action": "复盘会议", "owner": inc.get("commander", "待分配"), "due_date": None, "status": "pending"},
         ],
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "generated_by": "hub-postmortem-generator",
     }
 
@@ -2023,26 +2023,26 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-001", "name": "尝在一起-品智POS迁移", "source_system": "pinzhi",
         "merchant_id": "c002", "merchant_name": "尝在一起", "engineer": "李淳",
         "status": "completed", "current_phase": 4, "phase_name": "验证上线",
-        "created_at": (datetime.utcnow() - timedelta(days=60)).isoformat(),
-        "completed_at": (datetime.utcnow() - timedelta(days=30)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=60)).isoformat(),
+        "completed_at": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
         "phases": [
-            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=60)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=55)).isoformat()},
-            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=55)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=48)).isoformat()},
-            {"phase": 2, "name": "数据转换", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=48)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=40)).isoformat()},
-            {"phase": 3, "name": "数据加载", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=40)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=33)).isoformat()},
-            {"phase": 4, "name": "验证上线", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=33)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=30)).isoformat()},
+            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=60)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=55)).isoformat()},
+            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=55)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=48)).isoformat()},
+            {"phase": 2, "name": "数据转换", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=48)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()},
+            {"phase": 3, "name": "数据加载", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=40)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=33)).isoformat()},
+            {"phase": 4, "name": "验证上线", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=33)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()},
         ],
     },
     {
         "id": "mig-002", "name": "最黔线-天财商龙迁移", "source_system": "tiancai-shanglong",
         "merchant_id": "c003", "merchant_name": "最黔线", "engineer": "李淳",
         "status": "in_progress", "current_phase": 2, "phase_name": "数据转换",
-        "created_at": (datetime.utcnow() - timedelta(days=20)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=20)).isoformat(),
         "completed_at": None,
         "phases": [
-            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=20)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=16)).isoformat()},
-            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=16)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=10)).isoformat()},
-            {"phase": 2, "name": "数据转换", "status": "in_progress", "started_at": (datetime.utcnow() - timedelta(days=10)).isoformat(), "completed_at": None},
+            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=20)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=16)).isoformat()},
+            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=16)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()},
+            {"phase": 2, "name": "数据转换", "status": "in_progress", "started_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(), "completed_at": None},
             {"phase": 3, "name": "数据加载", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 4, "name": "验证上线", "status": "pending", "started_at": None, "completed_at": None},
         ],
@@ -2051,13 +2051,13 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-003", "name": "尚宫厨-客如云迁移", "source_system": "keruyun",
         "merchant_id": "c004", "merchant_name": "尚宫厨", "engineer": "李淳",
         "status": "in_progress", "current_phase": 3, "phase_name": "数据加载",
-        "created_at": (datetime.utcnow() - timedelta(days=25)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat(),
         "completed_at": None,
         "phases": [
-            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=25)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=22)).isoformat()},
-            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=22)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=16)).isoformat()},
-            {"phase": 2, "name": "数据转换", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=16)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=10)).isoformat()},
-            {"phase": 3, "name": "数据加载", "status": "in_progress", "started_at": (datetime.utcnow() - timedelta(days=10)).isoformat(), "completed_at": None},
+            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=22)).isoformat()},
+            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=22)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=16)).isoformat()},
+            {"phase": 2, "name": "数据转换", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=16)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()},
+            {"phase": 3, "name": "数据加载", "status": "in_progress", "started_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(), "completed_at": None},
             {"phase": 4, "name": "验证上线", "status": "pending", "started_at": None, "completed_at": None},
         ],
     },
@@ -2065,11 +2065,11 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-004", "name": "徐记海鲜-奥琦玮迁移", "source_system": "aoqiwei",
         "merchant_id": "c001", "merchant_name": "徐记海鲜", "engineer": "李淳",
         "status": "in_progress", "current_phase": 1, "phase_name": "数据抽取",
-        "created_at": (datetime.utcnow() - timedelta(days=10)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
         "completed_at": None,
         "phases": [
-            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=10)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=7)).isoformat()},
-            {"phase": 1, "name": "数据抽取", "status": "in_progress", "started_at": (datetime.utcnow() - timedelta(days=7)).isoformat(), "completed_at": None},
+            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()},
+            {"phase": 1, "name": "数据抽取", "status": "in_progress", "started_at": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(), "completed_at": None},
             {"phase": 2, "name": "数据转换", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 3, "name": "数据加载", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 4, "name": "验证上线", "status": "pending", "started_at": None, "completed_at": None},
@@ -2079,11 +2079,11 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-005", "name": "湘粤楼-微生活迁移", "source_system": "weishenghuo",
         "merchant_id": "c005", "merchant_name": "湘粤楼", "engineer": "李淳",
         "status": "paused", "current_phase": 1, "phase_name": "数据抽取",
-        "created_at": (datetime.utcnow() - timedelta(days=15)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=15)).isoformat(),
         "completed_at": None,
         "phases": [
-            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=15)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=12)).isoformat()},
-            {"phase": 1, "name": "数据抽取", "status": "paused", "started_at": (datetime.utcnow() - timedelta(days=12)).isoformat(), "completed_at": None},
+            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=15)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=12)).isoformat()},
+            {"phase": 1, "name": "数据抽取", "status": "paused", "started_at": (datetime.now(timezone.utc) - timedelta(days=12)).isoformat(), "completed_at": None},
             {"phase": 2, "name": "数据转换", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 3, "name": "数据加载", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 4, "name": "验证上线", "status": "pending", "started_at": None, "completed_at": None},
@@ -2093,10 +2093,10 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-006", "name": "费大厨-客如云迁移", "source_system": "keruyun",
         "merchant_id": "c006", "merchant_name": "费大厨", "engineer": "李淳",
         "status": "in_progress", "current_phase": 0, "phase_name": "准备",
-        "created_at": (datetime.utcnow() - timedelta(days=3)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
         "completed_at": None,
         "phases": [
-            {"phase": 0, "name": "准备", "status": "in_progress", "started_at": (datetime.utcnow() - timedelta(days=3)).isoformat(), "completed_at": None},
+            {"phase": 0, "name": "准备", "status": "in_progress", "started_at": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(), "completed_at": None},
             {"phase": 1, "name": "数据抽取", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 2, "name": "数据转换", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 3, "name": "数据加载", "status": "pending", "started_at": None, "completed_at": None},
@@ -2107,12 +2107,12 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-007", "name": "炊烟-品智POS迁移", "source_system": "pinzhi",
         "merchant_id": "c007", "merchant_name": "炊烟", "engineer": "李淳",
         "status": "failed", "current_phase": 2, "phase_name": "数据转换",
-        "created_at": (datetime.utcnow() - timedelta(days=18)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=18)).isoformat(),
         "completed_at": None,
         "phases": [
-            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=18)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=15)).isoformat()},
-            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.utcnow() - timedelta(days=15)).isoformat(), "completed_at": (datetime.utcnow() - timedelta(days=12)).isoformat()},
-            {"phase": 2, "name": "数据转换", "status": "failed", "started_at": (datetime.utcnow() - timedelta(days=12)).isoformat(), "completed_at": None},
+            {"phase": 0, "name": "准备", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=18)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=15)).isoformat()},
+            {"phase": 1, "name": "数据抽取", "status": "completed", "started_at": (datetime.now(timezone.utc) - timedelta(days=15)).isoformat(), "completed_at": (datetime.now(timezone.utc) - timedelta(days=12)).isoformat()},
+            {"phase": 2, "name": "数据转换", "status": "failed", "started_at": (datetime.now(timezone.utc) - timedelta(days=12)).isoformat(), "completed_at": None},
             {"phase": 3, "name": "数据加载", "status": "pending", "started_at": None, "completed_at": None},
             {"phase": 4, "name": "验证上线", "status": "pending", "started_at": None, "completed_at": None},
         ],
@@ -2121,7 +2121,7 @@ _MOCK_MIGRATIONS: list[dict[str, Any]] = [
         "id": "mig-008", "name": "黑色经典-ERP迁移", "source_system": "erp",
         "merchant_id": "c010", "merchant_name": "黑色经典", "engineer": "李淳",
         "status": "pending", "current_phase": -1, "phase_name": "未开始",
-        "created_at": (datetime.utcnow() - timedelta(days=1)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
         "completed_at": None,
         "phases": [
             {"phase": 0, "name": "准备", "status": "pending", "started_at": None, "completed_at": None},
@@ -2176,7 +2176,7 @@ async def hub_list_migrations(
 async def hub_create_migration(db: AsyncSession, data: dict[str, Any]) -> dict[str, Any]:
     """创建迁移项目 — 写入 hub_tickets type='migration'"""
     mig_id = f"mig-{str(uuid.uuid4())[:8]}"
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     try:
         resolution = json.dumps({
             "source_system": data["source_system"],
@@ -2285,7 +2285,7 @@ async def hub_advance_migration(db: AsyncSession, migration_id: str) -> Optional
         "previous_phase_name": _MIGRATION_PHASES[current] if current >= 0 else "未开始",
         "new_phase": next_phase,
         "new_phase_name": _MIGRATION_PHASES[next_phase],
-        "advanced_at": datetime.utcnow().isoformat(),
+        "advanced_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -2302,7 +2302,7 @@ async def hub_rollback_migration(db: AsyncSession, migration_id: str) -> Optiona
         "previous_phase": current,
         "rollback_to_phase": current - 1,
         "rollback_to_name": _MIGRATION_PHASES[current - 1],
-        "rolled_back_at": datetime.utcnow().isoformat(),
+        "rolled_back_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -2316,7 +2316,7 @@ async def hub_pause_migration(db: AsyncSession, migration_id: str) -> Optional[d
     return {
         "migration_id": migration_id,
         "status": "paused",
-        "paused_at": datetime.utcnow().isoformat(),
+        "paused_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -2330,28 +2330,28 @@ async def hub_resume_migration(db: AsyncSession, migration_id: str) -> Optional[
     return {
         "migration_id": migration_id,
         "status": "in_progress",
-        "resumed_at": datetime.utcnow().isoformat(),
+        "resumed_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
 # ─── Wave 2: Adapters 扩展 ───
 
 _MOCK_ADAPTERS_EXTENDED: list[dict[str, Any]] = [
-    {"id": "adp-pinzhi", "key": "pinzhi", "name": "品智POS", "type": "pos", "status": "healthy", "version": "2.3.1", "sync_interval_sec": 60, "last_sync": (datetime.utcnow() - timedelta(minutes=2)).isoformat(), "success_rate": 99.8, "avg_latency_ms": 45, "merchants_connected": 3},
-    {"id": "adp-aoqiwei", "key": "aoqiwei", "name": "奥琦玮", "type": "pos", "status": "healthy", "version": "1.8.0", "sync_interval_sec": 120, "last_sync": (datetime.utcnow() - timedelta(minutes=5)).isoformat(), "success_rate": 99.5, "avg_latency_ms": 62, "merchants_connected": 1},
-    {"id": "adp-tiancai-shanglong", "key": "tiancai-shanglong", "name": "天财商龙", "type": "pos", "status": "degraded", "version": "1.2.0", "sync_interval_sec": 180, "last_sync": (datetime.utcnow() - timedelta(minutes=35)).isoformat(), "success_rate": 95.2, "avg_latency_ms": 180, "merchants_connected": 1},
-    {"id": "adp-keruyun", "key": "keruyun", "name": "客如云", "type": "pos", "status": "healthy", "version": "2.0.1", "sync_interval_sec": 90, "last_sync": (datetime.utcnow() - timedelta(minutes=3)).isoformat(), "success_rate": 99.1, "avg_latency_ms": 55, "merchants_connected": 2},
-    {"id": "adp-weishenghuo", "key": "weishenghuo", "name": "微生活", "type": "member", "status": "healthy", "version": "1.5.0", "sync_interval_sec": 300, "last_sync": (datetime.utcnow() - timedelta(minutes=8)).isoformat(), "success_rate": 98.8, "avg_latency_ms": 78, "merchants_connected": 2},
-    {"id": "adp-meituan", "key": "meituan", "name": "美团", "type": "channel", "status": "healthy", "version": "3.1.0", "sync_interval_sec": 30, "last_sync": (datetime.utcnow() - timedelta(seconds=45)).isoformat(), "success_rate": 99.9, "avg_latency_ms": 32, "merchants_connected": 8},
-    {"id": "adp-eleme", "key": "eleme", "name": "饿了么", "type": "channel", "status": "degraded", "version": "2.8.0", "sync_interval_sec": 30, "last_sync": (datetime.utcnow() - timedelta(minutes=32)).isoformat(), "success_rate": 94.5, "avg_latency_ms": 210, "merchants_connected": 6},
-    {"id": "adp-douyin", "key": "douyin", "name": "抖音", "type": "channel", "status": "healthy", "version": "1.9.0", "sync_interval_sec": 60, "last_sync": (datetime.utcnow() - timedelta(minutes=1)).isoformat(), "success_rate": 99.3, "avg_latency_ms": 48, "merchants_connected": 4},
-    {"id": "adp-yiding", "key": "yiding", "name": "亿订", "type": "reservation", "status": "healthy", "version": "1.1.0", "sync_interval_sec": 120, "last_sync": (datetime.utcnow() - timedelta(minutes=4)).isoformat(), "success_rate": 99.0, "avg_latency_ms": 65, "merchants_connected": 2},
-    {"id": "adp-nuonuo", "key": "nuonuo", "name": "诺诺发票", "type": "finance", "status": "healthy", "version": "2.0.0", "sync_interval_sec": 600, "last_sync": (datetime.utcnow() - timedelta(minutes=12)).isoformat(), "success_rate": 99.7, "avg_latency_ms": 120, "merchants_connected": 5},
-    {"id": "adp-xiaohongshu", "key": "xiaohongshu", "name": "小红书", "type": "channel", "status": "healthy", "version": "0.9.0", "sync_interval_sec": 300, "last_sync": (datetime.utcnow() - timedelta(minutes=6)).isoformat(), "success_rate": 98.5, "avg_latency_ms": 85, "merchants_connected": 2},
-    {"id": "adp-erp", "key": "erp", "name": "ERP通用", "type": "erp", "status": "healthy", "version": "1.3.0", "sync_interval_sec": 600, "last_sync": (datetime.utcnow() - timedelta(minutes=15)).isoformat(), "success_rate": 99.2, "avg_latency_ms": 95, "merchants_connected": 3},
-    {"id": "adp-logistics", "key": "logistics", "name": "物流对接", "type": "logistics", "status": "healthy", "version": "1.0.0", "sync_interval_sec": 300, "last_sync": (datetime.utcnow() - timedelta(minutes=10)).isoformat(), "success_rate": 98.0, "avg_latency_ms": 110, "merchants_connected": 4},
-    {"id": "adp-delivery-factory", "key": "delivery_factory", "name": "配送工厂", "type": "delivery", "status": "offline", "version": "0.8.0", "sync_interval_sec": 60, "last_sync": (datetime.utcnow() - timedelta(hours=3)).isoformat(), "success_rate": 88.0, "avg_latency_ms": 250, "merchants_connected": 1},
-    {"id": "adp-wechat-delivery", "key": "wechat_delivery", "name": "微信外卖", "type": "channel", "status": "healthy", "version": "1.0.0", "sync_interval_sec": 30, "last_sync": (datetime.utcnow() - timedelta(seconds=30)).isoformat(), "success_rate": 99.4, "avg_latency_ms": 40, "merchants_connected": 3},
+    {"id": "adp-pinzhi", "key": "pinzhi", "name": "品智POS", "type": "pos", "status": "healthy", "version": "2.3.1", "sync_interval_sec": 60, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat(), "success_rate": 99.8, "avg_latency_ms": 45, "merchants_connected": 3},
+    {"id": "adp-aoqiwei", "key": "aoqiwei", "name": "奥琦玮", "type": "pos", "status": "healthy", "version": "1.8.0", "sync_interval_sec": 120, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(), "success_rate": 99.5, "avg_latency_ms": 62, "merchants_connected": 1},
+    {"id": "adp-tiancai-shanglong", "key": "tiancai-shanglong", "name": "天财商龙", "type": "pos", "status": "degraded", "version": "1.2.0", "sync_interval_sec": 180, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=35)).isoformat(), "success_rate": 95.2, "avg_latency_ms": 180, "merchants_connected": 1},
+    {"id": "adp-keruyun", "key": "keruyun", "name": "客如云", "type": "pos", "status": "healthy", "version": "2.0.1", "sync_interval_sec": 90, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat(), "success_rate": 99.1, "avg_latency_ms": 55, "merchants_connected": 2},
+    {"id": "adp-weishenghuo", "key": "weishenghuo", "name": "微生活", "type": "member", "status": "healthy", "version": "1.5.0", "sync_interval_sec": 300, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=8)).isoformat(), "success_rate": 98.8, "avg_latency_ms": 78, "merchants_connected": 2},
+    {"id": "adp-meituan", "key": "meituan", "name": "美团", "type": "channel", "status": "healthy", "version": "3.1.0", "sync_interval_sec": 30, "last_sync": (datetime.now(timezone.utc) - timedelta(seconds=45)).isoformat(), "success_rate": 99.9, "avg_latency_ms": 32, "merchants_connected": 8},
+    {"id": "adp-eleme", "key": "eleme", "name": "饿了么", "type": "channel", "status": "degraded", "version": "2.8.0", "sync_interval_sec": 30, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=32)).isoformat(), "success_rate": 94.5, "avg_latency_ms": 210, "merchants_connected": 6},
+    {"id": "adp-douyin", "key": "douyin", "name": "抖音", "type": "channel", "status": "healthy", "version": "1.9.0", "sync_interval_sec": 60, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), "success_rate": 99.3, "avg_latency_ms": 48, "merchants_connected": 4},
+    {"id": "adp-yiding", "key": "yiding", "name": "亿订", "type": "reservation", "status": "healthy", "version": "1.1.0", "sync_interval_sec": 120, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=4)).isoformat(), "success_rate": 99.0, "avg_latency_ms": 65, "merchants_connected": 2},
+    {"id": "adp-nuonuo", "key": "nuonuo", "name": "诺诺发票", "type": "finance", "status": "healthy", "version": "2.0.0", "sync_interval_sec": 600, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=12)).isoformat(), "success_rate": 99.7, "avg_latency_ms": 120, "merchants_connected": 5},
+    {"id": "adp-xiaohongshu", "key": "xiaohongshu", "name": "小红书", "type": "channel", "status": "healthy", "version": "0.9.0", "sync_interval_sec": 300, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=6)).isoformat(), "success_rate": 98.5, "avg_latency_ms": 85, "merchants_connected": 2},
+    {"id": "adp-erp", "key": "erp", "name": "ERP通用", "type": "erp", "status": "healthy", "version": "1.3.0", "sync_interval_sec": 600, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat(), "success_rate": 99.2, "avg_latency_ms": 95, "merchants_connected": 3},
+    {"id": "adp-logistics", "key": "logistics", "name": "物流对接", "type": "logistics", "status": "healthy", "version": "1.0.0", "sync_interval_sec": 300, "last_sync": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(), "success_rate": 98.0, "avg_latency_ms": 110, "merchants_connected": 4},
+    {"id": "adp-delivery-factory", "key": "delivery_factory", "name": "配送工厂", "type": "delivery", "status": "offline", "version": "0.8.0", "sync_interval_sec": 60, "last_sync": (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(), "success_rate": 88.0, "avg_latency_ms": 250, "merchants_connected": 1},
+    {"id": "adp-wechat-delivery", "key": "wechat_delivery", "name": "微信外卖", "type": "channel", "status": "healthy", "version": "1.0.0", "sync_interval_sec": 30, "last_sync": (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat(), "success_rate": 99.4, "avg_latency_ms": 40, "merchants_connected": 3},
 ]
 
 
@@ -2406,7 +2406,7 @@ async def hub_adapter_mapping(db: AsyncSession, adapter_id: str) -> Optional[dic
             {"source_field": "customer_phone", "target_field": "customer_mobile", "transform": "phone_normalize", "required": False},
             {"source_field": "store_code", "target_field": "store_id", "transform": "store_lookup", "required": True},
         ],
-        "last_updated": (datetime.utcnow() - timedelta(days=5)).isoformat(),
+        "last_updated": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
     }
 
 
@@ -2470,7 +2470,7 @@ async def hub_adapter_sync(db: AsyncSession, adapter_id: str) -> Optional[dict[s
         "adapter_name": adapter.get("name", adapter_id),
         "sync_id": sync_id,
         "status": "triggered",
-        "triggered_at": datetime.utcnow().isoformat(),
+        "triggered_at": datetime.now(timezone.utc).isoformat(),
         "estimated_duration_sec": 30,
     }
 
@@ -2602,7 +2602,7 @@ async def hub_run_playbook(db: AsyncSession, playbook_id: str, target_id: str, t
         "target_id": target_id,
         "target_type": target_type,
         "status": "running",
-        "triggered_at": datetime.utcnow().isoformat(),
+        "triggered_at": datetime.now(timezone.utc).isoformat(),
         "triggered_by": "manual",
         "estimated_duration_days": pb.get("avg_duration_days", 1),
     }
@@ -2664,14 +2664,14 @@ async def hub_playbook_runs(db: AsyncSession, playbook_id: str) -> Optional[list
 
 
 _MOCK_FLAGS: list[dict[str, Any]] = [
-    {"name": "edge_auto_update", "label": "边缘自动更新", "value": True, "rollout_pct": 100, "updated_at": (datetime.utcnow() - timedelta(days=3)).isoformat()},
-    {"name": "copilot_v2", "label": "Copilot V2 流式响应", "value": False, "rollout_pct": 0, "updated_at": (datetime.utcnow() - timedelta(days=7)).isoformat()},
-    {"name": "realtime_kds", "label": "实时KDS推送", "value": True, "rollout_pct": 60, "updated_at": (datetime.utcnow() - timedelta(days=1)).isoformat()},
-    {"name": "discount_guard_strict", "label": "折扣守护严格模式", "value": True, "rollout_pct": 100, "updated_at": (datetime.utcnow() - timedelta(hours=12)).isoformat()},
-    {"name": "journey_orchestrator", "label": "Journey编排器", "value": False, "rollout_pct": 0, "updated_at": datetime.utcnow().isoformat()},
-    {"name": "multi_brand_tenancy", "label": "多品牌租户", "value": True, "rollout_pct": 30, "updated_at": (datetime.utcnow() - timedelta(days=5)).isoformat()},
-    {"name": "ai_menu_recommendation", "label": "AI菜品推荐", "value": False, "rollout_pct": 0, "updated_at": (datetime.utcnow() - timedelta(days=10)).isoformat()},
-    {"name": "inventory_auto_reorder", "label": "库存自动补货", "value": True, "rollout_pct": 50, "updated_at": (datetime.utcnow() - timedelta(days=2)).isoformat()},
+    {"name": "edge_auto_update", "label": "边缘自动更新", "value": True, "rollout_pct": 100, "updated_at": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()},
+    {"name": "copilot_v2", "label": "Copilot V2 流式响应", "value": False, "rollout_pct": 0, "updated_at": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()},
+    {"name": "realtime_kds", "label": "实时KDS推送", "value": True, "rollout_pct": 60, "updated_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()},
+    {"name": "discount_guard_strict", "label": "折扣守护严格模式", "value": True, "rollout_pct": 100, "updated_at": (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()},
+    {"name": "journey_orchestrator", "label": "Journey编排器", "value": False, "rollout_pct": 0, "updated_at": datetime.now(timezone.utc).isoformat()},
+    {"name": "multi_brand_tenancy", "label": "多品牌租户", "value": True, "rollout_pct": 30, "updated_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()},
+    {"name": "ai_menu_recommendation", "label": "AI菜品推荐", "value": False, "rollout_pct": 0, "updated_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()},
+    {"name": "inventory_auto_reorder", "label": "库存自动补货", "value": True, "rollout_pct": 50, "updated_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()},
 ]
 
 
@@ -2686,7 +2686,7 @@ async def hub_update_flag(
     """更新 flag 值 — 降级使用内存 mock（feature_flags 表待创建）"""
     for f in _MOCK_FLAGS:
         if f["name"] == name:
-            result = {**f, "value": value, "updated_at": datetime.utcnow().isoformat()}
+            result = {**f, "value": value, "updated_at": datetime.now(timezone.utc).isoformat()}
             if rollout_pct is not None:
                 result["rollout_pct"] = rollout_pct
             return result
@@ -2698,7 +2698,7 @@ async def hub_update_flag(
 
 async def hub_list_releases(db: AsyncSession) -> list[dict[str, Any]]:
     """各环境发布状态 — 降级使用内存 mock（CI/CD API 待接入）"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return [
         {"env": "dev", "app": "gateway", "version": "v3.2.1-dev", "status": "running", "deployed_at": (now - timedelta(hours=2)).isoformat(), "deployer": "ci-bot"},
         {"env": "dev", "app": "tx-trade", "version": "v3.1.8-dev", "status": "running", "deployed_at": (now - timedelta(hours=4)).isoformat(), "deployer": "ci-bot"},
@@ -2720,7 +2720,7 @@ async def hub_deploy_release(
         "version": version,
         "env": env,
         "status": "triggered",
-        "triggered_at": datetime.utcnow().isoformat(),
+        "triggered_at": datetime.now(timezone.utc).isoformat(),
         "triggered_by": "hub-admin",
         "estimated_duration_sec": 120,
     }
@@ -2732,10 +2732,10 @@ async def hub_deploy_release(
 async def hub_list_security_users(db: AsyncSession) -> list[dict[str, Any]]:
     """用户列表 — 降级使用内存 mock（auth 表待接入）"""
     return [
-        {"id": "u001", "name": "李淳", "email": "lichun@tunxiang.tech", "role": "platform-admin", "status": "active", "last_login": (datetime.utcnow() - timedelta(hours=1)).isoformat(), "mfa_enabled": True},
-        {"id": "u002", "name": "陈工", "email": "chengong@tunxiang.tech", "role": "engineer", "status": "active", "last_login": (datetime.utcnow() - timedelta(hours=3)).isoformat(), "mfa_enabled": True},
-        {"id": "u003", "name": "王工", "email": "wanggong@tunxiang.tech", "role": "engineer", "status": "active", "last_login": (datetime.utcnow() - timedelta(days=1)).isoformat(), "mfa_enabled": False},
-        {"id": "u004", "name": "张CSM", "email": "zhangcsm@tunxiang.tech", "role": "csm", "status": "active", "last_login": (datetime.utcnow() - timedelta(hours=6)).isoformat(), "mfa_enabled": True},
+        {"id": "u001", "name": "李淳", "email": "lichun@tunxiang.tech", "role": "platform-admin", "status": "active", "last_login": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(), "mfa_enabled": True},
+        {"id": "u002", "name": "陈工", "email": "chengong@tunxiang.tech", "role": "engineer", "status": "active", "last_login": (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(), "mfa_enabled": True},
+        {"id": "u003", "name": "王工", "email": "wanggong@tunxiang.tech", "role": "engineer", "status": "active", "last_login": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(), "mfa_enabled": False},
+        {"id": "u004", "name": "张CSM", "email": "zhangcsm@tunxiang.tech", "role": "csm", "status": "active", "last_login": (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat(), "mfa_enabled": True},
     ]
 
 
@@ -2751,7 +2751,7 @@ async def hub_list_security_roles(db: AsyncSession) -> list[dict[str, Any]]:
 
 async def hub_list_audit_logs(db: AsyncSession) -> list[dict[str, Any]]:
     """审计日志 — 降级使用内存 mock（audit_log 表待接入）"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return [
         {"id": "aud-001", "timestamp": (now - timedelta(minutes=15)).isoformat(), "actor": "李淳", "action": "settings.flag.update", "resource": "edge_auto_update", "detail": "value: true, rollout_pct: 100", "ip": "10.0.1.5"},
         {"id": "aud-002", "timestamp": (now - timedelta(hours=1)).isoformat(), "actor": "李淳", "action": "deploy.trigger", "resource": "gateway@v3.2.1-dev", "detail": "env: dev", "ip": "10.0.1.5"},
@@ -2885,8 +2885,8 @@ _MOCK_JOURNEYS: list[dict[str, Any]] = [
         "edge_count": 16,
         "active_instances": 3,
         "status": "active",
-        "created_at": (datetime.utcnow() - timedelta(days=30)).isoformat(),
-        "updated_at": (datetime.utcnow() - timedelta(days=2)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
+        "updated_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
         "nodes": [
             {"id": "n1", "type": "trigger", "label": "触发: 签约完成", "x": 400, "y": 30, "status": "done"},
             {"id": "n2", "type": "action", "label": "签约确认邮件", "x": 260, "y": 130, "status": "done"},
@@ -2920,8 +2920,8 @@ _MOCK_JOURNEYS: list[dict[str, Any]] = [
         "edge_count": 8,
         "active_instances": 2,
         "status": "active",
-        "created_at": (datetime.utcnow() - timedelta(days=25)).isoformat(),
-        "updated_at": (datetime.utcnow() - timedelta(days=5)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat(),
+        "updated_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
         "nodes": [],
         "edges": [],
     },
@@ -2933,8 +2933,8 @@ _MOCK_JOURNEYS: list[dict[str, Any]] = [
         "edge_count": 7,
         "active_instances": 1,
         "status": "active",
-        "created_at": (datetime.utcnow() - timedelta(days=20)).isoformat(),
-        "updated_at": (datetime.utcnow() - timedelta(days=3)).isoformat(),
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=20)).isoformat(),
+        "updated_at": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
         "nodes": [],
         "edges": [],
     },
@@ -2966,7 +2966,7 @@ async def hub_save_journey(
         "name": data["name"],
         "node_count": len(data.get("nodes", [])),
         "edge_count": len(data.get("edges", [])),
-        "saved_at": datetime.utcnow().isoformat(),
+        "saved_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -2984,7 +2984,7 @@ async def hub_run_journey(
         "journey_name": journey["name"],
         "customer_id": customer_id,
         "status": "running",
-        "started_at": datetime.utcnow().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
         "current_node": journey.get("nodes", [{}])[0].get("id", "n1") if journey.get("nodes") else "n1",
     }
 
@@ -2996,7 +2996,7 @@ async def hub_list_journey_instances(
     journey = await hub_get_journey(db, journey_id)
     if not journey:
         return None
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return [
         {
             "instance_id": f"ji-{str(uuid.uuid4())[:8]}",

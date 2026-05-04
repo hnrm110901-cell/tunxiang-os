@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
@@ -75,7 +75,7 @@ async def _write_sync_log(
     """
     from sqlalchemy import text
 
-    finished_at = datetime.utcnow()
+    finished_at = datetime.now(timezone.utc)
     log_id = str(uuid.uuid4())
 
     try:
@@ -133,7 +133,7 @@ async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
     tenant_id = _get_tenant_id(merchant_code)
     merchant_cfg = MERCHANT_CONFIG[merchant_code]
     total_records = 0
-    started_at = datetime.utcnow()
+    started_at = datetime.now(timezone.utc)
 
     try:
         adapter = PinzhiAdapterFactory.create_for_merchant(merchant_code)
@@ -175,7 +175,7 @@ async def _sync_tables_for_merchant(merchant_code: str, db: Any) -> dict:
     tenant_id = _get_tenant_id(merchant_code)
     merchant_cfg = MERCHANT_CONFIG[merchant_code]
     total_upserted = 0
-    started_at = datetime.utcnow()
+    started_at = datetime.now(timezone.utc)
 
     adapter = None
     try:
@@ -378,7 +378,7 @@ async def _with_retry(coro_factory: Any, sync_type: str, merchant_code: str) -> 
         if attempt < RETRY_TIMES:
             # 指数退避：第 1 次等 300s，第 2 次等 600s
             wait_secs = RETRY_DELAY_SECONDS * (2 ** (attempt - 1))
-            next_retry = datetime.utcnow() + timedelta(seconds=wait_secs)
+            next_retry = datetime.now(timezone.utc) + timedelta(seconds=wait_secs)
             last_result["next_retry_at"] = next_retry
             log.info(
                 "sync_retry_waiting",
@@ -408,7 +408,7 @@ async def _run_dishes_sync() -> None:
     for merchant_code in MERCHANTS:
 
         async def _task(mc: str = merchant_code) -> None:
-            started_at = datetime.utcnow()
+            started_at = datetime.now(timezone.utc)
             result = await _with_retry(
                 lambda m=mc: _sync_dishes_for_merchant(m),
                 sync_type="dishes",
@@ -444,7 +444,7 @@ async def _run_master_data_sync() -> None:
     from shared.ontology.src.database import async_session_factory
 
     async def _sync_merchant_master(merchant_code: str) -> None:
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
 
         async with async_session_factory() as db:
             tenant_id = _get_tenant_id(merchant_code)
@@ -502,7 +502,7 @@ async def _run_orders_incremental_sync() -> None:
     from shared.ontology.src.database import async_session_factory
 
     async def _sync_merchant_orders(merchant_code: str) -> None:
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         result = await _with_retry(
             lambda mc=merchant_code: _sync_orders_incremental_for_merchant(mc),
             sync_type="orders_incremental",
@@ -542,7 +542,7 @@ async def _run_members_incremental_sync() -> None:
     from shared.ontology.src.database import async_session_factory
 
     async def _sync_merchant_members(merchant_code: str) -> None:
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         async with async_session_factory() as db:
             tenant_id = _get_tenant_id(merchant_code)
             result = await _with_retry(
