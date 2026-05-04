@@ -357,7 +357,7 @@ class AuditLogService:
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                 GROUP BY actor_id, hour_bucket
                 HAVING COUNT(*) > 5
                 ORDER BY cnt DESC
@@ -388,7 +388,7 @@ class AuditLogService:
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                 ORDER BY created_at DESC
             """),
             {
@@ -420,7 +420,7 @@ class AuditLogService:
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                 GROUP BY actor_id, hour_bucket
                 HAVING COUNT(*) > 3
                 ORDER BY cnt DESC
@@ -450,7 +450,7 @@ class AuditLogService:
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                   AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Shanghai') BETWEEN 2 AND 4
                 ORDER BY created_at DESC
             """),
