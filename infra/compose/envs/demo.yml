@@ -1,0 +1,229 @@
+# ============================================================
+# 屯象OS Compose Override — Demo 环境
+# ============================================================
+# 用法:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/demo.yml up -d
+#
+# 特点:
+#   - 三租户共生 + 一次性 migrate + 演示种子
+#   - PG 监听 5432 / Redis 6379（裸暴露给 demo_deploy.sh 用）
+#   - 仅启动核心 6 业务（trade/menu/member/ops/finance/analytics）+ gateway
+#   - 不强制 TX_AUTH（演示用）
+#   - 前端 Vite Dev Server（5173/5174/5175）
+#
+# 三租户初始化由 scripts/demo_seed.py 完成（demo_deploy.sh 调用）
+# ============================================================
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # ── API Gateway（Demo 模式 - 关闭 auth）─────────────────
+  gateway:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/gateway/requirements.txt &&
+             uvicorn services.gateway.src.main:app
+             --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    environment:
+      TX_ENV: demo
+      TX_AUTH_ENABLED: "false"
+      TX_RATE_LIMIT_ENABLED: "false"
+      LOG_LEVEL: INFO
+    volumes:
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
+
+  tx-trade:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-trade/requirements.txt &&
+             cd /app/services/tx-trade &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8001"
+    ports:
+      - "8001:8001"
+    environment:
+      TX_ENV: demo
+      TX_AUTH_ENABLED: "false"
+    volumes:
+      - ../../services/tx-trade:/app/services/tx-trade
+      - ../../shared:/app/shared
+
+  tx-menu:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-menu/requirements.txt &&
+             cd /app/services/tx-menu &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8002"
+    ports:
+      - "8002:8002"
+    environment:
+      TX_ENV: demo
+    volumes:
+      - ../../services/tx-menu:/app/services/tx-menu
+      - ../../shared:/app/shared
+
+  tx-member:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-member/requirements.txt &&
+             cd /app/services/tx-member &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8003"
+    ports:
+      - "8003:8003"
+    environment:
+      TX_ENV: demo
+    volumes:
+      - ../../services/tx-member:/app/services/tx-member
+      - ../../shared:/app/shared
+
+  tx-ops:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-ops/requirements.txt &&
+             cd /app/services/tx-ops &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8005"
+    ports:
+      - "8005:8005"
+    environment:
+      TX_ENV: demo
+    volumes:
+      - ../../services/tx-ops:/app/services/tx-ops
+      - ../../shared:/app/shared
+
+  tx-finance:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-finance/requirements.txt &&
+             cd /app/services/tx-finance &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8007"
+    ports:
+      - "8007:8007"
+    environment:
+      TX_ENV: demo
+    volumes:
+      - ../../services/tx-finance:/app/services/tx-finance
+      - ../../shared:/app/shared
+
+  tx-analytics:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             -r services/tx-analytics/requirements.txt &&
+             cd /app/services/tx-analytics &&
+             uvicorn src.main:app --host 0.0.0.0 --port 8009"
+    ports:
+      - "8009:8009"
+    environment:
+      TX_ENV: demo
+    volumes:
+      - ../../services/tx-analytics:/app/services/tx-analytics
+      - ../../shared:/app/shared
+
+  # ── 数据库迁移（一次性 job）────────────────────────────────
+  migrate:
+    image: python:3.11-slim
+    working_dir: /app
+    restart: "no"
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             alembic asyncpg sqlalchemy psycopg2-binary &&
+             alembic -c shared/db-migrations/alembic.ini upgrade head &&
+             echo '✅ demo 迁移完成'"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://tunxiang:tunxiang_demo_2024@postgres:5432/tunxiang_os}
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../../shared:/app/shared
+      - ../../services:/app/services
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-demo}"
+
+  # ── 前端（Vite Dev Server）────────────────────────────────
+  web-admin:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../apps/web-admin:/app
+      - demo_web_admin_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-demo}"
+
+  web-pos:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    ports:
+      - "5174:5174"
+    volumes:
+      - ../../apps/web-pos:/app
+      - demo_web_pos_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-demo}"
+
+  web-kds:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "npm config set registry https://registry.npmmirror.com &&
+             npm install && npm run dev -- --host 0.0.0.0 --port 5175"
+    ports:
+      - "5175:5175"
+    volumes:
+      - ../../apps/web-kds:/app
+      - demo_web_kds_nm:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-demo}"
+
+volumes:
+  demo_web_admin_nm:
+  demo_web_pos_nm:
+  demo_web_kds_nm:

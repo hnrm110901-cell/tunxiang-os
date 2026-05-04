@@ -1,0 +1,351 @@
+# ============================================================
+# 屯象OS Compose Override — Dev 环境
+# ============================================================
+# 用法:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/dev.yml up -d
+#
+# 特点:
+#   - 主机端口全暴露（5432/6379/8000-8019/5173-5175）
+#   - TX_AUTH_ENABLED=false / TX_RATE_LIMIT_ENABLED=false
+#   - 源码挂载 + uvicorn --reload 热重载
+#   - 前端 Vite Dev Server（5173/5174/5175）
+#   - 边缘 sync-engine（profile=edge 才启动）
+# ============================================================
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../docker/init-pgvector.sql:/docker-entrypoint-initdb.d/02-pgvector.sql
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  gateway:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/gateway/requirements.txt &&
+             uvicorn services.gateway.src.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    environment:
+      TX_AUTH_ENABLED: "false"
+      TX_RATE_LIMIT_ENABLED: "false"
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
+
+  tx-trade:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-trade/requirements.txt &&
+             uvicorn services.tx-trade.src.main:app --host 0.0.0.0 --port 8001 --reload"
+    ports:
+      - "8001:8001"
+    environment:
+      TX_AUTH_ENABLED: "false"
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ../../services/tx-trade:/app/services/tx-trade
+      - ../../shared:/app/shared
+
+  tx-menu:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-menu/requirements.txt &&
+             uvicorn services.tx-menu.src.main:app --host 0.0.0.0 --port 8002 --reload"
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../../services/tx-menu:/app/services/tx-menu
+      - ../../shared:/app/shared
+
+  tx-member:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-member/requirements.txt &&
+             uvicorn services.tx-member.src.main:app --host 0.0.0.0 --port 8003 --reload"
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../../services/tx-member:/app/services/tx-member
+      - ../../shared:/app/shared
+
+  tx-growth:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-growth/requirements.txt &&
+             uvicorn services.tx-growth.src.main:app --host 0.0.0.0 --port 8004 --reload"
+    ports:
+      - "8004:8004"
+    volumes:
+      - ../../services/tx-growth:/app/services/tx-growth
+      - ../../shared:/app/shared
+
+  tx-ops:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-ops/requirements.txt &&
+             uvicorn services.tx-ops.src.main:app --host 0.0.0.0 --port 8005 --reload"
+    ports:
+      - "8005:8005"
+    volumes:
+      - ../../services/tx-ops:/app/services/tx-ops
+      - ../../shared:/app/shared
+
+  tx-supply:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-supply/requirements.txt &&
+             uvicorn services.tx-supply.src.main:app --host 0.0.0.0 --port 8006 --reload"
+    ports:
+      - "8006:8006"
+    volumes:
+      - ../../services/tx-supply:/app/services/tx-supply
+      - ../../shared:/app/shared
+
+  tx-finance:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-finance/requirements.txt &&
+             uvicorn services.tx-finance.src.main:app --host 0.0.0.0 --port 8007 --reload"
+    ports:
+      - "8007:8007"
+    volumes:
+      - ../../services/tx-finance:/app/services/tx-finance
+      - ../../shared:/app/shared
+
+  tx-agent:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-agent/requirements.txt &&
+             uvicorn services.tx-agent.src.main:app --host 0.0.0.0 --port 8008 --reload"
+    ports:
+      - "8008:8008"
+    volumes:
+      - ../../services/tx-agent:/app/services/tx-agent
+      - ../../shared:/app/shared
+
+  tx-analytics:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-analytics/requirements.txt &&
+             uvicorn services.tx-analytics.src.main:app --host 0.0.0.0 --port 8009 --reload"
+    ports:
+      - "8009:8009"
+    volumes:
+      - ../../services/tx-analytics:/app/services/tx-analytics
+      - ../../shared:/app/shared
+
+  tx-brain:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-brain/requirements.txt &&
+             uvicorn services.tx-brain.src.main:app --host 0.0.0.0 --port 8010 --reload"
+    ports:
+      - "8010:8010"
+    volumes:
+      - ../../services/tx-brain:/app/services/tx-brain
+      - ../../shared:/app/shared
+
+  tx-intel:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-intel/requirements.txt &&
+             uvicorn services.tx-intel.src.main:app --host 0.0.0.0 --port 8011 --reload"
+    ports:
+      - "8011:8011"
+    volumes:
+      - ../../services/tx-intel:/app/services/tx-intel
+      - ../../shared:/app/shared
+
+  tx-org:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-org/requirements.txt &&
+             uvicorn services.tx-org.src.main:app --host 0.0.0.0 --port 8012 --reload"
+    ports:
+      - "8012:8012"
+    volumes:
+      - ../../services/tx-org:/app/services/tx-org
+      - ../../shared:/app/shared
+
+  tunxiang-api:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn[standard] &&
+             uvicorn services.tunxiang-api.src.main:app --host 0.0.0.0 --port 8013 --reload"
+    ports:
+      - "8013:8013"
+    volumes:
+      - ../../services/tunxiang-api:/app/services/tunxiang-api
+      - ../../shared:/app/shared
+
+  tx-civic:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-civic/requirements.txt &&
+             uvicorn services.tx-civic.src.main:app --host 0.0.0.0 --port 8014 --reload"
+    ports:
+      - "8014:8014"
+    volumes:
+      - ../../services/tx-civic:/app/services/tx-civic
+      - ../../shared:/app/shared
+
+  tx-expense:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-expense/requirements.txt &&
+             uvicorn services.tx-expense.src.main:app --host 0.0.0.0 --port 8015 --reload"
+    ports:
+      - "8015:8015"
+    volumes:
+      - ../../services/tx-expense:/app/services/tx-expense
+      - ../../shared:/app/shared
+
+  tx-pay:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-pay/requirements.txt &&
+             uvicorn services.tx-pay.src.main:app --host 0.0.0.0 --port 8016 --reload"
+    ports:
+      - "8016:8016"
+    volumes:
+      - ../../services/tx-pay:/app/services/tx-pay
+      - ../../shared:/app/shared
+
+  # Mount target uses underscore tx_devforge (Python module name)，与生产 Dockerfile 一致
+  tx-devforge:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx_devforge/requirements.txt &&
+             uvicorn services.tx_devforge.src.main:app --host 0.0.0.0 --port 8017 --reload"
+    ports:
+      - "8017:8017"
+    environment:
+      DEVFORGE_LOG_LEVEL: DEBUG
+    volumes:
+      - ../../services/tx-devforge:/app/services/tx_devforge
+      - ../../shared:/app/shared
+
+  mcp-server:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn[standard] &&
+             uvicorn services.mcp-server.src.main:app --host 0.0.0.0 --port 8018 --reload"
+    ports:
+      - "8018:8018"
+    volumes:
+      - ../../services/mcp-server:/app/services/mcp-server
+      - ../../shared:/app/shared
+
+  tx-predict:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-predict/requirements.txt &&
+             uvicorn services.tx-predict.src.main:app --host 0.0.0.0 --port 8019 --reload"
+    ports:
+      - "8019:8019"
+    volumes:
+      - ../../services/tx-predict:/app/services/tx-predict
+      - ../../shared:/app/shared
+
+  # ── 前端 Vite Dev Server ──────────────────────────────────
+  web-admin:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm config set registry https://registry.npmmirror.com && npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../apps/web-admin:/app
+      - web_admin_node_modules:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-dev}"
+
+  web-pos:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm config set registry https://registry.npmmirror.com && npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    ports:
+      - "5174:5174"
+    volumes:
+      - ../../apps/web-pos:/app
+      - web_pos_node_modules:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-dev}"
+
+  web-kds:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm config set registry https://registry.npmmirror.com && npm install && npm run dev -- --host 0.0.0.0 --port 5175"
+    ports:
+      - "5175:5175"
+    volumes:
+      - ../../apps/web-kds:/app
+      - web_kds_node_modules:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-dev}"
+
+  # ── 边缘同步引擎（profile=edge 才启动）────────────────────
+  sync-engine:
+    build:
+      context: ../..
+      dockerfile: edge/sync-engine/Dockerfile
+    environment:
+      CLOUD_PG_DSN: ${CLOUD_PG_DSN:-postgresql://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:-changeme_dev}@postgres/${POSTGRES_DB:-tunxiang_os}}
+      LOCAL_PG_DSN: ${LOCAL_PG_DSN:-postgresql://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:-changeme_dev}@postgres/${POSTGRES_DB:-tunxiang_os}}
+      STORE_ID: ${STORE_ID:-store_dev}
+      TENANT_ID: ${TENANT_ID:-}
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-300}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - edge
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-dev}"
+
+volumes:
+  web_admin_node_modules:
+  web_pos_node_modules:
+  web_kds_node_modules:
