@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from workers.rfm_updater import RFMUpdater
+from ..workers.rfm_updater import RFMUpdater
 
 from shared.ontology.src.database import get_db
 from shared.ontology.src.entities import Customer

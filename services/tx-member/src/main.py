@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # 注入 stamp_card_routes 的 get_db（避免 NotImplementedError stub）
-    import api.stamp_card_routes as _stamp_mod
+    from .api import stamp_card_routes as _stamp_mod
 
     from shared.ontology.src.database import get_db as _shared_get_db
 

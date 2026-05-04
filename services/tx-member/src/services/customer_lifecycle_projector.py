@@ -33,7 +33,7 @@ from shared.events.src.projector import ProjectorBase
 from shared.ontology.src.database import async_session_factory
 
 try:
-    from services.customer_lifecycle_fsm import CustomerLifecycleFSM
+    from ..services.customer_lifecycle_fsm import CustomerLifecycleFSM
 except ImportError:  # pragma: no cover
     from .customer_lifecycle_fsm import CustomerLifecycleFSM  # type: ignore[no-redef]
 

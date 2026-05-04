@@ -17,7 +17,7 @@ from typing import Any
 
 import structlog
 from fastapi import HTTPException
-from models.group_config import BrandGroup
+from ..models.group_config import BrandGroup
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 

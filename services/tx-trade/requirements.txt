@@ -8,3 +8,5 @@ httpx>=0.25.0
 # ── Phase 2: 订单完整性校验 ──
 cryptography>=42.0.0  # HMAC-SHA256（shared/utils/data_integrity.py，间接依赖）
 prometheus-fastapi-instrumentator>=6.1.0
+tenacity>=8.2.0
+python-jose[cryptography]>=3.3.0

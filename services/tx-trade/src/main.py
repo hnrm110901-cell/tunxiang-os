@@ -137,7 +137,7 @@ async def lifespan(app: FastAPI):
 
     from .security.rbac import assert_no_dev_bypass_in_production
     from .services.audit_outbox import start_audit_outbox_flusher
-    from .services.cook_time_stats import start_daily_scheduler
+    from .api.cook_time_routes import start_daily_scheduler
     from .services.group_buy_scheduler import start_group_buy_expiry_scheduler
 
     # 启动门禁（PR-2 / §19 R-A4-7）：拒绝生产环境 TX_AUTH_ENABLED=false 配置漂移。
@@ -163,7 +163,7 @@ async def lifespan(app: FastAPI):
     app.state.register_background_task = _register_background_task
 
     await init_db()
-    _register_background_task(asyncio.create_task(start_daily_scheduler(async_session_factory)))
+    start_daily_scheduler(async_session_factory)
     _register_background_task(asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory)))
 
     # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。

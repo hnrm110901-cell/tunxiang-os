@@ -23,7 +23,7 @@
 import uuid
 from typing import Optional
 
-import services.premium_card as svc
+from ..services import premium_card as svc
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession

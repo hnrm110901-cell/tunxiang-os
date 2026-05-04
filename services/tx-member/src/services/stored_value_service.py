@@ -68,7 +68,7 @@ class StoredValueService:
         remark: str | None = None,
     ) -> dict:
         """开卡 — 生成唯一卡号，插入 StoredValueCard"""
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         card_no = f"SV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
 
@@ -94,7 +94,7 @@ class StoredValueService:
 
     async def get_card(self, db: AsyncSession, card_no: str) -> Optional[dict]:
         """查询储值卡信息（按卡号）"""
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         result = await db.execute(
             select(StoredValueCard).where(
@@ -118,7 +118,7 @@ class StoredValueService:
         tenant_id: uuid.UUID,
     ) -> dict:
         """查询储值卡余额（按 card_id）"""
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         result = await db.execute(
             select(StoredValueCard).where(
@@ -146,7 +146,7 @@ class StoredValueService:
         tenant_id: uuid.UUID,
     ) -> Optional[dict]:
         """查询储值卡详情（按 card_id）"""
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         result = await db.execute(
             select(StoredValueCard).where(
@@ -174,7 +174,7 @@ class StoredValueService:
         store_id: uuid.UUID | None = None,
     ) -> dict:
         """按套餐充值 — 验证套餐有效性，同一事务内更新卡余额并记录流水"""
-        from models.stored_value import StoredValueRechargePlan, StoredValueTransaction
+        from ..models.stored_value import StoredValueRechargePlan, StoredValueTransaction
 
         # 查套餐（带 tenant_id 隔离）
         plan_result = await db.execute(
@@ -272,7 +272,7 @@ class StoredValueService:
         store_id: str | None = None,
     ) -> dict:
         """充值（按金额，含自动匹配赠送规则）— 兼容 v1 路由"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("充值金额必须大于0")
@@ -349,7 +349,7 @@ class StoredValueService:
         store_id: str | None = None,
     ) -> dict:
         """消费扣款 — 先扣赠送金再扣本金"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("消费金额必须大于0")
@@ -424,7 +424,7 @@ class StoredValueService:
         store_id: uuid.UUID | None = None,
     ) -> dict:
         """消费扣款（按 card_id，v2 路由用）"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("消费金额必须大于0")
@@ -492,7 +492,7 @@ class StoredValueService:
         operator_id: str | None = None,
     ) -> dict:
         """退款 — 仅退本金（兼容 v1 路由）"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("退款金额必须大于0")
@@ -553,7 +553,7 @@ class StoredValueService:
         operator_id: uuid.UUID | None = None,
     ) -> dict:
         """按原始流水退款 — 退款不超过原始消费额，仅退本金（v2 路由用）"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if refund_amount_fen <= 0:
             raise ValueError("退款金额必须大于0")
@@ -635,7 +635,7 @@ class StoredValueService:
         offset: int = 0,
     ) -> dict:
         """查询储值卡流水（按卡号，v1 兼容）"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from ..models.stored_value import StoredValueCard, StoredValueTransaction
 
         card_result = await db.execute(select(StoredValueCard.id).where(StoredValueCard.card_no == card_no))
         card_id = card_result.scalar_one_or_none()
@@ -676,7 +676,7 @@ class StoredValueService:
         size: int = 20,
     ) -> dict:
         """按 card_id 分页查询流水（v2 路由用）"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         offset = (page - 1) * size
 
@@ -718,7 +718,7 @@ class StoredValueService:
         tenant_id: uuid.UUID,
     ) -> list[dict]:
         """查询有效套餐列表（is_active=True，在有效期内）"""
-        from models.stored_value import StoredValueRechargePlan
+        from ..models.stored_value import StoredValueRechargePlan
 
         now = datetime.now(timezone.utc)
 
@@ -754,7 +754,7 @@ class StoredValueService:
         remark: str | None = None,
     ) -> dict:
         """新建充值套餐"""
-        from models.stored_value import StoredValueRechargePlan
+        from ..models.stored_value import StoredValueRechargePlan
 
         if recharge_amount_fen <= 0:
             raise ValueError("充值金额必须大于0")
@@ -798,7 +798,7 @@ class StoredValueService:
 
         满赠逻辑由调用方计算并通过 gift_amount_fen 传入。
         """
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("充值金额必须大于0")
@@ -858,7 +858,7 @@ class StoredValueService:
         remark: str | None = None,
     ) -> dict:
         """直接退款（仅退本金）— 按 card_id，不验证原始流水。"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("退款金额必须大于0")
@@ -908,7 +908,7 @@ class StoredValueService:
         并发安全：对两张卡同时加行锁（按 UUID 排序防死锁）。
         仅转本金余额，不转赠送余额。
         """
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from ..models.stored_value import StoredValueCard, StoredValueTransaction
 
         if amount_fen <= 0:
             raise ValueError("转赠金额必须大于0")
@@ -1030,7 +1030,7 @@ class StoredValueService:
 
         通知（发 NOTIFY 事件到 pg_notify）由调用方或 worker 负责发送。
         """
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from ..models.stored_value import StoredValueCard, StoredValueTransaction
 
         today = datetime.now(timezone.utc).date()
 
@@ -1083,7 +1083,7 @@ class StoredValueService:
 
     async def freeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
         """冻结储值卡"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         card = await self._get_active_card_for_update(db, card_no)
         card.status = "frozen"
@@ -1115,7 +1115,7 @@ class StoredValueService:
         remark: str | None = None,
     ) -> dict:
         """冻结储值卡（按 card_id）"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
         if card.status != "active":
@@ -1145,7 +1145,7 @@ class StoredValueService:
 
     async def unfreeze(self, db: AsyncSession, card_no: str, operator_id: str | None = None) -> dict:
         """解冻储值卡"""
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from ..models.stored_value import StoredValueCard, StoredValueTransaction
 
         result = await db.execute(
             select(StoredValueCard)
@@ -1187,7 +1187,7 @@ class StoredValueService:
         remark: str | None = None,
     ) -> dict:
         """解冻储值卡（按 card_id）"""
-        from models.stored_value import StoredValueTransaction
+        from ..models.stored_value import StoredValueTransaction
 
         card = await self._get_card_by_id_for_update(db, card_id, tenant_id)
         if card.status != "frozen":
@@ -1228,7 +1228,7 @@ class StoredValueService:
             include_inactive: True 时返回所有卡（含冻结/过期），
                               False 时只返回 active 卡（默认）。
         """
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         stmt = (
             select(StoredValueCard)
@@ -1276,7 +1276,7 @@ class StoredValueService:
             CardNotFoundError: 该会员没有 active 储值卡
             InsufficientBalanceError: 积分余额不足
         """
-        from models.stored_value import StoredValueCard, StoredValueTransaction
+        from ..models.stored_value import StoredValueCard, StoredValueTransaction
         from sqlalchemy import text
 
         if points <= 0:
@@ -1435,7 +1435,7 @@ class StoredValueService:
 
     async def _get_active_card_for_update(self, db: AsyncSession, card_no: str):
         """获取活跃卡并加行锁（防并发）— 按卡号"""
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         result = await db.execute(
             select(StoredValueCard)
@@ -1456,7 +1456,7 @@ class StoredValueService:
         tenant_id: uuid.UUID,
     ):
         """获取卡并加行锁（防并发）— 按 card_id，带 tenant_id 校验"""
-        from models.stored_value import StoredValueCard
+        from ..models.stored_value import StoredValueCard
 
         result = await db.execute(
             select(StoredValueCard)
@@ -1479,7 +1479,7 @@ class StoredValueService:
         store_id: str | None,
     ) -> int:
         """匹配充值赠送规则，返回赠送金额（v1 兼容）"""
-        from models.stored_value import RechargeRule
+        from ..models.stored_value import RechargeRule
 
         now = datetime.now(timezone.utc)
 

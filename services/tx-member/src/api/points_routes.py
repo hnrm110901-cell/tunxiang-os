@@ -36,18 +36,18 @@ from pydantic import BaseModel, Field
 
 # 服务层（importable，但 DB 路径在 demo 模式下可能未启动；以 ImportError 兜底）
 try:
-    from services.points_engine import (
+    from ..services.points_engine import (
         check_offset_against_margin_floor as _svc_check_offset,
     )
-    from services.points_engine import cross_store_settlement as _svc_settlement
-    from services.points_engine import earn_points as _svc_earn_points
-    from services.points_engine import get_points_balance as _svc_balance
-    from services.points_engine import get_points_history as _svc_history
-    from services.points_engine import manage_growth_value as _svc_growth
-    from services.points_engine import set_earn_rules as _svc_set_earn_rules
-    from services.points_engine import set_multiplier as _svc_set_multiplier
-    from services.points_engine import set_spend_rules as _svc_set_spend_rules
-    from services.points_engine import spend_points as _svc_spend_points
+    from ..services.points_engine import cross_store_settlement as _svc_settlement
+    from ..services.points_engine import earn_points as _svc_earn_points
+    from ..services.points_engine import get_points_balance as _svc_balance
+    from ..services.points_engine import get_points_history as _svc_history
+    from ..services.points_engine import manage_growth_value as _svc_growth
+    from ..services.points_engine import set_earn_rules as _svc_set_earn_rules
+    from ..services.points_engine import set_multiplier as _svc_set_multiplier
+    from ..services.points_engine import set_spend_rules as _svc_set_spend_rules
+    from ..services.points_engine import spend_points as _svc_spend_points
 
     _SERVICES_AVAILABLE = True
 except ImportError as exc:  # pragma: no cover
