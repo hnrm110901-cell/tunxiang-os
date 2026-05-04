@@ -32,9 +32,10 @@
 #     ⚠️ tx-predict   :8019 ← 原 8013 与 tunxiang-api 冲突 → 改 8019（空闲口）
 #     ⚠️ mcp-server   :8018 ← 原 8014 与 tx-civic 宪法冲突 → 改 8018（空闲口）
 #                              tx-civic 是 CLAUDE.md 宪法规定的 8014，不可让
-#     ⚠️ tx-forge（未合并 P0-2 分支）：拟在 8013 容器内端口 → 与 tunxiang-api
-#       冲突，待 rebase 后改 base 端口或与 tunxiang-api 二选一保留；本 base
-#       不预先收纳，由 P0-2 合并时单独处理
+#     ⓘ tx-forge    :8013 ← 容器内端口与 tunxiang-api/tx-predict 同号但分属不同
+#                              Docker container，同一 network 内通过服务名 DNS
+#                              解析（http://tx-forge:8013 vs http://tunxiang-api:8013），
+#                              不冲突。仅当 host 端口暴露时才需要避让。
 #
 # 上述端口决策已写入 docs/infra/port-allocation-2026-05.md（阶段 E 出表）。
 #
@@ -139,6 +140,7 @@ services:
       TX_DEVFORGE_URL:  http://tx-devforge:8017
       TX_MCP_URL:       http://mcp-server:8018
       TX_PREDICT_URL:   http://tx-predict:8019
+      TX_FORGE_URL:     http://tx-forge:8013
       TX_TUNXIANG_API_URL: http://tunxiang-api:8013
       WECOM_CORP_ID:        ${WECOM_CORP_ID:-}
       WECOM_AGENT_ID:       ${WECOM_AGENT_ID:-}
@@ -401,6 +403,29 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8017/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── Forge 外部 ISV 应用市场 :8013 ─────────────────────────────
+  # 注意：与 tx-devforge（内部研发平台 :8017）严格区分
+  # 端口：保留 8013 容器内端口（Docker network DNS 隔离，与 tunxiang-api/tx-predict 同号不冲突）
+  tx-forge:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-forge/Dockerfile
+    environment:
+      <<: *common-env
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8013/health',timeout=3).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
