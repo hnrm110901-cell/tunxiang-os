@@ -73,3 +73,9 @@ podAntiAffinity:
 podAnnotations: {}
 nodeSelector: {}
 tolerations: []
+
+# P0.6 工件 2 — ServiceAccount（默认创建，未引用前不影响 default sa）
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
