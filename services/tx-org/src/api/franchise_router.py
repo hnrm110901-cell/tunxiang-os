@@ -1,10 +1,18 @@
-"""加盟管理 API — 完整实现
+"""加盟管理 API — V2 路由（仅保留独有端点，主 CRUD 已交给 v5）
 
-端点清单：
-  GET    /api/v1/franchise/franchisees                   加盟商列表
-  POST   /api/v1/franchise/franchisees                   新建加盟商
+裁决（2026-05-04，路由冲突清理）：
+  本文件 V2 实现风格更现代（Query/UUID 校验、structlog），但 /franchisees
+  的数据契约（franchisee_name/contact_name…）与前端真实使用的 v5 契约
+  （name/region/store_name…）不兼容。为消除三家撞车，本次裁决：
+
+    保留 v5（franchise_v5_routes.py）作为 /franchisees CRUD 的唯一实现，
+    本文件**删除**以下端点：
+      GET    /api/v1/franchise/franchisees             → 由 v5 提供
+      POST   /api/v1/franchise/franchisees             → 由 v5 提供
+      PUT    /api/v1/franchise/franchisees/{id}        → 由 v5 提供
+
+端点清单（保留）：
   GET    /api/v1/franchise/franchisees/{id}              加盟商详情
-  PUT    /api/v1/franchise/franchisees/{id}              更新加盟商信息
   GET    /api/v1/franchise/franchisees/{id}/stores       旗下门店列表
   GET    /api/v1/franchise/franchisees/{id}/dashboard    经营看板
 
@@ -20,7 +28,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import structlog
@@ -62,39 +70,6 @@ def _parse_uuid(value: str, field_name: str) -> UUID:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-class RoyaltyTierReq(BaseModel):
-    min_revenue: float = Field(..., ge=0, description="触发阶梯的最低月营业额（元）")
-    rate: float = Field(..., gt=0, lt=1, description="该阶梯分润率")
-
-
-class CreateFranchiseeReq(BaseModel):
-    franchisee_name: str = Field(..., max_length=100, description="加盟商名称")
-    contact_name: Optional[str] = Field(None, max_length=50)
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    contact_email: Optional[str] = Field(None, max_length=100)
-    region: Optional[str] = Field(None, max_length=50)
-    contract_start: Optional[str] = Field(None, description="合同开始日期 YYYY-MM-DD")
-    contract_end: Optional[str] = Field(None, description="合同结束日期 YYYY-MM-DD")
-    royalty_rate: float = Field(default=0.05, gt=0, lt=1, description="基础分润率")
-    royalty_tiers: List[RoyaltyTierReq] = Field(default_factory=list)
-    management_fee_fen: int = Field(default=0, ge=0, description="月度管理费（分）")
-    brand_usage_fee_fen: int = Field(default=0, ge=0, description="品牌使用费（分）")
-
-
-class UpdateFranchiseeReq(BaseModel):
-    franchisee_name: Optional[str] = Field(None, max_length=100)
-    contact_name: Optional[str] = Field(None, max_length=50)
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    contact_email: Optional[str] = Field(None, max_length=100)
-    region: Optional[str] = Field(None, max_length=50)
-    contract_start: Optional[str] = None
-    contract_end: Optional[str] = None
-    royalty_rate: Optional[float] = Field(None, gt=0, lt=1)
-    management_fee_fen: Optional[int] = Field(None, ge=0)
-    brand_usage_fee_fen: Optional[int] = Field(None, ge=0)
-    status: Optional[str] = Field(None, description="active / suspended / terminated")
-
-
 class GenerateBatchReq(BaseModel):
     year: int = Field(..., ge=2020, le=2099, description="账单年份")
     month: int = Field(..., ge=1, le=12, description="账单月份")
@@ -114,41 +89,11 @@ class CreateAuditReq(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-@router.get("/franchisees")
-async def list_franchisees(
-    status: Optional[str] = Query(None, description="按状态过滤：active/suspended/terminated"),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    x_tenant_id: Optional[str] = Header(None),
-) -> Dict[str, Any]:
-    """加盟商列表（总部视角，支持状态过滤和分页）。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    result = await FranchiseService.list_franchisees(
-        tenant_id=tenant_id,
-        db=None,
-        status=status,
-        page=page,
-        size=size,
-    )
-    return {"ok": True, "data": result}
-
-
-@router.post("/franchisees", status_code=201)
-async def create_franchisee(
-    req: CreateFranchiseeReq,
-    x_tenant_id: Optional[str] = Header(None),
-) -> Dict[str, Any]:
-    """新建加盟商档案（总部操作）。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    try:
-        franchisee = await FranchiseService.create_franchisee(
-            data=req.model_dump(),
-            tenant_id=tenant_id,
-            db=None,
-        )
-        return {"ok": True, "data": franchisee.to_dict()}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# ── 已删除（2026-05-04 路由冲突裁决）────────────────────────────────────────
+#   GET  /franchisees  → 由 franchise_v5_routes.py 提供（v240 表 / 分 int / 前端契约）
+#   POST /franchisees  → 由 franchise_v5_routes.py 提供
+#   PUT  /franchisees/{id} → 由 franchise_v5_routes.py 提供
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @router.get("/franchisees/{franchisee_id}")
@@ -163,38 +108,6 @@ async def get_franchisee(
     if franchisee is None:
         raise HTTPException(status_code=404, detail=f"加盟商 {franchisee_id} 不存在")
     return {"ok": True, "data": franchisee.to_dict()}
-
-
-@router.put("/franchisees/{franchisee_id}")
-async def update_franchisee(
-    franchisee_id: str,
-    req: UpdateFranchiseeReq,
-    x_tenant_id: Optional[str] = Header(None),
-) -> Dict[str, Any]:
-    """更新加盟商信息（包含状态变更）。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    fid = _parse_uuid(franchisee_id, "franchisee_id")
-    data = req.model_dump(exclude_none=True)
-
-    try:
-        # 若包含状态变更，走专用状态流转方法
-        if "status" in data:
-            franchisee = await FranchiseService.update_franchisee_status(
-                franchisee_id=fid,
-                tenant_id=tenant_id,
-                new_status=data["status"],
-                db=None,
-            )
-        else:
-            franchisee = await FranchiseService.update_franchisee(
-                franchisee_id=fid,
-                tenant_id=tenant_id,
-                data=data,
-                db=None,
-            )
-        return {"ok": True, "data": franchisee.to_dict()}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/franchisees/{franchisee_id}/stores")

@@ -1,24 +1,33 @@
-"""加盟管理 API
+"""加盟管理 API（PB.1 兼容层 — 残留独有端点，主路由已迁移）
 
 # ROUTER REGISTRATION:
 # from .api.franchise_routes import router as franchise_router
 # app.include_router(franchise_router, prefix="/api/v1/franchise")
 
-端点清单：
-  POST   /franchise/franchisees              - 创建加盟商
-  GET    /franchise/franchisees              - 加盟商列表（总部视角）
-  POST   /franchise/{id}/assign-store        - 分配门店
-  GET    /franchise/{id}/dashboard           - 加盟商仪表盘
-  POST   /franchise/bills/generate           - 生成月度账单
-  GET    /franchise/bills                    - 账单列表（?franchisee_id=）
-  POST   /franchise/bills/{id}/confirm       - 确认账单
-  POST   /franchise/bills/{id}/pay           - 标记已付款
-  GET    /franchise/overdue-alerts           - 欠款预警
+裁决（2026-05-04，路由冲突清理）：
+  本文件原是 PB.1 元-float 体系的薄基础版。当时为兼容 _fen 加了补丁，但
+  数据契约（franchisee_name/contact_name…）与前端实际使用的 v5 契约
+  （name/region/store_name…）冲突，且与 franchise_router.py、
+  franchise_v5_routes.py 三家撞车。
+
+  本次保留 v5（franchise_v5_routes.py）作为 /franchisees 的唯一实现，
+  因此从本文件**删除**以下端点：
+    GET    /franchise/franchisees                    → 由 v5 提供
+    POST   /franchise/franchisees                    → 由 v5 提供
+    GET    /franchise/franchisees/{id}/dashboard     → 由 router(V2) 提供
+
+  保留的独有端点（无冲突）：
+    POST   /franchise/franchisees/{id}/assign-store  - 分配门店
+    POST   /franchise/bills/generate                 - 生成月度账单
+    GET    /franchise/bills                          - 账单列表（?franchisee_id=）
+    POST   /franchise/bills/{id}/confirm             - 确认账单
+    POST   /franchise/bills/{id}/pay                 - 标记已付款
+    GET    /franchise/overdue-alerts                 - 欠款预警
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
@@ -80,18 +89,6 @@ class RoyaltyTierReq(BaseModel):
         return 0.0
 
 
-class CreateFranchiseeReq(BaseModel):
-    franchisee_name: str = Field(..., max_length=100)
-    contact_name: Optional[str] = Field(None, max_length=50)
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    contract_start: Optional[str] = None  # "YYYY-MM-DD"
-    contract_end: Optional[str] = None
-    royalty_rate: float = Field(default=0.05, gt=0, lt=1)
-    royalty_tiers: List[RoyaltyTierReq] = Field(default_factory=list)
-    # 管理费：优先取 _fen，未传时按 0（CLAUDE.md §10 — 金额一律分）
-    management_fee_fen: Optional[int] = Field(default=None, ge=0, description="固定管理费（分）")
-
-
 class AssignStoreReq(BaseModel):
     store_id: str
 
@@ -103,63 +100,14 @@ class GenerateBillsReq(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  加盟商管理端点
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-
-@router.post("/franchisees")
-async def create_franchisee(
-    req: CreateFranchiseeReq,
-    x_tenant_id: Optional[str] = Header(None),
-):
-    """创建加盟商（总部操作）。
-
-    阶梯字段兼容：min_revenue_fen 优先，未传时回退 min_revenue（元）。
-    管理费字段：management_fee_fen（分，int），未传按 0。
-    """
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    try:
-        # 规范化阶梯：统一以元（float）形态进入 service / model.RoyaltyTier
-        # 内部计算（calculate_fen）会将 min_revenue × 100 转分用 Decimal
-        normalized_tiers = [
-            {"min_revenue": t.effective_min_revenue_yuan(), "rate": t.rate}
-            for t in req.royalty_tiers
-        ]
-        payload = {
-            "franchisee_name": req.franchisee_name,
-            "contact_name": req.contact_name,
-            "contact_phone": req.contact_phone,
-            "contract_start": req.contract_start,
-            "contract_end": req.contract_end,
-            "royalty_rate": req.royalty_rate,
-            "royalty_tiers": normalized_tiers,
-            "management_fee_fen": req.management_fee_fen or 0,
-        }
-        franchisee = await FranchiseService.create_franchisee(
-            data=payload,
-            tenant_id=tenant_id,
-            db=None,
-        )
-        return {"ok": True, "data": franchisee.to_dict()}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/franchisees")
-async def list_franchisees(
-    status: Optional[str] = None,
-    page: int = 1,
-    size: int = 20,
-    x_tenant_id: Optional[str] = Header(None),
-):
-    """加盟商列表（总部视角，支持状态过滤和分页）。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    result = await FranchiseService.list_franchisees(
-        tenant_id=tenant_id,
-        db=None,
-        status=status,
-        page=page,
-        size=size,
-    )
-    return {"ok": True, "data": result}
+#
+# 已删除（2026-05-04 路由冲突裁决）：
+#   GET    /franchisees                       → 由 franchise_v5_routes.py 提供
+#   POST   /franchisees                       → 由 franchise_v5_routes.py 提供
+#   GET    /franchisees/{id}/dashboard        → 由 franchise_router.py (V2) 提供
+#
+# 保留独有端点：
+#   POST   /franchisees/{id}/assign-store     - 分配门店（无冲突）
 
 
 @router.post("/franchisees/{franchisee_id}/assign-store")
@@ -178,24 +126,6 @@ async def assign_store(
             db=None,
         )
         return {"ok": True, "data": link.to_dict()}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/franchisees/{franchisee_id}/dashboard")
-async def get_franchisee_dashboard(
-    franchisee_id: str,
-    x_tenant_id: Optional[str] = Header(None),
-):
-    """加盟商仪表盘：本月营业额、本月分润、累计欠款。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    try:
-        dashboard = await FranchiseService.get_franchisee_dashboard(
-            franchisee_id=UUID(franchisee_id),
-            tenant_id=tenant_id,
-            db=None,
-        )
-        return {"ok": True, "data": dashboard}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

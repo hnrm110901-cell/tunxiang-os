@@ -189,8 +189,14 @@ app.include_router(admin_router)
 app.include_router(payroll_router)  # 薪资引擎 V4（v121 表，mock数据）前缀已内置 /api/v1/org/payroll
 app.include_router(payroll_v2_router, prefix="/api/v1/payroll")
 app.include_router(approval_engine_router, prefix="/api/v1/approval-engine")
-app.include_router(franchise_router)
-app.include_router(franchise_v2_router)
+# ── 加盟路由注册顺序（2026-05-04 路由冲突裁决） ──
+# Starlette 路由匹配规则：先注册者胜出。因此 v5（/franchisees CRUD 唯一实现）
+# 必须最先注册，确保前端 FranchiseManagePage.tsx 命中 v5 契约（v240 表 / 分 int）。
+# v2_router 仅保留 /franchisees/{id} 详情、/stores、/dashboard、/royalty/*、/audits/*；
+# franchise_router(v1) 仅保留 /franchisees/{id}/assign-store、/bills/*、/overdue-alerts。
+app.include_router(franchise_v5_router)  # 加盟商管理闭环 V5（v240表，模块3.2）— 唯一 /franchisees CRUD
+app.include_router(franchise_v2_router)  # V2 残留：/franchisees/{id}*、/royalty/*、/audits
+app.include_router(franchise_router)     # PB.1 残留：assign-store、bills/*、overdue-alerts
 app.include_router(approval_router, prefix="/api/v1")
 app.include_router(patrol_router, prefix="/api/v1")
 app.include_router(franchise_settlement_router)
@@ -221,7 +227,7 @@ app.include_router(revenue_schedule_router)  # 营收驱动排班（POS数据→
 app.include_router(labor_margin_router)  # 人力成本实时毛利仪表盘（P2-5）
 app.include_router(piecework_router)  # 计件提成3.0（厨师/传菜员按品项计件，v187表）
 app.include_router(franchise_contract_router)  # 加盟商合同+收费管理（v190表）
-app.include_router(franchise_v5_router)  # 加盟商管理闭环 V5（v240表，模块3.2）
+# franchise_v5_router 已在加盟路由块顶部注册（裁决：先注册胜出）
 app.include_router(employee_training_router)  # 员工培训管理DB持久化（v195表）OR-02
 app.include_router(performance_scoring_router)  # 绩效考核周期与评级扩展（Y-G8）
 app.include_router(brand_management_router)  # 多品牌管理DB统一（v198表，废弃内存双轨）Y-H1
