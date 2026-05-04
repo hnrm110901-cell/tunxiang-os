@@ -7,7 +7,7 @@
   Phase 3：移除 PaymentGateway、ShouqianbaClient、LakalaClient
 
 环境变量：
-  TX_PAY_URL — tx-pay 服务地址（默认 http://localhost:8013）
+  TX_PAY_URL — tx-pay 服务地址（默认 http://localhost:8016）
   TX_PAY_ENABLED — 是否启用 tx-pay 桥接（默认 false，渐进开启）
 """
 
@@ -21,7 +21,7 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-_TX_PAY_URL = os.getenv("TX_PAY_URL", "http://localhost:8013")
+_TX_PAY_URL = os.getenv("TX_PAY_URL", "http://localhost:8016")
 _TX_PAY_ENABLED = os.getenv("TX_PAY_ENABLED", "false").lower() in ("true", "1", "yes")
 
 # 连接池（模块级单例）
