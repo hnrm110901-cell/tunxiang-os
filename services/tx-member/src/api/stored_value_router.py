@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -357,7 +357,7 @@ async def list_charge_rules(
     tenant_id: uuid.UUID = Depends(_parse_tenant_id),
 ):
     """查询当前有效的充值赠送规则（is_active=true，在有效期内）。"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     rows = await db.execute(
         text(
             "SELECT id, store_id, charge_amount, bonus_amount, description, "
@@ -484,7 +484,7 @@ async def _match_charge_bonus(
     策略：取 charge_amount <= amount_fen 中赠送金额最大的规则。
     无匹配则返回 0。
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = await db.execute(
         text(
             "SELECT bonus_amount FROM sv_charge_rules "

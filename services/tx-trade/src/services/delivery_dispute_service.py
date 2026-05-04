@@ -12,7 +12,7 @@
 """
 
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -120,7 +120,7 @@ class DeliveryDisputeService:
             resolution_amount_fen = None
 
         dispute_id = str(_uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         await _set_tenant(self.db, self.tenant_id)
 
@@ -257,7 +257,7 @@ class DeliveryDisputeService:
         elif action == "reject":
             resolution_amount_fen = 0
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         update_params: dict = {
             "dispute_id": _uuid.UUID(dispute_id),

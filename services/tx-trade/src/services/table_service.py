@@ -7,7 +7,7 @@ Integrates context resolver and learning engine.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -216,7 +216,7 @@ class TableCardService:
                 tables.append(card)
 
             # Derive meal period from current UTC hour (simple heuristic)
-            hour = datetime.utcnow().hour
+            hour = datetime.now(timezone.utc).hour
             if hour < 11:
                 meal_period = "breakfast"
             elif hour < 14:
@@ -663,7 +663,7 @@ class TableCardService:
                 import json
 
                 data = {
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "store_id": store_id,
                     "statistics": response.summary.model_dump(),
                     "tables": [t.model_dump() for t in response.tables],
