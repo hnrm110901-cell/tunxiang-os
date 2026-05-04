@@ -115,6 +115,9 @@ class PullResponse(BaseModel):
     items: List[PullEventOut]
     count: int
     max_seq: int
+    # PJ.1: event_id 作为复合游标第三键，消除 (ts, seq) 重复时的数据丢失
+    # v147 events.event_id 是 UUID PK 全局唯一，永远可作为最终 tiebreaker
+    max_event_id: str = "00000000-0000-0000-0000-000000000000"
 
 
 # ─── 依赖：获取租户 ID ────────────────────────────────────────────────────
@@ -374,6 +377,13 @@ async def pull_events(
         ge=0,
         description="复合游标的序列号分量，用于同 ts 内事件的 tiebreaker",
     ),
+    since_id: str = Query(
+        default="00000000-0000-0000-0000-000000000000",
+        description=(
+            "复合游标的 event_id 分量（PJ.1 三键 tiebreaker）— 旧客户端缺省走零 UUID 即可，"
+            "events.event_id 是 UUID PK 全局唯一，最终消除 (ts, seq) 重复时的数据丢失"
+        ),
+    ),
     limit: int = Query(default=500, ge=1, le=500),
     tenant_id: str = Depends(_require_tenant),
     db: AsyncSession = Depends(get_db),
@@ -389,6 +399,9 @@ async def pull_events(
         )
 
     try:
+        # PJ.1: 三键 tiebreaker (recorded_at, sequence_num, event_id)
+        # 旧二元组 cursor 兼容：since_id 缺省零 UUID，配合 event_id > zero UUID
+        # 等价于"任意 event_id"，行为退化为原二键比较
         result = await db.execute(
             text(
                 """
@@ -401,8 +414,13 @@ async def pull_events(
                   AND (
                     recorded_at > :since_ts
                     OR (recorded_at = :since_ts AND sequence_num > :since_seq)
+                    OR (
+                      recorded_at = :since_ts
+                      AND sequence_num = :since_seq
+                      AND event_id > CAST(:since_id AS UUID)
+                    )
                   )
-                ORDER BY recorded_at ASC, sequence_num ASC
+                ORDER BY recorded_at ASC, sequence_num ASC, event_id ASC
                 LIMIT :limit
                 """
             ),
@@ -411,20 +429,36 @@ async def pull_events(
                 "store_id": store_id,
                 "since_ts": since_dt,
                 "since_seq": since_seq,
+                "since_id": since_id,
                 "limit": limit,
             },
         )
         keys = list(result.keys())
         rows = result.all()
-    except OperationalError:
-        # events 表不存在（非 v147+ 环境），返回空
+    except OperationalError as exc:
+        # PJ.1: 收窄 OperationalError 兜底范围 — 只接 "events does not exist"，
+        # 其他 OperationalError（连接断/磁盘满/lock timeout/无权限等）必须 raise，
+        # 否则客户端拿到空响应误判同步完成 → 静默丢失大批事件
+        err_msg = str(exc.orig) if exc.orig is not None else str(exc)
+        if "events" not in err_msg or "does not exist" not in err_msg:
+            logger.error(
+                "sync_ingest.pull_operational_error_propagated",
+                error=err_msg,
+                exc_info=True,
+            )
+            raise
         logger.warning(
             "sync_ingest.events_table_missing",
             msg="events table not found, returning empty list",
         )
         return {
             "ok": True,
-            "data": PullResponse(items=[], count=0, max_seq=since_seq).model_dump(),
+            "data": PullResponse(
+                items=[],
+                count=0,
+                max_seq=since_seq,
+                max_event_id=since_id,
+            ).model_dump(),
         }
     except SQLAlchemyError as exc:
         logger.error(
@@ -436,6 +470,7 @@ async def pull_events(
 
     items: List[PullEventOut] = []
     max_seq = since_seq
+    max_event_id = since_id
     for row in rows:
         d = dict(zip(keys, row))
         seq_val = int(d.get("sequence_num", 0))
@@ -458,11 +493,15 @@ async def pull_events(
             except (json.JSONDecodeError, ValueError):
                 meta = {}
 
+        eid = str(d["event_id"])
+        # 行已按 (recorded_at, sequence_num, event_id) 排序，最后一行就是最大 cursor
+        max_event_id = eid
+
         items.append(
             PullEventOut(
                 seq=seq_val,
                 ts=ts_str,
-                event_id=str(d["event_id"]),
+                event_id=eid,
                 event_type=str(d["event_type"]),
                 stream_id=str(d["stream_id"]),
                 stream_type=str(d["stream_type"]),
@@ -472,7 +511,12 @@ async def pull_events(
             )
         )
 
-    response = PullResponse(items=items, count=len(items), max_seq=max_seq)
+    response = PullResponse(
+        items=items,
+        count=len(items),
+        max_seq=max_seq,
+        max_event_id=max_event_id,
+    )
 
     logger.info(
         "sync_ingest.pull_done",
@@ -480,8 +524,10 @@ async def pull_events(
         store_id=store_id,
         since_ts=since_ts,
         since_seq=since_seq,
+        since_id=since_id,
         returned=len(items),
         max_seq=max_seq,
+        max_event_id=max_event_id,
     )
     return {"ok": True, "data": response.model_dump()}
 
