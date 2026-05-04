@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -88,7 +88,7 @@ async def create_inbound_record(
     """录入进货台账"""
     await _set_tenant(db, x_tenant_id)
     record_id = str(uuid4())
-    batch_no = body.batch_no or f"B-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{record_id[:8]}"
+    batch_no = body.batch_no or f"B-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{record_id[:8]}"
     try:
         await db.execute(
             text("""
