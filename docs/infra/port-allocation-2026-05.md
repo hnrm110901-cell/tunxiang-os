@@ -150,8 +150,8 @@ tx-brain:8010, tx-intel:8011, tx-org:8012, tx-civic:8014, mcp-server, tunxiang-a
 > NOTES.txt / serviceaccount.yaml / poddisruptionbudget.yaml /
 > networkpolicy.yaml / configmap.yaml。
 >
-> 注：本表 Tier 列已按 P0.6 规范更新（spec 优先于此前粗分）。
-> Tier 1 = 资金/收银核心 — 零容忍。
+> 注：本表 Tier 列对齐 CLAUDE.md 第十七节宪法（资金链路 + 三条硬约束 = T1）。
+> Tier 1 = 资金/收银核心 + 三条硬约束校验 — 零容忍。
 > Tier 2 = 运营核心。
 > Tier 3 = 辅助/低频。
 
@@ -160,12 +160,12 @@ tx-brain:8010, tx-intel:8011, tx-org:8012, tx-civic:8014, mcp-server, tunxiang-a
 | api-gateway | 8000 | T1 | ✓ | ✓ | ✓ minA=1 | ✓ off | ✓ off | 唯一带 ingress |
 | tx-trade | 8001 | T1 | ✓ | ✓ | ✓ minA=1 | ✓ off | ✓ off | 交易履约 |
 | tx-menu | 8002 | T2 | ✓ | ✓ | ✓ maxU=1 | ✓ off | ✓ off | 菜品菜单 |
-| tx-member | 8003 | T2 | ✓ | ✓ | ✓ maxU=1 | ✓ off | ✓ off | 会员 CDP |
+| tx-member | 8003 | T1 | ✓ | ✓ | ✓ minA=1 | ✓ off | ✓ off | 会员 CDP（含储值，资金链路）|
 | tx-growth | 8004 | T2 | ✓ | ✓ | ✓ maxU=1 | ✓ off | ✓ off | 增长营销 |
 | tx-ops | 8005 | T3 | ✓ | ✓ | ✓ off | ✓ off | ✓ off | 日清日结 |
-| tx-supply | 8006 | T2 | ✓ | ✓ | ✓ maxU=1 | ✓ off | ✓ off | 供应链 |
-| tx-finance | 8007 | T2 | ✓ | ✓ | ✓ maxU=1 | ✓ off | ✓ off | 财务结算 |
-| tx-agent | 8008 | T2 | ✓ | ✓ | ✓ maxU=1 | ✓ off | ✓ off | Agent OS |
+| tx-supply | 8006 | T1 | ✓ | ✓ | ✓ minA=1 | ✓ off | ✓ off | 供应链（含食安合规，三条硬约束）|
+| tx-finance | 8007 | T1 | ✓ | ✓ | ✓ minA=1 | ✓ off | ✓ off | 财务结算（发票/押金，资金链路）|
+| tx-agent | 8008 | T1 | ✓ | ✓ | ✓ minA=1 | ✓ off | ✓ off | Agent OS（三条硬约束校验）|
 | tx-analytics | 8009 | T3 | ✓ | ✓ | ✓ off | ✓ off | ✓ off | 经营分析 |
 | tx-brain | 8010 | T3 | ✓ | ✓ | ✓ off | ✓ off | ✓ off | AI 决策 |
 | tx-intel | 8011 | T3 | ✓ | ✓ | ✓ off | ✓ off | ✓ off | 商业智能 |
@@ -183,8 +183,8 @@ tx-brain:8010, tx-intel:8011, tx-org:8012, tx-civic:8014, mcp-server, tunxiang-a
 **21 个 chart × 5 工件 = 105 处对账，全绿**。
 
 **Tier 化 PDB 默认值**：
-- Tier 1（3 chart）：`pdb.enabled=true`, `minAvailable=1`
-- Tier 2（9 chart）：`pdb.enabled=true`, `maxUnavailable=1`
+- Tier 1（7 chart）：`pdb.enabled=true`, `minAvailable=1`
+- Tier 2（5 chart）：`pdb.enabled=true`, `maxUnavailable=1`
 - Tier 3（9 chart）：`pdb.enabled=false`（保留模板，按需启用）
 
 **NetworkPolicy / ConfigMap 全部默认 disabled**：
