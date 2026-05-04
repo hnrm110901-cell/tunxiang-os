@@ -1,0 +1,19 @@
+1. 服务名: tx-org
+   Helm Release: {{ .Release.Name }}
+   Namespace:    {{ .Release.Namespace }}
+   Tier:         Tier 2 (运营核心)
+
+2. 版本:
+   Chart  : {{ .Chart.Name }}-{{ .Chart.Version }}
+   AppVer : {{ .Chart.AppVersion }}
+   Image  : {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+
+3. 端口（容器内 / Service）:
+   service.port       = {{ .Values.service.port }}
+   service.targetPort = {{ .Values.service.targetPort }}
+
+4. 端口转发到本机（开发联调用）:
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "tx-org.fullname" . }} 8012:{{ .Values.service.port }}
+
+5. 健康检查（在 port-forward 终端外另开一个窗口执行）:
+   curl -fsSL http://127.0.0.1:8012/health
