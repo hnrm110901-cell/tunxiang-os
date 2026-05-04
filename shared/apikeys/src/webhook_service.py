@@ -6,6 +6,7 @@
   - 自动重试（指数退避）
   - 投递日志
 """
+
 import hashlib
 import hmac
 import json
@@ -17,9 +18,6 @@ import httpx
 import structlog
 
 logger = structlog.get_logger()
-
-SUBSCRIPTIONS_TABLE = "webhook_subscriptions"
-DELIVERY_LOGS_TABLE = "webhook_delivery_logs"
 
 # 最大重试次数
 MAX_RETRY_COUNT = 5
@@ -52,9 +50,9 @@ class WebhookService:
         """创建 Webhook 订阅。"""
         sub_id = uuid.uuid4()
         await self.db.execute(
-            f"INSERT INTO {SUBSCRIPTIONS_TABLE} "
-            f"(id, tenant_id, api_key_id, url, secret, events, status, retry_count, timeout_ms) "
-            f"VALUES (:id, :tenant_id, :api_key_id, :url, :secret, :events, 'active', :retry_count, :timeout_ms)",
+            "INSERT INTO webhook_subscriptions "
+            "(id, tenant_id, api_key_id, url, secret, events, status, retry_count, timeout_ms) "
+            "VALUES (:id, :tenant_id, :api_key_id, :url, :secret, :events, 'active', :retry_count, :timeout_ms)",
             {
                 "id": sub_id,
                 "tenant_id": self.tenant_id,
@@ -80,10 +78,10 @@ class WebhookService:
     async def list_subscriptions(self) -> list[dict[str, Any]]:
         """列出租户下的 Webhook 订阅。"""
         result = await self.db.execute(
-            f"SELECT id, url, events, status, retry_count, timeout_ms, created_at "
-            f"FROM {SUBSCRIPTIONS_TABLE} "
-            f"WHERE tenant_id = :tenant_id AND is_deleted = FALSE "
-            f"ORDER BY created_at DESC",
+            "SELECT id, url, events, status, retry_count, timeout_ms, created_at "
+            "FROM webhook_subscriptions "
+            "WHERE tenant_id = :tenant_id AND is_deleted = FALSE "
+            "ORDER BY created_at DESC",
             {"tenant_id": self.tenant_id},
         )
         rows = result.fetchall()
@@ -92,8 +90,8 @@ class WebhookService:
     async def delete_subscription(self, sub_id: uuid.UUID) -> None:
         """删除 Webhook 订阅（软删除）。"""
         result = await self.db.execute(
-            f"UPDATE {SUBSCRIPTIONS_TABLE} SET is_deleted = TRUE, updated_at = :now "
-            f"WHERE id = :id AND tenant_id = :tenant_id RETURNING id",
+            "UPDATE webhook_subscriptions SET is_deleted = TRUE, updated_at = :now "
+            "WHERE id = :id AND tenant_id = :tenant_id RETURNING id",
             {
                 "id": sub_id,
                 "tenant_id": self.tenant_id,
@@ -110,9 +108,7 @@ class WebhookService:
     @staticmethod
     def _sign_payload(payload: str, secret: str) -> str:
         """HMAC-SHA256 签名 payload。"""
-        return hmac.new(
-            secret.encode(), payload.encode(), hashlib.sha256
-        ).hexdigest()
+        return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
     async def deliver_event(
         self,
@@ -131,10 +127,10 @@ class WebhookService:
             匹配的订阅数
         """
         result = await self.db.execute(
-            f"SELECT id, url, secret, retry_count, timeout_ms "
-            f"FROM {SUBSCRIPTIONS_TABLE} "
-            f"WHERE status = 'active' AND is_deleted = FALSE "
-            f"AND (events @> :event_type OR events @> '[\"*\"]')",
+            "SELECT id, url, secret, retry_count, timeout_ms "
+            "FROM webhook_subscriptions "
+            "WHERE status = 'active' AND is_deleted = FALSE "
+            "AND (events @> :event_type OR events @> '[\"*\"]')",
             {"event_type": json.dumps([event_type])},
         )
         subs = result.fetchall()
@@ -179,9 +175,7 @@ class WebhookService:
                         event=event_type,
                         status=resp.status_code,
                     )
-                    await self._log_delivery(
-                        sub_id, event_type, body, log_status, resp.status_code, resp.text
-                    )
+                    await self._log_delivery(sub_id, event_type, body, log_status, resp.status_code, resp.text)
                 except httpx.TimeoutException:
                     logger.warning("webhook.timeout", sub_id=str(sub_id), url=url)
                     await self._log_delivery(sub_id, event_type, body, "timeout", None, None)
@@ -205,11 +199,11 @@ class WebhookService:
         """记录投递日志。"""
         log_id = uuid.uuid4()
         await self.db.execute(
-            f"INSERT INTO {DELIVERY_LOGS_TABLE} "
-            f"(id, subscription_id, tenant_id, event_type, payload, status, "
-            f"http_status, response_body, attempt) "
-            f"VALUES (:id, :sub_id, :tenant_id, :event_type, :payload::json, "
-            f":status, :http_status, :response_body, 1)",
+            "INSERT INTO webhook_delivery_logs "
+            "(id, subscription_id, tenant_id, event_type, payload, status, "
+            "http_status, response_body, attempt) "
+            "VALUES (:id, :sub_id, :tenant_id, :event_type, :payload::json, "
+            ":status, :http_status, :response_body, 1)",
             {
                 "id": log_id,
                 "sub_id": sub_id,
@@ -229,10 +223,10 @@ class WebhookService:
             delay = RETRY_BASE_SECONDS * (2 ** (attempt - 1))
             next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay)
             await self.db.execute(
-                f"UPDATE {DELIVERY_LOGS_TABLE} "
-                f"SET next_retry_at = :next_retry, attempt = :attempt "
-                f"WHERE subscription_id = :sub_id AND status IN ('failed', 'timeout', 'network_error') "
-                f"AND attempt = :current_attempt",
+                "UPDATE webhook_delivery_logs "
+                "SET next_retry_at = :next_retry, attempt = :attempt "
+                "WHERE subscription_id = :sub_id AND status IN ('failed', 'timeout', 'network_error') "
+                "AND attempt = :current_attempt",
                 {
                     "next_retry": next_retry,
                     "attempt": attempt,
@@ -246,14 +240,14 @@ class WebhookService:
         """重试所有到期的失败投递（由定时任务调用）。"""
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
-            f"SELECT dl.id, dl.subscription_id, dl.event_type, dl.payload, "
-            f"s.url, s.secret, s.timeout_ms "
-            f"FROM {DELIVERY_LOGS_TABLE} dl "
-            f"JOIN {SUBSCRIPTIONS_TABLE} s ON dl.subscription_id = s.id "
-            f"WHERE dl.status IN ('failed', 'timeout', 'network_error') "
-            f"AND dl.next_retry_at <= :now "
-            f"AND dl.attempt < s.retry_count "
-            f"LIMIT 50",
+            "SELECT dl.id, dl.subscription_id, dl.event_type, dl.payload, "
+            "s.url, s.secret, s.timeout_ms "
+            "FROM webhook_delivery_logs dl "
+            "JOIN webhook_subscriptions s ON dl.subscription_id = s.id "
+            "WHERE dl.status IN ('failed', 'timeout', 'network_error') "
+            "AND dl.next_retry_at <= :now "
+            "AND dl.attempt < s.retry_count "
+            "LIMIT 50",
             {"now": now},
         )
         logs = result.fetchall()
@@ -296,10 +290,10 @@ class WebhookService:
             )
             new_status = "delivered" if resp.is_success else "failed"
             await self.db.execute(
-                f"UPDATE {DELIVERY_LOGS_TABLE} SET status = :status, "
-                f"http_status = :http_status, response_body = :body, "
-                f"delivered_at = :now "
-                f"WHERE id = :id",
+                "UPDATE webhook_delivery_logs SET status = :status, "
+                "http_status = :http_status, response_body = :body, "
+                "delivered_at = :now "
+                "WHERE id = :id",
                 {
                     "status": new_status,
                     "http_status": resp.status_code,
@@ -321,12 +315,12 @@ class WebhookService:
     ) -> list[dict[str, Any]]:
         """查询投递日志。"""
         query = (
-            f"SELECT dl.id, dl.subscription_id, dl.event_type, dl.status, "
-            f"dl.http_status, dl.attempt, dl.delivered_at, dl.created_at, "
-            f"s.url "
-            f"FROM {DELIVERY_LOGS_TABLE} dl "
-            f"JOIN {SUBSCRIPTIONS_TABLE} s ON dl.subscription_id = s.id "
-            f"WHERE dl.tenant_id = :tenant_id"
+            "SELECT dl.id, dl.subscription_id, dl.event_type, dl.status, "
+            "dl.http_status, dl.attempt, dl.delivered_at, dl.created_at, "
+            "s.url "
+            "FROM webhook_delivery_logs dl "
+            "JOIN webhook_subscriptions s ON dl.subscription_id = s.id "
+            "WHERE dl.tenant_id = :tenant_id"
         )
         params: dict[str, Any] = {"tenant_id": self.tenant_id}
 
