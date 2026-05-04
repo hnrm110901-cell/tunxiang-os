@@ -1,3 +1,29 @@
+## 2026-05-04 积分系统 Tier 1 补全（路由接服务层 + 跨店结算 + FIFO 过期 + 毛利硬约束）
+
+### 今日完成
+- [feat(tx-member)] 修复审计 ghost claim：原 8 个积分端点全部为 mock 返回 0；本次接入 services.points_engine
+- [feat(tx-member)] services/points_settlement.py — 跨店应付分摊纯函数（按发行店权重，余数给最大债权人，金额无泄漏）
+- [feat(tx-member)] services/points_expiry_fifo.py — 批次列表 FIFO 消费 + 过期清零纯函数
+- [feat(tx-member)] services/points_engine.check_offset_against_margin_floor — 三条硬约束之一：抵现毛利率不可低于阈值（默认 15%），同时返回 max_offset_fen 提示
+- [feat(tx-member)] api/points_routes 全部改为依赖注入 + emit_event(MemberEventType.POINTS_CHANGED) 旁路写事件总线
+- [feat(tx-member)] 新增 POST /api/v1/member/points/offset-check 端点：POS 端预检
+- [feat(tx-member)] workers/points_expiry_worker.py — Cron Worker（单租户失败隔离）
+- [test(tx-member)] tests/test_points_tier1.py — 22 个用例覆盖 4 大场景
+
+### 数据变化
+- 迁移版本：无（schema 变更需 ontology 审批，本次不动）
+- 新增模块：3 个（points_settlement.py / points_expiry_fifo.py / points_expiry_worker.py）
+- 新增测试：22 个（test_points_tier1.py）
+
+### 遗留问题
+- services/points_engine.py 中 earn_points / spend_points 等异步函数仍引用 member_cards / points_log / card_types 三张未在任何 migration 中存在的表 → 集成测试落地需要 ontology 审批新增 schema
+- services/points_expiry.py 仍用模块级内存 dict 持久化批次；本次未替换为 DB（避免越权动 ontology），新模块以纯函数 + 注入方式绕开
+- main.py 尚未注册 PointsExpiryWorker 到 AsyncIOScheduler（待运维确认每日窗口期）
+
+### 明日计划
+- 推 ontology 审批：member_points_batches / member_card_points / points_log 三表 + RLS 策略
+- main.py lifespan 注册 PointsExpiryWorker（hour=3, minute=0）
+
 ## 2026-05-03 A1 授权加固回归测试 + 基础设施安全加固
 
 ### 今日完成
