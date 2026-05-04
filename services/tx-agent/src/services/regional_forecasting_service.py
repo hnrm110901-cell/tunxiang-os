@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -100,7 +100,7 @@ class RegionalForecastingService:
             "base_market": base_forecast.get("market", "MY"),
             "base_forecast": base_forecast,
             "market_forecasts": market_forecasts,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     @staticmethod
