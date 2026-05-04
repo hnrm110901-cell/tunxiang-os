@@ -10,6 +10,7 @@ jobs:
   python-lint-test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service: [gateway, tx-trade, tx-agent, tx-menu, tx-member, tx-supply, tx-finance, tx-org, tx-analytics]
     steps:
