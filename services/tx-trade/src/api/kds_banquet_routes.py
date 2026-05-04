@@ -118,7 +118,10 @@ async def list_today_banquet_sessions(
         # 计算到开席倒计时秒数
         countdown_seconds = None
         if r[2] and r[4] == "scheduled":
-            delta = r[2].replace(tzinfo=None) - datetime.now(timezone.utc)
+            # PG TIMESTAMPTZ → aware datetime；datetime.now(timezone.utc) 也是 aware
+            # PG.2 codemod 把 utcnow() → now(timezone.utc) 但漏删 .replace(tzinfo=None)，
+            # 导致 naive - aware TypeError。两边都 aware 即可（结果相同）
+            delta = r[2] - datetime.now(timezone.utc)
             countdown_seconds = max(0, int(delta.total_seconds()))
 
         sessions.append(
