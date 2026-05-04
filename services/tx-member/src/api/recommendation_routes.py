@@ -19,6 +19,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..db import get_db
 
 logger = structlog.get_logger(__name__)
@@ -101,7 +103,7 @@ async def recommend_at_order_time(
         uuid.UUID(req.customer_id)
         uuid.UUID(req.store_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+        raise safe_http_exception(400, "请求参数格式错误", e) from e
 
     meal_period = req.meal_period or _current_meal_period()
 
@@ -341,7 +343,7 @@ async def recommend_upsell(
         uuid.UUID(x_tenant_id)
         uuid.UUID(order_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+        raise safe_http_exception(400, "请求参数格式错误", e) from e
 
     async for db in get_db():
         try:
@@ -534,7 +536,7 @@ async def recommend_return_visit(
         uuid.UUID(x_tenant_id)
         uuid.UUID(customer_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+        raise safe_http_exception(400, "请求参数格式错误", e) from e
 
     async for db in get_db():
         try:
@@ -760,7 +762,7 @@ async def get_recommendation_metrics(
     try:
         uuid.UUID(x_tenant_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {e}") from e
+        raise safe_http_exception(400, "X-Tenant-ID 格式错误", e) from e
 
     async for db in get_db():
         try:

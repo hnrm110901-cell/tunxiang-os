@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/member/premium-cards", tags=["premium-card"])
 
@@ -48,10 +49,7 @@ def _parse_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> uui
     try:
         return uuid.UUID(x_tenant_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"X-Tenant-ID 格式错误: {x_tenant_id}",
-        ) from e
+        raise safe_http_exception(400, "X-Tenant-ID 格式错误", e) from e
 
 
 # ── 请求模型 ──────────────────────────────────────────────────
@@ -162,7 +160,7 @@ async def create_template(
             sort_order=body.sort_order,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -186,7 +184,7 @@ async def purchase_card(
         )
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
-        raise HTTPException(status_code=status_code, detail=str(e)) from e
+        raise safe_http_exception(status_code, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -227,7 +225,7 @@ async def get_card_detail(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "付费卡不存在", e) from e
     return _ok(result)
 
 
@@ -253,7 +251,7 @@ async def use_count_card(
         )
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
-        raise HTTPException(status_code=status_code, detail=str(e)) from e
+        raise safe_http_exception(status_code, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -280,7 +278,7 @@ async def use_benefit(
         )
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
-        raise HTTPException(status_code=status_code, detail=str(e)) from e
+        raise safe_http_exception(status_code, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -302,7 +300,7 @@ async def renew_period_card(
         )
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
-        raise HTTPException(status_code=status_code, detail=str(e)) from e
+        raise safe_http_exception(status_code, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -359,7 +357,7 @@ async def purchase_annual_card(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -377,7 +375,7 @@ async def get_card_benefits(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "付费卡不存在", e) from e
     return _ok(
         {
             "card_id": card_id,
@@ -406,7 +404,7 @@ async def check_benefit_usage(
         )
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
-        raise HTTPException(status_code=status_code, detail=str(e)) from e
+        raise safe_http_exception(status_code, "付费卡操作失败", e) from e
     return _ok(
         {
             "card_id": card_id,
@@ -434,7 +432,7 @@ async def renew_card_legacy(
         )
     except ValueError as e:
         status_code = 404 if _is_not_found(str(e)) else 400
-        raise HTTPException(status_code=status_code, detail=str(e)) from e
+        raise safe_http_exception(status_code, "付费卡操作失败", e) from e
     return _ok(result)
 
 
@@ -454,5 +452,5 @@ async def gift_card(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "付费卡操作失败", e) from e
     return _ok(result)
