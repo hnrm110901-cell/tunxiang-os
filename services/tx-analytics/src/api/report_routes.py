@@ -14,6 +14,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.report_engine import (
     ExportFormat,
     ReportEngine,
@@ -154,7 +156,7 @@ async def api_execute_report(
     except ReportInactiveError:
         raise HTTPException(status_code=403, detail=f"Report is inactive: {report_id}")
     except ReportParamError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
 
     return {"ok": True, "data": _renderer.to_json(result)}
 
@@ -197,7 +199,7 @@ async def api_export_report(
     except ReportInactiveError:
         raise HTTPException(status_code=403, detail=f"Report is inactive: {report_id}")
     except ReportParamError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
 
     if format == "excel":
         try:

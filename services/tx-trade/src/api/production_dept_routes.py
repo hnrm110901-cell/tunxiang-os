@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.production_dept_service import (
     batch_set_dish_dept_mappings,
@@ -178,7 +179,7 @@ async def api_create_production_dept(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     return _ok(_dept_to_dict(dept))
 
@@ -269,9 +270,9 @@ async def api_update_production_dept(
             is_active=body.is_active,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     return _ok(_dept_to_dict(dept))
 
@@ -292,9 +293,9 @@ async def api_delete_production_dept(
     try:
         await delete_production_dept(dept_id, tenant_id, db, force=force)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     return _ok({"dept_id": dept_id, "deleted": True})
 
@@ -324,7 +325,7 @@ async def api_set_dish_mapping(
             printer_id=body.printer_id,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     return _ok(_mapping_to_dict(mapping))
 
@@ -341,7 +342,7 @@ async def api_get_dish_mapping(
     try:
         mapping = await get_dish_dept_mapping(tenant_id, dish_id, db, primary_only=primary_only)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     if mapping is None:
         return {"ok": True, "data": None, "error": None}
@@ -368,9 +369,9 @@ async def api_batch_set_dish_mappings(
     try:
         results = await batch_set_dish_dept_mappings(tenant_id, mappings_data, db)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return _ok(
         {
@@ -392,7 +393,7 @@ async def api_remove_dish_mapping(
     try:
         await remove_dish_dept_mapping(tenant_id, dish_id, dept_id, db)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     return _ok({"dish_id": dish_id, "dept_id": dept_id, "unbound": True})
 

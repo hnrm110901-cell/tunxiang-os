@@ -18,10 +18,9 @@ from pathlib import Path
 HTTPEXC_DETAIL_RE = re.compile(
     r"raise\s+HTTPException\s*\(\s*"
     r"status_code\s*=\s*(?P<code>\d+)\s*,\s*"
-    r"detail\s*=\s*str\(\s*(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)\s*\)\s*,?\s*"
+    r"detail\s*=\s*str\(\s*(?P<var>[a-zA-Z_][a-zA-Z0-9_]*)\s*\)\s*"
     r"\)"
-    r"(?:\s+from\s+\w+)?",
-    re.DOTALL,
+    r"(?:\s+from\s+\w+)?"
 )
 
 GENERIC_MESSAGES: dict[int, str] = {

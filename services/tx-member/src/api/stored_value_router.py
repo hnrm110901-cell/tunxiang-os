@@ -26,6 +26,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.stored_value_service import (
     CardNotActiveError,
@@ -171,9 +172,9 @@ async def charge(
             },
         }
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -207,11 +208,11 @@ async def consume(
         )
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -259,7 +260,7 @@ async def refund(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -297,7 +298,7 @@ async def get_balance(
         result = await _svc.get_balance(db=db, card_id=card.id, tenant_id=tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -462,11 +463,11 @@ async def exchange_points(
         )
         return {"ok": True, "data": result}
     except CardNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.batch_group_service import BatchGroupService
 from ..services.dish_ranking_service import DishRankingService
@@ -125,7 +126,7 @@ async def get_rankings(
         )
     except RuntimeError as exc:
         logger.error("kds_analytics.get_rankings_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return DishRankingsOut(
         hot=[DishRankItemOut(**vars(item)) for item in rankings.hot],
@@ -163,7 +164,7 @@ async def get_batched_queue(
         )
     except RuntimeError as exc:
         logger.error("kds_analytics.get_batched_queue_error", dept_id=dept_id, error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return [
         BatchGroupOut(
@@ -208,7 +209,7 @@ async def set_base_quantity(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except RuntimeError as exc:
         logger.error(
             "kds_analytics.set_base_quantity_error",
@@ -216,7 +217,7 @@ async def set_base_quantity(
             dept_id=dept_id,
             error=str(exc),
         )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return SetBaseQtyRes(
         ok=True,
@@ -284,7 +285,7 @@ async def get_new_customer_rate(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return NewCustomerRateOut(
         store_id=store_id,

@@ -16,11 +16,12 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services import retail_mall as retail_mall_svc
 
@@ -90,7 +91,7 @@ async def list_products(
         )
         return {"ok": True, "data": data}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 2. 创建商品 ──────────────────────────────────────────────
@@ -113,7 +114,7 @@ async def create_product(
         )
         return {"ok": True, "data": data}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 3. 更新商品 ──────────────────────────────────────────────
@@ -136,7 +137,7 @@ async def update_product(
         )
         return {"ok": True, "data": data}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 4. 创建零售订单 ──────────────────────────────────────────
@@ -162,7 +163,7 @@ async def create_retail_order(
         )
         return {"ok": True, "data": data}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 5. 查询订单详情 ──────────────────────────────────────────
@@ -183,7 +184,7 @@ async def get_retail_order(
         )
         return {"ok": True, "data": data}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 # ── 6. 退款 ──────────────────────────────────────────────────
@@ -204,7 +205,7 @@ async def refund_retail_order(
         )
         return {"ok": True, "data": data}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 7. 零售统计 ──────────────────────────────────────────────

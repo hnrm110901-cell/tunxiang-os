@@ -13,6 +13,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.projector_runner import get_runner
 
 router = APIRouter(prefix="/api/v1/projectors", tags=["projectors"])
@@ -45,7 +47,7 @@ async def rebuild_projector(
         result = await runner.rebuild(projector_name, x_tenant_id)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.get("/discount-health")

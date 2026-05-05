@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.group_member_service import (
     CrossBrandNotAllowedError,
@@ -112,15 +113,15 @@ def _ok(data: object) -> dict:
 def _handle_service_error(exc: Exception) -> None:
     """将服务层异常映射到 HTTP 错误码。"""
     if isinstance(exc, CrossBrandNotAllowedError):
-        raise HTTPException(status_code=403, detail=str(exc))
+        raise safe_http_exception(403, "权限不足", exc) from exc
     if isinstance(exc, InsufficientPointsError):
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     if isinstance(exc, GroupNotFoundError):
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     if isinstance(exc, TenantNotInGroupError):
-        raise HTTPException(status_code=403, detail=str(exc))
+        raise safe_http_exception(403, "权限不足", exc) from exc
     if isinstance(exc, ValueError):
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     raise exc
 
 

@@ -35,6 +35,7 @@ from shared.ontology.src.extensions.banquet_leads import (
     LeadStage,
     SourceChannel,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..repositories.banquet_lead_repo import (
     BanquetLeadRepositoryBase,
@@ -182,7 +183,7 @@ async def transition(
             invalidation_reason=payload.invalidation_reason,
         )
     except BanquetLeadNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (InvalidStageTransitionError, InvalidationReasonMissingError) as exc:
         return _err(str(exc), code=exc.code)
     except BanquetLeadError as exc:
@@ -206,7 +207,7 @@ async def convert(
             tenant_id=tenant_id,
         )
     except BanquetLeadNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (
         InvalidStageTransitionError,
         ReservationIdMissingError,

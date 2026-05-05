@@ -25,6 +25,8 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..reports.p0_reports import P0Reports
 
 log = structlog.get_logger()
@@ -100,7 +102,7 @@ async def api_daily_revenue(
             db=None,  # 实际部署通过 Depends(get_db) 注入
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -134,7 +136,7 @@ async def api_payment_discount(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -166,7 +168,7 @@ async def api_cashflow_by_store(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -200,7 +202,7 @@ async def api_dish_sales(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -234,7 +236,7 @@ async def api_billing_audit(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -264,7 +266,7 @@ async def api_realtime_stats(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -298,7 +300,7 @@ async def api_daily_cashflow(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -331,6 +333,6 @@ async def api_daily_summary(
             db=None,
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
     return {"ok": True, "data": result}

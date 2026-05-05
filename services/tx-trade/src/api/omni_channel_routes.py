@@ -22,6 +22,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.omni_channel_service import (
     OmniChannelError,
@@ -179,10 +180,10 @@ async def webhook_receive_order(
         log.info("omni_channel.webhook.ok", platform_order_id=order.platform_order_id)
         return {"ok": True, "data": {"order_id": order.internal_order_id, "platform": platform}, "error": None}
     except UnsupportedPlatformError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except OmniChannelError as exc:
         log.error("omni_channel.webhook.failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
 
 @router.get("/orders/pending", summary="待接单列表（所有平台混合）")
@@ -248,7 +249,7 @@ async def accept_order(
         await db.commit()
         return {"ok": True, "data": result, "error": None}
     except OmniChannelError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/orders/{order_id}/reject", summary="拒单")
@@ -274,7 +275,7 @@ async def reject_order(
         await db.commit()
         return {"ok": True, "data": result, "error": None}
     except OmniChannelError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.get("/orders", summary="历史订单（含渠道）")
@@ -396,7 +397,7 @@ async def get_unified_orders_hq(
             size=size,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {"ok": True, "data": data, "error": None}
 
 

@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.alert_summary import get_alert_stats, get_today_alerts
 from ..services.sql_queries import query_revenue_trend, query_top_dishes
@@ -77,7 +78,7 @@ async def api_store_ranking(
     try:
         data = await get_store_ranking(metric, date_range, tenant_id, db=db, ascending=ascending)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     return {"ok": True, "data": data}
 
 
@@ -99,7 +100,7 @@ async def api_store_comparison(
     try:
         data = await get_store_comparison(sid_list, metric_list, date_range, tenant_id, db=db)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     return {"ok": True, "data": data}
 
 
@@ -127,7 +128,7 @@ async def api_revenue_trend(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     return {"ok": True, "data": data, "meta": {"store_id": store_id, "days": days}}
 
 
@@ -160,7 +161,7 @@ async def api_top_dishes(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     return {
         "ok": True,
         "data": data,
