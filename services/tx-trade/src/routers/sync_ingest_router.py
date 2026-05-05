@@ -65,11 +65,21 @@ def _edge_sync_secret() -> str:
 
 
 def _edge_sync_required() -> bool:
-    """True = 必须带合法 token；False = 仅 warn（dev 过渡期）。"""
-    if _edge_sync_secret():
-        return True
-    env = (os.environ.get("TX_ENV") or os.environ.get("ENVIRONMENT") or "").strip().lower()
-    return env in ("production", "prod", "gray")
+    """True = 必须带合法 HMAC token；False = 仅 warn（兼容老 client）。
+
+    独立 review NEW-P0：原来的"有 secret 即强制"逻辑会在 ops 配 secret 时立刻
+    打死所有未升级的 edge 客户端（仅发 X-Tenant-ID 不发 X-Edge-* headers），
+    Mac mini 离线同步功能直接中断 → 违反 4h 离线 SLA。
+    改为显式 env 开关，部署可分两步：
+      Step 1: 部署服务端代码 + 配 EDGE_SYNC_HMAC_SECRET（required=false 兼容老 client）
+      Step 2: 升级 edge sync-engine 客户端发 X-Edge-* HMAC headers
+      Step 3: 灰度验证 client 发的 token 能通过校验
+      Step 4: 设置 EDGE_SYNC_HMAC_REQUIRED=true 强制启用，正式 cutover
+    在 Step 1-3 阶段 secret 已配但未 required，verify_edge_sync_auth 走兼容
+    分支返回 X-Tenant-ID（与原行为一致），无功能性破坏。
+    """
+    explicit = os.environ.get("EDGE_SYNC_HMAC_REQUIRED", "").strip().lower()
+    return explicit in ("true", "1", "yes", "on")
 
 
 def _edge_sync_skew_seconds() -> int:
