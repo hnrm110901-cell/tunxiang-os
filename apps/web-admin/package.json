@@ -20,7 +20,7 @@
     "dompurify": "^3.1.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^7.14.1",
+    "react-router-dom": "^7.14.2",
     "zustand": "^5.0.12",
     "@tunxiang/design-system": "workspace:*",
     "@tx/tokens": "workspace:*"
