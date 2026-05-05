@@ -170,7 +170,7 @@ FAIL_FILES=()
 for test_file in "${PYTEST_ARGS[@]}"; do
     echo "--- $test_file ---"
     if docker run --rm -v "$REPO_ROOT:/app" -w /app "$IMAGE" \
-        bash -c "pip install --quiet $DEPS 2>/dev/null && python -m pytest '$test_file' --tb=line -q 2>&1 | tail -5"; then
+        bash -c "set -o pipefail; pip install --quiet $DEPS 2>/dev/null && python -m pytest '$test_file' --tb=line -q 2>&1 | tail -5"; then
         PASS=$((PASS + 1))
     else
         FAIL_FILES+=("$test_file")
