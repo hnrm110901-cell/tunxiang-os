@@ -4,6 +4,17 @@
 请求都能伪造租户绕 RLS。本模块提供"由 gateway 签、下游验"的最小化内部 JWT，
 搭配 NetworkPolicy 后构成纵深防御。
 
+⚠️ 独立 review P1-4：当前 InternalJwtMiddleware **尚未部署到任何下游服务**。
+   gateway 已开始 mint X-Internal-JWT，但下游 24 服务仍读 X-Tenant-ID header — 即
+   "只签不验"，S-02 完成度 50%。完整闭环 follow-up（约 2-3 天）：
+     1. 在每个 services/*/src/main.py 加 app.add_middleware(InternalJwtMiddleware)
+     2. 路由 _get_tenant_id() 改读 request.state.tenant_id（middleware 写入）
+        而非 request.headers.get("X-Tenant-ID", "")
+     3. k8s NetworkPolicy 限只有 gateway namespace 可达 tx-* pod 的端口
+   爆炸半径提示：HS256 共享密钥模型下单 pod 内存被 dump 即获密钥可签任意租户；
+   生产应配 Vault / Sealed Secret 限制 secret 投放范围；可考虑升级 RS256 非对称
+   （gateway 持私钥签，下游持公钥验，私钥可单独保护）。
+
 设计取舍：
   - 算法 HS256（共享密钥），不引 RSA 复杂度；密钥经 K8s Secret 注入
   - 有效期 60s（可配），只够穿过 gateway → 下游一跳；防止 token 外泄久留
@@ -15,7 +26,7 @@
 
 使用方式：
   - gateway proxy 调 mint_internal_jwt(...)，把返回值放 X-Internal-JWT
-  - 下游 FastAPI 服务挂 InternalJwtMiddleware (TODO follow-up)：校验后写
+  - 下游 FastAPI 服务挂 InternalJwtMiddleware (follow-up)：校验后写
     request.state.{tenant_id, user_id, role}，路由优先读这套 trusted 值
 """
 
