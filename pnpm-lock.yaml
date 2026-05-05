@@ -54,8 +54,8 @@ importers:
         specifier: ^2.6.7
         version: 2.6.7(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@ant-design/icons':
-        specifier: ^6.1.1
-        version: 6.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^6.2.2
+        version: 6.2.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@ant-design/pro-components':
         specifier: ^2.8.10
         version: 2.8.10(antd@5.29.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(rc-field-form@2.7.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -524,8 +524,8 @@ packages:
       react: '>=16.0.0'
       react-dom: '>=16.0.0'
 
-  '@ant-design/icons@6.1.1':
-    resolution: {integrity: sha512-AMT4N2y++TZETNHiM77fs4a0uPVCJGuL5MTonk13Pvv7UN7sID1cNEZOc1qNqx6zLKAOilTEFAdAoAFKa0U//Q==}
+  '@ant-design/icons@6.2.2':
+    resolution: {integrity: sha512-zlJtE7AMbG12TeYVPhtBXwNpFInNy8mjLzcIm+0BPw16/b8ODG87YJ1G37VIF5VFscdgfsf6EweAFPTobu/3iQ==}
     engines: {node: '>=8'}
     peerDependencies:
       react: '>=16.0.0'
@@ -3313,7 +3313,7 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@ant-design/icons@6.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@ant-design/icons@6.2.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@ant-design/colors': 8.0.1
       '@ant-design/icons-svg': 4.4.2

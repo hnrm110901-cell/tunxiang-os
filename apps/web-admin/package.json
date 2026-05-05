@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
-    "@ant-design/icons": "^6.1.1",
+    "@ant-design/icons": "^6.2.2",
     "@ant-design/pro-components": "^2.8.10",
     "antd": "^5.12.0",
     "dayjs": "^1.11.0",
