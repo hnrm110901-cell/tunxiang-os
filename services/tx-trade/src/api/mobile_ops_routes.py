@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import UniversalPublisher
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger()
 
@@ -109,7 +110,7 @@ async def update_table_info(
         return _ok(result)
     except ValueError as exc:
         log.warning("update_table_info_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 2. 沽清管理 ───
@@ -139,7 +140,7 @@ async def set_dish_availability(
         return _ok({"dish_id": dish_id, "available": body.available})
     except ValueError as exc:
         log.warning("dish_availability_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 3. 限量设置 ───
@@ -169,7 +170,7 @@ async def set_dish_daily_limit(
         return _ok({"dish_id": dish_id, "daily_limit": body.limit})
     except ValueError as exc:
         log.warning("dish_daily_limit_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 4. 修改点菜员 ───
@@ -199,7 +200,7 @@ async def update_order_waiter(
         return _ok({"order_id": order_id, "waiter_id": body.new_waiter_id})
     except ValueError as exc:
         log.warning("order_waiter_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 5. 复制菜品 ───
@@ -256,7 +257,7 @@ async def copy_dishes_from_order(
         return _ok({"order_id": order_id, "copied_count": copied_count})
     except ValueError as exc:
         log.warning("copy_dishes_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 6. 刷新菜品沽清/限量状态 ───
@@ -303,7 +304,7 @@ async def refresh_dish_status(
 
         return _ok({"items": items, "total": len(items)})
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ═══════════════════════════════════════════════
@@ -406,7 +407,7 @@ async def pre_bill(
         )
     except ValueError as exc:
         log.warning("pre_bill_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 8. 起菜(Fire to Kitchen) ───
@@ -485,7 +486,7 @@ async def fire_to_kitchen(
         )
     except ValueError as exc:
         log.warning("fire_to_kitchen_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 9. 上菜/划菜(Mark Served) ───
@@ -540,7 +541,7 @@ async def mark_item_served(
         )
     except ValueError as exc:
         log.warning("mark_served_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 10. 菜品变价(Temporary Price Override) ───
@@ -630,7 +631,7 @@ async def override_item_price(
         )
     except ValueError as exc:
         log.warning("price_override_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 11. 单品转台(Transfer Single Item) ───
@@ -734,7 +735,7 @@ async def transfer_single_item(
         )
     except ValueError as exc:
         log.warning("transfer_item_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 12. 打印客单(Print Receipt from Mobile) ───
@@ -805,7 +806,7 @@ async def print_order_receipt(
         )
     except ValueError as exc:
         log.warning("print_receipt_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 13. 后厨通知(Kitchen Message) ───
@@ -860,7 +861,7 @@ async def send_kitchen_message(
         )
     except ValueError as exc:
         log.warning("kitchen_message_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 14. 转账(Transfer Payment Between Orders) ───
@@ -927,4 +928,4 @@ async def transfer_payment(
         )
     except ValueError as exc:
         log.warning("payment_transfer_fail", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

@@ -3,11 +3,12 @@
 5 个端点：增长分析、活跃度分析、复购分析、流失预警、偏好洞察
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.member_analytics import (
     activity_analysis,
@@ -43,7 +44,7 @@ async def get_member_growth(
         data = await member_growth(x_tenant_id, (start_date, end_date), db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 2. 活跃度分析 ─────────────────────────────────────────────
@@ -61,7 +62,7 @@ async def get_activity_analysis(
         data = await activity_analysis(x_tenant_id, (start_date, end_date), db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 3. 复购分析 ───────────────────────────────────────────────
@@ -79,7 +80,7 @@ async def get_repurchase_analysis(
         data = await repurchase_analysis(x_tenant_id, (start_date, end_date), db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 4. 流失预警 ───────────────────────────────────────────────
@@ -98,7 +99,7 @@ async def get_churn_prediction(
         data = await churn_prediction(x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 5. 偏好洞察 ───────────────────────────────────────────────
@@ -115,4 +116,4 @@ async def get_preference_insight(
         data = await preference_insight(customer_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc

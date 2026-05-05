@@ -112,10 +112,43 @@ jobs:
             echo "::notice::No lint script in ${{ matrix.app }}, skipping"
           fi
 
+  test:
+    name: Vitest (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web-pos, web-kds, web-forge-admin]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: |
+          cd "apps/${{ matrix.app }}"
+          if grep -q '"test"' package.json; then
+            pnpm test
+          else
+            echo "::error::Expected test script in ${{ matrix.app }}/package.json but none found"
+            exit 1
+          fi
+
   build:
     name: Build (${{ matrix.app }})
     runs-on: ubuntu-latest
-    needs: [typecheck, lint]
+    needs: [typecheck, lint, test]
     strategy:
       fail-fast: false
       matrix:

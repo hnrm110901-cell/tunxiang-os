@@ -8,6 +8,8 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.print_manager import PrinterRole, get_print_manager
 
 router = APIRouter(prefix="/api/v1/printer", tags=["printer"])
@@ -102,7 +104,7 @@ async def print_receipt(
         )
         return {"ok": True, "data": task.to_dict()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except ConnectionError as exc:
         raise HTTPException(status_code=503, detail=f"打印机连接失败: {exc}") from exc
 
@@ -123,7 +125,7 @@ async def print_kitchen_order(
         )
         return {"ok": True, "data": [t.to_dict() for t in tasks]}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/reprint/{task_id}")
@@ -134,7 +136,7 @@ async def reprint(task_id: str):
         task = await mgr.reprint(task_id)
         return {"ok": True, "data": task.to_dict()}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ConnectionError as exc:
         raise HTTPException(status_code=503, detail=f"打印机连接失败: {exc}") from exc
 
@@ -176,7 +178,7 @@ async def configure_store(
         )
         return {"ok": True, "data": [i.to_dict() for i in infos]}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/test")
@@ -189,6 +191,6 @@ async def test_print(
         task = await mgr.test_print(req.printer_id)
         return {"ok": True, "data": task.to_dict()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except ConnectionError as exc:
         raise HTTPException(status_code=503, detail=f"打印机连接失败: {exc}") from exc

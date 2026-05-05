@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.corrective_action_service import CorrectiveActionService
 from ..services.sop_scheduler_service import SOPSchedulerService
@@ -267,7 +268,7 @@ async def bind_store(
             custom_overrides=req.custom_overrides,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -401,7 +402,7 @@ async def start_task(
             assignee_id=req.assignee_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -423,7 +424,7 @@ async def complete_task(
             compliance=req.compliance,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -444,7 +445,7 @@ async def skip_task(
             reason=req.reason,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -563,7 +564,7 @@ async def resolve_action(
             resolution=req.resolution,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -584,7 +585,7 @@ async def verify_action(
             verified_by=req.verified_by,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -605,7 +606,7 @@ async def escalate_action(
             escalated_to=req.escalated_to,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 

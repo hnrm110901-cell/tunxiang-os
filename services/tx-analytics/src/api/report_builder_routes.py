@@ -19,12 +19,13 @@ from __future__ import annotations
 from typing import Any, AsyncGenerator, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.report_builder_service import (
     DataSourceNotAllowedError,
@@ -158,7 +159,7 @@ async def list_templates(
         )
         return {"ok": True, "data": result}
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/templates/{template_id}")
@@ -172,7 +173,7 @@ async def get_template(
         result = await _service.get_template(db, x_tenant_id, template_id)
         return {"ok": True, "data": result}
     except TemplateNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/templates")
@@ -190,9 +191,9 @@ async def create_template(
         )
         return {"ok": True, "data": result}
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except DataSourceNotAllowedError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put("/templates/{template_id}")
@@ -212,9 +213,9 @@ async def update_template(
         )
         return {"ok": True, "data": result}
     except TemplateNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 报表执行 ────────────────────────────────────────────────────────────────
@@ -241,9 +242,9 @@ async def execute_report(
         )
         return {"ok": True, "data": result}
     except TemplateNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (ReportBuilderValidationError, DataSourceNotAllowedError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 实例接口 ────────────────────────────────────────────────────────────────
@@ -265,9 +266,9 @@ async def create_instance(
         )
         return {"ok": True, "data": result}
     except TemplateNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/instances")
@@ -306,9 +307,9 @@ async def schedule_instance(
         )
         return {"ok": True, "data": result}
     except InstanceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 导出接口 ────────────────────────────────────────────────────────────────
@@ -345,9 +346,9 @@ async def export_report(
             },
         )
     except TemplateNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 订阅接口 ────────────────────────────────────────────────────────────────
@@ -370,9 +371,9 @@ async def subscribe(
         )
         return {"ok": True, "data": result}
     except InstanceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 数据源接口 ──────────────────────────────────────────────────────────────
@@ -402,6 +403,6 @@ async def get_dimension_options(
         )
         return {"ok": True, "data": options}
     except DataSourceNotAllowedError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except ReportBuilderValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

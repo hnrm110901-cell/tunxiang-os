@@ -87,7 +87,7 @@ async def create_gdpr_request(
         )
         await db.commit()
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {"ok": True, "data": req}
 
 
@@ -154,7 +154,7 @@ async def review_gdpr_request(
         )
         await db.commit()
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {"ok": True, "data": req}
 
 
@@ -182,7 +182,7 @@ async def execute_erasure(
         )
         await db.commit()
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {"ok": True, "data": req}
 
 
@@ -204,7 +204,7 @@ async def export_customer_data(
     try:
         data = await svc.export_customer_data(customer_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return {"ok": True, "data": data}
 
 
@@ -250,6 +250,8 @@ from datetime import datetime, timezone
 import structlog as _structlog
 from sqlalchemy import text as _sa_text
 
+from shared.security.src.error_handler import safe_http_exception
+
 _log = _structlog.get_logger(__name__)
 
 
@@ -288,7 +290,7 @@ async def process_gdpr_request(
         )
         await db.commit()
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     _log.info(
         "gdpr_request_processed",
         request_id=request_id,

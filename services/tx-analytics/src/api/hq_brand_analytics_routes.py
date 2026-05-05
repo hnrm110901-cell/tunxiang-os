@@ -24,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from shared.ontology.src.database import async_session_factory
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.hq_brand_analytics_service import HQBrandAnalyticsService
 
@@ -298,7 +299,7 @@ async def get_brand_pnl(
                 year_month=year_month,
             )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         logger.error(
             "hq_brand_analytics.brand_pnl.db_error",

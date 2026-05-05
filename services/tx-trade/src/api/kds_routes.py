@@ -17,6 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..security.rbac import UserContext, require_role
 from ..services.cooking_scheduler import calculate_cooking_order, get_dept_load
@@ -162,7 +163,7 @@ async def api_kds_tasks(
             size=size,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {"ok": True, "data": {"items": tasks, "total": total, "page": page, "size": size}}
 
@@ -551,7 +552,7 @@ async def api_kds_orders_delta(
             limit=limit,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError:
         # 交由全局 exception handler 记录；给客户端统一 500 结构
         raise HTTPException(status_code=500, detail="DB_ERROR")
@@ -617,7 +618,7 @@ async def api_kds_device_heartbeat(
             health_status=body.health_status,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError:
         raise HTTPException(status_code=500, detail="DB_ERROR")
 

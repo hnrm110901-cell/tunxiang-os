@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..security.rbac import UserContext, require_role_audited
 from ..services.discount_audit_service import DiscountAuditService
@@ -70,7 +71,7 @@ async def get_audit_log(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Database error") from exc
 
@@ -126,7 +127,7 @@ async def get_audit_summary(
             }
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Database error") from exc
 
@@ -176,6 +177,6 @@ async def get_high_risk(
             }
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Database error") from exc

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.table_monitor_service import TableMonitorService
 
@@ -43,7 +44,7 @@ async def api_store_overview(
     try:
         tables = await TableMonitorService.get_store_overview(store_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {"ok": True, "data": {"tables": [t.model_dump() for t in tables], "total": len(tables)}}
 
 
@@ -61,7 +62,7 @@ async def api_table_detail(
     try:
         detail = await TableMonitorService.get_table_detail(table_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     if detail is None:
         raise HTTPException(status_code=404, detail=f"桌台 {table_id} 无活跃订单")
     return {"ok": True, "data": detail.model_dump()}
@@ -81,7 +82,7 @@ async def api_zone_summary(
     try:
         summary = await TableMonitorService.get_zone_summary(store_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {
         "ok": True,
         "data": {zone: s.model_dump() for zone, s in summary.items()},
@@ -102,7 +103,7 @@ async def api_alerts(
     try:
         alerts = await TableMonitorService.get_alerts(store_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {
         "ok": True,
         "data": {

@@ -47,6 +47,7 @@ from shared.adapters.delivery_publish import (
 )
 from shared.adapters.delivery_publish.base import PublishError
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dish_publish_orchestrator import (
     DishPublishOrchestrator,
@@ -127,7 +128,7 @@ async def publish_dish(
     try:
         spec = DishPublishSpec(**req.spec.model_dump())
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     targets = [
         PlatformTarget(
@@ -186,7 +187,7 @@ async def update_dish_price(
             original_price_fen=req.original_price_fen,
         )
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return await _run_operation(
         db=db,
@@ -219,7 +220,7 @@ async def update_dish_stock(
             stock=req.stock,
         )
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return await _run_operation(
         db=db,
@@ -272,7 +273,7 @@ async def resume_dish(
             stock=req.stock,
         )
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return await _run_operation(
         db=db,
         tenant_id=x_tenant_id,
