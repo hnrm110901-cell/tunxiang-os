@@ -216,6 +216,61 @@
 
 ---
 
+## 第三轮独立 verifier 跨 PR review 发现（2026-05-05）
+
+由 verifier agent 在 6 PR push 完成后跨 PR review 找出。审阅时**必看**：
+
+### 🔴 真实 merge conflict（必须人工解决）
+
+**#196 vs #201 在 `services/tx-trade/src/routers/sync_ingest_router.py` 实质冲突**
+
+- PR #196 包含 PR #195 全部 18 commits + edge HMAC client 2 commits（基于 PR #195 head）
+- PR #201 也包含 PR #195 全部 18 commits + nonce store 2 commits（同样基于）
+- PR #195 引入了 `_EDGE_SYNC_RECENT_NONCES` 进程内 dict + `_gc_old_nonces`
+- PR #201 在其上**完全替换**这套实现，改为 `from ..edge_sync_nonce_store import get_nonce_store`
+- PR #196 不动 sync_ingest_router 的 nonce 逻辑（保留 dict）
+- 结果：`#195 → #196` 合到 main 后，`#201` 的 sync_ingest_router 改动会与 main 上 #196 留下的 dict 实现冲突
+
+**正确合并路径**：
+1. merge #195
+2. merge #196
+3. **#201 作者 rebase #201 onto main（合 #196 后），手动决策保留 nonce_store 实现，删除 dict**
+4. merge rebased #201
+
+### ⚠️ 条件 conflict：#199 alembic 链断裂
+
+PR #199 `down_revision = "v399"`。当前 main head 是 v399，链合法。但用户的 PRs #187/#189/#192（v400/v401/v402 WITH CHECK 系列）若先 merge，main head 变成 v402，#199 的 `down_revision="v399"` 就指向历史中间节点，alembic multi-heads 错。
+
+**reviewer 必查**：merge #199 前**强制**核对当前 main 的 `alembic heads` 输出，必要时 rebase down_revision。建议在 #199 上加 GitHub `do-not-merge` label + 在 PR description 顶置此项。
+
+### ⚠️ 5 个 silently 失败场景（监控盲区）
+
+1. **多副本 + 无 Redis URL + `EDGE_SYNC_HMAC_REQUIRED=false`**：InProcess 静默降级，多副本下 nonce 防重放失效但无运行时报错。**ops 操作单必须明确"扩 HPA replica > 1 前必须配 Redis URL"。**
+
+2. **`HMAC_SECRET` 已配但 `REQUIRED=false`**：cutover Step 1-3 阶段，老 client 不发 X-Edge-* headers 仍会通过校验（兼容设计）。如果 ops 误以为 secret 配了 = HMAC 强制生效，会产生**安全误判**。文档化：cutover 完成 = `REQUIRED=true` 才算 HMAC 真生效。
+
+3. **InternalJwtMiddleware staging 模式**：`TX_INTERNAL_JWT_SECRET` 未配时 middleware skip，**staging 与 dev 行为一致**。Staging 测试结论不可外推到生产 — staging 必须配 secret 才能算 cutover 验证完成。
+
+4. **tx-pay 非 `pay()` 方法不计 metric**：PR #200 在 `wechat.py` 等渠道的 `create_payment` / `pay` 加了 inc，但 `query_order()` / `refund()` / `close_order()` 的 httpx 异常**没有加 inc**。多阶段支付场景（查单/退款）的 5xx 不会被 `PaymentChannelHighErrorRate` 告警捕获。**reviewer 应要求 PR #200 补全这些方法的 inc，或在 follow-up PR 跟进**。
+
+5. **PR #199 `down_revision` 脏链**：见上述条件 conflict 说明。
+
+### ❓ verifier 的一项错判（已 grep 推翻）
+
+verifier 怀疑 "PR #195 `payment_saga_total` Counter 没真调 inc"，担心 SLO 监控黑屏。
+
+**实际验证**：`git show da694931` 显示 PR #195 在 `services/tx-trade/src/services/payment_saga_service.py` **真有 4 处 inc 调用**：
+- S1 fail → `result="failed"`
+- S2 fail → `result="failed"`
+- S3 fail/compensated → `result=status`
+- DONE success → `result="success"`
+
+verifier 看的是 PR #195 最早 commit（在 da694931 之前的）。**这一项不是问题。`payment_saga_total` SLO 告警可正常触发。**
+
+但 verifier 同时关联指出的 PR #200 多阶段方法盲区（query_order/refund 不 inc）是真问题，请 reviewer 单独跟进。
+
+---
+
 ## 给 release manager 的"必须做完才 cutover"清单
 
 - [ ] 6 PR 全部 review 通过 + CI 绿 + merge 到 main
