@@ -15,8 +15,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 import structlog
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     PaymentRequest,
@@ -48,6 +50,7 @@ class LakalaChannel(BasePaymentChannel):
         payment_id = f"LKL{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
 
         if self._client is None:
+            payment_channel_requests_total.labels(channel="lakala", status="2xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.SUCCESS,
@@ -58,22 +61,30 @@ class LakalaChannel(BasePaymentChannel):
                 channel_data={"mock": True, "provider": "lakala"},
             )
 
-        # B扫C 场景
-        if request.trade_type == TradeType.B2C and request.auth_code:
-            result = await self._client.micropay(
-                out_trade_no=payment_id,
-                auth_code=request.auth_code,
-                total_fee=request.amount_fen,
-                body=request.description or "屯象OS订单",
-            )
-        else:
-            # C扫B / JSAPI
-            result = await self._client.create_qr(
-                out_trade_no=payment_id,
-                total_fee=request.amount_fen,
-                body=request.description or "屯象OS订单",
-            )
+        try:
+            # B扫C 场景
+            if request.trade_type == TradeType.B2C and request.auth_code:
+                result = await self._client.micropay(
+                    out_trade_no=payment_id,
+                    auth_code=request.auth_code,
+                    total_fee=request.amount_fen,
+                    body=request.description or "屯象OS订单",
+                )
+            else:
+                # C扫B / JSAPI
+                result = await self._client.create_qr(
+                    out_trade_no=payment_id,
+                    total_fee=request.amount_fen,
+                    body=request.description or "屯象OS订单",
+                )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="lakala", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="lakala", status="connect_error").inc()
+            raise
 
+        payment_channel_requests_total.labels(channel="lakala", status="2xx").inc()
         status = PayStatus.SUCCESS if result.get("trade_state") == "SUCCESS" else PayStatus.PENDING
         return PaymentResult(
             payment_id=payment_id,
