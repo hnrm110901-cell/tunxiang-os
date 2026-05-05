@@ -57,8 +57,8 @@ def _get_tenant_id(request: Request) -> str:
 def _verify_meituan_signature(body: bytes, signature: str, secret: str) -> bool:
     """美团签名验证：MD5(body + secret)"""
     if not secret:
-        logger.warning("omni_channel.webhook.no_secret", platform="meituan")
-        return True  # 无secret时放行（开发模式），生产应返回False
+        logger.error("omni_channel.webhook.no_secret", platform="meituan")
+        return False  # 生产环境必须配置 secret，拒绝无密钥请求
     expected = hashlib.md5(body + secret.encode()).hexdigest().lower()
     return hmac.compare_digest(expected, signature.lower())
 
@@ -66,8 +66,8 @@ def _verify_meituan_signature(body: bytes, signature: str, secret: str) -> bool:
 def _verify_eleme_signature(body: bytes, signature: str, secret: str) -> bool:
     """饿了么签名验证：HMAC-SHA256"""
     if not secret:
-        logger.warning("omni_channel.webhook.no_secret", platform="eleme")
-        return True
+        logger.error("omni_channel.webhook.no_secret", platform="eleme")
+        return False  # 生产环境必须配置 secret
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.lower())
 
@@ -75,8 +75,8 @@ def _verify_eleme_signature(body: bytes, signature: str, secret: str) -> bool:
 def _verify_douyin_signature(body: bytes, signature: str, secret: str) -> bool:
     """抖音签名验证：HMAC-SHA256"""
     if not secret:
-        logger.warning("omni_channel.webhook.no_secret", platform="douyin")
-        return True
+        logger.error("omni_channel.webhook.no_secret", platform="douyin")
+        return False  # 生产环境必须配置 secret
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.lower())
 
@@ -84,7 +84,8 @@ def _verify_douyin_signature(body: bytes, signature: str, secret: str) -> bool:
 def _verify_amap_signature(body: bytes, signature: str, secret: str) -> bool:
     """高德签名验证：MD5(body + secret)"""
     if not secret:
-        return True
+        logger.error("omni_channel.webhook.no_secret", platform="amap")
+        return False  # 生产环境必须配置 secret
     expected = hashlib.md5(body + secret.encode()).hexdigest().upper()
     return hmac.compare_digest(expected, signature.upper())
 
@@ -92,7 +93,8 @@ def _verify_amap_signature(body: bytes, signature: str, secret: str) -> bool:
 def _verify_taobao_signature(body: bytes, signature: str, secret: str) -> bool:
     """淘宝签名验证：MD5(body + secret)"""
     if not secret:
-        return True
+        logger.error("omni_channel.webhook.no_secret", platform="taobao")
+        return False  # 生产环境必须配置 secret
     expected = hashlib.md5(body + secret.encode()).hexdigest().upper()
     return hmac.compare_digest(expected, signature.upper())
 
@@ -124,7 +126,10 @@ def _verify_platform_signature(platform: str, body: bytes, request: Request) -> 
     signature = request.headers.get(sig_header_map.get(platform, "X-Signature"), "")
     if not signature:
         logger.warning("omni_channel.webhook.missing_signature", platform=platform)
-        return not secret  # 无secret时允许无签名请求（开发模式）
+        if not secret:
+            logger.error("omni_channel.webhook.no_secret_configured")
+            return False  # 生产环境必须配置 secret
+        return True
 
     return verifier(body, signature, secret)
 
@@ -445,9 +450,9 @@ async def get_channel_stats(
     day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=local_tz)
     day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=local_tz)
 
-    stats_by_platform = {}
-    for platform in OmniChannelService.PLATFORMS:
-        stmt = select(
+    stmt = (
+        select(
+            OrderModel.sales_channel_id,
             func.count().label("total_orders"),
             func.sum(
                 case(
@@ -461,33 +466,47 @@ async def get_channel_stats(
                     else_=0,
                 )
             ).label("gmv_fen"),
-        ).where(
+        )
+        .where(
             and_(
                 OrderModel.tenant_id == tid,
                 OrderModel.store_id == sid,
-                or_(
-                    OrderModel.sales_channel_id == platform,
-                    OrderModel.order_metadata["omni"]["platform"].astext == platform,
-                ),
+                OrderModel.order_type == "delivery",
                 OrderModel.created_at >= day_start,
                 OrderModel.created_at <= day_end,
                 OrderModel.is_deleted == False,  # noqa: E712
             )
         )
-        result = await db.execute(stmt)
-        row = result.one_or_none()
-        total = int(row[0] or 0) if row else 0
-        accepted = int(row[1] or 0) if row else 0
-        gmv_fen = int(row[2] or 0) if row else 0
-        accept_rate = round(accepted / total, 4) if total > 0 else 0.0
+        .group_by(OrderModel.sales_channel_id)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
 
+    stats_by_platform: dict[str, dict] = {}
+    for platform in OmniChannelService.PLATFORMS:
         stats_by_platform[platform] = {
             "platform": platform,
-            "total_orders": total,
-            "accepted_orders": accepted,
-            "gmv_fen": gmv_fen,
-            "accept_rate": accept_rate,
+            "total_orders": 0,
+            "accepted_orders": 0,
+            "gmv_fen": 0,
+            "accept_rate": 0.0,
         }
+
+    for row in rows:
+        ch = (row[0] or "").strip()
+        platform = ch.replace("delivery_", "") if ch.startswith("delivery_") else ch
+        if platform not in stats_by_platform:
+            stats_by_platform[platform] = {
+                "platform": platform, "total_orders": 0,
+                "accepted_orders": 0, "gmv_fen": 0, "accept_rate": 0.0,
+            }
+        total = int(row[1] or 0)
+        accepted = int(row[2] or 0)
+        gmv_fen = int(row[3] or 0)
+        stats_by_platform[platform]["total_orders"] = total
+        stats_by_platform[platform]["accepted_orders"] = accepted
+        stats_by_platform[platform]["gmv_fen"] = gmv_fen
+        stats_by_platform[platform]["accept_rate"] = round(accepted / total, 4) if total > 0 else 0.0
 
     return {"ok": True, "data": {"date": str(target_date), "platforms": stats_by_platform}, "error": None}
 

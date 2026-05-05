@@ -59,7 +59,7 @@ class ReconciliationEngine:
 
     def get_expected_commission(self, platform: str, amount_fen: int) -> int:
         rate = self.PLATFORM_COMMISSION_RATES.get(platform, 0.20)
-        return int(amount_fen * rate)
+        return round(amount_fen * rate)
 
     def match_settlement(
         self,

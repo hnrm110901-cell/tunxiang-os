@@ -419,8 +419,13 @@ class OmniChannelService:
             )
             await db.flush()
             log.info("omni_channel.receive_order.canonical_written")
-        except Exception:
-            log.exception("omni_channel.receive_order.canonical_write_failed", platform=order.platform)
+        except (SQLAlchemyError, TypeError, ValueError) as exc:
+            log.error(
+                "omni_channel.receive_order.canonical_write_failed",
+                platform=order.platform,
+                error=str(exc),
+                exc_info=True,
+            )
             # Canonical write failure does NOT block the order flow
 
         # 字段覆盖日志：追踪订单字段填充质量
@@ -471,14 +476,16 @@ class OmniChannelService:
         platform_key = row_omni_platform_key(order_row, self.PLATFORMS)
         ext_order_id = row_omni_platform_order_id(order_row)
 
-        # 更新内部状态
+        # 更新内部状态（先 commit 再回调平台，确保内部状态持久化优先）
         await self._update_order_status(order_id, "confirmed", tenant_id, db)
+        await db.commit()
 
         # 回调平台（失败不阻塞内部流程）
         if platform_key and ext_order_id:
             try:
                 adapter = self._get_platform_adapter(platform_key)
                 await adapter.confirm_order(ext_order_id)
+                await adapter.close()
                 log.info("omni_channel.accept_order.platform_callback_ok", platform=platform_key)
             except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
                 log.error(
@@ -531,14 +538,16 @@ class OmniChannelService:
         platform_key = row_omni_platform_key(order_row, self.PLATFORMS)
         ext_order_id = row_omni_platform_order_id(order_row)
 
-        # 更新内部状态
+        # 更新内部状态（先 commit 再回调平台）
         await self._update_order_status(order_id, "rejected", tenant_id, db)
+        await db.commit()
 
         # 回调平台拒单（失败只记录）
         if platform_key and ext_order_id:
             try:
                 adapter = self._get_platform_adapter(platform_key)
                 await adapter.cancel_order(ext_order_id, reason_code, reason_text)
+                await adapter.close()
                 log.info("omni_channel.reject_order.platform_callback_ok", platform=platform_key)
             except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
                 log.error(
@@ -679,6 +688,7 @@ class OmniChannelService:
             order_id_str = str(order_row.id)
             try:
                 await self._update_order_status(order_id_str, "rejected", tenant_id, db)
+                await db.commit()  # 先持久化内部状态，再回调平台
 
                 platform_key = row_omni_platform_key(order_row, self.PLATFORMS)
                 ext_order_id = row_omni_platform_order_id(order_row)
@@ -692,6 +702,7 @@ class OmniChannelService:
                             1,
                             "超时未接单，系统自动拒单",
                         )
+                        await adapter.close()
                     except (AdapterAPIError, httpx.HTTPError, ConnectionError, UnsupportedPlatformError) as exc:
                         log.error(
                             "omni_channel.auto_reject.platform_callback_failed",

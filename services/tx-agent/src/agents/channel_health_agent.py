@@ -263,5 +263,9 @@ class ChannelHealthAgent(EdgeAwareMixin, SkillAgent):
             "down": down,
             "alerts": all_alerts,
             "total_alerts": len(all_alerts),
-            "overall_status": "healthy" if not down else "degraded" if not degraded else "down",
+            "overall_status": (
+                "down" if down
+                else "degraded" if degraded
+                else "healthy"
+            ),
         }

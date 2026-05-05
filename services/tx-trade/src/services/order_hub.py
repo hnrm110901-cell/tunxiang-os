@@ -38,6 +38,10 @@ class OrderHub:
         self.tenant_id = tenant_id
 
     async def list_orders(self, filters: OrderHubFilters) -> dict:
+        await self.db.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
+            {"tid": self.tenant_id},
+        )
         conditions = [
             "o.tenant_id = :tenant_id",
             "o.order_type = 'delivery'",

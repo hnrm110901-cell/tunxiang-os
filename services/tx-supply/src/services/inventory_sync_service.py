@@ -46,8 +46,8 @@ class InventorySyncService:
         except ValueError:
             logger.debug("inventory_sync.platform_not_registered", platform=platform)
             return False
-        except Exception:
-            logger.exception("inventory_sync.platform_error", platform=platform)
+        except (OSError, ConnectionError, TimeoutError) as exc:
+            logger.error("inventory_sync.platform_error", platform=platform, error=str(exc), exc_info=True)
             return False
 
     async def sync_stock_to_all_platforms(
@@ -64,8 +64,8 @@ class InventorySyncService:
                 results[platform] = await self.sync_stock_to_platform(
                     sku_id, stock, platform, store_id
                 )
-            except Exception:
-                logger.exception(
+            except (OSError, ConnectionError, TimeoutError) as exc:
+                logger.error(
                     "inventory_sync.unexpected_error",
                     platform=platform, sku_id=sku_id,
                 )

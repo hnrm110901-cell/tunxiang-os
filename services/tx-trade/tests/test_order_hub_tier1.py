@@ -1,28 +1,30 @@
-"""Tier 1: 全渠道订单查询 — 真实餐厅场景测试
+"""Tier 2: OrderHub 数据模型 + 筛选逻辑单元测试
 
-测试用例基于徐记海鲜真实运营场景：
-- 200桌并发结账时订单查询不丢单
-- 跨租户隔离（tenant_A 查不到 tenant_B 的数据）
+NOTE: Tier 1 集成测试（DB验证、并发、断网恢复）需要 PostgreSQL 测试环境。
+      那些场景测试在 DEMO 环境手动执行，不在此文件中。
+
+测试基于徐记海鲜真实运营场景：
 - 多平台筛选正确性
+- 分页边界条件
+- 统计结构完整性
 """
 from __future__ import annotations
 
 import pytest
-from datetime import datetime, timedelta
-
 from services.tx_trade.src.services.order_hub import OrderHub, OrderHubFilters
 
 
-class TestOrderHubMultiPlatform:
-    """跨平台订单查询 — Tier 1 级"""
+class TestOrderHubFilters:
+    """筛选条件构造"""
 
-    async def test_filter_by_platform_only_returns_that_platform(self):
-        """查询 platform=meituan 时，只返回美团订单，不返回饿了吗/抖音"""
+    def test_filter_by_platform_only_returns_that_platform(self):
+        """查询 platform=meituan 时，筛选条件正确"""
         filters = OrderHubFilters(platform="meituan")
         assert filters.platform == "meituan"
-        # 集成测试：需要 DB fixture 验证 sales_channel_id = 'delivery_meituan'
+        assert filters.status == ""
+        assert filters.page == 1
 
-    async def test_filter_by_multiple_conditions(self):
+    def test_filter_by_multiple_conditions(self):
         """组合筛选：美团 + 待接单 + 关键词"""
         filters = OrderHubFilters(
             platform="meituan", status="pending", keyword="13800138000"
@@ -31,65 +33,54 @@ class TestOrderHubMultiPlatform:
         assert filters.status == "pending"
         assert filters.keyword == "13800138000"
 
-    async def test_empty_filters_returns_all_delivery_orders(self):
-        """无筛选条件时，返回所有外卖订单"""
+    def test_empty_filters_returns_all_delivery_orders(self):
+        """无筛选条件时，默认不过滤"""
         filters = OrderHubFilters()
         assert filters.platform == ""
         assert filters.status == ""
-
-
-class TestOrderHubRLS:
-    """多租户隔离 — Tier 1 级（安全关键）"""
-
-    async def test_tenant_id_always_in_conditions(self):
-        """OrderHub 的 SQL 条件中必须包含 tenant_id 过滤"""
-        hub_filters = OrderHubFilters()
-        # OrderHub 构造函数强制要求 tenant_id
-        # 集成测试：创建 hub("tenant-a"), 查询不应返回 tenant-b 的数据
-        assert hub_filters.platform == ""  # 默认不过滤平台
+        assert filters.page == 1
+        assert filters.size == 20
 
 
 class TestOrderHubPagination:
-    """分页边界 — Tier 1 级"""
+    """分页边界"""
 
-    async def test_first_page_returns_correct_size(self):
-        """第一页返回 size 条记录"""
+    def test_first_page_offset_zero(self):
+        """第一页 offset = 0"""
         filters = OrderHubFilters(page=1, size=20)
-        assert filters.page == 1
-        assert filters.size == 20
-        assert (filters.page - 1) * filters.size == 0  # offset = 0
+        assert (filters.page - 1) * filters.size == 0
 
-    async def test_large_page_handles_empty_result(self):
-        """翻到远超数据量的页码时，返回空列表不报错"""
+    def test_large_page_number_handled(self):
+        """远超数据量的页码不崩溃"""
         filters = OrderHubFilters(page=9999, size=20)
         assert filters.page == 9999
+        assert (filters.page - 1) * filters.size > 0
+
+    def test_custom_page_size(self):
+        """自定义每页条数"""
+        filters = OrderHubFilters(page=3, size=50)
+        assert filters.page == 3
+        assert filters.size == 50
+        assert (filters.page - 1) * filters.size == 100
 
 
-class TestOrderHubStats:
-    """统计数据 — Tier 1 级"""
+class TestOrderHubStatsStructure:
+    """统计返回结构定义"""
 
-    async def test_stats_structure_has_all_statuses(self):
-        """统计返回必须包含 pending/active/completed/cancelled 四个维度"""
-        # 结构验证（不依赖 DB）
+    def test_stats_keys_defined(self):
+        """统计返回必须包含所有必要维度"""
         expected_keys = {"total_orders", "total_fen", "pending", "active", "completed", "cancelled"}
-        assert expected_keys  # 确保结构定义存在
+        assert len(expected_keys) == 6
 
 
-class TestOrderHubTier1Scenarios:
-    """徐记海鲜真实场景"""
+class TestOrderHubConstruction:
+    """OrderHub 构造函数"""
 
-    async def test_200_tables_concurrent_order_query(self):
-        """200 桌并发结账场景下，订单查询 P99 < 200ms"""
-        # Tier 1 验收标准：P99 延迟 < 200ms
-        # 集成测试：200 并发查询，P99 < 200ms
-        pass
-
-    async def test_payment_timeout_saga_full_rollback(self):
-        """支付超时后，订单状态必须回滚为 cancelled，不能在多个平台残留"""
-        # Tier 1 验收标准：支付超时 → 座位/库存/积分 全部回滚
-        pass
-
-    async def test_offline_4h_reconnect_no_order_loss(self):
-        """断网 4 小时重连后，订单数据零丢失"""
-        # Tier 1 验收标准：CRDT 验证无数据丢失
-        pass
+    def test_tenant_id_required(self):
+        """OrderHub 构造函数显式要求 tenant_id"""
+        # 验证 OrderHub.__init__ 的签名包含 tenant_id 参数
+        import inspect
+        sig = inspect.signature(OrderHub.__init__)
+        param_names = list(sig.parameters.keys())
+        assert "tenant_id" in param_names
+        assert "db" in param_names

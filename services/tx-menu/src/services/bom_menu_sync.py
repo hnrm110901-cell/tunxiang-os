@@ -32,7 +32,7 @@ class BomMenuSyncService:
                 app_secret=os.environ.get(f"{platform.upper()}_APP_SECRET", ""),
             )
             result = await adapter.update_stock(
-                store_id=store_id, dish_id=dish_id, available=False
+                sku_id=dish_id, stock=0
             )
             await adapter.close()
             logger.info(
@@ -41,8 +41,8 @@ class BomMenuSyncService:
             return bool(result)
         except ValueError:
             return False
-        except Exception:
-            logger.exception("bom_menu.pause_failed", platform=platform, dish_id=dish_id)
+        except (OSError, ConnectionError, TimeoutError) as exc:
+            logger.error("bom_menu.pause_failed", platform=platform, dish_id=dish_id, error=str(exc), exc_info=True)
             return False
 
     async def resume_dish_on_platform(
@@ -58,7 +58,7 @@ class BomMenuSyncService:
                 app_secret=os.environ.get(f"{platform.upper()}_APP_SECRET", ""),
             )
             result = await adapter.update_stock(
-                store_id=store_id, dish_id=dish_id, available=True
+                sku_id=dish_id, stock=1
             )
             await adapter.close()
             logger.info(
@@ -81,8 +81,8 @@ class BomMenuSyncService:
                 results[platform] = await self.pause_dish_on_platform(
                     dish_id, platform, store_id
                 )
-            except Exception:
-                logger.exception("bom_menu.pause_unexpected", platform=platform)
+            except (OSError, ConnectionError, TimeoutError) as exc:
+                logger.error("bom_menu.pause_unexpected", platform=platform, error=str(exc), exc_info=True)
                 results[platform] = False
         return results
 
