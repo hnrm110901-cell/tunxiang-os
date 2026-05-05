@@ -2,7 +2,8 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY services/tx-pay/pyproject.toml ./pyproject.toml
 RUN pip install --no-cache-dir --retries 5 --timeout 120 -i https://mirrors.aliyun.com/pypi/simple/ \
-    fastapi uvicorn sqlalchemy[asyncio] asyncpg pydantic structlog httpx cryptography
+    fastapi uvicorn sqlalchemy[asyncio] asyncpg pydantic structlog httpx cryptography \
+    prometheus-fastapi-instrumentator
 COPY shared/ ./shared/
 COPY services/tx-pay/src/ ./services/tx_pay/src/
 ENV PYTHONPATH=/app

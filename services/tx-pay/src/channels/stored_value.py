@@ -15,8 +15,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 import structlog
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     PaymentRequest,
@@ -51,6 +53,7 @@ class StoredValueChannel(BasePaymentChannel):
         payment_id = f"SV{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
 
         if self._http is None:
+            payment_channel_requests_total.labels(channel="stored_value", status="2xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.SUCCESS,
@@ -62,6 +65,8 @@ class StoredValueChannel(BasePaymentChannel):
 
         member_id = request.metadata.get("member_id")
         if not member_id:
+            # 入参缺失等价 4xx（在 HTTP 调用前就被拒绝）
+            payment_channel_requests_total.labels(channel="stored_value", status="4xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.FAILED,
@@ -71,16 +76,31 @@ class StoredValueChannel(BasePaymentChannel):
                 error_msg="储值支付需要 member_id",
             )
 
-        resp = await self._http.post(
-            f"{_TX_MEMBER_BASE}/api/v1/member/stored-value/deduct",
-            json={
-                "member_id": member_id,
-                "amount_fen": request.amount_fen,
-                "order_id": request.order_id,
-                "idempotency_key": request.idempotency_key,
-            },
-            headers={"X-Tenant-ID": request.tenant_id},
-        )
+        try:
+            resp = await self._http.post(
+                f"{_TX_MEMBER_BASE}/api/v1/member/stored-value/deduct",
+                json={
+                    "member_id": member_id,
+                    "amount_fen": request.amount_fen,
+                    "order_id": request.order_id,
+                    "idempotency_key": request.idempotency_key,
+                },
+                headers={"X-Tenant-ID": request.tenant_id},
+            )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="stored_value", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="stored_value", status="connect_error").inc()
+            raise
+
+        # 按 HTTP 响应码分维（2xx/4xx/5xx）
+        if 200 <= resp.status_code < 300:
+            payment_channel_requests_total.labels(channel="stored_value", status="2xx").inc()
+        elif 400 <= resp.status_code < 500:
+            payment_channel_requests_total.labels(channel="stored_value", status="4xx").inc()
+        elif 500 <= resp.status_code < 600:
+            payment_channel_requests_total.labels(channel="stored_value", status="5xx").inc()
 
         if resp.status_code == 200:
             data = resp.json().get("data", {})

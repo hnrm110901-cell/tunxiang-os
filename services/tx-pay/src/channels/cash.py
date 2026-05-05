@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     PaymentRequest,
@@ -29,6 +30,8 @@ class CashChannel(BasePaymentChannel):
     supported_trade_types = [TradeType.B2C]
 
     async def pay(self, request: PaymentRequest) -> PaymentResult:
+        # 现金不走 HTTP，由收银员当面收款；记 2xx 等价于"成功完成业务调用"
+        payment_channel_requests_total.labels(channel="cash", status="2xx").inc()
         return PaymentResult(
             payment_id=f"CASH{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}",
             status=PayStatus.SUCCESS,

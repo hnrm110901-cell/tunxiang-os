@@ -12,6 +12,7 @@ from typing import Optional
 
 import structlog
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     PaymentRequest,
@@ -35,6 +36,8 @@ class AlipayChannel(BasePaymentChannel):
     async def pay(self, request: PaymentRequest) -> PaymentResult:
         payment_id = f"ALI{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
         logger.info("alipay_mock_pay", payment_id=payment_id, amount_fen=request.amount_fen)
+        # Mock 骨架：当前永远返回成功；真实对接后按 httpx 状态码分维
+        payment_channel_requests_total.labels(channel="alipay", status="2xx").inc()
         return PaymentResult(
             payment_id=payment_id,
             status=PayStatus.SUCCESS,
