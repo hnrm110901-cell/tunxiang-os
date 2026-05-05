@@ -1,3 +1,49 @@
+## 2026-05-05 09:50  PK 系列收官 — RLS 真注入修 + Tier 1 域 text(f) baseline 守门 5 PR
+
+### 本次会话目标
+PJ 系列 7 PR 收尾后，reviewer 在 tx-trade f-string 安全审计中发现 3 处真 RLS 注入；
+紧急修 + 全仓 SET LOCAL :tid 加固 + Tier 1 域 text(f) baseline 守门一并落地。
+
+### 完成状态
+- [x] PK.0 紧急修 3 处 RLS tenant_id SQL 注入 (#168 → `b0e8fdd8`) [P0/SECURITY]
+- [x] PK.0.1 全仓 89 处 SET LOCAL :tid → set_config 加固 (#169 → `fa7e345a`) [SECURITY]
+- [x] PK.1 tx-trade 域 text(f) baseline=139 守门 (#170 → `df0f52d3`) [Tier1]
+- [x] PK.2+3 tx-finance + tx-supply baseline=59/78 守门 (#173 → `985e007a`) [Tier1]
+- [x] PK.2-fix scanner blind spot 修 + 校准 PK.1 baseline (含 #173)
+- [x] PK.2-fix++ text(<sql_var>) 第二维 baseline 守门 (含 #173)
+
+### 关键决策
+- **PK.0 真注入紧急性** — `_set_rls(tenant_id)` f-string 拼接的 tenant_id 来自 X-Tenant-ID
+  header（用户可控），任何复用此模板的新 router 都会复制注入面 → P0，0 容忍立即修
+- **PK.0.1 SET LOCAL :tid 不可靠的根本原因** — PG SET 是 utility statement，不走 PARSE/BIND；
+  SQLAlchemy + asyncpg 行为不可 100% 确定（驱动版本依赖）。统一改 PG 原生
+  `SELECT set_config(name, value, is_local)` — 走标准 PREPARE+BIND，等价 SET LOCAL（is_local=true）
+- **方法论 pivot：codemod → baseline gate** — 全仓 ~298 处 text(f) 多数是项目内白名单
+  conditions list / set_clauses 拼接，零真注入面；ROI 极低噪音改动改套精确 baseline
+  双向锁定（> baseline fail 防新增 / < baseline fail 迫使下调显式 review 清理范围）
+- **strict-code-reviewer 救场** — 抓出 scanner 用 `splitlines()` 逐行扫漏 60%+ 真实命中
+  （多行 `text(\n  f"""...""")` 完全看不见），漏扫导致老 baseline 33/21/23 是错误子集。
+  同 PR 修 scanner（findall 整 body）+ 同步校准为 139/59/78 + 把 3 函数 parametrize
+- **全量审计完成** — reviewer 5 大问题全部修，Suggestion #6（text(sql/stmt) 变量间接面）
+  也加进去，3 域 × 2 维度 = 6 baseline 双层守门
+- **gh api PUT fallback 全程稳定** — git push 502 雪崩 + canonical clone 外部反复切分支，
+  全程走 PUT /contents 单文件推 + admin merge
+
+### 下一步
+- PI.2 — 73 历史 alembic head 分批收敛（独立 sprint 立项）
+- PJ.2 — staging PG 实跑 CONCURRENTLY 验证（需 staging 访问）
+- PE.2 — 与首批客户对账校验阶梯费率（需客户协作）
+
+### 已知风险
+- baseline 锁定的 ~302 处历史 text(f) + text(<sql_var>) 命中**已审计为零真注入面**
+  （都是项目内 literal conditions / set_clauses 拼接），不强制清理；但任何新引入会被 fail
+- text(f) baseline 在新增动态 SQL helper 时会触发 fail — reviewer 必须明确判定改 :param
+  + bindparams 模式 OR 上调 baseline（后者要写注释说明 + 列入下一轮 codemod 候选）
+- `set_config('app.tenant_id', :tid, true)` 在事务回滚时 GUC 自然回滚（PG 文档保证），
+  但跨 connection pool 复用时务必每次 set_config（已验证 PG.4 backfill / async session 模式）
+
+---
+
 ## 2026-05-05 00:00  PJ 系列后续修复 — 6 PR admin merge 收口
 
 ### 本次会话目标
