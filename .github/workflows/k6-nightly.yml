@@ -84,7 +84,7 @@ jobs:
           K6_BASE_URL: ${{ github.event.inputs.base_url || 'http://localhost:8000' }}
         run: |
           chmod +x infra/performance/run-k6.sh
-          infra/performance/run-k6.sh "${K6_BASE_URL}" || true
+          infra/performance/run-k6.sh "${K6_BASE_URL}"
 
       - name: Verify results file
         run: |
