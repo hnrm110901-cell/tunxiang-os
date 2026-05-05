@@ -38,34 +38,45 @@ _PROTECTED_FILES = (
 
 _FSTRING_START = re.compile(r"""(?<![A-Za-z_])[fF]['"]""")
 _SQL_KEYWORDS = ("SELECT", "INSERT INTO", "UPDATE ", "DELETE FROM", " JOIN ")
-# PJ.6: SQLAlchemy text() 包装的 f-string 也算注入面 — 即便没有命中
-# _SQL_KEYWORDS（如分页 LIMIT/动态 ORDER BY 等），text(f"...") 本身就足以判红。
+# PJ.6 + PK.2-fix: SQLAlchemy text() 包装的 f-string 也算注入面，且必须跨行扫描。
+# 模式 `\s*` 已经匹配 `\n`，所以同一 regex 同时覆盖：
+#   text(f"...")            （单行）
+#   text(\n    f"""...""")  （多行 — tx-finance/tx-supply 主流写法）
+# 关键：scanner 必须 read 整个 body 用 finditer/findall，**不能** splitlines 后逐行。
+# 此前因逐行扫漏 60%+ 真实命中（tx-trade: 33→139, tx-finance: 21→59, tx-supply: 23→78）。
 _TEXT_FSTRING_PATTERN = re.compile(r"""text\(\s*[fF]['"]""")
 
 
 def _scan_file(rel_path: str) -> list[tuple[int, str]]:
-    """单文件扫 f-string SQL 行。
+    """单文件扫 f-string SQL 行/块。
 
     命中条件（任一）：
       1. 行内有 f-string 起始 + 命中 SQL 关键字
-      2. 行内有 text(f"..." 或 text(f'..." 模式（PJ.6 新增）
+      2. text(f"..." 包装（含跨行：text( 后换行接 f-string 字面量）
     """
     p = _REPO_ROOT / rel_path
     if not p.is_file():
         return []
     try:
-        text = p.read_text(encoding="utf-8")
+        body = p.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
         return []
     hits: list[tuple[int, str]] = []
-    for i, line in enumerate(text.splitlines(), 1):
-        # 规则 1：f-string + SQL keyword
+    seen_lines: set[int] = set()
+    lines = body.splitlines()
+    # 规则 1：f-string + SQL keyword（按行）
+    for i, line in enumerate(lines, 1):
         if _FSTRING_START.search(line) and any(kw in line for kw in _SQL_KEYWORDS):
             hits.append((i, line.strip()))
+            seen_lines.add(i)
+    # 规则 2：text(f"..." 包装（含跨行）— finditer 整 body + 反算行号
+    for m in _TEXT_FSTRING_PATTERN.finditer(body):
+        line_no = body[: m.start()].count("\n") + 1
+        if line_no in seen_lines:
             continue
-        # 规则 2：text(f"...") 包装（PJ.6 新增）
-        if _TEXT_FSTRING_PATTERN.search(line):
-            hits.append((i, line.strip()))
+        hits.append((line_no, lines[line_no - 1].strip()))
+        seen_lines.add(line_no)
+    hits.sort(key=lambda h: h[0])
     return hits
 
 
@@ -81,21 +92,26 @@ def test_p22_cleaned_files_stay_clean(rel_path: str) -> None:
         )
 
 
-# ──────────────── PK.1：tx-trade Tier 1 财务红线 baseline 守门 ────────────────
+# ──────────────── PK.1+2+3 (PK.2-fix 整改后)：Tier 1 财务红线域 baseline 守门 ────────────────
 #
-# tx-trade 是 Tier 1 财务红线域。当前 src/api + src/services + src/routers
-# 共 33 处 text(f) 拼接，PK.0 审计已分类：
-#   - 0 处真注入（已在 PK.0 修完 3 处 RLS f-string）
-#   - 33 处都是项目内白名单 conditions list / set_clauses 拼接
+# 三大 Tier 1 域统一精确 baseline 双向锁定：
+#   - 命中数 > baseline：新 PR 引入 text(f) → fail，强迫改用 :param + bindparams
+#   - 命中数 < baseline：清理已发生 → fail（迫使下调 baseline 显式 review 清理范围）
 #
-# baseline 锁定上限 33，**不允许新增**：
-#   - 新 PR 引入 text(f) → fail，强迫 reviewer 改用 :param + bindparams
-#   - 重构减少命中 → fail（baseline 锁定为精确数，迫使开发者下调 baseline）
-# 已存在的 33 处不强制立即清理（噪音改动 ROI 低），但守门冻结后续退化。
+# baseline 数=本 PR 整改后的实测命中数（含多行 text(\n  f"""...""")）。
+# 当前命中均为项目内白名单 conditions list / set_clauses 拼接，零真注入面。
+# 不强制立即清理（噪音改动 ROI 低），但冻结后续退化。
+#
+# PK.2-fix 历史教训：原 scanner 单行扫漏 60%+ 真实命中（老 33/21/23 是单行子集），
+# 真实总数应为 139/59/78。任何新 baseline 调整必须 re-run `findall` 整 body。
 
 
 def _count_text_fstring_in_dir(rel_dir: str) -> int:
-    """统计目录内所有 .py 的 text(f"...") 命中数（生产代码，排除 tests/）。"""
+    """统计目录内所有 .py 的 text(f"...") 命中数（生产代码，排除 tests/）。
+
+    PK.2-fix：必须 findall 整 body — 单行 splitlines 会漏多行
+    text(...换行...f-string)（tx-finance/tx-supply 主流写法，曾漏 60%+ 真实命中）。
+    """
     base = _REPO_ROOT / rel_dir
     if not base.is_dir():
         return 0
@@ -108,92 +124,44 @@ def _count_text_fstring_in_dir(rel_dir: str) -> int:
             body = py.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        for line in body.splitlines():
-            if _TEXT_FSTRING_PATTERN.search(line):
-                count += 1
+        count += len(_TEXT_FSTRING_PATTERN.findall(body))
     return count
 
 
-# tx-trade 域 baseline：PK.0 审计后基线。下调请同步本数。
-_TX_TRADE_TEXT_FSTRING_BASELINE = 33
+# 三大 Tier 1 域 baseline。下调请把对应数字改小，同 PR review。
+# 上调（=新增 text(f) 拼接）请改走 :param + bindparams 模式（参考 PK.0
+# shared/ontology/src/database.py:25 set_config helper）。
+_TIER1_TEXT_FSTRING_BASELINES: dict[str, int] = {
+    "services/tx-trade/src": 139,  # PK.1 / PK.2-fix 校准
+    "services/tx-finance/src": 59,  # PK.2 / PK.2-fix 校准
+    "services/tx-supply/src": 78,  # PK.3 / PK.2-fix 校准
+}
 
 
-def test_tx_trade_text_fstring_baseline_exact() -> None:
-    """tx-trade 域 text(f) 命中数必须等于 baseline（防退化 + 防漂移）。
+@pytest.mark.parametrize(
+    "rel_dir,baseline",
+    sorted(_TIER1_TEXT_FSTRING_BASELINES.items()),
+    ids=lambda v: v if isinstance(v, str) else "",
+)
+def test_tier1_text_fstring_baseline_exact(rel_dir: str, baseline: int) -> None:
+    """Tier 1 域 text(f) 命中数必须精确等于 baseline（防退化 + 防漂移）。
 
-    - 命中数 > baseline：新 PR 引入 text(f)，请改用 :param + bindparams
-      参考 PK.0 set_config 模式（shared/ontology/src/database.py:25）
-    - 命中数 < baseline：清理工作已发生，请下调 _TX_TRADE_TEXT_FSTRING_BASELINE
-      锁定新基线（精确锁定迫使每次清理都被显式 review）
-
-    背景：PK.0 已修 3 处真注入（_set_rls f-string）；剩余 33 处都是
-    项目内 conditions list / set_clauses 拼接（白名单内字段名，零真注入风险）。
+    新增 text(f) → fail；清理 → 同步下调 _TIER1_TEXT_FSTRING_BASELINES[rel_dir]。
     """
-    current = _count_text_fstring_in_dir("services/tx-trade/src")
-    if current > _TX_TRADE_TEXT_FSTRING_BASELINE:
+    current = _count_text_fstring_in_dir(rel_dir)
+    if current > baseline:
         pytest.fail(
-            f"tx-trade/src text(f) 命中数 {current} > baseline {_TX_TRADE_TEXT_FSTRING_BASELINE}\n"
-            "Tier 1 财务红线域引入新 text(f) f-string SQL — "
-            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式）。\n"
-            "若确实必要（如新动态 WHERE 拼接 helper），更新 baseline 数并加注释说明。"
+            f"{rel_dir} text(f) 命中数 {current} > baseline {baseline}\n"
+            "Tier 1 域引入新 text(f) f-string SQL — "
+            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式，"
+            "shared/ontology/src/database.py:25）。\n"
+            "若确实必要（如新动态 WHERE 拼接 helper），更新 _TIER1_TEXT_FSTRING_BASELINES "
+            f"中 {rel_dir!r} 的值并加注释说明。"
         )
-    if current < _TX_TRADE_TEXT_FSTRING_BASELINE:
+    if current < baseline:
         pytest.fail(
-            f"tx-trade/src text(f) 命中数 {current} < baseline {_TX_TRADE_TEXT_FSTRING_BASELINE}\n"
-            "已有清理工作，请下调 _TX_TRADE_TEXT_FSTRING_BASELINE 锁定新基线。"
-        )
-
-
-# ──────────────── PK.2 / PK.3：tx-finance + tx-supply 同模式 baseline 守门 ────────────────
-#
-# 复用 PK.1 的精确 baseline 锁定模式（既防退化也防漂移）扩展到另两个 Tier 1 财务域。
-# 这两个域当前命中均为项目内白名单 conditions list / set_clauses 拼接，零真注入面，
-# 但凡新 PR 引入新的 text(f) 拼接都会被 fail，强迫 reviewer 改用 :param + bindparams。
-#
-# baseline 数=PK.2/PK.3 立项时实测命中数。下调请同步更新对应常量。
-# 上调（即新增 text(f) 拼接）会 fail — 请改走 set_config / bindparams 模式。
-
-_TX_FINANCE_TEXT_FSTRING_BASELINE = 21
-_TX_SUPPLY_TEXT_FSTRING_BASELINE = 23
-
-
-def test_tx_finance_text_fstring_baseline_exact() -> None:
-    """tx-finance 域 text(f) 命中数必须等于 baseline（防退化 + 防漂移）。
-
-    与 tx-trade 同等待遇 — Tier 1 财务结算域，资金安全敏感。
-    新增 text(f) → fail；清理 → 同步下调 _TX_FINANCE_TEXT_FSTRING_BASELINE。
-    """
-    current = _count_text_fstring_in_dir("services/tx-finance/src")
-    if current > _TX_FINANCE_TEXT_FSTRING_BASELINE:
-        pytest.fail(
-            f"tx-finance/src text(f) 命中数 {current} > baseline {_TX_FINANCE_TEXT_FSTRING_BASELINE}\n"
-            "Tier 1 财务结算域引入新 text(f) f-string SQL — "
-            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式）。"
-        )
-    if current < _TX_FINANCE_TEXT_FSTRING_BASELINE:
-        pytest.fail(
-            f"tx-finance/src text(f) 命中数 {current} < baseline {_TX_FINANCE_TEXT_FSTRING_BASELINE}\n"
-            "已有清理工作，请下调 _TX_FINANCE_TEXT_FSTRING_BASELINE 锁定新基线。"
-        )
-
-
-def test_tx_supply_text_fstring_baseline_exact() -> None:
-    """tx-supply 域 text(f) 命中数必须等于 baseline（防退化 + 防漂移）。
-
-    供应链域虽非直接资金路径，但库存/BOM/采购数据写入污染同样能放大下游决策风险。
-    新增 text(f) → fail；清理 → 同步下调 _TX_SUPPLY_TEXT_FSTRING_BASELINE。
-    """
-    current = _count_text_fstring_in_dir("services/tx-supply/src")
-    if current > _TX_SUPPLY_TEXT_FSTRING_BASELINE:
-        pytest.fail(
-            f"tx-supply/src text(f) 命中数 {current} > baseline {_TX_SUPPLY_TEXT_FSTRING_BASELINE}\n"
-            "供应链域引入新 text(f) f-string SQL — "
-            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式）。"
-        )
-    if current < _TX_SUPPLY_TEXT_FSTRING_BASELINE:
-        pytest.fail(
-            f"tx-supply/src text(f) 命中数 {current} < baseline {_TX_SUPPLY_TEXT_FSTRING_BASELINE}\n"
-            "已有清理工作，请下调 _TX_SUPPLY_TEXT_FSTRING_BASELINE 锁定新基线。"
+            f"{rel_dir} text(f) 命中数 {current} < baseline {baseline}\n"
+            f"已有清理工作，请下调 _TIER1_TEXT_FSTRING_BASELINES[{rel_dir!r}] 锁定新基线。"
         )
 
 
