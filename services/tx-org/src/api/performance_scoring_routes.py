@@ -203,7 +203,7 @@ async def list_performance_periods(
         ]
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except SQLAlchemyError as exc:
         logger.warning("performance_periods_db_fallback", error=str(exc))
         total = 0
@@ -267,7 +267,7 @@ async def create_performance_period(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except SQLAlchemyError as exc:
         logger.warning("create_period_db_fallback", error=str(exc))
         period_id = uuid.uuid4()
@@ -344,7 +344,7 @@ async def batch_evaluate(
                 },
             )
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
+            raise safe_http_exception(400, "请求参数无效", e) from e
         except SQLAlchemyError as exc:
             logger.warning("evaluate_db_fallback", error=str(exc), employee_id=item.employee_id)
 
@@ -385,7 +385,7 @@ async def batch_evaluate(
         )
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except SQLAlchemyError as exc:
         logger.warning("update_period_stats_fallback", error=str(exc))
 
@@ -450,7 +450,7 @@ async def get_period_results(
             )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except SQLAlchemyError as exc:
         logger.warning("period_results_db_fallback", error=str(exc))
         items = []
@@ -534,7 +534,7 @@ async def get_employee_performance_history(
             )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except SQLAlchemyError as exc:
         logger.warning("employee_perf_history_db_fallback", error=str(exc), employee_id=employee_id)
         history = []
@@ -634,7 +634,7 @@ async def get_performance_stats(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except SQLAlchemyError as exc:
         logger.warning("performance_stats_db_fallback", error=str(exc))
         return {
@@ -687,6 +687,8 @@ from services.performance_scoring_service import (
 from services.performance_scoring_service import (
     calibrate_score as svc_calibrate_score,
 )
+
+from shared.security.src.error_handler import safe_http_exception
 
 
 class ReviewCycleCreate(BaseModel):
@@ -744,7 +746,7 @@ async def create_review_cycle_endpoint(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/review-cycles")
@@ -762,7 +764,7 @@ async def list_review_cycles_endpoint(
         result = await list_review_cycles(db, uuid.UUID(tid), status=status, page=page, size=size)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/review-cycles/{cycle_id}")
@@ -778,7 +780,7 @@ async def get_review_cycle_detail_endpoint(
         result = await get_cycle_detail(db, uuid.UUID(tid), uuid.UUID(cycle_id))
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.put("/review-cycles/{cycle_id}/status")
@@ -796,7 +798,7 @@ async def update_review_cycle_status_endpoint(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/review-cycles/{cycle_id}/scores")
@@ -826,7 +828,7 @@ async def submit_review_score_endpoint(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/review-cycles/{cycle_id}/scores")
@@ -853,7 +855,7 @@ async def get_review_scores_endpoint(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/review-cycles/{cycle_id}/my-pending")
@@ -902,7 +904,7 @@ async def get_my_pending_reviews(
             )
         return {"ok": True, "data": {"items": items, "total": len(items)}}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/review-cycles/{cycle_id}/summary")
@@ -920,7 +922,7 @@ async def get_review_cycle_summary(
         items = await aggregate_cycle_scores(db, uuid.UUID(tid), uuid.UUID(cycle_id), store_id=sid)
         return {"ok": True, "data": {"items": items, "total": len(items)}}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.put("/review-cycles/{cycle_id}/calibrate")
@@ -945,7 +947,7 @@ async def calibrate_review_score_endpoint(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/review-cycles/{cycle_id}/stats")
@@ -961,4 +963,4 @@ async def get_review_cycle_stats(
         result = await get_review_stats(db, uuid.UUID(tid), uuid.UUID(cycle_id))
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e

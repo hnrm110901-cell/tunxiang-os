@@ -28,6 +28,8 @@ from services.ai_salary_advisor_service import (
     recommend_salary_structure,
 )
 
+from shared.security.src.error_handler import safe_http_exception
+
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 router = APIRouter(
@@ -126,7 +128,7 @@ async def recommend(payload: RecommendRequest) -> dict:
         raise
     except ValueError as e:
         log.warning("ai_salary_advisor.api.recommend.invalid", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except Exception as e:  # noqa: BLE001
         log.exception("ai_salary_advisor.api.recommend.error")
         raise HTTPException(status_code=500, detail="internal_error") from e
@@ -162,7 +164,7 @@ async def batch(payload: BatchRecommendRequest) -> dict:
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except Exception as e:  # noqa: BLE001
         log.exception("ai_salary_advisor.api.batch.error")
         raise HTTPException(status_code=500, detail="internal_error") from e

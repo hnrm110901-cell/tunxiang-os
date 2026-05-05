@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from services.tax_filing_service import (
     check_filing_status,
@@ -27,6 +27,8 @@ from services.tax_filing_service import (
     submit_to_tax_bureau,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/tax-filing", tags=["tax-filing"])
@@ -72,7 +74,7 @@ async def api_generate(
         await db.commit()
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/submit")
@@ -91,7 +93,7 @@ async def api_submit(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/history")
@@ -143,7 +145,7 @@ async def api_annual_summary(
         )
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/{filing_id}")
@@ -161,7 +163,7 @@ async def api_detail(
         )
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/{filing_id}/retry")
@@ -180,4 +182,4 @@ async def api_retry(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
