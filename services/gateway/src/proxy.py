@@ -97,39 +97,53 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
         # 防止经 gateway 后伪造租户绕 RLS。
         # Authorization 仍透传（下游 ApiKey 中间件 / 审计日志可能需要原 JWT），
         # 但下游应优先信任由 gateway 重注入的 X-Tenant-ID / X-Internal-JWT。
-        _STRIP = {
-            "host",
-            "content-length",
-            "x-tenant-id",
-            "x-internal-user-id",
-            "x-internal-role",
-            "x-internal-jwt",
-        }
-        headers = {k: v for k, v in request.headers.items() if k.lower() not in _STRIP}
-        trusted_tenant_id = getattr(request.state, "tenant_id", "") or ""
-        if trusted_tenant_id:
-            headers["X-Tenant-ID"] = str(trusted_tenant_id)
-        trusted_user_id = getattr(request.state, "user_id", "") or ""
-        if trusted_user_id:
-            headers["X-Internal-User-Id"] = str(trusted_user_id)
-        trusted_role = getattr(request.state, "role", "") or ""
-        if trusted_role:
-            headers["X-Internal-Role"] = str(trusted_role)
-        # 短期 HS256 内部 JWT —— 下游服务可挂 InternalJwtMiddleware 校验
-        # （follow-up：随服务升级把 X-Tenant-ID 信任源切到此 JWT）
-        try:
-            from shared.security.src.internal_jwt import mint_internal_jwt
+        #
+        # 独立 review P0-3：exempt 路径（/health / /docs / /api/v1/auth/* 等）
+        # AuthMiddleware 不会设 request.state.tenant_id —— 此时若按上述逻辑剥
+        # 客户端 X-Tenant-ID 后发现 state 上没有受信值，X-Tenant-ID header 会
+        # 静默丢失，下游收到空头反而比之前更糟。
+        # 处理：以 auth_method 是否被设值（非 None / 非空）作为"已认证"信号；
+        # 未认证（exempt 路径）一律透传原 headers，不引入新的隐患。
+        auth_method = getattr(request.state, "auth_method", None)
+        is_authenticated = bool(auth_method)
+        if not is_authenticated:
+            # Exempt / 未认证路径：保持向后兼容（透传原 headers，不剥不注入）。
+            headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
+        else:
+            _STRIP = {
+                "host",
+                "content-length",
+                "x-tenant-id",
+                "x-internal-user-id",
+                "x-internal-role",
+                "x-internal-jwt",
+            }
+            headers = {k: v for k, v in request.headers.items() if k.lower() not in _STRIP}
+            trusted_tenant_id = getattr(request.state, "tenant_id", "") or ""
+            if trusted_tenant_id:
+                headers["X-Tenant-ID"] = str(trusted_tenant_id)
+            trusted_user_id = getattr(request.state, "user_id", "") or ""
+            if trusted_user_id:
+                headers["X-Internal-User-Id"] = str(trusted_user_id)
+            trusted_role = getattr(request.state, "role", "") or ""
+            if trusted_role:
+                headers["X-Internal-Role"] = str(trusted_role)
+            # 短期 HS256 内部 JWT —— 下游服务可挂 InternalJwtMiddleware 校验
+            # （独立 review P1-4：当前下游中间件未部署，本 token 仅签不验，
+            #  S-02 完成度 50%；follow-up tracker 在 docs/security/）
+            try:
+                from shared.security.src.internal_jwt import mint_internal_jwt
 
-            internal_jwt = mint_internal_jwt(
-                tenant_id=str(trusted_tenant_id),
-                user_id=str(trusted_user_id),
-                role=str(trusted_role),
-            )
-            if internal_jwt:
-                headers["X-Internal-JWT"] = internal_jwt
-        except ImportError:
-            # helper 尚未部署到环境时降级 — 不阻塞 proxy
-            pass
+                internal_jwt = mint_internal_jwt(
+                    tenant_id=str(trusted_tenant_id),
+                    user_id=str(trusted_user_id),
+                    role=str(trusted_role),
+                )
+                if internal_jwt:
+                    headers["X-Internal-JWT"] = internal_jwt
+            except ImportError:
+                # helper 尚未部署到环境时降级 — 不阻塞 proxy
+                pass
         body = await request.body()
 
         resp = await _http_pool.request(
