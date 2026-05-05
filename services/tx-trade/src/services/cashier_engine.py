@@ -1119,7 +1119,14 @@ class CashierEngine:
     # ─────────────────────────────────────
 
     async def _get_order(self, order_id: uuid.UUID) -> Order:
-        result = await self.db.execute(select(Order).where(Order.id == order_id, Order.tenant_id == self.tenant_id))
+        # 审计 Tier1 F1（P0）：行锁防双重结账竞态。settle/refund/modify 等
+        # 路径都会调用本函数；READ COMMITTED 下没有 FOR UPDATE 时，
+        # 两并发请求可同时读到 status="confirmed" 都通过状态检查 → 双扣款。
+        result = await self.db.execute(
+            select(Order)
+            .where(Order.id == order_id, Order.tenant_id == self.tenant_id)
+            .with_for_update()
+        )
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
