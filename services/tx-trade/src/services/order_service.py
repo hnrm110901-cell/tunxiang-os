@@ -36,11 +36,6 @@ def _gen_order_no() -> str:
 
 
 class OrderService:
-    def __init__(self, db: AsyncSession, tenant_id: str):
-        self.db = db
-        self.tenant_id = uuid.UUID(tenant_id)
-        self._tenant_id_str = tenant_id
-
     """收银核心服务
 
     离线模式：
@@ -55,22 +50,16 @@ class OrderService:
         tenant_id: str,
         offline_sync_service: Optional[Any] = None,
     ) -> None:
+        # 审计 Tier1 F2（P0）：原本有两个 __init__ 定义，Python 只保留最后一个，
+        # 导致 _tenant_id_str 未初始化 → _set_tenant() 运行时 AttributeError。
+        # 此处合并为单一构造函数，同时设置 _tenant_id_str 与 _offline_sync。
         self.db = db
         self.tenant_id = uuid.UUID(tenant_id)
+        self._tenant_id_str = tenant_id
         self._offline_sync: Optional[Any] = offline_sync_service
 
     async def _set_tenant(self) -> None:
         await self.db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": self._tenant_id_str})
-
-    async def create_order(
-        self,
-        store_id: str,
-        order_type: str = OrderType.dine_in.value,
-        table_no: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        waiter_id: Optional[str] = None,
-    ) -> dict:
-        await self._set_tenant()
 
     async def create_order(
         self,
