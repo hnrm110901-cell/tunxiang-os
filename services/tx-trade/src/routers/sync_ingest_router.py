@@ -52,12 +52,9 @@ router = APIRouter(prefix="/api/v1/sync", tags=["edge-sync"])
 
 _EDGE_SYNC_TS_SKEW_DEFAULT = 300
 
-# WARNING（独立 review P1-1）：进程内 dict，**多副本部署下防重放失效**。
-# k8s HPA 副本 ≥ 2 时同一 nonce 打到不同 pod 无法共享检测；同一变更可被
-# 重放至多 (replica_count) 次直到被业务层 change_id 幂等去重救场。
-# 生产 follow-up：改用 Redis 共享存储（SETEX nonce → ttl），
-# 或显式接受"多副本下退化为时间窗口防重放"。
-_EDGE_SYNC_RECENT_NONCES: dict[str, float] = {}
+# 第二轮 review P1-1 修复：原本 _EDGE_SYNC_RECENT_NONCES dict 进程内不共享，
+# 已抽象到 edge_sync_nonce_store 模块，按 EDGE_SYNC_NONCE_REDIS_URL env
+# 选择 InProcessNonceStore 或 RedisNonceStore（多副本共享）。
 
 
 def _edge_sync_secret() -> str:
@@ -105,14 +102,6 @@ def _edge_sync_skew_seconds() -> int:
         return _EDGE_SYNC_TS_SKEW_DEFAULT
 
 
-def _gc_old_nonces(now: float) -> None:
-    """清理超过 ts skew 窗口外的 nonce。"""
-    threshold = now - _edge_sync_skew_seconds()
-    expired = [k for k, v in _EDGE_SYNC_RECENT_NONCES.items() if v < threshold]
-    for k in expired:
-        _EDGE_SYNC_RECENT_NONCES.pop(k, None)
-
-
 async def verify_edge_sync_auth(
     x_edge_store_id: Optional[str] = Header(default=None, alias="X-Edge-Store-Id"),
     x_edge_tenant_id: Optional[str] = Header(default=None, alias="X-Edge-Tenant-Id"),
@@ -154,14 +143,7 @@ async def verify_edge_sync_auth(
         logger.warning("edge_sync_auth_ts_skew", store=x_edge_store_id, skew=int(now - ts))
         raise HTTPException(status_code=401, detail="edge sync timestamp skew")
 
-    # nonce 防重放
-    nonce_key = f"{x_edge_store_id}:{x_edge_sync_nonce}"
-    _gc_old_nonces(now)
-    if nonce_key in _EDGE_SYNC_RECENT_NONCES:
-        logger.warning("edge_sync_auth_nonce_replay", store=x_edge_store_id, nonce=x_edge_sync_nonce)
-        raise HTTPException(status_code=401, detail="edge sync nonce replay")
-
-    # HMAC 校验
+    # HMAC 校验（先校验签名再 mark nonce —— 失败请求不污染 nonce store）
     msg = f"{x_edge_store_id}.{x_edge_tenant_id}.{x_edge_sync_ts}.{x_edge_sync_nonce}".encode("utf-8")
     expected = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, x_edge_store_token or ""):
@@ -178,7 +160,23 @@ async def verify_edge_sync_auth(
         )
         raise HTTPException(status_code=401, detail="X-Tenant-ID claim mismatch")
 
-    _EDGE_SYNC_RECENT_NONCES[nonce_key] = now
+    # nonce 防重放（用共享 store；多副本下 RedisNonceStore 才真共享）
+    from ..edge_sync_nonce_store import get_nonce_store
+
+    nonce_key = f"{x_edge_store_id}:{x_edge_sync_nonce}"
+    store = get_nonce_store()
+    skew = _edge_sync_skew_seconds()
+    try:
+        replayed = await store.seen_and_mark(nonce_key, ttl_seconds=skew)
+    except RuntimeError as exc:
+        # Redis 后端故障 → 503（运维介入；不能 silent fall through 到 in-process）
+        logger.error("edge_sync_nonce_store_unavailable error=%s", exc)
+        raise HTTPException(status_code=503, detail="nonce store unavailable") from exc
+
+    if replayed:
+        logger.warning("edge_sync_auth_nonce_replay", store=x_edge_store_id, nonce=x_edge_sync_nonce)
+        raise HTTPException(status_code=401, detail="edge sync nonce replay")
+
     logger.debug("edge_sync_auth_ok", store=x_edge_store_id, tenant=x_edge_tenant_id)
     return x_edge_tenant_id  # type: ignore[return-value]
 
