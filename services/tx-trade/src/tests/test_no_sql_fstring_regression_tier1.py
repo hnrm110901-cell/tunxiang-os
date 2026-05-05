@@ -165,6 +165,71 @@ def test_tier1_text_fstring_baseline_exact(rel_dir: str, baseline: int) -> None:
         )
 
 
+# ──────────────── PK.2-fix +：text(<sql_var>) 变量间接注入面守门 ────────────────
+#
+# strict-code-reviewer Suggestion #6：除 text(f"..." )，还有 text(sql) /
+# text(stmt) / text(*_sql) 模式 — SQL 先拼到变量再 execute。如果变量是字符串
+# 拼接构造的（sql = "SELECT ... " + clause），同样可注入。
+#
+# 不直接 ban — 这是项目内合法 helper 模式（动态拼复杂 WHERE/ORDER BY 的常用写法）。
+# 套同 baseline 双向锁定模式，冻结现状，迫使新增 reviewer 走 :param + bindparams。
+#
+# 范围限制：仅 sql / stmt / query / *_sql / *_stmt / *_query 这些 SQL 习惯命名，
+# 排除 text(self) / text(request) / text(message) 等显然非 SQL 的伪命中。
+_TEXT_SQLVAR_PATTERN = re.compile(r"""text\(\s*((?:sql|stmt|query)|[a-z_]+_(?:sql|stmt|query))\s*[,)]""")
+
+
+def _count_text_sqlvar_in_dir(rel_dir: str) -> int:
+    """统计目录内所有 .py 的 text(<sql_var>) 命中数（含 text(sql) / text(*_sql)）。"""
+    base = _REPO_ROOT / rel_dir
+    if not base.is_dir():
+        return 0
+    count = 0
+    for py in base.rglob("*.py"):
+        rel = py.relative_to(_REPO_ROOT).as_posix()
+        if "/tests/" in rel:
+            continue
+        try:
+            body = py.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        count += len(_TEXT_SQLVAR_PATTERN.findall(body))
+    return count
+
+
+_TIER1_TEXT_SQLVAR_BASELINES: dict[str, int] = {
+    "services/tx-trade/src": 15,  # PK.2-fix 立项时实测
+    "services/tx-finance/src": 4,
+    "services/tx-supply/src": 7,
+}
+
+
+@pytest.mark.parametrize(
+    "rel_dir,baseline",
+    sorted(_TIER1_TEXT_SQLVAR_BASELINES.items()),
+    ids=lambda v: v if isinstance(v, str) else "",
+)
+def test_tier1_text_sqlvar_baseline_exact(rel_dir: str, baseline: int) -> None:
+    """Tier 1 域 text(<sql_var>) 命中数必须精确等于 baseline（防退化 + 防漂移）。
+
+    新增 text(sql) / text(stmt) / text(*_sql) → fail；清理 → 同步下调
+    _TIER1_TEXT_SQLVAR_BASELINES[rel_dir]。
+    """
+    current = _count_text_sqlvar_in_dir(rel_dir)
+    if current > baseline:
+        pytest.fail(
+            f"{rel_dir} text(<sql_var>) 命中数 {current} > baseline {baseline}\n"
+            "Tier 1 域引入新 text(sql) / text(stmt) 变量间接调用 — "
+            "如变量来自字符串拼接则可注入，请改用 :param 占位 + bindparams。\n"
+            f"若确实必要，更新 _TIER1_TEXT_SQLVAR_BASELINES[{rel_dir!r}] 的值并加注释说明。"
+        )
+    if current < baseline:
+        pytest.fail(
+            f"{rel_dir} text(<sql_var>) 命中数 {current} < baseline {baseline}\n"
+            f"已有清理工作，请下调 _TIER1_TEXT_SQLVAR_BASELINES[{rel_dir!r}] 锁定新基线。"
+        )
+
+
 def test_apikeys_dir_strong_baseline() -> None:
     """shared/apikeys/src/ 整目录强基线 — 任何新增 .py 都不能引入 f-string SQL。"""
     apikeys = _REPO_ROOT / "shared" / "apikeys" / "src"
