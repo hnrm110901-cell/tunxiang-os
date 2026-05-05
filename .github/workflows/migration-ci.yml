@@ -25,6 +25,24 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install alembic
+        run: pip install "alembic>=1.13" "sqlalchemy>=2.0"
+
+      - name: Check single alembic head
+        # 防御 multiple-heads 静默放行（issue H5）
+        # 参考 v397 修复：双 head 必须显式 merge，不能由 CI 默默通过
+        # alembic heads 是离线 directory scan，不调用 env.py、不连 DB
+        working-directory: shared/db-migrations
+        run: |
+          set -euo pipefail
+          heads_count=$(alembic heads | grep -E '^[a-f0-9]+' | wc -l | tr -d ' ')
+          echo "alembic heads count: $heads_count"
+          if [ "$heads_count" != "1" ]; then
+            echo "::error::Expected exactly 1 alembic head, found $heads_count (see v397 for merge reference)"
+            alembic heads
+            exit 1
+          fi
+
       - name: Check migration chain integrity
         # KNOWN_BROKEN 白名单 + scope guard 实现已抽到
         # scripts/check_alembic_chain.py（PJ.5）：
