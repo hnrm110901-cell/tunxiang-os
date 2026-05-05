@@ -34,6 +34,8 @@ from .discount_guard import DiscountGuardAgent
 from .dormant_recall import DormantRecallAgent
 
 # Sprint D1 / PR 批次 4：库存原料（margin + safety，或豁免）
+# P5.2：跨平台渠道健康监控 Agent（只读，豁免三条硬约束）
+from .channel_health_agent import ChannelHealthAgent
 from .enterprise_activation import EnterpriseActivationAgent
 from .finance_audit import FinanceAuditAgent
 
@@ -186,6 +188,8 @@ ALL_SKILL_AGENTS = [
     SalesCoachAgent,
     # Sprint R2 Track C：宴会合同管家（P1 Agent，margin + safety）
     BanquetContractAgent,
+    # P5.2：跨平台渠道健康监控（P2 Agent，只读豁免）
+    ChannelHealthAgent,
 ]
 
 
