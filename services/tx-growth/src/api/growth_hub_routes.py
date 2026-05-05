@@ -314,7 +314,7 @@ async def get_growth_profile(
     """获取客户增长画像。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _profile_svc.get_profile(UUID(customer_id), str(tenant_id), db)
             if result is None:
@@ -333,7 +333,7 @@ async def update_growth_profile(
     """更新客户增长画像。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _profile_svc.upsert_profile(
                 UUID(customer_id),
@@ -363,7 +363,7 @@ async def list_journey_templates(
     """列出旅程模板（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.list_templates(
                 journey_type=journey_type,
@@ -384,7 +384,7 @@ async def create_journey_template(
     """创建旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.create_template(
                 body.model_dump(),
@@ -405,7 +405,7 @@ async def get_journey_template(
     """获取旅程模板详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.get_template(UUID(template_id), str(tenant_id), db)
             if result is None:
@@ -424,7 +424,7 @@ async def update_journey_template(
     """更新旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.update_template(
                 UUID(template_id),
@@ -446,7 +446,7 @@ async def activate_journey_template(
     """激活旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.activate_template(UUID(template_id), str(tenant_id), db)
             await db.commit()
@@ -463,7 +463,7 @@ async def deactivate_journey_template(
     """停用旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.deactivate_template(UUID(template_id), str(tenant_id), db)
             await db.commit()
@@ -488,7 +488,7 @@ async def list_journey_enrollments(
     """列出旅程参与记录（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.list_enrollments(
                 str(tenant_id),
@@ -511,7 +511,7 @@ async def create_journey_enrollment(
     """创建旅程参与。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.enroll_customer(
                 customer_id=UUID(body.customer_id),
@@ -539,7 +539,7 @@ async def get_journey_enrollment(
     """获取旅程参与详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.get_enrollment(UUID(enrollment_id), str(tenant_id), db)
             if result is None:
@@ -558,7 +558,7 @@ async def update_enrollment_state(
     """更新旅程参与状态（暂停/恢复/取消）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             target = body.journey_state
             eid = UUID(enrollment_id)
@@ -606,7 +606,7 @@ async def list_touch_executions(
     """列出触达执行记录（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.list_executions(
                 tenant_id=str(tenant_id),
@@ -629,7 +629,7 @@ async def create_touch_execution(
     """创建触达执行。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.execute_touch(
                 customer_id=UUID(body.customer_id),
@@ -657,7 +657,7 @@ async def update_touch_execution_state(
     """更新触达执行状态。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.update_execution_state(
                 UUID(execution_id),
@@ -680,7 +680,7 @@ async def update_touch_attribution(
     """更新触达归因（关联订单和收入）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.update_attribution_by_execution(
                 execution_id=UUID(execution_id),
@@ -713,7 +713,7 @@ async def list_repair_cases(
     """列出服务修复案例（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.list_cases(
                 customer_id=UUID(customer_id) if customer_id else None,
@@ -736,7 +736,7 @@ async def create_repair_case(
     """创建服务修复案例。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.create_case(
                 customer_id=UUID(body.customer_id),
@@ -762,7 +762,7 @@ async def get_repair_case(
     """获取服务修复案例详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.get_case(UUID(case_id), str(tenant_id), db)
             if result is None:
@@ -781,7 +781,7 @@ async def update_repair_case_state(
     """更新服务修复状态。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.transition_state(
                 case_id=UUID(case_id),
@@ -804,7 +804,7 @@ async def update_repair_compensation(
     """更新服务修复补偿方案。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.submit_compensation(
                 case_id=UUID(case_id),
@@ -836,7 +836,7 @@ async def list_agent_suggestions(
     """列出 Agent 策略建议（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.list_suggestions(
                 review_state=review_state,
@@ -860,7 +860,7 @@ async def create_agent_suggestion(
     """创建 Agent 策略建议。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.create_suggestion(
                 body.model_dump(),
@@ -881,7 +881,7 @@ async def get_agent_suggestion(
     """获取 Agent 策略建议详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.get_suggestion(UUID(suggestion_id), str(tenant_id), db)
             if result is None:
@@ -900,7 +900,7 @@ async def review_agent_suggestion(
     """审核 Agent 策略建议。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             revised_data = None
             if body.review_result == "revised":
@@ -934,7 +934,7 @@ async def publish_agent_suggestion(
     """发布 Agent 策略建议（触发执行）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.publish_suggestion(
                 UUID(suggestion_id),
@@ -1626,7 +1626,7 @@ async def get_segment_rule_presets(
     """P0 预置分群规则模板 + 实时命中人数。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             presets = []
 
@@ -1725,7 +1725,7 @@ async def get_tag_distribution(
     """增长标签分布统计。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             # 复购阶段分布
             r1 = await db.execute(
@@ -1810,7 +1810,7 @@ async def get_p1_distribution(
     """P1四维分布统计（心理距离/超级用户/里程碑/裂变场景）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             # 心理距离分布
             r1 = await db.execute(
@@ -1879,7 +1879,7 @@ async def trigger_p1_recompute(
     """手动触发P1字段重算（心理距离/超级用户/里程碑/裂变场景）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _profile_svc.batch_compute_p1_fields(str(tenant_id), db)
             await db.commit()
@@ -1923,7 +1923,7 @@ async def list_brand_configs(
     """列出所有品牌增长配置。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.list_brand_configs(str(tenant_id), db)
             return ok(result)
@@ -1940,7 +1940,7 @@ async def upsert_brand_config(
     """创建或更新品牌配置。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.upsert_brand_config(
                 brand_id=brand_id,
@@ -1961,7 +1961,7 @@ async def get_brand_config(
     """获取品牌增长配置详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.get_brand_config(brand_id, str(tenant_id), db)
             if result is None:
@@ -1979,7 +1979,7 @@ async def check_brand_budget(
     """检查品牌预算使用情况（今日触达量/本月offer金额）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.check_brand_budget(brand_id, str(tenant_id), db)
             return ok(result)
@@ -1996,7 +1996,7 @@ async def check_brand_frequency(
     """检查品牌级客户频控（日/周触达次数 vs 上限）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.check_brand_frequency(
                 brand_id,
@@ -2021,7 +2021,7 @@ async def get_dashboard_stats_by_brand(
     """按品牌分组的驾驶舱KPI（画像/旅程/触达/建议）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             # 1) 画像按品牌
             r_profiles = await db.execute(
@@ -2150,7 +2150,7 @@ async def get_attribution_by_store(
     """按门店分组的触达归因统计。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await db.execute(
                 text(
@@ -2200,7 +2200,7 @@ async def get_experiment_summary(
     """获取旅程模板的A/B实验摘要。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.get_experiment_summary(
                 UUID(template_id),
@@ -2220,7 +2220,7 @@ async def select_variant(
     """Thompson Sampling选择最优variant。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.select_variant(
                 UUID(template_id),
@@ -2241,7 +2241,7 @@ async def auto_pause_check(
     """检查是否应自动暂停低效variant。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.should_auto_pause(
                 UUID(template_id),
@@ -2267,7 +2267,7 @@ async def get_cross_brand_profile(
     """获取客户跨品牌统一画像。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.get_customer_cross_brand_profile(
                 UUID(customer_id),
@@ -2287,7 +2287,7 @@ async def check_cross_brand_frequency(
     """跨品牌频控检查。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.check_cross_brand_frequency(
                 UUID(customer_id),
@@ -2309,7 +2309,7 @@ async def list_cross_brand_opportunities(
     """发现跨品牌增长机会。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.find_cross_brand_opportunities(
                 str(tenant_id),
@@ -2335,7 +2335,7 @@ async def trigger_auto_iterate(
     """手动触发自动迭代 — 暂停低效variant，调整流量分配。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.auto_iterate(str(tenant_id), db)
             await db.commit()
@@ -2351,7 +2351,7 @@ async def get_experiment_adjustments(
     """获取最近的自动调整建议 — 低效mechanism/旅程分析。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.auto_adjust_journey_params(str(tenant_id), db)
             return ok(result)
@@ -2369,7 +2369,7 @@ async def get_cross_brand_recommendation(
     """为特定客户生成跨品牌推荐策略。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.get_cross_brand_recommendation(
                 customer_id=UUID(customer_id),
@@ -2456,7 +2456,7 @@ async def get_store_capabilities(
     """获取门店能力标签（包厢/活鲜/外卖/储值等）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_store_capabilities(
                 UUID(store_id),
@@ -2476,7 +2476,7 @@ async def get_store_growth_readiness(
     """门店增长就绪度评估 — 支撑旅程比例。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_store_growth_readiness(
                 UUID(store_id),
@@ -2495,7 +2495,7 @@ async def get_stores_readiness_ranking(
     """所有门店增长就绪度排行。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_all_stores_readiness(str(tenant_id), db)
             return ok(result)
@@ -2511,7 +2511,7 @@ async def match_journey_to_stores(
     """查找支持特定旅程的所有门店。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.match_journey_to_stores(
                 journey_code,

@@ -127,7 +127,7 @@ async def list_journey_definitions(
     where = " AND ".join(conditions)
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
 
         count_result = await db.execute(
             text(f"SELECT COUNT(*) FROM journey_definitions WHERE {where}"),
@@ -188,7 +188,7 @@ async def create_journey_definition(
 
     def_id = uuid.uuid4()
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         await db.execute(
             text(
                 """
@@ -235,7 +235,7 @@ async def get_journey_definition(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
             text(
                 """
@@ -305,7 +305,7 @@ async def update_journey_definition(
         params["segment"] = body.target_segment
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
             text(
                 f"""
@@ -338,7 +338,7 @@ async def delete_journey_definition(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
             text(
                 """
@@ -370,7 +370,7 @@ async def activate_journey(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
 
         check = await db.execute(
             text(
@@ -417,7 +417,7 @@ async def deactivate_journey(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
             text(
                 """
@@ -462,7 +462,7 @@ async def import_journey_template(
 
     def_id = uuid.uuid4()
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         await db.execute(
             text(
                 """
@@ -541,7 +541,7 @@ async def list_enrollments(
     where = " AND ".join(conditions)
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
 
         count_result = await db.execute(
             text(f"SELECT COUNT(*) FROM journey_enrollments e WHERE {where}"),
@@ -598,7 +598,7 @@ async def get_enrollment(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
             text(
                 """
@@ -647,7 +647,7 @@ async def get_enrollment_steps(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
             text(
                 """

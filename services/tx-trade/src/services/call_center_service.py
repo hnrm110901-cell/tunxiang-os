@@ -31,7 +31,7 @@ class CallCenterService:
     ) -> dict[str, Any]:
         """处理来电：创建通话记录 + 匹配客户 + 返回客户画像 + 近期预订/订单"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -166,7 +166,7 @@ class CallCenterService:
     ) -> Optional[dict[str, Any]]:
         """根据手机号查询客户画像：基本信息 + RFM + 最近5单 + 即将到来的预订"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -254,7 +254,7 @@ class CallCenterService:
     ) -> dict[str, Any]:
         """通话挂断：更新通话时长、录音地址、最终状态"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -339,7 +339,7 @@ class CallCenterService:
     ) -> dict[str, Any]:
         """创建回拨任务"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -382,7 +382,7 @@ class CallCenterService:
     ) -> dict[str, Any]:
         """完成回拨任务"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -425,7 +425,7 @@ class CallCenterService:
     ) -> dict[str, Any]:
         """通话历史（分页）"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -474,7 +474,7 @@ class CallCenterService:
     ) -> list[dict[str, Any]]:
         """获取未接来电列表"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -506,7 +506,7 @@ class CallCenterService:
     ) -> list[dict[str, Any]]:
         """获取回拨任务列表"""
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
@@ -550,7 +550,7 @@ class CallCenterService:
         period: today / week / month
         """
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
