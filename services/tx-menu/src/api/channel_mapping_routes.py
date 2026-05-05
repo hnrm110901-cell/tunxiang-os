@@ -37,8 +37,10 @@ _CHANNELS: dict[str, str] = {
     "dine_in": "堂食",
     "meituan": "外卖-美团",
     "eleme": "外卖-饿了么",
+    "douyin": "外卖-抖音",
+    "amap": "外卖-高德",
+    "taobao": "闪购-淘宝",
     "miniapp": "小程序",
-    "douyin": "抖音",
 }
 
 
