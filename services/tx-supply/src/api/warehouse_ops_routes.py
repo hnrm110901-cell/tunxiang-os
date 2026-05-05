@@ -9,6 +9,7 @@ from typing import List
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply", tags=["warehouse-ops"])
 
@@ -73,7 +74,7 @@ async def create_transfer_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -99,7 +100,7 @@ async def create_split_assembly(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -124,4 +125,4 @@ async def create_bom_split(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

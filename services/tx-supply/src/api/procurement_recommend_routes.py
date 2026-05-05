@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["procurement-recommend"])
@@ -133,7 +134,7 @@ async def apply_recommendations(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

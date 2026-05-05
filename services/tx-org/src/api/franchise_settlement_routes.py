@@ -27,6 +27,7 @@ from ..services.franchise_settlement_service import (
     InvalidStatusTransitionError,
     SettlementNotFoundError,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(
     prefix="/api/v1/franchise",
@@ -107,7 +108,7 @@ async def generate_settlement(
             db=db,
         )
     except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
     return _ok(settlement.model_dump(mode="json"))
 
 
@@ -129,9 +130,9 @@ async def send_settlement(
             db=db,
         )
     except SettlementNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
     except InvalidStatusTransitionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise safe_http_exception(409, "操作冲突", e) from e
     return _ok({"settlement_id": settlement_id, "status": "sent"})
 
 
@@ -155,11 +156,11 @@ async def confirm_settlement(
             db=db,
         )
     except SettlementNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
     except InvalidStatusTransitionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise safe_http_exception(409, "操作冲突", e) from e
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e) from e
     return _ok({"settlement_id": settlement_id, "status": "confirmed"})
 
 
@@ -183,9 +184,9 @@ async def mark_as_paid(
             db=db,
         )
     except SettlementNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
     except InvalidStatusTransitionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise safe_http_exception(409, "操作冲突", e) from e
     return _ok({"settlement_id": settlement_id, "status": "paid"})
 
 

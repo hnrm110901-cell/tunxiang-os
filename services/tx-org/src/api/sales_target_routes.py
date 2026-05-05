@@ -30,6 +30,7 @@ from shared.ontology.src.extensions.sales_targets import (
 )
 
 from ..services.sales_target_service import SalesTargetService
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -156,7 +157,7 @@ async def set_target(
         )
         return _ok(_serialize_target(target))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/{target_id}/decompose")
@@ -175,7 +176,7 @@ async def decompose_target(
             }
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/{target_id}/progress")
@@ -196,7 +197,7 @@ async def record_progress(
         )
         return _ok(_serialize_progress(progress))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("")
@@ -257,4 +258,4 @@ async def get_achievement(
         data = await _service.get_achievement(db, tenant_id=tid, target_id=target_id)
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc

@@ -36,6 +36,7 @@ from ..services.store_ops_service import (
     get_today_dashboard,
     get_weekly_summary,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -99,7 +100,7 @@ async def today_dashboard(
         data = await get_today_dashboard(db, tenant_id, store_id, target_date)
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/api/v1/store-ops/positions")
@@ -154,7 +155,7 @@ async def quick_action(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/api/v1/store-ops/weekly-summary")
@@ -207,7 +208,7 @@ async def fill_gap(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/api/v1/store-ops/labor-metrics")

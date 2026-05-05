@@ -9,6 +9,7 @@ from typing import List
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply", tags=["dept-issue"])
 
@@ -94,7 +95,7 @@ async def create_issue_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -120,7 +121,7 @@ async def create_return_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -146,7 +147,7 @@ async def create_dept_transfer(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -173,7 +174,7 @@ async def check_yield_rate(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

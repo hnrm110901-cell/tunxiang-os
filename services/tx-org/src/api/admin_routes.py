@@ -24,6 +24,7 @@ from services.store_batch import (
     import_stores_from_excel,
 )
 from services.store_clone import batch_clone, clone_store, get_clone_preview
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -115,7 +116,7 @@ async def api_clone_preview(
         result = get_clone_preview(store_id, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/clone")
@@ -134,7 +135,7 @@ async def api_clone_store(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/batch-clone")
@@ -153,7 +154,7 @@ async def api_batch_clone(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -177,7 +178,7 @@ async def api_create_legal_entity(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/companies")
@@ -195,7 +196,7 @@ async def api_create_company(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/assign-company")
@@ -213,7 +214,7 @@ async def api_assign_store(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/entity-structure")
@@ -237,7 +238,7 @@ async def api_company_stores(
         result = get_company_stores(company_id, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -257,7 +258,7 @@ async def api_batch_create(
         result = batch_create_stores(stores, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/batch-activate")
@@ -271,7 +272,7 @@ async def api_batch_activate(
         result = batch_activate(req.store_ids, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/batch-deactivate")
@@ -285,7 +286,7 @@ async def api_batch_deactivate(
         result = batch_deactivate(req.store_ids, req.reason, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/stores/import")
@@ -299,4 +300,4 @@ async def api_import_stores(
         result = import_stores_from_excel(req.file_data, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 
 from ..services.distribution_repository import DistributionRepository
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply/distribution", tags=["distribution"])
 
@@ -141,7 +142,7 @@ async def optimize_route(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/plan/{plan_id}/dispatch")
@@ -162,7 +163,7 @@ async def dispatch_delivery(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 @router.post("/plan/{plan_id}/confirm")
@@ -184,7 +185,7 @@ async def confirm_delivery(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 @router.get("/dashboard/{warehouse_id}")

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 
 from ..services.revenue_schedule_service import RevenueScheduleService
+from shared.security.src.error_handler import safe_http_exception
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -86,7 +87,7 @@ async def revenue_analysis(
         data = await _service.analyze_revenue_pattern(db, tenant_id, store_id, weeks)
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/optimal-plan")
@@ -113,7 +114,7 @@ async def optimal_plan(
         data = await _service.generate_weekly_plan(db, tenant_id, store_id, week_start)
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/apply-plan")
@@ -140,7 +141,7 @@ async def apply_plan(
         )
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/comparison")
@@ -194,7 +195,7 @@ async def comparison(
         }
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/savings-estimate")
@@ -219,4 +220,4 @@ async def savings_estimate(
         data = await _service.estimate_monthly_savings(db, tenant_id, store_id, month)
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

@@ -29,6 +29,7 @@ from services.store_clone import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/stores", tags=["store-clone"])
 
@@ -148,7 +149,7 @@ async def clone_preview(
         result = get_clone_preview(store_id, tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post(
@@ -178,9 +179,9 @@ async def clone_store_api(
             db=db,
         )
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     task_dict = _task_to_dict(task)
     _TASK_STORE[task.id] = task_dict
@@ -236,9 +237,9 @@ async def setup_store(
             created_by=req.created_by,
         )
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     task = result.get("clone_task")
     task_id: Optional[str] = None

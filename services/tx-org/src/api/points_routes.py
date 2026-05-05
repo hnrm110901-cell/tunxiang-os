@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 
 from ..services import employee_points_service as pts_svc
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -127,7 +128,7 @@ async def award_points(
         await db.commit()
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/deduct")
@@ -151,7 +152,7 @@ async def deduct_points(
         await db.commit()
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/balance/{employee_id}")
@@ -176,7 +177,7 @@ async def get_balance(
             }
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/history/{employee_id}")
@@ -193,7 +194,7 @@ async def get_history(
         result = await pts_svc.get_points_history_v2(db, tid, employee_id, page, size)
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/leaderboard")
@@ -210,7 +211,7 @@ async def get_leaderboard(
         items = await pts_svc.get_leaderboard_v2(db, tid, scope_type, scope_id, limit)
         return _ok({"items": items, "total": len(items)})
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/redeem")
@@ -226,7 +227,7 @@ async def redeem_reward(
         await db.commit()
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 兑换商品端点 ─────────────────────────────────────────────────────────────
@@ -278,7 +279,7 @@ async def toggle_reward(
         await db.commit()
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ── 统计端点 ─────────────────────────────────────────────────────────────────
@@ -355,7 +356,7 @@ async def get_season_ranking(
         result = await pts_svc.get_horse_race_season_ranking(db, tid, season_id, limit)
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.put("/horse-race/{season_id}/status")
@@ -372,4 +373,4 @@ async def update_season_status(
         await db.commit()
         return _ok(result)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e

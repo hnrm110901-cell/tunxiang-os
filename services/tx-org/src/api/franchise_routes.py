@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 
 from ..services.franchise_service import FranchiseService
 from ..services.royalty_calculator import RoyaltyCalculator
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/franchise", tags=["franchise"])
 
@@ -129,7 +130,7 @@ async def assign_store(
         )
         return {"ok": True, "data": link.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -159,7 +160,7 @@ async def generate_bills(
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/bills")
@@ -203,7 +204,7 @@ async def confirm_bill(
         )
         return {"ok": True, "data": bill.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/bills/{bill_id}/pay")
@@ -221,7 +222,7 @@ async def mark_bill_paid(
         )
         return {"ok": True, "data": bill.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

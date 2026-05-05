@@ -25,6 +25,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -161,7 +162,7 @@ async def trigger_supplier_score(
 
     except ValueError as exc:
         log.warning("supplier_score_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except (ProgrammingError, OperationalError) as exc:
         log.error("supplier_score_db_error", error=str(exc), exc_info=True)
         raise HTTPException(

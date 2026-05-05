@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 
 from ..services.contribution_score_service import ContributionScoreService
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -82,7 +83,7 @@ async def get_employee_contribution(
         data = await _service.calculate_score(db, tid, employee_id, p_start, p_end)
         return _ok(data)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.get("/rankings")

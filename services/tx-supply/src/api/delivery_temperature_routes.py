@@ -30,6 +30,7 @@ from ..models.delivery_temperature import (
     ThresholdCreate,
 )
 from ..services import delivery_temperature_service as svc
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply/delivery", tags=["delivery-temperature"])
 
@@ -109,7 +110,7 @@ async def post_temperature(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -204,7 +205,7 @@ async def handle_alert(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -234,7 +235,7 @@ async def create_threshold(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 @router.get("/temperature-thresholds")

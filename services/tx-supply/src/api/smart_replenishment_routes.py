@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(tags=["smart-replenishment"])
 
@@ -79,7 +80,7 @@ async def check_replenishment(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {
         "ok": True,
@@ -126,7 +127,7 @@ async def auto_create_requisition(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {"ok": True, "data": result.model_dump()}
 
@@ -162,7 +163,7 @@ async def get_thresholds(
             db=db,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {
         "ok": True,
@@ -211,7 +212,7 @@ async def set_threshold(
             ingredient_name=body.ingredient_name,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {"ok": True, "data": threshold.model_dump()}
 
@@ -258,7 +259,7 @@ async def get_procurement_forecast(
             db=db,
         )
     except (ValueError, RuntimeError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {
         "ok": True,
@@ -326,7 +327,7 @@ async def create_draft_order(
             db=db,
         )
     except (ValueError, RuntimeError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {
         "ok": True,
@@ -375,7 +376,7 @@ async def get_urgent_replenishment(
             db=db,
         )
     except (ValueError, RuntimeError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     return {
         "ok": True,

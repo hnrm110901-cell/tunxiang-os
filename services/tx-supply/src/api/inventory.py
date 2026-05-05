@@ -21,6 +21,7 @@ from ..services.transfer_service import (
     get_brand_ingredient_overview,
     get_brand_low_stock_alert,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply", tags=["supply"])
 
@@ -97,7 +98,7 @@ async def get_inventory_item(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.post("/inventory/{item_id}/adjust")
@@ -136,7 +137,7 @@ async def adjust_inventory(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/inventory/alerts")
@@ -210,7 +211,7 @@ async def receive_stock(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/inventory/issue")
@@ -252,7 +253,7 @@ async def issue_stock(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 库存余额与清单 ───
@@ -277,7 +278,7 @@ async def get_balance(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.get("/inventory/store/{store_id}")
@@ -354,7 +355,7 @@ async def get_stockout_forecast(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.get("/inventory/reorder/{store_id}")
@@ -579,7 +580,7 @@ async def get_brand_overview(
         )
         return {"ok": True, "data": {"stores": result, "total_stores": len(result)}}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.get("/inventory/low-stock-alert")

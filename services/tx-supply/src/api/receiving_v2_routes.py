@@ -31,6 +31,7 @@ from ..services.receiving_v2_service import (
     list_receiving_orders,
     reject_all,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/receiving", tags=["receiving-v2"])
 
@@ -100,7 +101,7 @@ async def create_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/orders")
@@ -143,7 +144,7 @@ async def get_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.post("/orders/{order_id}/items/{item_id}/inspect")
@@ -174,7 +175,7 @@ async def inspect_receiving_item(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/orders/{order_id}/complete")
@@ -199,7 +200,7 @@ async def complete_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/orders/{order_id}/reject-all")
@@ -219,4 +220,4 @@ async def reject_order_all(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

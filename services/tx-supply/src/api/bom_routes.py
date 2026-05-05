@@ -26,6 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -332,7 +333,7 @@ async def create_bom(
 
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("create_bom.db_error", error=str(exc))
@@ -818,7 +819,7 @@ async def consume_stock_by_bom(
 
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("consume_stock_by_bom.db_error", error=str(exc))

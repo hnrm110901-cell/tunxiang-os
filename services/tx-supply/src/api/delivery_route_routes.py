@@ -19,6 +19,7 @@ from typing import List, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -84,7 +85,7 @@ async def plan_route(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/{route_id}/driver-task", summary="司机工作任务单")
@@ -102,7 +103,7 @@ async def get_driver_task(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/{route_id}/progress", summary="更新配送进度")
@@ -128,7 +129,7 @@ async def update_delivery_progress(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/{route_id}/optimize", summary="重新优化路线")
@@ -147,4 +148,4 @@ async def optimize_route(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

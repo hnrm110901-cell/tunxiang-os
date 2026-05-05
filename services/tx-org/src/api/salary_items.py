@@ -15,6 +15,7 @@ from services.salary_item_library import (
     init_store_salary_config,
     toggle_salary_item,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/org", tags=["salary-items"])
 
@@ -107,7 +108,7 @@ async def template_preview(template: str = "standard"):
     try:
         config = init_store_salary_config(template)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
     return {"ok": True, "data": config}
 
 
@@ -117,7 +118,7 @@ async def init_salary_config(req: InitSalaryConfigReq):
     try:
         config = init_store_salary_config(req.template)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
     return {"ok": True, "data": config}
 
 
@@ -132,7 +133,7 @@ async def init_salary_items_db(req: InitSalaryItemsReq, request: Request):
     try:
         result = await init_salary_items_for_tenant(db, tenant_id, req.template)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
     return {"ok": True, "data": result}
 
 
@@ -180,7 +181,7 @@ async def create_custom_item(req: CustomSalaryItemReq, request: Request):
             description=req.description,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
     return {"ok": True, "data": result}
 
 
@@ -195,7 +196,7 @@ async def toggle_item(item_code: str, req: ToggleReq, request: Request):
     try:
         result = await toggle_salary_item(db, tenant_id, item_code, req.is_enabled)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
     return {"ok": True, "data": result}
 
 
