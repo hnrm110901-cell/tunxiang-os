@@ -102,7 +102,7 @@ class JourneyEngine:
 
         # 设置 RLS 上下文
         await db.execute(
-            text("SET LOCAL app.tenant_id = :tid"),
+            text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
