@@ -360,6 +360,24 @@ class OmniChannelService:
             log.error("omni_channel.receive_order.kds_failed", error=str(exc), exc_info=True)
             # 不重新抛出：KDS失败不影响内部订单流程
 
+        # 字段覆盖日志：追踪订单字段填充质量
+        try:
+            order_row = await self._get_order(internal_order_id, tenant_id, db)
+            logger.info(
+                "omni_channel.order_persisted",
+                platform=order.platform,
+                platform_order_id=order.platform_order_id,
+                internal_order_id=str(order_row.id),
+                fields={
+                    "customer_phone": bool(getattr(order_row, "customer_phone", None)),
+                    "delivery_address": bool(getattr(order_row, "delivery_address", None)),
+                    "notes": bool(getattr(order_row, "notes", None)),
+                    "items_count": len(order.items),
+                },
+            )
+        except (SQLAlchemyError, OmniChannelError) as exc:
+            log.warning("omni_channel.coverage_log_failed", error=str(exc))
+
         return order
 
     # ── 接单 ─────────────────────────────────────────────────────────────────

@@ -1,6 +1,17 @@
 """外卖平台 Webhook 回调接口
 
 接收美团/饿了么/抖音外卖订单推送，验签后解析订单并持久化到数据库。
+
+DEPRECATED: This module is scheduled for removal.
+All traffic should flow through omni_channel_routes.py instead.
+
+Timeline:
+- Phase 1 (current): All three endpoints still work, but redirect logging is active
+- Phase 2 (after P0.1 verification): Default routes disabled, opt-in via env var
+- Phase 3 (after P1 complete): File removed entirely
+
+New platform integrations should NOT be added here.
+Add them to services/tx-trade/src/api/omni_channel_routes.py instead.
 """
 
 import asyncio
@@ -157,6 +168,7 @@ async def meituan_order_push(request: Request) -> WebhookResp:
     3. 解析订单 → 调用 delivery_adapter.receive_order()
     4. 返回 {"data": "ok"} 告知美团接收成功
     """
+    logger.warning("webhook_routes.deprecated_path", platform="meituan", action="route_deprecated_use_omni_channel")
     # 美团推送通常是 form-encoded
     try:
         form_data = await request.form()
@@ -290,6 +302,7 @@ async def eleme_order_push(request: Request) -> WebhookResp:
       - X-Eleme-Signature: SHA256 签名
       - X-Eleme-Timestamp: 时间戳（秒）
     """
+    logger.warning("webhook_routes.deprecated_path", platform="eleme", action="route_deprecated_use_omni_channel")
     signature = request.headers.get("X-Eleme-Signature", "")
     timestamp = request.headers.get("X-Eleme-Timestamp", "")
     raw_body = (await request.body()).decode("utf-8")
@@ -421,6 +434,7 @@ async def douyin_order_push(request: Request) -> WebhookResp:
       - X-Douyin-Signature: HMAC-SHA256 签名
       - X-Douyin-Timestamp: 时间戳（秒）
     """
+    logger.warning("webhook_routes.deprecated_path", platform="douyin", action="route_deprecated_use_omni_channel")
     signature = request.headers.get("X-Douyin-Signature", "")
     timestamp = request.headers.get("X-Douyin-Timestamp", "")
     raw_body = (await request.body()).decode("utf-8")
