@@ -38,8 +38,15 @@ def _get_tenant_id(request: Request) -> str:
 
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
-    """设置 RLS 上下文变量。"""
-    await db.execute(text(f"SET LOCAL app.tenant_id = '{tenant_id}'"))
+    """设置 RLS 上下文变量。
+
+    PK.0 P0 SECURITY 修复：原 f-string 拼接 X-Tenant-ID（用户可控）→ RLS 隔离逃逸风险。
+    改用 set_config(..., true) 参数化（与 shared/ontology/src/database.py:25 一致）。
+    """
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
 
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────
