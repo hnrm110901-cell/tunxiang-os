@@ -67,8 +67,8 @@ class BomMenuSyncService:
             return bool(result)
         except ValueError:
             return False
-        except Exception:
-            logger.exception("bom_menu.resume_failed", platform=platform, dish_id=dish_id)
+        except (OSError, ConnectionError, TimeoutError) as exc:
+            logger.error("bom_menu.resume_failed", platform=platform, dish_id=dish_id, error=str(exc), exc_info=True)
             return False
 
     async def pause_dish_all_platforms(
@@ -96,8 +96,8 @@ class BomMenuSyncService:
                 results[platform] = await self.resume_dish_on_platform(
                     dish_id, platform, store_id
                 )
-            except Exception:
-                logger.exception("bom_menu.resume_unexpected", platform=platform)
+            except (OSError, ConnectionError, TimeoutError) as exc:
+                logger.error("bom_menu.resume_unexpected", platform=platform, error=str(exc), exc_info=True)
                 results[platform] = False
         return results
 
