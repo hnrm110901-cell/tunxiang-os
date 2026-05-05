@@ -51,11 +51,17 @@ ORDER BY tablename;
 
 **关键测试**：在 staging 给 1 张非关键表（如 `audit_logs`）单独加 FORCE，跑 e2e 套件 + Tier 1 测试，观察是否有路径回 0 行。
 
-### 阶段 3（D2-D3）：生成 retroactive FORCE migration
+### 阶段 3（D2-D3）：生成 retroactive FORCE migration — ✅ 已落代码
+
+**已交付**：`shared/db-migrations/versions/v500_rls_force_all_business_tables.py`
+（独立 PR `audit/p0-followup-rls-force-migration` + DO NOT MERGE 标签，等阶段 2
+staging dry-run 通过 + 阶段 4 BYPASSRLS 撤销 + tx_system_role 引入完成后才能 merge）。
+
+迁移文件示例（实际见上述路径）：
 
 ```python
-# shared/db-migrations/versions/vNNN_rls_force_all_business_tables.py
-"""vNNN — 给所有 ENABLE RLS 的业务表追加 FORCE [SECURITY][Tier1]
+# shared/db-migrations/versions/v500_rls_force_all_business_tables.py
+"""v500 — 给所有 ENABLE RLS 的业务表追加 FORCE [SECURITY][Tier1]
 
 审计 S-05 修复阶段 3：消除 BYPASSRLS-via-SET-LOCAL 绕过路径。
 
