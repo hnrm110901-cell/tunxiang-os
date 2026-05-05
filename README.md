@@ -89,6 +89,28 @@
 | 资源限制 | ✅ 全部服务有 CPU/内存 limits |
 | GitOps K8s | ✅ 14 个 Helm Chart，5 环境配置 |
 
+### 十大致命差距修复进度
+
+> 2026-04 v3 差距分析提出的 10 项核心能力差距 — 当前回顾（2026-05-05）。
+> CLAUDE.md §16 要求每次会话同步本表。详细日志见 DEVLOG.md。
+
+| # | 差距 | 起始版本 | 当前状态 |
+|---|------|----------|----------|
+| 1 | 财务引擎 | v117 | ✅ 凭证体系 v395-v399 + Tier 1 基线 289 测试 |
+| 2 | 中央厨房 | v119 | ✅ |
+| 3 | 加盟管理 | v125 | ✅ + v396 last_event_id（PR #176）|
+| 4 | 储值卡 | 早期 | ✅ + 无感支付原子性修复（_try_auto_pay）|
+| 5 | 菜单模板 | 早期 | ✅ |
+| 6 | 薪资引擎 | v120 | ✅ + v265 sales_target Tier 1 |
+| 7 | 审批流 | v121 | ✅ |
+| 8 | 同步引擎 | edge | ✅ CRDT + 断网 4h E2E 3/3 green |
+| 9 | RLS 多租户隔离 | v063 | 🟡 PG.7 28 表 UPDATE policy 缺 WITH CHECK，v400/v401/v402（PR #187/#189/#192）+ lint（#186）+ CI 接入（#193）等 admin merge |
+| 10 | 外卖聚合 | 早期 | ✅ 美团/饿了么/抖音/小红书 |
+
+**当前唯一未关闭项**：#9 RLS（PG.7 lint + 三批 migration 共 5 PR open，合入后跑 `scripts/check_rls_with_check.py --strict` 验证）。其余 9 项闭合。
+
+---
+
 ### 已知遗留项（非阻塞）
 
 - `coupon_service.py` `_StoredValueStore` 类保留用于单测 fixture（生产路径已切换 DB）
@@ -323,8 +345,8 @@ docker compose -f infra/compose/base.yml -f infra/compose/envs/gray.yml up -d   
 |------|------|
 | [CLAUDE.md](./CLAUDE.md) | 项目宪法 V3.0（架构决策 + 编码规范）|
 | [DEVLOG.md](./DEVLOG.md) | 每日开发进度日志 |
+| [docs/progress.md](./docs/progress.md) | 会话防漂移进度表（CLAUDE.md §18）|
 | [门店终端架构](./docs/architecture-store-terminals-stable-ai.md) | 门店端硬件拓扑与数据流 |
-| [V4.0 开发计划](./docs/development-plan-v4-showstopper.md) | 十大致命差距修复计划 |
 | [V6 审计修复](./docs/development-plan-v6-remediation.md) | 安全审计修复计划 |
 | [安全审计报告](./docs/security-audit-report.md) | RLS/Nginx/端口/租户安全审计 |
 | [徐记 23 系统替换](./docs/xuji-23-system-replacement-analysis.md) | 23 套系统替换对照表 |
