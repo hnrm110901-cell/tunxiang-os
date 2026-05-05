@@ -64,6 +64,15 @@ jobs:
           echo ""
           echo "=== Migration check passed ==="
 
+      - name: PG.7 — UPDATE/ALL policies must include WITH CHECK
+        # 防退化：新 migration 加 FOR UPDATE/ALL ... USING (...) 必须同时带 WITH CHECK，
+        # 否则跨租户逃逸面（应用层若能写 tenant_id 列即可把行改属另一租户）。
+        # 14 个 legacy 文件已在脚本 _BASELINE_FILES frozenset 内豁免；
+        # 运行时 policy 由 v395/v399/v400/v401/v402 修补 33 张表覆盖。
+        # 详见 docs/security/pg7-rls-update-policy-residual.md
+        run: |
+          python3 scripts/check_rls_with_check.py
+
       - name: Check migration files for SQL safety
         run: |
           VERSIONS_DIR="shared/db-migrations/versions"
