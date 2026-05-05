@@ -398,9 +398,10 @@ async def cancel_instance(
     if inst is None:
         raise HTTPException(status_code=404, detail="审批实例不存在")
     if inst["status"] != "pending":
-        raise HTTPException(
-            status_code=422,
-            detail=f"当前状态 {inst['status']!r} 不允许撤回，仅 pending 可撤回",
+        raise safe_http_exception(
+            422,
+            "请求格式错误",
+            ValueError(f"approval_status={inst['status']!r}"),
         )
     if inst["current_step"] != 1:
         raise HTTPException(
