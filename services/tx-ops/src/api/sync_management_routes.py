@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.multi_system_sync_service import (
     ALL_SYSTEMS,
     SYSTEM_AOQIWEI_CRM,
@@ -126,7 +128,7 @@ async def trigger_sync(
         )
     except (ValueError, RuntimeError) as exc:
         log.error("sync_trigger_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -207,7 +209,7 @@ async def get_sync_status(
         status = await svc.get_sync_status(x_tenant_id)
     except (ValueError, RuntimeError) as exc:
         log.error("get_sync_status_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return {"ok": True, "data": status}
 
@@ -300,7 +302,7 @@ async def list_sync_logs(
 
     except (ValueError, RuntimeError) as exc:
         log.error("list_sync_logs_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
     return {
         "ok": True,
