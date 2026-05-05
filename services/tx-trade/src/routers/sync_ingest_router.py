@@ -15,7 +15,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
+import re
+import time
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
@@ -32,6 +37,112 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/sync", tags=["edge-sync"])
 
+
+# ─── 审计 S-03（P0）：edge sync 强制 per-store 鉴权 ─────────────────────────
+# 原本 edge sync-engine ↔ 云仅靠 Tailscale 网络层信任 + X-Tenant-ID header；
+# 任一 Mac mini 被攻陷或 Tailscale ACL 漂移即可任意写。
+# 此处增加 per-store HMAC token：边缘端启动时由 ops 注入 EDGE_STORE_SYNC_KEY，
+# 每次请求附 X-Edge-Store-Token = HMAC_SHA256(secret, f"{store_id}.{tenant_id}.{ts}.{nonce}")
+# 头部同时附 X-Edge-Store-Id / X-Edge-Tenant-Id / X-Edge-Sync-Ts / X-Edge-Sync-Nonce。
+# 服务侧从 EDGE_SYNC_HMAC_SECRET（K8s Secret）读密钥校验。
+#
+# Rollout：
+#   - 环境变量 EDGE_SYNC_HMAC_SECRET 未配置 → 仅 warn 不阻断（dev/staging 过渡期）
+#   - 配置后 → 缺 token / 校验失败 / 时钟偏差 > 300s / nonce 重放 → 401
+
+_EDGE_SYNC_TS_SKEW_SECONDS = 300
+_EDGE_SYNC_RECENT_NONCES: dict[str, float] = {}  # nonce → timestamp，5min 窗口
+
+
+def _edge_sync_secret() -> str:
+    return os.environ.get("EDGE_SYNC_HMAC_SECRET", "").strip()
+
+
+def _edge_sync_required() -> bool:
+    """True = 必须带合法 token；False = 仅 warn（dev 过渡期）。"""
+    if _edge_sync_secret():
+        return True
+    env = (os.environ.get("TX_ENV") or os.environ.get("ENVIRONMENT") or "").strip().lower()
+    return env in ("production", "prod", "gray")
+
+
+def _gc_old_nonces(now: float) -> None:
+    """清理 5 分钟外的 nonce。"""
+    threshold = now - _EDGE_SYNC_TS_SKEW_SECONDS
+    expired = [k for k, v in _EDGE_SYNC_RECENT_NONCES.items() if v < threshold]
+    for k in expired:
+        _EDGE_SYNC_RECENT_NONCES.pop(k, None)
+
+
+async def verify_edge_sync_auth(
+    x_edge_store_id: Optional[str] = Header(default=None, alias="X-Edge-Store-Id"),
+    x_edge_tenant_id: Optional[str] = Header(default=None, alias="X-Edge-Tenant-Id"),
+    x_edge_sync_ts: Optional[str] = Header(default=None, alias="X-Edge-Sync-Ts"),
+    x_edge_sync_nonce: Optional[str] = Header(default=None, alias="X-Edge-Sync-Nonce"),
+    x_edge_store_token: Optional[str] = Header(default=None, alias="X-Edge-Store-Token"),
+    x_tenant_id: Optional[str] = Header(default=None, alias="X-Tenant-ID"),
+) -> str:
+    """校验 edge sync 请求；返回校验通过的 tenant_id。"""
+    secret = _edge_sync_secret()
+    required = _edge_sync_required()
+
+    # 兼容 dev：未配置 secret 且非生产环境 — 仅 warn 不阻
+    if not secret:
+        if required:
+            logger.error("edge_sync_secret_missing_in_production")
+            raise HTTPException(status_code=500, detail="edge sync auth misconfigured")
+        logger.warning(
+            "edge_sync_auth_skipped_dev_mode",
+            note="EDGE_SYNC_HMAC_SECRET 未配置；生产必须配置",
+        )
+        # dev 模式回退到原 X-Tenant-ID 信任
+        if not x_tenant_id:
+            raise HTTPException(status_code=400, detail="X-Tenant-ID required (dev mode)")
+        return x_tenant_id
+
+    # 强制校验
+    if not all([x_edge_store_id, x_edge_tenant_id, x_edge_sync_ts, x_edge_sync_nonce, x_edge_store_token]):
+        logger.warning("edge_sync_auth_missing_headers", store=x_edge_store_id)
+        raise HTTPException(status_code=401, detail="edge sync auth headers missing")
+
+    # 时间戳防重放
+    try:
+        ts = int(x_edge_sync_ts)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="invalid X-Edge-Sync-Ts") from None
+    now = time.time()
+    if abs(now - ts) > _EDGE_SYNC_TS_SKEW_SECONDS:
+        logger.warning("edge_sync_auth_ts_skew", store=x_edge_store_id, skew=int(now - ts))
+        raise HTTPException(status_code=401, detail="edge sync timestamp skew")
+
+    # nonce 防重放
+    nonce_key = f"{x_edge_store_id}:{x_edge_sync_nonce}"
+    _gc_old_nonces(now)
+    if nonce_key in _EDGE_SYNC_RECENT_NONCES:
+        logger.warning("edge_sync_auth_nonce_replay", store=x_edge_store_id, nonce=x_edge_sync_nonce)
+        raise HTTPException(status_code=401, detail="edge sync nonce replay")
+
+    # HMAC 校验
+    msg = f"{x_edge_store_id}.{x_edge_tenant_id}.{x_edge_sync_ts}.{x_edge_sync_nonce}".encode("utf-8")
+    expected = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, x_edge_store_token or ""):
+        logger.warning("edge_sync_auth_signature_invalid", store=x_edge_store_id)
+        raise HTTPException(status_code=401, detail="edge sync signature invalid")
+
+    # tenant_id 一致性
+    if x_tenant_id and x_tenant_id != x_edge_tenant_id:
+        logger.warning(
+            "edge_sync_auth_tenant_mismatch",
+            store=x_edge_store_id,
+            header_tenant=x_tenant_id,
+            claim_tenant=x_edge_tenant_id,
+        )
+        raise HTTPException(status_code=401, detail="X-Tenant-ID claim mismatch")
+
+    _EDGE_SYNC_RECENT_NONCES[nonce_key] = now
+    logger.debug("edge_sync_auth_ok", store=x_edge_store_id, tenant=x_edge_tenant_id)
+    return x_edge_tenant_id  # type: ignore[return-value]
+
 # 云端 sync_changelog 允许写入的表白名单
 ALLOWED_TABLES: frozenset[str] = frozenset(
     {
@@ -42,6 +153,28 @@ ALLOWED_TABLES: frozenset[str] = frozenset(
         "inventory_records",
     }
 )
+
+# 审计 Tier1 F3（P0）：列名安全正则 — snake_case 字母数字下划线，最长 63
+# （PG identifier 上限 64）。防止 JSON key 含 `"`、`;`、`)` 等字符
+# 在 `f'"{c}"'` 处突破双引号标识符注入 SQL（如 `id") SELECT pg_sleep(10);--`）。
+# TODO（强烈建议）：改为按表的显式列白名单，详见
+# docs/audit-2026-05/03-tier1-critical-paths.md F3 修复建议。
+_SAFE_COL_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+def _validate_columns(columns: list[str], table_name: str) -> None:
+    """校验全部列名形式安全；任一非法即 raise HTTPException(400)。"""
+    for c in columns:
+        if not _SAFE_COL_NAME_RE.match(c):
+            logger.warning(
+                "sync_ingest.unsafe_column_name",
+                column=c,
+                table=table_name,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"unsafe column name in sync payload: {c!r}",
+            )
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────────
@@ -599,6 +732,8 @@ async def _upsert_record(db: AsyncSession, change: ChangeRecordIn) -> None:
     data["tenant_id"] = change.tenant_id
 
     columns = list(data.keys())
+    # 审计 Tier1 F3（P0）：在拼 SQL 前严格校验列名形式，防 JSON key 注入。
+    _validate_columns(columns, change.table_name)
     col_list = ", ".join(f'"{c}"' for c in columns)
     placeholders = ", ".join(f":{c}" for c in columns)
     update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
