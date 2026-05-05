@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.delivery_temperature import (
     AlertHandlePayload,
@@ -30,7 +31,6 @@ from ..models.delivery_temperature import (
     ThresholdCreate,
 )
 from ..services import delivery_temperature_service as svc
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply/delivery", tags=["delivery-temperature"])
 

@@ -27,6 +27,7 @@ from services.ai_salary_advisor_service import (
     get_seniority_curve,
     recommend_salary_structure,
 )
+
 from shared.security.src.error_handler import safe_http_exception
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)

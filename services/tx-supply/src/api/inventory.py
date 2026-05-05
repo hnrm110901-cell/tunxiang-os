@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import InventoryEventType
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services import expiry_monitor, inventory_io, stock_forecast
 from ..services.supply_repository import SupplyRepository
@@ -21,7 +22,6 @@ from ..services.transfer_service import (
     get_brand_ingredient_overview,
     get_brand_low_stock_alert,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply", tags=["supply"])
 

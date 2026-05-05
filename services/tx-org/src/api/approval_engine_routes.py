@@ -43,6 +43,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.approval_flow_engine import (
     VALID_BUSINESS_TYPES,
@@ -55,7 +56,6 @@ from ..models.approval_flow_engine import (
     UpdateTemplateReq,
 )
 from ..services.approval_engine import ApprovalEngine
-from shared.security.src.error_handler import safe_http_exception
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 

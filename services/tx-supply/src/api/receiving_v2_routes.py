@@ -17,11 +17,12 @@ from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.receiving_v2_service import (
     complete_receiving,
@@ -31,7 +32,6 @@ from ..services.receiving_v2_service import (
     list_receiving_orders,
     reject_all,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/receiving", tags=["receiving-v2"])
 

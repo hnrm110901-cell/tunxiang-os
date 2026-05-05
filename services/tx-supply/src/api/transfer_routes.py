@@ -18,11 +18,12 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.transfer_service import (
     InsufficientStockError,
@@ -35,7 +36,6 @@ from ..services.transfer_service import (
     receive_transfer_order,
     ship_transfer_order,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/transfers", tags=["transfer"])
 

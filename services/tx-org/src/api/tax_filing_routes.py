@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from services.tax_filing_service import (
     check_filing_status,
@@ -27,6 +27,7 @@ from services.tax_filing_service import (
     submit_to_tax_bureau,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)

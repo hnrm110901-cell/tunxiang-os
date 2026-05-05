@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.store_ops_service import (
     execute_fill_gap,
@@ -36,7 +37,6 @@ from ..services.store_ops_service import (
     get_today_dashboard,
     get_weekly_summary,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 

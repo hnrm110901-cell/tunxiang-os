@@ -6,8 +6,9 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
+
 from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply/craft", tags=["craft"])

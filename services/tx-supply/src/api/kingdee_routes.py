@@ -15,7 +15,7 @@ import structlog
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from shared.ontology.src.database import Header, HTTPException
+from shared.ontology.src.database import Header
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 

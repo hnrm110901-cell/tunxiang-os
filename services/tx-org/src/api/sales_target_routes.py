@@ -28,9 +28,9 @@ from shared.ontology.src.extensions.sales_targets import (
     MetricType,
     PeriodType,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.sales_target_service import SalesTargetService
-from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 

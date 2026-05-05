@@ -8,7 +8,7 @@ from datetime import date
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from services.tx_supply.src.services import live_seafood_v2
 from services.tx_supply.src.services import seafood_management_service as svc

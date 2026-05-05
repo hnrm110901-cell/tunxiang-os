@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import InventoryEventType
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.auto_deduction import deduct_for_order, rollback_deduction
 from ..services.stocktake_loss_service import (
@@ -37,7 +38,6 @@ from ..services.stocktake_service import (
     record_count,
 )
 from ..services.waste_attribution import analyze_waste, get_top_waste_items
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply", tags=["deduction-stocktake-waste"])
 

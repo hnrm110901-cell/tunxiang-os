@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.employee_points_service import (
     POINT_RULES,
@@ -26,7 +27,6 @@ from ..services.performance_scoring_service import (
     get_scores,
     submit_score,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/org", tags=["performance"])
 

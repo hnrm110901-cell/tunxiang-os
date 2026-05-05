@@ -20,6 +20,8 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.franchise_settlement_service import (
     FranchiseeStatement,
     FranchiseSettlement,
@@ -27,7 +29,6 @@ from ..services.franchise_settlement_service import (
     InvalidStatusTransitionError,
     SettlementNotFoundError,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(
     prefix="/api/v1/franchise",

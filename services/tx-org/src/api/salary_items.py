@@ -15,6 +15,7 @@ from services.salary_item_library import (
     init_store_salary_config,
     toggle_salary_item,
 )
+
 from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/org", tags=["salary-items"])

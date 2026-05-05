@@ -33,9 +33,10 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.franchise_service import FranchiseService
 from ..services.royalty_calculator import RoyaltyCalculator
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/franchise", tags=["franchise"])
 

@@ -35,8 +35,9 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ..services.franchise_service import FranchiseService
 from shared.security.src.error_handler import safe_http_exception
+
+from ..services.franchise_service import FranchiseService
 
 logger = structlog.get_logger(__name__)
 

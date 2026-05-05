@@ -20,10 +20,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.warehouse_location import (
     AutoAllocateRequest,
@@ -43,7 +44,6 @@ from ..services.warehouse_location_service import (
     WarehouseLocationError,
     ZoneNotFoundError,
 )
-from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/supply/warehouse", tags=["supply-warehouse-location"])
 
