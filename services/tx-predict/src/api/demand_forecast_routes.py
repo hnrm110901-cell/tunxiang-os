@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.demand_predictor import DemandPredictor
 
@@ -60,7 +61,7 @@ async def get_demand_forecast(
         )
     except (ValueError, KeyError) as exc:
         logger.warning("demand_forecast.error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -84,7 +85,7 @@ async def get_prep_suggestions(
         result = await predictor.get_prep_suggestions(store_id, tenant_id, db, city=city)
     except (ValueError, KeyError) as exc:
         logger.warning("demand_forecast.prep_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -108,6 +109,6 @@ async def get_prediction_accuracy(
         result = await predictor.get_accuracy(store_id, tenant_id, db, days=days)
     except (ValueError, KeyError) as exc:
         logger.warning("demand_forecast.accuracy_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}

@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.stored_value_service import (
     CardNotActiveError,
@@ -148,7 +149,7 @@ async def create_card(
                 remark=f"开卡初始充值{req.initial_amount_fen / 100:.2f}元",
             )
         except (CardNotActiveError, ValueError) as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
+            raise safe_http_exception(400, "请求参数无效", e) from e
 
         # 刷新余额数据
         updated = await _svc.get_card_by_id(
@@ -240,9 +241,9 @@ async def recharge(
         )
         return {"ok": True, "data": result}
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -277,11 +278,11 @@ async def consume(
         )
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -312,7 +313,7 @@ async def refund(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -376,9 +377,9 @@ async def freeze_card(
         )
         return {"ok": True, "data": result}
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -407,6 +408,6 @@ async def unfreeze_card(
         )
         return {"ok": True, "data": result}
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e

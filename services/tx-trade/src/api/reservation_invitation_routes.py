@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from shared.ontology.src.extensions.reservation_invitations import (
     InvitationChannel,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..repositories.reservation_invitation_repo import (
     InMemoryInvitationRepository,
@@ -177,7 +178,7 @@ async def get_invitation(
     try:
         record = await service.get(invitation_id=invitation_id, tenant_id=tenant_id)
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return _ok(record.model_dump(mode="json"))
 
 
@@ -196,7 +197,7 @@ async def mark_sent(
             sent_at=payload.sent_at,
         )
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except InvalidInvitationTransitionError as exc:
         return _err(str(exc), code=exc.code)
     return _ok(record.model_dump(mode="json"))
@@ -217,7 +218,7 @@ async def confirm(
             confirmed_at=payload.confirmed_at,
         )
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except InvalidInvitationTransitionError as exc:
         return _err(str(exc), code=exc.code)
     return _ok(record.model_dump(mode="json"))
@@ -238,7 +239,7 @@ async def mark_failed(
             failure_reason=payload.failure_reason,
         )
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except InvalidInvitationTransitionError as exc:
         return _err(str(exc), code=exc.code)
     except ValueError as exc:

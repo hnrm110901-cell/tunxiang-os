@@ -17,7 +17,7 @@
 | 业务微服务 | 17 个（FastAPI + SQLAlchemy 2.0 + asyncpg）|
 | 前端应用 | 16 个（React 18 + TypeScript + Vite）|
 | 路由模块 | 844 个 |
-| 数据库迁移 | 256 个版本（v001 — v233）|
+| 数据库迁移 | 256 个版本（v001 — v388）|
 | 测试文件 | 7,326 个 |
 | 旧系统适配器 | 15 个（品智/奥琦玮/天财/客如云/美团/饿了么/抖音/小红书等）|
 | 设计文档 | 72 份 |
@@ -28,13 +28,13 @@
 
 ## 生产就绪状态
 
-> 最后审计日期：2026-05-03 · 基准：Week 8 DEMO Go/No-Go（徐记海鲜）
+> 最后审计日期：2026-05-05 · 基准：Week 8 DEMO Go/No-Go（徐记海鲜）
 
 ### Go/No-Go 检查（10/10）
 
 | # | 检查项 | 状态 |
 |---|--------|------|
-| §1 | Tier 1 测试 100% 通过 | ✅ 345 passed |
+| §1 | Tier 1 测试 100% 通过 | ✅ 46/46（pipefail 修补后真实基线，PR #171/#176）|
 | §2 | k6 P99 < 200ms | ✅ P99 = 188ms |
 | §3 | 支付成功率 > 99.9% | ✅（需 DB 连接验证）|
 | §4 | 断网 4h E2E 绿（连续 3 日）| ✅ 3/3 green |
@@ -59,6 +59,11 @@
 | **RLS** | 迁移链断链（13 处 down_revision + 17 重复 ID）| ✅ 修复 |
 | **授权** | A1 JWT 校验缺失（type/iss/aud）| ✅ 修复（上一轮）|
 | **授权** | 域级 RBAC + 9 条高危操作 MFA 强制 | ✅ 新增 |
+| **RLS** | INSERT policy USING-only（v391 跨租户写入逃逸）| ✅ v395+v397 修复（PG.1/PG.1.1）|
+| **RLS** | UPDATE policy USING-only（v392/v065/v072/v073/v076/v284/v386 共 16 表跨租户写入逃逸）| 🟡 v399+v400 修补待 admin merge（PG.7，PR #178/#179）|
+| **异常泄漏** | 17 服务 744+ 处 `raise HTTPException(detail=str(e))` 向前端泄漏内部异常 | 🟡 P2.5 Phase 2 batch1-4 修补待 admin merge（PR #166/#167/#172/#174）|
+| **SQL 注入** | 3 处 RLS f-string 拼接 tenant_id（X-Tenant-ID 用户可控）| ✅ PK.0 紧急修（#168）+ 全仓 89 处 SET LOCAL :tid → set_config 加固（#169）|
+| **alembic 链** | 35 个 dangling head（v264b 系列 + v397），`alembic upgrade head` 拒绝执行 | 🟡 v398 一次性收敛到单一 head 待 admin merge（PI.2，PR #177）|
 
 ### Tier 1 路径状态
 
@@ -90,6 +95,10 @@
 - `requirements.lock` 由 Python 3.9 生成，建议 CI 中用 Python 3.11 重新生成
 - Vite 8.x 升级后需 CI 跑 `pnpm build` 全量验证
 - `infra/docker/*.czyz.yml` 等租户专属 Compose 文件含硬编码密码（独立处理）
+- text(f) 全仓 287 处（动态 WHERE/SET 拼接，全白名单列名内插，0 真注入面）— baseline gate 锁定，不强制清理
+- alembic head ≤ 5 守门 CI gate — PI.2 v398 收敛后建议加（防再次分叉）
+- 4 个 Tier 1 测试文件需 real PG/fastapi.testclient（test_task_engine_tier1 / test_orders_idempotency_wiring_tier1 / test_sync_pull_*）— 待 docker-compose 起 PG 容器配套
+- 代理 fallback 机制 — 当前 `reclaude:53896` 间歇性 502 时手工切 `ClashX:7890`，自动切换待基础设施立项
 
 ---
 

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.traffic_predictor import TrafficPredictor
 
@@ -53,7 +54,7 @@ async def get_traffic_forecast_7days(
         result = await predictor.forecast_7days(store_id, tenant_id, db, city=city)
     except (ValueError, KeyError) as exc:
         logger.warning("traffic_forecast.7days_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -77,7 +78,7 @@ async def get_traffic_forecast_today(
         result = await predictor.forecast_today_remaining(store_id, tenant_id, db, city=city)
     except (ValueError, KeyError) as exc:
         logger.warning("traffic_forecast.today_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -100,6 +101,6 @@ async def trigger_traffic_train(
         result = await predictor.trigger_train(store_id, tenant_id, db)
     except (ValueError, KeyError) as exc:
         logger.warning("traffic_forecast.train_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}

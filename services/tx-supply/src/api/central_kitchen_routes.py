@@ -37,11 +37,12 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -168,7 +169,7 @@ async def list_kitchens(
         kitchens = await svc.list_kitchens()
         return {"ok": True, "data": {"items": [k.model_dump() for k in kitchens]}}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/kitchens", summary="新建中央厨房档案", status_code=201)
@@ -192,7 +193,7 @@ async def create_kitchen(
         await db.commit()
         return {"ok": True, "data": kitchen.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 生产计划 ──────────────────────────────────────────────────────────────
@@ -222,7 +223,7 @@ async def list_production_plans(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/plans", summary="创建生产计划", status_code=201)
@@ -253,7 +254,7 @@ async def create_production_plan(
         await db.commit()
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/plans/{plan_id}", summary="生产计划详情")
@@ -270,7 +271,7 @@ async def get_production_plan(
         plan = await svc.get_production_plan(plan_id=plan_id)
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/plans/{plan_id}/confirm", summary="确认生产计划")
@@ -292,7 +293,7 @@ async def confirm_production_plan(
         await db.commit()
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put("/plans/{plan_id}/start", summary="开始生产")
@@ -313,7 +314,7 @@ async def start_production(
         await db.commit()
         return {"ok": True, "data": plan.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 生产工单 ──────────────────────────────────────────────────────────────
@@ -343,7 +344,7 @@ async def list_production_orders(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put("/orders/{order_id}/complete", summary="完成生产工单")
@@ -368,7 +369,7 @@ async def complete_production_order(
         await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put(
@@ -397,7 +398,7 @@ async def update_production_progress(
         await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 配送单 ────────────────────────────────────────────────────────────────
@@ -427,7 +428,7 @@ async def list_distribution_orders(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/distribution", summary="创建配送单", status_code=201)
@@ -453,7 +454,7 @@ async def create_distribution_order(
         await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/distribution/{order_id}/deliver", summary="标记配送单已发出")
@@ -471,7 +472,7 @@ async def mark_distribution_dispatched(
         await db.commit()
         return {"ok": True, "data": order.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/distribution/{order_id}/receive", summary="门店确认收货")
@@ -497,7 +498,7 @@ async def store_receive(
         await db.commit()
         return {"ok": True, "data": confirmation.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put("/distribution/{order_id}/confirm", summary="门店确认收货（PUT 别名）")
@@ -526,7 +527,7 @@ async def store_receive_confirm(
         await db.commit()
         return {"ok": True, "data": confirmation.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/plans/{plan_id}/distribute", summary="从生产计划创建多门店配送单", status_code=201)
@@ -565,7 +566,7 @@ async def plan_distribute(
         await db.commit()
         return {"ok": True, "data": {"items": created_orders, "total": len(created_orders)}}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 看板与预测 ────────────────────────────────────────────────────────────
@@ -586,7 +587,7 @@ async def get_daily_dashboard(
         dashboard = await svc.get_daily_dashboard(kitchen_id=kitchen_id, date=date)
         return {"ok": True, "data": dashboard.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/demand-forecast", summary="需求预测")
@@ -604,7 +605,7 @@ async def demand_forecast(
         forecast = await svc.forecast_demand(kitchen_id=kitchen_id, target_date=target_date)
         return {"ok": True, "data": forecast.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/kitchens/{kitchen_id}/dashboard", summary="中央厨房看板（path-param 版）")
@@ -625,4 +626,4 @@ async def get_kitchen_dashboard(
         dashboard = await svc.get_daily_dashboard(kitchen_id=kitchen_id, date=date)
         return {"ok": True, "data": dashboard.model_dump()}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import ChannelEventType
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.delivery_adapter import DeliveryPlatformAdapter
 
@@ -223,7 +224,7 @@ async def meituan_order_push(request: Request) -> WebhookResp:
         )
     except ValueError as exc:
         logger.warning("meituan_webhook_order_error", error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     logger.info(
         "meituan_webhook_order_saved",
@@ -354,7 +355,7 @@ async def eleme_order_push(request: Request) -> WebhookResp:
         )
     except ValueError as exc:
         logger.warning("eleme_webhook_order_error", error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     logger.info(
         "eleme_webhook_order_saved",
@@ -482,7 +483,7 @@ async def douyin_order_push(request: Request) -> WebhookResp:
         )
     except ValueError as exc:
         logger.warning("douyin_webhook_order_error", error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     logger.info(
         "douyin_webhook_order_saved",

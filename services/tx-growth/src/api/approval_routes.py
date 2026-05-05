@@ -23,6 +23,8 @@ from pydantic import BaseModel, field_validator
 from services.approval_service import ApprovalService
 from sqlalchemy import and_, select
 
+from shared.security.src.error_handler import safe_http_exception
+
 log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/growth/approvals", tags=["approvals"])
@@ -366,7 +368,7 @@ async def approve_request(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("reason", "审批失败"))
@@ -401,7 +403,7 @@ async def reject_request(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("reason", "拒绝操作失败"))
@@ -435,7 +437,7 @@ async def cancel_request(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("reason", "撤销失败"))

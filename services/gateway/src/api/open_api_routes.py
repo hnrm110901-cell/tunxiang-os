@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..middleware.rate_limiter import RateLimiter
 from ..services.oauth2_service import OAuth2Service
 
@@ -263,7 +265,7 @@ async def issue_token(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+        raise safe_http_exception(401, "认证失败", exc) from exc
     except PermissionError as exc:
         error_msg = str(exc)
         # 区分未激活/已暂停(403) 和 secret错误(401)
@@ -304,6 +306,6 @@ async def rotate_secret(
     try:
         result = await _oauth2_service.rotate_secret(app_uuid, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     return {"ok": True, "data": result}

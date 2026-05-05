@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.delivery_temperature import (
     AlertHandlePayload,
@@ -109,7 +110,7 @@ async def post_temperature(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -204,7 +205,7 @@ async def handle_alert(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -234,7 +235,7 @@ async def create_threshold(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 @router.get("/temperature-thresholds")

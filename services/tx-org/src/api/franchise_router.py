@@ -35,6 +35,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.franchise_service import FranchiseService
 
 logger = structlog.get_logger(__name__)
@@ -142,7 +144,7 @@ async def get_franchisee_dashboard(
         )
         return {"ok": True, "data": dashboard}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -195,7 +197,7 @@ async def generate_royalty_batch(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/royalty/bills/{bill_id}/pay")
@@ -214,7 +216,7 @@ async def mark_royalty_bill_paid(
         )
         return {"ok": True, "data": bill.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/royalty/report")
@@ -295,4 +297,4 @@ async def create_audit(
         )
         return {"ok": True, "data": record}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

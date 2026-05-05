@@ -225,7 +225,9 @@ async def test_xujihaixian_saga_buffer_disk_full_safe_degrade():
     内存队列（不崩溃），并打 disk_io_error 对齐 A1 R1。"""
     # 用一个不存在且无法创建的只读路径模拟权限拒绝
     # /_readonly_root 父目录不可写，SagaBuffer 应触发 memory fallback
-    unwritable_path = Path("/_readonly_root/saga_buffer.db")
+    # /dev/null 是字符设备，把它当目录写文件必然 ENOTDIR — 即使 root 也无法创建，
+    # 比 /_readonly_root 更可靠（root 可以 mkdir /_readonly_root 然后写入）
+    unwritable_path = Path("/dev/null/saga_buffer.db")
     buf = SagaBuffer(device_id=POS_DEVICE_A, db_path=unwritable_path)
     await buf.initialize()
     try:
@@ -773,7 +775,9 @@ async def test_xujihaixian_memory_mode_disk_recovery_replays_to_sqlite(
       4. 重启进程后能从 SQLite 重建（验证持久化生效）
     """
     # 第 1 步：构造 memory_mode buffer（用不可写路径）
-    unwritable_path = Path("/_readonly_root/saga_buffer.db")
+    # /dev/null 是字符设备，把它当目录写文件必然 ENOTDIR — 即使 root 也无法创建，
+    # 比 /_readonly_root 更可靠（root 可以 mkdir /_readonly_root 然后写入）
+    unwritable_path = Path("/dev/null/saga_buffer.db")
     buf_mem = SagaBuffer(device_id=POS_DEVICE_A, db_path=unwritable_path)
     await buf_mem.initialize()
     assert buf_mem.is_memory_mode, "前置条件：必须先在 memory 模式"
@@ -841,7 +845,9 @@ async def test_xujihaixian_memory_mode_disk_recovery_replays_to_sqlite(
 async def test_xujihaixian_memory_mode_disk_still_full_stays_in_memory():
     """徐记海鲜门店磁盘仍满 → try_replay_memory_to_disk 必须探测失败，
     返回 0，保持 memory 模式（warning 日志，不抛异常，不删数据）。"""
-    unwritable_path = Path("/_readonly_root/saga_buffer.db")
+    # /dev/null 是字符设备，把它当目录写文件必然 ENOTDIR — 即使 root 也无法创建，
+    # 比 /_readonly_root 更可靠（root 可以 mkdir /_readonly_root 然后写入）
+    unwritable_path = Path("/dev/null/saga_buffer.db")
     buf = SagaBuffer(device_id=POS_DEVICE_A, db_path=unwritable_path)
     await buf.initialize()
     try:

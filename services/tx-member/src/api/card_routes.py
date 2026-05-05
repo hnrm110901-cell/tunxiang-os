@@ -3,11 +3,12 @@
 10 个端点：卡类型CRUD、等级设置、匿名卡、发卡、升降级、会员日、权益、批量操作
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.card_engine import (
     batch_card_operations,
@@ -68,7 +69,7 @@ async def create_card_type_route(
         data = await create_card_type(body.name, body.rules, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 2. 获取卡类型列表 ─────────────────────────────────────────
@@ -104,7 +105,7 @@ async def set_card_levels_route(
         data = await set_card_levels(card_type_id, body.levels, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 4. 批量创建匿名实体卡 ─────────────────────────────────────
@@ -122,7 +123,7 @@ async def create_anonymous_cards(
         data = await create_anonymous_card(card_type_id, body.batch_no, body.count, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 5. 发卡 ───────────────────────────────────────────────────
@@ -139,7 +140,7 @@ async def issue_card_route(
         data = await issue_card(body.customer_id, body.card_type_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 6. 等级升级 ───────────────────────────────────────────────
@@ -156,7 +157,7 @@ async def upgrade_level_route(
         data = await upgrade_level(card_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 7. 等级降级 ───────────────────────────────────────────────
@@ -173,7 +174,7 @@ async def downgrade_level_route(
         data = await downgrade_level(card_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 8. 设置会员日 ─────────────────────────────────────────────
@@ -191,7 +192,7 @@ async def set_member_day_route(
         data = await set_member_day(card_type_id, body.config, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 9. 获取卡权益 ─────────────────────────────────────────────
@@ -209,7 +210,7 @@ async def get_card_benefits_route(
         data = await get_card_benefits(card_id, store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 10. 批量操作 ──────────────────────────────────────────────
@@ -226,4 +227,4 @@ async def batch_card_operations_route(
         data = await batch_card_operations(body.operations, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

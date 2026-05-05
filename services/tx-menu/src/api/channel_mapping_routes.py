@@ -23,6 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.channel_mapping_service import (
     ChannelMappingService,
@@ -253,7 +254,7 @@ async def rollback_channel_version(
     try:
         version = await svc.rollback_channel_version(version_id=version_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": version.model_dump(mode="json"), "error": None}
 

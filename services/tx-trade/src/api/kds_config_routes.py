@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.kds_call_service import KdsCallService
 from ..services.order_push_config import OrderPushConfigService, OrderPushMode
@@ -61,7 +62,7 @@ async def api_get_calling_tasks(
     try:
         tasks = await KdsCallService.get_calling_tasks(store_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     items = [
         {
@@ -92,11 +93,11 @@ async def api_mark_calling(
     try:
         task = await KdsCallService.mark_calling(task_id, tenant_id, db)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {
         "ok": True,
@@ -123,11 +124,11 @@ async def api_confirm_served(
     try:
         task = await KdsCallService.confirm_served(task_id, tenant_id, db)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {
         "ok": True,
@@ -153,7 +154,7 @@ async def api_calling_stats(
     try:
         stats = await KdsCallService.get_calling_stats(store_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {
         "ok": True,
@@ -178,7 +179,7 @@ async def api_get_push_mode(
     try:
         mode = await OrderPushConfigService.get_store_mode(store_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {
         "ok": True,
@@ -205,7 +206,7 @@ async def api_set_push_mode(
     try:
         await OrderPushConfigService.set_store_mode(store_id, body.mode, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {
         "ok": True,

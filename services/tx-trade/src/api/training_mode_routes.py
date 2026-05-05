@@ -25,6 +25,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/training-mode", tags=["training-mode"])
@@ -184,7 +186,7 @@ async def enable_training_mode(
         logger.error("training_mode_enable_failed", store_id=store_id, error=str(exc))
         raise HTTPException(status_code=503, detail="Redis 连接失败，无法启用演示模式") from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
 
 @router.post("/disable/{store_id}", response_model=dict)
@@ -216,7 +218,7 @@ async def disable_training_mode(
         logger.error("training_mode_disable_failed", store_id=store_id, error=str(exc))
         raise HTTPException(status_code=503, detail="Redis 连接失败，无法关闭演示模式") from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
 
 @router.post("/reset/{store_id}", response_model=dict)
@@ -260,7 +262,7 @@ async def reset_training_data(
         logger.error("training_mode_reset_failed", store_id=store_id, error=str(exc))
         raise HTTPException(status_code=503, detail="Redis 连接失败，无法清理演示数据") from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
 
 @router.get("/demo-orders/{store_id}", response_model=dict)
@@ -296,7 +298,7 @@ async def get_demo_orders(
             "error": None,
         }
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise safe_http_exception(503, "服务暂时不可用", exc) from exc
 
 
 # ─── 内部调用端点（供 cashier_engine.py 使用）────────────────────────────────

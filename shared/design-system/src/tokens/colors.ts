@@ -1,24 +1,25 @@
 /**
  * 屯象OS · 色彩Token
- * 品牌色: Mint #0AAF9A — v2 设计系统
- * 基于 v2 prototype workspace.html 设计规范
+ * 品牌色: 暖橙 #FF6B35 — v3 设计系统
+ * CTA 色（非底色），仅用于操作点、品牌元素
  */
 
-// ── Mint 品牌主色阶 ──
+// ── 暖橙品牌主色阶（CTA 色，非填充色）──
 export const brand = {
-  50:  '#E6F7F5',
-  100: '#B3EBE4',
-  200: '#80DFD3',
-  300: '#4DD3C2',
-  400: '#26C9B4',
-  500: '#0AAF9A',  // Primary — --color-primary
-  600: '#099987',  // Hover
-  700: '#078070',  // Active/Pressed
-  800: '#056659',
-  900: '#034D43',
+  50:  '#FFF3ED',  // CTA 轻背景
+  100: '#FFE0CC',
+  200: '#FFBD99',
+  300: '#FF9966',  // — Active/Pressed
+  400: '#FF8555',  // — Hover
+  500: '#FF6B35',  // Primary — CTA 按钮 / 价格 / 活跃指示器
+  600: '#E55A28',  // — pressed
+  700: '#CC4A1A',  // — 深色背景 hover
+  800: '#A33515',
+  900: '#7A2510',
 } as const;
 
-// ── 保留旧名 mint 作为别名，兼容现有引用 ──
+// ── @deprecated 旧名 mint 指向品牌橙（v2→v3 兼容）──
+/** @deprecated 品牌色已从 Mint #0AAF9A 变更为暖橙 #FF6B35。请改用 `brand`。 */
 export const mint = brand;
 
 // ── Navy 文字/导航色阶 ──
@@ -66,12 +67,13 @@ export const semantic = {
   info:    '#2D9CDB',
 } as const;
 
-// ── Action 行动色（Orange CTA）──
+// ── Action 行动色（品牌色别名 — CTA 专用）──
 export const action = {
-  primary: '#FF6B2C',   // CTA: 加购/结算按钮
-  hover:   '#E55A1E',
-  active:  '#CC4F1A',
-  soft:    'rgba(255,107,44,0.12)',
+  primary: brand[500],   // #FF6B35 — CTA 按钮/价格
+  hover:   brand[400],   // #FF8555
+  active:  brand[300],   // #FF9966
+  soft:    'rgba(255,107,53,0.12)',   // CTA 轻背景
+  bg:      brand[50],    // #FFF3ED
 } as const;
 
 // ── Dark Mode 深色模式专用（v2 prototype 色板）──
@@ -90,7 +92,7 @@ export const dark = {
 
 // ── 快捷常量 ──
 export const colors = {
-  accent:  brand[500],   // #0AAF9A
+  accent:  brand[500],   // #FF6B35
   green:   semantic.success,
   red:     semantic.danger,
   yellow:  warm.sun,

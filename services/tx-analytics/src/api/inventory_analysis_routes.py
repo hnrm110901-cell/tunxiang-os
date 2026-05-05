@@ -4,8 +4,10 @@
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header
 from pydantic import BaseModel
+
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/analytics/inventory", tags=["inventory-analysis"])
 
@@ -46,7 +48,7 @@ async def inventory_turnover(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 2. 原料涨跌监控 ───
@@ -68,7 +70,7 @@ async def price_fluctuation_monitor(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 3. 损耗排行 ───
@@ -92,7 +94,7 @@ async def waste_ranking(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 4. 盘点差异分析 ───
@@ -116,7 +118,7 @@ async def stocktake_variance_analysis(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 5. 采购偏差 ───
@@ -140,7 +142,7 @@ async def procurement_variance(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 6. 菜品成本偏差 ───
@@ -164,7 +166,7 @@ async def dish_cost_variance_deep(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 7. 活鲜损耗专项 ───
@@ -188,7 +190,7 @@ async def seafood_waste_analysis(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 8. 食安风险图谱 ───
@@ -210,4 +212,4 @@ async def food_safety_risk_graph(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

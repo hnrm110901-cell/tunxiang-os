@@ -65,19 +65,35 @@ _FRANCHISE_TABLES: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    # ADD COLUMN 是元数据级修改，可在事务内执行
     for table in _FRANCHISE_TABLES:
         # 1. 加列（幂等）
         op.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS last_event_id UUID")
-        # 2. 主索引：按租户 + last_event_id 反查
-        op.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_last_event ON {table} (tenant_id, last_event_id)")
-        # 3. PARTIAL 索引：定位"未纳入事件流"的行（PG.5 backfill 入口）
-        op.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{table}_last_event_null ON {table} (tenant_id) WHERE last_event_id IS NULL"
-        )
+
+    # 2. 索引必须在 autocommit 块内执行（CREATE INDEX CONCURRENTLY 不能在事务内）
+    #    CONCURRENTLY 不持有 ACCESS EXCLUSIVE 锁，不阻塞 INSERT/UPDATE/DELETE
+    #    IF NOT EXISTS 让 alembic 重跑幂等
+    with op.get_context().autocommit_block():
+        for table in _FRANCHISE_TABLES:
+            # 主索引：按租户 + last_event_id 反查
+            op.execute(
+                f"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{table}_last_event "
+                f"ON {table} (tenant_id, last_event_id)"
+            )
+            # PARTIAL 索引：定位"未纳入事件流"的行（PG.5 backfill 入口）
+            op.execute(
+                f"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{table}_last_event_null "
+                f"ON {table} (tenant_id) WHERE last_event_id IS NULL"
+            )
 
 
 def downgrade() -> None:
+    # DROP INDEX CONCURRENTLY 同样不能在事务内执行
+    with op.get_context().autocommit_block():
+        for table in _FRANCHISE_TABLES:
+            op.execute(f"DROP INDEX CONCURRENTLY IF EXISTS idx_{table}_last_event_null")
+            op.execute(f"DROP INDEX CONCURRENTLY IF EXISTS idx_{table}_last_event")
+
+    # DROP COLUMN 在事务内执行
     for table in _FRANCHISE_TABLES:
-        op.execute(f"DROP INDEX IF EXISTS idx_{table}_last_event_null")
-        op.execute(f"DROP INDEX IF EXISTS idx_{table}_last_event")
         op.execute(f"ALTER TABLE {table} DROP COLUMN IF EXISTS last_event_id")

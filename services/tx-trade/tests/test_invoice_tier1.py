@@ -72,7 +72,7 @@ class TestInvoiceComplianceTier1:
         }
 
         with patch(
-            "services.invoice_service.create_invoice_request",
+            "services.tx_trade.src.services.invoice_service.create_invoice_request",
             new=AsyncMock(return_value=existing_invoice),
         ) as mock_create:
             # 第一次申请
@@ -139,7 +139,7 @@ class TestInvoiceComplianceTier1:
         mock_db.execute.return_value = mock_result
 
         with patch(
-            "services.invoice_service.get_invoice_status",
+            "services.tx_trade.src.services.invoice_service.get_invoice_status",
             new=AsyncMock(return_value={"id": invoice_id, "status": "submitted"}),
         ) as mock_status:
             result = await mock_status(

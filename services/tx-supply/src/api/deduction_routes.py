@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import InventoryEventType
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.auto_deduction import deduct_for_order, rollback_deduction
 from ..services.stocktake_loss_service import (
@@ -119,7 +120,7 @@ async def deduct_for_order_route(
             )
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/deduction/rollback/{order_id}")
@@ -155,7 +156,7 @@ async def rollback_deduction_route(
             )
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -175,7 +176,7 @@ async def create_stocktake_route(
         data = await create_stocktake(store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/stocktake/{stocktake_id}/count")
@@ -191,7 +192,7 @@ async def record_count_route(
         data = await record_count(stocktake_id, body.ingredient_id, body.actual_qty, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/stocktake/{stocktake_id}/finalize")
@@ -250,7 +251,7 @@ async def finalize_stocktake_route(
         asyncio.create_task(_try_auto_create())
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/stocktake/history")
@@ -265,7 +266,7 @@ async def get_stocktake_history_route(
         data = await get_stocktake_history(store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -290,7 +291,7 @@ async def get_waste_analysis(
         data = await analyze_waste(store_id, date_from, date_to, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/waste/top-items")
@@ -307,4 +308,4 @@ async def get_top_waste_items_route(
         data = await get_top_waste_items(store_id, x_tenant_id, db, limit=limit)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

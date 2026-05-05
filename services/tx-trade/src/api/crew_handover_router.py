@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -68,7 +69,7 @@ async def get_shift_summary(
         return {"ok": True, "data": summary}
     except ValueError as e:
         log.warning("crew_shift_summary_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_shift_summary_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -133,7 +134,7 @@ async def submit_handover(
         }
     except ValueError as e:
         log.warning("crew_handover_value_error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except Exception as e:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("crew_handover_error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

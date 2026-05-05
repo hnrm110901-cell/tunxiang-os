@@ -44,7 +44,7 @@ export function injectTokens() {
     '--border':          neutral[200],
     // 语义色
     '--accent':          brand[500],
-    '--accent-soft':     'rgba(10,175,154,0.08)',
+    '--accent-soft':     'rgba(255,107,53,0.08)',
     '--accent-hover':    brand[600],
     '--accent-active':   brand[700],
     '--accent-bg':       brand[50],

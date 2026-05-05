@@ -49,6 +49,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dispute_response_templates import (
     list_templates,
@@ -380,7 +381,7 @@ async def draft_response(
             extra_variables=req.extra_variables,
         )
     except DisputeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {"ok": True, "data": result.to_dict()}
 
@@ -408,13 +409,13 @@ async def respond(
             responded_by=x_operator_id,
         )
     except DisputeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     service = DisputeService(db, tenant_id=x_tenant_id)
     try:
         result = await service.submit_merchant_response(dispute_id=dispute_id, response=response_input)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_respond_db_error")
@@ -444,7 +445,7 @@ async def platform_ruling(
     try:
         result = await service.record_platform_ruling(dispute_id=dispute_id, ruling=ruling)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_ruling_db_error")
@@ -468,7 +469,7 @@ async def escalate(
     try:
         result = await service.escalate(dispute_id=dispute_id, reason=req.reason, escalated_by=x_operator_id)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_escalate_db_error")
@@ -491,7 +492,7 @@ async def withdraw(
     try:
         result = await service.withdraw(dispute_id=dispute_id, reason=req.reason)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_withdraw_db_error")

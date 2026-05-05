@@ -35,11 +35,17 @@ from .api.merchant_data_quality_routes import router as data_quality_router
 from .api.merchant_delivery_scorecard_routes import router as delivery_scorecard_router  # W4: 交付评分卡
 from .api.merchant_kpi_config_routes import router as merchant_kpi_router  # W2 4/13 商户KPI权重
 from .api.merchant_targets_routes import router as merchant_targets_router  # May W2: B-03
+from .api.merchant_targets_routes import _load_overrides_from_db  # B-03: 启动时加载DB覆盖值
 from .api.metrics_dict_routes import router as metrics_dict_router  # W2 4/13 指标口径字典
 from .api.monthly_brief_routes import router as monthly_brief_router  # W2 4/13 月报
 from .api.narrative_enhanced_routes import router as narrative_enhanced_router  # P3-02
 from .api.nlq_routes import router as nlq_router
 from .api.private_domain_routes import router as private_domain_router
+from .api.ceo_cockpit_routes import router as ceo_cockpit_router  # G6: CEO今日经营驾驶舱（7端点）
+from .api.cost_root_cause_routes import router as cost_root_cause_router  # v379: 成本根因分析Agent（4端点）
+from .api.olap_routes import router as olap_router  # BI-1.1: OLAP多维分析引擎（5端点）
+from .api.self_service_routes import router as self_service_router  # BI-1.2: 自助取数（8端点）
+from .api.alert_routes import router as alert_router  # BI-2.2: 预警闭环引擎（8端点）
 from .api.report_builder_routes import router as report_builder_router  # S5: 报表配置化引擎（12端点）
 from .api.report_config_routes import router as report_config_router
 from .api.report_routes import router as report_router
@@ -49,6 +55,7 @@ from .api.special_ops_report_routes import router as special_ops_report_router  
 from .api.store_analysis_routes import router as store_analysis_router
 from .api.stream_report_routes import router as stream_report_router
 from .api.weekly_brief_routes import router as weekly_brief_router  # W2 4/13 周报
+from .api.demo_monitor_routes import router as demo_monitor_router  # May W2: C-04 演示监控
 
 
 @asynccontextmanager
@@ -62,6 +69,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning("p0_seed_load_skipped", reason="DB not available")
     except OSError as exc:
         logger.warning("p0_seed_load_skipped", reason=str(exc))
+    # 从 merchant_target_overrides 表加载覆盖值到内存缓存
+    try:
+        await _load_overrides_from_db()
+    except Exception as exc:
+        logger.warning("merchant_targets_overrides_load_skipped", error=str(exc))
     logger.info("tx_analytics_started", etl_scheduler="running")
     yield
     scheduler.shutdown()
@@ -113,6 +125,10 @@ app.include_router(banquet_analytics_router)  # S7 宴会分析报表：8端点
 app.include_router(report_builder_router)  # S5 报表配置化引擎：12端点
 app.include_router(ceo_cockpit_router)  # G6 CEO今日经营驾驶舱：7端点
 app.include_router(cost_root_cause_router)  # v379 成本根因分析Agent：4端点
+app.include_router(olap_router)  # BI-1.1: OLAP多维分析引擎：5端点
+app.include_router(self_service_router)  # BI-1.2: 自助取数（8端点）
+app.include_router(alert_router)  # BI-2.2: 预警闭环引擎（8端点）
+app.include_router(demo_monitor_router)  # May W2: C-04 演示环境监控面板
 
 
 @app.get("/health")

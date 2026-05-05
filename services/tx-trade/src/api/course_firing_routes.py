@@ -1,10 +1,11 @@
 """Course Firing API 路由 — 打菜时机控制"""
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.course_firing_service import (
     assign_course,
@@ -66,9 +67,9 @@ async def api_fire_course(
             },
         }
     except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/{order_id}/courses")
@@ -111,7 +112,7 @@ async def api_assign_course(
         )
         return {"ok": True, "data": {"order_id": order_id, "item_id": item_id, "course_name": body.course_name}}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/{order_id}/courses/suggestion")

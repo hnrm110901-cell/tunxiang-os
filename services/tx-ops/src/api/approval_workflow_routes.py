@@ -38,6 +38,8 @@ router = APIRouter(prefix="/api/v1/ops/approvals", tags=["ops-approvals"])
 
 from fastapi import Depends
 
+from shared.security.src.error_handler import safe_http_exception
+
 
 async def get_db():  # noqa: ANN201
     """生产环境替换为真实 asyncpg / SQLAlchemy async session。"""
@@ -246,7 +248,7 @@ async def create_instance(
             amount_fen=body.amount_fen,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     # 若指定了 deadline_hours，补充写入 deadline_at
     if body.deadline_hours is not None:
@@ -364,9 +366,9 @@ async def act_on_instance(
             comment=body.comment,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -396,9 +398,10 @@ async def cancel_instance(
     if inst is None:
         raise HTTPException(status_code=404, detail="审批实例不存在")
     if inst["status"] != "pending":
-        raise HTTPException(
-            status_code=422,
-            detail=f"当前状态 {inst['status']!r} 不允许撤回，仅 pending 可撤回",
+        raise safe_http_exception(
+            422,
+            "请求格式错误",
+            ValueError(f"approval_status={inst['status']!r}"),
         )
     if inst["current_step"] != 1:
         raise HTTPException(

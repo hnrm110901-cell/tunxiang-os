@@ -182,6 +182,21 @@ class BackfillStats:
     skipped_no_tenant: int = 0
 
 
+async def set_tenant_guc(
+    db_execute: Callable[[str, dict[str, Any]], Awaitable[list[dict[str, Any]]]],
+    tenant_id: str,
+) -> None:
+    """在当前事务起手 SET LOCAL app.tenant_id = :tid。
+
+    抽出为独立函数：
+    - SET LOCAL 是事务级 GUC，commit 后失效；外层每开一个新事务都必须调用本函数
+      重设；否则后续表的 RLS 会把所有行过滤掉（静默回放 0 条）。
+    - 同一事务内若按行切换 tenant，也必须每次重新调用（防止跨租户 RLS 漏穿）。
+    - 入参 db_execute 与 backfill_one_table 同形参，便于 Tier1 测试 mock 捕获。
+    """
+    await db_execute("SET LOCAL app.tenant_id = :tid", {"tid": str(tenant_id)})
+
+
 async def backfill_one_table(
     spec: TableSpec,
     *,
@@ -195,81 +210,123 @@ async def backfill_one_table(
     """扫一张表的 last_event_id IS NULL 行 → 补 emit + writeback。
 
     抽出 db_execute / db_update / emit_event 为参数，便于 Tier1 测试注入 mock。
+
+    P1 修复（PJ.4）：
+    1. 单批 fetch → while 循环到 len(batch) < batch_size 收尾；防止大表只处理首批。
+    2. 每张表事务起手必须 SET LOCAL app.tenant_id（commit 后 GUC 清零）；
+       row 级若 tenant 切换也重设。dry-run 模式下没有真实事务也不调 emit/update，
+       仅扫一批做预览（不进 while 循环），保留原 plan 行为。
     """
     stats = BackfillStats(table=spec.table)
 
-    # 1. 扫描待回放行
-    cols = f"{spec.pk_col}, tenant_id, {spec.stream_id_col}"
-    if spec.has_store_id and "store_id" not in cols:
-        cols += ", store_id"
-    # 关键业务字段（mapper 会用到）— 用 SELECT *  简化（量级可控）
+    # ─── 事务起手：每张表入口必须重设 GUC（commit 后清零的兜底） ───
+    # tenant_filter 提供时，单租户回放可在表入口一次性 SET LOCAL；
+    # 多租户回放则在 row 处理时按 tenant 切换（见下）。
+    if tenant_filter and not dry_run:
+        await set_tenant_guc(db_execute, tenant_filter)
+
+    # 准备 SELECT（带 keyset 分页：上批最后一个 pk 之后继续）
     # spec.table / spec.pk_col 来自 _TABLE_SPECS 白名单（6 张固定表）；
-    # 所有外部值（tenant_id/limit）走 SQLAlchemy bind params。
-    select_sql = f"""
-        SELECT *
-        FROM {spec.table}
-        WHERE last_event_id IS NULL
-        {"AND tenant_id = :tenant_id" if tenant_filter else ""}
-        ORDER BY created_at NULLS FIRST, {spec.pk_col}
-        LIMIT :limit
-    """  # noqa: S608
-    params: dict[str, Any] = {"limit": batch_size}
+    # 所有外部值（tenant_id/limit/last_pk）走 SQLAlchemy bind params。
+    base_where = "WHERE last_event_id IS NULL"
     if tenant_filter:
-        params["tenant_id"] = tenant_filter
+        base_where += " AND tenant_id = :tenant_id"
 
-    rows = await db_execute(select_sql, params)
-    stats.scanned = len(rows)
+    last_pk: Any = None
+    current_tenant_in_guc: Optional[str] = tenant_filter
 
-    for row in rows:
-        tenant_id = row.get("tenant_id")
-        if not tenant_id:
-            stats.skipped_no_tenant += 1
-            continue
+    while True:
+        # keyset 分页：用 (created_at NULLS FIRST, pk) 的稳定排序 +
+        # WHERE pk > :last_pk 推进。OFFSET 在大表上昂贵，且会随写入漂移。
+        pk_advance = " AND " + spec.pk_col + " > :last_pk" if last_pk is not None else ""
+        select_sql = f"""
+            SELECT *
+            FROM {spec.table}
+            {base_where}{pk_advance}
+            ORDER BY created_at NULLS FIRST, {spec.pk_col}
+            LIMIT :limit
+        """  # noqa: S608
 
-        try:
-            event_type_str, payload = spec.mapper(row)
-            metadata = {"backfill": True, "source_table": spec.table}
-            kind = payload.pop("_kind", None)
-            if kind:
-                metadata["kind"] = kind
+        params: dict[str, Any] = {"limit": batch_size}
+        if tenant_filter:
+            params["tenant_id"] = tenant_filter
+        if last_pk is not None:
+            params["last_pk"] = last_pk
 
-            stream_id_val = row.get(spec.stream_id_col)
-            store_id_val = row.get("store_id") if spec.has_store_id else None
+        rows = await db_execute(select_sql, params)
+        if not rows:
+            break
 
-            if dry_run:
-                logger.info(
-                    "DRY-RUN %s row=%s → %s payload_keys=%s",
-                    spec.table,
-                    row[spec.pk_col],
-                    event_type_str,
-                    list(payload.keys()),
-                )
-                stats.emitted += 1
+        stats.scanned += len(rows)
+
+        for row in rows:
+            tenant_id = row.get("tenant_id")
+            if not tenant_id:
+                stats.skipped_no_tenant += 1
                 continue
 
-            event_id = await emit_event(
-                event_type=event_type_str,
-                tenant_id=tenant_id,
-                stream_id=str(stream_id_val) if stream_id_val else str(row[spec.pk_col]),
-                payload=payload,
-                store_id=str(store_id_val) if store_id_val else None,
-                source_service="backfill_franchise_events",
-                metadata=metadata,
-            )
+            try:
+                event_type_str, payload = spec.mapper(row)
+                metadata = {"backfill": True, "source_table": spec.table}
+                kind = payload.pop("_kind", None)
+                if kind:
+                    metadata["kind"] = kind
 
-            if event_id:
-                # spec.table/pk_col 白名单常量；eid/pk 走 bind params
-                await db_update(
-                    f"UPDATE {spec.table} SET last_event_id = :eid WHERE {spec.pk_col} = :pk",  # noqa: S608
-                    {"eid": event_id, "pk": row[spec.pk_col]},
+                stream_id_val = row.get(spec.stream_id_col)
+                store_id_val = row.get("store_id") if spec.has_store_id else None
+
+                if dry_run:
+                    logger.info(
+                        "DRY-RUN %s row=%s → %s payload_keys=%s",
+                        spec.table,
+                        row[spec.pk_col],
+                        event_type_str,
+                        list(payload.keys()),
+                    )
+                    stats.emitted += 1
+                    continue
+
+                # 多租户回放：row 的 tenant 与当前事务 GUC 不一致就重设。
+                # 单租户（tenant_filter 已设）路径会自动跳过此分支。
+                row_tenant = str(tenant_id)
+                if row_tenant != current_tenant_in_guc:
+                    await set_tenant_guc(db_execute, row_tenant)
+                    current_tenant_in_guc = row_tenant
+
+                event_id = await emit_event(
+                    event_type=event_type_str,
+                    tenant_id=tenant_id,
+                    stream_id=str(stream_id_val) if stream_id_val else str(row[spec.pk_col]),
+                    payload=payload,
+                    store_id=str(store_id_val) if store_id_val else None,
+                    source_service="backfill_franchise_events",
+                    metadata=metadata,
                 )
-                stats.emitted += 1
-            else:
+
+                if event_id:
+                    # spec.table/pk_col 白名单常量；eid/pk 走 bind params
+                    await db_update(
+                        f"UPDATE {spec.table} SET last_event_id = :eid WHERE {spec.pk_col} = :pk",  # noqa: S608
+                        {"eid": event_id, "pk": row[spec.pk_col]},
+                    )
+                    stats.emitted += 1
+                else:
+                    stats.failed += 1
+                    logger.warning("emit_event 返回 None：%s row=%s", spec.table, row[spec.pk_col])
+            except Exception:  # noqa: BLE001 — backfill 兜底，单行错不能阻断整批
                 stats.failed += 1
-                logger.warning("emit_event 返回 None：%s row=%s", spec.table, row[spec.pk_col])
-        except Exception:  # noqa: BLE001 — backfill 兜底，单行错不能阻断整批
-            stats.failed += 1
-            logger.exception("回放失败：%s row=%s", spec.table, row.get(spec.pk_col))
+                logger.exception("回放失败：%s row=%s", spec.table, row.get(spec.pk_col))
+
+        # 推进 keyset 游标到本批最后一个 pk
+        last_pk = rows[-1].get(spec.pk_col)
+
+        # dry-run：仅扫第一批做预览，不进入下一轮（避免本地无 DB 的 plan 模式空转）
+        if dry_run:
+            break
+
+        # 最后一批不满 → 回放结束
+        if len(rows) < batch_size:
+            break
 
     return stats
 
@@ -305,12 +362,14 @@ async def _main_async(args: argparse.Namespace) -> int:
     from shared.ontology.src.database import async_session_factory  # type: ignore
 
     async with async_session_factory() as session:
-        if args.tenant_id:
-            await session.execute(text("SET LOCAL app.tenant_id = :t"), {"t": args.tenant_id})
 
         async def _exec(sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
             res = await session.execute(text(sql), params)
-            keys = res.keys()
+            # SET LOCAL 等无返回值语句 res.keys() 会抛；简单兜底返回 []
+            try:
+                keys = res.keys()
+            except Exception:  # noqa: BLE001 — DDL/SET 无 result set
+                return []
             return [dict(zip(keys, r)) for r in res.all()]
 
         async def _upd(sql: str, params: dict[str, Any]) -> None:
@@ -320,6 +379,8 @@ async def _main_async(args: argparse.Namespace) -> int:
         for spec in _TABLE_SPECS:
             if args.table and spec.table != args.table:
                 continue
+            # 每张表 = 独立事务；backfill_one_table 内部会在事务起手 SET LOCAL
+            # app.tenant_id（commit 后 GUC 会清零，下一张表起手必须重设）。
             stats = await backfill_one_table(
                 spec,
                 db_execute=_exec,

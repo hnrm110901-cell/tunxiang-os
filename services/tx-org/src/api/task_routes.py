@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 from shared.ontology.src.extensions.tasks import Task, TaskStatus, TaskType
+from shared.security.src.error_handler import safe_http_exception
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -171,9 +172,9 @@ async def complete_task(
             tenant_id=tenant_id,
         )
     except TaskNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except TaskTerminalStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     return _ok(_task_to_dict(task))
 
 
@@ -195,9 +196,9 @@ async def escalate_task(
             escalation_level=body.escalation_level,
         )
     except TaskNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except TaskTerminalStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     return _ok(_task_to_dict(task))
 
 
@@ -213,11 +214,11 @@ async def cancel_task(
     try:
         task = await service.cancel_task(task_id=task_id, reason=body.reason, tenant_id=tenant_id)
     except TaskNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except TaskTerminalStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except CancelReasonRequired as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(_task_to_dict(task))
 
 
@@ -243,7 +244,7 @@ async def get_task(
     try:
         task = await service.get_task(task_id=task_id, tenant_id=tenant_id)
     except TaskNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return _ok(_task_to_dict(task))
 
 

@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.points_mall_v2 import (
     cancel_order,
@@ -180,7 +181,7 @@ async def api_list_products(
             size=size,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 
@@ -240,7 +241,7 @@ async def api_create_product(
             valid_until=body.valid_until,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 
@@ -348,7 +349,7 @@ async def api_get_customer_orders(
             size=size,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 
@@ -444,7 +445,7 @@ async def api_get_order_stats(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 
@@ -466,7 +467,7 @@ async def api_list_categories(
     try:
         result = await list_categories(tenant_id=tenant_id, db=db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 
@@ -568,7 +569,7 @@ async def api_get_achievements(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 
@@ -588,7 +589,7 @@ async def api_seed_achievements(
             db=db,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return _ok(result)
 
 

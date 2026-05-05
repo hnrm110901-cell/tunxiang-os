@@ -11,11 +11,12 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.subsidy_service import SubsidyService
 
@@ -188,7 +189,7 @@ async def check_eligibility(
         )
         return CheckEligibilityResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/apply", response_model=ApplySubsidyResponse)
@@ -209,7 +210,7 @@ async def apply_subsidy(
         )
         return ApplySubsidyResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/status", response_model=SubsidyStatusResponse)
@@ -225,7 +226,7 @@ async def get_subsidy_status(
         result = await service.get_subsidy_status(tenant_id=x_tenant_id)
         return SubsidyStatusResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/bill", response_model=BillResponse)
@@ -247,7 +248,7 @@ async def get_current_bill(
         )
         return BillResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/generate-invoice", response_model=GenerateInvoiceResponse)
@@ -267,4 +268,4 @@ async def generate_invoice(
         )
         return GenerateInvoiceResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
