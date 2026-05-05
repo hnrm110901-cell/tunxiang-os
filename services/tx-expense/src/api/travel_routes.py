@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import src.services.travel_expense_service as _travel_svc
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter()
 log = structlog.get_logger(__name__)
@@ -151,7 +152,7 @@ async def create_travel_request(
         )
         return {"ok": True, "data": _serialize_request(result)}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_request_create_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
         raise HTTPException(status_code=500, detail="创建差旅申请失败，请稍后重试")
@@ -253,7 +254,7 @@ async def update_travel_request(
     except LookupError:
         raise HTTPException(status_code=404, detail="差旅申请不存在或无权修改")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_request_update_failed", error=str(exc), request_id=str(request_id), exc_info=True)
         raise HTTPException(status_code=500, detail="更新差旅申请失败，请稍后重试")
@@ -285,7 +286,7 @@ async def submit_travel_request(
     except LookupError:
         raise HTTPException(status_code=404, detail="差旅申请不存在或无权提交")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_request_submit_failed", error=str(exc), request_id=str(request_id), exc_info=True)
         raise HTTPException(status_code=500, detail="提交差旅申请失败，请稍后重试")
@@ -322,7 +323,7 @@ async def add_itinerary(
     except LookupError:
         raise HTTPException(status_code=404, detail="差旅申请不存在或无权操作")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_itinerary_add_failed", error=str(exc), request_id=str(request_id), exc_info=True)
         raise HTTPException(status_code=500, detail="添加行程明细失败，请稍后重试")
@@ -357,7 +358,7 @@ async def update_itinerary(
     except LookupError:
         raise HTTPException(status_code=404, detail="行程明细不存在或无权操作")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_itinerary_update_failed", error=str(exc), itinerary_id=str(itinerary_id), exc_info=True)
         raise HTTPException(status_code=500, detail="更新行程明细失败，请稍后重试")
@@ -393,7 +394,7 @@ async def delete_itinerary(
     except LookupError:
         raise HTTPException(status_code=404, detail="行程明细不存在或无权操作")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_itinerary_delete_failed", error=str(exc), itinerary_id=str(itinerary_id), exc_info=True)
         raise HTTPException(status_code=500, detail="删除行程明细失败，请稍后重试")
@@ -455,7 +456,7 @@ async def complete_travel(
     except LookupError:
         raise HTTPException(status_code=404, detail="差旅申请不存在或无权操作")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("travel_complete_failed", error=str(exc), request_id=str(request_id), exc_info=True)
         raise HTTPException(status_code=500, detail="完成差旅申请失败，请稍后重试")

@@ -23,6 +23,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dynamic_pricing_ai_service import DynamicPricingAIService
 
@@ -103,7 +104,7 @@ async def get_dynamic_price(
         result = await _svc.calculate_dynamic_price(db, store_id, x_tenant_id, dish_id, context=ctx)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         log.error("dynamic_price_error", dish_id=dish_id, error=str(exc))
         raise HTTPException(status_code=500, detail="定价计算失败") from exc
@@ -150,7 +151,7 @@ async def simulate_pricing(
         result = await _svc.simulate_pricing(db, store_id, x_tenant_id, req.dish_id, mock_ctx)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         log.error("simulate_error", dish_id=req.dish_id, error=str(exc))
         raise HTTPException(status_code=500, detail="模拟定价失败") from exc
@@ -250,7 +251,7 @@ async def update_rule(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         log.error("update_rule_error", rule_id=rule_id, error=str(exc))
         raise HTTPException(status_code=500, detail="更新规则失败") from exc

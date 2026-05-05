@@ -26,6 +26,8 @@ from services.audience_segmentation import (
     AudienceSegmentationService,
 )
 
+from shared.security.src.error_handler import safe_http_exception
+
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/growth/segments", tags=["segmentation"])
 
@@ -154,7 +156,7 @@ async def get_segment_members(
     try:
         result = await _svc.get_segment_members(segment_id, tenant_id, page, size)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except httpx.HTTPError as exc:
         logger.error(
             "segment_members_http_error", segment_id=segment_id, tenant_id=str(tenant_id), error=str(exc), exc_info=exc
@@ -173,7 +175,7 @@ async def count_segment(
     try:
         count = await _svc.count_segment(segment_id, tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except httpx.HTTPError as exc:
         logger.error(
             "segment_count_http_error", segment_id=segment_id, tenant_id=str(tenant_id), error=str(exc), exc_info=exc
@@ -212,7 +214,7 @@ async def create_custom_segment(
     try:
         segment = await _svc.create_custom_segment(req.name, rules_dicts, tenant_id)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     return ok_response(segment)
 
 

@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.delivery_panel_service import (
     DeliveryOrderNotFound,
@@ -215,11 +216,11 @@ async def _handle_platform_webhook(
 
     except SignatureVerifyError as exc:
         log.warning("delivery_webhook.signature_failed", error=str(exc))
-        raise HTTPException(status_code=401, detail=str(exc))
+        raise safe_http_exception(401, "认证失败", exc) from exc
 
     except ValueError as exc:
         log.warning("delivery_webhook.value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/webhooks/meituan", summary="美团外卖新订单推送")
@@ -240,7 +241,7 @@ async def webhook_meituan(
         raise
     except ValueError as exc:
         logger.warning("webhook_meituan.value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         logger.error("webhook_meituan.unexpected", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -264,7 +265,7 @@ async def webhook_eleme(
         raise
     except ValueError as exc:
         logger.warning("webhook_eleme.value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         logger.error("webhook_eleme.unexpected", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -288,7 +289,7 @@ async def webhook_douyin(
         raise
     except ValueError as exc:
         logger.warning("webhook_douyin.value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         logger.error("webhook_douyin.unexpected", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -312,7 +313,7 @@ async def webhook_grabfood(
         raise
     except ValueError as exc:
         logger.warning("webhook_grabfood.value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         logger.error("webhook_grabfood.unexpected", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -381,7 +382,7 @@ async def list_delivery_orders(
         raise
     except ValueError as exc:
         log.warning("delivery_orders.list_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_orders.list_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -408,7 +409,7 @@ async def get_delivery_order(
         raise
     except ValueError as exc:
         log.warning("delivery_order.get_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.get_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -461,13 +462,13 @@ async def accept_delivery_order(
         raise
     except (DeliveryOrderNotFound, DeliveryOrderStatusError) as exc:
         log.warning("delivery_order.accept_validation_error", error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except PlatformAdapterError as exc:
         log.error("delivery_order.accept_platform_error", error=str(exc))
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise safe_http_exception(502, "上游服务不可用", exc) from exc
     except ValueError as exc:
         log.warning("delivery_order.accept_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.accept_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -514,13 +515,13 @@ async def reject_delivery_order(
         raise
     except (DeliveryOrderNotFound, DeliveryOrderStatusError) as exc:
         log.warning("delivery_order.reject_validation_error", error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except PlatformAdapterError as exc:
         log.error("delivery_order.reject_platform_error", error=str(exc))
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise safe_http_exception(502, "上游服务不可用", exc) from exc
     except ValueError as exc:
         log.warning("delivery_order.reject_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.reject_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -564,10 +565,10 @@ async def mark_order_ready(
         raise
     except (DeliveryOrderNotFound, DeliveryOrderStatusError) as exc:
         log.warning("delivery_order.ready_validation_error", error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except ValueError as exc:
         log.warning("delivery_order.ready_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.ready_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -605,7 +606,7 @@ async def delivery_stats(
         raise
     except ValueError as exc:
         log.warning("delivery_stats.value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_stats.error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -655,7 +656,7 @@ async def get_auto_accept_rule(
         raise
     except ValueError as exc:
         log.warning("auto_accept_rule.get_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("auto_accept_rule.get_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -738,7 +739,7 @@ async def upsert_auto_accept_rule(
         raise
     except ValueError as exc:
         log.warning("auto_accept_rule.upsert_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("auto_accept_rule.upsert_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

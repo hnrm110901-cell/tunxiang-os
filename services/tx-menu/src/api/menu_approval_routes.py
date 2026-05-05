@@ -24,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.menu_approval_service import (
     MenuApprovalService,
@@ -206,7 +207,7 @@ async def approve_approval(
             note=body.note,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     tid = _uuid.UUID(tenant_id)
     payload = approved.change_payload
@@ -310,7 +311,7 @@ async def reject_approval(
             note=body.note,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     log.info("approval.rejected", approval_id=str(approval_id), approver=str(body.approver_id))
     return {"ok": True, "data": result.model_dump(mode="json")}
 
@@ -363,7 +364,7 @@ async def create_publish_request(body: CreatePublishRequestBody, request: Reques
         )
         return {"ok": True, "data": result.model_dump(mode="json")}
     except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     finally:
         await db.close()
 
@@ -429,7 +430,7 @@ async def approve_publish_request(
         )
         return {"ok": True, "data": result.model_dump(mode="json")}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     finally:
         await db.close()
 
@@ -451,7 +452,7 @@ async def reject_publish_request(
         )
         return {"ok": True, "data": result.model_dump(mode="json")}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     finally:
         await db.close()
 
@@ -465,7 +466,7 @@ async def apply_publish_request(request_id: UUID, request: Request) -> dict:
         result = await svc.apply_approved_request(request_id=request_id)
         return {"ok": True, "data": result.model_dump(mode="json")}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     finally:
         await db.close()
 
@@ -504,7 +505,7 @@ async def update_store_permission(
         )
         return {"ok": True, "data": perm.model_dump(mode="json")}
     except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     finally:
         await db.close()
 
@@ -526,6 +527,6 @@ async def clone_store_menu(body: CloneStoreMenuBody, request: Request) -> dict:
         )
         return {"ok": True, "data": result.model_dump(mode="json")}
     except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     finally:
         await db.close()

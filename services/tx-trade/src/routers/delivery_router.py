@@ -32,6 +32,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.delivery_aggregator import DeliveryAggregator
 
 logger = structlog.get_logger(__name__)
@@ -137,7 +139,7 @@ async def webhook_meituan(
         raise
     except ValueError as exc:
         logger.warning("webhook_meituan_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error("webhook_meituan_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -161,7 +163,7 @@ async def webhook_eleme(
         raise
     except ValueError as exc:
         logger.warning("webhook_eleme_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error("webhook_eleme_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -185,7 +187,7 @@ async def webhook_douyin(
         raise
     except ValueError as exc:
         logger.warning("webhook_douyin_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         logger.error("webhook_douyin_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -288,7 +290,7 @@ async def confirm_delivery_order(
         raise
     except ValueError as exc:
         log.warning("delivery_confirm_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_confirm_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -318,7 +320,7 @@ async def reject_delivery_order(
         raise
     except ValueError as exc:
         log.warning("delivery_reject_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_reject_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -362,7 +364,7 @@ async def delivery_daily_stats(
         raise
     except ValueError as exc:
         log.warning("delivery_daily_stats_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_daily_stats_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -504,7 +506,7 @@ async def create_platform_config(
         raise
     except ValueError as exc:
         log.warning("delivery_create_platform_config_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_create_platform_config_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -548,7 +550,7 @@ async def update_platform_config(
         raise
     except ValueError as exc:
         log.warning("delivery_update_platform_config_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — MLPS3-P0: 最外层HTTP兜底
         log.error("delivery_update_platform_config_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
