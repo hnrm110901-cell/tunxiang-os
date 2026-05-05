@@ -1,3 +1,48 @@
+## 2026-05-05 10:30  P2.5 Phase 2 收尾 + Tier 1 基线扩展（含 review P0 修补 + ClashX 7890 救场推送）
+
+### 本次会话目标
+`/loop` 自驱动 P2.5 Phase 2 异常泄漏归一 + Tier 1 基线扩展 8 → 46 文件。
+后接 strict-code-reviewer 审查发现 2 P0：tier1 runner 假阳 + approval f-string 泄漏。
+
+### 完成状态
+- [x] PR #166 rebase + force-push（解 CONFLICTING）— 1 commit 干净 replay
+- [x] PR #171 Tier 1 47 文件 baseline + pipefail 修 + DEPS 加 pyyaml/aiosqlite/asyncpg → 真实 44/46 绿
+- [x] PR #172 batch3 — 4 服务 56 文件 289 处 detail=str() 归一
+- [x] PR #174 batch4 — 12 服务 45 文件 184 处归一 + review 修 codemod re.DOTALL + approval f-string 泄漏 + rebase 解冲突
+- [x] PR #175 docs/progress 同步（含 review 修补 + ClashX 救场记录）
+- [x] codemod 修 bug：顶层 import + DOTALL multi-line（之前 26 处多行漏匹配）
+
+### 关键决策
+- **代理切换救场** — `reclaude:53896` 间歇性 502 持续整个会话；发现 `ClashX:7890` 备用
+  端口仍工作，5 分支批量推送一次成功；之前所有 fail 是 reclaude 单一代理问题
+- **strict-code-reviewer 揭露假阳** — tier1 runner `tail -5` 在默认 bash 中管道退出码取
+  最后命令（tail 永 0），导致 pytest 失败被吞，46/46 报绿全是骗局；加 `set -o pipefail`
+  后真实 42/46，DEPS 补全后 44/46，剩 2 真坏需独立修
+- **codemod re.DOTALL 必要性** — 单行正则跳过 26 处多行 `raise HTTPException(\n  ...,\n  detail=str(e),\n)`；
+  实测多行 detail 多为静态字符串非 str(var) 故不影响历史替换数；但 approval_workflow:401
+  f-string 泄漏 `inst['status']` 是真泄漏，手工修
+- **避让并发 PK 工作分支** — sec/pk23-finance-supply-baseline 同时段在 tx-finance/tx-supply
+  做 text(f) baseline 守门；P2.5 batch4 跳过这两服务避免 rebase 冲突
+
+### 累积成果（6 PR）
+- P2.5 Phase 2 归一 **744+ 处**跨 17 服务（tx-trade/analytics/member/agent/malaysia/expense/
+  growth/predict/brain/gateway/menu/vietnam/indonesia/ops/org/supply/finance）
+- Tier 1 真实基线 44/46（识破 46/46 假阳）
+- 修 2 P0 + 1 codemod 多行 bug
+
+### 下一步
+- 6 PR admin merge 后清点真实残余
+- 修 Tier 1 真坏 2 文件：test_saga_buffer disk mock 路径硬编码 / test_invoice_tier1 patch `services.invoice_service` 模块路径错
+- PI.2 — 73 历史 alembic head 收敛（独立 sprint）
+
+### 已知风险
+- ClashX:7890 也可能间歇失败；需要建立代理 fallback 自动切换机制
+- 744+ 处自动替换语义抽查未做（仅 ast.parse round-trip 通过）；建议下轮选 5-10 个高密度文件人工核对
+- saga_buffer / invoice_tier1 真坏 5 个用例反向暴露 Tier 1 测试质量 — 下一轮要查全部 47
+  文件是否还有更多 silent fail（被 tail/pipefail 双重掩盖到现在才暴露）
+
+---
+
 ## 2026-05-05 09:50  PK 系列收官 — RLS 真注入修 + Tier 1 域 text(f) baseline 守门 5 PR
 
 ### 本次会话目标
@@ -41,7 +86,6 @@ PJ 系列 7 PR 收尾后，reviewer 在 tx-trade f-string 安全审计中发现 
   + bindparams 模式 OR 上调 baseline（后者要写注释说明 + 列入下一轮 codemod 候选）
 - `set_config('app.tenant_id', :tid, true)` 在事务回滚时 GUC 自然回滚（PG 文档保证），
   但跨 connection pool 复用时务必每次 set_config（已验证 PG.4 backfill / async session 模式）
-
 ---
 
 ## 2026-05-05 00:00  PJ 系列后续修复 — 6 PR admin merge 收口
