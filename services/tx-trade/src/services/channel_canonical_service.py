@@ -75,7 +75,8 @@ class ChannelCanonicalRepository:
                 SELECT id, tenant_id, store_id, channel_code, external_order_id,
                        canonical_order_id, status, total_fen, subsidy_fen,
                        merchant_share_fen, commission_fen, settlement_fen,
-                       payload, received_at, created_at, updated_at, is_deleted
+                       payload, platform_raw_response, received_at, created_at,
+                       updated_at, is_deleted
                 FROM channel_canonical_orders
                 WHERE tenant_id = :tid
                   AND channel_code = :code
@@ -105,6 +106,7 @@ class ChannelCanonicalRepository:
         merchant_share_fen: int,
         commission_fen: int,
         payload: dict[str, Any],
+        platform_raw_response: Optional[dict[str, Any]] = None,
         received_at: datetime,
     ) -> dict[str, Any]:
         """新增一行。返回完整行（含 GENERATED settlement_fen）。
@@ -118,16 +120,17 @@ class ChannelCanonicalRepository:
                 INSERT INTO channel_canonical_orders (
                     tenant_id, store_id, channel_code, external_order_id,
                     status, total_fen, subsidy_fen, merchant_share_fen,
-                    commission_fen, payload, received_at
+                    commission_fen, payload, platform_raw_response, received_at
                 ) VALUES (
                     :tid, :sid, :code, :eid,
                     :st, :total, :subsidy, :merch,
-                    :comm, CAST(:payload AS JSONB), :recv_at
+                    :comm, CAST(:payload AS JSONB), CAST(:raw_resp AS JSONB), :recv_at
                 )
                 RETURNING id, tenant_id, store_id, channel_code, external_order_id,
                           canonical_order_id, status, total_fen, subsidy_fen,
                           merchant_share_fen, commission_fen, settlement_fen,
-                          payload, received_at, created_at, updated_at, is_deleted
+                          payload, platform_raw_response, received_at, created_at,
+                          updated_at, is_deleted
                 """
             ),
             {
@@ -141,6 +144,7 @@ class ChannelCanonicalRepository:
                 "merch": int(merchant_share_fen),
                 "comm": int(commission_fen),
                 "payload": json.dumps(payload, ensure_ascii=False, default=str),
+                "raw_resp": json.dumps(platform_raw_response, ensure_ascii=False, default=str) if platform_raw_response else None,
                 "recv_at": received_at,
             },
         )
@@ -175,7 +179,8 @@ class ChannelCanonicalRepository:
                     SELECT id, tenant_id, store_id, channel_code, external_order_id,
                            canonical_order_id, status, total_fen, subsidy_fen,
                            merchant_share_fen, commission_fen, settlement_fen,
-                           payload, received_at, created_at, updated_at, is_deleted
+                           payload, platform_raw_response, received_at, created_at,
+                           updated_at, is_deleted
                     FROM channel_canonical_orders
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND is_deleted IS NOT TRUE
@@ -204,7 +209,8 @@ class ChannelCanonicalRepository:
                     SELECT id, tenant_id, store_id, channel_code, external_order_id,
                            canonical_order_id, status, total_fen, subsidy_fen,
                            merchant_share_fen, commission_fen, settlement_fen,
-                           payload, received_at, created_at, updated_at, is_deleted
+                           payload, platform_raw_response, received_at, created_at,
+                           updated_at, is_deleted
                     FROM channel_canonical_orders
                     WHERE tenant_id = :tid AND is_deleted IS NOT TRUE
                     ORDER BY received_at DESC
@@ -226,7 +232,8 @@ class ChannelCanonicalRepository:
                 SELECT id, tenant_id, store_id, channel_code, external_order_id,
                        canonical_order_id, status, total_fen, subsidy_fen,
                        merchant_share_fen, commission_fen, settlement_fen,
-                       payload, received_at, created_at, updated_at, is_deleted
+                       payload, platform_raw_response, received_at, created_at,
+                       updated_at, is_deleted
                 FROM channel_canonical_orders
                 WHERE tenant_id = :tid AND id = :id AND is_deleted IS NOT TRUE
                 LIMIT 1

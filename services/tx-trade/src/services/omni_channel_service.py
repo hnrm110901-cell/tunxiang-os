@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -255,6 +256,33 @@ def _items_from_omni_meta(row: Any) -> list[UnifiedOrderItem]:
     return out
 
 
+def _order_to_canonical_payload(order: UnifiedOrder) -> dict:
+    """Convert UnifiedOrder to serializable dict for canonical storage."""
+    return {
+        "platform": order.platform,
+        "platform_order_id": order.platform_order_id,
+        "source_channel": order.source_channel,
+        "tenant_id": order.tenant_id,
+        "store_id": order.store_id,
+        "status": order.status,
+        "total_fen": order.total_fen,
+        "items": [
+            {
+                "name": item.name,
+                "quantity": item.quantity,
+                "price_fen": item.price_fen,
+                "sku_id": item.sku_id,
+                "notes": item.notes,
+                "internal_dish_id": item.internal_dish_id,
+            }
+            for item in order.items
+        ],
+        "notes": order.notes,
+        "customer_phone": order.customer_phone,
+        "delivery_address": order.delivery_address,
+    }
+
+
 async def _dispatch_order_to_kds(*args: Any, **kwargs: Any) -> Any:
     """延迟导入 kds_dispatch，便于单测在无相对包结构时只测标准化/落库逻辑。"""
     from .kds_dispatch import dispatch_order_to_kds
@@ -359,6 +387,41 @@ class OmniChannelService:
         except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             log.error("omni_channel.receive_order.kds_failed", error=str(exc), exc_info=True)
             # 不重新抛出：KDS失败不影响内部订单流程
+
+        # 4. 写入 channel_canonical_orders（审计溯源，失败不阻塞订单流程）
+        try:
+            canonical_payload = _order_to_canonical_payload(order)
+            canonical_sql = text("""
+                INSERT INTO channel_canonical_orders (
+                    tenant_id, store_id, channel_code, external_order_id,
+                    canonical_order_id, status, total_fen, subsidy_fen,
+                    merchant_share_fen, commission_fen, payload,
+                    platform_raw_response, received_at
+                ) VALUES (
+                    :tenant_id, :store_id, :channel_code, :external_order_id,
+                    :canonical_order_id, :status, :total_fen, 0, 0,
+                    0, CAST(:payload AS JSONB), CAST(:raw_resp AS JSONB), NOW()
+                )
+            """)
+            await db.execute(
+                canonical_sql,
+                {
+                    "tenant_id": uuid.UUID(order.tenant_id),
+                    "store_id": uuid.UUID(order.store_id),
+                    "channel_code": order.platform,
+                    "external_order_id": order.platform_order_id,
+                    "canonical_order_id": uuid.UUID(internal_order_id) if internal_order_id else None,
+                    "status": order.status,
+                    "total_fen": order.total_fen,
+                    "payload": _json.dumps(canonical_payload, ensure_ascii=False, default=str),
+                    "raw_resp": _json.dumps(raw_payload, ensure_ascii=False, default=str),
+                },
+            )
+            await db.flush()
+            log.info("omni_channel.receive_order.canonical_written")
+        except Exception:
+            log.exception("omni_channel.receive_order.canonical_write_failed", platform=order.platform)
+            # Canonical write failure does NOT block the order flow
 
         # 字段覆盖日志：追踪订单字段填充质量
         try:

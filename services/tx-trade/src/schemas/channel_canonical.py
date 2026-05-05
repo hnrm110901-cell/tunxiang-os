@@ -129,6 +129,7 @@ class CanonicalOrderRecord(BaseModel):
     commission_fen: int
     settlement_fen: int
     payload: dict[str, Any]
+    platform_raw_response: Optional[dict[str, Any]] = None
     received_at: datetime
     created_at: datetime
     updated_at: datetime
