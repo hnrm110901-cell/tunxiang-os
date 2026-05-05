@@ -227,3 +227,274 @@ class TestChannelMetricsTier1:
         payment_channel_requests_total.labels(channel="wechat", status="5xx")
         payment_channel_requests_total.labels(channel="alipay", status="5xx")
         # 不抛异常即视为合规
+
+
+# ─── Follow-up（verifier 第三轮 P1）：query / refund / verify_callback inc ───
+#
+# 上面的 TestChannelMetricsTier1 仅覆盖 pay() 路径，verifier 指出多阶段支付
+# (查单/退款/回调) 的 5xx 也应触发 PaymentChannelHighErrorRate 告警，否则
+# 监控存在盲区。本 class 覆盖 7 渠道 × {query, refund} + wechat verify_callback。
+
+
+class _MockAggregatorClientWithQueryRefund:
+    """模拟 LakalaClient / ShouqianbaClient — 含 query/refund 异常分支"""
+
+    def __init__(self, raise_exc: Exception | None = None) -> None:
+        self._raise = raise_exc
+
+    async def query(self, **_kwargs) -> dict:
+        if self._raise:
+            raise self._raise
+        return {"trade_state": "SUCCESS", "order_status": "PAID", "channel_trade_no": "ok", "sn": "ok"}
+
+    async def refund(self, **_kwargs) -> dict:
+        if self._raise:
+            raise self._raise
+        return {"result_code": "SUCCESS", "refund_trade_no": "ref-ok", "sn": "ok"}
+
+
+class _MockWechatService:
+    """模拟 shared.integrations.wechat_pay.WechatPayService"""
+
+    def __init__(self, raise_exc: Exception | None = None, callback_data: dict | None = None) -> None:
+        self._raise = raise_exc
+        self._callback = callback_data or {
+            "out_trade_no": "WX123",
+            "transaction_id": "txn_ok",
+            "amount": {"total": 100},
+        }
+
+    async def query_order(self, _payment_id: str) -> dict:
+        if self._raise:
+            raise self._raise
+        return {
+            "trade_state": "SUCCESS",
+            "amount": {"total": 100},
+            "transaction_id": "txn_ok",
+        }
+
+    async def refund(self, **_kwargs) -> dict:
+        if self._raise:
+            raise self._raise
+        return {"status": "SUCCESS", "refund_id": "rid_ok"}
+
+    async def verify_callback(self, _headers: dict, _body: bytes) -> dict:
+        if self._raise:
+            raise self._raise
+        return self._callback
+
+
+class TestQueryRefundCallbackBlindspots:
+    """query / refund / verify_callback 路径的 metric inc 覆盖 — verifier P1"""
+
+    # ─── Mock 路径：query/refund 应 inc(2xx) ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_alipay_query_mock_inc_2xx(self) -> None:
+        before = _counter_value("alipay", "2xx")
+        ch = AlipayChannel()
+        await ch.query("p-1")
+        assert _delta("alipay", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_alipay_refund_mock_inc_2xx(self) -> None:
+        before = _counter_value("alipay", "2xx")
+        ch = AlipayChannel()
+        await ch.refund("p-1", 100)
+        assert _delta("alipay", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_cash_query_inc_2xx(self) -> None:
+        before = _counter_value("cash", "2xx")
+        ch = CashChannel()
+        await ch.query("p-1")
+        assert _delta("cash", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_cash_refund_inc_2xx(self) -> None:
+        before = _counter_value("cash", "2xx")
+        ch = CashChannel()
+        await ch.refund("p-1", 100)
+        assert _delta("cash", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_stored_value_query_mock_inc_2xx(self) -> None:
+        before = _counter_value("stored_value", "2xx")
+        ch = StoredValueChannel(http_client=None)
+        await ch.query("p-1")
+        assert _delta("stored_value", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_stored_value_refund_mock_inc_2xx(self) -> None:
+        before = _counter_value("stored_value", "2xx")
+        ch = StoredValueChannel(http_client=None)
+        await ch.refund("p-1", 100)
+        assert _delta("stored_value", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_lakala_query_mock_inc_2xx(self) -> None:
+        before = _counter_value("lakala", "2xx")
+        ch = LakalaChannel(client=None)
+        await ch.query("p-1")
+        assert _delta("lakala", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_lakala_refund_mock_inc_2xx(self) -> None:
+        before = _counter_value("lakala", "2xx")
+        ch = LakalaChannel(client=None)
+        await ch.refund("p-1", 100)
+        assert _delta("lakala", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_shouqianba_query_mock_inc_2xx(self) -> None:
+        before = _counter_value("shouqianba", "2xx")
+        ch = ShouqianbaChannel(client=None)
+        await ch.query("p-1")
+        assert _delta("shouqianba", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_shouqianba_refund_mock_inc_2xx(self) -> None:
+        before = _counter_value("shouqianba", "2xx")
+        ch = ShouqianbaChannel(client=None)
+        await ch.refund("p-1", 100)
+        assert _delta("shouqianba", "2xx", before) == 1.0
+
+    # ─── 真 client 异常分支：query/refund timeout / connect_error ─────
+
+    @pytest.mark.asyncio
+    async def test_lakala_query_timeout_inc(self) -> None:
+        before = _counter_value("lakala", "timeout")
+        ch = LakalaChannel(client=_MockAggregatorClientWithQueryRefund(raise_exc=httpx.TimeoutException("slow")))
+        with pytest.raises(httpx.TimeoutException):
+            await ch.query("p-1")
+        assert _delta("lakala", "timeout", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_lakala_refund_connect_error_inc(self) -> None:
+        before = _counter_value("lakala", "connect_error")
+        ch = LakalaChannel(client=_MockAggregatorClientWithQueryRefund(raise_exc=httpx.ConnectError("dns fail")))
+        with pytest.raises(httpx.ConnectError):
+            await ch.refund("p-1", 100)
+        assert _delta("lakala", "connect_error", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_shouqianba_query_timeout_inc(self) -> None:
+        before = _counter_value("shouqianba", "timeout")
+        ch = ShouqianbaChannel(client=_MockAggregatorClientWithQueryRefund(raise_exc=httpx.TimeoutException("slow")))
+        with pytest.raises(httpx.TimeoutException):
+            await ch.query("p-1")
+        assert _delta("shouqianba", "timeout", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_shouqianba_refund_connect_error_inc(self) -> None:
+        before = _counter_value("shouqianba", "connect_error")
+        ch = ShouqianbaChannel(
+            client=_MockAggregatorClientWithQueryRefund(raise_exc=httpx.ConnectError("dns fail"))
+        )
+        with pytest.raises(httpx.ConnectError):
+            await ch.refund("p-1", 100)
+        assert _delta("shouqianba", "connect_error", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_stored_value_refund_timeout_inc(self) -> None:
+        before = _counter_value("stored_value", "timeout")
+        ch = StoredValueChannel(http_client=_MockHttpClient(raise_exc=httpx.TimeoutException("slow")))
+        with pytest.raises(httpx.TimeoutException):
+            await ch.refund("p-1", 100)
+        assert _delta("stored_value", "timeout", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_stored_value_refund_5xx_inc(self) -> None:
+        before = _counter_value("stored_value", "5xx")
+        ch = StoredValueChannel(http_client=_MockHttpClient(resp=_MockHttpResp(503)))
+        await ch.refund("p-1", 100)
+        assert _delta("stored_value", "5xx", before) == 1.0
+
+    # ─── wechat 三方法（query/refund/verify_callback）路径 ────────────
+
+    @pytest.mark.asyncio
+    async def test_wechat_mock_query_inc_2xx(self) -> None:
+        before = _counter_value("wechat", "2xx")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = None
+        await ch.query("WX123")
+        assert _delta("wechat", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_wechat_mock_refund_inc_2xx(self) -> None:
+        before = _counter_value("wechat", "2xx")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = None
+        await ch.refund("WX123", 100)
+        assert _delta("wechat", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_wechat_real_query_timeout_inc(self) -> None:
+        before = _counter_value("wechat", "timeout")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = _MockWechatService(raise_exc=httpx.TimeoutException("slow"))
+        with pytest.raises(httpx.TimeoutException):
+            await ch.query("WX123")
+        assert _delta("wechat", "timeout", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_wechat_real_refund_connect_error_inc(self) -> None:
+        before = _counter_value("wechat", "connect_error")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = _MockWechatService(raise_exc=httpx.ConnectError("dns fail"))
+        with pytest.raises(httpx.ConnectError):
+            await ch.refund("WX123", 100)
+        assert _delta("wechat", "connect_error", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_wechat_real_query_2xx(self) -> None:
+        before = _counter_value("wechat", "2xx")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = _MockWechatService()  # 正常返回
+        await ch.query("WX123")
+        assert _delta("wechat", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_wechat_verify_callback_signature_invalid_4xx(self) -> None:
+        """微信回调签名校验失败 → ValueError → inc(4xx)"""
+        before = _counter_value("wechat", "4xx")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = _MockWechatService(raise_exc=ValueError("bad sig"))
+        with pytest.raises(ValueError):
+            await ch.verify_callback({}, b"")
+        assert _delta("wechat", "4xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_wechat_verify_callback_2xx(self) -> None:
+        before = _counter_value("wechat", "2xx")
+        ch = WechatPayChannel.__new__(WechatPayChannel)
+        ch._notify_url = ""
+        ch._service = _MockWechatService()
+        await ch.verify_callback({}, b"")
+        assert _delta("wechat", "2xx", before) == 1.0
+
+    # ─── credit_account（PR #200 漏加 inc 的渠道） ────────────────────
+
+    @pytest.mark.asyncio
+    async def test_credit_account_query_inc_2xx(self) -> None:
+        from services.tx_pay.src.channels.credit_account import CreditAccountChannel
+
+        before = _counter_value("credit_account", "2xx")
+        ch = CreditAccountChannel(http_client=None)
+        await ch.query("TAB123")
+        assert _delta("credit_account", "2xx", before) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_credit_account_refund_inc_2xx(self) -> None:
+        from services.tx_pay.src.channels.credit_account import CreditAccountChannel
+
+        before = _counter_value("credit_account", "2xx")
+        ch = CreditAccountChannel(http_client=None)
+        await ch.refund("TAB123", 100)
+        assert _delta("credit_account", "2xx", before) == 1.0
