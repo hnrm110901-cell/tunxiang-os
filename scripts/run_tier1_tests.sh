@@ -60,7 +60,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="python:3.11-slim"
-DEPS="pytest pytest-asyncio structlog sqlalchemy fastapi pydantic httpx"
+DEPS="pytest pytest-asyncio structlog sqlalchemy fastapi pydantic httpx pyyaml aiosqlite asyncpg"
 
 # 测试参数（默认全套 Tier 1，可被 $1 覆盖为子集模式）
 PYTEST_ARGS=()
