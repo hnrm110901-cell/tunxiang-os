@@ -22,6 +22,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import TenantIDInvalid, TenantIDMissing, get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -38,7 +39,7 @@ async def _get_db(
         async for session in get_db_with_tenant(x_tenant_id):
             yield session
     except (TenantIDMissing, TenantIDInvalid) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
@@ -134,7 +135,7 @@ async def api_create_transfer(
             reason=req.reason,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
     transfer_id = uuid.uuid4()
     now = datetime.now(timezone.utc)

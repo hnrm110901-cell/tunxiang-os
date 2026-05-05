@@ -23,6 +23,7 @@ from shared.region.src.region_config import (
     get_config_by_code,
     get_supported_markets,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/regional", tags=["regional"])
 
@@ -139,7 +140,7 @@ async def get_consolidated_revenue(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/market-comparison")
@@ -164,4 +165,4 @@ async def get_market_comparison(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

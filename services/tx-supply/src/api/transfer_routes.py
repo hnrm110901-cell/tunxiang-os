@@ -18,11 +18,12 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.transfer_service import (
     InsufficientStockError,
@@ -117,7 +118,7 @@ async def create_transfer(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("")
@@ -163,7 +164,7 @@ async def inventory_check(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.get("/{order_id}")
@@ -181,7 +182,7 @@ async def get_transfer(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 @router.post("/{order_id}/approve")
@@ -205,9 +206,9 @@ async def approve_transfer(
         )
         return {"ok": True, "data": result}
     except InsufficientStockError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/{order_id}/ship")
@@ -231,9 +232,9 @@ async def ship_transfer(
         )
         return {"ok": True, "data": result}
     except InsufficientStockError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/{order_id}/receive")
@@ -258,7 +259,7 @@ async def receive_transfer(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/{order_id}/cancel")
@@ -279,4 +280,4 @@ async def cancel_transfer(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

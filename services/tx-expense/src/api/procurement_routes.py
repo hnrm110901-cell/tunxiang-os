@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 try:
     from src.services.procurement_payment_service import ProcurementPaymentService
@@ -141,7 +142,7 @@ async def create_payment(
         return {"ok": True, "data": result}
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error(
@@ -203,7 +204,7 @@ async def get_payment(
         result = await svc.get_payment(db=db, tenant_id=tenant_id, payment_id=payment_id)
         return {"ok": True, "data": result}
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except Exception as exc:
         log.error(
             "procurement_payment_get_failed",
@@ -245,10 +246,10 @@ async def update_payment(
         return {"ok": True, "data": result}
     except LookupError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error(
@@ -289,10 +290,10 @@ async def approve_payment(
         return {"ok": True, "data": result, "message": "付款单审批通过"}
     except LookupError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error(
@@ -335,10 +336,10 @@ async def mark_paid(
         return {"ok": True, "data": result, "message": "付款单已标记为已付"}
     except LookupError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error(
@@ -381,7 +382,7 @@ async def match_invoice(
         return {"ok": True, "data": result}
     except LookupError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error(
@@ -425,7 +426,7 @@ async def reconcile_payment(
         return {"ok": True, "data": result}
     except LookupError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error(

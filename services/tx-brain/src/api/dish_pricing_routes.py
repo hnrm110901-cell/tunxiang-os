@@ -16,6 +16,8 @@ from __future__ import annotations
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..agents.dish_pricing import (
     DishPricingRequest,
     DishPricingResponse,
@@ -84,4 +86,4 @@ async def recommend_price(
         return await service.recommend(req)
     except ValueError as exc:
         # 输入级问题（cost >= base 等）
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

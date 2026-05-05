@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.patrol_service import (
     PatrolService,
@@ -124,7 +125,7 @@ async def create_template(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/patrol/templates")
@@ -171,7 +172,7 @@ async def start_patrol(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put("/patrol/records/{record_id}/submit")
@@ -192,7 +193,7 @@ async def submit_patrol(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 排名端点 ──────────────────────────────────────────────────────────────────
@@ -263,7 +264,7 @@ async def create_issue(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put("/patrol/issues/{issue_id}")
@@ -285,4 +286,4 @@ async def update_issue(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

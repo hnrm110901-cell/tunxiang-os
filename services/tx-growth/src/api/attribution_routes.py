@@ -23,6 +23,7 @@ from pydantic import BaseModel, field_validator
 from services.roi_attribution import ROIAttributionService
 
 from shared.ontology.src.database import async_session_factory
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -137,7 +138,7 @@ async def get_attribution_dashboard(
             return ok(data)
         except (ValueError, KeyError) as exc:
             log.warning("attribution_dashboard_error", error=str(exc), tenant_id=str(tenant_id))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ async def get_campaign_roi(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +215,7 @@ async def get_journey_roi(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +246,7 @@ async def get_conversion_funnel(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +299,7 @@ async def record_touch(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +357,7 @@ async def attribute_order(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -388,4 +389,4 @@ async def get_top_performers(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc

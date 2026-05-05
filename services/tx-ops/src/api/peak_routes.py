@@ -6,11 +6,12 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/peak", tags=["peak-management"])
 
@@ -46,7 +47,7 @@ async def detect_peak(
         result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 2. 档口负载实时监控 ───
@@ -65,7 +66,7 @@ async def get_dept_load_monitor(
         result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 3. 服务加派建议 ───
@@ -84,7 +85,7 @@ async def suggest_staff_dispatch(
         result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 4. 等位拥堵指标 ───
@@ -103,7 +104,7 @@ async def get_queue_pressure(
         result = await svc(store_id=store_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 5. 高峰事件处理 ───
@@ -129,4 +130,4 @@ async def handle_peak_event(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

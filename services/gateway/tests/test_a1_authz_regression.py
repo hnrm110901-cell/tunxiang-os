@@ -255,7 +255,6 @@ def test_t6_jwt_wrong_issuer_rejected():
     from datetime import datetime, timedelta, timezone
 
     import jwt as pyjwt
-
     from services.jwt_service import JWTService
 
     svc = JWTService()
@@ -282,7 +281,6 @@ def test_t6_jwt_wrong_audience_rejected():
     from datetime import datetime, timedelta, timezone
 
     import jwt as pyjwt
-
     from services.jwt_service import JWTService
 
     svc = JWTService()

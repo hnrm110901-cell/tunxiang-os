@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.employee_points_service import (
     POINT_RULES,
@@ -125,7 +126,7 @@ async def list_performance_scores(
     try:
         raw = await get_scores(db, tid, sid, month, page=page, size=size)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     items = [_row_to_hr_item(dict(r)) for r in raw["items"]]
     return _ok({"items": items, "total": raw["total"], "page": page, "size": size})
 
@@ -147,7 +148,7 @@ async def submit_performance_scores(
     try:
         result = await submit_score(db, tid, scid, eid, body.month, merged)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     return _ok(
         {
             "weighted_total": result["weighted_total"],
@@ -170,7 +171,7 @@ async def get_performance_rankings(
     try:
         rows = await get_rankings(db, tid, sid, month)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     ranked = []
     for r in rows:
         ranked.append(
@@ -198,7 +199,7 @@ async def performance_horse_race(
     try:
         result = await compute_horse_race(db, tid, body.store_ids, body.month)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     leaderboard = []
     for s in result["stores"]:
         avg = float(s["avg_score"])
@@ -235,7 +236,7 @@ async def points_leaderboard(
     try:
         data = await get_leaderboard(db, tid_s, store_id, pl, page=page, size=size)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     items: list[dict[str, Any]] = []
     for it in data["items"]:
         items.append(
@@ -297,7 +298,7 @@ async def points_award(
                     body.note,
                 )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     await db.commit()
     return _ok(result)
 
@@ -313,7 +314,7 @@ async def points_detail(
     try:
         d = await get_employee_points_detail(db, tid_s, employee_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     total = int(d["total_points"])
     entries: list[dict[str, Any]] = []
     run = total

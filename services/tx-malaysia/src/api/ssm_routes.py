@@ -9,8 +9,10 @@
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.ssm_service import SSMService
 
@@ -134,7 +136,7 @@ async def verify_company(
         )
         return VerifyCompanyResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/search", response_model=SearchCompanyResponse)
@@ -154,7 +156,7 @@ async def search_company(
         )
         return SearchCompanyResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/company/{registration_no}", response_model=CompanyDetailResponse)
@@ -170,7 +172,7 @@ async def get_company_detail(
         )
         return CompanyDetailResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/validate-director", response_model=ValidateDirectorResponse)
@@ -191,4 +193,4 @@ async def validate_director(
         )
         return ValidateDirectorResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

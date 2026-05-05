@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 from src.models.expense_enums import ApprovalAction
 
 try:
@@ -131,7 +132,7 @@ async def approve_application(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("approval_approve_failed", error=str(exc), application_id=str(application_id), exc_info=True)
         raise HTTPException(status_code=500, detail="审批操作失败，请稍后重试")
@@ -183,7 +184,7 @@ async def reject_application(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("approval_reject_failed", error=str(exc), application_id=str(application_id), exc_info=True)
         raise HTTPException(status_code=500, detail="驳回操作失败，请稍后重试")
@@ -292,7 +293,7 @@ async def transfer_approval(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("approval_transfer_failed", error=str(exc), application_id=str(application_id), exc_info=True)
         raise HTTPException(status_code=500, detail="转交审批失败，请稍后重试")
