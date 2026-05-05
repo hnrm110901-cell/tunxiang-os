@@ -1,3 +1,38 @@
+## 2026-05-05 P2.5 Phase 2 收尾 + Tier 1 基线扩展（/loop 自驱动 4 PR + 1 docs PR）
+
+### 今日完成
+- [PR #171] Tier 1 基线 47 文件 / 46 测试 docker python:3.11-slim — pipefail 修补后真实 44/46，2 已知坏（saga_buffer disk mock + invoice_tier1 patch 路径）
+- [PR #172] P2.5 batch3 — tx-trade/tx-analytics/tx-member/tx-agent **56 文件 289 处** detail=str() → safe_http_exception
+- [PR #174] P2.5 batch4 — 12 服务/子目录 **45 文件 184 处**（含 tx-ops 补 8 处）+ review P0 修补（codemod re.DOTALL + approval f-string 泄漏）
+- [PR #166 rebase] 1 commit 干净 replay + force-push（解 CONFLICTING）
+- [PR #175] DEVLOG + progress.md 同步
+- [scripts/codemod_safe_http_exception.py] 修 bug — 只识别顶格 import（避免插入函数体内 IndentationError）+ re.DOTALL（多行 HTTPException 支持）
+
+### 关键决策
+- **strict-code-reviewer 揭露 2 P0**：tier1 runner `tail -5` 掩盖 pytest 退出码导致 46/46 假阳；approval_workflow:401 f-string detail 泄漏 `inst['status']` DB 字段。两者均已修
+- **Tier1 真实基线 44/46**（之前 46/46 不可信）：DEPS 加 `pyyaml aiosqlite asyncpg` 修 2 文件，剩 2 文件是测试自身缺陷（saga disk path / invoice_service patch 模块名），独立 follow-up
+- **代理 502 应对**：`reclaude:53896` 间歇性 502 → 切 `ClashX:7890`，5 分支批量 push 通过
+
+### 数据变化
+- P2.5 Phase 2 累积归一处数：**744+ 处**（PR #166 16 + #167 255 + #172 289 + #174 184）
+- 涉及服务：17 个（tx-trade/tx-analytics/tx-member/tx-agent/tx-malaysia/tx-expense/
+  tx-growth/tx-predict/tx-brain/gateway/tx-menu/tx-vietnam/tx-indonesia/tx-ops/
+  tx-org/tx-supply 通过 #167）
+- 新增工具脚本：`scripts/codemod_safe_http_exception.py`（119 行，正则匹配 + 顶层 import 注入 + idempotent + DOTALL）
+- ruff F401 + I001 自动清理：109 errors → 0
+
+### 遗留问题
+- 6 PR 等创始人 admin merge：#166（已 MERGEABLE）/ #167 / #171（含 P0 修补）/ #172 / #174（rebase 后）/ #175
+- tx-finance / tx-supply 残余 38 处由 PK.2/PK.3 baseline 守门作业域处理
+- 4 个 Tier 1 文件需 real PG/fastapi.testclient（test_task_engine_tier1 / test_orders_idempotency_wiring_tier1 / test_sync_pull_*_tier1）
+- 2 新发现 Tier 1 真坏：test_saga_buffer disk mock 3 个 / test_invoice_tier1 patch 路径 2 个
+
+### 明日计划
+- 6 PR admin merge 后清点 P2.5 真实残余 + 修 saga_buffer + invoice_tier1 测试缺陷
+- PI.2 — 73 历史 alembic head 分批收敛（独立 sprint）
+
+---
+
 ## 2026-05-05 PK 系列 — RLS 真注入紧急修 + text(f) 全 Tier 1 域 baseline 守门收官
 
 > 本会话由 reviewer 发现的 3 处真 RLS f-string 注入起 → 全仓 SET LOCAL :tid 模式可靠性
@@ -41,7 +76,6 @@
 - 评估 PI.2 73 历史 alembic head 收敛工程立项
 - 评估 PJ.2 在 staging PG 实跑 CONCURRENTLY 验证（需 staging 访问）
 - 等待 PE.2 客户协作
-
 ---
 
 ## 2026-05-05 PD.2 收尾 — 积分系统 29 测试全绿（本机 Python 3.11）
