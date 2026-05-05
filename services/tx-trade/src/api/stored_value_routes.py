@@ -216,7 +216,7 @@ async def get_stored_value(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
     account = await _get_or_create_account(db, tenant_id, member_id)
     await db.commit()
@@ -264,7 +264,7 @@ async def recharge(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
     account = await _get_or_create_account(db, tenant_id, member_id)
     account_id = str(account["id"])
@@ -332,7 +332,7 @@ async def consume(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
     # 先确保账户存在（只创建，不用于扣款判断）
     account = await _get_or_create_account(db, tenant_id, member_id)
@@ -416,7 +416,7 @@ async def refund(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant_id = _get_tenant_id(request)
-    await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
+    await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
     # 校验原始消费流水
     orig_row = await db.execute(
