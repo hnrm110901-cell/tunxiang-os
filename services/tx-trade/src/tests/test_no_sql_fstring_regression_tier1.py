@@ -144,6 +144,59 @@ def test_tx_trade_text_fstring_baseline_exact() -> None:
         )
 
 
+# ──────────────── PK.2 / PK.3：tx-finance + tx-supply 同模式 baseline 守门 ────────────────
+#
+# 复用 PK.1 的精确 baseline 锁定模式（既防退化也防漂移）扩展到另两个 Tier 1 财务域。
+# 这两个域当前命中均为项目内白名单 conditions list / set_clauses 拼接，零真注入面，
+# 但凡新 PR 引入新的 text(f) 拼接都会被 fail，强迫 reviewer 改用 :param + bindparams。
+#
+# baseline 数=PK.2/PK.3 立项时实测命中数。下调请同步更新对应常量。
+# 上调（即新增 text(f) 拼接）会 fail — 请改走 set_config / bindparams 模式。
+
+_TX_FINANCE_TEXT_FSTRING_BASELINE = 21
+_TX_SUPPLY_TEXT_FSTRING_BASELINE = 23
+
+
+def test_tx_finance_text_fstring_baseline_exact() -> None:
+    """tx-finance 域 text(f) 命中数必须等于 baseline（防退化 + 防漂移）。
+
+    与 tx-trade 同等待遇 — Tier 1 财务结算域，资金安全敏感。
+    新增 text(f) → fail；清理 → 同步下调 _TX_FINANCE_TEXT_FSTRING_BASELINE。
+    """
+    current = _count_text_fstring_in_dir("services/tx-finance/src")
+    if current > _TX_FINANCE_TEXT_FSTRING_BASELINE:
+        pytest.fail(
+            f"tx-finance/src text(f) 命中数 {current} > baseline {_TX_FINANCE_TEXT_FSTRING_BASELINE}\n"
+            "Tier 1 财务结算域引入新 text(f) f-string SQL — "
+            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式）。"
+        )
+    if current < _TX_FINANCE_TEXT_FSTRING_BASELINE:
+        pytest.fail(
+            f"tx-finance/src text(f) 命中数 {current} < baseline {_TX_FINANCE_TEXT_FSTRING_BASELINE}\n"
+            "已有清理工作，请下调 _TX_FINANCE_TEXT_FSTRING_BASELINE 锁定新基线。"
+        )
+
+
+def test_tx_supply_text_fstring_baseline_exact() -> None:
+    """tx-supply 域 text(f) 命中数必须等于 baseline（防退化 + 防漂移）。
+
+    供应链域虽非直接资金路径，但库存/BOM/采购数据写入污染同样能放大下游决策风险。
+    新增 text(f) → fail；清理 → 同步下调 _TX_SUPPLY_TEXT_FSTRING_BASELINE。
+    """
+    current = _count_text_fstring_in_dir("services/tx-supply/src")
+    if current > _TX_SUPPLY_TEXT_FSTRING_BASELINE:
+        pytest.fail(
+            f"tx-supply/src text(f) 命中数 {current} > baseline {_TX_SUPPLY_TEXT_FSTRING_BASELINE}\n"
+            "供应链域引入新 text(f) f-string SQL — "
+            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式）。"
+        )
+    if current < _TX_SUPPLY_TEXT_FSTRING_BASELINE:
+        pytest.fail(
+            f"tx-supply/src text(f) 命中数 {current} < baseline {_TX_SUPPLY_TEXT_FSTRING_BASELINE}\n"
+            "已有清理工作，请下调 _TX_SUPPLY_TEXT_FSTRING_BASELINE 锁定新基线。"
+        )
+
+
 def test_apikeys_dir_strong_baseline() -> None:
     """shared/apikeys/src/ 整目录强基线 — 任何新增 .py 都不能引入 f-string SQL。"""
     apikeys = _REPO_ROOT / "shared" / "apikeys" / "src"
