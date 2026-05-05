@@ -42,6 +42,8 @@ class CashChannel(BasePaymentChannel):
         )
 
     async def query(self, payment_id: str, trade_no: Optional[str] = None) -> PaymentResult:
+        # 现金 query 永远成功（pure logic，无外部调用），仍 inc 让告警分母完整
+        payment_channel_requests_total.labels(channel="cash", status="2xx").inc()
         return PaymentResult(
             payment_id=payment_id,
             status=PayStatus.SUCCESS,
@@ -56,6 +58,7 @@ class CashChannel(BasePaymentChannel):
         reason: str = "",
         refund_id: Optional[str] = None,
     ) -> RefundResult:
+        payment_channel_requests_total.labels(channel="cash", status="2xx").inc()
         return RefundResult(
             refund_id=refund_id or f"REFCASH{uuid.uuid4().hex[:10].upper()}",
             payment_id=payment_id,

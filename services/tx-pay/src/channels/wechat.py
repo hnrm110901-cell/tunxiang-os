@@ -97,6 +97,7 @@ class WechatPayChannel(BasePaymentChannel):
 
     async def query(self, payment_id: str, trade_no: Optional[str] = None) -> PaymentResult:
         if self._service is None:
+            payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.SUCCESS,
@@ -106,7 +107,16 @@ class WechatPayChannel(BasePaymentChannel):
                 channel_data={"mock": True},
             )
 
-        result = await self._service.query_order(payment_id)
+        try:
+            result = await self._service.query_order(payment_id)
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="wechat", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="wechat", status="connect_error").inc()
+            raise
+
+        payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
         status_map = {
             "SUCCESS": PayStatus.SUCCESS,
             "NOTPAY": PayStatus.PENDING,
@@ -132,6 +142,7 @@ class WechatPayChannel(BasePaymentChannel):
         rid = refund_id or f"REF{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
 
         if self._service is None:
+            payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
             return RefundResult(
                 refund_id=rid,
                 payment_id=payment_id,
@@ -141,13 +152,22 @@ class WechatPayChannel(BasePaymentChannel):
                 refunded_at=datetime.now(timezone.utc),
             )
 
-        result = await self._service.refund(
-            out_trade_no=payment_id,
-            out_refund_no=rid,
-            refund_fen=refund_amount_fen,
-            total_fen=refund_amount_fen,  # 调用方保证正确
-            reason=reason,
-        )
+        try:
+            result = await self._service.refund(
+                out_trade_no=payment_id,
+                out_refund_no=rid,
+                refund_fen=refund_amount_fen,
+                total_fen=refund_amount_fen,  # 调用方保证正确
+                reason=reason,
+            )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="wechat", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="wechat", status="connect_error").inc()
+            raise
+
+        payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
         return RefundResult(
             refund_id=rid,
             payment_id=payment_id,
@@ -158,9 +178,23 @@ class WechatPayChannel(BasePaymentChannel):
 
     async def verify_callback(self, headers: dict, body: bytes) -> CallbackPayload:
         if self._service is None:
+            payment_channel_requests_total.labels(channel="wechat", status="4xx").inc()
             raise NotImplementedError("Mock 模式不支持回调验证")
 
-        data = await self._service.verify_callback(headers, body)
+        try:
+            data = await self._service.verify_callback(headers, body)
+        except ValueError:
+            # 签名验证失败（PR #195 banquet_payment_routes 的安全核心）
+            payment_channel_requests_total.labels(channel="wechat", status="4xx").inc()
+            raise
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="wechat", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="wechat", status="connect_error").inc()
+            raise
+
+        payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
         return CallbackPayload(
             payment_id=data.get("out_trade_no", ""),
             trade_no=data.get("transaction_id", ""),

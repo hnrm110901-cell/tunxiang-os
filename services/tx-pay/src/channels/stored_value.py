@@ -124,6 +124,8 @@ class StoredValueChannel(BasePaymentChannel):
         )
 
     async def query(self, payment_id: str, trade_no: Optional[str] = None) -> PaymentResult:
+        # PR #200 follow-up：储值 query 当前为 mock，但仍 inc 让告警分母统计完整
+        payment_channel_requests_total.labels(channel="stored_value", status="2xx").inc()
         return PaymentResult(
             payment_id=payment_id,
             status=PayStatus.SUCCESS,
@@ -141,6 +143,7 @@ class StoredValueChannel(BasePaymentChannel):
         rid = refund_id or f"REFSV{uuid.uuid4().hex[:10].upper()}"
 
         if self._http is None:
+            payment_channel_requests_total.labels(channel="stored_value", status="2xx").inc()
             return RefundResult(
                 refund_id=rid,
                 payment_id=payment_id,
@@ -150,17 +153,25 @@ class StoredValueChannel(BasePaymentChannel):
             )
 
         # 调用 tx-member 退还余额
-        resp = await self._http.post(
-            f"{_TX_MEMBER_BASE}/api/v1/member/stored-value/refund",
-            json={
-                "payment_id": payment_id,
-                "refund_amount_fen": refund_amount_fen,
-                "reason": reason,
-                "refund_id": rid,
-            },
-        )
+        try:
+            resp = await self._http.post(
+                f"{_TX_MEMBER_BASE}/api/v1/member/stored-value/refund",
+                json={
+                    "payment_id": payment_id,
+                    "refund_amount_fen": refund_amount_fen,
+                    "reason": reason,
+                    "refund_id": rid,
+                },
+            )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="stored_value", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="stored_value", status="connect_error").inc()
+            raise
 
         if resp.status_code == 200:
+            payment_channel_requests_total.labels(channel="stored_value", status="2xx").inc()
             return RefundResult(
                 refund_id=rid,
                 payment_id=payment_id,
@@ -168,6 +179,11 @@ class StoredValueChannel(BasePaymentChannel):
                 amount_fen=refund_amount_fen,
                 refunded_at=datetime.now(timezone.utc),
             )
+
+        if resp.status_code >= 500:
+            payment_channel_requests_total.labels(channel="stored_value", status="5xx").inc()
+        else:
+            payment_channel_requests_total.labels(channel="stored_value", status="4xx").inc()
 
         return RefundResult(
             refund_id=rid,
