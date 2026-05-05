@@ -39,6 +39,8 @@ _VALID_CHANNELS = frozenset(
         "meituan",
         "eleme",
         "douyin",
+        "amap",
+        "taobao",
         "miniapp",
         "all",
     }
@@ -49,7 +51,9 @@ _CHANNEL_DISPLAY = {
     "takeaway": "外卖（自营）",
     "meituan": "外卖-美团",
     "eleme": "外卖-饿了么",
-    "douyin": "抖音团购",
+    "douyin": "外卖-抖音",
+    "amap": "外卖-高德",
+    "taobao": "闪购-淘宝",
     "miniapp": "小程序",
     "all": "全渠道",
 }
