@@ -228,14 +228,29 @@
 - PR #201 也包含 PR #195 全部 18 commits + nonce store 2 commits（同样基于）
 - PR #195 引入了 `_EDGE_SYNC_RECENT_NONCES` 进程内 dict + `_gc_old_nonces`
 - PR #201 在其上**完全替换**这套实现，改为 `from ..edge_sync_nonce_store import get_nonce_store`
-- PR #196 不动 sync_ingest_router 的 nonce 逻辑（保留 dict）
-- 结果：`#195 → #196` 合到 main 后，`#201` 的 sync_ingest_router 改动会与 main 上 #196 留下的 dict 实现冲突
 
-**正确合并路径**：
-1. merge #195
-2. merge #196
-3. **#201 作者 rebase #201 onto main（合 #196 后），手动决策保留 nonce_store 实现，删除 dict**
-4. merge rebased #201
+> **2026-05-05 实测推翻 verifier 误判**：
+>
+> ```bash
+> $ git checkout origin/audit/p0-followup-edge-hmac-client
+> $ git merge --no-commit origin/audit/p0-followup-redis-nonce-store
+> Automatic merge went well; stopped before committing as requested
+> $ git ls-files -u   # 冲突文件 → 空
+> ```
+>
+> 真实情况：
+> - **PR #196 完全不动 `sync_ingest_router.py`**（diff stat 仅改 `edge/sync-engine/*` 5 文件）
+> - **PR #201 只改 `sync_ingest_router.py` + 新加 2 文件**（不碰 edge/）
+> - 两 PR 文件域 100% 不重叠 → git 三方合并自动取 #201 版本（#196 没动 → 取动了的那一边）
+>
+> verifier 把"逻辑替代关系"（#201 替代 #195 留下的 dict）误判为"代码冲突"。
+> git merge 不感知这种语义关系。
+>
+> **实际合并路径无需 rebase**：
+> 1. merge #195
+> 2. merge #196 / #201 / #200 / #202（任意顺序，互不冲突）
+> 3. ops 顺序约束：`EDGE_SYNC_NONCE_REDIS_URL` 必须在 #201 已 merge 后再配，
+>    `EDGE_SYNC_HMAC_REQUIRED=true` 必须在 #196 客户端升级后才设
 
 ### ⚠️ 条件 conflict：#199 alembic 链断裂
 
