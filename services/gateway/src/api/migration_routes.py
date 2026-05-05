@@ -27,6 +27,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..response import ok
 
 logger = structlog.get_logger(__name__)
@@ -194,7 +196,7 @@ async def get_pending_members_summary(
 
     except Exception as exc:
         logger.error("pending_members_summary_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
 
 @router.get("/pending-members")
@@ -281,7 +283,7 @@ async def list_pending_members(
 
     except Exception as exc:
         logger.error("list_pending_members_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
 
 @router.post("/pending-members/{record_id}/approve")
@@ -402,7 +404,7 @@ async def approve_pending_member(
         raise
     except Exception as exc:
         logger.error("approve_pending_member_failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
 
 @router.post("/pending-members/{record_id}/reject")
@@ -467,7 +469,7 @@ async def reject_pending_member(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
 
 # ── 内部辅助 ──────────────────────────────────────────────────────────

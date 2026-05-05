@@ -31,6 +31,7 @@ from models.brand_strategy import (
 from services.brand_strategy_db_service import BrandStrategyDbService
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -101,7 +102,7 @@ async def create_profile(
     try:
         profile = await _svc.create_profile(tenant_id, body, db)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     return ok_response(profile)
 
 
@@ -116,7 +117,7 @@ async def update_profile(
     try:
         profile = await _svc.update_profile(tenant_id, profile_id, body, db)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     if profile is None:
         raise HTTPException(status_code=404, detail=f"品牌档案不存在: {profile_id}")
     return ok_response(profile)
@@ -148,7 +149,7 @@ async def add_calendar_entry(
     try:
         entry = await _svc.create_calendar_entry(tenant_id, body, db)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     return ok_response(entry)
 
 
@@ -178,7 +179,7 @@ async def add_constraint(
     try:
         constraint = await _svc.create_constraint(tenant_id, body, db)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     return ok_response(constraint)
 
 
@@ -206,5 +207,5 @@ async def get_content_brief(
     try:
         brief = await _svc.build_content_brief(tenant_id, channel, segment, purpose, db)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     return ok_response(brief.model_dump(mode="json"))

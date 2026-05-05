@@ -15,8 +15,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
+
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.auto_dispatch import (
     check_sla,
@@ -104,7 +106,7 @@ async def handle_agent_alert(
             )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/rules")

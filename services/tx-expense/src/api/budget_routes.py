@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.budget_service import BudgetService
 
@@ -115,7 +116,7 @@ async def create_budget(
         return {"ok": True, "data": result}
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("budget_create_db_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
@@ -280,7 +281,7 @@ async def update_budget(
         raise HTTPException(status_code=404, detail="预算不存在或无权访问")
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error("budget_update_failed", error=str(exc), budget_id=str(budget_id), exc_info=True)
@@ -317,7 +318,7 @@ async def approve_budget(
         raise HTTPException(status_code=404, detail="预算不存在或无权访问")
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error("budget_approve_failed", error=str(exc), budget_id=str(budget_id), exc_info=True)
@@ -359,7 +360,7 @@ async def add_allocation(
         raise HTTPException(status_code=404, detail="预算不存在或无权访问")
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error("budget_allocation_add_failed", error=str(exc), budget_id=str(budget_id), exc_info=True)
@@ -406,7 +407,7 @@ async def adjust_budget(
         raise HTTPException(status_code=404, detail="预算不存在或无权访问")
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         await db.rollback()
         log.error("budget_adjust_failed", error=str(exc), budget_id=str(budget_id), exc_info=True)

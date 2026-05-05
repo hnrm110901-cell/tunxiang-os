@@ -18,7 +18,6 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
 
 import pytest
-
 from services.dish_health_score import (
     DishHealthScoreEngine,
     ScoreWeights,

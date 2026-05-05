@@ -18,6 +18,8 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import ValidationError
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..agents.activity_roi.pipeline import ActivityROIPipeline
 from ..agents.activity_roi.schemas import (
     ActivityROIRequest,
@@ -98,7 +100,7 @@ async def predict_activity_roi(
         return await pipeline.predict(req)
     except InsufficientHistoricalDataError as exc:
         logger.info("activity_roi_insufficient_history", tenant=tenant_id, error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except (RuntimeError, ValueError, TimeoutError) as exc:
         logger.error("activity_roi_pipeline_failed", tenant=tenant_id, error=str(exc))
         raise HTTPException(status_code=500, detail="activity ROI prediction failed") from exc

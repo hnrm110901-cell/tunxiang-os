@@ -7,11 +7,12 @@
   - POST /api/v1/ppn/validate-npwp  验证 NPWP 税号格式
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.ppn_service import PPNService
 
@@ -96,7 +97,7 @@ async def calculate_ppn(
             total_ppn_fen=result["total_ppn_fen"],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/rates")

@@ -6,11 +6,12 @@
   - GET  /api/v1/sst/categories  查询 SST 分类选项
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.sst_service import SSTService
 
@@ -78,7 +79,7 @@ async def calculate_sst(
             total_sst_fen=result["total_sst_fen"],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/rates")

@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger()
 
@@ -79,7 +80,7 @@ async def run_diagnosis(
         }
     except ValueError as exc:
         log.error("diagnosis_value_error", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层HTTP兜底
         log.error("diagnosis_unexpected_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="诊断执行失败") from exc

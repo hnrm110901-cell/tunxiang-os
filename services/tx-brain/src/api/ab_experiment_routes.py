@@ -30,6 +30,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.ab_experiment_service import (
     ABExperimentService,
@@ -143,7 +144,7 @@ async def create_experiment(
             created_by=x_operator_id,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     service = ABExperimentService(db, tenant_id=x_tenant_id)
     try:
@@ -268,7 +269,7 @@ async def start_experiment(
     try:
         result = await service.start_experiment(experiment_id)
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"启动失败: {exc}") from exc
@@ -287,7 +288,7 @@ async def pause_experiment(
     try:
         result = await service.pause_experiment(experiment_id)
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"暂停失败: {exc}") from exc
@@ -313,7 +314,7 @@ async def terminate_experiment(
             winner_arm_id=req.winner_arm_id,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"终止失败: {exc}") from exc
@@ -336,7 +337,7 @@ async def experiment_significance(
             use_bayesian=use_bayesian,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail=f"评估失败: {exc}") from exc
     return {"ok": True, "data": result}
@@ -357,7 +358,7 @@ async def assign(
             entity_id=req.entity_id,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"分配失败: {exc}") from exc
@@ -394,7 +395,7 @@ async def record_event(
             idempotency_key=req.idempotency_key,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     service = ABExperimentService(db, tenant_id=x_tenant_id)
     try:
         result = await service.record_event(
@@ -402,7 +403,7 @@ async def record_event(
             inp=inp,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"记录失败: {exc}") from exc

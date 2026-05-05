@@ -41,6 +41,7 @@ from services.attribution_aggregator import AttributionAggregator
 from services.touch_tracker import TouchTracker
 
 from shared.ontology.src.database import async_session_factory
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -217,7 +218,7 @@ async def track_click(
         except (ValueError, KeyError) as exc:
             await db.rollback()
             log.warning("track_click_error", touch_id=touch_id, error=str(exc))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +314,7 @@ async def list_touches(
             return ok({"items": items, "total": total, "page": page, "size": size})
         except (ValueError, KeyError) as exc:
             log.warning("list_touches_error", error=str(exc), tenant_id=str(tenant_id))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +401,7 @@ async def list_conversions(
             return ok({"items": items, "total": total, "page": page, "size": size})
         except (ValueError, KeyError) as exc:
             log.warning("list_conversions_error", error=str(exc), tenant_id=str(tenant_id))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -519,7 +520,7 @@ async def get_campaign_summary(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +571,7 @@ async def get_channel_performance(
             )
         except (ValueError, KeyError) as exc:
             log.warning("channel_performance_error", error=str(exc), tenant_id=str(tenant_id))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -618,7 +619,7 @@ async def get_segment_performance(
             )
         except (ValueError, KeyError) as exc:
             log.warning("segment_performance_error", error=str(exc), tenant_id=str(tenant_id))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -692,7 +693,7 @@ async def record_touch(
         except (ValueError, KeyError) as exc:
             await db.rollback()
             log.warning("record_touch_error", error=str(exc), tenant_id=str(tenant_id))
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -766,4 +767,4 @@ async def attribute_conversion(
                 error=str(exc),
                 tenant_id=str(tenant_id),
             )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise safe_http_exception(400, "请求参数无效", exc) from exc

@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.traffic_predictor import TrafficPredictor
 
@@ -105,7 +106,7 @@ async def get_revenue_forecast(
         traffic = await predictor.forecast_7days(store_id, tenant_id, db, city=city)
     except (ValueError, KeyError) as exc:
         logger.warning("revenue_forecast.traffic_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     avg_check_fen = await _get_avg_check(store_id, tenant_id, db)
 
