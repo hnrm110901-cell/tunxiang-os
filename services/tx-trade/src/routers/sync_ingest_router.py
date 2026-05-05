@@ -50,8 +50,14 @@ router = APIRouter(prefix="/api/v1/sync", tags=["edge-sync"])
 #   - 环境变量 EDGE_SYNC_HMAC_SECRET 未配置 → 仅 warn 不阻断（dev/staging 过渡期）
 #   - 配置后 → 缺 token / 校验失败 / 时钟偏差 > 300s / nonce 重放 → 401
 
-_EDGE_SYNC_TS_SKEW_SECONDS = 300
-_EDGE_SYNC_RECENT_NONCES: dict[str, float] = {}  # nonce → timestamp，5min 窗口
+_EDGE_SYNC_TS_SKEW_DEFAULT = 300
+
+# WARNING（独立 review P1-1）：进程内 dict，**多副本部署下防重放失效**。
+# k8s HPA 副本 ≥ 2 时同一 nonce 打到不同 pod 无法共享检测；同一变更可被
+# 重放至多 (replica_count) 次直到被业务层 change_id 幂等去重救场。
+# 生产 follow-up：改用 Redis 共享存储（SETEX nonce → ttl），
+# 或显式接受"多副本下退化为时间窗口防重放"。
+_EDGE_SYNC_RECENT_NONCES: dict[str, float] = {}
 
 
 def _edge_sync_secret() -> str:
@@ -66,9 +72,32 @@ def _edge_sync_required() -> bool:
     return env in ("production", "prod", "gray")
 
 
+def _edge_sync_skew_seconds() -> int:
+    """时间戳容忍窗口（秒）。
+
+    独立 review P0-2：默认 300s 防重放足够，但与 4h 离线 SLA 矛盾 ——
+    边缘 sync-engine 离线 4h 重连时若签名 ts 是写入时的，全部请求被拒。
+
+    解决路径分两层：
+      1. 边缘客户端必须在 **send 时签名**（非 write 时），原始写入时间戳
+         放 payload `original_ts` 字段供业务层幂等使用（推荐）。
+      2. 服务端窗口可经 EDGE_SYNC_TS_SKEW_SECONDS 调到（如 14400 = 4h）以兜底
+         尚未升级的老 edge 客户端，但每多放宽 1s 都给攻击者 1s 重放窗口，
+         **必须搭配 Redis 共享 nonce store** 防重放被放大。
+
+    生产推荐：默认 300 + edge 客户端 send-time 签名（更安全）。
+    """
+    raw = os.environ.get("EDGE_SYNC_TS_SKEW_SECONDS", str(_EDGE_SYNC_TS_SKEW_DEFAULT))
+    try:
+        v = int(raw)
+        return max(60, min(v, 86400))  # clamp 1min..24h
+    except ValueError:
+        return _EDGE_SYNC_TS_SKEW_DEFAULT
+
+
 def _gc_old_nonces(now: float) -> None:
-    """清理 5 分钟外的 nonce。"""
-    threshold = now - _EDGE_SYNC_TS_SKEW_SECONDS
+    """清理超过 ts skew 窗口外的 nonce。"""
+    threshold = now - _edge_sync_skew_seconds()
     expired = [k for k, v in _EDGE_SYNC_RECENT_NONCES.items() if v < threshold]
     for k in expired:
         _EDGE_SYNC_RECENT_NONCES.pop(k, None)
@@ -111,7 +140,7 @@ async def verify_edge_sync_auth(
     except (TypeError, ValueError):
         raise HTTPException(status_code=401, detail="invalid X-Edge-Sync-Ts") from None
     now = time.time()
-    if abs(now - ts) > _EDGE_SYNC_TS_SKEW_SECONDS:
+    if abs(now - ts) > _edge_sync_skew_seconds():
         logger.warning("edge_sync_auth_ts_skew", store=x_edge_store_id, skew=int(now - ts))
         raise HTTPException(status_code=401, detail="edge sync timestamp skew")
 
@@ -280,7 +309,7 @@ def _require_tenant(
 )
 async def ingest_changes(
     req: IngestRequest,
-    tenant_id: str = Depends(_require_tenant),
+    tenant_id: str = Depends(verify_edge_sync_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     response = IngestResponse(accepted=[], conflicts=[], errors=[], error_messages=[])
@@ -390,7 +419,7 @@ async def get_cloud_changes(
     ),
     page: int = Query(default=1, ge=1, description="页码"),
     size: int = Query(default=500, ge=1, le=500, description="每页条数"),
-    tenant_id: str = Depends(_require_tenant),
+    tenant_id: str = Depends(verify_edge_sync_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     try:
@@ -518,7 +547,7 @@ async def pull_events(
         ),
     ),
     limit: int = Query(default=500, ge=1, le=500),
-    tenant_id: str = Depends(_require_tenant),
+    tenant_id: str = Depends(verify_edge_sync_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     try:
