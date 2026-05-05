@@ -91,7 +91,45 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
 
     try:
         url = f"{target_url}{request.url.path}"
-        headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
+        # 审计 S-02（P0）：剥客户端可控的认证 header，从 request.state 重注入。
+        # AuthMiddleware 已在 request.state.{tenant_id,user_id,role} 写入受信值；
+        # 任何客户端传入的 X-Tenant-ID / X-Internal-* 都视为伪造直接覆盖，
+        # 防止经 gateway 后伪造租户绕 RLS。
+        # Authorization 仍透传（下游 ApiKey 中间件 / 审计日志可能需要原 JWT），
+        # 但下游应优先信任由 gateway 重注入的 X-Tenant-ID / X-Internal-JWT。
+        _STRIP = {
+            "host",
+            "content-length",
+            "x-tenant-id",
+            "x-internal-user-id",
+            "x-internal-role",
+            "x-internal-jwt",
+        }
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in _STRIP}
+        trusted_tenant_id = getattr(request.state, "tenant_id", "") or ""
+        if trusted_tenant_id:
+            headers["X-Tenant-ID"] = str(trusted_tenant_id)
+        trusted_user_id = getattr(request.state, "user_id", "") or ""
+        if trusted_user_id:
+            headers["X-Internal-User-Id"] = str(trusted_user_id)
+        trusted_role = getattr(request.state, "role", "") or ""
+        if trusted_role:
+            headers["X-Internal-Role"] = str(trusted_role)
+        # 短期 HS256 内部 JWT —— 下游服务可挂 InternalJwtMiddleware 校验
+        # （follow-up：随服务升级把 X-Tenant-ID 信任源切到此 JWT）
+        try:
+            from shared.security.src.internal_jwt import mint_internal_jwt
+
+            internal_jwt = mint_internal_jwt(
+                tenant_id=str(trusted_tenant_id),
+                user_id=str(trusted_user_id),
+                role=str(trusted_role),
+            )
+            if internal_jwt:
+                headers["X-Internal-JWT"] = internal_jwt
+        except ImportError:
+            # helper 尚未部署到环境时降级 — 不阻塞 proxy
+            pass
         body = await request.body()
 
         resp = await _http_pool.request(
