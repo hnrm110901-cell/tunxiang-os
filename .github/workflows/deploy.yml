@@ -148,8 +148,10 @@ jobs:
               exit 1
             fi
             # 解析 P99 并强制 < 200ms（Tier 1 SLO）
-            P99=$(python3 -c "import json,sys; d=json.load(open('$K6_FILE')); print(d.get('metrics',{}).get('http_req_duration',{}).get('p(99)','999'))")
-            P99_INT=${P99%.*}
+            # 独立 review P2-2：用 python3 直接 int 转换，避免 ${P99%.*} 在科学
+            # 计数法（如 1.5e+02 = 150）下被截成 "1" 误判通过的边界 bug。
+            P99=$(python3 -c "import json; d=json.load(open('$K6_FILE')); print(d.get('metrics',{}).get('http_req_duration',{}).get('p(99)','999'))")
+            P99_INT=$(python3 -c "print(int(float('$P99')))" 2>/dev/null || echo 999)
             if [ "$P99_INT" -ge 200 ]; then
               echo "::error::k6 实测 P99 = ${P99}ms ≥ 200ms — 违反 Tier 1 SLO（CLAUDE.md §22）"
               exit 1
