@@ -104,10 +104,18 @@ groups:
           description: "Agent类型 {{ $labels.agent_type }} 失败率为 {{ $value | humanizePercentage }}。"
 
   # ─── 支付 SLO 告警（审计 OPS-002 修复：原本零支付 SLO 规则）───
-  # 前提：tx-trade / tx-pay 必须暴露以下 Counter 指标：
+  #
+  # ⚠️ 独立 review P1-3：本组规则当前**不会触发**，因为下列指标在代码库里
+  # 还未被任何服务暴露（grep -r "payment_saga_total" services/ 返回 0）：
   #   payment_saga_total{result="success|failed|compensated"}
   #   payment_saga_compensated_total{reason="..."}
   #   payment_channel_requests_total{channel="wechat|alipay|lakala", status="2xx|4xx|5xx"}
+  #
+  # 规则保留作为指标契约 + 后续暴露后立即生效；徐记海鲜 DEMO 前必须做完：
+  #   1. tx-trade payment_saga_service.py 加 prometheus_client.Counter 实例化
+  #   2. tx-pay channels/{wechat,alipay,lakala}.py 在请求发出/响应处加 increment
+  #   3. 服务暴露 /metrics（用 prometheus_fastapi_instrumentator 已在 main.py 接好）
+  #   4. 跑一次端到端微信支付看告警是否能在故障注入下 fire
   # 暴露方式参考 services/tx-pay/src/metrics.py（如不存在需新增）。
   # SLO 目标（CLAUDE.md §22）：支付成功率 > 99.9%。
   - name: tunxiang-payment-slo
