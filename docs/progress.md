@@ -2401,7 +2401,7 @@ TestV264MigrationFileStructure（结构契约,防漂移）
 
 ### 跨会话事件（pid 921 / s004 tab）
 本会话期间 s004 tab 的并发 Claude Code 主会话（vanilla `claude`，非 OMC subagent）独立完成审计 P0 批次：
-- **PR #195** audit/p0-fixes-batch-1-5 — 23 P0 阻断项（S-02/S-03/S-04/S-05/F1/F2/F3/OPS-001/002/003/004 + 双轮独立 review，18 commit + 我误置的 1 README commit = 19 audit-specific + 1 base = 20 total）
+- **PR #195** audit/p0-fixes-batch-1-5 — 23 P0 阻断项（S-02/S-03/S-04/S-05/F1/F2/F3/OPS-001/002/003/004 + 双轮独立 review；分支共 20 commit = 1 base 共享 + 18 pid 921 audit + 1 我误置的 README）
 - **PR #196** audit/p0-followup-edge-hmac-client — edge sync-engine 客户端 HMAC 签名（解 #195 NEW-P0 阻塞，2 commit / 15 tier1 测试全过）
 - ⚠️ **#195 CI UNSTABLE**：源/测试配对 fail（CLAUDE.md §20 违规 — Tier 1 源改没配 *tier1*.py）+ Tier 1 测试 regression（tx-trade/tx-org）+ Ruff×9 → admin merge 前需 pid 921 修
 - 双 PR 必须**严格按 #195 → #196 顺序合**，倒序或漏合会让 `EDGE_SYNC_HMAC_REQUIRED=true` cutover 时打死全部 Mac mini
