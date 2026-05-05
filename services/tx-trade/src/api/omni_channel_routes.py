@@ -42,6 +42,8 @@ _PLATFORM_SECRETS: dict[str, str] = {
     "meituan": os.environ.get("MEITUAN_WEBHOOK_SECRET", ""),
     "eleme": os.environ.get("ELEME_WEBHOOK_SECRET", ""),
     "douyin": os.environ.get("DOUYIN_WEBHOOK_SECRET", ""),
+    "amap": os.environ.get("AMAP_WEBHOOK_SECRET", ""),
+    "taobao": os.environ.get("TAOBAO_WEBHOOK_SECRET", ""),
 }
 
 
@@ -79,10 +81,28 @@ def _verify_douyin_signature(body: bytes, signature: str, secret: str) -> bool:
     return hmac.compare_digest(expected, signature.lower())
 
 
+def _verify_amap_signature(body: bytes, signature: str, secret: str) -> bool:
+    """高德签名验证：MD5(body + secret)"""
+    if not secret:
+        return True
+    expected = hashlib.md5(body + secret.encode()).hexdigest().upper()
+    return hmac.compare_digest(expected, signature.upper())
+
+
+def _verify_taobao_signature(body: bytes, signature: str, secret: str) -> bool:
+    """淘宝签名验证：MD5(body + secret)"""
+    if not secret:
+        return True
+    expected = hashlib.md5(body + secret.encode()).hexdigest().upper()
+    return hmac.compare_digest(expected, signature.upper())
+
+
 _SIGNATURE_VERIFIERS = {
     "meituan": _verify_meituan_signature,
     "eleme": _verify_eleme_signature,
     "douyin": _verify_douyin_signature,
+    "amap": _verify_amap_signature,
+    "taobao": _verify_taobao_signature,
 }
 
 
@@ -98,6 +118,8 @@ def _verify_platform_signature(platform: str, body: bytes, request: Request) -> 
         "meituan": "X-Meituan-Signature",
         "eleme": "X-Eleme-Signature",
         "douyin": "X-Douyin-Signature",
+        "amap": "X-Amap-Signature",
+        "taobao": "X-Taobao-Signature",
     }
     signature = request.headers.get(sig_header_map.get(platform, "X-Signature"), "")
     if not signature:

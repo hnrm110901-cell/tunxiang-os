@@ -312,7 +312,7 @@ class OmniChannelService:
     - 接单后自动推送到KDS
     """
 
-    PLATFORMS = ["meituan", "eleme", "douyin"]
+    PLATFORMS = ["meituan", "eleme", "douyin", "amap", "taobao"]
 
     def __init__(self, auto_reject_minutes: int = 3) -> None:
         self.auto_reject_minutes = auto_reject_minutes
