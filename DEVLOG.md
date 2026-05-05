@@ -1,3 +1,20 @@
+## 2026-05-05 PD.2 收尾 — 积分系统 29 测试全绿（本机 Python 3.11）
+
+### 今日完成
+- [tx-member] 跑 `services/tx-member/src/tests/test_points_tier1.py` 全 29 用例 → **29 passed in 0.46s**
+- 7 类场景全覆盖：EarnRules / CashOffset / MarginFloorConstraint / CrossStoreSettlement / FifoExpiry / RoutesNotMocked / ExpiryWorker
+- 不再依赖 Docker — 本机 Python 3.11.15 直接 pytest 即可
+
+### 关键决策
+- **PD.2 阻塞解除** — 之前以为需要 Docker Python 3.11+，实际本机已装 `~/.local/bin/python3.11`，直接跑 0.46s 完成
+- 任务 #28（PD.2 原条目）+ #31（PD.2 重新定位）一并 completed
+
+### 遗留问题（不变）
+- PE.2 — 与首批客户对账校验阶梯费率（仍待客户协作）
+- text(f) 全仓 codemod / PI.2 73 历史 head 收敛（独立工程立项）
+
+---
+
 ## 2026-05-05 PJ 系列后续修复（7 PR admin merge / CodeRabbit post-merge P1 全清 / 主分支事件总线收口）
 
 > 上一会话 7 PR 合并后 CodeRabbit 发现 6 处真 P1 + 主分支冒出 v393/v396 双 alembic head，
