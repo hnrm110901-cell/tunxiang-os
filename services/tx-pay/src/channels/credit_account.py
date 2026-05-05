@@ -17,6 +17,7 @@ from typing import Optional
 
 import structlog
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     PaymentRequest,
@@ -97,6 +98,7 @@ class CreditAccountChannel(BasePaymentChannel):
         )
 
     async def query(self, payment_id: str, trade_no: Optional[str] = None) -> PaymentResult:
+        payment_channel_requests_total.labels(channel="credit_account", status="2xx").inc()
         return PaymentResult(
             payment_id=payment_id,
             status=PayStatus.SUCCESS,
@@ -113,6 +115,7 @@ class CreditAccountChannel(BasePaymentChannel):
     ) -> RefundResult:
         rid = refund_id or f"REFTAB{uuid.uuid4().hex[:10].upper()}"
         # 挂账退款 = 冲减应收账款，暂为 Mock
+        payment_channel_requests_total.labels(channel="credit_account", status="2xx").inc()
         return RefundResult(
             refund_id=rid,
             payment_id=payment_id,

@@ -49,6 +49,8 @@ class AlipayChannel(BasePaymentChannel):
         )
 
     async def query(self, payment_id: str, trade_no: Optional[str] = None) -> PaymentResult:
+        # PR #200 follow-up（verifier P1）：mock 也 inc，让告警分母真实统计
+        payment_channel_requests_total.labels(channel="alipay", status="2xx").inc()
         return PaymentResult(
             payment_id=payment_id,
             status=PayStatus.SUCCESS,
@@ -66,6 +68,7 @@ class AlipayChannel(BasePaymentChannel):
         refund_id: Optional[str] = None,
     ) -> RefundResult:
         rid = refund_id or f"REFALI{uuid.uuid4().hex[:10].upper()}"
+        payment_channel_requests_total.labels(channel="alipay", status="2xx").inc()
         return RefundResult(
             refund_id=rid,
             payment_id=payment_id,
