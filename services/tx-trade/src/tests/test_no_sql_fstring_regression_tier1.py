@@ -81,6 +81,69 @@ def test_p22_cleaned_files_stay_clean(rel_path: str) -> None:
         )
 
 
+# ──────────────── PK.1：tx-trade Tier 1 财务红线 baseline 守门 ────────────────
+#
+# tx-trade 是 Tier 1 财务红线域。当前 src/api + src/services + src/routers
+# 共 33 处 text(f) 拼接，PK.0 审计已分类：
+#   - 0 处真注入（已在 PK.0 修完 3 处 RLS f-string）
+#   - 33 处都是项目内白名单 conditions list / set_clauses 拼接
+#
+# baseline 锁定上限 33，**不允许新增**：
+#   - 新 PR 引入 text(f) → fail，强迫 reviewer 改用 :param + bindparams
+#   - 重构减少命中 → fail（baseline 锁定为精确数，迫使开发者下调 baseline）
+# 已存在的 33 处不强制立即清理（噪音改动 ROI 低），但守门冻结后续退化。
+
+
+def _count_text_fstring_in_dir(rel_dir: str) -> int:
+    """统计目录内所有 .py 的 text(f"...") 命中数（生产代码，排除 tests/）。"""
+    base = _REPO_ROOT / rel_dir
+    if not base.is_dir():
+        return 0
+    count = 0
+    for py in base.rglob("*.py"):
+        rel = py.relative_to(_REPO_ROOT).as_posix()
+        if "/tests/" in rel:
+            continue
+        try:
+            body = py.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for line in body.splitlines():
+            if _TEXT_FSTRING_PATTERN.search(line):
+                count += 1
+    return count
+
+
+# tx-trade 域 baseline：PK.0 审计后基线。下调请同步本数。
+_TX_TRADE_TEXT_FSTRING_BASELINE = 33
+
+
+def test_tx_trade_text_fstring_baseline_exact() -> None:
+    """tx-trade 域 text(f) 命中数必须等于 baseline（防退化 + 防漂移）。
+
+    - 命中数 > baseline：新 PR 引入 text(f)，请改用 :param + bindparams
+      参考 PK.0 set_config 模式（shared/ontology/src/database.py:25）
+    - 命中数 < baseline：清理工作已发生，请下调 _TX_TRADE_TEXT_FSTRING_BASELINE
+      锁定新基线（精确锁定迫使每次清理都被显式 review）
+
+    背景：PK.0 已修 3 处真注入（_set_rls f-string）；剩余 33 处都是
+    项目内 conditions list / set_clauses 拼接（白名单内字段名，零真注入风险）。
+    """
+    current = _count_text_fstring_in_dir("services/tx-trade/src")
+    if current > _TX_TRADE_TEXT_FSTRING_BASELINE:
+        pytest.fail(
+            f"tx-trade/src text(f) 命中数 {current} > baseline {_TX_TRADE_TEXT_FSTRING_BASELINE}\n"
+            "Tier 1 财务红线域引入新 text(f) f-string SQL — "
+            "请改用 :param 占位 + bindparams（参考 PK.0 set_config 模式）。\n"
+            "若确实必要（如新动态 WHERE 拼接 helper），更新 baseline 数并加注释说明。"
+        )
+    if current < _TX_TRADE_TEXT_FSTRING_BASELINE:
+        pytest.fail(
+            f"tx-trade/src text(f) 命中数 {current} < baseline {_TX_TRADE_TEXT_FSTRING_BASELINE}\n"
+            "已有清理工作，请下调 _TX_TRADE_TEXT_FSTRING_BASELINE 锁定新基线。"
+        )
+
+
 def test_apikeys_dir_strong_baseline() -> None:
     """shared/apikeys/src/ 整目录强基线 — 任何新增 .py 都不能引入 f-string SQL。"""
     apikeys = _REPO_ROOT / "shared" / "apikeys" / "src"
